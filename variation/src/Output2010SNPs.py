@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.5
+#!/sw/bin/python2.5
 """
 Usage: Output2010SNPs.py [OPTIONS] -o OUTPUT_FILE
 

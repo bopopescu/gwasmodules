@@ -33,6 +33,7 @@ import sys, getopt, traceback
 import phenotypeData, dataParsers
 
 from phenotypeData import *
+import math
 
 def _run_():
 	if len(sys.argv) == 1:
@@ -62,8 +63,8 @@ def _run_():
 	onlyPublishable = False
 	genotypeFile = None
 	help = 0
-	passwd = None
-	user=None
+	passwd = '*rri_bjarni@usc'
+	user='bvilhjal'
 	host="papaya.usc.edu"
 	
 	for opt, arg in opts:
@@ -124,7 +125,10 @@ def _run_():
 		passwd = getpass.getpass()
 
 		#Retrieve phenotype data.
-	phenData = getPhenotypes(host=host,user=user,passwd=passwd,onlyBinary=onlyBinary, onlyQuantitative=onlyQuantitative, onlyCategorical=onlyCategorical, onlyReplicates=onlyReplicates, includeSD=includeSD, rawPhenotypes=rawPhenotypes, onlyPublishable=onlyPublishable)
+	phenData = getPhenotypes(host=host,user=user,passwd=passwd,onlyBinary=onlyBinary, 
+				 onlyQuantitative=onlyQuantitative, onlyCategorical=onlyCategorical, 
+				 onlyReplicates=onlyReplicates, includeSD=includeSD, rawPhenotypes=rawPhenotypes, 
+				 onlyPublishable=onlyPublishable)
 
 	if phenotypeIDs:
 		print "Remoing phenotypes."
@@ -151,27 +155,30 @@ def _run_():
 		phenData.orderAccessions(associationMapping)
 			
 		#Output phenotypes to file.
-	phenData.writeToFile(output_fname, delimiter='\t')
+	phenData.writeToFile(output_fname, delimiter='\t',with_pid=True)
 
 
 #transformationMap = {210: (1,1), 211: (1,1), 212: (1,1), 213: (5,1), 214: (5,1), 215: (5,1)}
 #transformationMap = {253: (0,1), 254: (0,1), 255: (0,1), 256: (8,1), 257: (0,1), 258: (1,1), 259: (0,1)}
-transformationMap = {5: (9,1), 6: (9,1), 7: (9,1), 65: (6,1), 67: (6,1), 71: (6,1), 73: (6,1)}
+#transformationMap = {5: (9,1), 6: (9,1), 7: (9,1), 65: (6,1), 67: (6,1), 71: (6,1), 73: (6,1)}
 
-#transformationMap = {1: (1,1), 2: (1,1), 3: (1,1), 4: (1,1), 5: (1,1), 6: (1,1), 7: (1,1), 
-#					8: (0,1),
-#					9: (0,3), 10: (0,3), 11: (0,3), 12: (0,3), 13: (0,3),
-#					14: (0,1), 15: (0,1), 16: (1,1), 17: (0,1), 18: (0,1), 19: (0,1), 20: (0,1), 
-#					21: (0,1), 22: (1,1), 23: (0,1), 24: (1,1), 25: (0,1), 26: (0,1), 27: (0,1), 28: (1,1), 29: (0,1), 30: (1,1), 31: (1,1),
-#					32: (0,3), 33: (0,3), 34: (0,3), 35: (0,3), 36: (0,3), 37: (0,3), 38: (0,3),
-#					39: (1,1), 40: (1,1), 41: (1,1), 42: (1,1), 43: (1,1), 44: (1,1), 45: (1,1), 46: (1,1), 47: (1,1), 48: (7,1),
-#					57: (0,1), 58: (0,1), 59: (1,1), 60: (1,1), 61: (1,1), 62: (1,1), 
-#					63: (0,1), 64: (0,1), 65: (6,1), 66: (0,1), 67: (6,1), 68: (0,1), 69: (0,1), 70: (0,1), 71: (6,1), 72: (0,1), 73: (6,1), 74: (0,1), 75: (1,1), 76: (1,1), 
-#					77: (0,3), 78: (0,3), 79: (0,3), 
-#					80: (1,1), 81: (1,1), 82: (1,1), 
-#					158: (0,2), 159: (0,2), 160: (1,2), 161: (0,2), 162: (4,3), 163: (1,2), 164: (1,1), 165: (0,1), 166: (0,1), 167: (0,3), 168: (0,3), 169: (0,3), 170: (0,3), 
-#					171: (0,3), 172: (0,3), 173: (0,2), 174: (0,2), 175: (0,2), 176: (0,3), 177: (0,3), 178: (0,3), 179: (0,2), 180: (0,2), 181: (0,2), 182: (1,1), 
-#					183: (1,1), 184: (1,1), 185: (0,1), 186: (0,1)}
+transformationMap = {1: (1,1), 2: (1,1), 3: (1,1), 4: (1,1), 5: (1,1), 6: (1,1), 7: (1,1), 
+					8: (0,1),
+					9: (0,3), 10: (0,3), 11: (0,3), 12: (0,3), 13: (0,3),
+					14: (0,1), 15: (0,1), 16: (1,1), 17: (0,1), 18: (0,1), 19: (0,1), 20: (0,1), 
+					21: (0,1), 22: (1,1), 23: (0,1), 24: (1,1), 25: (0,1), 26: (0,1), 27: (0,1), 28: (1,1), 29: (0,1), 30: (1,1), 31: (1,1),
+					32: (0,3), 33: (0,3), 34: (0,3), 35: (0,3), #36: (0,3), 37: (0,3), 38: (0,3),
+					39: (1,1), 40: (1,1), 41: (1,1), 42: (1,1), 43: (1,1), 44: (1,1), 45: (1,1), 46: (1,1), 47: (1,1), 48: (1,1), #48: (7,1)
+					57: (0,1), 58: (0,1), 59: (1,1), 60: (1,1), 61: (1,1), 62: (1,1), 
+					63: (0,1), 64: (0,1), 65: (6,1), 66: (0,1), 67: (6,1), 68: (0,1), 69: (0,1), 70: (0,1), 71: (6,1), 72: (0,1), 73: (6,1), 74: (0,1), 75: (1,1), 76: (1,1), 
+					77: (0,3), 78: (0,3), 79: (0,3), 
+					80: (1,1), 81: (1,1), 82: (1,1), 
+					158: (0,2), 159: (0,2), 160: (1,2), 161: (0,2), 162: (4,3), 163: (1,2), 164: (1,1), 165: (0,1), 166: (0,1), 167: (0,3), 168: (0,3), 169: (0,3), 170: (0,3), 
+					171: (0,3), 172: (0,3), 173: (0,2), 174: (0,2), 175: (0,2), 176: (0,3), 177: (0,3), 178: (0,3), 179: (0,2), #180: (0,2), 181: (0,2), 
+					182: (1,1), 183: (1,1), 184: (1,1), 185: (0,1), 186: (0,1),
+					272: (0,1), 273: (0,1), 274: (0,1), 275: (1,1), 276: (1,1), 
+					277: (1,1), 278: (0,1), 279: (1,1), 280: (0,1), 281: (1,1), 282: (1,1), 283: (0,1),
+					}
 
 
 transformation2phenotype = {0: [8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 23, 25, 26, 27, 29, 32, 33, 34, 35, 36, 37, 
@@ -184,44 +191,46 @@ transformation2phenotype = {0: [8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21
 							7: [48]}
 
 
+{224:(0,1),225:(0,1),226:(1,1),227:(0,1),228:(1,1),229:(0,1),230:(1,1),231:(0,1),232:(1,1),233:(1,1),234:(1,1),235:(1,1),236:(0,1),237:(1,1),238:(1,1),239:(0,1),240:(1,1),241:(0,1),242:(1,1)}
+
 datatypeDict = {1:"quantitative",2:"ordered_categorical",3:"binary"}
-transformationTypes = {0:"None", 1:"Log(x)", 2:"Log(0.5+x)", 3:"Log(5+x)", 4:"(x-3)", 5:"Log(x) w. outlier cutoff = IQR*10", 6: "Log(SD/10+x)", 7:"Ranks", 8:"Log(-x-minVal+SD/10)", 9:"Log(x) w. 192 only"}
+transformationTypes = {0:"None", 1:"Log(SD/10+x-minVal)", 2:"Log(0.5+x)", 3:"Log(5+x)", 4:"(x-3)", 5:"Log(x) w. outlier cutoff = IQR*10", 6: "Log(SD/10+x-minVal)", 7:"Ranks", 8:"Log(-x-minVal+SD/10)", 9:"Log(x) w. 192 only"}
 
 
 def _fakeTransformPhenotypes_():
 	import os
 	res_dir = "/Network/Data/250k/tmp-bvilhjal/emma_results/"
-	phenotypeFile = "/Network/Data/250k/dataFreeze_011209/phenotypes_all_raw_012509.tsv"
+	phenotypeFile = "/Network/Data/250k/dataFreeze_011209/phenotypes_all_raw_042109.tsv"
 	phed = phenotypeData.readPhenotypeFile(phenotypeFile, delimiter = '\t')
 	for p_i in transformationMap: 
 		(trans_type,data_type) = transformationMap[p_i]
 		print trans_type
 		if trans_type==1 or trans_type==6:
-			t_type = "new_logTransform" #m"
+			t_type = "logTransform" #m"
 		elif trans_type==9 :
-			t_type = "new_logTransform_f192" #m"
+			t_type = "logTransform_f192" #m"
 		elif trans_type==5:
-			t_type = "newDataset_logTransform_noOutliers"
+			t_type = "logTransform_noOutliers"
 		elif trans_type==7:
-			t_type = "new_ranks"
+			t_type = "ranks"
 		elif trans_type==8:
 			t_type = "neg_const_logTransform"
 		else: #if trans_type==0:
-			t_type = "new_raw"
+			t_type = "raw"
 		phenName = phed.getPhenotypeName(p_i)
 #		oldName = res_dir+"Emma_"+t_type+"_"+phenName+".pvals"
-#		newName = res_dir+"Emma_new_trans_"+phenName+".pvals"
+#		newName = res_dir+"Emma_trans_"+phenName+".pvals"
 #		cp_command = "sudo cp "+oldName+" "+newName
 #		print cp_command
 #		os.system(cp_command)
-		oldName = res_dir+"Emma_"+t_type+"_"+phenName+".sr.pvals"
-		newName = res_dir+"Emma_new_trans_"+phenName+".sr.pvals"
+		oldName = res_dir+"Emma_"+t_type+"_"+phenName+".pvals"
+		newName = res_dir+"Emma_trans_"+phenName+".pvals"
 		cp_command = "sudo cp "+oldName+" "+newName
 		print cp_command
 		os.system(cp_command)
 
 
-def _transformPhenotypes_(phenotypeTransformations = {224:(0,1),225:(0,1),226:(1,1),227:(0,1),228:(1,1),229:(0,1),230:(1,1),231:(0,1),232:(1,1),233:(1,1),234:(1,1),235:(1,1),236:(0,1),237:(1,1),238:(1,1),239:(0,1),240:(1,1),241:(0,1),242:(1,1)}):
+def _transformPhenotypes_(phenotypeTransformations = transformationMap):
 	"""
 	Transforms phenotypes.  {phenotype_id: (type_transform,data_type)}
 	"""
@@ -266,6 +275,7 @@ def _transformPhenotypes_(phenotypeTransformations = {224:(0,1),225:(0,1),226:(1
 		sys.exit (1)
 	cursor = conn.cursor()
 	print "Inserting results into DB."
+	
 	for p_i in phenotypeTransformations: #range(0,len(phenData.phenotypeNames)):
 		i = phenData.getPhenIndex(p_i)
 		
@@ -273,20 +283,44 @@ def _transformPhenotypes_(phenotypeTransformations = {224:(0,1),225:(0,1),226:(1
 		if phenotypeTransformations[p_i][0]==5:
 			phenData.naOutliers(p_i)
 			
-		for j in range(0,len(phenData.accessions)):
-			transFormedValue = _transformValue_(phenData.phenotypeValues[j][i],phenotypeTransformations[p_i][0])
-			acc=phenData.accessions[j]
-			#Insert info
-			print phenData.phenotypeValues[j][i], transFormedValue, p_i, acc
-			sqlStatm = "UPDATE stock_250k.phenotype_avg SET transformed_value="+str(transFormedValue)+" WHERE ecotype_id="+acc+" and method_id="+str(p_i)+""
-			numRows = int(cursor.execute(sqlStatm))	
-			conn.commit()
+		if phenotypeTransformations[p_i][0]==6 or phenotypeTransformations[p_i][1]==1 and not phenData.isBinary(p_i) and phenData.getMinValue(p_i)<=0:
+			addConstant = math.sqrt(phenData.getVariance(p_i))/10
+			addConstant = addConstant - phenData.getMinValue(p_i)
+			
+			print "Adding a constant to phenotype, constant:",addConstant
+			phenData.addConstant(p_i,addConstant)
+			print phenData.accessions
+			for j in range(0,len(phenData.accessions)):
+				if phenData.phenotypeValues[j][i] == "NA": 
+					transFormedValue = "NULL"
+				else:
+					transFormedValue = phenData.phenotypeValues[j][i]
+				acc=phenData.accessions[j]
+				#Insert info
+				print phenData.phenotypeValues[j][i], transFormedValue, p_i, acc
+				sqlStatm = "UPDATE stock_250k.phenotype_avg SET transformed_value="+str(transFormedValue)+" WHERE ecotype_id="+acc+" and method_id="+str(p_i)+""
+				print sqlStatm
+				numRows = int(cursor.execute(sqlStatm))	
+				conn.commit()
+		else:			
+			for j in range(0,len(phenData.accessions)):
+				transFormedValue = _transformValue_(phenData.phenotypeValues[j][i],phenotypeTransformations[p_i][0])
+				acc=phenData.accessions[j]
+				#Insert info
+				print phenData.phenotypeValues[j][i], transFormedValue, p_i, acc
+				sqlStatm = "UPDATE stock_250k.phenotype_avg SET transformed_value="+str(transFormedValue)+" WHERE ecotype_id="+acc+" and method_id="+str(p_i)+""
+				numRows = int(cursor.execute(sqlStatm))	
+				conn.commit()
 			
 	for p_i in phenotypeTransformations:		
 		sqlStatm = "UPDATE stock_250k.phenotype_method SET data_type='"+datatypeDict[phenotypeTransformations[p_i][1]]+"' WHERE id="+str(p_i)+""
 		print sqlStatm
 		numRows = int(cursor.execute(sqlStatm))	
-		sqlStatm = "UPDATE stock_250k.phenotype_method SET transformation_description='"+transformationTypes[phenotypeTransformations[p_i][0]]+"' WHERE id="+str(p_i)+""
+		if phenotypeTransformations[p_i][1]==1 and not phenData.isBinary(p_i) and phenData.getMinValue(p_i)<=0:
+			transType = transformationTypes[6]
+		else:			
+			transType = transformationTypes[phenotypeTransformations[p_i][0]]
+		sqlStatm = "UPDATE stock_250k.phenotype_method SET transformation_description='"+transType+"' WHERE id="+str(p_i)+""
 		print sqlStatm
 		numRows = int(cursor.execute(sqlStatm))	
 		conn.commit()
@@ -317,12 +351,20 @@ def _transformValue_(value,transformType):
 
 
 def _test1_():
-	pass
+	phenotypeFile = "/Network/Data/250k/dataFreeze_011209/phenotypes_all_raw_042109.tsv"
+	phed = phenotypeData.readPhenotypeFile(phenotypeFile, delimiter='\t')
+	print "phenName, data_type, transformation_type"
+	for ctg in [1,2,3,4]:
+		phenIds = phenotypeData.categories_2_phenotypes[ctg]
+		for pi in phenIds:
+			phenName = phed.getPhenotypeName(pi)
+			(trans_type,data_type) = transformationMap[pi]
+			print str(phenName)+", "+str(datatypeDict[data_type])+", "+str(transformationTypes[trans_type])
 
 
 if __name__ == '__main__':
 	#_test1_()
 	#_transformPhenotypes_()
-	_fakeTransformPhenotypes_()
-	#_run_()
+	#_fakeTransformPhenotypes_()
+	_run_()
 

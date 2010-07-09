@@ -8,7 +8,6 @@ Option:
 	-d ..., --delim=...			default is ", "	  
 	-m ..., --missingval=...		default is "NA"
 	--phenotypeFileType=...	 		1 (default) if file has tsv format, 2 if file has csv format and contains accession names (instead of ecotype ID)
-	-a ..., --withArrayId=...   		1 for array ID info (default), 0 if file has no array ID info.
 	-h, --help				show this help
 	--parallel=...				Run KW on the cluster with standard parameters.  The arguement is used for runid 
 						as well as output files.  Note that if this option is used then no output file should be specified.
@@ -35,14 +34,17 @@ Option:
 	--sr							Perform a second run.
 	--srSkipFirstRun				Skip first run
 	--srInput=pvalFile 		       	Use given results as input. (use with srSkipFirstRun)
-	--srOutput=resultFile 		    SOutput new results in given file. 
+	--srOutput=resultFile 		        SOutput new results in given file. 
 	--srPar=topQuantile,windowSize	        Default topQuantile is 0.95, and windowSize = 20000 bases. 
+	
+	--memReq=...				Request memory (on cluster), 5g is default
+	--walltimeReq=...			Request time limit (on cluster), 100:00:00 (100 hours) is default
 
 Examples:
 	KW.py -o outputFile  250K.csv phenotypes.tsv phenotype_index 
 	
 Description:
-  Applies the Kruskal Wallis test to phenotypes, which are not binary.
+  Applies a faster KW test to phenotypes, which are not binary.
   Applies a Chi-square test to the phenotypes which are binary!
 
 """
@@ -59,7 +61,10 @@ import tempfile
 import plotResults 
 import SecondStageAnalysis
 import util
-from rpy import r
+#import rpy2
+#from rpy2.rpy_classic import r
+#from rpy2.robjects import r
+#from rpy import r
 import math
 import time
 import random
@@ -69,8 +74,10 @@ import analyzeHaplotype
 
 #import AddResults2DB
 
-resultDir="/home/cmb-01/bvilhjal/results/"
-scriptDir="/home/cmb-01/bvilhjal/Projects/Python-snps/"
+#resultDir="/home/cmb-01/bvilhjal/results/"
+resultDir = '/home/cmbpanfs-01/bvilhjal/results/'
+#scriptDir="/home/cmb-01/bvilhjal/Projects/Python-snps/"
+scriptDir="/home/cmbpanfs-01/bvilhjal/src/"
 
 
 def _run_():
@@ -78,14 +85,15 @@ def _run_():
 		print __doc__
 		sys.exit(2)
 	
-	long_options_list=["outputFile=", "delim=", "missingval=", "withArrayId=", "phenotypeFileType=", 
+	long_options_list=["outputFile=", "delim=", "missingval=", "phenotypeFileType=", 
 					"help", "parallel=", "parallelAll", "addToDB", 
 					"callMethodID=", "comment=", "onlyOriginal192","onlyOriginal96", "subSample=" , 
 					"subSampleLikePhenotype=", "subsampleTest=", "complement", "onlyBelowLatidue=", 
 					"onlyAboveLatidue=", "srInput=", "sr","srOutput=", "srPar=","srSkipFirstRun",
-					"permTest=", "savePermutations", "permutationFilter=", "testRobustness"]
+					"permTest=", "savePermutations", "permutationFilter=", "testRobustness",
+					"memReq=","walltimeReq=",]
 	try:
-		opts, args=getopt.getopt(sys.argv[1:], "o:c:d:m:a:h", long_options_list)
+		opts, args=getopt.getopt(sys.argv[1:], "o:c:d:m:h", long_options_list)
 
 	except:
 		traceback.print_exc()
@@ -94,12 +102,11 @@ def _run_():
 		sys.exit(2)
 	
 	
-		phenotypeFileType=1
-		outputFile=None
+	phenotypeFileType=1
+	outputFile=None
 	delim=","
 	missingVal="NA"
 	help=0
-	withArrayIds=1
 	parallel=None
 	parallelAll=False
 	addToDB=False
@@ -128,12 +135,13 @@ def _run_():
 	
 	testRobustness = False
 
+	memReq = "5g"
+	walltimeReq = "100:00:00"
+
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
 			help=1
 			print __doc__
-		elif opt in ("-a", "--withArrayId"):
-			withArrayIds=int(arg)
 		elif opt in ("-o", "--outputFile"):
 			outputFile=arg
 		elif opt in ("--phenotypeFileType"):
@@ -191,6 +199,10 @@ def _run_():
 			vals = arg.split(",")
 			srTopQuantile = float(vals[0]) 
 			srWindowSize = int(vals[1]) 
+		elif opt in ("--memReq"):
+			memReq=arg
+		elif opt in ("--walltimeReq"):
+			walltimeReq=arg
 		else:
 			if help==0:
 				print "Unkown option!!\n"
@@ -215,6 +227,7 @@ def _run_():
 	print "onlyOriginal192:",onlyOriginal192
 	print "onlyBelowLatidue:",onlyBelowLatidue
 	print "onlyAboveLatidue:",onlyAboveLatidue
+	print "complement:",complement
 	print "subSampleLikePhenotype:",subSampleLikePhenotype
 	print "subsampleTest:",subsampleTest
 	print "numSubSamples:",numSubSamples
@@ -229,27 +242,25 @@ def _run_():
 	print "savePermutations:",savePermutations
 	print "permutationFilter:",permutationFilter
 	print "testRobustness:",testRobustness
-	
+	print "walltimeReq:",walltimeReq
+	print "memReq:",memReq
 
 	def runParallel(phenotypeIndex,id=""):
 		#Cluster specific parameters
 		phed=phenotypeData.readPhenotypeFile(phenotypeDataFile, delimiter = '\t')  #Get Phenotype data 
 		phenName=phed.getPhenotypeName(phenotypeIndex)
-		phenName=phenName.replace("/", "_div_")
-		phenName=phenName.replace("*", "_star_")
+		print phenName
 		outputFile=resultDir+"KW_"+parallel+"_"+phenName+id
 
-		shstr="""#!/bin/csh
-#PBS -l walltime=100:00:00
-#PBS -l mem=4g 
-#PBS -q cmb
-"""
+		shstr = "#!/bin/csh\n"
+		shstr += "#PBS -l walltime="+walltimeReq+"\n"
+		shstr += "#PBS -l mem="+memReq+"\n"
+		shstr +="#PBS -q cmb\n"
 		
 		shstr+="#PBS -N K"+phenName+"_"+parallel+"\n"
 		shstr+="set phenotypeName="+parallel+"\n"
 		shstr+="set phenotype="+str(phenotypeIndex)+"\n"
 		shstr+="(python "+scriptDir+"KW.py -o "+outputFile+" "
-		shstr+=" -a "+str(withArrayIds)+" "			
 		if subSample:
 			shstr+=" --subSample="+str(subSample)+" "			
 		elif onlyOriginal96:
@@ -401,7 +412,7 @@ def _run_():
 	
 	
 	#Load genotype file
-	snpsds=dataParsers.parseCSVData(snpsDataFile, format = 1, deliminator = delim, missingVal = missingVal, withArrayIds = withArrayIds)
+	snpsds=dataParsers.parseCSVData(snpsDataFile, format = 1, deliminator = delim, missingVal = missingVal)
 
 
 	#Checking overlap between phenotype and genotype accessions. 
@@ -500,44 +511,29 @@ def _run_():
 	print "sr:",sr, ", srSkipFirstRun:",srSkipFirstRun
 	if (not sr) or (sr and not srSkipFirstRun):
 		#Writing files
-		if env.user=="bjarni":
-			tempfile.tempdir='/tmp'
-		(fId, phenotypeTempFile)=tempfile.mkstemp()
-		os.close(fId)
-		(fId, genotypeTempFile)=tempfile.mkstemp()
-		os.close(fId)
-		
-		phed.writeToFile(phenotypeTempFile, [phenotype])	
-		sys.stdout.write("Phenotype file written\n")
-		sys.stdout.flush()
-		snpsDataset=snpsdata.SNPsDataSet(newSnpsds, [1, 2, 3, 4, 5])
-		decoder={1:1, 0:0,-1:'NA'}	
-		snpsDataset.writeToFile(genotypeTempFile, deliminator = delim, missingVal = missingVal, withArrayIds = 0, decoder = decoder)
-		sys.stdout.write("Genotype file written\n")
-		sys.stdout.flush()
-	
+		#phed and phenotype
+		sd=snpsdata.SNPsDataSet(newSnpsds, [1, 2, 3, 4, 5])
 		phenotypeName=phed.getPhenotypeName(phenotypeIndex)
-	
-		rDataFile=outputFile+".rData"
+		
+		if phed.isBinary(phenotypeIndex):
+			pvals = run_fet(sd.getSnps(),phed.getPhenVals(phenotypeIndex))	
+		else:
+			snps = sd.getSnps()
+			phen_vals = phed.getPhenVals(phenotypeIndex)
+			try:
+				kw_res = util.kruskal_wallis(snps,phen_vals)
+				pvals = kw_res['ps']
+			except:
+				print snps
+				print phen_vals
+				print len(snps),len(snps[0]),len(phen_vals)
+				raise Exception
+							
+		res = gwaResults.Result(scores = pvals,name="KW_"+phenotypeName, snpsds=newSnpsds, load_snps=False)
 		pvalFile=outputFile+".pvals"
-		#Is the phenotype binary?
-		binary=phed.isBinary(phenotypeIndex)
-		rstr=_generateRScript_(genotypeTempFile, phenotypeTempFile, rDataFile, pvalFile, name = phenotypeName, binary = binary)
-		rFileName=outputFile+".r"
-		f=open(rFileName, 'w')
-		f.write(rstr)
-		f.close()
-		outRfile=rFileName+".out"
-		errRfile=rFileName+".err"
-		print "Running R file:"
-		cmdStr="(R --vanilla < "+rFileName+" > "+outRfile+") >& "+errRfile
-		sys.stdout.write(cmdStr+"\n")
-		sys.stdout.flush()	
-		gc.collect() 
-		os.system(cmdStr)
-		#print "Emma output saved in R format in", rDataFile
+		res.writeToFile(pvalFile)
+
 		print "Generating a GW plot."
-		res = gwaResults.Result(pvalFile,name="KW_"+phenotypeName, phenotypeID=phenotypeIndex)
 		res.negLogTransform()
 		pngFile = pvalFile+".png"
 		plotResults.plotResult(res,pngFile=pngFile,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", plotBonferroni=True,usePylab=False)	
@@ -556,125 +552,34 @@ def _run_():
 		srRes.negLogTransform()
 		srPngFile = pvalFile+".sr.png"
 		plotResults.plotResultWithSecondRun(res,srRes,pngFile=srPngFile,ylab="$-$log$_{10}(p)$", plotBonferroni=True)	
-	
-	
-def _generateRScript_(genotypeFile, phenotypeFile, rDataFile, pvalFile, name = None, binary = False, chiSquare = False):
-	
-	rstr='data250K <- read.csv("'+str(genotypeFile)+'", header=TRUE);\n'
-	rstr+='phenotData <- read.csv("'+str(phenotypeFile)+'",header=TRUE);\n'
-	rstr+="""
-phenMat <- t(as.matrix(as.matrix(phenotData)[,2]));
-res <- list();
-pvals <- c();
-positions <- c();
-chrs <- c();
-maf <- c();
-marf <- c();
-for (chr in (1:5)){
-  mat250K <- as.matrix(data250K);
-  mat250K <- mat250K[mat250K[,1]==chr,];
-  pos <- mat250K[,2];
-  mat250K <- mat250K[,3:length(mat250K[1,])];
-  res[[chr]] <- list();
-  res[[chr]][["ps"]] <- c();
-  res[[chr]][["stat"]] <- c();
-  for (j in (1:length(mat250K[,1]))){
-"""
-	if binary: 
-		if chiSquare:
-			rstr+="	v <- chisq.test(as.vector(phenMat),as.vector(mat250K[j,]));"
-			rstr+="""
-	res[[chr]]$ps[j] <- as.double(v$p.value);
-	res[[chr]]$stat[j] <- as.double(v[1]);		
-"""
-		else:
-			rstr+="	v <- fisher.test(as.vector(phenMat),as.vector(mat250K[j,]));"			
-			rstr+="""
-	res[[chr]]$ps[j] <- as.double(v$p.value);
-	res[[chr]]$stat[j] <- as.double(v$p.value);		
-"""
+		
 
-	else:
-		rstr+="	v <- kruskal.test(as.vector(phenMat),as.vector(mat250K[j,]));"
-		rstr+="""
-	res[[chr]]$ps[j] <- as.double(v$p.value);
-	res[[chr]]$stat[j] <- as.double(v[1]);		
-"""
-	rstr+="""
-  }  
-  res[[chr]][["pos"]] <- pos;
-  res[[chr]][["chr_pos"]] <- pos;
-
-  pvals <- append(pvals,res[[chr]]$ps);
-  positions <- append(positions,pos);
-  chrs <- append(chrs,rep(chr,length(pos)));
-
-  af <- c();
-  arf <- c();
-  for(i in (1:length(mat250K[,1]))){
-	f = factor(mat250K[i,]);
-	freq <- summary(f)[[1]]
-	alleleCount <- length(f)
-	v <- freq/alleleCount;
-	af[i] <- min(freq,alleleCount-freq);
-	arf[i] <- min(v,1-v);
-  }
-  res[[chr]][["maf"]] <- af;
-  res[[chr]][["marf"]] <- arf;
-
-  marf <- append(marf,arf);
-  maf <- append(maf,af);
-}
-
-#write to a pvalue-file
-l <- list();
-l[["Chromasome"]]<-chrs;
-l[["Positions"]]<-positions;
-l[["Pvalues"]]<-pvals;
-l[["MARF"]]<-marf;
-l[["MAF"]]<-maf;
-dl <- as.data.frame(l)
-"""
-	rstr+='write.table(dl,file="'+pvalFile+'", sep=", ", row.names = FALSE);\n'		
-	rstr+="""
-#Save data as R object.
-res[[2]]$pos <- res[[2]]$pos+res[[1]]$pos[length(res[[1]]$pos)];
-res[[3]]$pos <- res[[3]]$pos+res[[2]]$pos[length(res[[2]]$pos)];
-res[[4]]$pos <- res[[4]]$pos+res[[3]]$pos[length(res[[3]]$pos)];
-res[[5]]$pos <- res[[5]]$pos+res[[4]]$pos[length(res[[4]]$pos)];
-
-res[["ylim"]] <- c(min(min(-log(res[[1]]$ps)),min(-log(res[[2]]$ps)),min(-log(res[[3]]$ps)),min(-log(res[[4]]$ps)),min(-log(res[[5]]$ps))), max(max(-log(res[[1]]$ps)),max(-log(res[[2]]$ps)),max(-log(res[[3]]$ps)),max(-log(res[[4]]$ps)),max(-log(res[[5]]$ps))));
-
-res[["xlim"]] <- c(min(res[[1]]$pos),max(res[[5]]$pos));
-
-res[["FRI"]]<-c(269026+res[[3]]$pos[length(res[[3]]$pos)],271503+res[[3]]$pos[length(res[[3]]$pos)]);
-res[["FLC"]]<-c(3173498+res[[4]]$pos[length(res[[4]]$pos)],3179449+res[[4]]$pos[length(res[[4]]$pos)]);
-
-
-"""
-	if name:
-		if binary:
-			if chiSquare:
-				rstr+='res[["lab"]]= "Chi-Square p-values for '+name+'";\n'
-			else:
-				rstr+='res[["lab"]]= "Fisher p-values for '+name+'";\n'
-		else:
-			rstr+='res[["lab"]]= "Kruskal Wallis p-values for '+name+'";\n'
-	else:
-		rstr+='res[["lab"]]="";\n'
-	rstr+='save(file="'+rDataFile+'",res);\n'
-	return rstr	
-	
-
-def run_kw(snps,phenotypeValues,verbose=False):
-	print "Running KW on",len(snps),"snps, and",len(phenotypeValues),"phenotype values."
+def run_kw(snpsd,phend,phen_i,chromosome,with_missing_vals=True):
 	pvals = []
-	for snp in snps:
-		res = r.kruskal_test(phenotypeValues,snp)
-		#print snp,res,phenotypeValues
-		#pdb.set_trace()
-		pvals.append(res["p.value"])
-	return pvals
+	print "Running KW on",len(snpsd.snps),"snps."
+	if with_missing_vals: 
+		snpsd_indices = []
+		for i in range(len(snpsd.snps)):			
+			(snp,phen_vals) = snpsd.get_snp_phen_pair(i,phend,phen_i,missingVal='NA')
+#			print "Phen NA count:",phen_vals.count("NA")
+#			print "SNP NA count:",snp.count("NA")
+#			print "Running KW on",len(phen_vals),"phenotype values."
+			if len(set(snp))>1 and len(set(phen_vals))>1:
+				res = util.kruskal_wallis([snp],phen_vals)
+				pvals.append(res["ps"][0])
+				snpsd_indices.append(i)
+			else:
+				pvals.append(1)
+		#snpsd.filter_snp_indices(snpsd_indices)
+	else:
+		res = util.kruskal_wallis(snpsd.snps,phen_vals)
+		pvals = res["ps"]
+
+	#print pvals
+	gwas_result = gwaResults.Result(snpsds=[snpsd],name="KW_"+str(phen_i),phenotypeID=phen_i,scores=pvals,chromosomes=[chromosome]) 
+	#gwas_result = gwaResults.Result(name="KW_"+str(phen_i),phenotypeID=phen_i,scores=pvals,chromosomes=[chromosome]) 
+	#return {'ps':pvals,'positions':positions,'snpsd_indices':snpsd_indices}
+	return gwas_result, snpsd
 
 	
 def run_fet(snps,phenotypeValues,verbose=False):
@@ -881,7 +786,7 @@ def _perm_test_(all_snps,phenVals,numPerm,outputFile,filter=0.1,test_type = "KW"
 			f.write(",".join(pvals_str)+"\n")
 		print "Done writing to",permOutputFile
 	
-	f.close()
+		f.close()
 
 
 	#Output results

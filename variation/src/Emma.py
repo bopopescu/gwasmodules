@@ -14,12 +14,11 @@ Option:
 	--negate				Negates the values
 	--kinshipDatafile=			Datafile which is used to calculate the kinship matrix.		(default is the same as the given genotype file)
 	--BoundaryStart=...			Only the region within the boundary is considered in the GWA. (Default is no boundaries)
+	--BoundaryEnd=...		   
 	--phenotypeRanks			Use ranked phenotype values as the phenotype values.  (Invariant of transformation)
 	--minMAF=...				Remove all SNPs which have MAF smaller than the given argument.  (0.0 is set as default).
 	--LRT					Use ML and LRT instead of REML and a t-test.
-	--BoundaryEnd=...		   
 	--phenotypeFileType=...			1 (default) if file has tsv format, 2 if file has csv format and contains accession names (instead of ecotype ID)
-	-a ..., --withArrayId=...		1 for array ID info (default), 0 if file has no array ID info.
 	-h, --help				show this help
 	--parallel=...				Run Emma on the cluster with standard parameters.  The arguement is used for runid as well as output files.  
 	--parallelAll				Run Emma on all phenotypes.
@@ -41,6 +40,16 @@ Option:
 	--srInput=pvalFile 		       	Use given results as input. (use with srSkipFirstRun)
 	--srOutput=resultFile 		    SOutput new results in given file. 
 	--srPar=topQuantile,windowSize	        Default topQuantile is 0.95, and windowSize = 30000 bases. 
+	
+	
+	--useLinearRegress			Use linear regression instead of KW.
+	--regressionCofactors=...		Include a pickled dictionary containing factors.
+	--FriLerAsCofactor
+	--FriColAsCofactor
+
+	--memReq=...				Request memory (on cluster), 5g is default
+	--walltimeReq=...			Request time limit (on cluster), 100:00:00 (100 hours) is default
+
 Examples:
 	Emma.py -o emma_result.r  250K.csv phenotypes.tsv phenotype_index 
 	
@@ -49,18 +58,9 @@ Description:
 """
 
 import sys, getopt, traceback
-import os, env
-import phenotypeData
-import plotResults 	
-import tempfile
-import gwaResults
-import SecondStageAnalysis
-import dataParsers
-import snpsdata
-import math
-import time
-import numpy
-import util
+import os, env, phenotypeData, plotResults, tempfile
+import gwaResults, SecondStageAnalysis, dataParsers, snpsdata 
+import math, time, numpy, util
 
 #Not neccessary if using script based emma.
 from numpy import *
@@ -73,7 +73,9 @@ def calcKinship(snps):
 	"""
 	a = array(snps)
 	#r.library("emma")
-	r.source("emma.R")
+	print r.source("emma.R")
+	print a
+	#print r.emma_kinship(a)
 	return r.emma_kinship(a)
 
 
@@ -90,6 +92,79 @@ def runEmma(phed,p_i,k,snps):
 	res = r.emma_REML_t(phenArray,snpsArray,k)
 	#print res
 	return res
+
+def run_emma_w_missing_data(snpsd,phed,p_i,chromosome,k,missing_val='NA'):
+	"""
+	Runs Emma w. missing data.
+	"""
+	#Assume that the accessions are ordered.
+	snps = snpsd.snps
+	r.source("emma.R")
+	phen_vals = phed.getPhenVals(p_i,noNAs=False)
+	if phen_vals.count('NA'):
+		print "Coordinating SNPs and phenotypes, removing %d accessions which were missing phenotypic values." % phen_vals.count('NA')
+		ai_to_keep = [i for i in range(len(phen_vals)) if phen_vals[i]!='NA']
+		#print ai_to_keep
+		new_snps = []
+		for snp in snps:
+			new_snps.append([snp[i] for i in ai_to_keep])
+		snps = new_snps
+		#print snps[0]
+		phen_vals = [phen_vals[i] for i in ai_to_keep]
+		#print phen_vals
+		new_k = zeros((len(ai_to_keep),len(ai_to_keep)))
+		for j1 in range(len(ai_to_keep)):
+			for j2 in range(len(ai_to_keep)):
+				new_k[j1,j2]=k[ai_to_keep[j1],ai_to_keep[j2]]
+		k = new_k
+		 
+	p_vals = []
+	for snp in snps:
+		
+		if snp.count(missing_val):
+			acc_to_keep = []
+			new_snp = []
+			for j, nt in enumerate(snp):
+				if not nt == missing_val:
+					acc_to_keep.append(j)
+					new_snp.append(nt)
+			new_k = zeros((len(acc_to_keep),len(acc_to_keep)))
+			new_phen_vals = []
+			for j1 in range(len(acc_to_keep)):
+				for j2 in range(len(acc_to_keep)):
+					new_k[j1,j2]=k[acc_to_keep[j1],acc_to_keep[j2]]
+				new_phen_vals.append(phen_vals[acc_to_keep[j1]])
+			
+			if len(set(snp))==1:
+				p_vals.append(1)
+				print phenArray
+				print snpsArray
+				print new_k 
+			else:
+				phenArray = array([new_phen_vals])
+				snpsArray = array([new_snp])
+				#print "Running EMMA w. missing data."
+				try:
+					p_vals.extend(r.emma_REML_t(phenArray,snpsArray,new_k)['ps'])
+				except Exception, err_str:
+					print err_str
+					print phenArray
+					print snpsArray
+					print new_k 
+			  
+		else:
+			phenArray = array([phen_vals])
+			snpsArray = array([snp])
+			#print "Running EMMA w.o. missing data."
+			try:
+				p_vals.extend(r.emma_REML_t(phenArray,snpsArray,k)['ps'])
+			except Exception, err_str:
+				print err_str
+				print phenArray
+				print snpsArray
+				print k 
+	gwas_result = gwaResults.Result(snpsds=[snpsd],name="Emma_"+phed.getPhenotypeName(p_i),phenotypeID=p_i,scores=p_vals,chromosomes=[chromosome]) 
+	return gwas_result
 
 
 def _runEmma_(snps,phenValues,k):
@@ -120,8 +195,10 @@ def _sampleSNPs_(snps,n,withReplacement=False):
 
 
 #For cluster use only!
-emmadir = '/home/cmb-01/bvilhjal/Projects/Python-snps/'
-resultDir = '/home/cmb-01/bvilhjal/results/'
+#emmadir = '/home/cmb-01/bvilhjal/Projects/Python-snps/'
+emmadir = '/home/cmbpanfs-01/bvilhjal/src/'
+#resultDir = '/home/cmb-01/bvilhjal/results/'
+resultDir = '/home/cmbpanfs-01/bvilhjal/results/'
 
 
 
@@ -131,13 +208,14 @@ def _run_():
 		print __doc__
 		sys.exit(2)
 	
-	long_options_list = ["rFile=","chr=", "delim=", "missingval=", "withArrayId=", "BoundaryStart=", "removeOutliers=", "addConstant=",
-						"logTransform", "BoundaryEnd=", "phenotypeFileType=", "help", "parallel=", "parallelAll", "LRT", "minMAF=", 
-						"kinshipDatafile=", "phenotypeRanks", "onlyMissing","onlyOriginal96", "onlyOriginal192", "onlyBelowLatidue=", 
-						"complement", "negate", "srInput=", "sr","srOutput=", "srPar=","srSkipFirstRun", "testRobustness",
-						"permutationFilter="]
+	long_options_list = ["rFile=","chr=", "delim=", "missingval=", "BoundaryStart=", "removeOutliers=", "addConstant=",
+			"logTransform", "BoundaryEnd=", "phenotypeFileType=", "help", "parallel=", "parallelAll", "LRT", "minMAF=", 
+			"kinshipDatafile=", "phenotypeRanks", "onlyMissing","onlyOriginal96", "onlyOriginal192", "onlyBelowLatidue=", 
+			"complement", "negate", "srInput=", "sr","srOutput=", "srPar=","srSkipFirstRun", "testRobustness",
+			"permutationFilter=","useLinearRegress", "regressionCofactors=", "FriLerAsCofactor","FriColAsCofactor",
+			"memReq=","walltimeReq=",]
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "o:c:d:m:a:h", long_options_list)
+		opts, args = getopt.getopt(sys.argv[1:], "o:c:d:m:h", long_options_list)
 
 	except:
 		traceback.print_exc()
@@ -154,7 +232,6 @@ def _run_():
 	missingVal = "NA"
 	help = 0
 	minMAF=0.0
-	withArrayIds = 1
 	boundaries = [-1,-1]
 	chr=None
 	parallel = None
@@ -179,12 +256,18 @@ def _run_():
 	testRobustness = False
 	permutationFilter = 0.002
 
+	useLinearRegress=False
+	regressionCofactors=None
+	FriLerAsCofactor = False
+	FriColAsCofactor = False
+
+	memReq = "5g"
+	walltimeReq = "150:00:00"
+
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
 			help = 1
 			print __doc__
-		elif opt in ("-a","--withArrayId"):
-			withArrayIds = int(arg)
 		elif opt in ("-o","--rFile"):
 			rFile = arg
 		elif opt in ("--phenotypeFileType"):
@@ -245,6 +328,18 @@ def _run_():
 			testRobustness = True
 		elif opt in ("--permutationFilter"):
 			permutationFilter = float(arg)
+		elif opt in ("--FriLerAsCofactor"):
+			FriLerAsCofactor=True
+		elif opt in ("--FriColAsCofactor"):
+			FriColAsCofactor=True
+		elif opt in ("--useLinearRegress"): 
+			useLinearRegress=True
+		elif opt in ("--regressionCofactors"):
+			regressionCofactors=arg
+		elif opt in ("--memReq"):
+			memReq=arg
+		elif opt in ("--walltimeReq"):
+			walltimeReq=arg
 		else:
 			if help==0:
 				print "Unkown option!!\n"
@@ -260,7 +355,6 @@ def _run_():
 	print "Emma is being set up with the following parameters:"
 	print "output:",rFile
 	print "phenotypeRanks:",phenotypeRanks
-	print "withArrayId:",withArrayIds
 	print "phenotypeFileType:",phenotypeFileType
 	print "parallel:",parallel
 	print "parallelAll:",parallelAll
@@ -288,7 +382,12 @@ def _run_():
 	print "srWindowSize:",srWindowSize
 	print "testRobustness:",testRobustness
 	print "permutationFilter:",permutationFilter
-
+	print "useLinearRegress:",useLinearRegress
+	print "regressionCofactors:",regressionCofactors
+	print "FriLerAsCofactor:",FriLerAsCofactor
+	print "FriColAsCofactor:",FriColAsCofactor
+	print "walltimeReq:",walltimeReq
+	print "memReq:",memReq
 
 	def runParallel(phenotypeIndex,phed):
 		#Cluster specific parameters
@@ -296,16 +395,26 @@ def _run_():
 		phenName = phed.getPhenotypeName(phenotypeIndex)
 		outFileName = resultDir+"Emma_"+parallel+"_"+phenName
 
-		shstr = """#!/bin/csh
-#PBS -l walltime=100:00:00
-#PBS -l mem=8g 
-#PBS -q cmb
-"""
+		shstr = "#!/bin/csh\n"
+		shstr += "#PBS -l walltime="+walltimeReq+"\n"
+		shstr += "#PBS -l mem="+memReq+"\n"
+		shstr +="#PBS -q cmb\n"
 
 		shstr += "#PBS -N E"+phenName+"_"+parallel+"\n"
 		shstr += "set phenotypeName="+parallel+"\n"
 		shstr += "set phenotype="+str(phenotypeIndex)+"\n"
+		if useLinearRegress:
+			outFileName = resultDir+"LR_"+parallel+"_"+phenName
 		shstr += "(python "+emmadir+"Emma.py -o "+outFileName+" "
+		if useLinearRegress:
+			shstr+=" --useLinearRegress "
+
+		if regressionCofactors:
+			shstr+=" --regressionCofactors="+str(regressionCofactors)+" "			
+		if FriLerAsCofactor:
+			shstr+=" --FriLerAsCofactor "			
+		if FriColAsCofactor:
+			shstr+=" --FriColAsCofactor "			
 		if onlyOriginal96:
 			shstr+=" --onlyOriginal96 "			
 		elif onlyOriginal192:
@@ -337,7 +446,6 @@ def _run_():
 				shstr += " --srSkipFirstRun "				
 			shstr += " --srPar="+str(srTopQuantile)+","+str(srWindowSize)+" "
 			
-		shstr += " -a "+str(withArrayIds)+" "			
 		if kinshipDatafile:
 			shstr += " --kinshipDatafile="+str(kinshipDatafile)+" "			
 		shstr += " --addConstant="+str(addConstant)+" "			
@@ -399,7 +507,7 @@ def _run_():
 
 
 
-	snpsds = dataParsers.parseCSVData(snpsDataFile, format=1, deliminator=delim, missingVal=missingVal, withArrayIds=withArrayIds)
+	snpsds = dataParsers.parseCSVData(snpsDataFile, format=1, deliminator=delim, missingVal=missingVal)
 
 	#Load phenotype file
 	phed = phenotypeData.readPhenotypeFile(phenotypeDataFile, delimiter='\t')  #Get Phenotype data 
@@ -538,7 +646,7 @@ def _run_():
 	print "Checking kinshipfile:",kinshipDatafile
 	
 	if kinshipDatafile:  #Is there a special kinship file?
-		kinshipSnpsds = dataParsers.parseCSVData(kinshipDatafile, format=1, deliminator=delim, missingVal=missingVal, withArrayIds=withArrayIds)
+		kinshipSnpsds = dataParsers.parseCSVData(kinshipDatafile, format=1, deliminator=delim, missingVal=missingVal)
 
 		accIndicesToKeep = []			
 		#Checking which accessions to keep and which to remove (genotype data).
@@ -606,6 +714,9 @@ def _run_():
 	if negate: 
 		phed.negateValues(phenotypeIndex)
 
+	if logTransform and not phed.isBinary(phenotypeIndex) and phed.getMinValue(phenotypeIndex)<=0:
+		addConstant=0
+
 	#Adding a constant.
 	if addConstant!=-1:
 		if addConstant==0:
@@ -646,7 +757,96 @@ def _run_():
 		_robustness_test_(allSNPs,phenVals,rFile,filter=permutationFilter)
 		sys.exit(0)
 
-	if (not sr) or (sr and not srSkipFirstRun):
+	if useLinearRegress:
+		phenVals = phed.getPhenVals(phenotypeIndex)
+		d0 = {}
+		d0["phen"]=phenVals
+		dh = {}
+		dh["phen"]=phenVals
+		import rpy, gc
+		if regressionCofactors: #Adds ler and col as cofactors
+			import pickle
+			f = open(regressionCofactors,"r")
+			co_factors = pickle.load(f)
+			f.close()
+			#inserting co factors into model
+			for factor in co_factors:
+				d[factor] = co_factors[factor]
+		import analyzeHaplotype as ah
+		(ler_factor, col_factor) = ah.getLerAndColAccessions(newSnpsds,True)
+		if FriColAsCofactor:
+			d0["col"] = col_factor
+			dh["col"] = col_factor
+		if FriLerAsCofactor:
+			d0["ler"] = ler_factor
+			dh["ler"] = ler_factor
+		chr_pos_pvals = []
+		stats = []
+		sys.stdout.write("Applying the linear model")
+		sys.stdout.flush()
+		for i in range(0,len(newSnpsds)): #[3]:#
+			snpsd=newSnpsds[i] 
+			sys.stdout.write("|")
+			sys.stdout.flush()
+			gc.collect()  #Calling garbage collector, in an attempt to clean up memory..
+			for j in range(0,len(snpsd.snps)):
+				if j%5000==0:
+					sys.stdout.write(".")
+					sys.stdout.flush()
+				#if snpsd.positions[j]>1700000:
+				#	break
+				snp = snpsd.snps[j]
+				d0["snp"]=snp
+				try:
+					rpy.set_default_mode(rpy.NO_CONVERSION)
+					aov0 = rpy.r.aov(r("phen ~ ."), data = d0)
+					aovh = rpy.r.aov(r("phen ~ ."), data = dh)
+					rpy.set_default_mode(rpy.BASIC_CONVERSION)
+					s0 = rpy.r.summary(aov0)
+					sh = rpy.r.summary(aovh)
+					#print s0,sh
+					rss_0 = s0['Sum Sq'][-1]
+					if type(sh['Sum Sq'])!=float:
+						rss_h = sh['Sum Sq'][-1]
+						
+					else:
+						rss_h = sh['Sum Sq']
+					f = (rss_h-rss_0)/(rss_0/(len(phenVals)-len(d0)+1))
+					pval = rpy.r.pf(f,1, len(phenVals), lower_tail = False)
+				except Exception, err_str:
+					print "Calculating p-value failed"#,err_str
+					pval =1.0
+				#print "dh:",dh
+				#print "d0:",d0
+				#print "rss_h,rss_0:",rss_h,rss_0
+				#print "f,p:",f,pval
+				chr_pos_pvals.append([i+1,snpsd.positions[j],pval])
+				mafc = min(snp.count(snp[0]),len(snp)-snp.count(snp[0]))
+				maf = mafc/float(len(snp))
+				stats.append([maf,mafc])
+		sys.stdout.write("\n")
+		#Write out to a result file
+		sys.stdout.write("Writing results to file\n")
+		sys.stdout.flush()
+		pvalFile = rFile+".pvals"
+		f = open(pvalFile,"w")
+		f.write("Chromosome,position,p-value,marf,maf\n")
+		for i in range(0,len(chr_pos_pvals)):
+			chr_pos_pval = chr_pos_pvals[i]
+			stat = stats[i]
+			f.write(str(chr_pos_pval[0])+","+str(chr_pos_pval[1])+","+str(chr_pos_pval[2])+","+str(stat[0])+","+str(stat[1])+"\n")		
+		f.close()
+		
+		#Plot results
+		print "Generating a GW plot."
+		phenotypeName=phed.getPhenotypeName(phenotypeIndex)
+		res = gwaResults.Result(pvalFile,name="LM_"+phenotypeName, phenotypeID=phenotypeIndex)
+		res.negLogTransform()
+		pngFile = pvalFile+".png"
+		plotResults.plotResult(res,pngFile=pngFile,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", plotBonferroni=True,usePylab=False)	
+		
+		
+	elif (not sr) or (sr and not srSkipFirstRun):
 		sys.stdout.write("Running Primary Emma.\n")
 		sys.stdout.flush()
 		pvalFile = _runEmmaScript_(snpsDataset, kinshipSnpsDataset, phed, phenotypeIndex, rFile, chr=chr, delim=delim, missingVal=missingVal, boundaries=boundaries, lrt=lrt)
@@ -675,7 +875,7 @@ def _run_():
 def _runEmmaScript_(snpsDataset, kinshipSnpsDataset, phed, p_i, rFile, chr=None, delim=",", missingVal="NA", boundaries=[-1,-1], lrt=False):
 
 	#Writing files
-	cluster = "/home/cmb-01/bvilhjal/"==env.homedir #Am I running on the cluster?
+	cluster = "/home/cmb-01/bvilhjal/"==env.home_dir #Am I running on the cluster?
 	#tempfile.tempdir = "/home/cmb-01/bvilhjal/tmp/" #(Temporary) debug hack...
 	if not cluster:
 		tempfile.tempdir='/tmp'
@@ -692,10 +892,10 @@ def _runEmmaScript_(snpsDataset, kinshipSnpsDataset, phed, p_i, rFile, chr=None,
 
 
 	#Put into a function....
-	snpsDataset.writeToFile(genotypeTempFile, deliminator=delim, missingVal = missingVal, withArrayIds = 0)
+	snpsDataset.writeToFile(genotypeTempFile, deliminator=delim, missingVal = missingVal)
 	sys.stdout.write( "Genotype file written\n")
 	sys.stdout.flush()
-	kinshipSnpsDataset.writeToFile(kinshipTempFile, deliminator=delim, missingVal = missingVal, withArrayIds = 0)
+	kinshipSnpsDataset.writeToFile(kinshipTempFile, deliminator=delim, missingVal = missingVal)
 	sys.stdout.write( "Kinship genotype file written\n")
 	sys.stdout.flush()
 
@@ -742,6 +942,9 @@ K2010<- emma.kinship(mat2010All,use="all") #Kinship matrix
 	rstr += """
 pvals <- c();
 genotype_var_perc <- c();
+remls <- c();
+vgs <- c();
+ves <- c();
 positions <- c();
 chrs <- c();
 maf <- c();
@@ -769,6 +972,9 @@ marf <- c();
   res[[chr]][["chr_pos"]] <- pos;
 
   pvals <- append(pvals,res[[chr]]$ps);
+  remls <- append(remls,res[[chr]]$REMLs)
+  vgs <- append(vgs,res[[chr]]$vgs)
+  ves <- append(ves,res[[chr]]$ves)
   genotype_var_perc <- append(genotype_var_perc,res[[chr]]$genotype_var_perc)
   positions <- append(positions,pos);
   chrs <- append(chrs,rep(chr,length(pos)));
@@ -798,6 +1004,9 @@ l[["Pvalues"]]<-pvals;
 l[["MARF"]]<-marf;
 l[["MAF"]]<-maf;
 l[["genotype_var_perc"]]<-genotype_var_perc;
+l[["REMLs"]]<-remls;
+l[["vgs"]]<-vgs;
+l[["ves"]]<-ves;
 dl <- as.data.frame(l);
 """
 	rstr +=' write.table(dl,file="'+pvalFile+'", sep=", ", row.names = FALSE);\n'		

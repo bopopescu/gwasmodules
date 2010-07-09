@@ -43,11 +43,14 @@ import dataParsers
 import phenotypeData
 	
 import plotResults, gwaResults
+import pylab
+
 
 #Database variables
 _user_="bvilhjal"
 _passwd_="bamboo123"
 _host_="papaya.usc.edu"
+
 
 def _run_():
 	if len(sys.argv) == 1:
@@ -63,7 +66,6 @@ def _run_():
 		print sys.exc_info()
 		print __doc__
 		sys.exit(2)
-	
 	
 	output_fname = None
 	callMethodID = None
@@ -145,6 +147,7 @@ def drawBoxPlot(snp,pData,accIndices,phenotypeName="SNP",runId="",filename="/tmp
 	allele1 = snp.alleles[accIndices[0][1]]
 	for (i1,i2) in accIndices:
 		if snp.alleles[i2] == allele1:
+			
 			phenoG1.append(float(pData[i1]))
 		else:
 			phenoG2.append(float(pData[i1]))				
@@ -162,6 +165,8 @@ def drawBoxPlot(snp,pData,accIndices,phenotypeName="SNP",runId="",filename="/tmp
 	pylab.title(phenotypeName+": chromosome "+str(snp.chromosome)+", position "+str(snp.position))
 	pylab.savefig(filename,format="pdf")
 	
+
+
 #import yh_matplotlib_artists
 #import pylab
 import gwaResults
@@ -1519,16 +1524,28 @@ def drawSegregatingGWAPlots(phenotypeIndices=None,ecotypePairList=None,res_path=
 			gc.collect()  #Calling garbage collector, in an attempt to clean up memory..
 
 
-def plotPeakWidths(phenotypeIndices,pdfFile=None,pngFile=None,ylab="",cgl_id=None, specialGenes=None, shade_scale=0.9,filterPercentile=0.9996):
+def _read_phs_result_():
+	import csv
+	phs_filename = "/Users/bjarnivilhjalmsson/Projects/Data/chris_toomaijan/PHSresults_chris_toomaijan"
+	f = open(phs_filename,"r")
+	phs_reader = csv.reader(f, delimiter=',', quotechar='|')
+	positions = [[] for i in range(0,5)]
+	phs_scores = [[] for i in range(0,5)]
+	for row in phs_reader:
+		positions[int(row[0])-1].append(int(row[1]))
+		phs_scores[int(row[0])-1].append(float(row[2]))
+	return (positions,phs_scores)
+
+		
+def plotPeakWidths(phenotypeIndices,pdfFile=None,pngFile=None,ylab="",cgl_id=None, specialGenes=None, shade_scale=0.8,filterPercentile=0.999,with_phs=True):
 	import phenotypeData
-	phenotypeFile = "/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_120308.tsv"
+	phenotypeFile = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phenotypes_all_raw_042109.tsv"
 	phed = phenotypeData.readPhenotypeFile(phenotypeFile, delimiter='\t')
 
 	if not phenotypeIndices:
 		phenotypeIndices = phed.phenIds
-
 		
-	snpsDataFile="/Network/Data/250k/dataFreeze_080608/250K_f12_120508.csv"
+	snpsDataFile="/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_f13_012609.csv"
 	import dataParsers,snpsdata,phenotypeData
 	snpsds = dataParsers.parseCSVData(snpsDataFile, format=1, deliminator=",")#,debug=True)
 	snpsd = snpsdata.SNPsDataSet(snpsds,[1,2,3,4,5])
@@ -1556,7 +1573,7 @@ def plotPeakWidths(phenotypeIndices,pdfFile=None,pngFile=None,ylab="",cgl_id=Non
 		for (chr,pos) in chr_pos_list:
 			 chr_pos_map[chr].append(pos)
 
-		window = 10000
+		window = 20000
 		newCandGenes = []
 		#Check whether cg are close to dots...
 		for gene in candGenes:
@@ -1568,22 +1585,39 @@ def plotPeakWidths(phenotypeIndices,pdfFile=None,pngFile=None,ylab="",cgl_id=Non
 		print "len(newCandGenes):",len(newCandGenes),", len(candGenes):",len(candGenes)
 		candGenes = newCandGenes
 		
-		candGeneInfoFile = "/Users/bjarni/tmp/flowering_time_cand_genes.txt"
+		candGeneInfoFile = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/flowering_time_cand_genes.txt"
 		f = open(candGeneInfoFile,"w")
 		f.write("chr, pos, tairID, name, description\n")
 		for gene in candGenes:
 			st = str(gene)+"\n"
 			f.write(st)
 		f.close()
-			
+		
+	if with_phs:
+		(phs_positions,phs_scores) = _read_phs_result_()	
 		
 	import pylab
+	#x_size=14.0*snpsds[0].positions[-1]/float(snpsds[0].positions[-1])
+	#y_size=45.0*len(phenotypeIndices)/30.0+1
 	for chromosome in[1,2,3,4,5]:
+		scale = snpsds[chromosome-1].positions[-1]/float(snpsds[0].positions[-1])
+		x_size=1.9+13.1*scale
+		if with_phs:
+			pylab.subplot(211)
+			y_size=5.0*len(phenotypeIndices)/30.0+5
+		else:
+			y_size=5.0*len(phenotypeIndices)/30.0+1
+		print x_size, y_size
+		pylab.figure(figsize=(x_size,y_size))
+		x_start = 1.7/(1.9+13.1*scale)
+		x_end = 0.2/(1.9+13.1*scale)
+		if with_phs:
+			pylab.axes([x_start,0.35,1.0-(x_start+x_end),0.6])
+		else:
+			pylab.axes([x_start,0.11,1.0-(x_start+x_end),0.82])
+		#pylab.subplot(510+chromosome)
 		y_shift = 0
 		print "Working on chromosome",chromosome
-		x_size=20.0*snpsds[chromosome-1].positions[-1]/float(snpsds[0].positions[-1])
-		y_size=7.0*len(phenotypeIndices)/30.0+1
-		pylab.figure(figsize=(x_size,y_size))
 		
 				
 
@@ -1591,18 +1625,17 @@ def plotPeakWidths(phenotypeIndices,pdfFile=None,pngFile=None,ylab="",cgl_id=Non
 		if cgl_id:
 			for gene in candGenes:
 				if gene.chromosome==chromosome:
-					pylab.axvspan(gene.startPos,gene.endPos, facecolor=(0.1,0.6,0.1),edgecolor=(0.1,0.6,0.1), alpha=1,linewidth=1.2)
+					pylab.axvspan(gene.startPos,gene.endPos, facecolor=(0.0,0.7,0.1),edgecolor=(0.0,0.7,0.1), alpha=0.7,linewidth=1)
 					#pylab.plot([gene.startPos,gene.startPos],[-0.4,len(phenotypeIndices)-0.4],"--",color=(0.2,0.2,0.2),linewidth=0.8)
 					#pylab.plot([gene.endPos,gene.endPos],[-0.4,len(phenotypeIndices)-0.4],"--",color=(0.2,0.2,0.2),linewidth=0.8)
 		
 		if specialGenes:
 			for (gene_name,gene) in specialGenes:
 				if gene.chromosome==chromosome:
-					specialColor = "g" #(0.7,0.5,0.2)
-					pylab.plot([gene.startPos,gene.startPos],[-0.4,len(phenotypeIndices)-0.4],"-",color=specialColor,linewidth=1.2)
-					pylab.plot([gene.endPos,gene.endPos],[-0.4,len(phenotypeIndices)-0.4],"-",color=specialColor,linewidth=1.2)
-					x_shift = 200000
-					pylab.text(gene.startPos-x_shift,(len(phenotypeIndices)-1)*1.06, gene_name,color=specialColor)
+					specialColor = (0.7,0.5,0.2)
+					pylab.axvspan(gene.startPos,gene.endPos, facecolor=specialColor,edgecolor=specialColor, alpha=0.7,linewidth=2)
+					#x_shift = 200000
+					#pylab.text(gene.startPos-x_shift,(len(phenotypeIndices)-1)*1.06, gene_name,color=specialColor)
 				
 		
 		for p_i in phenotypeIndices:
@@ -1619,75 +1652,474 @@ def plotPeakWidths(phenotypeIndices,pdfFile=None,pngFile=None,ylab="",cgl_id=Non
 					if result.resultType.resultType=='KW':
 						shade = shade_scale*(max(min(score,10.0)-8.0,0))/2.0
 						col = (shade_scale-shade,shade_scale-shade,1)
-						pylab.plot([pos],[y_shift+0.2],".",color=col)
+						pylab.plot([pos],[y_shift+0.25],".",color=col,alpha=0.5)
 					if result.resultType.resultType=='Emma':
 						shade = shade_scale*(max(min(score,6.0)-4.0,0))/2.0
 						col = (1,shade_scale-shade,shade_scale-shade)
-						pylab.plot([pos],[y_shift],".",color=col)
+						pylab.plot([pos],[y_shift],".",color=col,alpha=0.5)
 				print "\nFinished plotting result",result.name,":"
 			y_shift += 1
 		
 		x_shift = 250000
 		pylab.axis([0-x_shift,snpsds[chromosome-1].positions[-1]+x_shift,0-0.05*(y_shift),(y_shift-1)+0.05*(y_shift)])
-		ticks = range(0,snpsds[chromosome-1].positions[-1]+x_shift,1000000)
-		s_ticks = []
-		for tick in ticks:
+		x_ticks = range(0,snpsds[chromosome-1].positions[-1]+x_shift,1000000)
+		x_s_ticks = []
+		for tick in x_ticks:
 			if tick%5000000==0:
-				s_ticks.append(str(int(tick/1000000)))
+				x_s_ticks.append(str(int(tick/1000000)))
 			else: 
-				s_ticks.append("")
-		pylab.xticks(ticks,s_ticks)
+				x_s_ticks.append("")
+		pylab.xticks(x_ticks,x_s_ticks)
 		s_ticks = []
 		for p_i in phenotypeIndices:
-			phenName = phed.getPhenotypeName(p_i)
-			phenNameList = phenName.split("_")[1:]
-			phenName = " ".join(phenNameList)
+			phenName = phed.getPhenotypeName(p_i,niceName=True)
 			s_ticks.append(phenName)
 		#s_ticks = [""]*len(phenotypeIndices)
 		ticks = [i+0.12 for i in range(0,len(phenotypeIndices))]
+		#pylab.yticks(ticks,s_ticks,size="small")
 		pylab.yticks(ticks,s_ticks,size="medium")
-		pylab.ylabel(ylab,size='x-large')
+
+		pylab.ylabel(ylab,size='large')
+		#if chromosome==3:
+		#	pylab.ylabel(ylab,size='large')
 		x_shift = 1600000
 		pylab.text(snpsds[chromosome-1].positions[-1]/2.0-x_shift,(len(phenotypeIndices)-1)*1.08,"Chromosome "+str(chromosome),size='x-large')
-		pylab.xlabel("Position (mb)",size='x-large')
-		pylab.axhspan(-2, len(phenotypeIndices)+1, facecolor='0.8', alpha=0.5)
+		#pylab.text(snpsds[chromosome-1].positions[-1]*1.02,(len(phenotypeIndices)-1)*0.25,"Chromosome "+str(chromosome),rotation=90)
+		#if chromosome==5:
+		#	pylab.xlabel("Position (mb)",size='large')
+		pylab.axhspan(-2, len(phenotypeIndices)+1, facecolor=(0.9,0.9,0.9), alpha=0.2)
 		
+		if with_phs:
+			pylab.axes([x_start,0.07,1.0-(x_start+x_end),0.23])
+			pylab.plot(phs_positions[chromosome-1],phs_scores[chromosome-1],".",alpha=0.75)
+			max_score = max(phs_scores[chromosome-1])
+			min_score = min(phs_scores[chromosome-1])
+			phs_range = max_score-min_score
+			pylab.xticks(x_ticks,x_s_ticks)
+			x_shift = 250000
+			pylab.axis([0-x_shift,snpsds[chromosome-1].positions[-1]+x_shift,min_score-0.07*(phs_range),max_score+0.07*(phs_range)])
+			pylab.xlabel("Position (Mb)",size='large')
+			pylab.ylabel("PHS")
+			if cgl_id:
+				for gene in candGenes:
+					if gene.chromosome==chromosome:
+						pylab.axvspan(gene.startPos,gene.endPos, facecolor=(0.0,0.7,0.1),edgecolor=(0.0,0.7,0.1), alpha=0.5,linewidth=1)
+			
+			if specialGenes:
+				for (gene_name,gene) in specialGenes:
+					if gene.chromosome==chromosome:
+						specialColor = (0.7,0.5,0.2)
+						pylab.axvspan(gene.startPos,gene.endPos, facecolor=specialColor,edgecolor=specialColor, alpha=0.5,linewidth=2)
+
+		gc.collect()  #Calling garbage collector, in an attempt to clean up memory..
+
 		if pngFile:
-			pylab.savefig(pngFile+"_"+str(chromosome)+".png",format="png")    	
+			pylab.savefig(pngFile+"_"+str(chromosome)+".png",format="png",dpi=300)    	
+			pylab.savefig(pngFile+"_"+str(chromosome)+".pdf",format="pdf")    	
 		if not (pngFile or pdfFile):
 			pylab.show()
 		pylab.clf()
-		gc.collect()  #Calling garbage collector, in an attempt to clean up memory..
+		
+#	pylab.subplots_adjust(right=0.975)
+#	pylab.subplots_adjust(left=0.09)
+#	pylab.subplots_adjust(bottom=0.03)
+#	pylab.subplots_adjust(top=0.99)
+#	if pngFile:
+#		pylab.savefig(pngFile+".png",format="png")    	
+#		pylab.savefig(pngFile+".pdf",format="pdf")    	
+#	if not (pngFile or pdfFile):
+#		pylab.show()
+#	pylab.clf()
+
+
+def _draw_wilczek_comparison_plots_():
+	import env
+	dtb_fall_pids = [429,451,473,539,583]
+	dtb_other_pids = [495,517,561,585,587]
+	dtb_pids = dtb_fall_pids+dtb_other_pids
+	dtf_fall_pids = [431,453,475,541]
+	dtf_other_pids = [497,519,563]
+	dtf_pids = dtf_fall_pids+dtf_other_pids
+	llb_pids = [433,455,477,499,521,543,565]
+	fi_pids = [435,457,479,501,523,545,567]
+	ps_pids = [437,459,481,503,525,547,569]
+	bb_pids = [439,461,483,505,527,549,571]
+	hob_pids = [441,463,485,507,529,551,573]
+	tb_pids = [443,465,487,509,531,553,575]
+	sl_pids = [445,467,489,511,533,555,577]
+	sn_pids = [447,469,491,513,535,557,579]
+	fitness_fall_pids = [449,471,493,559]
+	fitness_other_pids = [515,537,581]
+	fitness_pids = fitness_fall_pids+fitness_other_pids
+	
+	kwargs = {'alpha': 0.6, 'color': 'green'}
+
+	pylab.figure(figsize=(6, 6))
+	
+	#TOP SNPS
+#	ax = pylab.axes([0.125,0.575,0.85,0.35])
+#	ax.set_title('DTB')
+#	snp_occurence_hist(dtb_pids,**kwargs)
+#
+#	filename=env.home_dir+"tmp/DTB_DTF_FALL.pdf"
+#	ax = pylab.axes([0.125,0.075,0.85,0.35])
+#	ax.set_title('DTF')
+#	snp_occurence_hist(dtf_pids,**kwargs)
+#	pylab.savefig(filename,format='pdf')
+#
+#	pylab.clf()
+#	ax = pylab.axes([0.125,0.575,0.85,0.35])
+#	ax.set_title('Fitness')
+#	snp_occurence_hist(fitness_pids,**kwargs)
+#
+#	filename=env.home_dir+"tmp/Fitness_Silique_Number.pdf"
+#	ax = pylab.axes([0.125,0.075,0.85,0.35])
+#	ax.set_title('Silique number')
+#	snp_occurence_hist(sn_pids,**kwargs)
+#	pylab.savefig(filename,format='pdf')
+#
+#	pylab.clf()
+#	ax = pylab.axes([0.125,0.575,0.85,0.35])
+#	ax.set_title('LfLatBolt')
+#	snp_occurence_hist(llb_pids,**kwargs)
+#
+#	filename=env.home_dir+"tmp/LfLatBolt_Flower_Interval.pdf"
+#	ax = pylab.axes([0.125,0.075,0.85,0.35])
+#	ax.set_title('Flower Interval')
+#	snp_occurence_hist(fi_pids,**kwargs)
+#	pylab.savefig(filename,format='pdf')
+#	
+#
+#	pylab.clf()
+#	ax = pylab.axes([0.125,0.575,0.85,0.35])
+#	ax.set_title('Proportion survived')
+#	snp_occurence_hist(ps_pids,**kwargs)
+#
+#	filename=env.home_dir+"tmp/Prop_Surv_BasalBr.pdf"
+#	ax = pylab.axes([0.125,0.075,0.85,0.35])
+#	ax.set_title('BasalBr')
+#	snp_occurence_hist(bb_pids,**kwargs)
+#	pylab.savefig(filename,format='pdf')
+#
+#
+#	pylab.clf()
+#	ax = pylab.axes([0.125,0.575,0.85,0.35])
+#	ax.set_title('Higher order branches')
+#	snp_occurence_hist(hob_pids,**kwargs)
+#
+#	filename=env.home_dir+"tmp/HOBr_TotBr.pdf"
+#	ax = pylab.axes([0.125,0.075,0.85,0.35])
+#	ax.set_title('Total branches')
+#	snp_occurence_hist(tb_pids,**kwargs)
+#	pylab.savefig(filename,format='pdf')
+#	
+#
+#	pylab.clf()
+#	ax = pylab.axes([0.125,0.575,0.85,0.35])
+#	ax.set_title('Silique length')
+#	snp_occurence_hist(sl_pids,**kwargs)
+#	filename=env.home_dir+"tmp/Silique_len.pdf"
+#	pylab.savefig(filename,format='pdf')
+#	
+
+
+        #TOP GENES
+	ax = pylab.axes([0.125,0.575,0.85,0.35])
+	ax.set_title('DTB')
+	gene_occurence_hist(dtb_pids,**kwargs)
+
+	filename=env.home_dir+"tmp/DTB_DTF_FALL_top100_genes.pdf"
+	ax = pylab.axes([0.125,0.075,0.85,0.35])
+	ax.set_title('DTF')
+	gene_occurence_hist(dtf_pids,**kwargs)
+	pylab.savefig(filename,format='pdf')
+
+	pylab.clf()
+	ax = pylab.axes([0.125,0.575,0.85,0.35])
+	ax.set_title('Fitness')
+	gene_occurence_hist(fitness_pids,**kwargs)
+
+	filename=env.home_dir+"tmp/Fitness_Silique_Number_top100_genes.pdf"
+	ax = pylab.axes([0.125,0.075,0.85,0.35])
+	ax.set_title('Silique number')
+	gene_occurence_hist(sn_pids,**kwargs)
+	pylab.savefig(filename,format='pdf')
+
+	pylab.clf()
+	ax = pylab.axes([0.125,0.575,0.85,0.35])
+	ax.set_title('LfLatBolt')
+	gene_occurence_hist(llb_pids,**kwargs)
+
+	filename=env.home_dir+"tmp/LfLatBolt_Flower_Interval_top100_genes.pdf"
+	ax = pylab.axes([0.125,0.075,0.85,0.35])
+	ax.set_title('Flower Interval')
+	gene_occurence_hist(fi_pids,**kwargs)
+	pylab.savefig(filename,format='pdf')
+	
+
+	pylab.clf()
+	ax = pylab.axes([0.125,0.575,0.85,0.35])
+	ax.set_title('Proportion survived')
+	gene_occurence_hist(ps_pids,**kwargs)
+
+	filename=env.home_dir+"tmp/Prop_Surv_BasalBr_top100_genes.pdf"
+	ax = pylab.axes([0.125,0.075,0.85,0.35])
+	ax.set_title('BasalBr')
+	gene_occurence_hist(bb_pids,**kwargs)
+	pylab.savefig(filename,format='pdf')
+
+
+	pylab.clf()
+	ax = pylab.axes([0.125,0.575,0.85,0.35])
+	ax.set_title('Higher order branches')
+	gene_occurence_hist(hob_pids,**kwargs)
+
+	filename=env.home_dir+"tmp/HOBr_TotBr_top100_genes.pdf"
+	ax = pylab.axes([0.125,0.075,0.85,0.35])
+	ax.set_title('Total branches')
+	gene_occurence_hist(tb_pids,**kwargs)
+	pylab.savefig(filename,format='pdf')
+	
+
+	pylab.clf()
+	ax = pylab.axes([0.125,0.575,0.85,0.35])
+	ax.set_title('Silique length')
+	gene_occurence_hist(sl_pids,**kwargs)
+	filename=env.home_dir+"tmp/Silique_len_top100_genes.pdf"
+	pylab.savefig(filename,format='pdf')
+	
+
+def get_snp_occurence(results=None,result_files=None, pids=None, aids=None, cmid=54, num_snps=1000, host='gmi-ara-devel-be',
+		       **kwargs):
+	import gwaResults as gr
+	snp_lists = []
+	all_snps = set()
+	if pids and not aids:
+		aids = [1]*len(pids)
+	if result_files:
+		num_results = len(result_files)
+		for result_file in result_files:
+			r = gr.Result(result_file)
+			r.neg_log_trans()
+			sl = r.get_top_snps(num_snps)
+			snp_lists.append(sl)
+			all_snps = all_snps.union(set(sl))
+		
+	elif pids and aids: 
+		assert len(pids)==len(aids),"The pids and aids don't match in length."
+		num_results = len(pids)
+		for pid,aid in zip(pids,aids):
+			r,r_id=gr.load_result_from_db(pid,aid,cmid,host=host)
+			r.neg_log_trans()
+			sl = r.get_top_snps(num_snps)
+			snp_lists.append(sl)
+			all_snps = all_snps.union(set(sl))
+	elif results:
+		num_results = len(results)
+		for r in results:
+			sl = r.get_top_snps(num_snps)
+			snp_lists.append(sl)
+			all_snps = all_snps.union(set(sl))
+	else:
+		raise Exception("pids or result_files are missing")
+	snp_counts = []
+	all_snps = list(all_snps)
+	#pdb.set_trace()
+	for cps in all_snps:
+		snp_count = 0
+		for sl in snp_lists:
+			if cps in sl:
+				snp_count += 1
+		snp_counts.append(snp_count)
+	count_list = [[] for i in range(num_results)]
+	for sc,s in zip(snp_counts,all_snps):
+		count_list[sc-1].append(s)
+	return count_list,snp_counts,num_results
+
+
+def get_result_occurences(result_files=None, pids=None, aids=None, cmid=54, num_genes=100, window_size=5000, 
+			  num_snps=1000, host='gmi-ara-devel-be', **kwargs):
+	import gwaResults as gr
+	if result_files:
+		results = []
+		for rf in result_files: 
+ 			r = gr.Result(rf)
+			r.neg_log_trans()
+			results.append(r)
+	else:
+		results=None
+	
+	snps_result = get_snp_occurence(results=results,result_files=None, pids=pids, aids=aids, cmid=cmid,
+				        num_snps=num_snps, host=host, **kwargs)
+	genes_result = get_gene_occurences(results=results,result_files=None, pids=pids, aids=aids, cmid=cmid,
+					        num_genes=num_genes, window_size=window_size, host=host, **kwargs)
+	return {'snps_result':snps_result, 'genes_result':genes_result}
+
+
+def snp_occurence_hist(result_files=None, pids=None, aids=None, cmid=54, num_snps=1000, host='gmi-ara-devel-be',
+		       **kwargs):
+	count_list,snp_counts,num_results = get_snp_occurence(result_files=result_files, pids=pids, aids=aids, cmid=cmid, 
+						   num_snps=num_snps, host=host,**kwargs)
+	bins = [i+0.5 for i in range(0,num_results+1)]
+	kwargs['bins']=bins
+	x_lim = [0.5,num_results+0.5]
+	x_range = [x_lim[0]-0.05*num_results,x_lim[-1]+0.05*num_results]
+	kwargs['range']=x_range
+	hist = pylab.hist(snp_counts,normed=1.0,**kwargs)
+	ax = pylab.gca()
+	ax.set_xlabel('Number of sites which share top %d SNP'%(num_snps))
+	ax.set_ylabel('Frequency')
+	return hist
 	
 
 
+def get_gene_occurences(results=None, result_files=None, pids=None, aids=None, cmid=54, num_genes=100, window_size=5000, 
+		        host='gmi-ara-devel-be', **kwargs):
+	import gwaResults as gr
+	import dbutils
+	conn = dbutils.connect_to_db(host,'genome')
+	g_lists = []
+	all_genes = set()
+	if pids and not aids:
+		aids = [1]*len(pids)
+	if result_files:
+		num_results = len(result_files)
+		for result_file in result_files:
+			r = gr.Result(result_file)
+			r.neg_log_trans()
+			genes = r.get_top_genes(num_genes,window_size=window_size,conn=conn)
+			g_lists.append(list(genes))
+			all_genes = all_genes.union(genes)
+		
+	elif pids and aids: 
+		assert len(pids)==len(aids),"The pids and aids don't match in length."
+		num_results = len(pids)
+		for pid,aid in zip(pids,aids):
+			r,r_id=gr.load_result_from_db(pid,aid,cmid,host=host)
+			r.neg_log_trans()
+			genes = r.get_top_genes(num_genes,window_size=window_size,conn=conn)
+			g_lists.append(list(genes))
+			all_genes = all_genes.union(genes)
+	elif results:
+		num_results = len(results)
+		for r in results:
+			genes = r.get_top_genes(num_genes,window_size=window_size,conn=conn)
+			g_lists.append(list(genes))
+			all_genes = all_genes.union(genes)		
+	else:
+		raise Exception("pids or result_files are missing")
+	conn.close()
+	gene_counts = []
+	all_genes = list(all_genes)
+	#pdb.set_trace()
+	for g in all_genes:
+		gene_count = 0
+		for gl in g_lists:
+			if g in gl:
+				gene_count += 1
+		gene_counts.append(gene_count)
+	count_list = [[] for i in range(num_results)]
+	for gc,g in zip(gene_counts,all_genes):
+		count_list[gc-1].append(g)
+	return count_list, gene_counts, num_results
 
 
-def _test1_():
-	snpsDataFile="/Network/Data/250k/dataFreeze_080608/250K_f11_100708.csv"
-	import dataParsers,snpsdata,phenotypeData
-	snpsds = dataParsers.parseCSVData(snpsDataFile, format=1, deliminator=",")#,debug=True)
-	snpsd = snpsdata.SNPsDataSet(snpsds,[1,2,3,4,5])
+def gene_occurence_hist(result_files=None, pids=None, aids=None, cmid=54, num_genes=100, window_size=5000, 
+		        host='gmi-ara-devel-be', **kwargs):
+	count_list, gene_counts,num_results = get_gene_occurences(result_files=result_files, pids=pids, aids=aids, cmid=cmid, 
+					  num_genes=num_genes, window_size=window_size, host=host, **kwargs)
+	bins = [i+0.5 for i in range(0,num_results+1)]
+	kwargs['bins']=bins
+	x_lim = [0.5,num_results+0.5]
+	x_range = [x_lim[0]-0.05*num_results,x_lim[-1]+0.05*num_results]
+	kwargs['range']=x_range
+	hist = pylab.hist(gene_counts,normed=1.0,**kwargs)
+	ax = pylab.gca()
+	ax.set_xlabel('Number of sites which share top %d Genes'%(num_genes))
+	ax.set_ylabel('Frequency')
+	return hist
+
+
+
+def get_comparison_lists(result_file_1=None, result_file_2=None, type='fraction', top_fraction=0.02, pids=None, 
+			 aids=None, cmid=54, host='gmi-ara-devel-be', **kwargs):
+	import gwaResults as gr
+	results = []
+	if not result_file_1 and not result_file_2 and pids:
+		if not aids:
+			aids = [1]*len(pids)
+		assert len(pids)==len(aids)==2, "Phenotype/analysis IDs must be exactly two."
+		pid,aid = zip(pids,aids)[0]
+	  	r1,r1_id=gr.load_result_from_db(pid,aid,cmid,host=host)
+		pid,aid = zip(pids,aids)[1]
+		r2,r2_id=gr.load_result_from_db(pid,aid,cmid,host=host)
+	else:
+		assert result_file_1 and result_file_2,"Result files are missing"
+		r1 = gr.Result(result_file_1)
+		r2 = gr.Result(result_file_2)			
+	r1.neg_log_trans()
+	if 'min_MAF_x' in kwargs:
+		if kwargs['min_MAF_y']:
+			r1.filter_attr("marfs",kwargs['min_MAF_x'])
+	r2.neg_log_trans()
+	if 'min_MAF_y' in kwargs:
+		if kwargs['min_MAF_y']:
+		      r2.filter_attr("marfs",kwargs['min_MAF_y'])
+	r1.filter_common_top_scores(r2,top_fraction)
+	results.append(r1)
+	results.append(r2)
+	chr_pos_scores = zip(r1.chromosomes,r1.positions,r1.scores,r2.scores)
+	return {'results':results, "chr_pos_scores":chr_pos_scores}
+
+
+def plot_result_comparison(result_file_1=None, result_file_2=None, type='fraction', top_fraction=0.02, 
+			   pdf_file='/tmp/test.pdf', png_file=None, pids=None, aids=None, cmid=54, 
+			   host='gmi-ara-devel-be', **kwargs):
+	import pylab
+	r = get_comparison_lists(result_file_1=result_file_1, result_file_2=result_file_2, pids=pids, aids=aids, 
+				 cmid=cmid, host=host, type=type, top_fraction=top_fraction, **kwargs)
+	x_range = max(r["results"][0].scores)
+	y_range = max(r["results"][1].scores)
+	pylab.axes([0.06,0.08,0.93,0.91])
+	pylab.plot(r["results"][0].scores,r["results"][1].scores,'.')
+	pylab.axis([-0.025*x_range,1.025*x_range,-0.025*y_range,1.025*y_range])
 	
+	pylab.xlabel('$log_{10}(p$-value$)$')
+	pylab.ylabel('$log_{10}(p$-value$)$')
 	
-	resdir = "/Network/Data/250k/tmp-bvilhjal/"
-	filename = resdir+"ecotype_acc_stockParent.csv"
-	f = open(filename,"w")
-	ecotype_dict = phenotypeData._getEcotypeIdToStockParentDict_()
-	l = []
-	for acc in snpsd.accessions:
-		acc = int(acc)
-		l.append(ecotype_dict[acc])
-	l.sort()
-	for (name,csID) in l:
-		f.write(str(name)+", "+str(csID)+"\n")
-	f.close()
-
-
+	pylab.savefig(pdf_file,format='pdf')
+	if png_file:
+		pylab.savefig(png_file,format='png')
+	pylab.show()
+	return r
 	
-ftIndices = [1,2,3,4,5,6,7,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,80,81,82]  # pid 60 was removed since it's not really a flowering time
-ionomicsIndices = range(14,32)
-#getQuantitativeIndices()[0:10]
+
+def plot_snp_comparison(result_files=None, pdf_file='/tmp/test.pdf', png_file=None, title='',
+			     pids=None, aids=None, cmid=54, num_snps=1000, host='gmi-ara-devel-be'):
+	import pylab
+	kwargs = {'alpha': 0.6, 'color': 'green'}
+	pylab.figure(figsize=(6, 4))
+	ax = pylab.axes([0.1,0.1,0.88,0.88])
+	ax.set_title(title)
+	hist = snp_occurence_hist(result_files=result_files, pids=pids, aids=aids, cmid=cmid, num_snps=num_snps, 
+			   host=host,**kwargs)
+	pylab.savefig(pdf_file,format='pdf')
+	if png_file:
+		pylab.savefig(png_file,format='png')
+
+def plot_gene_comparison(result_files=None, pdf_file='/tmp/test.pdf', png_file=None, title='',
+			      pids=None, aids=None, cmid=54, num_genes=100, window_size=5000, host='gmi-ara-devel-be'):
+	import pylab
+	kwargs = {'alpha': 0.6, 'color': 'green'}
+	pylab.figure(figsize=(6, 4))
+	ax = pylab.axes([0.1,0.1,0.88,0.88])
+	ax.set_title(title)
+	hist = gene_occurence_hist(result_files=result_files,pids=pids, aids=aids, cmid=cmid,num_genes=num_genes,
+			    window_size=window_size,host=host,**kwargs)
+	pylab.savefig(pdf_file,format='pdf')
+	if png_file:
+		pylab.savefig(png_file,format='png')
+
 
 
 		
@@ -1698,7 +2130,7 @@ if __name__ == '__main__':
 	#drawSegregatingGWAPlots(phenotypeIndices=[1,7],runId="gwPlot")
 	#drawAllGWPlots([224,225,227,229,231,236,239,241],res_path="/Users/bjarni/tmp/",runId="r")
 	#drawAllGWPlots([226,228,230,232,233,234,235,237,238,240,242],res_path="/Users/bjarni/tmp/",runId="r")
-	drawSecondRunGWPlots([17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],res_path="/Users/bjarni/tmp/",runId="r")
+	#drawSecondRunGWPlots([17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],res_path="/Users/bjarni/tmp/",runId="r")
 	#drawPowerGWPlots([187,188,189,190],runId="r")
 	#getAlexMethodRegions(ftIndices,runId="test",statId="",window=[50000,50000],res_path="/Network/Data/250k/tmp-bvilhjal/snp_res_alex/")
 	#drawAllPlots(ftIndices,None,method="rank_snps",res_path="/Network/Data/250k/tmp-bvilhjal/snp_res_final/w25000/",runId="final",statId="",window=[25000,25000])
@@ -1706,14 +2138,21 @@ if __name__ == '__main__':
 	#_run_()
 	#_testGenePlot_()
 	#specialGenes = [("SVP",gwaResults.Gene(2,9586954,9590973)),("FRI",gwaResults.Gene(4,269026,271503)), ("FLC",gwaResults.Gene(5,3173498,3179449))]
-	#plotPeakWidths(phenotypeData.categories_2_phenotypes[1],pngFile="/Users/bjarni/tmp/FT_width_cutoff_KW10_8_E6_4_l",ylab="Phenotypes",cgl_id=28,shade_scale=0.6) #
+	#specialGenes = [("DOG1",gwaResults.Gene(5,18589482,18591400))]
+	#plotPeakWidths(ftIndices,pngFile="/Users/bjarni/tmp/FT_width_cutoff_KW10_8_E6_4_l",ylab="Phenotypes",cgl_id=145,shade_scale=0.4) #
+	#plotPeakWidths(phenotypeData.categories_2_phenotypes[1],pngFile="/Users/bjarnivilhjalmsson/tmp/FT_width_cutoff_KW10_8_E6_4_l",ylab="Phenotypes",shade_scale=0.4,cgl_id=145,specialGenes=specialGenes)
 	#plotPeakWidths([1,2],pngFile="/Users/bjarni/tmp/test",ylab="Phenotypes",cgl_id=28,shade_scale=0.6) #
 	#plotPeakWidths(phenotypeData.categories_2_phenotypes[2],pngFile="/Users/bjarni/tmp/FT_related_width",ylab="Flowering time related")
 	#plotPeakWidths([1,2],pngFile="/Users/bjarni/tmp/FT_related_width",ylab="Flowering time related",cgl_id=129)
 	#plotPeakWidths(phenotypeData.categories_2_phenotypes[3],pngFile="/Users/bjarni/tmp/Disease_resistance_width",ylab="Disease resistance",cgl_id=130)
 	#plotPeakWidths(phenotypeData.categories_2_phenotypes[4],pngFile="/Users/bjarni/tmp/Ionomics_width",ylab="Ionomics",cgl_id=20)
 	#plotPeakWidths(ionomicsIndices,pngFile="/Users/bjarni/tmp/Ionomics_old_width",cgl_id=43)
-
+	#plot_result_comparison(pids=[364,491],png_file='/Users/bjarnivilhjalmsson/tmp/test.png')
+	#plot_result_comparison('/Network/Data/250k/db/results/type_1/4060_results.tsv','/Network/Data/250k/db/results/type_1/4299_results.tsv',png_file='/Users/bjarnivilhjalmsson/tmp/test.png')
+	plot_snp_comparison(pids=[491,493,495,497,499,501],png_file='/Users/bjarnivilhjalmsson/tmp/test.png')
+	#plot_result_comparison([493,491],png_file='/Users/bjarnivilhjalmsson/tmp/test.png')
+	#_draw_wilczek_comparison_plots_()
+	
 
 
 #FRI deletions

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.5
+#!/sw/bin/python2.5
 """
 Usage: Output2010SNPs.py [OPTIONS] -o OUTPUT_FILE
 
@@ -88,7 +88,7 @@ def _run_():
 	
 	accDecoder=None
 	if useAccessionName:
-		accDecoder = dataParsers.ecotypeId2Name
+ 		accDecoder = dataParsers.ecotypeId2Name
 	import snpsdata
 	snpsdata.writeRawSnpsDatasToFile(output_fname,snpsds,chromosomes=[1,2,3,4,5], deliminator=delim, missingVal = missingVal, accDecoder=accDecoder)
 

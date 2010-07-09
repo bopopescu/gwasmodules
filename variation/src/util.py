@@ -32,7 +32,11 @@ def getRanks(values,withTies=True):
 			
 
 def kruskal_wallis(snps,phenVals,useTieCorrection=True):
-	from rpy import r
+	#from rpy2.robjects import r
+	#from rpy2.rpy_classic import r
+	#from rpy2.rpy_classic import r
+	from scipy import stats
+	assert len(snps[0])==len(phenVals),"SNPs and phenotypes are not equal length."
 	def _kw_test_(snp,ranks,tieCorrection):
 		n = len(snp)
 		group_vals = list(set(snp))
@@ -53,7 +57,9 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 			nominator += ns[i]*v*v
 
 		d = ((12.0/(n*(n+1))) * nominator)*tieCorrection
-		p =  r.pchisq(d,g-1,lower_tail = False)
+		p =  stats.chi2.sf(d,g-1)
+		#print p 
+		#p = r.pchisq(d,g-1,lower_tail = False)
 		return (d,p)
 
 	
@@ -69,14 +75,15 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 			s += t*(t*t-1.0)
 		s = float(s)/(n_total*(n_total*n_total-1))
 		tieCorrection = 1.0/(1-s)
-		print "tieCorrection:", tieCorrection
+		#print "tieCorrection:", tieCorrection
 		
 	ds = []
 	ps = []
-	for snp in snps:
+	for snp in snps:		
 		(d,p) = _kw_test_(snp, ranks,tieCorrection=tieCorrection)
 		ds.append(d)
 		ps.append(p)
+	#print ps
 	return {"ps":ps,"ds":ds}
 
 
@@ -87,10 +94,18 @@ def plotHist(x,y):
 
 class Queue:
 	"A first-in-first-out queue."
-	def __init__(self, items=None): self.start = 0; self.A = items or []
-	def __len__(self):				return len(self.A) - self.start
-	def append(self, item):		   self.A.append(item)
-	def extend(self, items):		  self.A.extend(items)
+	def __init__(self, items=None): 
+		self.start = 0 
+		self.A = items or []
+	
+	def __len__(self):
+		return len(self.A) - self.start
+	
+	def append(self, item):
+		self.A.append(item)
+
+	def extend(self, items):
+		self.A.extend(items)
 
 	def pop(self):
 		A = self.A

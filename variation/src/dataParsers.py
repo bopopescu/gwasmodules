@@ -3,13 +3,42 @@ This library offers functions to parse different types of SNPs data from multipl
 
 Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
-import time, sys
+import time, sys, random
 
 from snpsdata import *
 
 # this should be fixed
 homedir = "/Users/bjarni/"
 resultsdir = ""
+
+
+#Standard missing value is NA
+missing_val = 'NA'
+#Standard nt decoding, is using the IUPAC alphabet
+nt_decoder = {'A':'A', 
+	      'C':'C', 
+	      'G':'G', 
+	      'T':'T', 
+	      'AG':'R', 
+	      'AC':'M', 
+	      'GT':'K', 
+	      'CT':'Y', 
+	      'AT':'W', 
+	      'CG':'S',
+	      'Y':'Y',
+	      'R':'R',
+	      'W':'W',
+	      'S':'S',
+	      'K':'K',
+	      'M':'M',
+	      'D':'D',
+	      'H':'H',
+	      'V':'V',
+	      'B':'B',
+	      'X':'N', #Unknown base(s)
+	      'N':'N', #Unknown base(s)
+	      '-':'-', #Indel 
+	      '|':missing_val}	#05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched)
 
 
 
@@ -58,40 +87,40 @@ def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=Non
 	return ecotDict
 
 
-def getEcotypeToNameDictionary(host="papaya.usc.edu", user=None, passwd=None, defaultValue=None):
-	class _ecotypeDict_(dict):
-		def __missing__(self, key):
-			return defaultValue
-
-	import MySQLdb
-	print "Connecting to db, host="+host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Fetching data"
-	numRows = int(cursor.execute("select distinct ei.id, ei.nativename from stock.ecotype ei order by ei.name"))
-	
-	ecotDict = _ecotypeDict_()
-	while(1):
-		row = cursor.fetchone()
-		if not row:
-			break;
-		ecotypeID = str(int(row[0]))
-		ecotDict[ecotypeID]=str(row[1])
-	cursor.close ()
-	conn.close ()
-	return ecotDict
+#def getEcotypeToNameDictionary(host="papaya.usc.edu", user=None, passwd=None, defaultValue=None):
+#	class _ecotypeDict_(dict):
+#		def __missing__(self, key):
+#			return defaultValue
+#
+#	import MySQLdb
+#	print "Connecting to db, host="+host
+#	if not user:
+#		import sys
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#	#Retrieve the filenames
+#	print "Fetching data"
+#	numRows = int(cursor.execute("select distinct ei.id, ei.nativename from stock.ecotype ei order by ei.name"))
+#	
+#	ecotDict = _ecotypeDict_()
+#	while(1):
+#		row = cursor.fetchone()
+#		if not row:
+#			break;
+#		ecotypeID = str(int(row[0]))
+#		ecotDict[ecotypeID]=str(row[1])
+#	cursor.close ()
+#	conn.close ()
+#	return ecotDict
 
 	 
 
@@ -413,7 +442,7 @@ def get149DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", o
 
 
 def get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", only96accessions=False, user = None,passwd = None):
-	import MySQLdb
+	import MySQLdb,sys
 	"""
 	Retrieve 2010 data from DB.  Returns a list of RawSnpsData objects. 
 	"""
@@ -475,7 +504,7 @@ def get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", 
 			row = cursor.fetchone()
 			newPosition = int(row[0])
 			while(1):
-				if not row:
+				if not row: 
 					break;
 				positions.append(newPosition)
 				oldPosition = newPosition
@@ -498,6 +527,103 @@ def get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", 
 	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
 
 	return snpsds
+
+
+
+def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc",
+				chromosomes=[1,2,3,4,5], dataVersion="3"):
+	"""
+	Returns a list of AlignmentData objects.
+	"""
+	rt = time.time()
+	decoder = RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
+	
+	print "Connecting to db, host="+host
+	if not user:
+		import sys
+		sys.stdout.write("Username: ")
+		user = sys.stdin.readline().rstrip()
+	if not passwd:
+		import getpass
+		passwd = getpass.getpass()
+	try:
+		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+	except MySQLdb.Error, e:
+		print "Error %d: %s" % (e.args[0], e.args[1])
+		sys.exit (1)
+	cursor = conn.cursor ()
+	
+	locStr = " and l.offset=0 "  
+	if int(dataVersion)==4:		   #If using version=4, then allow any locus.offset.
+		locStr = ""
+
+		
+	#Get distinct accessions and their id.
+
+	numRows = int(cursor.execute("select distinct eva.accession_id, eva.nativename, eva.ecotype_id, e2tge.tg_ecotypeid from at.accession2tg_ecotypeid eva, stock.ecotypeid2tg_ecotypeid e2tge where eva.ecotype_id = e2tge.ecotypeid order by eva.accession_id"))
+	aid_dict = {}
+	while(1):
+		row = cursor.fetchone()
+		if not row:
+			break;
+		aid_dict[int(row[0])]=(row[1],row[2],row[3])
+
+	numRows = int(cursor.execute("select distinct an.id, an.chromosome, an.start, an.end, an.version from at.alignment an where an.version>="+dataVersion+locStr+" order by an.chromosome, an.start"))
+	alignment_datas = []
+	i = 0
+	while(1):
+		row = cursor.fetchone()
+		if not row:
+			break;
+		
+		a_id = int(row[0])
+		a_chr = int(row[1])
+		a_start = int(row[2])
+		a_end = int(row[3])
+		sequences = []
+		positions = []
+		offsets = []
+		numRows = int(cursor.execute("select distinct l.id, l.position, l.offset, from at.locus l where l.alignment="+str(a_id)+" order by l.position, l.offset"))
+		
+
+
+
+	print "Fetching 2010 data (version "+dataVersion+"):"
+	snpsds=[]
+	for chromosome in chromosomes:
+		print "	Chromosome",chromosome
+		numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>="+dataVersion+locStr+" and g.accession=eva.accession_id and l.chromosome="+str(chromosome)+" order by l.position, eva.nativename"))
+		print "	",numRows,"rows retrieved."
+		positions = []
+		snps = []
+		if numRows > 0:
+			row = cursor.fetchone()
+			newPosition = int(row[0])
+			while(1):
+				if not row: 
+					break;
+				positions.append(newPosition)
+				oldPosition = newPosition
+				snp = ['NA']*len(accessions)  #Initialize to missing data.
+				while(oldPosition==newPosition):
+					snp[dict[int(row[1])]]=decoder[row[3]]
+					row = cursor.fetchone()
+					if not row:
+						break;
+					newPosition = int(row[0])
+				snps.append(snp)
+
+		snpsd = RawSnpsData(snps,positions,accessions=accessions)
+		snpsd.alphabet.append('-')
+		snpsds.append(snpsd)
+				
+	cursor.close ()
+	conn.close ()
+	dif = int(time.time() - rt)
+	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
+
+	return snpsds
+
 
 
 
@@ -589,7 +715,29 @@ def getPerlgenDataFromDb(host="papaya.usc.edu", db = "chip", chromosomes=[1,2,3,
 	return snpsds
 
 
-def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArrayIds=False, use_nt2number=0, returnChromosomes=False, useDecoder=True, debug=False):
+def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA'):
+	accessions = []
+	f = open(datafile, 'r')
+	line = f.readline()
+ 	withArrayIds = line=="Chromosome"
+	if withArrayIds:
+		line = line.split(deliminator)
+		arrayIds = []
+		for arrayId in line[2:]:
+			arrayIds.append(arrayId.strip())
+		line = f.readline()
+	f.close()
+	line = line.split(deliminator)
+	for acc in line[2:]:
+		accessions.append(acc.strip())
+	print "Found",len(accessions),"arrays/strains."
+	if withArrayIds:
+		return accessions,arrayIds
+	else:
+		return accessions
+
+def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2number=0, 
+		returnChromosomes=False, useDecoder=True, filter=1, id=None, marker_type=None):
 	"""
 	05/12/08 yh. add argument use_nt2number, to turn nucleotide into numbers. default is not
 	05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched) check nt2number in 'variation.common' to decoder
@@ -602,13 +750,12 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArray
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
+		
 	sys.stderr.write("Loading file: %s ... \n"%datafile)
-	decoder={missingVal:'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T', 
-			 'AG':'NA', 'AC':'NA', 'GT':'NA', 'CT':'NA', 'AT':'NA', 'CG':'NA', '-':'-', '|':'NA'}	#05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched)
-	
-	if use_nt2number:	#05/12/08
-		from common import nt2number
-		decoder = nt2number
+	decoder = nt_decoder
+	decoder[missingVal]=missing_val
+	#decoder={missingVal:'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T', 'N':'N',
+	#		 'AG':'NA', 'AC':'NA', 'GT':'NA', 'CT':'NA', 'AT':'NA', 'CG':'NA', '-':'-', '|':'NA'}	#05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched)	
 	
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
@@ -617,8 +764,6 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArray
 	#Reading column data
 	f = open(datafile, 'r')
 	lines = f.readlines()
-	if debug:
-		lines = lines[0:1000]+lines[60000:61000]+lines[120000:121000]  #Some arbitrary regions.
 	f.close()
 		
 	chromosomes = []
@@ -627,9 +772,8 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArray
 	accessions = []
 	arrayIds = None
 	line = lines[1].split(deliminator)
-	withArrayIds = line[0]=="Chromosome"
 	i=0
-	if withArrayIds:
+	if line[0]=="Chromosome":
 		line = lines[i].split(deliminator)
 		arrayIds = []
 		for arrayId in line[2:]:
@@ -648,11 +792,20 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArray
 	while i < len(lines):
 		chromosomes.append(int(newChr))
 		oldChr = newChr
-		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds)	#05/11/2008 yh. use rawSnpsData
+		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds,id=id)	#05/11/2008 yh. use rawSnpsData
 		rawSnpsData.snps = []
 		rawSnpsData.positions = []
 		rawSnpsData.chromosome = oldChr
 		while i < len(lines) and newChr == oldChr:
+			if filter<1 and random.random()>filter:
+	  			i += 1
+				if i < len(lines):
+					line = lines[i].split(deliminator)
+					newChr = int(line[0])
+			       	else:
+					break
+ 				continue
+			
 			line = lines[i].split(deliminator)
 			#print i,":",lines[i]
 			oldChr = int(line[0])
@@ -673,9 +826,14 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArray
 				break
 		
 		sys.stderr.write("Loaded %s of %s SNPs.\n"%(i-no_of_headers, len(lines)-no_of_headers))
+		#Adding marker
+		if marker_type:
+			marker_types = [marker_type]*len(rawSnpsData.snps)
+			rawSnpsData.marker_types = marker_types
 		snpsd_ls.append(rawSnpsData)
 		del rawSnpsData
 	if format==0:
+		print "Converting raw SNPs data to binary SNPs."
 		for i in range(0,len(chromosomes)):
 			snpsd_ls[i] = snpsd_ls[i].getSnpsData()
 	sys.stderr.write( "\n")
@@ -683,6 +841,9 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', withArray
 		return (snpsd_ls,chromosomes)
 	else:
 		return snpsd_ls
+
+	
+	
 
 
 def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", missingVal='NA', withArrayIds=False):
@@ -868,216 +1029,215 @@ def parse2010Data(datafile=None):
 	return(chromasomes)
 
 
-def parse250DataRaw(imputed = True):
-	"""
-	WARNING: OUTDATED
-	Returns 250K Data in a list of RawSnpsData objects (one for each chromosome).
-
-	Set imputed to False, if un-imputed data is preferred.
-
-	"""
-
-	if imputed:
-		datadir = homedir+"Projects/data/NPUTE_results/"
-		datafile = datadir+"250K_snp2acc_NPUTE.csv"
-		datafilecol = datadir+"250K_snp2acc_NPUTE.colnames.csv"
-		datafilerow = datadir+"250K_snp2acc_NPUTE.rownames.csv"
-	else:
-		datadir = homedir+"Projects/data/020808dump/"
-		datafile = datadir+"250K_snp2acc_GOOD.csv"
-		datafilecol = datadir+"250K_snp2acc_GOOD.colnames.csv"
-		datafilerow = datadir+"250K_snp2acc_GOOD.rownames.csv"
-		
-	positions = [] #list[chr][position_index]
-	genotypes = [] #list[chr][position_index][acces]
-	accessions = []
-	
-	phenotype = None
-	filteredPhenotypes = [] #list[acces]
-	individuals = [] #list[acces][chr][position_index]  Filtered for specific phenotypes.
-	
-	#Reading column data
-	f = open(datafilecol, 'r')
-	lines = f.readlines()
-	f.close()
-	for line in lines:
-		if imputed:
-			acc = line.strip()
-		else:
-			acc = (line.strip().split("."))[1]			
-		accessions.append(accessionName2Id[accessions250To2010[acc]])
-
-	#Reading row data
-	f = open(datafilerow, 'r')
-	lines = f.readlines()
-	f.close()
-	positions = [[],[],[],[],[]] #1 list per chromasome
-	for line in lines:
-		if imputed:
-			l = line.strip().split(".")
-			chr = int(l[0])
-			pos = int(l[1])
-		else:
-			pos = int(line.strip())
-			chr = pos/100000000
-			pos = pos%100000000
-		positions[chr-1].append(pos)
-
-	#Reading genotype data
-	rawgenotypes = [[],[],[],[],[]] #1 list per chromasome
-	f = open(datafile, 'r')
-	for i in range(0,5):
-		for p in positions[i]:
-			line = f.readline()
-			l = (line.strip()).split(",")
-			if l == []:
-				raise Exception("Data problem") 
-			rawgenotypes[i].append(l)
-	f.close()
-	print "raw genotype read"
-
-	import random
-	#Converting genotype and filtering.
-	decoder = RawDecoder()
-	genotypes = [[],[],[],[],[]]
-	newpositions = [[],[],[],[],[]]
-	for i in range(0,len(rawgenotypes)):
-		for j in range(0,len(positions[i])):
-			l = []
-			for nt in rawgenotypes[i][j]:
-				l.append(decoder[nt])
-			genotypes[i].append(l)
-			newpositions[i].append(positions[i][j])
-		print "Chromosome",i+1,":",len(newpositions[i]),"SNPs."
-
-	"""
-	for i in range(0,5):
-		print newpositions[i][-1]
-	"""
-	del positions
-	del rawgenotypes
-	positions = newpositions
-	
-	chromasomes = []
-	for i in range(0,5):
-		chromasomes.append(RawSnpsData(genotypes[i],positions[i],accessions=accessions))
-			
-	return(chromasomes)
-
-
+#def parse250DataRaw(imputed = True):
+#	"""
+#	WARNING: OUTDATED
+#	Returns 250K Data in a list of RawSnpsData objects (one for each chromosome).
+#
+#	Set imputed to False, if un-imputed data is preferred.
+#
+#	"""
+#
+#	if imputed:
+#		datadir = homedir+"Projects/data/NPUTE_results/"
+#		datafile = datadir+"250K_snp2acc_NPUTE.csv"
+#		datafilecol = datadir+"250K_snp2acc_NPUTE.colnames.csv"
+#		datafilerow = datadir+"250K_snp2acc_NPUTE.rownames.csv"
+#	else:
+#		datadir = homedir+"Projects/data/020808dump/"
+#		datafile = datadir+"250K_snp2acc_GOOD.csv"
+#		datafilecol = datadir+"250K_snp2acc_GOOD.colnames.csv"
+#		datafilerow = datadir+"250K_snp2acc_GOOD.rownames.csv"
+#		
+#	positions = [] #list[chr][position_index]
+#	genotypes = [] #list[chr][position_index][acces]
+#	accessions = []
+#	
+#	phenotype = None
+#	filteredPhenotypes = [] #list[acces]
+#	individuals = [] #list[acces][chr][position_index]  Filtered for specific phenotypes.
+#	
+#	#Reading column data
+#	f = open(datafilecol, 'r')
+#	lines = f.readlines()
+#	f.close()
+#	for line in lines:
+#		if imputed:
+#			acc = line.strip()
+#		else:
+#			acc = (line.strip().split("."))[1]			
+#		accessions.append(accessionName2Id[accessions250To2010[acc]])
+#
+#	#Reading row data
+#	f = open(datafilerow, 'r')
+#	lines = f.readlines()
+#	f.close()
+#	positions = [[],[],[],[],[]] #1 list per chromasome
+#	for line in lines:
+#		if imputed:
+#			l = line.strip().split(".")
+#			chr = int(l[0])
+#			pos = int(l[1])
+#		else:
+#			pos = int(line.strip())
+#			chr = pos/100000000
+#			pos = pos%100000000
+#		positions[chr-1].append(pos)
+#
+#	#Reading genotype data
+#	rawgenotypes = [[],[],[],[],[]] #1 list per chromasome
+#	f = open(datafile, 'r')
+#	for i in range(0,5):
+#		for p in positions[i]:
+#			line = f.readline()
+#			l = (line.strip()).split(",")
+#			if l == []:
+#				raise Exception("Data problem") 
+#			rawgenotypes[i].append(l)
+#	f.close()
+#	print "raw genotype read"
+#
+#	import random
+#	#Converting genotype and filtering.
+#	decoder = RawDecoder()
+#	genotypes = [[],[],[],[],[]]
+#	newpositions = [[],[],[],[],[]]
+#	for i in range(0,len(rawgenotypes)):
+#		for j in range(0,len(positions[i])):
+#			l = []
+#			for nt in rawgenotypes[i][j]:
+#				l.append(decoder[nt])
+#			genotypes[i].append(l)
+#			newpositions[i].append(positions[i][j])
+#		print "Chromosome",i+1,":",len(newpositions[i]),"SNPs."
+#
+#	"""
+#	for i in range(0,5):
+#		print newpositions[i][-1]
+#	"""
+#	del positions
+#	del rawgenotypes
+#	positions = newpositions
+#	
+#	chromasomes = []
+#	for i in range(0,5):
+#		chromasomes.append(RawSnpsData(genotypes[i],positions[i],accessions=accessions))
+#			
+#	return(chromasomes)
 
 
-def parse250KDataFiles(imputed = True):
-	"""
-	WARNING: OUTDATED
-	Returns 250K Data as a list of SnpsData objects (not RawSnpsData).
-	
-	Set imputed to False, if un-imputed data is preferred.
 
-	"""
-	
-	if imputed:
-		datadir = homedir+"Projects/data/NPUTE_results/"
-		datafile = datadir+"250K_snp2acc_NPUTE.csv"
-		datafilecol = datadir+"250K_snp2acc_NPUTE.colnames.csv"
-		datafilerow = datadir+"250K_snp2acc_NPUTE.rownames.csv"
-	else:
-		datadir = homedir+"Projects/data/020808dump/"
-		datafile = datadir+"250K_snp2acc_GOOD.csv"
-		datafilecol = datadir+"250K_snp2acc_GOOD.colnames.csv"
-		datafilerow = datadir+"250K_snp2acc_GOOD.rownames.csv"
-		
-	positions = [] #list[chr][position_index]
-	genotypes = [] #list[chr][position_index][acces]
-	accessions = []
-	
-	phenotype = None
-	filteredPhenotypes = [] #list[acces]
-	individuals = [] #list[acces][chr][position_index]  Filtered for specific phenotypes.
-	
-	#Reading column data
-	f = open(datafilecol, 'r')
-	lines = f.readlines()
-	f.close()
-	for line in lines:
-		if imputed:
-			acc = line.rstrip()
-		else:
-			acc = (line.rstrip().split("."))[1]			
-		accessions.append(acc)
-
-	#Reading row data
-	f = open(datafilerow, 'r')
-	lines = f.readlines()
-	f.close()
-	positions = [[],[],[],[],[]] #1 list per chromasome
-	for line in lines:
-		if imputed:
-			l = line.rstrip().split(".")
-			chr = int(l[0])
-			pos = int(l[1])
-		else:
-			pos = int(line.rstrip())
-			chr = pos/100000000
-			pos = pos%100000000
-		positions[chr-1].append(pos)
-
-	#Reading genotype data
-	rawgenotypes = [[],[],[],[],[]] #1 list per chromasome
-	f = open(datafile, 'r')
-	for i in range(0,5):
-		for p in positions[i]:
-			line = f.readline()
-			l = (line.rstrip()).split(",")
-			if l == []:
-				raise Exception("Data problem") 
-			rawgenotypes[i].append(l)
-	f.close()
-	print "raw genotype read"
-
-	import random
-	#Converting genotype and filtering.
-	countAll = 0
-	countGood = 0 
-	countStupid = 0
-	decoder = {'NA':'NA'}
-	genotypes = [[],[],[],[],[]]
-	newpositions = [[],[],[],[],[]]
-	for i in range(0,len(rawgenotypes)):
-		for j in range(0,len(positions[i])):
-			countAll = countAll+1
-			k = 0
-			ntl = [] #list of observed nucleotides.
-			for nt in ['A','C','G','T']:
-				if nt in rawgenotypes[i][j]:
-					decoder[nt]=k
-					ntl.append(nt)
-					k = k+1
-			if k==2:
-				countGood = countGood + 1
-				l = []
-				for nt in rawgenotypes[i][j]:
-					l.append(decoder[nt])
-				genotypes[i].append(l)
-				newpositions[i].append(positions[i][j])
-			else:
-				if k==1:
-					countStupid = countStupid+1
-	print countAll," SNPs in all"
-	print countGood," SNPs used"
-	print countStupid," Stupid SNPs thrown away"
-
-	for i in range(0,5):
-		print newpositions[i][-1]
-	del positions
-	del rawgenotypes
-	positions = newpositions
-	
-	chromasomes = []
-	for i in range(0,5):
-		chromasomes.append(SnpsData(genotypes[i],positions[i],accessions=accessions))
-			
-	return(chromasomes)
+#def parse250KDataFiles(imputed = True):
+#	"""
+#	WARNING: OUTDATED
+#	Returns 250K Data as a list of SnpsData objects (not RawSnpsData).
+#	
+#	Set imputed to False, if un-imputed data is preferred.
+#
+#	"""
+#	
+#	if imputed:
+#		datadir = homedir+"Projects/data/NPUTE_results/"
+#		datafile = datadir+"250K_snp2acc_NPUTE.csv"
+#		datafilecol = datadir+"250K_snp2acc_NPUTE.colnames.csv"
+#		datafilerow = datadir+"250K_snp2acc_NPUTE.rownames.csv"
+#	else:
+#		datadir = homedir+"Projects/data/020808dump/"
+#		datafile = datadir+"250K_snp2acc_GOOD.csv"
+#		datafilecol = datadir+"250K_snp2acc_GOOD.colnames.csv"
+#		datafilerow = datadir+"250K_snp2acc_GOOD.rownames.csv"
+#		
+#	positions = [] #list[chr][position_index]
+#	genotypes = [] #list[chr][position_index][acces]
+#	accessions = []
+#	
+#	phenotype = None
+#	filteredPhenotypes = [] #list[acces]
+#	individuals = [] #list[acces][chr][position_index]  Filtered for specific phenotypes.
+#	
+#	#Reading column data
+#	f = open(datafilecol, 'r')
+#	lines = f.readlines()
+#	f.close()
+#	for line in lines:
+#		if imputed:
+#			acc = line.rstrip()
+#		else:
+#			acc = (line.rstrip().split("."))[1]			
+#		accessions.append(acc)
+#
+#	#Reading row data
+#	f = open(datafilerow, 'r')
+#	lines = f.readlines()
+#	f.close()
+#	positions = [[],[],[],[],[]] #1 list per chromasome
+#	for line in lines:
+#		if imputed:
+#			l = line.rstrip().split(".")
+#			chr = int(l[0])
+#			pos = int(l[1])
+#		else:
+#			pos = int(line.rstrip())
+#			chr = pos/100000000
+#			pos = pos%100000000
+#		positions[chr-1].append(pos)
+#
+#	#Reading genotype data
+#	rawgenotypes = [[],[],[],[],[]] #1 list per chromasome
+#	f = open(datafile, 'r')
+#	for i in range(0,5):
+#		for p in positions[i]:
+#			line = f.readline()
+#			l = (line.rstrip()).split(",")
+#			if l == []:
+#				raise Exception("Data problem") 
+#			rawgenotypes[i].append(l)
+#	f.close()
+#	print "raw genotype read"
+#
+#	import random
+#	#Converting genotype and filtering.
+#	countAll = 0
+#	countGood = 0 
+#	countStupid = 0
+#	decoder = {'NA':'NA'}
+#	genotypes = [[],[],[],[],[]]
+#	newpositions = [[],[],[],[],[]]
+#	for i in range(0,len(rawgenotypes)):
+#		for j in range(0,len(positions[i])):
+#			countAll = countAll+1
+#			k = 0
+#			ntl = [] #list of observed nucleotides.
+#			for nt in ['A','C','G','T']:
+#				if nt in rawgenotypes[i][j]:
+#					decoder[nt]=k
+#					ntl.append(nt)
+#					k = k+1
+#			if k==2:
+#				countGood = countGood + 1
+#				l = []
+#				for nt in rawgenotypes[i][j]:
+#					l.append(decoder[nt])
+#				genotypes[i].append(l)
+#				newpositions[i].append(positions[i][j])
+#			else:
+#				if k==1:
+#					countStupid = countStupid+1
+#	print countAll," SNPs in all"
+#	print countGood," SNPs used"
+#	print countStupid," Stupid SNPs thrown away"
+#
+#	for i in range(0,5):
+#		print newpositions[i][-1]
+#	del positions
+#	del rawgenotypes
+#	positions = newpositions
+#	
+#	chromasomes = []
+#	for i in range(0,5):
+#		chromasomes.append(SnpsData(genotypes[i],positions[i],accessions=accessions))
+#			
+#	return(chromasomes)
 
 
 def parseMSFile(filename):
@@ -1458,7 +1618,52 @@ def parseMSDataFilter(filename, baseScale=1000000,sampleNum=None, fixPos=True, f
 	
 
 
+def parse_snp_data(datafile, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,id=None):
+	"""
+	format=1: the function return a RawSnpsData object list
+	format=0: the function return a SnpsData object list
+	"""
+ 	snpsds = parseCSVData(datafile, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
+	return SNPsDataSet(snpsds,[1,2,3,4,5])
 
+
+def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",", 
+			missingVal='NA', format=1, filter=1,id=None):
+	"""
+	Return a region of snpsd.
+	"""
+	snpsds = parseCSVData(datafile, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
+	snpsd = SNPsDataSet(snpsds,[1,2,3,4,5])
+	return snpsd.get_region_snpsd(chromosome,start_pos,end_pos)
+
+	
+
+def parse_chr_pos_list(datafile, delimiter=",", min_marf=0.0):
+	"""
+	Return a chr_pos list without loading all data...
+	"""
+		
+	sys.stderr.write("Loading file: %s ... \n"%datafile)
+	       
+	chr_pos_list = []
+	
+	#Reading column data
+	f = open(datafile, 'r')
+	lines = f.readlines()
+	f.close()
+		
+	line = lines[1].split(delimiter)
+	withArrayIds = line[0]=="Chromosome"
+	i=1
+	if withArrayIds:
+		i += 1
+	while i < len(lines):
+		line = lines[i].split(delimiter)
+		chr_pos_list.append((int(line[0]),int(line[1])))
+		i += 1
+	sys.stderr.write( "Chromosomes and positions read\n")
+	return chr_pos_list
+	
 
 
 #--------------------------------------------------------------------------------#

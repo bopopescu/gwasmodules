@@ -20,6 +20,11 @@ Option:
         --heterozygous2NA           Treat heterozygous SNPs as NAs 
 
         --first96                   Outputs only the first (old) 96 accessions.
+	--first192		    Outputs only the first (old) 192 accessions (which are actually more like 210 accessions).
+
+	--removeLer		    Remove all FRI Ler deletion accessions
+	--removeCol		    Remove all FRI Col deletion accessions
+
 	-b, --debug	            enable debug
 	-h, --help                  show this help
 
@@ -42,7 +47,7 @@ def _run_():
 	
 	long_options_list = ["maxError=", "comparisonFile=", "maxMissing=", "removeEcotypeId=", "removeArrayId=", "first96", 
 			     "removeIdentical", "onlyCommon", "delim=", "missingval=", "withArrayId=", "debug", "report", 
-			     "help", "heterozygous2NA"]
+			     "help", "heterozygous2NA", "first192", "removeLer", "removeCol"]
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:d:m:a:bh", long_options_list)
 
@@ -69,7 +74,10 @@ def _run_():
 	help = 0
 	withArrayIds = 1
 	first96 = False
+	first192 = False
 	heterozygous2NA = False
+	removeLer = False
+	removeCol = False
 	
 	for opt, arg in opts:
 		if opt in ('-o'):
@@ -98,6 +106,12 @@ def _run_():
 			onlyCommon = True
 		elif opt in ("--first96"):
 			first96 = True
+		elif opt in ("--first192"):
+			first192 = True
+		elif opt in ("--removeLer"):
+			removeLer = True
+		elif opt in ("--removeCol"):
+			removeCol = True
 		elif opt in ("-d","--delim"):
 			delim = arg
 		elif opt in ("-m","--missingval"):
@@ -153,7 +167,22 @@ def _run_():
 		print "All accessions:"
 		for name in names:
 			print name
-
+	elif first192:
+		import phenotypeData
+		ecotypes_192 = map(str,phenotypeData._getFirst192Ecotypes_())
+		print ecotypes_192,snpsds[0].accessions		
+		for acc in snpsds[0].accessions:
+			if acc not in ecotypes_192:
+				accessionsToRemove.append(acc)
+		print "found", len(ecotypes_192), '"192" ecotypes... removing',len(accessionsToRemove),"ecotypes."
+	
+	if removeLer:
+		import analyzeHaplotype as ah
+		accessionsToRemove += ah.getLerAndColAccessions(snpsds)[0]
+	if removeCol:
+		import analyzeHaplotype as ah
+		accessionsToRemove += ah.getLerAndColAccessions(snpsds)[1]
+		
 
 	#Retrieve comparison list of accessions.  (Error rates for accessions)
 	if (removeIdentical or maxError<1.0) and comparisonFile:

@@ -33,17 +33,15 @@ Description:
 """
 #Relative to the home directory (not absolute directories).  These parameters are only used on the cluster.
 
-resultDir="/home/cmb-01/bvilhjal/results/"
-randomForestDir="/home/cmb-01/bvilhjal/Projects/randomForest/"
-programDir="/home/cmb-01/bvilhjal/Projects/Python-snps/"
-
-#resultDir="/home/cmb-01/atarone/Projects/"
-#randomForestDir="/home/cmb-01/atarone/randomForest/"
-#programDir="/home/cmb-01/atarone/"
-
 import sys, getopt, traceback
 import os, env
 import phenotypeData
+
+resultDir = env.results_dir
+programDir = env.script_dir
+randomForestDir = None
+if env.rf_dir:
+	randomForestDir = env.rf_dir
 
 def _run_():
 	if len(sys.argv) == 1:
@@ -134,7 +132,7 @@ def _run_():
 		impFileName = resultDir+"RF_"+parallel+"_"+phenName
 		outFileName = impFileName
 		shstr = """#!/bin/csh
-#PBS -l walltime=120:00:00
+#PBS -l walltime=50:00:00
 """
 		shstr += "#PBS -l mem="+mem+"\n"
 		shstr +="""
@@ -316,7 +314,7 @@ def _run_():
 			tmpFile.write(outStr)
 		tmpFile.close()
 			
-		rstr = _generateRScript_(genotypeTempFile, phenotypeTempFile, impFile, rDataFile, cluster=True, binary=binary, nTrees=nTrees, nodeSize=nodeSize)
+		rstr = _generateRScript_(genotypeTempFile, phenotypeTempFile, impFile, rDataFile, binary=binary, nTrees=nTrees, nodeSize=nodeSize)
 		f = open(rFile,'w')
 		f.write(rstr)
 		f.close()
@@ -354,7 +352,7 @@ def _run_():
 			outStr += "\n"
 			tmpFile.write(outStr)
 		tmpFile.close()
-		rstr = _generateRScript_(genotypeTempFile, phenotypeTempFile, topImpFile, topRDataFile, cluster=True, binary=binary, nTrees=nTrees, nodeSize=nodeSize)
+		rstr = _generateRScript_(genotypeTempFile, phenotypeTempFile, topImpFile, topRDataFile, binary=binary, nTrees=nTrees, nodeSize=nodeSize)
 		f = open(rFile,'w')
 		f.write(rstr)
 		f.close()
@@ -365,9 +363,9 @@ def _run_():
 		os.system(cmdStr)
 	
 	
-def _generateRScript_(genotypeFile, phenotypeFile, impFile, rDataFile, cluster=False, binary=False, nTrees=500, nodeSize=False):
+def _generateRScript_(genotypeFile, phenotypeFile, impFile, rDataFile, binary=False, nTrees=500, nodeSize=False):
 	
-	if cluster:
+	if randomForestDir:
 		rstr = 'library(randomForest,lib.loc="'+randomForestDir+'");\n'
 	else:
 		rstr = "library(randomForest);\n"
