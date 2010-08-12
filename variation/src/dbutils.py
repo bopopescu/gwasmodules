@@ -1,20 +1,21 @@
-#import sqlalchemy as salc
+user_name = "bvilhjal"
+user_passwd = "*rri_bjarni@usc"
 
 def connect_to_papaya(db="stock_250k"):
-	return connect_to_db("papaya.usc.edu",db,"bvilhjal","*rri_bjarni@usc")
+	return connect_to_db("papaya.usc.edu",db,user_name,user_passwd)
 
 def connect_to_gmi_ara_devel_be(db="stock_250k"):
-	return connect_to_db("gmi-ara-devel-be.gmi.oeaw.ac.at",db,"bvilhjal","*rri_bjarni@usc")
+	return connect_to_db("gmi-ara-devel-be.gmi.oeaw.ac.at",db,user_name,user_passwd)
 
 def connect_to_default_lookup(db="stock_250k"):
 	import env
-	return connect_to_db(env.env['default_lookup_db'],db,"bvilhjal","*rri_bjarni@usc")
+	return connect_to_db(env.env['default_lookup_db'],db,user_name,user_passwd)
 
 def connect_to_default_insert(db="stock_250k"):
 	import env
-	return connect_to_db(env.env['default_insert_db'],db,"bvilhjal","*rri_bjarni@usc")
+	return connect_to_db(env.env['default_insert_db'],db,user_name,user_passwd)
 
-def connect_to_db(host,db,user="bvilhjal",passwd="*rri_bjarni@usc"):	
+def connect_to_db(host,db,user=user_name,passwd=user_passwd):	
 	"""
 	Returns a MySQLdb connection (needs to be closed).
 	"""
@@ -56,7 +57,7 @@ def get_tg_ecotypes(ecotypes,user=None,passwd=None,host = "papaya.usc.edu"):
 		sys.exit (1)
 	cursor = conn.cursor ()
 
-	url = salc.engine.url.URL("mysql",username="bvilhjal", password="bamboo123", host="papaya.usc.edu",database="stock")
+	url = salc.engine.url.URL("mysql",username=user_name, password="bamboo123", host="papaya.usc.edu",database="stock")
 	e = salc.create_engine(url) #Creating an engine object
 	#c = e.connect()
 	meta = salc.MetaData()
@@ -65,8 +66,6 @@ def get_tg_ecotypes(ecotypes,user=None,passwd=None,host = "papaya.usc.edu"):
 	from sqlalchemy.sql import select
 	res = select([einfo_table])
 	print res
-#	for row in einfo_table.select("id").execute():
-#		print row
 	
 if __name__ == "__main__":
 	get_tg_ecotypes(1)

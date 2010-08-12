@@ -2730,7 +2730,8 @@ def getCandidateGeneList(cgl_id,host="papaya.usc.edu",user="bvilhjal",passwd="bj
 	return candGenes
 
 
-def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be",user="bvilhjal",passwd="*rri_bjarni@usc",db="stock_250k",include_intron_exons=True,verbose=False,conn=None):
+def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be",include_intron_exons=True,\
+		verbose=False,conn=None):
 	import dbutils
 	if not conn:
 		new_conn = dbutils.connect_to_db(host,'genome')

@@ -285,8 +285,6 @@ class LinearMixedModel(LinearModel):
                 rss = residuals.T*H_inverse*residuals
                 x_beta_var = var(x_beta,ddof=1)
                 var_perc = x_beta_var/self.y_var
-                        
-                
                 res_dict = {'max_ll':opt_ll, 'delta':opt_delta, 'beta':beta_est, 've':opt_ve, 'vg':opt_vg,
                             'var_perc':var_perc, 'rss':rss, 'H_sqrt':H_sqrt}
                 if xs and return_f_stat:
