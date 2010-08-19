@@ -254,6 +254,19 @@ class OutputPhenotype(object):
 		pheno_data.col_label_ls = phenotype_info.method_id_name_ls
 		return pheno_data
 	
+	
+	@classmethod
+	def transform_log(cls,data,minValue=None,maxValue=None):
+		import numpy
+		phenotype_values = filter(lambda a: a != 'NA', data.values())
+		constant = numpy.std(a = phenotype_values,ddof = 1)*0.1 - minValue
+		for ecotype,phenotype_value in data.items():
+			if data[ecotype] != "NA":
+				data[ecotype] = math.log(phenotype_value + constant)
+		return data
+		
+		
+	
 	def run(self):
 		if self.debug==1:
 			import pdb
