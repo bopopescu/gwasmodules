@@ -220,6 +220,11 @@ def r_list_2_dict(rList):
 	return pyDict
 
 
+
+anti_decoder = {1:0,0:1}
+def anti_binary_snp(snp):
+	return [anti_decoder[nt] for nt in snp]
+
 if __name__=='__main__':
 	l = [1,2,3,3,3,2,3,4,1,0,3,3,3]
 	ranks = getRanks(l)

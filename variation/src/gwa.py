@@ -77,6 +77,8 @@ import multiprocessing as mp
 import time
 import pickle
 
+import linear_models as lm
+
 from numpy import *
 #import rpy2.robjects as robjects
 #import rpy2.robjects.numpy2ri
@@ -97,7 +99,7 @@ script_dir = env['script_dir']
 transformation_method_dict = {
 			'none':1,
 			'log_trans':2,
-			'box_cox':3,
+			'box_cox':3, 
 			}
 
 
@@ -107,7 +109,7 @@ analysis_methods_dict = {"kw":1,
 			 "emma_trans":47,
 			 #"emma_trans_no":49,
 			 "emmax":32,
-			 "top100_emmax":,
+			 #"top100_emmax":,
 			 #"emmax_trans":4,
 			 }
 
@@ -444,13 +446,20 @@ def _run_():
 
 	#SNPs data
 	snps_data_file = data_dir+'250K_t'+str(callMethodID)+'.csv'
+	sd_binary_file = snps_data_file+'.binary'
 
 	if analysis_plots:
 		print "\nAnalysing GWAs results jointly... QQ plots etc."
 		
 		#Genotype and phenotype data is only used for permutations.
-		sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
+		if os.path.isfile(sd_binary_file):
+			sd = dataParsers.parse_binary_snp_data(sd_binary_file, delimiter = delim, 
+					      missing_val = missingVal, filter = debug_filter)
+		else:
+			sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
 					      missingVal = missingVal, filter = debug_filter)
+			print 'Save a binary snps data file:',sd_binary_file
+			sd.writeToFile(sd_binary_file,binary_format=True)
 		prepare_data(sd,phed,p_i,trans_method,remove_outliers)
 		snps = sd.getSnps()
 		phen_vals = phed.getPhenVals(p_i)		
@@ -543,8 +552,16 @@ def _run_():
 		#Check whether result already exists.
 		if use_existing_results:
 			if region_plots:
-				sd=dataParsers.parse_snp_data(snps_data_file, format = 0, delimiter = delim, 
-							      missingVal = missingVal,filter=debug_filter)
+				if os.path.isfile(sd_binary_file):
+					sd = dataParsers.parse_binary_snp_data(sd_binary_file, delimiter = delim, 
+							      missing_val = missingVal, filter = debug_filter)
+				else:
+					sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
+							      missingVal = missingVal, filter = debug_filter)
+					print 'Save a binary snps data file:',sd_binary_file
+					sd.writeToFile(sd_binary_file,binary_format=True)
+#				sd=dataParsers.parse_snp_data(snps_data_file, format = 0, delimiter = delim, 
+#							      missingVal = missingVal,filter=debug_filter)
 				num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)
 				if remove_outliers:
 					assert num_outliers!=0,"No outliers were removed, so it makes no sense to go on and perform GWA."
@@ -574,8 +591,16 @@ def _run_():
 		if not res: #If results weren't found in a file... then do GWA.
 			gc.collect()
 			#Load genotype file (in binary format)
-			sd=dataParsers.parse_snp_data(snps_data_file, format = 0, delimiter = delim, 
-						      missingVal = missingVal,filter=debug_filter)
+			if os.path.isfile(sd_binary_file):
+				sd = dataParsers.parse_binary_snp_data(sd_binary_file, delimiter = delim, 
+						      missing_val = missingVal, filter = debug_filter)
+			else:
+				sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
+						      missingVal = missingVal, filter = debug_filter)
+				print 'Save a binary snps data file:',sd_binary_file
+				sd.writeToFile(sd_binary_file,binary_format=True)
+#			sd=dataParsers.parse_snp_data(snps_data_file, format = 0, delimiter = delim, 
+#						      missingVal = missingVal,filter=debug_filter)
 			
 			#Do we need to calculate the K-matrix?
 			if mapping_method in ['emma','emmax','py_emma']:
@@ -650,7 +675,7 @@ def _run_():
 					sys.stdout.write("Done!\n")
 					sys.stdout.flush()
 				elif mapping_method in ['emmax']:
-					res = run_emmax(snps,phen_vals,k)
+					res = lm.emmax(snps,phen_vals,k)
 					kwargs['genotype_var_perc'] = res['var_perc']
 					kwargs['beta0'] = [val[0] for val in res['betas']]
 					kwargs['beta1'] = [val[1] for val in res['betas']]
@@ -919,27 +944,6 @@ def runEmma(snps,phenValues,k):
 	snpsArray = array(snps)
 	res = r.emma_REML_t(phenArray,snpsArray,k)
 	return res
-
-
-
-def run_emmax(snps,phenotypes,K):
-	import linear_models as lm
-	lmm = lm.LinearMixedModel(phenotypes)
-	lmm.add_random_effect(K)
-
-	print "Running EMMAX" 
-	s1 = time.time()
-	res = lmm.emmax_f_test(snps)
-	secs = time.time()-s1
-	if secs>60:
-		mins = int(secs)/60
-		secs = secs - mins*60
-		print 'Took %d mins and %f seconds.'%(mins,secs)
-	else:
-		print 'Took %f seconds.'%(secs)
-	print 'pseudo_heritability:',res['pseudo_heritability']
-	return res	
-
 
 		
 def run_fet(snps,phenotypeValues,verbose=False):

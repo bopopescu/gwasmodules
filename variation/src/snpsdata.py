@@ -2397,7 +2397,8 @@ class SNPsDataSet:
                 
 
 
-	def writeToFile(self, filename, delimiter=", ", missingVal = "NA", accDecoder=None, withArrayIds = False, decoder=None, callProbFile=None):
+	def writeToFile(self, filename, delimiter=", ", missingVal = "NA", accDecoder=None, 
+                        withArrayIds = False, decoder=None, callProbFile=None, binary_format=False):
 		"""
 		Writes data to a file. 
 		
@@ -2423,7 +2424,10 @@ class SNPsDataSet:
 			for acc in self.snpsDataList[i].accessions:
 				fieldStrings.append(str(acc))
 		outStr += delimiter.join(fieldStrings)+"\n"
-		f = open(filename,"w")
+		if binary_format:
+                        f = open(filename,"wb")
+                else:
+                        f = open(filename,"w")
 		f.write(outStr)
 		if decoder:
 			for i in range(0,len(self.chromosomes)):
@@ -2649,6 +2653,31 @@ class SNPsDataSet:
 				snp = snpsd.snps[j]
 				chr_pos_snp_list.append((chr,pos,snp))
 		return chr_pos_snp_list
+                
+        
+        def get_region_pos_snp_dict(chromosome,start_pos=None,end_pos=None):
+                """
+                Returns a dict containing a list of positions and snps.
+                """
+                positions = []
+                snps = []
+                for snpsd in self.snpsDataList:
+                        if snpsd.chromosome==chromosome:
+                                break
+                assert snpsd.chromosome==chromosome, "SNPs data with appropriate chromosomes wasn't found"
+                i = 0
+                while i<len(snpsd.positions) and snpsd.positions[i]<start_pos:
+                        i+=1
+                if end_pos:
+                        while i<len(snpsd.positions) and snpsd.positions[i]<end_pos:
+                                positions.append(snpsd.positions[i])
+                                snps.append(snpsd.snps[i])
+                                i += 1
+                else:
+                        positions = snpsd.positions[i:]
+                        snps = snpsd.snps[i:]
+                return {'positions':positions, 'snps':snps}
+                  
 
 
 	def get_pc(self,pc_num=1, random_fraction=0.1):
