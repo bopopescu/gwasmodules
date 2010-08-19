@@ -753,10 +753,7 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 		
 	sys.stderr.write("Loading file: %s ... \n"%datafile)
 	decoder = nt_decoder
-	decoder[missingVal]=missing_val
-	#decoder={missingVal:'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T', 'N':'N',
-	#		 'AG':'NA', 'AC':'NA', 'GT':'NA', 'CT':'NA', 'AT':'NA', 'CG':'NA', '-':'-', '|':'NA'}	#05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched)	
-	
+	decoder[missingVal]=missing_val	
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
@@ -769,7 +766,6 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 	chromosomes = []
 	positionsList = []
 	snpsList = []
-	accessions = []
 	arrayIds = None
 	line = lines[1].split(deliminator)
 	i=0
@@ -843,6 +839,8 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 		return snpsd_ls
 
 	
+
+
 	
 
 
@@ -1617,20 +1615,79 @@ def parseMSDataFilter(filename, baseScale=1000000,sampleNum=None, fixPos=True, f
 	return data
 	
 
+def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1):
+	"""
+	A sped-up version, to load a binary file in binary format.
+	"""
+	import random
+	sys.stderr.write("Loading binary file: %s ... \n"%data_file)
+	accessions = []
+	snpsd_ls = []
+	chromosomes = []
+	
+	#Reading accession data
+	f = open(data_file, 'rb')
+	line = f.next().split(delimiter)
+	for acc in line[2:]:
+		accessions.append(acc.strip())
+	print "Found",len(accessions),"arrays/strains."
+	
+	positions = []
+	snps = []
+	line = f.next().split(delimiter)
+	old_chromosome = int(line[0])
+	positions.append(int(line[1]))
+	snps.append(map(int,line[2:]))
+	i = 0 
+	
+	if filter<1.0:
+		for i, line in enumerate(f):
+			if random.random()>filter: continue
+			line_list = line.split(delimiter)
+			chromosome = int(line_list[0])
+			if chromosome!=old_chromosome: #Then save snps_data
+				snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+				snpsd_ls.append(snpsd)
+				chromosomes.append(old_chromosome)
+				positions = []
+				snps = []
+				old_chromosome = chromosome
+				sys.stderr.write("Loaded %s SNPs.\n"%i)
+			positions.append(int(line_list[1]))
+			snps.append(map(int,line_list[2:]))
+	else:
+		for i, line in enumerate(f):		
+			line_list = line.split(delimiter)
+			chromosome = int(line_list[0])
+			if chromosome!=old_chromosome: #Then save snps_data
+				snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+				snpsd_ls.append(snpsd)
+				chromosomes.append(old_chromosome)
+				positions = []
+				snps = []
+				old_chromosome = chromosome
+				sys.stderr.write("Loaded %s SNPs.\n"%i)
+			positions.append(int(line_list[1]))
+			snps.append(map(int,line_list[2:]))
+		
 
-def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,id=None):
+	f.close()
+	snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+	snpsd_ls.append(snpsd)
+	chromosomes.append(old_chromosome)
+	sys.stderr.write("Loaded %s SNPs.\n"%i)
+
+	return SNPsDataSet(snpsd_ls,chromosomes)
+
+
+
+
+def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,
+		id=None, useDecoder=True):
 	"""
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
-	"""
-	#if format==0:
-		#Check if binary SNP format is available
-	#	data_file = data_file+'.binary'
-		#Load binary file TODO
- 	#else:
- 	#	snpsds = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
- 		#SAVE IN BINARY FORMAT.
- 		
+	"""		
 	snpsds = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
  	return SNPsDataSet(snpsds,[1,2,3,4,5])
 

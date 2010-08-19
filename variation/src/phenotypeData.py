@@ -1,5 +1,6 @@
 import pdb
 from env import *
+#from idlelib.TreeWidget import row
 
 # Phenotype categories: (category,order)
 phenotypeCategories = {
@@ -103,12 +104,13 @@ class PhenotypeData:
 			name_dict[int(ls[0])]=ls[1].rstrip()
 		return name_dict
 
-	def get_db_pid(self,pid):
+	def get_db_pid(self,pid,conn=None):
 		"""
 		Retrieves the DB pid, using the phenotype name.
 		"""
 	        import dbutils
-	        conn = dbutils.connect_to_papaya()
+	        if not conn:
+		        conn = dbutils.connect_to_default_lookup()
 		cursor = conn.cursor()
 		sql_statement = "SELECT id FROM stock_250k.phenotype_method WHERE short_name='%s'"%(self.getPhenotypeName(pid))
 		print sql_statement
@@ -120,7 +122,8 @@ class PhenotypeData:
 			print "No id found in DB for phenotype:%s"%(self.getPhenotypeName(pid))
 			db_pid = None		
 	        cursor.close()
-		conn.close()
+	        if not conn:
+	        	conn.close()
 		return db_pid
 
 
@@ -864,7 +867,7 @@ class PhenotypeData:
 			
 
 
-	def insert_into_DB(self,pids=None,host="papaya.usc.edu",db="stock_250k",phenotype_scoring='',
+	def insert_into_DB(self,pids=None,phenotype_scoring='',
 			   method_description='',growth_condition='',biology_category_id='',
 			   citations='',data_description='',transformation_description=None,
 			   method_id=None, data_type=None, comment=''):
@@ -876,58 +879,78 @@ class PhenotypeData:
 		if not pids:
 			pids = self.phenIds
 		import dbutils
-		conn = dbutils.connect_to_db(host, db)
+		conn = dbutils.connect_to_default_insert("stock_250k")
 		cursor = conn.cursor()
-		for pid in pids:
-			phen_name = self.getPhenotypeName(pid)
-			cur_method_id = self.get_db_pid(pid)
-			phen_vals = self.getPhenVals(pid,noNAs=True)
-			ecotypes = self.getNonNAEcotypes(pid)
-			no_of_accessions = len(ecotypes)
-			if cur_method_id:
-				print phen_name, 'is already in DB.'
-				print 'Updating values only.'
-				
-				sql_statement = "UPDATE stock_250k.phenotype_method SET no_of_accessions=%d WHERE short_name='%s'"%(no_of_accessions,phen_name)
-				print sql_statement
-				cursor.execute(sql_statement)
-			else:
-				if not data_type:
-					if self.isBinary(pid):
-						data_type='binary'
-					else:
-						data_type='quantitative'
-				print "Inserting phenotype %s into DB." % phen_name				
-				if method_id:
-					sql_statement = "INSERT INTO stock_250k.phenotype_method  (id, short_name, only_first_96, no_of_accessions,"+\
-					     " biology_category_id,phenotype_scoring, method_description, growth_condition, data_description, comment,"+\
-					     " data_type, transformation_description) VALUES ("+str(method_id)+", '"+phen_name+"', false, "+\
-					     str(no_of_accessions)+", "+str(biology_category_id)+", '"+phenotype_scoring+"', '"+method_description+\
-					     "', '"+growth_condition+"', '"+data_description+"', '"+comment+"', '"+data_type+"', '"+\
-					     str(transformation_description)+"')"
+		for fpid, pid in enumerate(pids):
+			try:
+				phen_name = self.getPhenotypeName(pid)
+				cur_method_id = self.get_db_pid(pid,conn=conn)
+				phen_vals = self.getPhenVals(pid,noNAs=True)
+				ecotypes = self.getNonNAEcotypes(pid)
+				no_of_accessions = len(ecotypes)
+				print cur_method_id
+				if cur_method_id:
+					print phen_name, 'is already in DB.'
+					print 'Updating values only.'
+					
+					sql_statement = "UPDATE stock_250k.phenotype_method SET no_of_accessions=%d, biology_category_id=%d WHERE short_name='%s'"%(no_of_accessions,biology_category_id,phen_name)
+					print sql_statement
+					cursor.execute(sql_statement)
 				else:
-					sql_statement = "INSERT INTO stock_250k.phenotype_method  (short_name, only_first_96, no_of_accessions,"+\
-					     " biology_category_id,phenotype_scoring, method_description, growth_condition, data_description,"+\
-					     " comment, data_type, transformation_description) VALUES ('"+phen_name+"', false, "+\
-					     str(no_of_accessions)+", "+str(biology_category_id)+", '"+phenotype_scoring+"', '"+method_description+\
-					     "', '"+growth_condition+"', '"+data_description+"', '"+comment+"', '"+data_type+"', '"+\
-					     str(transformation_description)+"')"
-			
-				print sql_statement
-				cur_method_id = self.get_db_pid(pid)
-							
-			print "Inserting values for phenotype method_id = %d"%cur_method_id 	
-			for e_i, val in zip(ecotypes,phen_vals):				
-				sql_statement = "INSERT INTO stock_250k.phenotype_avg (ecotype_id, value, ready_for_publication, "+\
-						"method_id, transformed_value) VALUES ( "+str(e_i)+", "+str(val)+", 0, "+\
-						str(cur_method_id)+", "+str(val)+" )"
-				print sql_statement
-				numRows = int(cursor.execute(sql_statement))
-				row = cursor.fetchone()
-				if row:
-					print row
-			print "Committing"
-			conn.commit()
+					if not data_type:
+						if self.isBinary(pid):
+							data_type='binary'
+						else:
+							data_type='quantitative'
+					print "Inserting phenotype %s into DB." % phen_name				
+					if method_id:
+						sql_statement = "INSERT INTO stock_250k.phenotype_method  (id, short_name, only_first_96, no_of_accessions,"+\
+						     " biology_category_id,phenotype_scoring, method_description, growth_condition, data_description, comment,"+\
+						     " data_type, transformation_description) VALUES ("+str(method_id)+", '"+phen_name+"', false, "+\
+						     str(no_of_accessions)+", "+str(biology_category_id)+", '"+phenotype_scoring+"', '"+method_description+\
+						     "', '"+growth_condition+"', '"+data_description+"', '"+comment+"', '"+data_type+"', '"+\
+						     str(transformation_description)+"')"
+					else:
+						sql_statement = "INSERT INTO stock_250k.phenotype_method  (short_name, only_first_96, no_of_accessions,"+\
+						     " biology_category_id,phenotype_scoring, method_description, growth_condition, data_description,"+\
+						     " comment, data_type, transformation_description) VALUES ('"+phen_name+"', false, "+\
+						     str(no_of_accessions)+", "+str(biology_category_id)+", '"+phenotype_scoring+"', '"+method_description+\
+						     "', '"+growth_condition+"', '"+data_description+"', '"+comment+"', '"+data_type+"', '"+\
+						     str(transformation_description)+"')"
+										
+					print sql_statement
+					numRows = int(cursor.execute(sql_statement))
+					row = cursor.fetchone()
+					if row:
+						print row
+					cur_method_id = self.get_db_pid(pid,conn=conn)
+								
+				print "Inserting values for phenotype method_id = %d"%cur_method_id 	
+				for e_i, val in zip(ecotypes,phen_vals):				
+					sql_statement = "INSERT INTO stock_250k.phenotype_avg  (ecotype_id, value, ready_for_publication, "+\
+							"method_id, transformed_value) VALUES ( "+str(e_i)+", "+str(val)+", 0, "+\
+							str(cur_method_id)+", "+str(val)+" )"
+					try:
+						print sql_statement
+						numRows = int(cursor.execute(sql_statement))
+						row = cursor.fetchone()
+						if row:
+							print row
+					except Exception, err_str:
+						print 'Failed at inserting data:',err_str
+						print 'Trying to update.'
+						sql_statement = "UPDATE stock_250k.phenotype_avg SET value=%d, transformed_value=%d \
+								 WHERE ecotype_id=%d and method_id=%d"%(val,val,int(e_i),cur_method_id)
+						print sql_statement
+						numRows = int(cursor.execute(sql_statement))
+						row = cursor.fetchone()
+						if row:
+							print row
+						
+				print "Committing"
+				conn.commit()
+			except Exception, err_str:
+				print 'Failed at inserting phentoype nr.',fpid+1,':',err_str
 
 		cursor.close ()
 		conn.close ()
@@ -1723,6 +1746,34 @@ def _insert_bergelsson_phen_into_db_():
 			     data_type=data_type, comment=comment)
 	
 	
+def _insert_wilczek_phen_into_db_2_():
+	"""
+	"""
+	
+	phen_file = "/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/wilczek_seaset.txt"
+	phend = readPhenotypeFile(phen_file)
+	phenotype_scoring = ""
+	method_description = ""
+	growth_condition = ""
+	biology_category_id = 22
+	citations = ""
+	data_description = ""
+	transformation_description = "None"
+	#transformation_description = "Log(SD/10+x-minVal)"
+	method_id = None
+	data_type = ""
+	comment = "Data from Amity Wilczek"			
+	print len(phend.accessions),len(set(phend.accessions))
+	
+	
+	phend.insert_into_DB(phenotype_scoring=phenotype_scoring, method_description=method_description, 
+			     growth_condition=growth_condition, biology_category_id=biology_category_id, 
+			     citations=citations, data_description=data_description, 
+			     transformation_description=transformation_description, method_id=method_id, 
+			     data_type=data_type, comment=comment)
+	
+	return phend
+
 	
 
 
