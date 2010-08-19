@@ -368,6 +368,7 @@ class ResultsMethod(Entity):
 	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	results_method_type = ManyToOne('%s.ResultsMethodType'%__name__, colname='results_method_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	rm_json = OneToMany('%s.ResultsMethodJson'%__name__)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -939,7 +940,17 @@ class TopSNPTestRMNullData(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('observed_id', 'run_no', 'null_distribution_type_id'))
 	
-
+class TransformationMethod(Entity):
+	"""
+	2010-08-18
+	"""
+	name = Field(String(30))
+	description = Field(Text)
+	formular = Field(String(100))
+	function = Field(String(20))
+	using_options(tablename='transformation_method', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	
 class SNPRegionPlotType(Entity):
 	"""
 	2008-10-06
