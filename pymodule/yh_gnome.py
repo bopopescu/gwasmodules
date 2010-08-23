@@ -228,13 +228,17 @@ class NavigationToolbar2GTKAgg_chromosome(NavigationToolbar2GTKAgg):
 					self.set_message(s)
 		else: self.set_message(self.mode)
 
-def getDataOutOfTextEntry(widget, data_type=None, filter_func=None):
+def getDataOutOfTextEntry(widget, data_type=None, filter_func=None, default=None):
 	"""
+	2010-6-14
+		add argument default
 	2010-4-27
 		This function fetches the data present in a text widget.
 		
 		widget could be text_entry, combobox, ComboBoxEntry
-		filter_func could be: lambda x: x.split('_')[0]
+		
+		Example for filter_func
+			filter_func = lambda x: x.split('_')[0]
 	"""
 	if hasattr(widget, 'get_text'):
 		text = widget.get_text()
@@ -249,4 +253,6 @@ def getDataOutOfTextEntry(widget, data_type=None, filter_func=None):
 			text = data_type(text)
 		else:
 			text = None
+	if default is not None and text is None:
+		text = default
 	return text
