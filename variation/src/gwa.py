@@ -15,7 +15,7 @@ Option:
 						used or it's generated.)
 
 	-a ..., --specific_methods=...		Apply specific methods, otherwise all available are applied:
-						emma,emma_trans,kw,ft, etc.
+						lm,emma,emmax,kw,ft, etc.
 	-b ..., --specific_transformations=... 	Apply a transformation to the data, default is none, other possibilities are 
 						log_trans, box_cox_lambda (where lambda is a number)
 	--remove_outliers=...			Should phenotype outliers be removed.  0 (no fence) is the default, else the outlier fence is 
@@ -47,8 +47,10 @@ Option:
 	--proc_per_node=...			Request number of processors per node, default is 8. (Works only for EMMA.)
 	--debug_filter=...			Filter SNPs randomly (speed-up for debugging)
 	
-	--cofactor_pos=...			A list of SNP positions to be added as co-factors in the analysis.
-								
+	--cofactor_chr_pos=...			A list of SNP (chromosome,positions) to be added as co-factors in the analysis.
+	--cofactor_phen_id=...			A list of SNP positions to be added as co-factors in the analysis.
+	--cofactor_file=...			A file specifying the cofactor.
+	--cofactor_no_interact			Exclude interaction terms for cofactors.
 						
 
 Examples:
@@ -106,11 +108,8 @@ transformation_method_dict = {
 analysis_methods_dict = {"kw":1,
 			 "ft":2,
 			 "emma":4,
-			 "emma_trans":47,
-			 #"emma_trans_no":49,
+			 'lm':16,
 			 "emmax":32,
-			 #"top100_emmax":,
-			 #"emmax_trans":4,
 			 }
 
 
@@ -160,7 +159,8 @@ def _run_():
 			   'remove_outliers=',"analysis_plots",'data_dir=',
 			   "use_existing_results","region_plots=","cand_genes_file=",
 			   "debug_filter=", "no_phenotype_ids", "proc_per_node=", 'phen_file=',
-			   'kinship_file=', 'only_add_2_db']
+			   'kinship_file=', 'only_add_2_db', 'cofactor_chr_pos', 
+			   'cofactor_phen_id', 'cofactor_file', 'cofactor_no_interact' ]
 	try:
 		opts, args=getopt.getopt(sys.argv[1:], "d:m:h:p:a:b:t:r:k:", long_options_list)
 
@@ -183,7 +183,7 @@ def _run_():
 	walltimeReq = "12:00:00"
 	proc_per_node = 8
 	
-	specific_methods = ['kw','ft','emma','emmax']
+	specific_methods = ['kw','ft','lm','emma','emmax']
 	specific_transformations = ['none']
 	remove_outliers = 0
 	data_dir = env['data_dir']
@@ -197,6 +197,12 @@ def _run_():
 	phen_file = None
 	kinship_file=None
 	only_add_2_db = False
+	
+	cofactor_chr_pos = None
+	cofactor_phen_id = None
+	cofactor_file = None
+	cofactor_no_interact = False
+	
 	print ''
 
 	for opt, arg in opts:
@@ -299,12 +305,12 @@ def _run_():
 			elif mapping_method in ["kw"]:
 				return
 			elif analysis_plots:
-				specific_methods = ["ft","emma",'emmax']
+				specific_methods = ["ft",'lm',"emma",'emmax']
 		else:
 			if mapping_method in ["ft"]:
 				return
 			elif analysis_plots:
-				specific_methods = ["kw","emma",'emmax']
+				specific_methods = ["kw",'lm',"emma",'emmax']
 			
 		phenotype_name=phed.getPhenotypeName(p_i)
 		#Cluster specific parameters
@@ -349,7 +355,7 @@ def _run_():
 
 		shstr = "#!/bin/csh\n"
 		shstr+="#PBS -l walltime="+walltimeReq+"\n"
-		if mapping_method in ['emma','emma_trans','emma_trans_no']:
+		if mapping_method in ['emma']:
 			shstr+="#PBS -l nodes=1:ppn=%d \n"%proc_per_node
 		shstr+="#PBS -l mem="+memReq+"\n"
 		shstr+="#PBS -q cmb\n"
@@ -439,7 +445,8 @@ def _run_():
 		return
 	else:
 		p_i=int(args[0])
-
+	
+	filter_accessions = phed.getNonNAEcotypes(p_i)
 	phen_is_binary = phed.isBinary(p_i)
 	phenotype_name=phed.getPhenotypeName(p_i)
 	print "Phenotype:%s, phenotype_id:%s"%(phenotype_name, p_i)
@@ -452,7 +459,8 @@ def _run_():
 		
 		#Genotype and phenotype data is only used for permutations.
 		sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-					      missingVal = missingVal, filter = debug_filter)
+					      missingVal = missingVal, filter = debug_filter,
+					      filter_accessions=filter_accessions)
 		prepare_data(sd,phed,p_i,trans_method,remove_outliers)
 		snps = sd.getSnps()
 		phen_vals = phed.getPhenVals(p_i)		
@@ -487,7 +495,7 @@ def _run_():
 						res = gwaResults.Result(result_file=file_name,name=mapping_method+"_"+\
 								        phenotype_name,snps=snps)
 						pvals=True
-						if mapping_method in ["emma"]:
+						if mapping_method in ['lm','emma','emmax']:
 							res.filter_attr("mafs",15)
 						results[mapping_method]=res
 	
@@ -546,7 +554,8 @@ def _run_():
 		if use_existing_results:
 			if region_plots:
 				sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-							      missingVal = missingVal, filter = debug_filter)
+							      missingVal = missingVal, filter = debug_filter,
+							      filter_accessions=filter_accessions)
 				num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)
 				if remove_outliers:
 					assert num_outliers!=0,"No outliers were removed, so it makes no sense to go on and perform GWA."
@@ -575,37 +584,42 @@ def _run_():
 		
 		if not res: #If results weren't found in a file... then do GWA.
 			gc.collect()
-			#Load genotype file (in binary format)
-			sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-						      missingVal = missingVal, filter = debug_filter)
-			
 			#Do we need to calculate the K-matrix?
-			if mapping_method in ['emma','emmax','py_emma']:
+			if mapping_method in ['emma','emmax']:
+				#Load genotype file (in binary format)
 				sys.stdout.write("Retrieving the Kinship matrix K....")
 				sys.stdout.flush()
 				k_file = data_dir+"kinship_matrix_cm"+str(callMethodID)+".pickled"
 				if not kinship_file and os.path.isfile(k_file): #Check if corresponding call_method_file is available
 					kinship_file = k_file
 				if kinship_file:   #Kinship file was supplied..
-					num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)
-					k = load_kinship_from_file(kinship_file,sd.accessions)
+					sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
+								      missingVal = missingVal, filter = debug_filter,
+								      filter_accessions=filter_accessions)
+					num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)	
+					k = lm.load_kinship_from_file(kinship_file,sd.accessions)
 				else:
+					sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
+							      missingVal = missingVal, filter = debug_filter)
 					print "No kinship file was found.  Generating kinship file:",k_file
 					snps = sd.getSnps()		
 					k_accessions = sd.accessions[:]
 					if debug_filter:
 						import random
 						snps = random.sample(snps,int(debug_filter*len(snps)))			 
-					k = calcKinship(snps)
+					k = lm.calc_kinship(snps)
 					f = open(k_file,'w')
 					pickle.dump([k,sd.accessions],f)
 					f.close()
 					num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)
-					k = filter_k_for_accessions(k, k_accessions, sd.accessions)
+					k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
 				sys.stdout.flush()
 				gc.collect()
 				sys.stdout.write("Done!.\n")
 			else:
+				sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
+							      missingVal = missingVal, filter = debug_filter,
+							      filter_accessions=filter_accessions)
 				num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)	
 			
 			snps = sd.getSnps()
@@ -667,8 +681,16 @@ def _run_():
 					pass
 					#CONNECT TO PYTHON EMMA
 				elif mapping_method in ['lm']:
-					pass
-					#CONNECT TO LINEAR MODEL
+					res = lm.linear_model(snps,phen_vals)
+					kwargs['genotype_var_perc'] = res['var_perc']
+					kwargs['beta0'] = [val[0] for val in res['betas']]
+					kwargs['beta1'] = [val[1] for val in res['betas']]
+					additional_columns.append('genotype_var_perc')
+					additional_columns.append('beta0')
+					additional_columns.append('beta1')
+					pvals = res['ps']
+					sys.stdout.write("Done!\n")
+					sys.stdout.flush()
 
 			
 			
@@ -758,52 +780,6 @@ def _run_():
 	
 	#run function ends here.
 
-
-
-				
-			
-def _filter_k_(k,indices_to_keep):
-	new_k = zeros((len(indices_to_keep),len(indices_to_keep)))
-	for i in range(len(indices_to_keep)):
-		for j in range(len(indices_to_keep)):
-			new_k[i,j]=k[indices_to_keep[i],indices_to_keep[j]]
-	k = new_k
-	return k
-
-
-def filter_k_for_accessions(k,k_accessions,accessions):
-	indices_to_keep = []
-	for i, acc in enumerate(k_accessions):
-		if acc in accessions:
-			indices_to_keep.append(i)		
-	return _filter_k_(k, indices_to_keep)
-
-
-
-def load_kinship_from_file(kinship_file,accessions=None):
-	assert os.path.isfile(kinship_file), 'File not found.'
-	sys.stdout.write("Loading K.\n")
-	sys.stdout.flush()
-	f = open(kinship_file,'r')
-	l = pickle.load(f)
-	f.close()
-	k = l[0]
-	k_accessions = l[1]
-	return filter_k_for_accessions(k,k_accessions,accessions)
-			
-		
-
-def calcKinship(snps):
-	"""
-	Requires EMMA to be installed.
-	"""
-	from rpy import r 
-	a = array(snps)
-	#r_source(script_dir+"emma_fast.R")
-	#r_emma_kinship = robjects.r['emma.kinship']
-	#return array(r_emma_kinship(a))
-	r.source(script_dir+"emma_fast.R")
-	return r.emma_kinship(a)
 
 	
 def _run_emma_mp_(in_que,out_que,confirm_que,num_splits=10):

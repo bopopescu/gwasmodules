@@ -553,44 +553,6 @@ class Result(object):
 		print "%i scores were removed."%(count-len(self.scores))
 		
 
-
-#	def filter_attr(self, attr_name, attr_threshold):
-#		"""
-#		Filter out scores/pvalues etc. which have attr<attr_threshold.	
-#		
-#		attr are e.g. 
-#		'mafs', 'marfs', 'scores', etc.	
-#		"""
-#		print "Filtering for attribute '%s' with threshold: %g"%(attr_name,attr_threshold)
-#		attr = getattr(self, attr_name)
-#		print len(attr)
-#		newScores = []
-#		newPositions = []
-#		newChromosomes = []
-#		newMafs = []
-#		newMarfs = []
-#		new_snps = []
-#		remove_count = 0
-#		for i in range(0,len(self.scores)):
-#			if attr[i]>= attr_threshold:
-#				newScores.append(self.scores[i])
-#				newPositions.append(self.positions[i])
-#				newChromosomes.append(self.chromosomes[i])
-#				newMafs.append(self.mafs[i])
-#				newMarfs.append(self.marfs[i])
-#				if self.snps:
-#					new_snps.append(self.snps[i])
-#			else:
-#				remove_count += 1
-#		
-#		self.scores = newScores
-#		self.positions = newPositions
-#		self.chromosomes = newChromosomes
-#		self.mafs = newMafs
-#		self.marfs = newMarfs
-#		self.snps=new_snps
-#		print "%i scores were removed."%(remove_count)
-
 	def filter_attr(self, attr_name, attr_threshold):
 		"""
 		Filter out scores/pvalues etc. which have attr<attr_threshold.	
@@ -620,62 +582,6 @@ class Result(object):
 		self.snps=self.snp_results['snps']
 		print "%i scores were removed."%(count-len(self.scores))
 
-
-#	def filter_maf(self, minMaf=15):
-#		"""
-#		Filter out scores/pvalues which have maf<minMaf.		
-#		"""
-#		newScores = []
-#		newPositions = []
-#		newChromosomes = []
-#		newMafs = []
-#		newMarfs = []
-#		new_snps = []
-#		for i in range(0,len(self.scores)):
-#			if self.mafs[i]>= minMaf:
-#				newScores.append(self.scores[i])
-#				newPositions.append(self.positions[i])
-#				newChromosomes.append(self.chromosomes[i])
-#				newMafs.append(self.mafs[i])
-#				newMarfs.append(self.marfs[i])
-#				if self.snps:
-#					new_snps.append(self.snps[i])
-#		
-#		self.scores = newScores
-#		self.positions = newPositions
-#		self.chromosomes = newChromosomes
-#		self.mafs = newMafs
-#		self.marfs = newMarfs
-#		self.snps=new_snps
-#
-#	def filter_marf(self, minMaf=0.1):
-#		"""
-#		Filter out scores/pvalues which have maf<minMaf.		
-#		"""
-#
-#		newScores = []
-#		newPositions = []
-#		newChromosomes = []
-#		newMafs = []
-#		newMarfs = []
-#		new_snps = []
-#		for i in range(0,len(self.scores)):
-#			if self.marfs[i]>= minMaf:
-#				newScores.append(self.scores[i])
-#				newPositions.append(self.positions[i])
-#				newChromosomes.append(self.chromosomes[i])
-#				newMafs.append(self.mafs[i])
-#				newMarfs.append(self.marfs[i])
-#				if self.snps:
-#					new_snps.append(self.snps[i])
-#
-#		
-#		self.scores = newScores
-#		self.positions = newPositions
-#		self.chromosomes = newChromosomes
-#		self.mafs = newMafs
-#		self.marfs = newMarfs
-#		self.snps=new_snps
 
 	
 	def filter_non_segregating_snps(self, ecotype1, ecotype2, accessions=None):
@@ -1007,1107 +913,1107 @@ class Result(object):
 	
 		
 		
-
-class Result_old(object):
-	"""
-	Contains information on the result.
-	"""
-
-	def __init__(self,resultFile=None,snpsds=None,chromosome_list=None,name=None,
-		     resultType=None,phenotypeID=None,interactionResult=False,load_snps=True,
-		     scores=[],snps=[],chromosomes=[],positions=[],accessions=None,
-		     marfs=[],mafs=[]):
-		"""
-		if snps is given as argument, then they must match the other data...
-		"""
-
-		self.phenotypeID =phenotypeID
-		self.resultType=resultType
-		self.name = name
-		self.scores = scores #Scores or p-values
-		self.positions = positions
-		self.chromosomes = chromosomes		
-		self.marfs = marfs #Minor allele relative frequencies.
-		self.mafs = mafs #Minor allele frequencies.
-		self.accessions = accessions
-
-		self.secondaryScores = []
-		self.secondaryPositions = []
-		self.secondaryChromosomes = []
-		self.orders = None
-		self.ranks = None
-		self.chromosomeEnds = []
-		self.snps = snps
-
-		self.interactionResult=interactionResult
-		if not chromosomes and snpsds:
-			chromosomes = range(1,len(snpsds)+1)
-		if interactionResult:
-			self.interactionPositions = []			
-		if resultFile:
-			self._loadResult_(resultFile)
-		elif scores and snpsds:
-			print "Loading p-values directly!"
-			self._load_pvals_(scores,snpsds,chromosome_list)
-		if snpsds and load_snps:
-			self._loadSnpsData_(snpsds,chromosome_list)
-
-
-
-	def _loadResult_(self,resultFile):
-		f = open(resultFile,"r")
-		lines = f.readlines()
-		try_delims = [",","\t"," ",]
-		i = 0
-		delim = try_delims[i]
-		while len(lines[0].split(delim))==1:
-			i += 1
-			delim = try_delims[i]
-		if len(lines[0].split(delim))==1:
-			raise Exception("Appropriate delimiter wasn't found.")
-		print "Delimiter used:",str(delim)	
-		line = lines[0].split(delim)
-		withMAF = len(line)>3
-		print "withMAF:", withMAF
-		start = 0
-		currChrom = -1
-		lastPos = 0
-		if not (line[0].strip()).isdigit():
-			start = 1
-			#print "Header detected"
-			#print line[0].strip()
-		if not withMAF:
-			for i in range(start,len(lines)):
-				line = lines[i].split(delim)
-				newChrom = int(line[0].strip())
-				if newChrom!=currChrom:
-					currChrom = newChrom
-					if lastPos:
-						self.chromosomeEnds.append(lastPos)
-				self.chromosomes.append(newChrom)
-				if self.interactionResult:
-					iPos = [int(line[-1].strip())]
-					self.interactionPositions.append(iPos)
-				lastPos = int(line[1].strip())
-				self.positions.append(lastPos)
-				self.scores.append(float(line[2].strip()))
-		else:
-			for i in range(start,len(lines)):
-				line = lines[i].split(delim)
-				newChrom = int(line[0].strip())
-				if newChrom!=currChrom:
-					currChrom = newChrom
-					if lastPos:
-						self.chromosomeEnds.append(lastPos)
-				self.chromosomes.append(newChrom)
-				if self.interactionResult:
-					iPos = [int(line[-1].strip())]
-					self.interactionPositions.append(iPos)
-				lastPos = int(line[1].strip())
-				self.positions.append(lastPos)
-				self.scores.append(float(line[2].strip()))
-				self.marfs.append(float(line[3].strip()))
-				self.mafs.append(float(line[4].strip()))
-								
-		self.chromosomeEnds.append(lastPos)
-		self._calcGlobalRanks_()
-		if not (len(self.positions)==len(self.mafs)==len(self.scores)):
-			print len(self.positions),len(self.mafs),len(self.scores)
-			raise Exception
-
-	
-
-	def _load_pvals_(self,result_pvals,snpsds,chromosomes):
-		print "Loading the pvalues, and snpsdata's to construct a Result object."
-		for i, snpsd in enumerate(snpsds):
-			r = snpsd.get_mafs()
-			self.mafs += r["mafs"]
-			self.marfs += r["marfs"]
-			self.positions += snpsd.positions
-			self.chromosomes += [chromosomes[i]]*len(snpsd.positions)
-			self.chromosomeEnds.append(snpsd.positions[-1])
-		self.scores = result_pvals  # Should I log transform? 
-
-	def _calcGlobalRanks_(self):
-		"""
-		This function should only be called right after loading the full results.
-		"""
-		self._rankScores_()
-		self.globalRanks = self.ranks
-		self.ranks = None
-
-
-	def _loadSnpsData_(self,snpsds,chromosomes=None):
-		"""
-		Loads the SNP data.  (only loads those which are in the results)
-		"""		
-		self.snps = []
-		self.accessions=snpsds[0].accessions
-		chr_i = 0 # chromosome index
-		chr_set = set(self.chromosomes)
-		print chr_set
-		print len(self.scores)
-		for chr_i in range(len(chromosomes)):
-			if chromosomes[chr_i] in chr_set:
-				i = 0 #result index
-				while i<len(self.scores):
-					while i<len(self.chromosomes) and chromosomes[chr_i] != self.chromosomes[i]:
-						i += 1
-					j = 0
-					pos = self.positions[i]
-					while j<len(snpsds[chr_i].positions) and pos > snpsds[chr_i].positions[j]:
-						j += 1
-					if j<len(snpsds[chr_i].positions) and pos == snpsds[chr_i].positions[j]:
-						self.snps.append(snpsds[chr_i].snps[j])
-					i += 1
-		
-				if pos > snpsds[chr_i].positions[j]:
-					while j<len(snpsds[chr_i].positions) and pos > snpsds[chr_i].positions[j]:
-						j += 1
-					if j<len(snpsds[chr_i].positions) and pos == snpsds[chr_i].positions[j]:
-						self.snps.append(snpsds[chr_i].snps[j])
-
-		if i!= len(self.snps):
-			print "Problems with loading SNPs",i,len( self.snps)
-		else:
-			print "Loading SNPs appears to have worked?"
-			
-		print "Loaded",len(self.snps)," SNPs and",len(self.accessions),"accessions."
-
-	def _rankScores_(self):
-		"""
-		Generates two data structures: 
-		self.orders (SNP indices ordered by rank)
-		self.ranks (ranks of the SNPs)
-		"""
-		rank_ls = zip(self.scores, range(0,len(self.scores)))
-		rank_ls.sort()
-		rank_ls.reverse()
-		self.orders = []
-		for j in range(0,len(rank_ls)):
-			(s,i) = rank_ls[j]
-			self.orders.append(i)
-			rank_ls[j] = (i,j)
-
-		rank_ls.sort()
-		self.ranks = []
-		for (i,j) in rank_ls:
-			self.ranks.append(j+1)
-
-
-	def getChromosomeSplit(self):
-		"""
-		"""
-		oldChrom = 0
-		chromosomeSplits = []
-		for i in range(0,len(self.scores)):
-			newChrom = self.chromosomes[i]
-			if oldChrom != newChrom:
-				while oldChrom < newChrom:
-					oldChrom += 1
-					chromosomeSplits.append((i,oldChrom))
-		chromosomeSplits.append((i,-1))
-		return chromosomeSplits
-
-			
-	def getSecondaryChromosomeSplit(self):
-		"""
-		"""
-		oldChrom = 0
-		chromosomeSplits = []
-		for i in range(0,len(self.secondaryScores)):
-			newChrom = self.secondaryChromosomes[i]
-			if oldChrom != newChrom:
-				while oldChrom < newChrom:
-					oldChrom += 1
-					chromosomeSplits.append((i,oldChrom))
-		chromosomeSplits.append((i,-1))
-		return chromosomeSplits
- 
-
-	def negLogTransform(self):
-		"""
-		apply -log(x) to the pvalues (scores)
-		"""
-		import math
-		newScores = []
-		for score in self.scores:
-			if score != 0.0:
-				newScore = -math.log(score,10)
-				newScores.append(newScore)
-			else:
-				newScores.append(50)  				
-		self.scores = newScores
-		
-
-	def filterNicePeaks(self,scoreThreshold,singletonScoreThreshold,window=[20000,20000], method=1):
-		currScoreWeight=0.2
-		currChrom = -1
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		singletonCount = 0
-		lastSecondaryEnd = 0
-		if method == 1:
-			for i in range(0,len(self.positions)):
-				if currChrom != self.chromosomes[i]: #Restart
-					currChrom = self.chromosomes[i]
-					startIndex = i #windowIndices 
-					stopIndex = i #windowIndices 
-					curScoreSum = currScoreWeight*self.scores[i]				
-					oldScore=0
-					numSNPs = 1
-				currPos = self.positions[i]
-
-				while currPos - self.positions[startIndex]>window[0]:
-					curScoreSum -= self.scores[startIndex]
-					startIndex += 1
-					numSNPs -= 1
-				
-				while stopIndex+1 < len(self.positions) and self.positions[stopIndex+1]-currPos<window[1]:
-					stopIndex += 1
-					curScoreSum += self.scores[stopIndex]
-					numSNPs += 1
-
-				curScoreSum -= oldScore				
-				oldScore = currScoreWeight*numSNPs*self.scores[i]
-				curScoreSum += oldScore
-
-				if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold) or  (numSNPs > 5 and curScoreSum/float(numSNPs) > scoreThreshold):
-					if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold):
-						singletonCount +=1 
-					newScores.append(self.scores[i])
-					newPositions.append(self.positions[i])
-					newChromosomes.append(self.chromosomes[i])
-					newMafs.append(self.mafs[i])
-					newMarfs.append(self.mafs[i])
-
-		elif method==2:
-			for i in range(0,len(self.scores)):
-				if self.scores[i]>=singletonScoreThreshold:
-					newScores.append(self.scores[i])
-					newPositions.append(self.positions[i])
-					newChromosomes.append(self.chromosomes[i])
-					newMafs.append(self.mafs[i])
-					newMarfs.append(self.mafs[i])
-
-		# The following code locates the regions before and after the "nice" SNPs.
-		j = 0
-		for i in range(0,len(self.positions)):
-			pos = self.positions[i]
-			chr = self.chromosomes[i]
-			if j < len(newPositions) and pos == newPositions[j] and chr==newChromosomes[j]:
-				k = 0				
-				while  i+k > lastSecondaryEnd and pos-self.positions[i+k-1]<window[0] and self.chromosomes[i+k-1]==chr:
-					k -= 1
-				while i+k < len(self.positions)-1 and self.positions[i+k]-pos < window[1] and self.chromosomes[i+k]==chr:
-					if i+k > lastSecondaryEnd:
-						self.secondaryScores.append(self.scores[i+k])
-						self.secondaryPositions.append(self.positions[i+k])
-						self.secondaryChromosomes.append(self.chromosomes[i+k])						
-					k+= 1 
-				lastSecondaryEnd = i+k-1
-				j += 1 
-				
-		
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-
-		print singletonCount,"singletons were added"
-
-
-	def filterPercentile(self,percentile):
-		newScores = []
-		for score in self.scores:
-			newScores.append(score)
-		newScores.sort() 
-		scoreCutoff = newScores[int(len(newScores)*percentile)]
-		self.filterScoreCutoff(scoreCutoff)
-
-
-	def filter(self, quantile=0.98, window=[25000,25000], singletonScoreCutoff=None, nicePeaks = False, method=1):
-		"""
-		Filter out scores/pvalues.
-				
-		"""
-		originalSize = len(self.scores)
-		newScores = []
-		for score in self.scores:
-			newScores.append(score)
-		newScores.sort() 
-		
-		if nicePeaks: 
-			basic_quantile = 0.90
-			top_quantile = 0.998
-			singleton_quantile=0.9998
-			
-			scoreCutoff = newScores[int(len(newScores)*basic_quantile)]
-			self._filterScoreCutoff_(scoreCutoff)
-			scoreCutoff = newScores[int(len(newScores)*top_quantile)]				
-			if not singletonScoreCutoff:
-				singletonScoreCutoff = newScores[int(len(newScores)*singleton_quantile)]
-			self.filterNicePeaks(scoreCutoff,singletonScoreCutoff,window,method)
-
-			
-		scoreCutoff = newScores[int(len(newScores)*quantile)]
-		self._filterScoreCutoff_(scoreCutoff)
-
-		finalSize = len(self.scores)
-
-		print "Original results size =",originalSize
-		print "results size after filtration =",finalSize
-
-
-	def filterMAF(self, minMaf=15):
-		"""
-		Filter out scores/pvalues which have maf<minMaf.		
-		"""
-		if self.interactionResult:
-			newIPos = []
-			for i in range(0,len(self.scores)):
-				if self.mafs[i]>= minMaf:
-					newIPos.append(self.interactionPositions[i])
-			del self.interactionPositions
-			self.interactionPositions = newIPos
-
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		for i in range(0,len(self.scores)):
-			if self.mafs[i]>= minMaf:
-				newScores.append(self.scores[i])
-				newPositions.append(self.positions[i])
-				newChromosomes.append(self.chromosomes[i])
-				newMafs.append(self.mafs[i])
-				newMarfs.append(self.marfs[i])
-
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-		
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-
-
-	def filterMARF(self, minMaf=0.1):
-		"""
-		Filter out scores/pvalues which have maf<minMaf.		
-		"""
-		if self.interactionResult:
-			newIPos = []
-			for i in range(0,len(self.scores)):
-				if self.mafs[i]>= minMaf:
-					newIPos.append(self.interactionPositions[i])
-			del self.interactionPositions
-			self.interactionPositions = newIPos
-
-		snps_indices_to_keep = []
-
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		for i in range(0,len(self.scores)):
-			if self.marfs[i]>= minMaf:
-				newScores.append(self.scores[i])
-				newPositions.append(self.positions[i])
-				newChromosomes.append(self.chromosomes[i])
-				newMafs.append(self.mafs[i])
-				newMarfs.append(self.marfs[i])
-				snps_indices_to_keep.append(i)
-
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-		
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-		return snps_indices_to_keep
-
-	
-	def filterNonSegregatingSnps(self, ecotype1, ecotype2, snpsd):
-		"""
-		Filter out all SNPs which are not segregating in the two accessions.		
-		"""
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-
-		ecotypes = snpsd.accessions
-		
-		e_i1 = ecotypes.index(ecotype1)
-		e_i2 = ecotypes.index(ecotype2)
-
-		res_chr_pos_list = zip(self.chromosomes,self.positions)
-		snpsd_chr_pos_snp_list = snpsd.getChrPosSNPList()
-
-		i = 0 #index in snpsd
-		j = 0 #index in result
-		
-		while i < len(snpsd_chr_pos_snp_list):
-			(chr,pos,snp) = snpsd_chr_pos_snp_list[i]
-			if j<len(res_chr_pos_list) and (chr,pos)==res_chr_pos_list[j]:
-				if snp[e_i1]!=snp[e_i2]:
-					newScores.append(self.scores[j])
-					newPositions.append(self.positions[j])
-					newChromosomes.append(self.chromosomes[j])
-					newMafs.append(self.mafs[j])
-					newMarfs.append(self.marfs[j])					
-				j += 1				
-			elif j<len(res_chr_pos_list) and (chr,pos)>res_chr_pos_list[j]:
-				import pdb;pdb.set_trace()
-				
-				print "ERROR!!!"
-			i += 1
-			
-		n = len(self.scores)
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-		
-		print n-len(newScores),"SNPs were removed, with",len(newScores),"remaining."
-
-			
-	def filterScoreCutoff(self, scoreCutoff):
-
-		if self.interactionResult:
-			newIPos = []
-			for i in range(0,len(self.scores)):
-				if self.scores[i]>scoreCutoff:
-					newIPos.append(self.interactionPositions[i])
-			del self.interactionPositions
-			self.interactionPositions = newIPos
-
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		for i in range(0,len(self.scores)):
-			if self.scores[i]>scoreCutoff:
-				newScores.append(self.scores[i])
-				newPositions.append(self.positions[i])
-				newChromosomes.append(self.chromosomes[i])
-				newMafs.append(self.mafs[i])
-				newMarfs.append(self.marfs[i])
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-		
-
-	def getRegions(self,window=[25000,25000]):
-		self._rankScores_()
-		snpIndex = 0
-		startPos = startPos = max(0,self.positions[0]-window[0])
-		endPos = self.positions[0]+window[1]
-		regions = []
-		snpRank = self.ranks[0]
-		chr = self.chromosomes[0]
-		maxScore = self.scores[0]
-		maxPos = self.positions[0]
-		oldPos = self.positions[0]
-		for i in range(1,len(self.positions)):
-			pos = self.positions[i]
-			if chr!=self.chromosomes[i]:
-				size = endPos-startPos
-				regions.append((snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos))
-				snpIndex = -1
-				maxScore = 0
-				startPos = max(0,pos-window[0])
-				chr = self.chromosomes[i]
-			elif pos-oldPos>sum(window):
-				size = endPos-startPos
-				regions.append((snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos))
-				maxScore = 0
-				startPos = pos-window[0]
-			if self.scores[i]>maxScore:
-				snpIndex = i 
-				snpRank = self.ranks[snpIndex]
-				maxScore = self.scores[i]
-				maxPos = self.positions[i]
-			
-			endPos = pos+window[1]
-			oldPos = pos
-		
-		regions.append((snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos))
-		
-		regions.sort()
-		
-		self.regions = []
-		for i in range(0,len(regions)):
-			(snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos) = regions[i]
-			#self.regions.append((snpIndex,startPos,endPos,chr,size,maxScore,maxPos,snpRank,i+1))
-			#def __init__(self,chromosome,startPos,endPos,snps=None,snpsd_indices=None,maxScores=None,maxPositions=None,maxSnpIndices=None,ranks=None):
-			self.regions.append(Region(chr,startPos,endPos))#,maxScores=[maxScore],maxPositions=[maxPos],maxSnpIndices=[snpIndex],ranks=[snpRank]))
-		
-		#pdb.set_trace()
-		self.regions.sort()
-		#print self.regions		
-		return self.regions
-		
-
-	def getTopSnps(self,n):
-		"""
-		returns top n SNPs
-		"""
-		import copy
-		result = copy.deepcopy(self) #Cloning
-		result.filterTopSNPs(n) 
-		return result
-	
-	def get_snps(self):
-		"""
-		Returns this result's SNPs as a list of SNP objects.
-		"""
-		raise  NotImplementedError
-		for i, snp in enumerate(self.snps):
-			SNP(position,chromosome,accessions=None,alleles=None,snpsds=None,score=None,rank=None,regionRank=None)
-			
-		
-			
-
-	def _countRegions_(self,res_ls,window=[25000,25000]):
-		oldPos = 0
-		countRegions = 0
-		chr = -1
-		for i in range(0,len(res_ls)):
-			pos = res_ls[i][1]
-			if chr!=res_ls[i][0]:
-				countRegions += 1
-				chr = res_ls[i][0]
-			elif pos-oldPos>sum(window):
-				countRegions += 1
-			oldPos = pos
-		
-		return countRegions
-
-
-	def getChrScorePos(self,chromosome):
-		"""
-		returns a list of (score,pos) tuples.
-		"""
-		i = 0
-		while i<len(self.chromosomes) and self.chromosomes[i]<chromosome:
-			i += 1
-		
-		posList = []
-		scoreList = []
-		while i<len(self.chromosomes) and self.chromosomes[i]==chromosome:
-			posList.append(self.positions[i])
-			scoreList.append(self.scores[i])
-			i += 1
-
-		return zip(scoreList,posList)
-
-	def getChrPos(self):
-		"""
-		returns a list of (chr,pos) tuples
-		"""
-		posList = []
-		chrList = []
-		for i in range(0,len(self.positions)):
-			posList.append(self.positions[i])
-			chrList.append(self.chromosomes[i])
-		return zip(chrList,posList)
-
-
-
-	def get_top_regions(self,n,distance_threshold=25000):
-		"""
-		returns a regionSet top n SNPs
-		"""
-		self._rankScores_() 
-		chromosome_ends = self.get_chromosome_ends()
-			
-		i = 0 #how many SNPs are needed
-		region_count = 0
-		regions = {1:[],2:[],3:[],4:[],5:[]}  #a list of (chromosome,start,stop)
-		while region_count < n:
-			snp_i = self.orders[i]
-			snp_pos = self.positions[snp_i]
-			chromosome = self.chromosomes[snp_i]
-			new_snp_reg = (chromosome,max(snp_pos-distance_threshold,0),min(snp_pos+distance_threshold,chromosome_ends[chromosome-1]))
-			merged=False
-			for reg_i,reg in enumerate(regions[chromosome]):
-				if (new_snp_reg[1]<reg[2] and new_snp_reg[2]>reg[2]) or (new_snp_reg[1]<reg[1] and new_snp_reg[2]>reg[1]): #then merge					
-					merged_reg = (reg[0],min(reg[1],new_snp_reg[1]),max(reg[2],new_snp_reg[2]))
-					print "Merged region:",merged_reg
-					regions[chromosome][reg_i] = merged_reg     
-					merged=True
-					break
-				elif (new_snp_reg[1]>reg[2] and new_snp_reg[2]<reg[2]):
-					merged=True  #It's already covered
-					break
-			if not merged:
-				regions[chromosome].append(new_snp_reg)
-				region_count+=1
-			i += 1 
-		
-		regions_list = regions[1]+regions[2]+regions[3]+regions[4]+regions[5]
-		return regions_list 
-	
-	def get_region_result(self,chromosome,start_pos,end_pos):
-		"""
-		returns a result object with only the SNPs, etc. within the given boundary. 
-		"""
-		positions = []
-		scores = []
-		snps = []
-		mafs = []
-		marfs = []
-		chromosomes = []
-		i = 0
-		while i<len(self.chromosomes) and self.chromosomes[i]!=chromosome: 
-			i += 1
-		while i<len(self.chromosomes) and self.positions[i]<start_pos:
-			i += 1
-		if i == len(self.chromosomes):
-			raise Exception("region results never found!")
-		
-		while i<len(self.chromosomes) and self.positions[i]<=end_pos and self.chromosomes[i]==chromosome:
-			chromosomes.append(chromosome)
-			positions.append(self.positions[i])
-			scores.append(self.scores[i])
-			snps.append(self.snps[i])
-			mafs.append(self.mafs[i])
-			marfs.append(self.marfs[i])	
-		
-		return Result(resultType=self.resultType,phenotypeID=self.phenotypeID,
-			      scores=scores,chromosomes=chromosomes,positions=positions,
-			      snps=snps,accessions=self.accessions,marfs=marfs,mafs=mafs)
-		
-		
-		
-	def get_top_region_results(self,n,distance_threshold=25000):
-		reg_results = []
-		i = 0
-		for reg in self.get_top_regions(n, distance_threshold):
-			reg_results.append(self.get_region_result(*reg))
-		return reg_results
-	
-
-	def filterTopSNPs(self,n):
-		self._rankScores_() #Making sure the ranks are updated
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		l = self.orders[0:n]
-		l.sort()
-	
-		for i in l:
-			newScores.append(self.scores[i])
-			newPositions.append(self.positions[i])
-			newChromosomes.append(self.chromosomes[i])
-			newMafs.append(self.mafs[i])
-			newMarfs.append(self.marfs[i])
-
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-
-
-	def _sortByChrPos_(self):
-		res_ls = zip(self.chromosomes,self.positions,self.scores,self.mafs,self.marfs)
-		res_ls.sort()
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		for (chr,pos,score,maf,marf) in res_ls:
-			newScores.append(score)
-			newPositions.append(pos)
-			newChromosomes.append(chr)
-			newMafs.append(maf)
-			newMarfs.append(marf)
-
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-
-
-	def get_chromosome_ends(self):
-		if not self.chromosomeEnds:
-			self._sortByChrPos_()
-			i = 0
-			ch_i = 0
-			curr_chr = self.chromosomes[i]
-			chromosome_ends = [] 
-			while ch_i<5:
-				while i<len(self.chromosomes) and self.chromosomes[i]==curr_chr:
-					i += 1
-				chromosome_ends.append(self.positions[i-1])
-			self.chromosomeEnds = chromosome_ends
-		return self.chromosomeEnds
-		
-
-	def filterTopRegions(self,n,window=[25000,25000],minScore=None):
-		self._rankScores_() 
-		oldScores = self.scores
-		oldPositions = self.positions
-		oldChromosomes = self.chromosomes
-		oldMafs = self.mafs
-		oldMarfs = self.marfs
-		oldGlobalRanks = self.globalRanks
-
-		self.scores = []
-		self.positions = []
-		self.chromosomes = []
-		self.mafs = []
-		self.marfs = []
-		elf.globalRanks = []
-		regionCount = 0 
-		i = 0 
-		
-		res_ls = []
-		while regionCount < n:
-			res_ls.append((oldChromosomes[self.orders[i]],oldPositions[self.orders[i]]))
-			res_ls.sort()
-			if minScore and oldScores[self.orders[i]]<minScore:
-				break
-			self.scores.append(oldScores[self.orders[i]])
-			self.positions.append(oldPositions[self.orders[i]])
-			self.chromosomes.append(oldChromosomes[self.orders[i]])
-			self.mafs.append(oldMafs[self.orders[i]])
-			self.marfs.append(oldMarfs[self.orders[i]])
-			self.globalRanks.append(oldGlobalRanks[self.orders[i]])
-			regionCount = self._countRegions_(res_ls,window=window)
-			i += 1 
-		
-		del oldScores
-		del oldPositions
-		del oldChromosomes
-		del oldMafs
-		del oldMarfs
-		del oldGlobalRanks
-
-		self._sortByChrPos_()
-
-
-		
-			
-
-	def mergeWith(self,snpResult):
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		
-		i1 = 0
-		
-		pos1 = self.positions[i1] 
-		chr1 = self.chromosomes[i1]
-
-		for i2 in range(0,len(snpResult.positions)):
-			pos2 = snpResult.positions[i2]
-			chr2 = snpResult.chromosomes[i2]
-			while i1 <len(self.positions)-1 and (chr1,pos1)<(chr2,pos2):
-				newPositions.append(self.positions[i1])
-				newChromosomes.append(self.chromosomes[i1])
-				newScores.append(self.scores[i1])
-				newMafs.append(self.mafs[i1])
-				newMarfs.append(self.marfs[i1])
-				i1 += 1
-				pos1 = self.positions[i1]
-				chr1 = self.chromosomes[i1]
-
-			if i1 <len(self.positions)-1 and (chr1,pos1)==(chr2,pos2):
-				i1 += 1
-				pos1 = self.positions[i1]
-				chr1 = self.chromosomes[i1]
-
-			newPositions.append(snpResult.positions[i2])
-			newChromosomes.append(snpResult.chromosomes[i2])
-			newScores.append(snpResult.scores[i2])
-			newMafs.append(snpResult.mafs[i2])
-			newMarfs.append(snpResult.marfs[i2])
-
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-
-	def clone(self):
-		if self.snps:
-			result = SNPResult(name=self.name)
-			result.snps = self.snps + []
-		else:
-			result = Result(name=self.name)
-		result.resultType = self.resultType
-		result.name = self.name
-		result.scores = self.scores + []
-		result.positions = self.positions + []
-		result.chromosomes = self.chromosomes + []
-		result.chromosomeEnds = self.chromosomeEnds + []
-		result.marfs = self.marfs + [] #Minor allele relative frequencies.
-		result.mafs = self.mafs + [] #Minor allele frequencies.
-		if self.accessions:
-			result.accessions = self.accessions + []
-		if self.orders:
-		   result.orders = self.orders + []
-		if self.ranks:
-		   result.ranks = self.ranks + []
-		return result
-
-	
-	def naMAF(self, minMaf=10):
-		"""
-		NA scores/pvalues which have maf<minMaf.		
-		"""
-		for i in range(0,len(self.scores)):
-			if self.mafs[i]< minMaf:
-				self.scores[i]= "NA"
-
-
-	def alexFiltering(self,emmaScores,cutoff=6,window=[50000,50000]): 
-		"""
-		
-		"""
-		scoreList = zip(emmaScores,self.scores)
-		
-		scoreList.sort()
-		scoreList.reverse()
-		
-		cScores = []
-		i=0
-		emmaScore = scoreList[0][0]
-		while emmaScore>cutoff: 
-			cScores.append(scoreList[i][1])
-			i += 1
-			emmaScore = scoreList[i][0]
-
-
-		#Always top 5 regions, and at most 20 regions,  continue until cutoff is reached.
-
-
-		if len(cScores):
-			first5Regions = self.clone()
-			first5Regions.filterTopRegions(5,window=window)
-			cScoreCutoff = min(cScores)
-			self.filterTopRegions(20,window=window)
-			self.filterScoreCutoff(cScoreCutoff)
-			self.mergeWith(first5Regions)
-		else:
-			self.filterTopRegions(5,window=window)
-			
-	def updateRegions(self,regionList):
-		self._rankScores_()
-		i=0
-		rl_i=0 #region list index
-		while rl_i<len(regionList):
-			region = regionList[rl_i]
-			cp1=(self.chromosomes[i],self.positions[i])
-			cp_start=(region.chromosome,region.startPos)
-			while cp1 < cp_start:
-				i += 1
-				cp1=(self.chromosomes[i],self.positions[i])
-			cp_end=(region.chromosome,region.endPos)
-
-			maxScore = 0
-			maxRank = 0
-			maxPos = 0 
-			while cp1<=cp_end:
-				"""Update current region!"""
-				if maxScore < self.scores[i]:
-					maxScore = self.scores[i]
-					maxRank = self.ranks[i]
-					maxPos = self.positions[i]
-				i += 1
-				cp1=(self.chromosomes[i],self.positions[i])
-						
-			region.snpsInfo[self.resultType.name] = {"maxScore":maxScore,"maxRank":maxRank,"maxPos":maxPos}
-			rl_i += 1
-			
-	
-	def writeToFile(self,filename,format="simple"):
-		f = open(filename,"w")
-		f.write("Chromosome,Position,Score,MARF,MAF \n")
-		for (ch,pos,score,marf,maf) in zip(self.chromosomes,self.positions,self.scores,self.marfs,self.mafs):
-			l = map(str,[ch,pos,score,marf,maf])
-			f.write(",".join(l)+"\n")
-		f.close()
-		
-		
-		
-class EmmaResult(Result):
-	"""
-	Loads information on variance estimates and maximum likelihood as well...
-	"""			
-	def __init__(self,resultFile=None,snpsds=None,name=None,resultType=None,phenotypeID=None,interactionResult=False):
-
-		self.phenotypeID =phenotypeID
-		self.resultType=resultType
-		self.name = name
-		self.scores = [] #Scores or p-values
-		self.positions = []
-		self.chromosomes = []
-		self.chromosomeEnds = []
-		self.marfs = [] #Minor allele relative frequencies.
-		self.mafs = [] #Minor allele frequencies.
-		self.var_expl = [] #Variance explained
-		self.ml = [] #Maximum likelihood
-		self.vg = [] #Genetic variance scalar
-		self.ve = [] #Error variance scalar
-		self.accessions = None
-
-		self.secondaryScores = []
-		self.secondaryPositions = []
-		self.secondaryChromosomes = []
-		self.orders = None
-		self.ranks = None
-		self.snps = None
-		self.interactionResult=interactionResult
-		if interactionResult:
-			self.interactionPositions = []			
-		if resultFile:
-			self._loadResult_(resultFile)
-		if snpsds:
-			self._loadSnpsData_(snpsds)
-
-	
-	def _loadResult_(self,resultFile):
-		f = open(resultFile,"r")
-		lines = f.readlines()
-		line = lines[0].split(",")
-		withMAF = len(line)>3
-		start = 0
-		currChrom = -1
-		lastPos = 0
-		if not (line[0].strip()).isdigit():
-			start = 1
-
-		for i in range(start,len(lines)):
-			line = lines[i].split(",")
-			newChrom = int(line[0].strip())
-			if newChrom!=currChrom:
-				currChrom = newChrom
-				if lastPos:
-					self.chromosomeEnds.append(lastPos)
-			self.chromosomes.append(newChrom)
-			if self.interactionResult:
-				iPos = [int(line[-1].strip())]
-				self.interactionPositions.append(iPos)
-			lastPos = int(line[1].strip())
-			self.positions.append(lastPos)
-			self.scores.append(float(line[2].strip()))
-			self.marfs.append(float(line[3].strip()))
-			self.mafs.append(float(line[4].strip()))
-			self.var_expl.append(float(line[5].strip()))
-			self.ml.append(float(line[6].strip()))
-			self.vg.append(float(line[7].strip()))
-			self.ve.append(float(line[8].strip()))
-								
-		self.chromosomeEnds.append(lastPos)
-		self._calcGlobalRanks_()
-
-	def filterMARF(self, minMaf=0.1):
-		"""
-		Filter out scores/pvalues which have maf<minMaf.		
-		"""
-		if self.interactionResult:
-			newIPos = []
-			for i in range(0,len(self.scores)):
-				if self.mafs[i]>= minMaf:
-					newIPos.append(self.interactionPositions[i])
-			del self.interactionPositions
-			self.interactionPositions = newIPos
-
-		newScores = []
-		newPositions = []
-		newChromosomes = []
-		newMafs = []
-		newMarfs = []
-		newVarExpl = []
-		newML = []
-		newVG = []
-		newVE = []
-		for i in range(0,len(self.scores)):
-			if self.marfs[i]>= minMaf:
-				newScores.append(self.scores[i])
-				newPositions.append(self.positions[i])
-				newChromosomes.append(self.chromosomes[i])
-				newMafs.append(self.mafs[i])
-				newMarfs.append(self.marfs[i])
-				newVarExpl.append(self.var_expl[i])
-				newML.append(self.ml[i])
-				newVG.append(self.vg[i])
-				newVE.append(self.ve[i])
-
-		del self.scores
-		del self.positions
-		del self.chromosomes
-		del self.mafs
-		del self.marfs
-		del self.var_expl
-		del self.ml
-		del self.vg
-		del self.ve
-		
-		self.scores = newScores
-		self.positions = newPositions
-		self.chromosomes = newChromosomes
-		self.mafs = newMafs
-		self.marfs = newMarfs
-		self.var_expl = newVarExpl
-		self.ml = newML
-		self.vg = newVG
-		self.ve = newVE
+#
+#class Result_old(object):
+#	"""
+#	Contains information on the result.
+#	"""
+#
+#	def __init__(self,resultFile=None,snpsds=None,chromosome_list=None,name=None,
+#		     resultType=None,phenotypeID=None,interactionResult=False,load_snps=True,
+#		     scores=[],snps=[],chromosomes=[],positions=[],accessions=None,
+#		     marfs=[],mafs=[]):
+#		"""
+#		if snps is given as argument, then they must match the other data...
+#		"""
+#
+#		self.phenotypeID =phenotypeID
+#		self.resultType=resultType
+#		self.name = name
+#		self.scores = scores #Scores or p-values
+#		self.positions = positions
+#		self.chromosomes = chromosomes		
+#		self.marfs = marfs #Minor allele relative frequencies.
+#		self.mafs = mafs #Minor allele frequencies.
+#		self.accessions = accessions
+#
+#		self.secondaryScores = []
+#		self.secondaryPositions = []
+#		self.secondaryChromosomes = []
+#		self.orders = None
+#		self.ranks = None
+#		self.chromosomeEnds = []
+#		self.snps = snps
+#
+#		self.interactionResult=interactionResult
+#		if not chromosomes and snpsds:
+#			chromosomes = range(1,len(snpsds)+1)
+#		if interactionResult:
+#			self.interactionPositions = []			
+#		if resultFile:
+#			self._loadResult_(resultFile)
+#		elif scores and snpsds:
+#			print "Loading p-values directly!"
+#			self._load_pvals_(scores,snpsds,chromosome_list)
+#		if snpsds and load_snps:
+#			self._loadSnpsData_(snpsds,chromosome_list)
+#
+#
+#
+#	def _loadResult_(self,resultFile):
+#		f = open(resultFile,"r")
+#		lines = f.readlines()
+#		try_delims = [",","\t"," ",]
+#		i = 0
+#		delim = try_delims[i]
+#		while len(lines[0].split(delim))==1:
+#			i += 1
+#			delim = try_delims[i]
+#		if len(lines[0].split(delim))==1:
+#			raise Exception("Appropriate delimiter wasn't found.")
+#		print "Delimiter used:",str(delim)	
+#		line = lines[0].split(delim)
+#		withMAF = len(line)>3
+#		print "withMAF:", withMAF
+#		start = 0
+#		currChrom = -1
+#		lastPos = 0
+#		if not (line[0].strip()).isdigit():
+#			start = 1
+#			#print "Header detected"
+#			#print line[0].strip()
+#		if not withMAF:
+#			for i in range(start,len(lines)):
+#				line = lines[i].split(delim)
+#				newChrom = int(line[0].strip())
+#				if newChrom!=currChrom:
+#					currChrom = newChrom
+#					if lastPos:
+#						self.chromosomeEnds.append(lastPos)
+#				self.chromosomes.append(newChrom)
+#				if self.interactionResult:
+#					iPos = [int(line[-1].strip())]
+#					self.interactionPositions.append(iPos)
+#				lastPos = int(line[1].strip())
+#				self.positions.append(lastPos)
+#				self.scores.append(float(line[2].strip()))
+#		else:
+#			for i in range(start,len(lines)):
+#				line = lines[i].split(delim)
+#				newChrom = int(line[0].strip())
+#				if newChrom!=currChrom:
+#					currChrom = newChrom
+#					if lastPos:
+#						self.chromosomeEnds.append(lastPos)
+#				self.chromosomes.append(newChrom)
+#				if self.interactionResult:
+#					iPos = [int(line[-1].strip())]
+#					self.interactionPositions.append(iPos)
+#				lastPos = int(line[1].strip())
+#				self.positions.append(lastPos)
+#				self.scores.append(float(line[2].strip()))
+#				self.marfs.append(float(line[3].strip()))
+#				self.mafs.append(float(line[4].strip()))
+#								
+#		self.chromosomeEnds.append(lastPos)
+#		self._calcGlobalRanks_()
+#		if not (len(self.positions)==len(self.mafs)==len(self.scores)):
+#			print len(self.positions),len(self.mafs),len(self.scores)
+#			raise Exception
+#
+#	
+#
+#	def _load_pvals_(self,result_pvals,snpsds,chromosomes):
+#		print "Loading the pvalues, and snpsdata's to construct a Result object."
+#		for i, snpsd in enumerate(snpsds):
+#			r = snpsd.get_mafs()
+#			self.mafs += r["mafs"]
+#			self.marfs += r["marfs"]
+#			self.positions += snpsd.positions
+#			self.chromosomes += [chromosomes[i]]*len(snpsd.positions)
+#			self.chromosomeEnds.append(snpsd.positions[-1])
+#		self.scores = result_pvals  # Should I log transform? 
+#
+#	def _calcGlobalRanks_(self):
+#		"""
+#		This function should only be called right after loading the full results.
+#		"""
+#		self._rankScores_()
+#		self.globalRanks = self.ranks
+#		self.ranks = None
+#
+#
+#	def _loadSnpsData_(self,snpsds,chromosomes=None):
+#		"""
+#		Loads the SNP data.  (only loads those which are in the results)
+#		"""		
+#		self.snps = []
+#		self.accessions=snpsds[0].accessions
+#		chr_i = 0 # chromosome index
+#		chr_set = set(self.chromosomes)
+#		print chr_set
+#		print len(self.scores)
+#		for chr_i in range(len(chromosomes)):
+#			if chromosomes[chr_i] in chr_set:
+#				i = 0 #result index
+#				while i<len(self.scores):
+#					while i<len(self.chromosomes) and chromosomes[chr_i] != self.chromosomes[i]:
+#						i += 1
+#					j = 0
+#					pos = self.positions[i]
+#					while j<len(snpsds[chr_i].positions) and pos > snpsds[chr_i].positions[j]:
+#						j += 1
+#					if j<len(snpsds[chr_i].positions) and pos == snpsds[chr_i].positions[j]:
+#						self.snps.append(snpsds[chr_i].snps[j])
+#					i += 1
+#		
+#				if pos > snpsds[chr_i].positions[j]:
+#					while j<len(snpsds[chr_i].positions) and pos > snpsds[chr_i].positions[j]:
+#						j += 1
+#					if j<len(snpsds[chr_i].positions) and pos == snpsds[chr_i].positions[j]:
+#						self.snps.append(snpsds[chr_i].snps[j])
+#
+#		if i!= len(self.snps):
+#			print "Problems with loading SNPs",i,len( self.snps)
+#		else:
+#			print "Loading SNPs appears to have worked?"
+#			
+#		print "Loaded",len(self.snps)," SNPs and",len(self.accessions),"accessions."
+#
+#	def _rankScores_(self):
+#		"""
+#		Generates two data structures: 
+#		self.orders (SNP indices ordered by rank)
+#		self.ranks (ranks of the SNPs)
+#		"""
+#		rank_ls = zip(self.scores, range(0,len(self.scores)))
+#		rank_ls.sort()
+#		rank_ls.reverse()
+#		self.orders = []
+#		for j in range(0,len(rank_ls)):
+#			(s,i) = rank_ls[j]
+#			self.orders.append(i)
+#			rank_ls[j] = (i,j)
+#
+#		rank_ls.sort()
+#		self.ranks = []
+#		for (i,j) in rank_ls:
+#			self.ranks.append(j+1)
+#
+#
+#	def getChromosomeSplit(self):
+#		"""
+#		"""
+#		oldChrom = 0
+#		chromosomeSplits = []
+#		for i in range(0,len(self.scores)):
+#			newChrom = self.chromosomes[i]
+#			if oldChrom != newChrom:
+#				while oldChrom < newChrom:
+#					oldChrom += 1
+#					chromosomeSplits.append((i,oldChrom))
+#		chromosomeSplits.append((i,-1))
+#		return chromosomeSplits
+#
+#			
+#	def getSecondaryChromosomeSplit(self):
+#		"""
+#		"""
+#		oldChrom = 0
+#		chromosomeSplits = []
+#		for i in range(0,len(self.secondaryScores)):
+#			newChrom = self.secondaryChromosomes[i]
+#			if oldChrom != newChrom:
+#				while oldChrom < newChrom:
+#					oldChrom += 1
+#					chromosomeSplits.append((i,oldChrom))
+#		chromosomeSplits.append((i,-1))
+#		return chromosomeSplits
+# 
+#
+#	def negLogTransform(self):
+#		"""
+#		apply -log(x) to the pvalues (scores)
+#		"""
+#		import math
+#		newScores = []
+#		for score in self.scores:
+#			if score != 0.0:
+#				newScore = -math.log(score,10)
+#				newScores.append(newScore)
+#			else:
+#				newScores.append(50)  				
+#		self.scores = newScores
+#		
+#
+#	def filterNicePeaks(self,scoreThreshold,singletonScoreThreshold,window=[20000,20000], method=1):
+#		currScoreWeight=0.2
+#		currChrom = -1
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		singletonCount = 0
+#		lastSecondaryEnd = 0
+#		if method == 1:
+#			for i in range(0,len(self.positions)):
+#				if currChrom != self.chromosomes[i]: #Restart
+#					currChrom = self.chromosomes[i]
+#					startIndex = i #windowIndices 
+#					stopIndex = i #windowIndices 
+#					curScoreSum = currScoreWeight*self.scores[i]				
+#					oldScore=0
+#					numSNPs = 1
+#				currPos = self.positions[i]
+#
+#				while currPos - self.positions[startIndex]>window[0]:
+#					curScoreSum -= self.scores[startIndex]
+#					startIndex += 1
+#					numSNPs -= 1
+#				
+#				while stopIndex+1 < len(self.positions) and self.positions[stopIndex+1]-currPos<window[1]:
+#					stopIndex += 1
+#					curScoreSum += self.scores[stopIndex]
+#					numSNPs += 1
+#
+#				curScoreSum -= oldScore				
+#				oldScore = currScoreWeight*numSNPs*self.scores[i]
+#				curScoreSum += oldScore
+#
+#				if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold) or  (numSNPs > 5 and curScoreSum/float(numSNPs) > scoreThreshold):
+#					if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold):
+#						singletonCount +=1 
+#					newScores.append(self.scores[i])
+#					newPositions.append(self.positions[i])
+#					newChromosomes.append(self.chromosomes[i])
+#					newMafs.append(self.mafs[i])
+#					newMarfs.append(self.mafs[i])
+#
+#		elif method==2:
+#			for i in range(0,len(self.scores)):
+#				if self.scores[i]>=singletonScoreThreshold:
+#					newScores.append(self.scores[i])
+#					newPositions.append(self.positions[i])
+#					newChromosomes.append(self.chromosomes[i])
+#					newMafs.append(self.mafs[i])
+#					newMarfs.append(self.mafs[i])
+#
+#		# The following code locates the regions before and after the "nice" SNPs.
+#		j = 0
+#		for i in range(0,len(self.positions)):
+#			pos = self.positions[i]
+#			chr = self.chromosomes[i]
+#			if j < len(newPositions) and pos == newPositions[j] and chr==newChromosomes[j]:
+#				k = 0				
+#				while  i+k > lastSecondaryEnd and pos-self.positions[i+k-1]<window[0] and self.chromosomes[i+k-1]==chr:
+#					k -= 1
+#				while i+k < len(self.positions)-1 and self.positions[i+k]-pos < window[1] and self.chromosomes[i+k]==chr:
+#					if i+k > lastSecondaryEnd:
+#						self.secondaryScores.append(self.scores[i+k])
+#						self.secondaryPositions.append(self.positions[i+k])
+#						self.secondaryChromosomes.append(self.chromosomes[i+k])						
+#					k+= 1 
+#				lastSecondaryEnd = i+k-1
+#				j += 1 
+#				
+#		
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#
+#		print singletonCount,"singletons were added"
+#
+#
+#	def filterPercentile(self,percentile):
+#		newScores = []
+#		for score in self.scores:
+#			newScores.append(score)
+#		newScores.sort() 
+#		scoreCutoff = newScores[int(len(newScores)*percentile)]
+#		self.filterScoreCutoff(scoreCutoff)
+#
+#
+#	def filter(self, quantile=0.98, window=[25000,25000], singletonScoreCutoff=None, nicePeaks = False, method=1):
+#		"""
+#		Filter out scores/pvalues.
+#				
+#		"""
+#		originalSize = len(self.scores)
+#		newScores = []
+#		for score in self.scores:
+#			newScores.append(score)
+#		newScores.sort() 
+#		
+#		if nicePeaks: 
+#			basic_quantile = 0.90
+#			top_quantile = 0.998
+#			singleton_quantile=0.9998
+#			
+#			scoreCutoff = newScores[int(len(newScores)*basic_quantile)]
+#			self._filterScoreCutoff_(scoreCutoff)
+#			scoreCutoff = newScores[int(len(newScores)*top_quantile)]				
+#			if not singletonScoreCutoff:
+#				singletonScoreCutoff = newScores[int(len(newScores)*singleton_quantile)]
+#			self.filterNicePeaks(scoreCutoff,singletonScoreCutoff,window,method)
+#
+#			
+#		scoreCutoff = newScores[int(len(newScores)*quantile)]
+#		self._filterScoreCutoff_(scoreCutoff)
+#
+#		finalSize = len(self.scores)
+#
+#		print "Original results size =",originalSize
+#		print "results size after filtration =",finalSize
+#
+#
+#	def filterMAF(self, minMaf=15):
+#		"""
+#		Filter out scores/pvalues which have maf<minMaf.		
+#		"""
+#		if self.interactionResult:
+#			newIPos = []
+#			for i in range(0,len(self.scores)):
+#				if self.mafs[i]>= minMaf:
+#					newIPos.append(self.interactionPositions[i])
+#			del self.interactionPositions
+#			self.interactionPositions = newIPos
+#
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		for i in range(0,len(self.scores)):
+#			if self.mafs[i]>= minMaf:
+#				newScores.append(self.scores[i])
+#				newPositions.append(self.positions[i])
+#				newChromosomes.append(self.chromosomes[i])
+#				newMafs.append(self.mafs[i])
+#				newMarfs.append(self.marfs[i])
+#
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#		
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#
+#
+#	def filterMARF(self, minMaf=0.1):
+#		"""
+#		Filter out scores/pvalues which have maf<minMaf.		
+#		"""
+#		if self.interactionResult:
+#			newIPos = []
+#			for i in range(0,len(self.scores)):
+#				if self.mafs[i]>= minMaf:
+#					newIPos.append(self.interactionPositions[i])
+#			del self.interactionPositions
+#			self.interactionPositions = newIPos
+#
+#		snps_indices_to_keep = []
+#
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		for i in range(0,len(self.scores)):
+#			if self.marfs[i]>= minMaf:
+#				newScores.append(self.scores[i])
+#				newPositions.append(self.positions[i])
+#				newChromosomes.append(self.chromosomes[i])
+#				newMafs.append(self.mafs[i])
+#				newMarfs.append(self.marfs[i])
+#				snps_indices_to_keep.append(i)
+#
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#		
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#		return snps_indices_to_keep
+#
+#	
+#	def filterNonSegregatingSnps(self, ecotype1, ecotype2, snpsd):
+#		"""
+#		Filter out all SNPs which are not segregating in the two accessions.		
+#		"""
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#
+#		ecotypes = snpsd.accessions
+#		
+#		e_i1 = ecotypes.index(ecotype1)
+#		e_i2 = ecotypes.index(ecotype2)
+#
+#		res_chr_pos_list = zip(self.chromosomes,self.positions)
+#		snpsd_chr_pos_snp_list = snpsd.getChrPosSNPList()
+#
+#		i = 0 #index in snpsd
+#		j = 0 #index in result
+#		
+#		while i < len(snpsd_chr_pos_snp_list):
+#			(chr,pos,snp) = snpsd_chr_pos_snp_list[i]
+#			if j<len(res_chr_pos_list) and (chr,pos)==res_chr_pos_list[j]:
+#				if snp[e_i1]!=snp[e_i2]:
+#					newScores.append(self.scores[j])
+#					newPositions.append(self.positions[j])
+#					newChromosomes.append(self.chromosomes[j])
+#					newMafs.append(self.mafs[j])
+#					newMarfs.append(self.marfs[j])					
+#				j += 1				
+#			elif j<len(res_chr_pos_list) and (chr,pos)>res_chr_pos_list[j]:
+#				import pdb;pdb.set_trace()
+#				
+#				print "ERROR!!!"
+#			i += 1
+#			
+#		n = len(self.scores)
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#		
+#		print n-len(newScores),"SNPs were removed, with",len(newScores),"remaining."
+#
+#			
+#	def filterScoreCutoff(self, scoreCutoff):
+#
+#		if self.interactionResult:
+#			newIPos = []
+#			for i in range(0,len(self.scores)):
+#				if self.scores[i]>scoreCutoff:
+#					newIPos.append(self.interactionPositions[i])
+#			del self.interactionPositions
+#			self.interactionPositions = newIPos
+#
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		for i in range(0,len(self.scores)):
+#			if self.scores[i]>scoreCutoff:
+#				newScores.append(self.scores[i])
+#				newPositions.append(self.positions[i])
+#				newChromosomes.append(self.chromosomes[i])
+#				newMafs.append(self.mafs[i])
+#				newMarfs.append(self.marfs[i])
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#		
+#
+#	def getRegions(self,window=[25000,25000]):
+#		self._rankScores_()
+#		snpIndex = 0
+#		startPos = startPos = max(0,self.positions[0]-window[0])
+#		endPos = self.positions[0]+window[1]
+#		regions = []
+#		snpRank = self.ranks[0]
+#		chr = self.chromosomes[0]
+#		maxScore = self.scores[0]
+#		maxPos = self.positions[0]
+#		oldPos = self.positions[0]
+#		for i in range(1,len(self.positions)):
+#			pos = self.positions[i]
+#			if chr!=self.chromosomes[i]:
+#				size = endPos-startPos
+#				regions.append((snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos))
+#				snpIndex = -1
+#				maxScore = 0
+#				startPos = max(0,pos-window[0])
+#				chr = self.chromosomes[i]
+#			elif pos-oldPos>sum(window):
+#				size = endPos-startPos
+#				regions.append((snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos))
+#				maxScore = 0
+#				startPos = pos-window[0]
+#			if self.scores[i]>maxScore:
+#				snpIndex = i 
+#				snpRank = self.ranks[snpIndex]
+#				maxScore = self.scores[i]
+#				maxPos = self.positions[i]
+#			
+#			endPos = pos+window[1]
+#			oldPos = pos
+#		
+#		regions.append((snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos))
+#		
+#		regions.sort()
+#		
+#		self.regions = []
+#		for i in range(0,len(regions)):
+#			(snpRank,snpIndex,startPos,endPos,chr,size,maxScore,maxPos) = regions[i]
+#			#self.regions.append((snpIndex,startPos,endPos,chr,size,maxScore,maxPos,snpRank,i+1))
+#			#def __init__(self,chromosome,startPos,endPos,snps=None,snpsd_indices=None,maxScores=None,maxPositions=None,maxSnpIndices=None,ranks=None):
+#			self.regions.append(Region(chr,startPos,endPos))#,maxScores=[maxScore],maxPositions=[maxPos],maxSnpIndices=[snpIndex],ranks=[snpRank]))
+#		
+#		#pdb.set_trace()
+#		self.regions.sort()
+#		#print self.regions		
+#		return self.regions
+#		
+#
+#	def getTopSnps(self,n):
+#		"""
+#		returns top n SNPs
+#		"""
+#		import copy
+#		result = copy.deepcopy(self) #Cloning
+#		result.filterTopSNPs(n) 
+#		return result
+#	
+#	def get_snps(self):
+#		"""
+#		Returns this result's SNPs as a list of SNP objects.
+#		"""
+#		raise  NotImplementedError
+#		for i, snp in enumerate(self.snps):
+#			SNP(position,chromosome,accessions=None,alleles=None,snpsds=None,score=None,rank=None,regionRank=None)
+#			
+#		
+#			
+#
+#	def _countRegions_(self,res_ls,window=[25000,25000]):
+#		oldPos = 0
+#		countRegions = 0
+#		chr = -1
+#		for i in range(0,len(res_ls)):
+#			pos = res_ls[i][1]
+#			if chr!=res_ls[i][0]:
+#				countRegions += 1
+#				chr = res_ls[i][0]
+#			elif pos-oldPos>sum(window):
+#				countRegions += 1
+#			oldPos = pos
+#		
+#		return countRegions
+#
+#
+#	def getChrScorePos(self,chromosome):
+#		"""
+#		returns a list of (score,pos) tuples.
+#		"""
+#		i = 0
+#		while i<len(self.chromosomes) and self.chromosomes[i]<chromosome:
+#			i += 1
+#		
+#		posList = []
+#		scoreList = []
+#		while i<len(self.chromosomes) and self.chromosomes[i]==chromosome:
+#			posList.append(self.positions[i])
+#			scoreList.append(self.scores[i])
+#			i += 1
+#
+#		return zip(scoreList,posList)
+#
+#	def getChrPos(self):
+#		"""
+#		returns a list of (chr,pos) tuples
+#		"""
+#		posList = []
+#		chrList = []
+#		for i in range(0,len(self.positions)):
+#			posList.append(self.positions[i])
+#			chrList.append(self.chromosomes[i])
+#		return zip(chrList,posList)
+#
+#
+#
+#	def get_top_regions(self,n,distance_threshold=25000):
+#		"""
+#		returns a regionSet top n SNPs
+#		"""
+#		self._rankScores_() 
+#		chromosome_ends = self.get_chromosome_ends()
+#			
+#		i = 0 #how many SNPs are needed
+#		region_count = 0
+#		regions = {1:[],2:[],3:[],4:[],5:[]}  #a list of (chromosome,start,stop)
+#		while region_count < n:
+#			snp_i = self.orders[i]
+#			snp_pos = self.positions[snp_i]
+#			chromosome = self.chromosomes[snp_i]
+#			new_snp_reg = (chromosome,max(snp_pos-distance_threshold,0),min(snp_pos+distance_threshold,chromosome_ends[chromosome-1]))
+#			merged=False
+#			for reg_i,reg in enumerate(regions[chromosome]):
+#				if (new_snp_reg[1]<reg[2] and new_snp_reg[2]>reg[2]) or (new_snp_reg[1]<reg[1] and new_snp_reg[2]>reg[1]): #then merge					
+#					merged_reg = (reg[0],min(reg[1],new_snp_reg[1]),max(reg[2],new_snp_reg[2]))
+#					print "Merged region:",merged_reg
+#					regions[chromosome][reg_i] = merged_reg     
+#					merged=True
+#					break
+#				elif (new_snp_reg[1]>reg[2] and new_snp_reg[2]<reg[2]):
+#					merged=True  #It's already covered
+#					break
+#			if not merged:
+#				regions[chromosome].append(new_snp_reg)
+#				region_count+=1
+#			i += 1 
+#		
+#		regions_list = regions[1]+regions[2]+regions[3]+regions[4]+regions[5]
+#		return regions_list 
+#	
+#	def get_region_result(self,chromosome,start_pos,end_pos):
+#		"""
+#		returns a result object with only the SNPs, etc. within the given boundary. 
+#		"""
+#		positions = []
+#		scores = []
+#		snps = []
+#		mafs = []
+#		marfs = []
+#		chromosomes = []
+#		i = 0
+#		while i<len(self.chromosomes) and self.chromosomes[i]!=chromosome: 
+#			i += 1
+#		while i<len(self.chromosomes) and self.positions[i]<start_pos:
+#			i += 1
+#		if i == len(self.chromosomes):
+#			raise Exception("region results never found!")
+#		
+#		while i<len(self.chromosomes) and self.positions[i]<=end_pos and self.chromosomes[i]==chromosome:
+#			chromosomes.append(chromosome)
+#			positions.append(self.positions[i])
+#			scores.append(self.scores[i])
+#			snps.append(self.snps[i])
+#			mafs.append(self.mafs[i])
+#			marfs.append(self.marfs[i])	
+#		
+#		return Result(resultType=self.resultType,phenotypeID=self.phenotypeID,
+#			      scores=scores,chromosomes=chromosomes,positions=positions,
+#			      snps=snps,accessions=self.accessions,marfs=marfs,mafs=mafs)
+#		
+#		
+#		
+#	def get_top_region_results(self,n,distance_threshold=25000):
+#		reg_results = []
+#		i = 0
+#		for reg in self.get_top_regions(n, distance_threshold):
+#			reg_results.append(self.get_region_result(*reg))
+#		return reg_results
+#	
+#
+#	def filterTopSNPs(self,n):
+#		self._rankScores_() #Making sure the ranks are updated
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		l = self.orders[0:n]
+#		l.sort()
+#	
+#		for i in l:
+#			newScores.append(self.scores[i])
+#			newPositions.append(self.positions[i])
+#			newChromosomes.append(self.chromosomes[i])
+#			newMafs.append(self.mafs[i])
+#			newMarfs.append(self.marfs[i])
+#
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#
+#
+#	def _sortByChrPos_(self):
+#		res_ls = zip(self.chromosomes,self.positions,self.scores,self.mafs,self.marfs)
+#		res_ls.sort()
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		for (chr,pos,score,maf,marf) in res_ls:
+#			newScores.append(score)
+#			newPositions.append(pos)
+#			newChromosomes.append(chr)
+#			newMafs.append(maf)
+#			newMarfs.append(marf)
+#
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#
+#
+#	def get_chromosome_ends(self):
+#		if not self.chromosomeEnds:
+#			self._sortByChrPos_()
+#			i = 0
+#			ch_i = 0
+#			curr_chr = self.chromosomes[i]
+#			chromosome_ends = [] 
+#			while ch_i<5:
+#				while i<len(self.chromosomes) and self.chromosomes[i]==curr_chr:
+#					i += 1
+#				chromosome_ends.append(self.positions[i-1])
+#			self.chromosomeEnds = chromosome_ends
+#		return self.chromosomeEnds
+#		
+#
+#	def filterTopRegions(self,n,window=[25000,25000],minScore=None):
+#		self._rankScores_() 
+#		oldScores = self.scores
+#		oldPositions = self.positions
+#		oldChromosomes = self.chromosomes
+#		oldMafs = self.mafs
+#		oldMarfs = self.marfs
+#		oldGlobalRanks = self.globalRanks
+#
+#		self.scores = []
+#		self.positions = []
+#		self.chromosomes = []
+#		self.mafs = []
+#		self.marfs = []
+#		elf.globalRanks = []
+#		regionCount = 0 
+#		i = 0 
+#		
+#		res_ls = []
+#		while regionCount < n:
+#			res_ls.append((oldChromosomes[self.orders[i]],oldPositions[self.orders[i]]))
+#			res_ls.sort()
+#			if minScore and oldScores[self.orders[i]]<minScore:
+#				break
+#			self.scores.append(oldScores[self.orders[i]])
+#			self.positions.append(oldPositions[self.orders[i]])
+#			self.chromosomes.append(oldChromosomes[self.orders[i]])
+#			self.mafs.append(oldMafs[self.orders[i]])
+#			self.marfs.append(oldMarfs[self.orders[i]])
+#			self.globalRanks.append(oldGlobalRanks[self.orders[i]])
+#			regionCount = self._countRegions_(res_ls,window=window)
+#			i += 1 
+#		
+#		del oldScores
+#		del oldPositions
+#		del oldChromosomes
+#		del oldMafs
+#		del oldMarfs
+#		del oldGlobalRanks
+#
+#		self._sortByChrPos_()
+#
+#
+#		
+#			
+#
+#	def mergeWith(self,snpResult):
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		
+#		i1 = 0
+#		
+#		pos1 = self.positions[i1] 
+#		chr1 = self.chromosomes[i1]
+#
+#		for i2 in range(0,len(snpResult.positions)):
+#			pos2 = snpResult.positions[i2]
+#			chr2 = snpResult.chromosomes[i2]
+#			while i1 <len(self.positions)-1 and (chr1,pos1)<(chr2,pos2):
+#				newPositions.append(self.positions[i1])
+#				newChromosomes.append(self.chromosomes[i1])
+#				newScores.append(self.scores[i1])
+#				newMafs.append(self.mafs[i1])
+#				newMarfs.append(self.marfs[i1])
+#				i1 += 1
+#				pos1 = self.positions[i1]
+#				chr1 = self.chromosomes[i1]
+#
+#			if i1 <len(self.positions)-1 and (chr1,pos1)==(chr2,pos2):
+#				i1 += 1
+#				pos1 = self.positions[i1]
+#				chr1 = self.chromosomes[i1]
+#
+#			newPositions.append(snpResult.positions[i2])
+#			newChromosomes.append(snpResult.chromosomes[i2])
+#			newScores.append(snpResult.scores[i2])
+#			newMafs.append(snpResult.mafs[i2])
+#			newMarfs.append(snpResult.marfs[i2])
+#
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#
+#	def clone(self):
+#		if self.snps:
+#			result = SNPResult(name=self.name)
+#			result.snps = self.snps + []
+#		else:
+#			result = Result(name=self.name)
+#		result.resultType = self.resultType
+#		result.name = self.name
+#		result.scores = self.scores + []
+#		result.positions = self.positions + []
+#		result.chromosomes = self.chromosomes + []
+#		result.chromosomeEnds = self.chromosomeEnds + []
+#		result.marfs = self.marfs + [] #Minor allele relative frequencies.
+#		result.mafs = self.mafs + [] #Minor allele frequencies.
+#		if self.accessions:
+#			result.accessions = self.accessions + []
+#		if self.orders:
+#		   result.orders = self.orders + []
+#		if self.ranks:
+#		   result.ranks = self.ranks + []
+#		return result
+#
+#	
+#	def naMAF(self, minMaf=10):
+#		"""
+#		NA scores/pvalues which have maf<minMaf.		
+#		"""
+#		for i in range(0,len(self.scores)):
+#			if self.mafs[i]< minMaf:
+#				self.scores[i]= "NA"
+#
+#
+#	def alexFiltering(self,emmaScores,cutoff=6,window=[50000,50000]): 
+#		"""
+#		
+#		"""
+#		scoreList = zip(emmaScores,self.scores)
+#		
+#		scoreList.sort()
+#		scoreList.reverse()
+#		
+#		cScores = []
+#		i=0
+#		emmaScore = scoreList[0][0]
+#		while emmaScore>cutoff: 
+#			cScores.append(scoreList[i][1])
+#			i += 1
+#			emmaScore = scoreList[i][0]
+#
+#
+#		#Always top 5 regions, and at most 20 regions,  continue until cutoff is reached.
+#
+#
+#		if len(cScores):
+#			first5Regions = self.clone()
+#			first5Regions.filterTopRegions(5,window=window)
+#			cScoreCutoff = min(cScores)
+#			self.filterTopRegions(20,window=window)
+#			self.filterScoreCutoff(cScoreCutoff)
+#			self.mergeWith(first5Regions)
+#		else:
+#			self.filterTopRegions(5,window=window)
+#			
+#	def updateRegions(self,regionList):
+#		self._rankScores_()
+#		i=0
+#		rl_i=0 #region list index
+#		while rl_i<len(regionList):
+#			region = regionList[rl_i]
+#			cp1=(self.chromosomes[i],self.positions[i])
+#			cp_start=(region.chromosome,region.startPos)
+#			while cp1 < cp_start:
+#				i += 1
+#				cp1=(self.chromosomes[i],self.positions[i])
+#			cp_end=(region.chromosome,region.endPos)
+#
+#			maxScore = 0
+#			maxRank = 0
+#			maxPos = 0 
+#			while cp1<=cp_end:
+#				"""Update current region!"""
+#				if maxScore < self.scores[i]:
+#					maxScore = self.scores[i]
+#					maxRank = self.ranks[i]
+#					maxPos = self.positions[i]
+#				i += 1
+#				cp1=(self.chromosomes[i],self.positions[i])
+#						
+#			region.snpsInfo[self.resultType.name] = {"maxScore":maxScore,"maxRank":maxRank,"maxPos":maxPos}
+#			rl_i += 1
+#			
+#	
+#	def writeToFile(self,filename,format="simple"):
+#		f = open(filename,"w")
+#		f.write("Chromosome,Position,Score,MARF,MAF \n")
+#		for (ch,pos,score,marf,maf) in zip(self.chromosomes,self.positions,self.scores,self.marfs,self.mafs):
+#			l = map(str,[ch,pos,score,marf,maf])
+#			f.write(",".join(l)+"\n")
+#		f.close()
+#		
+#		
+#		
+#class EmmaResult(Result):
+#	"""
+#	Loads information on variance estimates and maximum likelihood as well...
+#	"""			
+#	def __init__(self,resultFile=None,snpsds=None,name=None,resultType=None,phenotypeID=None,interactionResult=False):
+#
+#		self.phenotypeID =phenotypeID
+#		self.resultType=resultType
+#		self.name = name
+#		self.scores = [] #Scores or p-values
+#		self.positions = []
+#		self.chromosomes = []
+#		self.chromosomeEnds = []
+#		self.marfs = [] #Minor allele relative frequencies.
+#		self.mafs = [] #Minor allele frequencies.
+#		self.var_expl = [] #Variance explained
+#		self.ml = [] #Maximum likelihood
+#		self.vg = [] #Genetic variance scalar
+#		self.ve = [] #Error variance scalar
+#		self.accessions = None
+#
+#		self.secondaryScores = []
+#		self.secondaryPositions = []
+#		self.secondaryChromosomes = []
+#		self.orders = None
+#		self.ranks = None
+#		self.snps = None
+#		self.interactionResult=interactionResult
+#		if interactionResult:
+#			self.interactionPositions = []			
+#		if resultFile:
+#			self._loadResult_(resultFile)
+#		if snpsds:
+#			self._loadSnpsData_(snpsds)
+#
+#	
+#	def _loadResult_(self,resultFile):
+#		f = open(resultFile,"r")
+#		lines = f.readlines()
+#		line = lines[0].split(",")
+#		withMAF = len(line)>3
+#		start = 0
+#		currChrom = -1
+#		lastPos = 0
+#		if not (line[0].strip()).isdigit():
+#			start = 1
+#
+#		for i in range(start,len(lines)):
+#			line = lines[i].split(",")
+#			newChrom = int(line[0].strip())
+#			if newChrom!=currChrom:
+#				currChrom = newChrom
+#				if lastPos:
+#					self.chromosomeEnds.append(lastPos)
+#			self.chromosomes.append(newChrom)
+#			if self.interactionResult:
+#				iPos = [int(line[-1].strip())]
+#				self.interactionPositions.append(iPos)
+#			lastPos = int(line[1].strip())
+#			self.positions.append(lastPos)
+#			self.scores.append(float(line[2].strip()))
+#			self.marfs.append(float(line[3].strip()))
+#			self.mafs.append(float(line[4].strip()))
+#			self.var_expl.append(float(line[5].strip()))
+#			self.ml.append(float(line[6].strip()))
+#			self.vg.append(float(line[7].strip()))
+#			self.ve.append(float(line[8].strip()))
+#								
+#		self.chromosomeEnds.append(lastPos)
+#		self._calcGlobalRanks_()
+#
+#	def filterMARF(self, minMaf=0.1):
+#		"""
+#		Filter out scores/pvalues which have maf<minMaf.		
+#		"""
+#		if self.interactionResult:
+#			newIPos = []
+#			for i in range(0,len(self.scores)):
+#				if self.mafs[i]>= minMaf:
+#					newIPos.append(self.interactionPositions[i])
+#			del self.interactionPositions
+#			self.interactionPositions = newIPos
+#
+#		newScores = []
+#		newPositions = []
+#		newChromosomes = []
+#		newMafs = []
+#		newMarfs = []
+#		newVarExpl = []
+#		newML = []
+#		newVG = []
+#		newVE = []
+#		for i in range(0,len(self.scores)):
+#			if self.marfs[i]>= minMaf:
+#				newScores.append(self.scores[i])
+#				newPositions.append(self.positions[i])
+#				newChromosomes.append(self.chromosomes[i])
+#				newMafs.append(self.mafs[i])
+#				newMarfs.append(self.marfs[i])
+#				newVarExpl.append(self.var_expl[i])
+#				newML.append(self.ml[i])
+#				newVG.append(self.vg[i])
+#				newVE.append(self.ve[i])
+#
+#		del self.scores
+#		del self.positions
+#		del self.chromosomes
+#		del self.mafs
+#		del self.marfs
+#		del self.var_expl
+#		del self.ml
+#		del self.vg
+#		del self.ve
+#		
+#		self.scores = newScores
+#		self.positions = newPositions
+#		self.chromosomes = newChromosomes
+#		self.mafs = newMafs
+#		self.marfs = newMarfs
+#		self.var_expl = newVarExpl
+#		self.ml = newML
+#		self.vg = newVG
+#		self.ve = newVE
 			
 
 class SNPResult(Result):

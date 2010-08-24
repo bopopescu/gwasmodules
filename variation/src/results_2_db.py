@@ -130,7 +130,8 @@ def _run_():
 
 def add_results_to_db(results_file, short_name, call_method_id, phenotype_method_id, analysis_method_id,
 		      transformation_method_id, remove_outliers=0, transformation_parameters=0, 
-		      results_method_type_id=1, method_description="", data_description="", comment=""):
+		      results_method_type_id=1, method_description="", data_description="", comment="", 
+		      pseudo_heritability=None):
  	
         #Connect to DB
         import dbutils

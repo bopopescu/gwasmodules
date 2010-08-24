@@ -21,13 +21,13 @@ env['rf_dir']=rf_dir
 env['default_lookup_db']='gmi-ara-devel-be.gmi.oeaw.ac.at'
 env['default_insert_db']='gmi-ara-devel-be.gmi.oeaw.ac.at'
 env['db_results_dir']='/Network/Data/250k/db/results/type_1/'
-
+env['tmp_dir']='/tmp/'
 
 try:
 	import configobj
 	try:
 		config = configobj.ConfigObj(config_file)
-		print config
+		print 'GWAs configuration file loaded:',config_file
 		for c in config:
 			env[c] = config[c]
 	except Exception, err_str:

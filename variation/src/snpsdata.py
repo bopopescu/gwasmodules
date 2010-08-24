@@ -2579,7 +2579,24 @@ class SNPsDataSet:
 				snplist += snpsd.snps
 		return snplist
 		
-	def getPositions(self):
+        def get_snp_at(self,chromosome,position):
+                """
+                Returns the SNP at the given position, if it exits.
+                """
+                c_i = self.chromosomes.index(chromosome)
+                sd = self.snpsDataList[c_i]
+                i = 0
+                while sd.positions[i] < position:
+                        i += 1
+                if sd.positions[i] == position:
+                        print 'Found the SNP.'
+                        return sd.snps[i]
+                else:
+                        print "Didn't find the SNP on chromosome %d, at position %d"%(chromosome,position)
+                        return None                
+
+	
+        def getPositions(self):
 		poslist = []
 		for snpsd in self.snpsDataList:
 			for pos in snpsd.positions:

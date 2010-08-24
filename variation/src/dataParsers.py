@@ -1616,12 +1616,12 @@ def parseMSDataFilter(filename, baseScale=1000000,sampleNum=None, fixPos=True, f
 	return data
 	
 
-def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1):
+def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None):
 	"""
 	A sped-up version, to load a binary file in binary format.
 	"""
 	import random
-	sys.stderr.write("Loading binary file: %s ... \n"%data_file)
+	sys.stderr.write("Loading binary SNPs data file: %s \n"%data_file)
 	accessions = []
 	snpsd_ls = []
 	chromosomes = []
@@ -1633,6 +1633,17 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1):
 		accessions.append(acc.strip())
 	print "Found",len(accessions),"arrays/strains."
 	
+	if filter_accessions:
+		indices_to_include = []
+		new_accessions = []
+		for i, acc in enumerate(accessions):
+			if acc in filter_accessions:
+				indices_to_include.append(i) 
+				new_accessions.append(acc)
+		accessions = new_accessions
+		print "Loading only",len(accessions),"arrays/strains."
+
+	
 	positions = []
 	snps = []
 	line = f.next().split(delimiter)
@@ -1642,34 +1653,70 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1):
 	i = 0 
 	
 	if filter<1.0:
-		for i, line in enumerate(f):
-			if random.random()>filter: continue
-			line_list = line.split(delimiter)
-			chromosome = int(line_list[0])
-			if chromosome!=old_chromosome: #Then save snps_data
-				snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
-				snpsd_ls.append(snpsd)
-				chromosomes.append(old_chromosome)
-				positions = []
-				snps = []
-				old_chromosome = chromosome
-				sys.stderr.write("Loaded %s SNPs.\n"%i)
-			positions.append(int(line_list[1]))
-			snps.append(map(int,line_list[2:]))
+		if filter_accessions: 
+			for i, line in enumerate(f):
+				if random.random()>filter: continue
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				snp = line_list[2:]
+				snp = [int(snp[j]) for j in indices_to_include]
+				snps.append(snp)
+		else:
+			for i, line in enumerate(f):
+				if random.random()>filter: continue
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				snps.append(map(int,line_list[2:]))
 	else:
-		for i, line in enumerate(f):		
-			line_list = line.split(delimiter)
-			chromosome = int(line_list[0])
-			if chromosome!=old_chromosome: #Then save snps_data
-				snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
-				snpsd_ls.append(snpsd)
-				chromosomes.append(old_chromosome)
-				positions = []
-				snps = []
-				old_chromosome = chromosome
-				sys.stderr.write("Loaded %s SNPs.\n"%i)
-			positions.append(int(line_list[1]))
-			snps.append(map(int,line_list[2:]))
+		if filter_accessions: 
+			for i, line in enumerate(f):		
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				snp = line_list[2:]
+				snp = [int(snp[j]) for j in indices_to_include]
+				snps.append(snp)
+		else:
+			for i, line in enumerate(f):		
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SnpsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				snps.append(map(int,line_list[2:]))
+
 		
 
 	f.close()
@@ -1684,7 +1731,7 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1):
 
 
 def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,
-		id=None, useDecoder=True, look_for_binary=True):
+		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None):
 	"""
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
@@ -1693,10 +1740,12 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1
 		sd_binary_file = data_file+'.binary'
 		if os.path.isfile(sd_binary_file):
 			sd = parse_binary_snp_data(sd_binary_file, delimiter = delimiter, 
-					      missing_val = missingVal, filter = filter)
+					      missing_val = missingVal, filter = filter,
+					      filter_accessions=filter_accessions)
 		else:
 			sd = parse_snp_data(snps_data_file , format = 0, delimiter = delimiter, 
-					      missingVal = missingVal, filter = filter, look_for_binary=False)
+					      missingVal = missingVal, filter = filter, look_for_binary=False,
+					      filter_accessions=filter_accessions)
 			print 'Save a binary snps data file:',sd_binary_file
 			sd.writeToFile(sd_binary_file,binary_format=True)
 	else:
