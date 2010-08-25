@@ -13,7 +13,6 @@ import pdb
 import cPickle
 import os
 import sys
-from numarray.image.combine import threshhold
 
 class LinearModel(object):
         """
