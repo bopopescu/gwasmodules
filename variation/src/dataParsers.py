@@ -1743,7 +1743,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1
 					      missing_val = missingVal, filter = filter,
 					      filter_accessions=filter_accessions)
 		else:
-			sd = parse_snp_data(snps_data_file , format = 0, delimiter = delimiter, 
+			sd = parse_snp_data(data_file , format = 0, delimiter = delimiter, 
 					      missingVal = missingVal, filter = filter, look_for_binary=False,
 					      filter_accessions=filter_accessions)
 			print 'Save a binary snps data file:',sd_binary_file
