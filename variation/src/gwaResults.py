@@ -360,8 +360,7 @@ class Result(object):
 			
 		num_scores = len(self.scores)
 		result = self.simple_clone()
-	
-
+		
 		result.filter_percentile(percentile/100.0)
 		if percentile<100 and len(result.scores)==len(self.scores):
 			raise Exception()
@@ -834,8 +833,11 @@ class Result(object):
 
 
 	def simple_clone(self):
-		return Result(scores=self.scores[:], positions=self.positions[:], chromosomes=self.chromosomes[:],
+		result = Result(scores=self.scores[:], positions=self.positions[:], chromosomes=self.chromosomes[:],
 				marfs=self.marfs[:], mafs=self.mafs[:], accessions=self.accessions[:])
+		result.chromosome_ends=self.chromosome_ends[:]
+		return result
+		
 	
 	
 	
