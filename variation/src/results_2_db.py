@@ -128,6 +128,9 @@ def _run_():
 	addResultsToDB(resultsFile, callMethodID,phenotypeMethodID,analysisMethodID,
 		       createdBy,shortName,resultsMethodID,methodDescription,dataDescription,comment,commit=commit)
 
+
+
+
 def add_results_to_db(results_file, short_name, call_method_id, phenotype_method_id, analysis_method_id,
 		      transformation_method_id, remove_outliers=0, transformation_parameters=0, 
 		      results_method_type_id=1, method_description="", data_description="", comment="", 
@@ -138,6 +141,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
         #conn = dbutils.connect_to_papaya()
 	conn = dbutils.connect_to_default_insert()
 	cursor = conn.cursor()
+	db_result_dir = "/Network/Data/250k/db/results/type_1/"
 	
         
 	print "Checking whether result is in DB."
@@ -175,7 +179,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 		results_id = int(row[0])
 		
 		#Updating filename
-		db_file = "/Network/Data/250k/db/results/type_1/"+str(results_id)+"_results.tsv"
+		db_file = db_result_dir+str(results_id)+"_results.tsv"
 		sql_statement = "UPDATE stock_250k.results_method SET filename='%s' WHERE id=%d"%(db_file,results_id)
 		print sql_statement
 		cursor.execute(sql_statement)	
@@ -183,7 +187,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 		print "Committing transaction (making changes permanent)."
 		conn.commit()
 		
-	print "Closing connection."
+	print "Closing connection.\n"
         cursor.close()
 	conn.close()
 
@@ -198,14 +202,21 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 	results_dir = env.env['db_results_dir'] #'/home/cmbpanfs-01/bvilhjal/data/result_files/'
 	file_name=results_dir+str(results_id)+"_results.tsv"
 	print "Writing tsv file:",file_name
-	f = open(file_name,"w")
-	for line in lines:
-		line = line.replace(",","\t")
-		f.write(line)
-	f.close()
-	
-	print "Remember to copy files i necessary: scp %s* /Network/Data/250k/db/results/type_1/"%(results_dir)
-
+	try:
+		f = open(file_name,"w")
+		for line in lines:
+			line = line.replace(",","\t")
+			f.write(line)
+		f.close()
+		
+	except Exception, err_str:
+		print 'Failed at writing the result files to the designated results directory:',err_str
+		print "Make sure the 'db_results_dir' path is correct in ~/.gwa_config\n"
+	if db_result_dir!=results_dir:
+		print "Remember to copy the result file: scp %s user_name@arabidopsis.gmi.oeaw.ac.at:%s\n"\
+			%(file_name,db_result_dir)
+		
+		
 
 if __name__ == '__main__':
 	#_test1_()

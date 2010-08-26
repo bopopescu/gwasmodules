@@ -822,9 +822,14 @@ class Result(object):
 		
 					
 
-	def clone(self):
+	def clone(self, exclude_snps=True):
 		import copy
+		if exclude_snps:
+			snps = self.snps
+			self.snps = []
 		result = copy.deepcopy(self) #Cloning
+		if exclude_snps:
+			self.snps = snps
 		return result
 	
 	
@@ -899,18 +904,21 @@ class Result(object):
 			for info in additional_columns:
 				if info in self.snp_results:
 					columns.append(info)
-		f = open(filename,"w")
+		try:
+			f = open(filename,"w")
 		
-		f.write(','.join(columns)+"\n")
-		
-		for i in range(len(self.snp_results[columns[0]])):
-			l = []
-			for c in columns:
-				l.append(self.snp_results[c][i])				
-			l = map(str,l)
-			f.write(",".join(l)+"\n")
-		f.close()
-	
+			f.write(','.join(columns)+"\n")
+			
+			for i in range(len(self.snp_results[columns[0]])):
+				l = []
+				for c in columns:
+					l.append(self.snp_results[c][i])				
+				l = map(str,l)
+				f.write(",".join(l)+"\n")
+			f.close()
+		except Exception, err_str:
+			print 'Failed writing the resultfile:',err_str
+			print 'Make sure the given path is correct, and you have write rights.'
 		
 		
 #

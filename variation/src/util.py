@@ -36,15 +36,17 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 	#from rpy2.rpy_classic import r
 	#from rpy2.rpy_classic import r
 	from scipy import stats
+	import time
+	s1 = time.time()	
 	assert len(snps[0])==len(phenVals),"SNPs and phenotypes are not equal length."
 	def _kw_test_(snp,ranks,tieCorrection):
 		n = len(snp)
 		group_vals = list(set(snp))
 		g = len(group_vals)
-		snp_ranks = zip(snp,ranks)
+		
 		ns = [0]*g
 		rs = [0.0]*g
-		for (nt,rank) in snp_ranks:
+		for (nt,rank) in zip(snp,ranks):
 			i = 0
 			while group_vals[i] != nt:
 				i += 1
@@ -84,6 +86,13 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 		ds.append(d)
 		ps.append(p)
 	#print ps
+	secs = time.time()-s1
+	if secs>60:
+		mins = int(secs)/60
+		secs = secs - mins*60
+		print 'Took %d mins and %f seconds.'%(mins,secs)
+	else:
+		print 'Took %f seconds.'%(secs)
 	return {"ps":ps,"ds":ds}
 
 
