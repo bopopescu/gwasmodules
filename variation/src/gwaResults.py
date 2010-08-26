@@ -150,9 +150,9 @@ class Result(object):
 	"""
 	Contains information on the result.  (The old object is renamed Result_old, for now..)  Poised to cause problems?
 	"""
-	def __init__(self,result_file=None,scores=None,snps_data=None,accessions=None,name=None,
-		     result_type=None,phen_id=None,positions=None,chromosomes=None,marfs=None,
-		     mafs=None,snps=None, **snp_results_info):
+	def __init__(self, result_file=None, scores=None, snps_data=None, accessions=None, name=None,
+		     result_type=None, phen_id=None, positions=None, chromosomes=None, marfs=None,
+		     mafs=None, snps=None, recall_snps=False, **snp_results_info):
 		"""
 		032610: A new init function to clean up the previous mess...  
 
@@ -161,6 +161,9 @@ class Result(object):
 		snps_data is assumed to match the results, (in term of positions, etc)
 		
 		accessions (when used) should fit the results!
+		
+		recall_snps: if this is flagged, then the result object stores all the SNPs, 
+			otherwise SNP data is just uesd for MAF calculations. 
 		"""
 		
 		#Contain various information for every snp and position
@@ -356,8 +359,9 @@ class Result(object):
 				chr_cand_genes.append(cgs)
 			
 		num_scores = len(self.scores)
-		result = self.clone()
+		result = self.simple_clone()
 	
+
 		result.filter_percentile(percentile/100.0)
 		if percentile<100 and len(result.scores)==len(self.scores):
 			raise Exception()
@@ -462,7 +466,8 @@ class Result(object):
 	
 	def get_chromosome_splits(self):
 		"""
-		Returns list of indices (and prev chromosome), for the when the chromosomes change in the scores,positions indices.
+		Returns list of indices (and prev chromosome), for the when the chromosomes 
+		change in the scores,positions indices.
 		USE WITH CARE
 		"""
 		oldChrom = 0
@@ -822,15 +827,16 @@ class Result(object):
 		
 					
 
-	def clone(self, exclude_snps=True):
+	def clone(self):
 		import copy
-		if exclude_snps:
-			snps = self.snps
-			self.snps = []
 		result = copy.deepcopy(self) #Cloning
-		if exclude_snps:
-			self.snps = snps
 		return result
+
+
+	def simple_clone(self):
+		return Result(scores=self.scores[:], positions=self.positions[:], chromosomes=self.chromosomes[:],
+				marfs=self.marfs[:], mafs=self.mafs[:], accessions=self.accessions[:])
+	
 	
 	
 #	def insert_into_db(self,result_id,host='gmi-ara-devel-be'):
