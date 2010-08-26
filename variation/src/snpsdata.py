@@ -8,6 +8,8 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 
 import sys,warnings
 import pdb
+import numpy as np
+
 
 IUPAC_alphabet = ['A','C','G','T','-','Y','R','W','S','K','M','D','H','V','B','X','N']
 
@@ -820,7 +822,7 @@ class _SnpsData_(object):
 			newAccessions.append(self.accessions[i])
 			if self.arrayIds:
 				newArrayIds.append(self.arrayIds[i])
-		for i in range(0, len(self.snps)):
+		for i in range(len(self.snps)):
 			snp = self.snps[i]
 			newSnp = []
 			for j in indicesToKeep:
@@ -968,26 +970,26 @@ class _SnpsData_(object):
 		return (new_snp,new_phen_vals)
 		
 
-	def get_mafs(self):
-		"""
-		Returns MAFs and MARFs
-		
-		Assumes that this is a binary allele.
-		"""		
-		mafs = []
-		marfs = []
-		for snp in self.snps:
-			missing_count = snp.count(self.missingVal)
-			num_nts = len(snp)-missing_count
-			nts = set(snp)
-			if missing_count:
-				nts.remove(self.missingVal)
-			c = snp.count(nts.pop())/float(num_nts)
-			if c>0.5:
-				c = 1.0-c
-			marfs.append(c)
-			mafs.append(int(c*num_nts))
-		return {"mafs":mafs, "marfs":marfs}
+        def get_mafs(self):
+                """
+                Returns MAFs and MARFs
+                
+                Assumes that this is a binary allele.
+                """                
+                mafs = []
+                marfs = []
+                for snp in self.snps:
+                        missing_count = list(snp).count(self.missingVal)
+                        num_nts = len(snp)-missing_count
+                        nts = set(snp)
+                        if missing_count:
+                                nts.remove(self.missingVal)
+                        c = list(snp).count(nts.pop())/float(num_nts)
+                        if c>0.5:
+                                c = 1.0-c
+                        marfs.append(c)
+                        mafs.append(int(c*num_nts))
+                return {"mafs":mafs, "marfs":marfs}
 		
 
 
@@ -1759,8 +1761,87 @@ class RawSnpsData(_SnpsData_):
 		pass
 
 
-	
- 
+class SNPsData(_SnpsData_):	
+        """
+        Efficient genotype data, using the numpy class.
+        
+        An alternative to the old SnpsData class.
+        """ 
+        alphabet = [-1,0,1,2,3]  #Here -1 is thought to be missing data value.
+        def __init__(self,snps,positions, accessions=None, arrayIds=None, chromosome=None,
+                        alignment_positions=None, id=None, marker_types=None, missing_val=-1):
+                self.snps = snps 
+                self.positions = positions
+                self.accessions=accessions
+                self.arrayIds = arrayIds
+                self.chromosome=chromosome
+                self.alignment_positions = alignment_positions
+                self.marker_types = marker_types #Where do these markers come frome, what type are they?  Useful for later analysis.
+                self.id = id
+                self.missingVal = missing_val
+
+
+
+        def removeAccessionIndices(self,indicesToKeep):
+                """
+                Removes accessions from the data.
+                """
+                newAccessions = []
+                newArrayIds = []
+                for i in indicesToKeep:
+                        newAccessions.append(self.accessions[i])
+                        if self.arrayIds:
+                                newArrayIds.append(self.arrayIds[i])
+                num_accessions = len(indicesToKeep)
+                for i in range(len(self.snps)):
+                        snp = self.snps[i]
+                        newSnp = np.zeros(num_accessions,dtype='int8')
+                        for j,k in enumerate(indicesToKeep):
+                                newSnp[j] = snp[k]
+                        self.snps[i] = newSnp
+                self.accessions = newAccessions
+                if self.arrayIds:
+                        #print "removeAccessionIndices: has array IDs: self.arrayIds =",self.arrayIds
+                        self.arrayIds = newArrayIds
+                        #print "len(self.arrayIds):",len(self.arrayIds)
+                #pdb.set_trace()
+                #print "len(self.accessions):",len(self.accessions)
+
+
+
+
+        def get_mafs(self,w_missing=False):
+                """
+                Returns MAFs and MARFs
+                
+                Assumes that this is a binary allele.
+                """                
+                mafs = []
+                marfs = []
+                num_nts = len(self.snps[0])
+                for snp in self.snps:
+                        if w_missing and self.missingVal in snp:
+                                missing_count = list(snp).count(self.missingVal)
+                                num_nts = len(snp)-missing_count
+                                nts = set(snp)
+                                nts.remove(self.missingVal)
+                                c = list(snp).count(nts.pop())/float(num_nts)
+                                if c>0.5:
+                                        c = 1.0-c
+                                marfs.append(c)
+                                mafs.append(int(c*num_nts))
+                        else:
+                                l = np.bincount(snp)
+                                maf = min(l)
+                                mafs.append(maf)
+                                marfs.append(maf/float(num_nts))
+                                
+                return {"mafs":mafs, "marfs":marfs}
+                
+
+
+
+
  
 class SnpsData(_SnpsData_):
 	"""
@@ -2242,7 +2323,7 @@ class SNPsDataSet:
 			if self.accessions != self.snpsDataList[i].accessions:
 				raise Exception("Accessions (or order) are different between SNPs datas")
 		if not is_binary:
-			self.is_binary = snpsds[0].snps[0].count(0) or snpsds[0].snps[0].count(1)				 		
+			self.is_binary = list(snpsds[0].snps[0]).count(0) or list(snpsds[0].snps[0]).count(1)				 		
 		else:
 			self.is_binary = is_binary
 
