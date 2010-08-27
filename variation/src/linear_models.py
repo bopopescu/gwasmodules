@@ -92,24 +92,25 @@ class LinearModel(object):
                 A standard linear model, using a F-test
                 """                
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X,self.Y)
-                f_stats = []
-                rss_list = []
-                betas_list = []
-                p_vals = []
-                var_perc = []
+                num_snps = len(snps)
+                f_stats = zeros(num_snps)
+                rss_list = repeat(h0_rss,num_snps)
+                betas_list = [h0_betas]*num_snps
+                var_perc = zeros(num_snps)
                 q = 1
                 n_p = self.n-self.p
-                for snp in snps:
-                        #snp_mat = H_sqrt_inv*(matrix(snp).T) #Transformed inputs
+                for i, snp in enumerate(snps):
                         X = hstack([self.X,matrix(snp).T]) 
                         (betas, rss, rank, s) = linalg.lstsq(X,self.Y)
+                        if not rss:
+                                print 'No predictability in the marker, moving on...'
+                                continue
                         f_stat = ((h0_rss-rss)/q)/(rss/n_p)
-                        p_val = stats.f.sf(f_stat,q,n_p)
-                        p_vals.append(p_val[0])            
-                        f_stats.append(f_stat[0])                
-                        rss_list.append(rss[0])                
-                        betas_list.append(map(float,list(betas)))
-                        var_perc.append(float(1-rss/h0_rss))
+                        f_stats[i] = f_stat[0]                
+                        rss_list[i] = rss[0]                
+                        betas_list[i] = map(float,list(betas))
+                        var_perc[i] = float(1-rss/h0_rss)
+                p_vals = stats.f.sf(f_stats,q,n_p)
 
                         
                 return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
@@ -499,6 +500,60 @@ class LinearMixedModel(LinearModel):
                 h0_X = H_sqrt_inv*self.X
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
                 h0_betas = map(float,list(h0_betas))
+                num_snps = len(snps)
+                f_stats = zeros(num_snps)
+                rss_list = repeat(h0_rss,num_snps)
+                betas_list = [h0_betas]*num_snps
+                var_perc = zeros(num_snps)
+                for i, snp in enumerate(snps):
+                        X = hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]) 
+                        (betas, rss, p, sigma) = linalg.lstsq(X,Y)
+                        if not rss:
+                                print 'No predictability in the marker, moving on...'
+                                continue
+                        f_stat = ((h0_rss-rss)/q)/(rss/n_p)
+                        f_stats[i] = f_stat[0]                
+                        rss_list[i] = rss[0]                
+                        betas_list[i] = map(float,list(betas))
+                        var_perc[i] = float(1-rss/h0_rss)
+                p_vals = stats.f.sf(f_stats,q,n_p)
+
+                      
+                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
+                        'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
+
+                        
+        def emmax_f_test_old(self,snps):
+                """
+                EMMAX implementation (in python)
+                Single SNPs
+                
+                With interactions between SNP and possible cofactors.
+                """
+#                try:
+#                        import psyco
+#                        psyco.full()
+#                except ImportError:
+#                        print 'Failed using psyco.. hence no speed-up'
+#                        pass
+                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
+                q = 1  # Single SNP is being tested
+                p = len(self.X.T)+q
+                n = self.n
+                n_p = n-p
+                                
+
+                K = self.random_effects[1][1]
+                eig_L = self._get_eigen_L_(K)
+                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
+                delta = res['delta']
+                print 'pseudo_heritability:',1.0/(1+delta)
+                H_sqr = res['H_sqrt']
+                H_sqrt_inv = H_sqr.I
+                Y = H_sqrt_inv*self.Y        #The transformed outputs.
+                h0_X = H_sqrt_inv*self.X
+                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
+                h0_betas = map(float,list(h0_betas))
                 f_stats = []
                 rss_list = []
                 betas_list = []
@@ -527,53 +582,6 @@ class LinearMixedModel(LinearModel):
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
                         
-                     
-                
-    
-        def fast_emmax_f_test(self,snps):
-                """
-                EMMAX implementation (in python)
-                Single SNPs
-                """
-                q = 1  # Single SNP is being tested
-                p = len(self.X.T)+q
-                n = self.n
-                n_p = n-p
-#                try:
-#                        import psyco
-#                        psyco.full()
-#                except ImportError:
-#                        print 'Failed using psyco.. hence no speed-up'
-#                        pass
-                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
-                K = self.random_effects[1][1]
-                eig_L = self._get_eigen_L_(K)
-                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-                delta = res['delta']
-                print 'pseudo_heritability:',1.0/(1+delta)
-                H_sqr = res['H_sqrt']
-                H_sqrt_inv = H_sqr.I
-                Y = H_sqrt_inv*self.Y        #The transformed outputs.
-                h0_X = H_sqrt_inv*self.X
-                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-                f_stats = []
-                rss_list = []
-                betas_list = []
-                p_vals = []
-                var_perc = []
-                for snp in snps:
-                        X = hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]) 
-                        (betas, rss, rank, s) = linalg.lstsq(X,Y)
-                        f_stat = ((h0_rss-rss)/q)/(rss/n_p)
-                        p_val = stats.f.sf(f_stat,q,n_p)
-                        p_vals.append(p_val[0])            
-                        f_stats.append(f_stat[0])                
-                        rss_list.append(rss[0])                
-                        betas_list.append(map(float,list(betas)))
-                        var_perc.append(float(1-rss/h0_rss))
-                      
-                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
-                        'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
                         
          
 

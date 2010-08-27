@@ -700,7 +700,7 @@ def _run_():
 			 
 			res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
 										
-			if pvals:
+			if mapping_method in ["kw","ft","emma",'lm',"emmax"]:
 			 	result_file=run_id+".pvals"
 			else:
 			 	result_file=run_id+".scores"	
@@ -737,7 +737,7 @@ def _run_():
 		sys.stdout.flush()
 		png_file = run_id+"_gwa_plot.png"
 		#png_file_max30 = run_id+"_gwa_plot_max30.png"
-		if pvals:
+		if mapping_method in ["kw","ft","emma",'lm',"emmax"]:
 			res.neg_log_trans()
 			if mapping_method in ["kw","ft"]:
 				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 

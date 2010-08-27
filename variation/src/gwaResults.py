@@ -173,26 +173,26 @@ class Result(object):
 		self.phen_id = phen_id
 		self.result_type=result_type
 		self.name = name
-		self.scores = scores #Scores or p-values
+		self.scores = list(scores) #Scores or p-values
 		self.positions = positions
 		self.chromosomes = chromosomes
 		self.marfs = marfs #Minor allele relative frequencies.
 		self.mafs = mafs
 		self.snps = snps
 		self.accessions = accessions
-		if not scores:
+		if not self.scores:
 			self.scores = [] 
-		if not positions:
+		if not self.positions:
 			self.positions = []
-		if not chromosomes:
+		if not self.chromosomes:
 			self.chromosomes = []		
-		if not marfs:
+		if not self.marfs:
 			self.marfs = [] 
-		if not mafs:
+		if not self.mafs:
 			self.mafs = [] 
-		if not snps:
+		if not self.snps:
 			self.snps = []
-		if not accessions:
+		if not self.accessions:
 			self.accessions = []
 
 		self.orders = None
@@ -574,7 +574,7 @@ class Result(object):
 		for i in range(0,len(self.scores)):
 			if attr[i]>= attr_threshold:
 				for info in self.snp_results:
-					if self.snp_results[info]:
+					if len(self.snp_results[info])>0:
 						new_snp_results[info].append(self.snp_results[info][i])
 		
 		self.snp_results = new_snp_results
