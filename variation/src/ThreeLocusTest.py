@@ -5,9 +5,10 @@ Option:
 
 	-o ..., --outputFile=...		Output files, one 'name'.rData file, and one 'name'.pvals file.
 	-h, --help				show this help
-	--parallel=...				Run KW on the cluster with standard parameters.  The arguement is used for runid 
+	-a ..., --mapping_method=...		kw, emmax, lm
+	--parallel=...				Run analysis on the cluster with standard parameters.  The arguement is used for runid 
 						as well as output files.  Note that if this option is used then no output file should be specified.
-	--parallelAll				Run KW on all phenotypes.
+	--parallelAll				Apply to all phenotypes.
 	--numberPerRun=...			Number of SNPs (phenotypes) per node, default is 100
 	--filter=...				Random fraction (given as parameters) of phenotypes will be used.
 	--local=...				Do a local GWA with the given windowsize (bases).
@@ -24,6 +25,8 @@ Option:
 	
 	--summarizeRuns				Collect results and plot things (Does not generate pvalue files...) 
 	--plot_all_models			Plot all phenotype models when summarizing results.
+	
+	--kinship_file=...			Necessary for running EMMAX.
 
 Examples:
 	ThreeLocusTest.py -o outputFile  250K.csv phenotype_index 
@@ -124,9 +127,10 @@ def _run_():
 	
 	long_options_list=["outputFile=", "help", "parallel=", "numberPerRun=", "parallelAll", "filter=","local=",
 			"pvalueThreshold=","noPvals", "summarizeRuns", "maf_filter=", "latent_variable=",
-			"phenotype_model=","phenotypeFile=", "runId=", "score_file=","plot_all_models", "latent_corr="]
+			"phenotype_model=","phenotypeFile=", "runId=", "score_file=","plot_all_models", "latent_corr=",
+			'mapping_method=','kinship_file=']
 	try:
-		opts, args=getopt.getopt(sys.argv[1:], "o:h", long_options_list)
+		opts, args=getopt.getopt(sys.argv[1:], "o:a:h", long_options_list)
 
 	except:
 		traceback.print_exc()
@@ -155,6 +159,8 @@ def _run_():
 	score_file = None
 	plot_all_models = False
 	latent_corr=None
+	mapping_method = 'kw'
+	kinship_file = None
 	
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
@@ -170,6 +176,8 @@ def _run_():
 			numberPerRun=int(arg)
 		elif opt in ("--pvalueThreshold"):
 			pvalueThreshold=float(arg)
+		elif opt in ("--kinship_file"):
+			kinship_file=arg
 		elif opt in ("--filter"):
 			filter=float(arg)
 		elif opt in ("--local"):
@@ -194,6 +202,8 @@ def _run_():
 			phenotypeFile=arg
 		elif opt in ("--phenotype_model"):
 			phenotype_model=int(arg)
+		elif opt in ('-a',"--mapping_method"):
+			mapping_method=int(arg)
 		
 		else:
 			if help==0:
@@ -220,6 +230,7 @@ def _run_():
 	print "noPvals:",noPvals
 	print "plot_all_models:",noPvals
 	print "summarizeRuns:",summarizeRuns
+	print "mapping_method:",mapping_method
 	print "maf_filter:",maf_filter
 	print "latent_variable:",latent_variable 
 	print "latent_corr:",latent_corr
@@ -272,7 +283,7 @@ def _run_():
 			shstr+=" --phenotype_model="+str(phenotype_model)+" "			
 		if summarizeRuns:
 			shstr+=" --summarizeRuns "			
-		shstr+=" --pvalueThreshold="+str(pvalueThreshold)+" "			
+		shstr+=" --pvalueThreshold="+str(pvalueThreshold)+" --mapping_method="+str(mapping_method)+"  "			
 		shstr+=snpsDataFile+" "+str(phen_index)+" "
 		shstr+="> "+outputFile+"_job"+".out) >& "+outputFile+"_job"+".err\n"
 		#print shstr
@@ -607,6 +618,7 @@ def _run_():
 #			for (score,pos,ch) in score_pos_list:
 #				snps_to_keep_indices.append(snps_dataset)  #FINISH!!!
 
+
 		snps_dataset = dataParsers.parse_snp_data(snpsDataFile,format=0)
 		if 0<maf_filter<=0.5:
 			snps_dataset.filter_maf_snps(maf_filter)
@@ -814,9 +826,14 @@ def _run_():
 		print "len(snps_list):",len(snps_list)
 		for i in range(0,len(phenotypes)):
 			phenotype = phenotypes[i]
-			sys.stdout.write("KW is being applied to the "+str(i)+"'th phenotype.\n")
-       			sys.stdout.flush()
-			pvals = util.kruskal_wallis(snps_list,phenotype)["ps"]
+       			if mapping_method=='kw':
+				sys.stdout.write("KW is being applied to the "+str(i)+"'th phenotype.\n")
+	       			sys.stdout.flush()
+			       	pvals = util.kruskal_wallis(snps_list,phenotype)["ps"]
+			elif mapping_method=='emmax':
+				pass
+			elif mapping_method=='lm':
+				pass
 			results.append(pvals)
 	print "len(results):",len(results)
 

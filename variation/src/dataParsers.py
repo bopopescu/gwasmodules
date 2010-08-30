@@ -201,7 +201,6 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 	
 
 	print "Reading and processing (cutting & merging) raw call files"
-	import os
 	import tempfile
 	tempfile.tempdir='/tmp'
 	tmpFiles = []
@@ -1616,12 +1615,33 @@ def parseMSDataFilter(filename, baseScale=1000000,sampleNum=None, fixPos=True, f
 	return data
 	
 
-def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None):
+def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None, use_pickle=True):
 	"""
 	A sped-up version, to load a binary file in binary format.
+	
+	If pickle is used then more memory is required, but it speeds up.
 	"""
 	import numpy as np
 	import random
+	import cPickle
+	import time
+	pickle_file = data_file+'.pickled'
+	if use_pickle: 
+		if os.path.isfile(pickle_file):
+			print 'Loading pickled object.'
+			t_ = time.time()
+			f = open(pickle_file,'rb')
+			sd = cPickle.load(f)
+			f.close()
+			print 'Loading done'
+			if filter_accessions and set(filter_accessions)!=set(sd.accessions):
+				print 'Filtering accessions.'
+				sd.filter_accessions(filter_accessions)
+			print 'Loading genotype data took %.2f s...'%(time.time()-t_)
+			return sd
+		else:
+			filter_accessions_ = filter_accessions
+			filter_accessions = None
 	sys.stderr.write("Loading binary SNPs data file: %s \n"%data_file)
 	accessions = []
 	snpsd_ls = []
@@ -1731,8 +1751,14 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 	snpsd_ls.append(snpsd)
 	chromosomes.append(old_chromosome)
 	sys.stderr.write("Loaded %s SNPs.\n"%i)
-
-	return SNPsDataSet(snpsd_ls,chromosomes)
+	sd = SNPsDataSet(snpsd_ls,chromosomes)
+	if use_pickle:
+		print 'Saving a pickled version of genotypes.'
+		f = open(pickle_file,'wb')
+		cPickle.dump(sd, f, protocol=2)
+		f.close()
+		sd.filter_accessions(filter_accessions_)
+	return sd
 
 
 
@@ -1846,11 +1872,28 @@ def _testDBParser_():
 
 if __name__ == "__main__":
 
-	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
-	print len(snpsds)
-	for i in range(0,len(snpsds)):
-		print len(snpsds[i].snps)
-
+#	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
+#	print len(snpsds)
+#	for i in range(0,len(snpsds)):
+#		print len(snpsds[i].snps)
+#	sd = parse_snp_data('/Users/bjarni.vilhjalmsson/Projects/Data/250k/250K_t54.csv',look_for_binary=False)
+#	sd = parse_binary_snp_data('/Users/bjarni.vilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
+	import cPickle
+	import time
+	import random
+#	t_ = time.time()
+#	f = open('/tmp/test.pickled','wb')
+#	cPickle.dump(sd, f, protocol=2)
+#	print 'Took %.2f s...'%(time.time()-t_)
+#	f.close()
+	
+	f = open('/tmp/test.pickled','rb')
+	t_ = time.time()
+	sd = cPickle.load(f)
+	f_accessions = random.sample(sd.accessions,900)
+	sd.filter_accessions(f_accessions)
+	print 'Took %.2f s...'%(time.time()-t_)
+	f.close()
 	
 	#get250KDataFromDb(user="bvilhjal", passwd="bamboo123")
 	

@@ -460,8 +460,7 @@ def _run_():
 		
 		#Genotype and phenotype data is only used for permutations.
 		sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-					      missingVal = missingVal, filter = debug_filter,
-					      filter_accessions=filter_accessions)
+					      missingVal = missingVal, filter = debug_filter)
 		prepare_data(sd,phed,p_i,trans_method,remove_outliers)
 		snps = sd.getSnps()
 		phen_vals = phed.getPhenVals(p_i)		
@@ -555,8 +554,7 @@ def _run_():
 		if use_existing_results:
 			if region_plots:
 				sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-							      missingVal = missingVal, filter = debug_filter,
-							      filter_accessions=filter_accessions)
+							      missingVal = missingVal, filter = debug_filter)
 				num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)
 				if remove_outliers:
 					assert num_outliers!=0,"No outliers were removed, so it makes no sense to go on and perform GWA."
@@ -595,8 +593,7 @@ def _run_():
 					kinship_file = k_file
 				if kinship_file:   #Kinship file was supplied..
 					sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-								      missingVal = missingVal, filter = debug_filter,
-								      filter_accessions=filter_accessions)
+								      missingVal = missingVal, filter = debug_filter)
 					num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)	
 					k = lm.load_kinship_from_file(kinship_file,sd.accessions)
 				else:
