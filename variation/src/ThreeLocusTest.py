@@ -54,6 +54,8 @@ import time
 import random
 import pdb
 import cPickle
+import scipy as sp
+import scipy.stats as stats
 
 #import AddResults2DB
 
@@ -704,6 +706,8 @@ def _run_():
 				if len(set(phenotype))>1:
 					phenotypes.append(phenotype)
 					#print phenotype
+					if phenotype_error>0.0:
+						sp.var(phenotype,)
 					phen_positions.append(pos)
 					phen_chr_pos.append((chr,pos))
 					phen_mafs.append(maf)
@@ -1679,9 +1683,8 @@ def plot_rank_3D_hist(r_list1,r_list2,min_pvals,filename,
 	maf_thresholds = [0.1,0.2,0.3,0.4,0.5]
 
 	#Binning (manually)
-	import numpy as np
 	r_bin_str =["r$=$1","1$<$r$\leq$10", "10$<$r$\leq$10$^{2}$", "10$^{2}<$r$\leq$10$^{3}$", "10$^{3}<$r"]
-	counts = np.zeros((len(r_bin_str),len(r_bin_str)))
+	counts = sp.zeros((len(r_bin_str),len(r_bin_str)))
 	r_bin_thresholds = [1,2,11,101,1001]
 	for r1,r2 in zip(r_list1,r_list2):
 		ci1 = 4
@@ -1751,9 +1754,8 @@ def plot_dist_3D_hist(r_list1,r_list2,min_pvals,filename,
 	maf_thresholds = [0.1,0.2,0.3,0.4,0.5]
 
 	#Binning (manually)
-	import numpy as np
 	r_bin_str =["d$=$0","0$<$d$\leq$5", "5$<$d$\leq$50", "50$<$d", "Other chr."]
-	counts = np.zeros((len(r_bin_str),len(r_bin_str)))
+	counts = sp.zeros((len(r_bin_str),len(r_bin_str)))
 	r_bin_thresholds = [0,1,5001,50001]
 	for r1,r2 in zip(r_list1,r_list2):
 		if r1<0:

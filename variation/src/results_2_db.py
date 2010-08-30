@@ -132,7 +132,7 @@ def _run_():
 
 
 def add_results_to_db(results_file, short_name, call_method_id, phenotype_method_id, analysis_method_id,
-		      transformation_method_id, remove_outliers=0, transformation_parameters=0, 
+		      transformation_method_id, remove_outliers=0, transformation_parameters='null', 
 		      results_method_type_id=1, method_description="", data_description="", comment="", 
 		      pseudo_heritability=None):
  	
@@ -142,16 +142,20 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 	conn = dbutils.connect_to_default_insert()
 	cursor = conn.cursor()
 	db_result_dir = "/Network/Data/250k/db/results/type_1/"
-	
+	if transformation_parameters=='null':
+		transformation_parameters_str = 'is null'
+	else:
+		transformation_parameters_str = "= '%s'"%transformation_parameters
+		 
         
 	print "Checking whether result is in DB."
 	sql_statement = "SELECT id FROM stock_250k.results_method \
 			WHERE phenotype_method_id=%d AND call_method_id=%d AND analysis_method_id=%d \
 			AND results_method_type_id=%d AND transformation_method_id=%d AND remove_outliers=%d \
-			AND transformation_parameters='%s'"\
-			%(phenotype_method_id,call_method_id,analysis_method_id,results_method_type_id,\
-				transformation_method_id,remove_outliers,str(transformation_parameters))
-	#print sql_statement
+			AND transformation_parameters %s"\
+			%(phenotype_method_id, call_method_id, analysis_method_id, results_method_type_id,\
+				transformation_method_id,remove_outliers,str(transformation_parameters_str))
+	print sql_statement
 	cursor.execute(sql_statement)
 	row = cursor.fetchone()
 	if row:

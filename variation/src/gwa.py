@@ -341,7 +341,7 @@ def _run_():
 				if remove_outliers:
 					short_name+="_no"
 				tm_id = transformation_method_dict[trans_method]
-				rdb.add_results_to_db(result_file,short_name,callMethodID,db_pid,analysis_methods_dict[mapping_method], 
+				rdb.add_results_to_db(result_file, short_name, callMethodID, db_pid, analysis_methods_dict[mapping_method], 
 						tm_id, remove_outliers=remove_outliers)
 				return
 			else:

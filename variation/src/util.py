@@ -51,7 +51,6 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 		s = np.sum(group_counts*(group_counts*group_counts-ones_array))
 		s = s/(n_total*(n_total*n_total-1.0))
 		tieCorrection = 1.0/(1-s)
-		#print "tieCorrection:", tieCorrection
 	
 	n = len(phenVals)
 	ds = np.zeros(len(snps))
