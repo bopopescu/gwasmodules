@@ -447,7 +447,6 @@ def _run_():
 	else:
 		p_i=int(args[0])
 	
-	filter_accessions = phed.getNonNAEcotypes(p_i)
 	phen_is_binary = phed.isBinary(p_i)
 	phenotype_name=phed.getPhenotypeName(p_i)
 	print "Phenotype:%s, phenotype_id:%s"%(phenotype_name, p_i)
@@ -616,8 +615,7 @@ def _run_():
 				sys.stdout.write("Done!.\n")
 			else:
 				sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
-							      missingVal = missingVal, filter = debug_filter,
-							      filter_accessions=filter_accessions)
+							      missingVal = missingVal, filter = debug_filter)
 				num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)	
 			
 			snps = sd.getSnps()
