@@ -477,18 +477,58 @@ class LinearMixedModel(LinearModel):
                 
                 With interactions between SNP and possible cofactors.
                 """
-#                try:
-#                        import psyco
-#                        psyco.full()
-#                except ImportError:
-#                        print 'Failed using psyco.. hence no speed-up'
-#                        pass
                 assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
                 q = 1  # Single SNP is being tested
                 p = len(self.X.T)+q
                 n = self.n
-                n_p = n-p
-                                
+                n_p = n-p                                
+
+                K = self.random_effects[1][1]
+                eig_L = self._get_eigen_L_(K)
+                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
+                delta = res['delta']
+                print 'pseudo_heritability:',1.0/(1+delta)
+                H_sqr = res['H_sqrt']
+                H_sqrt_inv = H_sqr.I
+                Y = H_sqrt_inv*self.Y        #The transformed outputs.
+                h0_X = H_sqrt_inv*self.X
+                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
+                h0_betas = map(float,list(h0_betas))
+                num_snps = len(snps)
+                rss_ratio = ones(num_snps)
+                rss_list = repeat(h0_rss,num_snps)
+                betas_list = [h0_betas]*num_snps
+                var_perc = zeros(num_snps)
+                snp_mat = matrix(snps)*(H_sqrt_inv.T)
+                for i, snp in enumerate(snp_mat):
+                        (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,snp.T]),Y)
+                        if not rss:
+                                print 'No predictability in the marker, moving on...'
+                                continue
+                        rss_ratio[i] = h0_rss/rss             
+                        rss_list[i] = rss[0]                
+                        betas_list[i] = map(float,list(betas))
+                var_perc = 1-1/rss_ratio
+                f_stats = (rss_ratio-1)*n_p/float(q)
+                p_vals = stats.f.sf(f_stats,q,n_p)
+
+                      
+                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
+                        'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
+
+        
+        def emmax_f_test_old(self,snps):
+                """
+                EMMAX implementation (in python)
+                Single SNPs
+                
+                With interactions between SNP and possible cofactors.
+                """
+                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
+                q = 1  # Single SNP is being tested
+                p = len(self.X.T)+q
+                n = self.n
+                n_p = n-p                                
 
                 K = self.random_effects[1][1]
                 eig_L = self._get_eigen_L_(K)
@@ -522,8 +562,9 @@ class LinearMixedModel(LinearModel):
                 return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
-                        
-        def emmax_f_test_old(self,snps):
+
+        
+        def emmax_f_test_old_2(self,snps):
                 """
                 EMMAX implementation (in python)
                 Single SNPs

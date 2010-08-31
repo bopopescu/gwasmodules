@@ -918,9 +918,9 @@ def run_fet(snps,phenotypeValues,verbose=False):
 
 def calc_correlations(snps,phen_vals):
 	import scipy as sp
-	corrs = []
-	for snp in snps:
-		corrs.append(sp.corrcoef(snp,phen_vals)[1,0])
+	corrs = sp.zeros(len(snps))
+	for i, snp in enumerate(snps):
+		corrs[i] = sp.corrcoef(snp,phen_vals)[1,0]
 	return corrs
 	
 	
