@@ -507,8 +507,7 @@ class LinearMixedModel(LinearModel):
                 betas_list = [h0_betas]*num_snps
                 var_perc = zeros(num_snps)
                 for i, snp in enumerate(snps):
-                        X = hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]) 
-                        (betas, rss, p, sigma) = linalg.lstsq(X,Y)
+                        (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]),Y)
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
                                 continue
