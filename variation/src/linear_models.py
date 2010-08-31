@@ -502,7 +502,7 @@ class LinearMixedModel(LinearModel):
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
                 h0_betas = map(float,list(h0_betas))
                 num_snps = len(snps)
-                f_stats = zeros(num_snps)
+                rss_ratio = ones(num_snps)
                 rss_list = repeat(h0_rss,num_snps)
                 betas_list = [h0_betas]*num_snps
                 var_perc = zeros(num_snps)
@@ -512,11 +512,11 @@ class LinearMixedModel(LinearModel):
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
                                 continue
-                        f_stat = ((h0_rss-rss)/q)/(rss/n_p)
-                        f_stats[i] = f_stat[0]                
+                        rss_ratio[i] = h0_rss/rss             
                         rss_list[i] = rss[0]                
-                        #betas_list[i] = map(float,list(betas))
-                        #var_perc[i] = float(1-rss/h0_rss)
+                        betas_list[i] = map(float,list(betas))
+                var_perc = 1-1/rss_ratio
+                f_stats = (rss_ratio-1)*n_p/float(q)
                 p_vals = stats.f.sf(f_stats,q,n_p)
 
                       
