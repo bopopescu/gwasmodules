@@ -177,6 +177,8 @@ class PhenotypeData:
 		pylab.axes([0.03,0.08,0.96,0.91])
 		dend_dict = hc.dendrogram(Z,leaf_font_size=7,labels=pi_list)
 		pylab.show()
+
+
 	
 	def getPC(self,pc_num=1):
 		"""
@@ -465,6 +467,7 @@ class PhenotypeData:
 				
 		
 		return {"marker":new_marker,"phen_vals":new_phen_vals,"accessions":new_accessions}
+	
 	
 	def plot_histogram(self,p_i, title = None , pdfFile = None, pngFile = None,withLabels=False):
 		import matplotlib
@@ -958,10 +961,16 @@ class PhenotypeData:
 		
 		
 		
-	def writeToFile(self, outputFile, phenotypes=None, delimiter=',',with_pid=False):
+	def writeToFile(self, outputFile, phenotypes=None, delimiter=',',with_pid=False, 
+			with_accession_names=False):
 		print "Writing out phenotype file:",outputFile
 		outStr = "ecotype_id"
-		if self.accessionNames:
+		if with_accession_names:
+			if not self.accessionNames:
+				ei_dict = get_ecotype_id_info_dict()
+				self.accessionNames = []
+				for ei in self.accessions:
+					self.accessionNames.append(ei_dict[int(ei)][0])
 			outStr += delimiter+"accession_name"
 		if phenotypes:
 			for i in phenotypes:
@@ -1288,64 +1297,54 @@ def _getFirst192Ecotypes_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_b
 #	print len(snps_data.accessions)
 #	snps_data.writeToFile("/tmp/250K_t43_192.csv")
 #	snpsds = dataParsers.parseCSVData("/tmp/250K_t43_192.csv")
+#
+#
+#		
+#	
+#
+#
+#def _getEcotypeIdToStockParentDict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
+#	import MySQLdb
+#	import sys
+#	print "Connecting to db, host="+host
+#	if not user:
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#	#Retrieve the filenames
+#	print "Fetching data"
+#	ecotypeDict = {}
+#	numRows = int(cursor.execute("select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid "))
+#	i = 0
+#	while(1):
+#		row = cursor.fetchone()
+#		if not row:
+#			break;
+#		ecotypeDict[int(row[0])] = (row[1],row[2])
+#		sp = "NA"
+#		if row[2]:
+#			sp = row[2]
+#		#print str(int(row[0]))+","+str(row[1])+","+sp
+#	cursor.close ()
+#	conn.close ()
+#	return ecotypeDict
+#	
+#	
 
-
-		
-	
-
-
-def _getEcotypeIdToStockParentDict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
-	import MySQLdb
-	import sys
-	print "Connecting to db, host="+host
-	if not user:
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Fetching data"
-	ecotypeDict = {}
-	numRows = int(cursor.execute("select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid "))
-	i = 0
-	while(1):
-		row = cursor.fetchone()
-		if not row:
-			break;
-		ecotypeDict[int(row[0])] = (row[1],row[2])
-		sp = "NA"
-		if row[2]:
-			sp = row[2]
-		#print str(int(row[0]))+","+str(row[1])+","+sp
-	cursor.close ()
-	conn.close ()
-	return ecotypeDict
-	
-	
-
-def _getEcotypeIdInfoDict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
-	import MySQLdb
-	import sys
-	print "Connecting to db, host="+host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
+def get_ecotype_id_info_dict(defaultValue=None):
+	"""
+	Returns a dict containing tuples of (nativename,stockparent,latitude,longitude,country)
+	"""
+	import dbutils
+	conn = dbutils.connect_to_default_lookup(db='stock')
 	cursor = conn.cursor ()
 	#Retrieve the filenames
 	print "Fetching data"
@@ -1387,171 +1386,170 @@ where e.id=ei.tg_ecotypeid and e.siteid=s.id and s.addressid=a.id and a.countryi
 	
 
 
-def _get_stock_parent_info_dict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
-	import MySQLdb
-	import sys
-	print "Connecting to db, host="+host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Fetching data"
-	ecotypeDict = {}
-
-	sql_statment= """
-select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
-from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock.site s, stock.address a, stock.country c
-where e.id=ei.tg_ecotypeid and e.siteid=s.id and s.addressid=a.id and a.countryid=c.id
-"""
-
-	numRows = int(cursor.execute(sql_statment))
-	i = 0
-	while(1):
-		row = cursor.fetchone()
-		if not row:
-			break;
-		latitude = None
-		longitude = None
-		country = None
-		if row[3]:
-			latitude = float(row[3])
-		if row[4]:
-			longitude = float(row[4])
-		if row[5]:
-			country = row[5]
-		if row[2]:
-			ecotypeDict[str(row[2])] = (row[0],row[1],latitude,longitude,country)
-		#print row #str(int(row[0]))+","+str(row[1])+","+sp
-	cursor.close()
-	conn.close()
-	return ecotypeDict
-	
-
-
-
-
-def _getEcotype2TgEcotypeDict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
-	import MySQLdb
-	#print "Connecting to db, host="+host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "stock")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	#print "Fetching data"
-	eDict = {}
-	numRows = int(cursor.execute("select distinct ecotypeid, tg_ecotypeid from stock.ecotypeid2tg_ecotypeid "))
-	while(1):
-		row = cursor.fetchone()
-		if row:
-			eDict[int(row[0])] = int(row[1])
-		else:
-			break
-	cursor.close ()
-	conn.close ()
-	print "Ecotype to tg_eoctype dictionary was retrieved from the DB."
-	return eDict
-
-
-
-def _getAccessionToEcotypeIdDict_(accessions,stockParents=None,host="papaya.usc.edu", user="bvilhjal", 
-				passwd="*rri_bjarni@usc", defaultValue=None, only_250K_accessions=False, lower_cases=True):
-	import warnings
-	warnings.warn("This function is possibly outdated, please update SQL statement before use!")
-#def _getAccessionToEcotypeIdDict_(accessions,stockParents=None,host="arabidopsis", user="bjarni", 
-#				passwd="brfgiSzw25Kf98", defaultValue=None, only_250K_accessions=True, lower_cases=True):
-	import MySQLdb
-	print "Connecting to db, host="+host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Fetching data in DB."
-	accDict = {}
-	not_found_count = 0
-	for i in range(0,len(accessions)):
-		acc = accessions[i]
-		#acc = unicode(acc,"latin-1")
-		#print acc
-		if stockParents!=None and stockParents[i]!="NA":
-			sp = stockParents[i]
-			if only_250K_accessions:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and ei.nativename like '"+str(acc.lower())+"' and ei.stockparent like '"+str(sp)+"'"
-			else:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei where ei.nativename like '"+str(acc.lower())+"' and ei.stockparent like '"+str(sp)+"'"				
-		else:
-			if only_250K_accessions:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and ei.nativename like '"+str(acc.lower())+"'"
-			else:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei where ei.nativename like '"+str(acc.lower())+"'"
-		#sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ei.nativename like '"+str(acc)+"'"
-		#print sql_statement
-		numRows = int(cursor.execute(sql_statement))
-		i = 0
-		accession_found = False
-		while(1):
-			row = cursor.fetchone()
-			#print row
-			if not row:
-				if i==0:
-					not_found_count += 1
-					print "Accession",acc,"wasn't found."
-				break
-			else: 
-				if i==0:
-					ecotype = int(row[0])
-				else:
-					ecotype = min(int(row[0]),ecotype)
-				i += 1
-		if i:
-			if not accDict.has_key(acc.lower()):
-				accDict[acc.lower()] = ecotype
-				if not lower_cases:
-					accDict[acc.upper()] = ecotype				
-					accDict[acc] = ecotype				
-			elif  accDict[acc.lower()]>ecotype:
-				accDict[acc.lower()] = ecotype
-				if not lower_cases:
-					accDict[acc.upper()] = ecotype				
-					accDict[acc] = ecotype				
-				#print acc.lower(),":", row[1], int(row[0])
-	cursor.close ()
-	conn.close ()
-	if not_found_count:
-		print not_found_count, "accessions weren't found."
-	else:
-		print "All accessions were found in DB."
-	return accDict
-
+#def _get_stock_parent_info_dict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
+#	import MySQLdb
+#	import sys
+#	print "Connecting to db, host="+host
+#	if not user:
+#		import sys
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#	#Retrieve the filenames
+#	print "Fetching data"
+#	ecotypeDict = {}
+#
+#	sql_statment= """
+#select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
+#from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock.site s, stock.address a, stock.country c
+#where e.id=ei.tg_ecotypeid and e.siteid=s.id and s.addressid=a.id and a.countryid=c.id
+#"""
+#
+#	numRows = int(cursor.execute(sql_statment))
+#	i = 0
+#	while(1):
+#		row = cursor.fetchone()
+#		if not row:
+#			break;
+#		latitude = None
+#		longitude = None
+#		country = None
+#		if row[3]:
+#			latitude = float(row[3])
+#		if row[4]:
+#			longitude = float(row[4])
+#		if row[5]:
+#			country = row[5]
+#		if row[2]:
+#			ecotypeDict[str(row[2])] = (row[0],row[1],latitude,longitude,country)
+#		#print row #str(int(row[0]))+","+str(row[1])+","+sp
+#	cursor.close()
+#	conn.close()
+#	return ecotypeDict
+#	
+#
+#
+#
+#
+#def _getEcotype2TgEcotypeDict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
+#	import MySQLdb
+#	#print "Connecting to db, host="+host
+#	if not user:
+#		import sys
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "stock")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#	#Retrieve the filenames
+#	#print "Fetching data"
+#	eDict = {}
+#	numRows = int(cursor.execute("select distinct ecotypeid, tg_ecotypeid from stock.ecotypeid2tg_ecotypeid "))
+#	while(1):
+#		row = cursor.fetchone()
+#		if row:
+#			eDict[int(row[0])] = int(row[1])
+#		else:
+#			break
+#	cursor.close ()
+#	conn.close ()
+#	print "Ecotype to tg_eoctype dictionary was retrieved from the DB."
+#	return eDict
+#
+#
+#
+#def _getAccessionToEcotypeIdDict_(accessions,stockParents=None,host="papaya.usc.edu", user="bvilhjal", 
+#				passwd="*rri_bjarni@usc", defaultValue=None, only_250K_accessions=False, lower_cases=True):
+#	import warnings
+#	warnings.warn("This function is possibly outdated, please update SQL statement before use!")
+##def _getAccessionToEcotypeIdDict_(accessions,stockParents=None,host="arabidopsis", user="bjarni", 
+##				passwd="brfgiSzw25Kf98", defaultValue=None, only_250K_accessions=True, lower_cases=True):
+#	import MySQLdb
+#	print "Connecting to db, host="+host
+#	if not user:
+#		import sys
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#	#Retrieve the filenames
+#	print "Fetching data in DB."
+#	accDict = {}
+#	not_found_count = 0
+#	for i in range(0,len(accessions)):
+#		acc = accessions[i]
+#		#acc = unicode(acc,"latin-1")
+#		#print acc
+#		if stockParents!=None and stockParents[i]!="NA":
+#			sp = stockParents[i]
+#			if only_250K_accessions:
+#				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and ei.nativename like '"+str(acc.lower())+"' and ei.stockparent like '"+str(sp)+"'"
+#			else:
+#				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei where ei.nativename like '"+str(acc.lower())+"' and ei.stockparent like '"+str(sp)+"'"				
+#		else:
+#			if only_250K_accessions:
+#				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and ei.nativename like '"+str(acc.lower())+"'"
+#			else:
+#				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei where ei.nativename like '"+str(acc.lower())+"'"
+#		#sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ei.nativename like '"+str(acc)+"'"
+#		#print sql_statement
+#		numRows = int(cursor.execute(sql_statement))
+#		i = 0
+#		accession_found = False
+#		while(1):
+#			row = cursor.fetchone()
+#			#print row
+#			if not row:
+#				if i==0:
+#					not_found_count += 1
+#					print "Accession",acc,"wasn't found."
+#				break
+#			else: 
+#				if i==0:
+#					ecotype = int(row[0])
+#				else:
+#					ecotype = min(int(row[0]),ecotype)
+#				i += 1
+#		if i:
+#			if not accDict.has_key(acc.lower()):
+#				accDict[acc.lower()] = ecotype
+#				if not lower_cases:
+#					accDict[acc.upper()] = ecotype				
+#					accDict[acc] = ecotype				
+#			elif  accDict[acc.lower()]>ecotype:
+#				accDict[acc.lower()] = ecotype
+#				if not lower_cases:
+#					accDict[acc.upper()] = ecotype				
+#					accDict[acc] = ecotype				
+#				#print acc.lower(),":", row[1], int(row[0])
+#	cursor.close ()
+#	conn.close ()
+#	if not_found_count:
+#		print not_found_count, "accessions weren't found."
+#	else:
+#		print "All accessions were found in DB."
+#	return accDict
 
 
 	
@@ -1746,101 +1744,100 @@ def _insert_bergelsson_phen_into_db_():
 			     data_type=data_type, comment=comment)
 	
 	
-def _insert_wilczek_phen_into_db_2_():
-	"""
-	"""
-	
-	phen_file = "/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/wilczek_seaset.txt"
-	phend = readPhenotypeFile(phen_file)
-	phenotype_scoring = ""
-	method_description = ""
-	growth_condition = ""
-	biology_category_id = 22
-	citations = ""
-	data_description = ""
-	transformation_description = "None"
-	#transformation_description = "Log(SD/10+x-minVal)"
-	method_id = None
-	data_type = ""
-	comment = "Data from Amity Wilczek"			
-	print len(phend.accessions),len(set(phend.accessions))
-	
-	
-	phend.insert_into_DB(phenotype_scoring=phenotype_scoring, method_description=method_description, 
-			     growth_condition=growth_condition, biology_category_id=biology_category_id, 
-			     citations=citations, data_description=data_description, 
-			     transformation_description=transformation_description, method_id=method_id, 
-			     data_type=data_type, comment=comment)
-	
-	return phend
-
-	
-
-
-
-def _createRatioPhenotype_(pi1,pi2,methodID,short_name,method_description,data_description="",data_type="quantitative",created_by="bvilhjal",comment="",biology_category_id=1,only_first_96=0,readyForPublication = 0,user = "bvilhjal",host="papaya.usc.edu",passwd="bamboo123"):
-	phed = getPhenotypes(user=user, passwd=passwd,rawPhenotypes=True) 
-	pi1 = phed.getPhenIndex(pi1)
-	pi2 = phed.getPhenIndex(pi2)
-	print len(phed.accessions)
-	
-	newVals = []
-	for i in range(0,len(phed.accessions)):
-		newVal = 'NA'
-		if phed.phenotypeValues[i][pi1] != 'NA' and phed.phenotypeValues[i][pi2]!='NA':
-			v1 = float(phed.phenotypeValues[i][pi1])
-			v2 = float(phed.phenotypeValues[i][pi2])
-			#print v1, v2
-			if v2 != 0.0:
-				newVal = v1/v2
-		newVals.append(newVal)
-
-	import MySQLdb
-	print "Connecting to db, host="+host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-
-	sqlStat = """INSERT INTO stock_250k.phenotype_method 
-    (id,short_name,only_first_96,biology_category_id,method_description, data_description, comment, created_by, data_type) 
-    VALUES """
-	sqlStat += "("+str(methodID)+",'"+short_name+"',"+str(only_first_96)+","+str(biology_category_id)+",'"+method_description+"','"+data_description+"','"+comment+"','"+created_by+"','"+data_type+"')"	
-	#print sqlStat	
-	#numRows = int(cursor.execute(sqlStat))
-	#print "Inserted data into stock_250k.phenotype_method:",numRows
-	#row = cursor.fetchone()
-	#if row:
-	#	print row
-	
-	for i in range(0,len(phed.accessions)):
-		
-		val = newVals[i]
-		if val !='NA':
-			e_i = phed.accessions[i]
-			sqlStatement = "INSERT INTO stock_250k.phenotype_avg (ecotype_id, value, ready_for_publication, method_id) VALUES ( "+str(e_i)+", "+str(val)+", "+str(readyForPublication)+", "+str(methodID)+")"
-			#print sqlStatement
-			numRows = int(cursor.execute(sqlStatement))
-			row = cursor.fetchone()
-			if row:
-				print row
-	print "Done inserting data into table!"
-	conn.commit()
-	cursor.close ()
-	conn.close ()
-
-
-	
-
+#def _insert_wilczek_phen_into_db_2_():
+#	"""
+#	"""
+#	
+#	phen_file = "/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/wilczek_seaset.txt"
+#	phend = readPhenotypeFile(phen_file)
+#	phenotype_scoring = ""
+#	method_description = ""
+#	growth_condition = ""
+#	biology_category_id = 22
+#	citations = ""
+#	data_description = ""
+#	transformation_description = "None"
+#	#transformation_description = "Log(SD/10+x-minVal)"
+#	method_id = None
+#	data_type = ""
+#	comment = "Data from Amity Wilczek"			
+#	print len(phend.accessions),len(set(phend.accessions))
+#	
+#	
+#	phend.insert_into_DB(phenotype_scoring=phenotype_scoring, method_description=method_description, 
+#			     growth_condition=growth_condition, biology_category_id=biology_category_id, 
+#			     citations=citations, data_description=data_description, 
+#			     transformation_description=transformation_description, method_id=method_id, 
+#			     data_type=data_type, comment=comment)
+#	
+#	return phend
+#
+#	
+#
+#
+#def _createRatioPhenotype_(pi1,pi2,methodID,short_name,method_description,data_description="",data_type="quantitative",created_by="bvilhjal",comment="",biology_category_id=1,only_first_96=0,readyForPublication = 0,user = "bvilhjal",host="papaya.usc.edu",passwd="bamboo123"):
+#	phed = getPhenotypes(user=user, passwd=passwd,rawPhenotypes=True) 
+#	pi1 = phed.getPhenIndex(pi1)
+#	pi2 = phed.getPhenIndex(pi2)
+#	print len(phed.accessions)
+#	
+#	newVals = []
+#	for i in range(0,len(phed.accessions)):
+#		newVal = 'NA'
+#		if phed.phenotypeValues[i][pi1] != 'NA' and phed.phenotypeValues[i][pi2]!='NA':
+#			v1 = float(phed.phenotypeValues[i][pi1])
+#			v2 = float(phed.phenotypeValues[i][pi2])
+#			#print v1, v2
+#			if v2 != 0.0:
+#				newVal = v1/v2
+#		newVals.append(newVal)
+#
+#	import MySQLdb
+#	print "Connecting to db, host="+host
+#	if not user:
+#		import sys
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#
+#	sqlStat = """INSERT INTO stock_250k.phenotype_method 
+#    (id,short_name,only_first_96,biology_category_id,method_description, data_description, comment, created_by, data_type) 
+#    VALUES """
+#	sqlStat += "("+str(methodID)+",'"+short_name+"',"+str(only_first_96)+","+str(biology_category_id)+",'"+method_description+"','"+data_description+"','"+comment+"','"+created_by+"','"+data_type+"')"	
+#	#print sqlStat	
+#	#numRows = int(cursor.execute(sqlStat))
+#	#print "Inserted data into stock_250k.phenotype_method:",numRows
+#	#row = cursor.fetchone()
+#	#if row:
+#	#	print row
+#	
+#	for i in range(0,len(phed.accessions)):
+#		
+#		val = newVals[i]
+#		if val !='NA':
+#			e_i = phed.accessions[i]
+#			sqlStatement = "INSERT INTO stock_250k.phenotype_avg (ecotype_id, value, ready_for_publication, method_id) VALUES ( "+str(e_i)+", "+str(val)+", "+str(readyForPublication)+", "+str(methodID)+")"
+#			#print sqlStatement
+#			numRows = int(cursor.execute(sqlStatement))
+#			row = cursor.fetchone()
+#			if row:
+#				print row
+#	print "Done inserting data into table!"
+#	conn.commit()
+#	cursor.close ()
+#	conn.close ()
+#
+#
+#	
+#
 #		
 #def _runTest_():
 #	filename = "/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_120308.tsv"
@@ -1864,75 +1861,80 @@ def _createRatioPhenotype_(pi1,pi2,methodID,short_name,method_description,data_d
 #	print vals
 #	print accessions
 #	
-
-	
-	
-def _runTest_():
-	filename = "/Network/Data/250k/dataFreeze_011209/250K_f13_012609.csv"
-	import dataParsers,snpsdata
-	snpsds = dataParsers.parseCSVData(filename, format=1, deliminator=",")#,debug=True)
-	snpsd = snpsdata.SNPsDataSet(snpsds,[1,2,3,4,5])
-	eDict = _getEcotypeIdToStockParentDict_()
-	accessions = _getFirst192Ecotypes_()
-	accessions = map(int,accessions)
-	a_set = set(accessions) 
-	accessions = map(int,snpsd.accessions)
-	a_set = a_set.intersection(set(accessions))
-	accessions = list(a_set)
-	accessions.sort()
-	print "ecotype_id, native_name, stock_parent"
-	i = 0
-	import csv
-	filename = "/Users/bjarni/tmp/192_accessions_031009.csv"
-	f = open(filename,"w")
-	w = csv.writer(f)
-	w.writerow(["ecotype_id","accession_name","stock_parent_id"])
-	#l = zip(log_true_pvals,sd_log_pvals)
-	for et in accessions:
-		w.writerow([et,eDict[et][0],eDict[et][1]])
-	f.close()
-
-	for et in accessions:
-		et = int(et)
-		print str(et)+", "+str(eDict[et][0])+", "+str(eDict[et][1])
-	print len(accessions)
-	
-def _runTest2_():
-	filename = "/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_120308.tsv"
-	phed = readPhenotypeFile(filename)	
-	phed.getTree()
-	
-def _runtest3_():
-	d = _getEcotypeIdInfoDict_()
-	tg_d = _getEcotype2TgEcotypeDict_()
-	import pickle
-	f = open("/Users/bjarnivilhjalmsson/tmp/eco_dict.pickle","w")
-	for ei in [6899,6909,6916,8215,6046,7515,7514,6968,6970,8268,8269,5719,7059,8281,8299,8324,8346,7336,7374,8400]:
-		print "%i,%i,%s"%(ei, tg_d[ei], d[tg_d[ei]])
-	pickle.dump(d,f)
-	f.close()
-	
-def _test_phen_map_plot_():
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phenotypes_all_raw_081009.tsv"
-	phed = readPhenotypeFile(filename)	
-	accessions = phed.getAccessionsWithValues(1)
-	phed.plot_accession_map(1, "/Users/bjarnivilhjalmsson/tmp/test.pdf",accessions=accessions)
-	
-def _getTransformedPhenoype_():
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phenotypes_all_raw_081009.tsv"
-	phed = readPhenotypeFile(filename)	
-	phed.logTransform(43)
-	phed.writeToFile("/tmp/test.tsv", [43], "\t")
-
-
-def get_AW_common_dataset():
-        filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_wilzcek_wo_OF_NS06_060210.csv"
-        phed = readPhenotypeFile(filename)  
-        phed.filter_accessions_w_missing_data()
-        phed.writeToFile('/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_wilzcek_wo_OF_NS06_060210.tsv', delimiter='\t')
-         
-             
-
+#
+#	
+#	
+#def _runTest_():
+#	filename = "/Network/Data/250k/dataFreeze_011209/250K_f13_012609.csv"
+#	import dataParsers,snpsdata
+#	snpsds = dataParsers.parseCSVData(filename, format=1, deliminator=",")#,debug=True)
+#	snpsd = snpsdata.SNPsDataSet(snpsds,[1,2,3,4,5])
+#	eDict = _getEcotypeIdToStockParentDict_()
+#	accessions = _getFirst192Ecotypes_()
+#	accessions = map(int,accessions)
+#	a_set = set(accessions) 
+#	accessions = map(int,snpsd.accessions)
+#	a_set = a_set.intersection(set(accessions))
+#	accessions = list(a_set)
+#	accessions.sort()
+#	print "ecotype_id, native_name, stock_parent"
+#	i = 0
+#	import csv
+#	filename = "/Users/bjarni/tmp/192_accessions_031009.csv"
+#	f = open(filename,"w")
+#	w = csv.writer(f)
+#	w.writerow(["ecotype_id","accession_name","stock_parent_id"])
+#	#l = zip(log_true_pvals,sd_log_pvals)
+#	for et in accessions:
+#		w.writerow([et,eDict[et][0],eDict[et][1]])
+#	f.close()
+#
+#	for et in accessions:
+#		et = int(et)
+#		print str(et)+", "+str(eDict[et][0])+", "+str(eDict[et][1])
+#	print len(accessions)
+#	
+#def _runTest2_():
+#	filename = "/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_120308.tsv"
+#	phed = readPhenotypeFile(filename)	
+#	phed.getTree()
+#	
+#def _runtest3_():
+#	d = _getEcotypeIdInfoDict_()
+#	tg_d = _getEcotype2TgEcotypeDict_()
+#	import pickle
+#	f = open("/Users/bjarnivilhjalmsson/tmp/eco_dict.pickle","w")
+#	for ei in [6899,6909,6916,8215,6046,7515,7514,6968,6970,8268,8269,5719,7059,8281,8299,8324,8346,7336,7374,8400]:
+#		print "%i,%i,%s"%(ei, tg_d[ei], d[tg_d[ei]])
+#	pickle.dump(d,f)
+#	f.close()
+#	
+#def _test_phen_map_plot_():
+#	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phenotypes_all_raw_081009.tsv"
+#	phed = readPhenotypeFile(filename)	
+#	accessions = phed.getAccessionsWithValues(1)
+#	phed.plot_accession_map(1, "/Users/bjarnivilhjalmsson/tmp/test.pdf",accessions=accessions)
+#	
+#def _getTransformedPhenoype_():
+#	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phenotypes_all_raw_081009.tsv"
+#	phed = readPhenotypeFile(filename)	
+#	phed.logTransform(43)
+#	phed.writeToFile("/tmp/test.tsv", [43], "\t")
+#
+#def get_AW_common_dataset():
+#        filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_wilzcek_wo_OF_NS06_060210.csv"
+#        phed = readPhenotypeFile(filename)  
+#        phed.filter_accessions_w_missing_data()
+#        phed.writeToFile('/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_wilzcek_wo_OF_NS06_060210.tsv', delimiter='\t')
+#         
+#             
+#
+#def get_hypocotyl_lenghts():
+#	filename = "/home/GMI/bjarni.vilhjalmsson/Projects/data/phen_raw_071910.tsv"
+#	phed = readPhenotypeFile(filename)	
+#	phed.removePhenotypes([182])
+#	phed.filter_accessions_w_missing_data()
+#	phed.writeToFile('/tmp/hypocotyl.tsv',with_accession_names=True)
 
 
 if __name__ == '__main__':
@@ -1947,7 +1949,7 @@ if __name__ == '__main__':
 	#_test_phen_map_plot_()
 	#_insert_bergelsson_phen_into_db_()
 	#get_AW_common_dataset()
-	_insert_wilzcek_phen_into_db_()
+	get_hypocotyl_lenghts()
 	print "Done!"
 	
 	

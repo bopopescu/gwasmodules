@@ -5,6 +5,7 @@ from scipy import *
 from scipy import linalg
 from scipy import stats
 from scipy import optimize
+from scipy import weave
 import math
 import time
 import warnings
@@ -514,8 +515,8 @@ class LinearMixedModel(LinearModel):
                         f_stat = ((h0_rss-rss)/q)/(rss/n_p)
                         f_stats[i] = f_stat[0]                
                         rss_list[i] = rss[0]                
-                        betas_list[i] = map(float,list(betas))
-                        var_perc[i] = float(1-rss/h0_rss)
+                        #betas_list[i] = map(float,list(betas))
+                        #var_perc[i] = float(1-rss/h0_rss)
                 p_vals = stats.f.sf(f_stats,q,n_p)
 
                       

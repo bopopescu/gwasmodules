@@ -131,6 +131,19 @@ def prepare_data(sd,phed,p_i,transformation_type,remove_outliers):
 	
 	
 
+def _parse_pids_(pid_arg_str):
+	t_pids = pid_arg_str.split(',')
+	pids = []
+	for s in t_pids:
+		if '-' in s:
+			pid_range = map(int,s.split('-'))
+		        for pid in range(pid_range[0],pid_range[1]+1):
+		        	pids.append(pid)
+		else:
+			pids.append(int(s))
+	return pids
+	
+
 def get_perm_pvals(snps,phen_vals,mapping_method='kw',num_perm=100,snps_filter=0.05):
 	import random
 	if snps_filter<1.0:
@@ -180,7 +193,7 @@ def _run_():
 	callMethodID=None
 	comment=""
 	
-	memReq = "3800mb"
+	memReq = "1800mb"
 	walltimeReq = "12:00:00"
 	proc_per_node = 8
 	
@@ -423,15 +436,7 @@ def _run_():
 				raise Exception('Phenotype file or phenotype ID is missing.')
 			pids = phed.phenIds
 		elif len(args)==1:
-			t_pids = args[0].split(',')
-			pids = []
-			for s in t_pids:
-				if '-' in s:
-					pid_range = map(int,s.split('-'))
-				        for pid in range(pid_range[0],pid_range[1]+1):
-				        	pids.append(pid)
-				else:
-					pids.append(int(s))
+			pids = _parse_pids_(args[0])
 		else:
 			raise Exception('Too many arguments..')
 		
@@ -445,6 +450,7 @@ def _run_():
 						run_parallel(p_i,phed,mapping_method,trans_method)
 		return
 	else:
+		pids = _parse_pids_(args[0])
 		p_i=int(args[0])
 	
 	phen_is_binary = phed.isBinary(p_i)
@@ -779,6 +785,7 @@ def _run_():
 
 	
 def _run_emma_mp_(in_que,out_que,confirm_que,num_splits=10):
+	from rpy import r 
 	args = in_que.get(block=True)
 	#r_source(script_dir+"emma_fast.R")
 	#r_emma_REML_t = robjects.r['emma.REML.t']

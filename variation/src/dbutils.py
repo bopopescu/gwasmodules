@@ -1,5 +1,7 @@
-user_name = "bvilhjal"
-user_passwd = "*rri_bjarni@usc"
+import env
+
+user_name = env.env['db_user']
+user_passwd = env.env['db_passwd']
 
 def connect_to_papaya(db="stock_250k"):
 	return connect_to_db("papaya.usc.edu",db,user_name,user_passwd)
