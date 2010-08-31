@@ -469,53 +469,6 @@ class LinearMixedModel(LinearModel):
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
 
-
-        def emmax_f_test_memory(self,snps):
-                """
-                EMMAX implementation (in python)
-                Single SNPs
-                
-                With interactions between SNP and possible cofactors.
-                """
-                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
-                q = 1  # Single SNP is being tested
-                p = len(self.X.T)+q
-                n = self.n
-                n_p = n-p                                
-
-                K = self.random_effects[1][1]
-                eig_L = self._get_eigen_L_(K)
-                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-                delta = res['delta']
-                print 'pseudo_heritability:',1.0/(1+delta)
-                H_sqr = res['H_sqrt']
-                H_sqrt_inv = H_sqr.I
-                Y = H_sqrt_inv*self.Y        #The transformed outputs.
-                h0_X = H_sqrt_inv*self.X
-                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-                h0_betas = map(float,list(h0_betas))
-                num_snps = len(snps)
-                rss_ratio = ones(num_snps)
-                rss_list = repeat(h0_rss,num_snps)
-                betas_list = [h0_betas]*num_snps
-                var_perc = zeros(num_snps)
-                snp_mat = matrix(snps)*(H_sqrt_inv.T)
-                for i, snp in enumerate(snp_mat):
-                        (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,snp.T]),Y)
-                        if not rss:
-                                print 'No predictability in the marker, moving on...'
-                                continue
-                        rss_ratio[i] = h0_rss/rss             
-                        rss_list[i] = rss[0]                
-                        betas_list[i] = map(float,list(betas))
-                var_perc = 1-1/rss_ratio
-                f_stats = (rss_ratio-1)*n_p/float(q)
-                p_vals = stats.f.sf(f_stats,q,n_p)
-
-                      
-                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
-                        'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
-
         
         def emmax_f_test(self,snps):
                 """
@@ -1377,13 +1330,17 @@ def calc_kinship(snps):
         """
         Requires EMMA to be installed.
         """
-        from rpy import r 
+        import rpy2.robjects as robjects
+        import rpy2.robjects.numpy2ri
+        import env
+        r_source = robjects.r('source')
         a = array(snps)
-        #r_source(script_dir+"emma_fast.R")
-        #r_emma_kinship = robjects.r['emma.kinship']
-        #return array(r_emma_kinship(a))
-        r.source(script_dir+"emma_fast.R")
-        return r.emma_kinship(a)
+        r_source(env.env['script_dir']+"emma_fast.R")
+        r_emma_kinship = robjects.r['emma.kinship']
+        return array(r_emma_kinship(a))
+        #from rpy import r 
+        #r.source(script_dir+"emma_fast.R")
+        #return r.emma_kinship(a)
 
 
 
@@ -1479,8 +1436,18 @@ def _test_cofactor_emma_():
 #                            scatter_plot_file=scat_plot, fm_scatter_plot_file=fm_scat_plot, 
 #                            fm_image_plot_file=fm_im_plot, image_plot_file=im_plot)
   
-  
+
+
+def _test_kinship_():
+        import dataParsers as dp
+        import random
+        sd = dp.parse_binary_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary',filter=0.1)
+        snps = sd.getSnps()
+        #snps = random.sample(sd.getSnps(),10000)
+        print 'Calculating kinship'
+        K = calc_kinship(snps)
+        print K
   
   
 if __name__ == "__main__":
-        _test_cofactor_emma_()
+        _test_kinship_()
