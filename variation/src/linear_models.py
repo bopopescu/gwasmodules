@@ -470,7 +470,7 @@ class LinearMixedModel(LinearModel):
 
 
 
-        def emmax_f_test(self,snps):
+        def emmax_f_test_memory(self,snps):
                 """
                 EMMAX implementation (in python)
                 Single SNPs
@@ -517,7 +517,7 @@ class LinearMixedModel(LinearModel):
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
         
-        def emmax_f_test_old(self,snps):
+        def emmax_f_test(self,snps):
                 """
                 EMMAX implementation (in python)
                 Single SNPs
