@@ -32,10 +32,16 @@ Examples:
 	# 2010-2-1 EMMAX
 	~/script/variation/src/Association.py -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv -p /Network/Data/250k/tmp-yh//phenotype.tsv -o /tmp/call_method_17_y8.tsv  -y8 -w 1
 	
+	#2010-8-7 Run KW on binary (0-1) CNV deletion data. -n is added to turn off snpAlleleOrdinalConversion.
+	Association.py -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -p ~/panfs/250k/phenotype/phenotype.tsv
+		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y1_pheno.tsv -y1 -w 1-7 -n
+	
 Description:
 	class to do association test on SNP data. option 'test_type' decides which test to run.
 	
 	Input genotype file format is Strain X SNP format (Yu's format, Output by DB_250k2data.py Or Output250KSNPs.py + ConvertBjarniSNPFormat2Yu.py).
+		Each allele is either in atcgATCG... or 0(NA)1234(ACGT) digital format. It converts everything into integer matrix.
+		If the input is in integer but has different meaning, like 0 is not NA, toggle noSNPAlleleOrdinalConversion.
 	Input phenotype file format is Strain X phenotype format (Output by OutputPhenotype.py). 
 	
 	It requires a minimum number of ecotypes for either alleles of a single SNP to be eligible for kruskal wallis or linear model test.
@@ -71,6 +77,10 @@ class Association(Kruskal_Wallis):
 		6: LM two phenotypes with PCs, GeneXEnvironment Interaction, 7: Emma for genotype matrix without NA (no MAC and MAF output), 8: EMMAX (variance matrix is estimated once)']})
 	option_default_dict.update({('eigen_vector_fname', 0, ): [None, 'f', 1, 'eigen vector file with PCs outputted by smartpca.perl from EIGENSOFT', ]})
 	option_default_dict.update({('which_PC_index_ls', 0, ): [None, 'W', 1, 'list of indices indicating which PC(s) from eigen_vector_fname should be used. format: 0,1-3', ]})
+	option_default_dict.update({('noSNPAlleleOrdinalConversion', 0, ): [0, 'n', 0, 'by default (exept test-type 4), it converts everything other than 0(=NA) into binary. toggle this for no such conversion.', ]})
+
+	
+	
 	def __init__(self, **keywords):
 		"""
 		2008-11-10
@@ -628,6 +638,7 @@ class Association(Kruskal_Wallis):
 		2008-11-11
 			only for binary data_matrix. identity_vector[k]=1 only when data_matrix[i,k]=data_matrix[j,k]
 		"""
+		sys.stderr.write("Calculating kinship matrix .... ")
 		no_of_rows, no_of_cols = data_matrix.shape
 		kinship_matrix = numpy.identity(no_of_rows, numpy.float)
 		for i in range(no_of_rows):
@@ -635,6 +646,7 @@ class Association(Kruskal_Wallis):
 				identity_vector = data_matrix[i,:]*data_matrix[j,:]+ (1-data_matrix[i,:])*(1-data_matrix[j,:])	#only for binary data_matrix. identity_vector[k]=1 only when data_matrix[i,k]=data_matrix[j,k]
 				kinship_matrix[i,j] = sum(identity_vector)/float(no_of_cols)
 				kinship_matrix[j,i] = kinship_matrix[i,j]
+		sys.stderr.write("Done.\n")
 		return kinship_matrix
 	
 	emma_R_sourced = False	# 2010-4-23
@@ -657,6 +669,7 @@ class Association(Kruskal_Wallis):
 		if len_functor:
 			n = len_functor()
 			if n==0:	# if non_NA_genotype_ls is an empty list, same effect as None.
+				non_NA_genotype_ls = None	#2010-8-22 empty list could mislead createDesignMatrix().
 				n = None
 		else:
 			n = None
@@ -815,7 +828,7 @@ class Association(Kruskal_Wallis):
 			rpy.r.source(os.path.expanduser('~/script/variation/src/gwa/emma/R/emma.R'))
 			cls.emma_R_sourced = True
 		# run EMMA here to get vg & ve, scalars for the two variance matrices (random effect, residual) 
-		one_emma_rs = cls.emma(non_NA_genotype_ls=non_NA_phenotype_ls, \
+		one_emma_rs = cls.emma(non_NA_genotype_ls=non_NA_genotype_ls, \
 			non_NA_phenotype_ls=non_NA_phenotype_ls, kinship_matrix=kinship_matrix, eig_L=None)
 		vg = one_emma_rs.vg
 		ve = one_emma_rs.ve
@@ -1140,6 +1153,8 @@ class Association(Kruskal_Wallis):
 			which_phenotype_ls = []
 		pdata = PassingData(snpData=snpData, phenData=phenData, PC_matrix=PC_matrix, which_phenotype_ls=which_phenotype_ls, \
 						phenotype_method_id_ls=phenotype_method_id_ls)
+		sys.stderr.write("%s phenotypes, %s accessions, %s SNPs.\n"%(len(which_phenotype_ls), len(snpData.row_id_ls), \
+															len(snpData.col_id_ls)))
 		return pdata
 	
 	def preprocessForTwoPhenotypeAsso(self, snpData, which_phenotype_ls, data_matrix_phen):
@@ -1177,12 +1192,16 @@ class Association(Kruskal_Wallis):
 			import pdb
 			pdb.set_trace()
 		
-		initData = self.readInData(self.phenotype_fname, self.input_fname, self.eigen_vector_fname, self.phenotype_method_id_ls, self.test_type, self.report)
+		initData = self.readInData(self.phenotype_fname, self.input_fname, self.eigen_vector_fname, \
+								phenotype_method_id_ls=self.phenotype_method_id_ls, \
+								test_type=self.test_type, report=self.report, \
+								snpAlleleOrdinalConversion=1-self.noSNPAlleleOrdinalConversion)
 		
 		if self.test_type==5 or self.test_type==6:
-			which_phenotype_index_ls, environment_matrix, initData.phenData.data_matrix = self.preprocessForTwoPhenotypeAsso(initData.snpData, \
-																							initData.which_phenotype_ls,\
-																							initData.phenData.data_matrix)
+			which_phenotype_index_ls, environment_matrix, initData.phenData.data_matrix = \
+					self.preprocessForTwoPhenotypeAsso(initData.snpData, \
+													initData.which_phenotype_ls,\
+													initData.phenData.data_matrix)
 		else:
 			which_phenotype_index_ls = initData.which_phenotype_ls
 			environment_matrix = None
