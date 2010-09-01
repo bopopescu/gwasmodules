@@ -57,9 +57,10 @@ import scipy.stats as stats
 
 
 def get_latent_snp(latent_variable,accessions,snpsdata=None):	
-	f = open("/home/cmbpanfs-01/bvilhjal/data/eco_dict.pickle")
-	ecotype_info_dict = cPickle.load(f)
-	f.close()
+	ecotype_info_dict = phenotypeData.get_ecotype_id_info_dict()
+	#f = open(env.env['data_dir']+"eco_dict.pickle")
+	#ecotype_info_dict = cPickle.load(f)
+	#f.close()
 	#ecotype_info_dict = phenotypeData._getEcotypeIdInfoDict_()
 	latent_snp = []
 	if latent_variable=="swedish":
@@ -245,7 +246,11 @@ def _run_():
 	print "kinship_error:",kinship_error
 	print "runId:",runId
 
+	
 	def runParallel(phen_index,numberPerRun=0,runId=None,phenotypeFile=None,phenotype_model=None):
+		"""
+		Run if summarizing or setting up parallel jobs.
+		"""
 		#Cluster specific parameters
 		if not runId:
 			outputFile=env.env['results_dir']+"TLS_"+parallel+"_"+str(phen_index)+"_"+str(numberPerRun)
@@ -610,9 +615,10 @@ def _run_():
 	else:
 		phenotype_models = range(1,5)
 
+	assert not (parallelAll and summarizeRuns), 'Invalid options' 
 		
 	if parallelAll:
-		#Generating the phenotype
+		#Generating the phenotype  (ONLY IF PARALLEL ALL?)
 #		if score_file:
 #			snps_dataset = dataParsers.parse_snp_data(snpsDataFile,format=0)
 #			#1. Load the score file...
@@ -642,6 +648,8 @@ def _run_():
 			latent_corr = 1
 		if filter:
 			snps_dataset.sample_snps(filter)
+		
+		print 'Generating the phenotypes'
 		snps_list = snps_dataset.getSnps()
 		num_lines = len(snps_list[0])  #Number of lines
 		anti_decoder = {1:0,0:1}                        
@@ -719,7 +727,7 @@ def _run_():
 						latent_loci_snp_chr_pos_mafs.append(lsd)
 				else:
 					print "Found problematic anti-phenotype"
-				if anti_phenotype == phenotype:
+				if sp.all(anti_phenotype == phenotype):
 					print "Phenotype and anti-phenotype are the same!?!?!?"
 				
 			print "Phenotypes generated for phenotype model:",phenotype_model
@@ -739,45 +747,42 @@ def _run_():
 		
 		
 		
-	elif not (summarizeRuns and parallel):	
-		f = open(phenotype_file,"r")
-
-		phen_dict = cPickle.load(f)
-		print f
-		print phen_dict.keys
-		print phenotype_models[0]
-		print phenotype_models
-		d = phen_dict[phenotype_models[0]]
-		phenotypes = d["phenotypes"]
-		phen_positions = d["phen_positions"]
-		phen_chr_pos = d["phen_chr_pos"]
-		latent_snp = d["latent_snp"]
-		phen_mafs = d["phen_mafs"]
-		latent_loci_snp_chr_pos_mafs = d["latent_loci_snp_chr_pos_mafs"]
-		f.close()
-	else: #Submitting a summary run to the cluster!
+	elif summarizeRuns and parallel: #Set up a summary run (on the cluster)
 		runParallel("summary",numberPerRun, runId=parallel, phenotypeFile=phenotype_file)
-		return
+		return #Exiting
+
+	f = open(phenotype_file,"r")
+
+	phen_dict = cPickle.load(f)
+	print f
+	print phen_dict.keys
+	print phenotype_models[0]
+	print phenotype_models
+	d = phen_dict[phenotype_models[0]]
+	phenotypes = d["phenotypes"]
+	phen_positions = d["phen_positions"]
+	phen_chr_pos = d["phen_chr_pos"]
+	latent_snp = d["latent_snp"]
+	phen_mafs = d["phen_mafs"]
+	latent_loci_snp_chr_pos_mafs = d["latent_loci_snp_chr_pos_mafs"]
+	f.close()
 
 			
 	num_phenotypes = len(phenotypes) 
 	print "num_phenotypes:",num_phenotypes
-		
-	
-	if parallelAll and not summarizeRuns:  #Running on the cluster..
+
+	if parallelAll:  #Running on the cluster..
 		phen_indices = range(0,num_phenotypes,numberPerRun)
 		for phenotype_model in phenotype_models:
 			print "Submitting jobs for phenotype model:",phenotype_model
 			for phen_index in phen_indices:
 				runParallel(phen_index,numberPerRun,phenotypeFile=phenotype_file,phenotype_model=phenotype_model)
-		return
+		return #Exiting
 
 	elif summarizeRuns:		
-		#summarizeAllRuns(phenotypes,phen_positions,phen_chr_pos,phen_mafs,latent_snp)
-		
 		for phenotype_model in phenotype_models:
 			summarizeAllRuns(runId, phenotype_model)
-		return
+		return #Exiting
 	else:
 		phen_index=int(args[1])
 	print "phen_index:",phen_index
@@ -801,7 +806,6 @@ def _run_():
 	snps_positions = snps_dataset.getPositions()
 	snps_list = snps_dataset.getSnps()
 	chr_pos_list = snps_dataset.getChrPosList()
-	#Run KW
 	results = [] #[num_of_phen][num_of_snps]
 	print "Running Analysis"
         
