@@ -27,6 +27,9 @@ Option:
 	--plot_all_models			Plot all phenotype models when summarizing results.
 	
 	--kinship_file=...			Necessary for running EMMAX.
+	--phenotype_error=...			Percentage of variance, due to error.
+	--kinship_error=...			Fraction of error, du to kinship term.
+	
 
 Examples:
 	ThreeLocusTest.py -o outputFile  250K.csv phenotype_index 
@@ -50,7 +53,9 @@ import math
 import time
 import random
 import pdb
-import pickle
+import cPickle
+import scipy as sp
+import scipy.stats as stats
 
 #import AddResults2DB
 
@@ -60,7 +65,7 @@ tempDir="/home/cmbpanfs-01/bvilhjal/tmp/"
 
 def get_latent_snp(latent_variable,accessions,snpsdata=None):	
 	f = open("/home/cmbpanfs-01/bvilhjal/data/eco_dict.pickle")
-	ecotype_info_dict = pickle.load(f)
+	ecotype_info_dict = cPickle.load(f)
 	f.close()
 	#ecotype_info_dict = phenotypeData._getEcotypeIdInfoDict_()
 	latent_snp = []
@@ -97,13 +102,13 @@ def get_latent_snp(latent_variable,accessions,snpsdata=None):
 		import os.path
 		if os.path.isfile(pc_file):
 			f = open(pc_file,'r')
-			pc = pickle.load(f)
+			pc = cPickle.load(f)
 			f.close()
 		else:
 			print "PC file wasn't found, calculating "+latent_variable+"."
 			pc = snpsdata.get_pc()
 			f = open(pc_file,'w')
-			pc = pickle.dump(pc,f)
+			pc = cPickle.dump(pc,f)
 			f.close()			
 		
 		mean_pc_val = sum(pc)/len(pc)
@@ -126,9 +131,9 @@ def _run_():
 		sys.exit(2)
 	
 	long_options_list=["outputFile=", "help", "parallel=", "numberPerRun=", "parallelAll", "filter=","local=",
-			"pvalueThreshold=","noPvals", "summarizeRuns", "maf_filter=", "latent_variable=",
-			"phenotype_model=","phenotypeFile=", "runId=", "score_file=","plot_all_models", "latent_corr=",
-			'mapping_method=','kinship_file=']
+			"pvalueThreshold=", "noPvals", "summarizeRuns", "maf_filter=", "latent_variable=",
+			"phenotype_model=", "phenotypeFile=", "runId=", "score_file=","plot_all_models", "latent_corr=",
+			'mapping_method=', 'kinship_file=', 'phenotype_error=', 'kinship_error=']
 	try:
 		opts, args=getopt.getopt(sys.argv[1:], "o:a:h", long_options_list)
 
@@ -161,6 +166,8 @@ def _run_():
 	latent_corr=None
 	mapping_method = 'kw'
 	kinship_file = None
+	phenotype_error = 0
+	kinship_error = 0
 	
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
@@ -176,8 +183,6 @@ def _run_():
 			numberPerRun=int(arg)
 		elif opt in ("--pvalueThreshold"):
 			pvalueThreshold=float(arg)
-		elif opt in ("--kinship_file"):
-			kinship_file=arg
 		elif opt in ("--filter"):
 			filter=float(arg)
 		elif opt in ("--local"):
@@ -204,6 +209,12 @@ def _run_():
 			phenotype_model=int(arg)
 		elif opt in ('-a',"--mapping_method"):
 			mapping_method=int(arg)
+		elif opt in ("--kinship_file"):
+			kinship_file=arg
+		elif opt in ("--phenotype_error"):
+			phenotype_error=arg
+		elif opt in ("--kinship_error"):
+			kinship_error=arg
 		
 		else:
 			if help==0:
@@ -236,6 +247,9 @@ def _run_():
 	print "latent_corr:",latent_corr
 	print "phenotype_model:",phenotype_model 
 	print "score_file:",score_file
+	print "kinship_file:",kinship_file
+	print "phenotype_error:",phenotype_error
+	print "kinship_error:",kinship_error
 	print "runId:",runId
 
 	def runParallel(phen_index,numberPerRun=0,runId=None,phenotypeFile=None,phenotype_model=None):
@@ -280,10 +294,13 @@ def _run_():
 		if maf_filter:
 			shstr+=" --latent_variable="+str(latent_variable)+" "			
 		if phenotype_model:
-			shstr+=" --phenotype_model="+str(phenotype_model)+" "			
+			shstr+=" --phenotype_model="+str(phenotype_model)+" "
+		if kinship_file:
+			shstr+=" --kinship_file="+str(kinship_file)+" "						
 		if summarizeRuns:
 			shstr+=" --summarizeRuns "			
-		shstr+=" --pvalueThreshold="+str(pvalueThreshold)+" --mapping_method="+str(mapping_method)+"  "			
+		shstr+=" --pvalueThreshold=%f --mapping_method=%s  --phenotype_error=%f  --kinship_error=%f "\
+			%(pvalueThreshold,mapping_method,phenotype_error,kinship_error)			
 		shstr+=snpsDataFile+" "+str(phen_index)+" "
 		shstr+="> "+outputFile+"_job"+".out) >& "+outputFile+"_job"+".err\n"
 		#print shstr
@@ -317,7 +334,7 @@ def _run_():
 				filename=resultDir+"TLS_"+runId+"_"+str(phen_index)+"_"+str(numberPerRun)+".pvals"
 				try:
 					f = open(filename,"r")
-					l = pickle.load(f)
+					l = cPickle.load(f)
 					f.close()
 					fail_count = 0
 				except Exception, err_str:
@@ -431,7 +448,7 @@ def _run_():
 				print "Loading data from file:",filename
 				try:
 					f = open(filename,"r")
-					p_d_r_stats = pickle.load(f)
+					p_d_r_stats = cPickle.load(f)
 					f.close()
 					fail_count = 0
 				except Exception, err_str:
@@ -619,7 +636,7 @@ def _run_():
 #				snps_to_keep_indices.append(snps_dataset)  #FINISH!!!
 
 
-		snps_dataset = dataParsers.parse_snp_data(snpsDataFile,format=0)
+		snps_dataset = dataParsers.parse_binary_snp_data(snpsDataFile)
 		if 0<maf_filter<=0.5:
 			snps_dataset.filter_maf_snps(maf_filter)
 		if latent_variable!='random_snp':
@@ -633,7 +650,9 @@ def _run_():
 		if filter:
 			snps_dataset.sample_snps(filter)
 		snps_list = snps_dataset.getSnps()
+		num_lines = len(snps_list[0])  #Number of lines
 		anti_decoder = {1:0,0:1}
+		get_anti_snp = sp.vectorize(lambda x: anti_decoder[x])  #Creating a vectorized function
 		chr_pos_list = snps_dataset.getChrPosList()
 		mafs = snps_dataset.get_mafs()["marfs"]
 
@@ -647,11 +666,7 @@ def _run_():
 			for i, snp in enumerate(snps_list):
 				(chr,pos) = chr_pos_list[i]
 				maf = mafs[i]
-				anti_snp = []
-				for nt in snp:
-					anti_snp.append(anti_decoder[nt]) 
-				phenotype = []
-				anti_phenotype = []
+				anti_snp = get_anti_snp(snp) #Retrieving the anti-snp
 				if latent_corr:
 					lsd = random.choice(latent_snp_chr_pos_maf)
 					(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
@@ -665,28 +680,30 @@ def _run_():
 							latent_snp.append(1)
 						else:
 							latent_snp.append(0)								
-				for j in range(len(snp)):
-					if phenotype_model == 1:#xor
-						#print "XOR"
-						phen_val = int(snp[j]!=latent_snp[j])
-						anti_phen_val = int(anti_snp[j]!=latent_snp[j])
-					elif phenotype_model == 2:#or
-						#print "OR/AND"
-						phen_val = snp[j] or latent_snp[j] 
-						anti_phen_val = anti_snp[j] or latent_snp[j] 
-					elif phenotype_model == 3:#plus
-						#print "+"
-						phen_val = snp[j] + latent_snp[j] 
-						anti_phen_val = anti_snp[j] + latent_snp[j] 
-					elif phenotype_model == 4:#xor plus
-						#print "XOR +0.5"
-						phen_val = int(snp[j]!=latent_snp[j])+0.5*int(snp[j]==1 and latent_snp[j]==1)
-						anti_phen_val = int(anti_snp[j]!=latent_snp[j])+0.5*int(anti_snp[j]==1 and latent_snp[j]==1)
-					phenotype.append(phen_val)
-					anti_phenotype.append(anti_phen_val)
+				#Constructing empty arrays
+				if phenotype_model == 1:#xor
+					#print "XOR"					
+					phenotype = snp ^ latent_snp
+					anti_phenotype = anti_snp ^ latent_snp
+				elif phenotype_model == 2:#or
+					#print "OR/AND"
+					phenotype = snp | latent_snp
+					anti_phenotype = anti_snp | latent_snp
+				elif phenotype_model == 3:#plus
+					#print "+"
+					phenotype = snp + latent_snp
+					anti_phenotype = anti_snp + latent_snp
+				elif phenotype_model == 4:#xor plus
+					#print "XOR +0.5"
+					phenotype = (snp ^ latent_snp)+0.5*(snp & latent_snp)
+					anti_phenotype = (anti_snp ^ latent_snp)+0.5*(anti_snp & latent_snp)
+				
 				#Check whether phenotype is OK.
 				#SHOULD THIS CHECK BE SKIPPED???
-				if len(set(phenotype))>1:
+				if len(sp.bincount(phenotype))>1:
+					if phenotype_error>0.0:
+						phen_var = sp.var(phenotype,ddof=1)
+						
 					phenotypes.append(phenotype)
 					#print phenotype
 					phen_positions.append(pos)
@@ -722,7 +739,7 @@ def _run_():
 			#phenotype_models for loop ends.
 		f = open(phenotype_file,"w")
 		print "dumping phenotypes to file:",f
-		pickle.dump(phen_dict,f)
+		cPickle.dump(phen_dict,f)
 		f.close()
 		
 		
@@ -730,7 +747,7 @@ def _run_():
 	elif not (summarizeRuns and parallel):	
 		f = open(phenotype_file,"r")
 
-		phen_dict = pickle.load(f)
+		phen_dict = cPickle.load(f)
 		print f
 		print phen_dict.keys
 		print phenotype_models[0]
@@ -791,6 +808,7 @@ def _run_():
 	chr_pos_list = snps_dataset.getChrPosList()
 	#Run KW
 	results = [] #[num_of_phen][num_of_snps]
+	print "Running KW"
 	if local:
 		
 		print "len(snps_list):",len(snps_list)
@@ -1031,7 +1049,7 @@ def _run_():
 		pvalFile = outputFile+".pvals"
 		print "Writing p-values to file:",pvalFile
 		f = open(pvalFile,"w")
-		pickle.dump(l,f)	
+		cPickle.dump(l,f)	
 		f.close()
 
 	p_d_r_dict = {}
@@ -1054,7 +1072,7 @@ def _run_():
 	filename = outputFile+".stats"	
 	print "Writing results to file:",filename
 	f = open(filename,"w")
-	pickle.dump(p_d_r_dict,f)
+	cPickle.dump(p_d_r_dict,f)
 	f.close
 
 
@@ -1663,9 +1681,8 @@ def plot_rank_3D_hist(r_list1,r_list2,min_pvals,filename,
 	maf_thresholds = [0.1,0.2,0.3,0.4,0.5]
 
 	#Binning (manually)
-	import numpy as np
 	r_bin_str =["r$=$1","1$<$r$\leq$10", "10$<$r$\leq$10$^{2}$", "10$^{2}<$r$\leq$10$^{3}$", "10$^{3}<$r"]
-	counts = np.zeros((len(r_bin_str),len(r_bin_str)))
+	counts = sp.zeros((len(r_bin_str),len(r_bin_str)))
 	r_bin_thresholds = [1,2,11,101,1001]
 	for r1,r2 in zip(r_list1,r_list2):
 		ci1 = 4
@@ -1735,9 +1752,8 @@ def plot_dist_3D_hist(r_list1,r_list2,min_pvals,filename,
 	maf_thresholds = [0.1,0.2,0.3,0.4,0.5]
 
 	#Binning (manually)
-	import numpy as np
 	r_bin_str =["d$=$0","0$<$d$\leq$5", "5$<$d$\leq$50", "50$<$d", "Other chr."]
-	counts = np.zeros((len(r_bin_str),len(r_bin_str)))
+	counts = sp.zeros((len(r_bin_str),len(r_bin_str)))
 	r_bin_thresholds = [0,1,5001,50001]
 	for r1,r2 in zip(r_list1,r_list2):
 		if r1<0:

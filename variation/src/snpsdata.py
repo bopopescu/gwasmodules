@@ -1795,7 +1795,7 @@ class SNPsData(_SnpsData_):
                 num_accessions = len(indicesToKeep)
                 for i in range(len(self.snps)):
                         snp = self.snps[i]
-                        newSnp = np.zeros(num_accessions,dtype='int8')
+                        newSnp = np.empty(num_accessions,dtype='int8')
                         for j,k in enumerate(indicesToKeep):
                                 newSnp[j] = snp[k]
                         self.snps[i] = newSnp
@@ -1807,6 +1807,23 @@ class SNPsData(_SnpsData_):
                 #pdb.set_trace()
                 #print "len(self.accessions):",len(self.accessions)
 
+
+        def onlyBinarySnps(self):
+                """
+                Removes all but binary SNPs.  (I.e. monomorphic, tertiary and quaternary alleles SNPs are removed.)
+                """
+                new_positions = []
+                new_snps = []
+                for i, (snp, pos) in enumerate(zip(self.snps,self.positions)):
+                        if 0 in snp and 1 in snp:
+                                new_snps.append(snp)
+                                new_positions.append(pos)
+                num_removed = len(self.positions)-len(new_positions)
+                self.no_of_nonbinary_snps_removed = num_removed
+                self.snps = new_snps
+                self.positions = new_positions
+                print "Removed %d non-binary SNPs, leaving %d SNPs in total."%(num_removed,len(self.snps))                
+                return num_removed
 
 
 

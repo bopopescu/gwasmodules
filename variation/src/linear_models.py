@@ -14,6 +14,8 @@ import pdb
 import cPickle
 import os
 import sys
+import multiprocessing as mp
+
 
 class LinearModel(object):
         """
@@ -94,26 +96,22 @@ class LinearModel(object):
                 """                
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X,self.Y)
                 num_snps = len(snps)
-                f_stats = zeros(num_snps)
                 rss_list = repeat(h0_rss,num_snps)
                 betas_list = [h0_betas]*num_snps
                 var_perc = zeros(num_snps)
                 q = 1
                 n_p = self.n-self.p
                 for i, snp in enumerate(snps):
-                        X = hstack([self.X,matrix(snp).T]) 
-                        (betas, rss, rank, s) = linalg.lstsq(X,self.Y)
+                        (betas, rss, rank, s) = linalg.lstsq(hstack([self.X,matrix(snp).T]),self.Y)
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
                                 continue
-                        f_stat = ((h0_rss-rss)/q)/(rss/n_p)
-                        f_stats[i] = f_stat[0]                
                         rss_list[i] = rss[0]                
                         betas_list[i] = map(float,list(betas))
-                        var_perc[i] = float(1-rss/h0_rss)
+                rss_ratio = h0_rss/rss_list
+                var_perc = 1-1/rss_ratio
+                f_stats = (rss_ratio-1)*n_p/float(q)
                 p_vals = stats.f.sf(f_stats,q,n_p)
-
-                        
                 return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
                         'var_perc':var_perc}
 
@@ -385,14 +383,6 @@ class LinearMixedModel(LinearModel):
                         'max_lls':max_lls,'betas':betas}
         
 
-        def _emmax_snp_test_(self,Y,X,h0_rss,n,p,q):
-                (betas, rss, rank, s) = linalg.lstsq(X,Y)
-                f_stat = ((h0_rss-rss)/q)/(rss/(n-p))
-                p_val = stats.f.sf(f_stat,q,n-p)
-                return {'p_val':p_val[0],'f_stat':f_stat,'rss':rss,'betas':map(float,list(betas)),\
-                        'var_perc':float(1-rss/h0_rss)}
-      
-
         def emmax_f_test_w_interactions(self,snps,int_af_threshold=15):
                 """
                 EMMAX implementation (in python)
@@ -400,12 +390,6 @@ class LinearMixedModel(LinearModel):
                 
                 With interactions between SNP and possible cofactors.
                 """
-#                try:
-#                        import psyco
-#                        psyco.full()
-#                except ImportError:
-#                        print 'Failed using psyco.. hence no speed-up'
-#                        pass
                 assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
                 p_0 = len(self.X.T)  
                 n = self.n
@@ -477,7 +461,6 @@ class LinearMixedModel(LinearModel):
                 
                 With interactions between SNP and possible cofactors.
                 """
-                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
                 q = 1  # Single SNP is being tested
                 p = len(self.X.T)+q
                 n = self.n
@@ -495,7 +478,6 @@ class LinearMixedModel(LinearModel):
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
                 h0_betas = map(float,list(h0_betas))
                 num_snps = len(snps)
-                rss_ratio = ones(num_snps)
                 rss_list = repeat(h0_rss,num_snps)
                 betas_list = [h0_betas]*num_snps
                 var_perc = zeros(num_snps)
@@ -504,9 +486,9 @@ class LinearMixedModel(LinearModel):
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
                                 continue
-                        rss_ratio[i] = h0_rss/rss             
                         rss_list[i] = rss[0]                
                         betas_list[i] = map(float,list(betas))
+                rss_ratio = h0_rss/rss_list
                 var_perc = 1-1/rss_ratio
                 f_stats = (rss_ratio-1)*n_p/float(q)
                 p_vals = stats.f.sf(f_stats,q,n_p)
@@ -516,26 +498,17 @@ class LinearMixedModel(LinearModel):
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
 
-        
-        def emmax_f_test_old_2(self,snps):
+        def emmax_simple_f_test(self,snps):
                 """
                 EMMAX implementation (in python)
                 Single SNPs
                 
                 With interactions between SNP and possible cofactors.
                 """
-#                try:
-#                        import psyco
-#                        psyco.full()
-#                except ImportError:
-#                        print 'Failed using psyco.. hence no speed-up'
-#                        pass
-                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
                 q = 1  # Single SNP is being tested
                 p = len(self.X.T)+q
                 n = self.n
-                n_p = n-p
-                                
+                n_p = n-p                                
 
                 K = self.random_effects[1][1]
                 eig_L = self._get_eigen_L_(K)
@@ -547,35 +520,84 @@ class LinearMixedModel(LinearModel):
                 Y = H_sqrt_inv*self.Y        #The transformed outputs.
                 h0_X = H_sqrt_inv*self.X
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-                h0_betas = map(float,list(h0_betas))
-                f_stats = []
-                rss_list = []
-                betas_list = []
-                p_vals = []
-                var_perc = []
-                for snp in snps:
-                        X = hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]) 
-                        (betas, rss, p, sigma) = linalg.lstsq(X,Y)
+                num_snps = len(snps)
+                rss_list = repeat(h0_rss,num_snps)
+                for i, snp in enumerate(snps):
+                        (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]),Y)
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
-                                p_vals.append(1)            
-                                f_stats.append(0)                
-                                rss_list.append(h0_rss)                
-                                betas_list.append(h0_betas)
-                                var_perc.append(0)
                                 continue
-                        f_stat = ((h0_rss-rss)/q)/(rss/n_p)
-                        p_val = stats.f.sf(f_stat,q,n_p)
-                        p_vals.append(p_val[0])            
-                        f_stats.append(f_stat[0])                
-                        rss_list.append(rss[0])                
-                        betas_list.append(map(float,list(betas)))
-                        var_perc.append(float(1-rss/h0_rss))
+                        rss_list[i] = rss[0]                
+                rss_ratio = h0_rss/rss_list
+                f_stats = (rss_ratio-1)*n_p/float(q)
+                p_vals = stats.f.sf(f_stats,q,n_p)
+
+                      
+                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'delta':delta, 'pseudo_heritability': 1.0/(1+delta)}
+
+        
+        def emmax_f_test_parallel(self,snps,num_proc=2):
+                """
+                EMMAX implementation (in python)
+                Single SNPs
+                
+                With interactions between SNP and possible cofactors.
+                """
+                assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
+                q = 1  # Single SNP is being tested
+                p = len(self.X.T)+q
+                n = self.n
+                n_p = n-p                                
+
+                K = self.random_effects[1][1]
+                eig_L = self._get_eigen_L_(K)
+                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
+                delta = res['delta']
+                print 'pseudo_heritability:',1.0/(1+delta)
+                H_sqr = res['H_sqrt']
+                H_sqrt_inv = H_sqr.I
+                Y = H_sqrt_inv*self.Y        #The transformed outputs.
+                h0_X = H_sqrt_inv*self.X
+                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
+
+                
+                h0_betas = map(float,list(h0_betas))
+                num_snps = len(snps)
+                var_perc = zeros(num_snps)
+
+                rss_ratio = mp.Array('d', range(num_snps))
+                rss_list = mp.Array('d', [h0_rss]*num_snps)
+                beta1_arr = mp.Array('d', range(num_snps))
+                beta0_arr = mp.Array('d', range(num_snps))
+                def _emmax_mp_loop_(self,snps,j):
+                        for i, snp in enumerate(snps):
+                                (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]),Y)
+                                if not rss:
+                                        print 'No predictability in the marker, moving on...'
+                                        continue
+                                rss_ratio[i+j] = h0_rss/rss             
+                                rss_list[i+j] = rss[0]                
+                                betas_list[i+j] = map(float,list(betas))
+
+                snp_chunk_size = num_snps/num_proc 
+                processes = []
+                for i in range(num_proc-1):
+                        snp_chunk = snps[i:i+snp_chunk_size]
+                        betas_list_ = [h0_betas]*num_snps
+                        rss_ratio_ = ones(num_snps)
+                        rss_list_ = repeat(h0_rss,num_snps)
+                        p = mp.Process(target=_emmax_mp_loop_, args=(snp_chunk,i))
+                        p.start()
+                        processes.append(p)
+                        
+                var_perc = 1-1/rss_ratio
+                f_stats = (rss_ratio-1)*n_p/float(q)
+                p_vals = stats.f.sf(f_stats,q,n_p)
+
                       
                 return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
-
-                        
+                    
                         
          
 
