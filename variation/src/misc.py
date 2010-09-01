@@ -1,6 +1,18 @@
 #!/usr/bin/env python
-
-import os,sys
+"""
+Examples:
+	# enter debug mode
+	misc.py -b
+	
+	# change the db connection setting 
+	misc.py -z localhost -u yh
+	
+Description:
+	It's a file with all sorts of classes that haven't gone on to be independent.
+	
+	All those classes are manually chosen to be run in Main.run().
+"""
+import os, sys, numpy
 
 class DisplaySNPMatrix(object):
 	"""
@@ -352,6 +364,14 @@ class DB149(object):
 		sys.stderr.write("Done.\n")
 		return strain_snp_pair_set, inconsistent_dup_strain_snp_pair_set
 	
+	"""
+		#ecotype_table = 'ecotype'
+		#calls_table = 'calls'
+		#strain_snp_pair_set1, inconsistent_dup_strain_snp_pair_set1 = DB149.check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table)
+		#strain_snp_pair_set2, inconsistent_dup_strain_snp_pair_set2 = DB149.check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table, strainname_type=2)
+		#strain_snp_pair_set3, inconsistent_dup_strain_snp_pair_set3 = DB149.check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table, strainname_type=3)
+		
+	"""
 	
 	def get_nativename_snp_distinct_set(curs, ecotype_table, calls_table):
 		"""
@@ -3290,6 +3310,8 @@ class JBDataGWA(object):
 	@classmethod
 	def getExpandedKinship(cls, kinship_output_fname=None, genotype_fname_to_generate_kinship=None, JBData=None):
 		"""
+		2010-8-22
+			return JBData as well
 		2010-4-23
 			split out of getCholeskyInverseData()
 		"""
@@ -3308,17 +3330,19 @@ class JBDataGWA(object):
 			del snpData
 			kinshipData.tofile(kinship_output_fname)
 		
-		JBData = JBData.removeRowsNotInTargetSNPData(kinshipData)
+		JBData = JBData.removeRowsNotInTargetSNPData(kinshipData)	#2010-8-22 a new JBData is generated
 		Z = cls.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, kinshipData.row_id_ls)
 		
 		new_K = numpy.dot(numpy.dot(Z, kinshipData.data_matrix), numpy.transpose(Z))
-		return new_K
+		return new_K, JBData	#2010-8-22 return JBData as well
 		
 	@classmethod
 	def getCholeskyInverseData(cls, L_inverse_fname, kinship_output_fname=None, genotype_fname_to_generate_kinship=None,\
 								JBData=None, logPhenotype=False, preEMMAXCofactor_ls=None, env_variable_coding_ls=None,\
-								needKinship=False):
+								needKinship=False, vg=None, ve=None):
 		"""
+		2010-8-22
+			return JBData as well in case it's changed in getExpandedKinship
 		2010-4-23
 			add argument needKinship. whether need a kinship matrix which matches the JBData.
 				Usually it's more than just loading the matrix out of kinship_output_fname.
@@ -3336,11 +3360,11 @@ class JBDataGWA(object):
 			L_inverse_Data = SNPData(input_fname=L_inverse_fname, ignore_2nd_column=1, matrix_data_type=float, turn_into_array=1)
 			L_inverse = L_inverse_Data.data_matrix
 			if needKinship:
-				new_K = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
+				new_K, JBData = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
 			else:
 				new_K = None
 		else:
-			new_K = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
+			new_K, JBData = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
 			if vg is None or ve is None:
 				phenotype_ls = cls.getPhenotypeLsOutOfJBData(JBData, logPhenotype=logPhenotype)
 				non_NA_genotype_ls = []
@@ -3349,6 +3373,7 @@ class JBDataGWA(object):
 					for i in range(len(preEMMAXCofactor_ls)):
 						factorName = preEMMAXCofactor_ls[i]
 						non_NA_genotype_ls.append(JBDataEnvEncoded.getColDataGivenColName(factorName))
+				non_NA_genotype_ls = numpy.array(non_NA_genotype_ls)
 				preEMMAX_data = Association.preEMMAX(phenotype_ls, new_K, non_NA_genotype_ls=non_NA_genotype_ls, debug=True)
 				variance_matrix = preEMMAX_data.variance_matrix
 				non_NA_phenotype_ar = preEMMAX_data.non_NA_phenotype_ar
@@ -3363,7 +3388,7 @@ class JBDataGWA(object):
 			L_inverse_Data = SNPData(row_id_ls=JBData.row_id_ls, col_id_ls=JBData.row_id_ls, data_matrix=L_inverse)
 			L_inverse_Data.tofile(L_inverse_fname)
 		sys.stderr.write("Done.\n")
-		return PassingData(L_inverse_Data=L_inverse_Data , kinship_matrix = new_K)
+		return PassingData(L_inverse_Data=L_inverse_Data , kinship_matrix = new_K, JBData = JBData)
 	
 	@classmethod
 	def outputPhenotypePrediction(cls, output_fname, covariateData=None, phenotype_ls=[], \
@@ -3568,13 +3593,14 @@ class JBDataGWA(object):
 		else:
 			needKinship = False
 		returnData = cls.getCholeskyInverseData(L_inverse_fname, kinship_output_fname, \
-													genotype_fname_to_generate_kinship, \
-													JBData=JBData, logPhenotype=logPhenotype, \
-													preEMMAXCofactor_ls=preEMMAXCofactor_ls, \
-													env_variable_coding_ls=env_variable_coding_ls,
-													needKinship=needKinship)
+											genotype_fname_to_generate_kinship, \
+											JBData=JBData, logPhenotype=logPhenotype, \
+											preEMMAXCofactor_ls=preEMMAXCofactor_ls, \
+											env_variable_coding_ls=env_variable_coding_ls,
+											needKinship=needKinship,vg=vg, ve=ve)
 		L_inverse_Data = returnData.L_inverse_Data
 		kinship_matrix = returnData.kinship_matrix
+		JBData = returnData.JBData	#2010-8-22
 		if useYanSNPData:
 			selectSNPDataWithReplicates = None	# 2010-4-2 use SNP data from yan's file
 			JBData = JBData.removeRowsNotInTargetSNPData(L_inverse_Data)
@@ -3757,6 +3783,8 @@ class JBDataGWA(object):
 										counting_and_NA_checking=True, \
 										variance_matrix=None, lower_triangular_cholesky_inverse=L_inverse)
 					if pdata is not None:
+						geno_effect_var = numpy.var(numpy.dot(genotype_matrix, pdata.coeff_list[1:]))	# genotype_matrix doesn't include intercept.
+						pdata.var_perc_real = geno_effect_var/phenotype_variance	#2010-4-18
 						results.append(pdata)
 						
 						Association.output_multi_variate_lm_results([pdata], writer, extraVariateNameLs=extraVariateNameLs)
@@ -3779,287 +3807,272 @@ class JBDataGWA(object):
 		#sys.exit(0)
 	
 	"""
-	# 2010-3-22
-	### test
-	#phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
-	#genotype_fname_to_generate_kinship = '/Network/Data/250k/tmp-yh/250k_data/call_method_49_core482_test.tsv'
-	#output_fname = os.path.expanduser('/tmp/d4DTF_pairwise_epistasis_using_core482_test.tsv')
-	#vg=1451.803; ve=331.4423;
-	#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, \
-	#							vg=vg, ve=ve, debug=True, includeInteraction=True)
-	#sys.exit(0)
-	
-	###### generate kinship, estimate vg, ve, etc. using core482 from call 49
-	phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
-	genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482.tsv')
-	#kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
-	kinship_fname = None
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_pairwise_cofactor.tsv')
-	#vg=1451.803; ve=331.4423; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
-	vg=None
-	ve=None
-	vg=1534.10171646	# 2010-3-24 estimates from ~/mnt/panfs/250k/dataset/call_method_49_core482.tsv
-	ve=499.58683376
-	#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
-	
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_snp_environment_epistasis.tsv')
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
-			includeInteraction=True, kinship_fname=kinship_fname)
-	sys.exit(0)
-	
-	
-	###### use existing core469 kinship and old vg and ve estimates (from JBLabSeasonFlowering.R)
-	kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core469_K_old_vg_ve_pairwise_cofactor.tsv')
-	vg=1451.803; ve=331.4423;
-	#vg=None
-	#ve=None
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
-	
-	#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core469_K_old_vg_ve_pairwise_epistasis.tsv')
-	#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
-	#		includeInteraction=True, kinship_fname=kinship_fname)
-	
-	
-	# 2010-3-26 final full model with FRI-FLC, and FT-FLC
-	cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
-	interaction_snp_id_in_base_formula_ls = ['X4_264496', 'X5_3188328']	# FRI-FLC
-	special_interaction_snp_id_ls = ['X1_24345319','X5_3188328']	# 2010-3-26 FT-FLC
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			special_interaction_snp_id_ls=special_interaction_snp_id_ls)
-	
-	# 2010-4-1 final full model with FRI-FLC, and FT-FLC
-	cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
-	cholesky_inverse_fname = None
-	vg=None
-	ve=None
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_plus_FT_FLC_and_FRI_FLC_epistasis_with_snp_from_core482_with_FRI_del_impute.tsv')
-	interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
-	special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+		# 2010-3-22
+		### test
+		#phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
+		#genotype_fname_to_generate_kinship = '/Network/Data/250k/tmp-yh/250k_data/call_method_49_core482_test.tsv'
+		#output_fname = os.path.expanduser('/tmp/d4DTF_pairwise_epistasis_using_core482_test.tsv')
+		#vg=1451.803; ve=331.4423;
+		#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, \
+		#							vg=vg, ve=ve, debug=True, includeInteraction=True)
+		#sys.exit(0)
+		
+		###### generate kinship, estimate vg, ve, etc. using core482 from call 49
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482.tsv')
+		#kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
+		kinship_fname = None
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_pairwise_cofactor.tsv')
+		#vg=1451.803; ve=331.4423; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
+		vg=None
+		ve=None
+		vg=1534.10171646	# 2010-3-24 estimates from ~/mnt/panfs/250k/dataset/call_method_49_core482.tsv
+		ve=499.58683376
+		#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
+		
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_snp_environment_epistasis.tsv')
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
+				includeInteraction=True, kinship_fname=kinship_fname)
+		sys.exit(0)
+		
+		
+		###### use existing core469 kinship and old vg and ve estimates (from JBLabSeasonFlowering.R)
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core469_K_old_vg_ve_pairwise_cofactor.tsv')
+		vg=1451.803; ve=331.4423;
+		#vg=None
+		#ve=None
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
+		
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core469_K_old_vg_ve_pairwise_epistasis.tsv')
+		#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
+		#		includeInteraction=True, kinship_fname=kinship_fname)
+		
+		
+		# 2010-3-26 final full model with FRI-FLC, and FT-FLC
+		cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
+		interaction_snp_id_in_base_formula_ls = ['X4_264496', 'X5_3188328']	# FRI-FLC
+		special_interaction_snp_id_ls = ['X1_24345319','X5_3188328']	# 2010-3-26 FT-FLC
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				special_interaction_snp_id_ls=special_interaction_snp_id_ls)
+		
+		# 2010-4-1 final full model with FRI-FLC, and FT-FLC
+		cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
+		cholesky_inverse_fname = None
+		vg=None
+		ve=None
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_plus_FT_FLC_and_FRI_FLC_epistasis_with_snp_from_core482_with_FRI_del_impute.tsv')
+		interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
+		special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+									'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
+									'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				special_interaction_snp_id_ls=special_interaction_snp_id_ls)
+		
+		
+		# 2010-4-7 full model without GXE , GXG
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_tg_ecotypeid.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		kinship_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship.tsv')	#two FRI allele shall not make a difference.
+		cholesky_inverse_fname = None
+		vg=None
+		ve=None
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_without_GXE_GXG_core482_with_FRI_del_impute.tsv')
+		interaction_snp_id_in_base_formula_ls = []
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
 								'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
 								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			special_interaction_snp_id_ls=special_interaction_snp_id_ls)
-	
-	
-	# 2010-4-7 full model without GXE , GXG
-	phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_tg_ecotypeid.tsv')
-	genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-	kinship_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship.tsv')	#two FRI allele shall not make a difference.
-	cholesky_inverse_fname = None
-	vg=None
-	ve=None
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_without_GXE_GXG_core482_with_FRI_del_impute.tsv')
-	interaction_snp_id_in_base_formula_ls = []
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-							'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
-							'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True)
-	sys.exit(0)
-	
-	#2010-3-26 run genome scan phenotype ~ SNP
-	cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_gwa.tsv')	
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-								output_fname, vg=vg, ve=ve, \
-								kinship_fname=kinship_fname, \
-								cholesky_inverse_fname = cholesky_inverse_fname,\
-								run_genome_scan=True)
-	sys.exit(0)
-	
-	#2010-4-6 run genome scan phenotype ~ SNP
-	cholesky_inverse_fname = None
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_core482_gwa.tsv')
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-								output_fname, vg=vg, ve=ve, \
-								kinship_fname=kinship_fname, \
-								cholesky_inverse_fname = cholesky_inverse_fname,\
-								run_genome_scan=True)
-	sys.exit(0)
-	
-	
-	# 2010-3-27 full model with old K with new vg and ve estimates
-	vg=None
-	ve=None
-	vg=1451.80295945; ve=331.442279994; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
-	kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core469_old_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
-	interaction_snp_id_in_base_formula_ls = ['X4_264496', 'X5_3188328']	# FRI-FLC
-	special_interaction_snp_id_ls = ['X1_24345319','X5_3188328']	# 2010-3-26 FT-FLC
-	cholesky_inverse_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K_new_vg_ve_L_inverse.tsv')
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname, \
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			special_interaction_snp_id_ls=special_interaction_snp_id_ls)
-	sys.exit(0)
-	
-	##### 2010-3-26 add FRI-FLC interaction to 4 block-only full model
-	interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
-	special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
-	vg=None
-	ve=None
-	loc_value_ls = ['spain', 'sweden']
-	planting_value_ls = ['spring', 'summer']
-	for planting_value in planting_value_ls:
-		for loc_value in loc_value_ls:
-			cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
-			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_FT_FLC_and_FRI_FLC_epistasis_%s_%s.tsv'%(loc_value, planting_value))	
-			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-										output_fname, vg=vg, ve=ve, \
-										includeInteraction=True, kinship_fname=kinship_fname, \
-										cholesky_inverse_fname = cholesky_inverse_fname,\
-										interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-										special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
-										planting_value=planting_value, loc_value=loc_value)
-	
-	sys.exit(0)
-	
-	
-	#### 2010-4-7 verify using Yan's newsst SNP data & kinship
-	phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/data/a2.tsv')
-	
-	genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-	kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/data/K1b.tsv')
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/results/a2DTF_K1b_full_model_without_GXE_GXG_YanData.tsv')
-	vg=None
-	ve=None
-	cholesky_inverse_fname = None
-	interaction_snp_id_in_base_formula_ls = []
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-							'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
-							'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-	
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			useYanSNPData=True, logPhenotype=False, run_genome_scan=False, drawIntercept=True)
-	sys.exit(0)
-	
-	#############################
-	#####2010-4-28 final code
-	# 2010-4-6
-	phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
-	#phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_tg_ecotypeid.tsv')
-	phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_tg_ecotypeid.tsv')
-	
-	genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482.tsv')
-	genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_impute.tsv')
-	genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-	#kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
-	kinship_fname = None
-	kinship_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship.tsv')	#two FRI allele shall not make a difference.
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_pairwise_cofactor.tsv')
-	#vg=1451.803; ve=331.4423; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
-	vg=None
-	ve=None
-	vg=1534.10171646	# 2010-3-24 estimates from ~/mnt/panfs/250k/dataset/call_method_49_core482.tsv
-	ve=499.58683376
-	#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
-	
-	
-	# 2010-4-1 final full model with FRI-FLC, and FT-FLC
-	cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
-	cholesky_inverse_fname = None
-	vg=None
-	ve=None
-	#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_intersection_yanSNPData_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
-	#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
-	#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_full_model_without_GXE_YanSNP.tsv')
-	interaction_snp_id_in_base_formula_ls = [('4_264496', '5_3188328'), ('1_24345319','5_3188328')]	# FRI-FLC, FT-FLC
-	interaction_snp_id_in_base_formula_ls = [('1_24345319','5_3188328')]	# FT-FLC
-	interaction_snp_id_in_base_formula_ls = []
-	#interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
-	#special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-							'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
-							'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-	
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-							'4_1356197',  '4_158958', '4_199214', '4_264496',  '4_268809', '4_269962', '4_286905', '4_387727', \
-							'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-							'4_1356197',  '4_268809', '4_269962', '5_18620282', '5_25376551', '5_3188328']	
-	
-	
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-							'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
-							'5_18620282', '5_25376551', '5_3188328']
-	
-	#2010-4-23 use original EMMA, rather EMMAX
-	run_type = 2
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_run_type_%s.tsv'%run_type)
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True, includeGXE=True, \
-			includeEXE=True, includeE=True, includeG=True, run_type=run_type)
-	sys.exit(0)
-	
-	
-	# 2010-4-16 include E cofactors in preEMMAX (estimating vg and ve)
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_preEMMAX_w_Ecofactors.tsv')	
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True, includeGXE=False, \
-			includeEXE=False, addEnvAsCofactorInPreEMMAX=True)
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_preEMMAX_w_Ecofactors_GXE.tsv')	
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True, includeGXE=True, \
-			includeEXE=True, addEnvAsCofactorInPreEMMAX=True)
-	sys.exit(0)
-	
-	#### 2010-4-15 epistasis scan: run_genome_scan=2
-	output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_epistasis_scan.tsv')	
-	JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
-			snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-			kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
-			interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-			useYanSNPData=False, logPhenotype=True, run_genome_scan=2, drawIntercept=True, includeGXE=False, includeEXE=False)
-	sys.exit(0)
-	
-	
-	special_interaction_snp_id_ls = []
-	loc_value_ls = ['spain', 'sweden']
-	planting_value_ls = ['spring', 'summer']
-	logPhenotype = True
-	common_prefix = 'DaysToFlower16replicates_full_model_9'
-	for planting_value in planting_value_ls:
-		# take data from the same planting_value
-		cholesky_inverse_fname = None
-		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/%s_%s.tsv'%(common_prefix, planting_value))
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True)
+		sys.exit(0)
+		
+		#2010-3-26 run genome scan phenotype ~ SNP
+		cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_gwa.tsv')	
 		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
 									output_fname, vg=vg, ve=ve, \
-									snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-									includeInteraction=True, kinship_fname=kinship_fname, \
+									kinship_fname=kinship_fname, \
 									cholesky_inverse_fname = cholesky_inverse_fname,\
-									interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-									special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
-									planting_value=planting_value, loc_value=None,\
-									logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, \
-									includeGXE=False, includeEXE=True)
-		for loc_value in loc_value_ls:
-			# take data from the same loc_value
+									run_genome_scan=True)
+		sys.exit(0)
+		
+		#2010-4-6 run genome scan phenotype ~ SNP
+		cholesky_inverse_fname = None
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_core482_gwa.tsv')
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+									output_fname, vg=vg, ve=ve, \
+									kinship_fname=kinship_fname, \
+									cholesky_inverse_fname = cholesky_inverse_fname,\
+									run_genome_scan=True)
+		sys.exit(0)
+		
+		
+		# 2010-3-27 full model with old K with new vg and ve estimates
+		vg=None
+		ve=None
+		vg=1451.80295945; ve=331.442279994; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core469_old_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
+		interaction_snp_id_in_base_formula_ls = ['X4_264496', 'X5_3188328']	# FRI-FLC
+		special_interaction_snp_id_ls = ['X1_24345319','X5_3188328']	# 2010-3-26 FT-FLC
+		cholesky_inverse_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K_new_vg_ve_L_inverse.tsv')
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, \
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname, \
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				special_interaction_snp_id_ls=special_interaction_snp_id_ls)
+		sys.exit(0)
+		
+		##### 2010-3-26 add FRI-FLC interaction to 4 block-only full model
+		interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
+		special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
+		vg=None
+		ve=None
+		loc_value_ls = ['spain', 'sweden']
+		planting_value_ls = ['spring', 'summer']
+		for planting_value in planting_value_ls:
+			for loc_value in loc_value_ls:
+				cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
+				output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_FT_FLC_and_FRI_FLC_epistasis_%s_%s.tsv'%(loc_value, planting_value))	
+				JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+											output_fname, vg=vg, ve=ve, \
+											includeInteraction=True, kinship_fname=kinship_fname, \
+											cholesky_inverse_fname = cholesky_inverse_fname,\
+											interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+											special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
+											planting_value=planting_value, loc_value=loc_value)
+		
+		sys.exit(0)
+		
+		
+		#### 2010-4-7 verify using Yan's newsst SNP data & kinship
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/data/a2.tsv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/data/K1b.tsv')
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/results/a2DTF_K1b_full_model_without_GXE_GXG_YanData.tsv')
+		vg=None
+		ve=None
+		cholesky_inverse_fname = None
+		interaction_snp_id_in_base_formula_ls = []
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
+								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				useYanSNPData=True, logPhenotype=False, run_genome_scan=False, drawIntercept=True)
+		sys.exit(0)
+		
+		#############################
+		#####2010-4-28 final code
+		# 2010-4-6
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
+		#phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_tg_ecotypeid.tsv')
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_tg_ecotypeid.tsv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_impute.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		#kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
+		kinship_fname = None
+		kinship_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship.tsv')	#two FRI allele shall not make a difference.
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_pairwise_cofactor.tsv')
+		#vg=1451.803; ve=331.4423; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
+		vg=None
+		ve=None
+		vg=1534.10171646	# 2010-3-24 estimates from ~/mnt/panfs/250k/dataset/call_method_49_core482.tsv
+		ve=499.58683376
+		#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
+		
+		
+		# 2010-4-1 final full model with FRI-FLC, and FT-FLC
+		cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
+		cholesky_inverse_fname = None
+		vg=None
+		ve=None
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_intersection_yanSNPData_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_full_model_without_GXE_YanSNP.tsv')
+		interaction_snp_id_in_base_formula_ls = [('4_264496', '5_3188328'), ('1_24345319','5_3188328')]	# FRI-FLC, FT-FLC
+		interaction_snp_id_in_base_formula_ls = [('1_24345319','5_3188328')]	# FT-FLC
+		interaction_snp_id_in_base_formula_ls = []
+		#interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
+		#special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
+								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_199214', '4_264496',  '4_268809', '4_269962', '4_286905', '4_387727', \
+								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_268809', '4_269962', '5_18620282', '5_25376551', '5_3188328']	
+		
+		
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
+								'5_18620282', '5_25376551', '5_3188328']
+		
+		#2010-4-23 use original EMMA, rather EMMAX
+		run_type = 2
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_run_type_%s.tsv'%run_type)
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True, includeGXE=True, \
+				includeEXE=True, includeE=True, includeG=True, run_type=run_type)
+		sys.exit(0)
+		
+		
+		# 2010-4-16 include E cofactors in preEMMAX (estimating vg and ve)
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_preEMMAX_w_Ecofactors.tsv')	
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True, includeGXE=False, \
+				includeEXE=False, addEnvAsCofactorInPreEMMAX=True)
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_preEMMAX_w_Ecofactors_GXE.tsv')	
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				includeInteraction=True, kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				useYanSNPData=False, logPhenotype=True, run_genome_scan=False, drawIntercept=True, includeGXE=True, \
+				includeEXE=True, addEnvAsCofactorInPreEMMAX=True)
+		sys.exit(0)
+		
+		#### 2010-4-15 epistasis scan: run_genome_scan=2
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_9_epistasis_scan.tsv')	
+		JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve,\
+				snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+				kinship_fname=kinship_fname, cholesky_inverse_fname=cholesky_inverse_fname,\
+				interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+				useYanSNPData=False, logPhenotype=True, run_genome_scan=2, drawIntercept=True, includeGXE=False, includeEXE=False)
+		sys.exit(0)
+		
+		
+		special_interaction_snp_id_ls = []
+		loc_value_ls = ['spain', 'sweden']
+		planting_value_ls = ['spring', 'summer']
+		logPhenotype = True
+		common_prefix = 'DaysToFlower16replicates_full_model_9'
+		for planting_value in planting_value_ls:
+			# take data from the same planting_value
 			cholesky_inverse_fname = None
-			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/%s_%s.tsv'%\
-											(common_prefix, loc_value,))
+			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/%s_%s.tsv'%(common_prefix, planting_value))
 			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
 										output_fname, vg=vg, ve=ve, \
 										snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
@@ -4067,89 +4080,29 @@ class JBDataGWA(object):
 										cholesky_inverse_fname = cholesky_inverse_fname,\
 										interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
 										special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
-										planting_value=None, loc_value=loc_value,\
+										planting_value=planting_value, loc_value=None,\
 										logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, \
 										includeGXE=False, includeEXE=True)
-			
-			#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
-			cholesky_inverse_fname = None
-			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/%s_%s_%s.tsv'%\
-											(common_prefix, loc_value, planting_value))
-			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-										output_fname, vg=vg, ve=ve, \
-										snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-										includeInteraction=True, kinship_fname=kinship_fname, \
-										cholesky_inverse_fname = cholesky_inverse_fname,\
-										interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-										special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
-										planting_value=planting_value, loc_value=loc_value,\
-										logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, \
-										includeGXE=False, includeEXE=True)
-	
-	sys.exit(0)
-	
-	
-	# 2010-4-6 run genome scan around FRI for all environments together, log & non-log phenotype
-	start_snp_id = '4_1'
-	stop_snp_id = '4_1700000'
-	for logPhenotype in [True, False]:
-		for snp_id_to_be_included_ls in [['4_268809'], ['4_269962'], ['4_268809', '4_269962'], []]:
-			cholesky_inverse_fname = None
-			included_snp_ids = '_'.join(snp_id_to_be_included_ls)
-			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_around_FRI_cofactor_%s.tsv'%
-											(included_snp_ids))
-			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-										output_fname, vg=vg, ve=ve, \
-										snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-										kinship_fname=kinship_fname,\
-										cholesky_inverse_fname = cholesky_inverse_fname,\
-										start_snp_id = start_snp_id, stop_snp_id = stop_snp_id,\
-										logPhenotype=logPhenotype, run_genome_scan=True)
-	sys.exit(0)
-	
-	# 2010-4-6 run genome scan around FRI for 4 environments, log & non-log phenotype
-	loc_value_ls = ['spain', 'sweden']
-	planting_value_ls = ['spring', 'summer']
-	start_snp_id = '4_1'
-	stop_snp_id = '4_1700000'
-	logPhenotype = True
-	for planting_value in planting_value_ls:
-		for loc_value in loc_value_ls:
-			for snp_id_to_be_included_ls in [[], ['4_268809'], ['4_269962'], ['4_268809', '4_269962']]:
+			for loc_value in loc_value_ls:
+				# take data from the same loc_value
 				cholesky_inverse_fname = None
-				included_snp_ids = '_'.join(snp_id_to_be_included_ls)
-				output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_around_FRI_%s_%s_cofactor_%s.tsv'%
-												(loc_value, planting_value, included_snp_ids))
+				output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/%s_%s.tsv'%\
+												(common_prefix, loc_value,))
 				JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
 											output_fname, vg=vg, ve=ve, \
 											snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-											kinship_fname=kinship_fname,\
+											includeInteraction=True, kinship_fname=kinship_fname, \
 											cholesky_inverse_fname = cholesky_inverse_fname,\
-											start_snp_id = start_snp_id, stop_snp_id = stop_snp_id,\
-											planting_value=planting_value, loc_value=loc_value, \
-											logPhenotype=logPhenotype, run_genome_scan=True)
-	sys.exit(0)
-	
-	
-	
-	##### 2010-3-26 add FRI-FLC interaction to 4 block-only full model
-	snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
-								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-	interaction_snp_id_in_base_formula_ls = [('4_264496', '5_3188328'), ('1_24345319','5_3188328')]	# FRI-FLC, FT-FLC
-	interaction_snp_id_in_base_formula_ls = []	#2010-4-7
-	special_interaction_snp_id_ls = []	# 2010-3-26 
-	vg=None
-	ve=None
-	loc_value_ls = ['spain', 'sweden']
-	planting_value_ls = ['spring', 'summer']
-	for planting_value in planting_value_ls:
-		for loc_value in loc_value_ls:
-			for logPhenotype in [True, False]:
+											interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+											special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
+											planting_value=None, loc_value=loc_value,\
+											logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, \
+											includeGXE=False, includeEXE=True)
+				
 				#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
 				cholesky_inverse_fname = None
-				output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_without_GXE_GXG_%s_%s.tsv'%\
-												(loc_value, planting_value))
+				output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/%s_%s_%s.tsv'%\
+												(common_prefix, loc_value, planting_value))
 				JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
 											output_fname, vg=vg, ve=ve, \
 											snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
@@ -4158,10 +4111,85 @@ class JBDataGWA(object):
 											interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
 											special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
 											planting_value=planting_value, loc_value=loc_value,\
-											logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
-	
-	sys.exit(0)
-	
+											logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, \
+											includeGXE=False, includeEXE=True)
+		
+		sys.exit(0)
+		
+		
+		# 2010-4-6 run genome scan around FRI for all environments together, log & non-log phenotype
+		start_snp_id = '4_1'
+		stop_snp_id = '4_1700000'
+		for logPhenotype in [True, False]:
+			for snp_id_to_be_included_ls in [['4_268809'], ['4_269962'], ['4_268809', '4_269962'], []]:
+				cholesky_inverse_fname = None
+				included_snp_ids = '_'.join(snp_id_to_be_included_ls)
+				output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_around_FRI_cofactor_%s.tsv'%
+												(included_snp_ids))
+				JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+											output_fname, vg=vg, ve=ve, \
+											snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+											kinship_fname=kinship_fname,\
+											cholesky_inverse_fname = cholesky_inverse_fname,\
+											start_snp_id = start_snp_id, stop_snp_id = stop_snp_id,\
+											logPhenotype=logPhenotype, run_genome_scan=True)
+		sys.exit(0)
+		
+		# 2010-4-6 run genome scan around FRI for 4 environments, log & non-log phenotype
+		loc_value_ls = ['spain', 'sweden']
+		planting_value_ls = ['spring', 'summer']
+		start_snp_id = '4_1'
+		stop_snp_id = '4_1700000'
+		logPhenotype = True
+		for planting_value in planting_value_ls:
+			for loc_value in loc_value_ls:
+				for snp_id_to_be_included_ls in [[], ['4_268809'], ['4_269962'], ['4_268809', '4_269962']]:
+					cholesky_inverse_fname = None
+					included_snp_ids = '_'.join(snp_id_to_be_included_ls)
+					output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_around_FRI_%s_%s_cofactor_%s.tsv'%
+													(loc_value, planting_value, included_snp_ids))
+					JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+												output_fname, vg=vg, ve=ve, \
+												snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+												kinship_fname=kinship_fname,\
+												cholesky_inverse_fname = cholesky_inverse_fname,\
+												start_snp_id = start_snp_id, stop_snp_id = stop_snp_id,\
+												planting_value=planting_value, loc_value=loc_value, \
+												logPhenotype=logPhenotype, run_genome_scan=True)
+		sys.exit(0)
+		
+		
+		
+		##### 2010-3-26 add FRI-FLC interaction to 4 block-only full model
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+									'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
+									'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		interaction_snp_id_in_base_formula_ls = [('4_264496', '5_3188328'), ('1_24345319','5_3188328')]	# FRI-FLC, FT-FLC
+		interaction_snp_id_in_base_formula_ls = []	#2010-4-7
+		special_interaction_snp_id_ls = []	# 2010-3-26 
+		vg=None
+		ve=None
+		loc_value_ls = ['spain', 'sweden']
+		planting_value_ls = ['spring', 'summer']
+		for planting_value in planting_value_ls:
+			for loc_value in loc_value_ls:
+				for logPhenotype in [True, False]:
+					#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
+					cholesky_inverse_fname = None
+					output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/DaysToFlower16replicates_full_model_without_GXE_GXG_%s_%s.tsv'%\
+													(loc_value, planting_value))
+					JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+												output_fname, vg=vg, ve=ve, \
+												snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+												includeInteraction=True, kinship_fname=kinship_fname, \
+												cholesky_inverse_fname = cholesky_inverse_fname,\
+												interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+												special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
+												planting_value=planting_value, loc_value=loc_value,\
+												logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
+		
+		sys.exit(0)
+		
 	
 	"""
 	
@@ -5720,6 +5748,7 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 		"""
 		2009-11-18
 			use SVM (support vector machine) to predict phenotype_ls based on data_matrix
+			package python-libsvm is based on http://www.csie.ntu.edu.tw/~cjlin/libsvm/
 		"""
 		from svm import svm_problem, svm_parameter, svm_model, cross_validation, LINEAR, POLY, RBF
 		import numpy
@@ -6498,12 +6527,92 @@ class Data250k(object):
 		del snpData1
 	
 	"""
-call_method_id1 = 34
-call_method_id2 = 33
-output_fname = '/tmp/call_method_%s_arrays_from_%s.tsv'%(call_method_id1, call_method_id2)
-Data250k.filterCallMethod1ToHaveSameArraysAsCallMethod2(call_method_id1, call_method_id2, output_fname)
+	call_method_id1 = 34
+	call_method_id2 = 33
+	output_fname = '/tmp/call_method_%s_arrays_from_%s.tsv'%(call_method_id1, call_method_id2)
+	Data250k.filterCallMethod1ToHaveSameArraysAsCallMethod2(call_method_id1, call_method_id2, output_fname)
 	"""
 	
+	@classmethod
+	def addUnimputedArrayCallsToImputedCalls(cls, db_250k, imputed_call_method_id=54, unimputed_array_ids='1516-1602',\
+											output_fname=None, minCallProbability=0.85):
+		"""
+		2010-7-2
+			for Rhonda Meyer's stuff
+		"""
+		sys.stderr.write("Adding unimputed array calls to imputed ones ....")
+		import Stock_250kDB, csv
+		from pymodule import figureOutDelimiter, getListOutOfStr, SNPData
+		from pymodule.SNP import nt2number
+		imputed_call_method = Stock_250kDB.CallMethod.get(imputed_call_method_id)
+		reader = csv.reader(open(imputed_call_method.filename), \
+						delimiter=figureOutDelimiter(imputed_call_method.filename))
+		
+		sys.stderr.write("Constructing chr_pos2col_index ...")
+		header = reader.next()
+		snp_chr_pos_ls = header[2:]
+		no_of_snps = len(snp_chr_pos_ls)
+		chr_pos2col_index = {}
+		for i in range(no_of_snps):
+			chr_pos = snp_chr_pos_ls[i]
+			chr_pos2col_index[chr_pos] = i
+		sys.stderr.write("Done.\n")
+		
+		
+		writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+		writer.writerow(header)
+		
+		sys.stderr.write("Outputting unimputed calls  ....\n")
+		unimputed_array_ids = getListOutOfStr(unimputed_array_ids, data_type=int)
+		for i in xrange(len(unimputed_array_ids)):
+			array_id = unimputed_array_ids[i]
+			call_info = Stock_250kDB.CallInfo.query.filter_by(method_id=3).filter_by(array_id=array_id).first()
+			sys.stderr.write("%s%s\tarray %s"%('\x08'*80, i, call_info.array_id))
+			tmp_reader = csv.reader(open(call_info.filename), delimiter='\t')
+			tmp_reader.next()
+			snp_call_ls = [0]*no_of_snps
+			for row in tmp_reader:
+				snp_id = row[0].split('_')	# 1_657_C_T
+				snp_id = '_'.join(snp_id[:2])	# remove _C_T
+				snp_col_index = chr_pos2col_index.get(snp_id)
+				if snp_col_index is not None:
+					oligo_probability = float(row[2])
+					if oligo_probability>=minCallProbability:
+						call_integer = nt2number[row[1]]
+					else:
+						call_integer = 0
+					snp_call_ls[snp_col_index] = call_integer
+			data_row = ['', call_info.array_id,] + snp_call_ls
+			writer.writerow(data_row)
+		sys.stderr.write("Done.\n")
+		
+		sys.stderr.write("Outputting imputed calls of method %s ....\n" %(imputed_call_method_id))
+		counter = 0
+		for row in reader:
+			sys.stderr.write("%s%s"%('\x08'*80, counter))
+			writer.writerow(row)
+			counter += 1
+		del writer
+		sys.stderr.write("Done.\n")
+	
+	"""
+		#2010-7-2
+		imputed_call_method_id=54
+		output_fname = os.path.expanduser('~/script/variation/data/call_%s_with_RhondaUnimputedCalls.tsv'%(imputed_call_method_id))
+		Data250k.addUnimputedArrayCallsToImputedCalls(db_250k, imputed_call_method_id=imputed_call_method_id, \
+				unimputed_array_ids='1516-1602',\
+				output_fname=output_fname, minCallProbability=0.85)
+		sys.exit(0)
+		
+		#2010-7-2
+		imputed_call_method_id=54
+		output_fname = os.path.expanduser('~/script/variation/data/call_%s_with_RhondaUnimputedCalls.tsv'%(imputed_call_method_id))
+		Data250k.addUnimputedArrayCallsToImputedCalls(db_250k, imputed_call_method_id=imputed_call_method_id, \
+				unimputed_array_ids='1516-1602',\
+				output_fname=output_fname, minCallProbability=0.85)
+		sys.exit(0)
+		
+	"""
 class BooleanInteraction(object):
 	
 	"""
@@ -6605,10 +6714,10 @@ class BooleanInteraction(object):
 	
 	
 	@classmethod
-	def handleMostSignificantOperatorPerSNPPair(cls, input_fname, function_handler, param_obj):
+	def handleMostSignificantOperatorPerSNPPair(cls, input_fname, afterMatchFunction, param_obj):
 		"""
 		2009-2-19
-			a general function which calls function_handler to do a bit processing for the most significant operator of each SNP pair.
+			a general function which calls afterMatchFunction to do a bit processing for the most significant operator of each SNP pair.
 				(results from the same SNP pair are always cluttered together.)
 		"""
 		import csv
@@ -6640,7 +6749,7 @@ class BooleanInteraction(object):
 			else:	#new pairs
 				i = 0
 				prev_snp1_id = row_with_min_pvalue[0]
-				function_handler(row_with_min_pvalue, param_obj)
+				afterMatchFunction(row_with_min_pvalue, param_obj)
 				real_counter += 1
 				prev_snp1_id = snp1_id
 				prev_snp2_id = snp2_id
@@ -7834,7 +7943,7 @@ DB250k.outputProbeIntensityOfOneSNPAcrossArrays(db_250k, intensity_matrix_fname,
 				db_id = db_id_ls[i]
 				db_entry = Stock_250kDB.Phenotype.get(db_id)
 				db_entry.replicate = i +1
-				db.session.save_or_update(db_entry)
+				db.session.add(db_entry)
 				db.session.flush()
 		db.session.commit()
 		sys.stderr.write("Done.\n")
@@ -7856,7 +7965,7 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 		db_entry.sample_size = len(individual_value_ls)
 		if db_entry.sample_size>1:
 			db_entry.stddev = numpy.std(individual_value_ls) 
-		db.session.save_or_update(db_entry)
+		db.session.add(db_entry)
 		
 	
 	@classmethod
@@ -7912,14 +8021,14 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 						individual_value_ls.append(db_entry.value)
 						phenotype_entry = Stock_250kDB.Phenotype(method_id=db_entry.method_id, ecotype_id=db_entry.ecotype_id, \
 																value=db_entry.value, replicate=i+1)
-						db.session.save(phenotype_entry)
+						db.session.add(phenotype_entry)
 						db.session.delete(db_entry)
 					#insert the last phenotype_avg into Stock_250kDB.Phenotype and update it in  phenotype_avg
 					db_entry = Stock_250kDB.PhenotypeAvg.get(db_id_ls[-1])
 					individual_value_ls.append(db_entry.value)
 					phenotype_entry = Stock_250kDB.Phenotype(method_id=db_entry.method_id, ecotype_id=db_entry.ecotype_id, \
 																value=db_entry.value, replicate=len(db_id_ls))
-					db.session.save(phenotype_entry)
+					db.session.add(phenotype_entry)
 					cls.updatePhenotypeAvgEntry(db, db_entry, individual_value_ls)
 					#insert data from db_id_ls into Stock_250kDB.Phenotype
 		db.session.commit()
@@ -7976,7 +8085,7 @@ DB250k.cleanUpTablePhenotypeAvg(db)
 			#phenotype_avg_entry.value = row.avg_value
 			#phenotype_avg_entry.stddev = row.stddev
 			#phenotype_avg_entry.sample_size = row.sample_size
-			#db.session.save_or_update(phenotype_avg_entry)
+			#db.session.add(phenotype_avg_entry)
 			avg_count += 1
 		db.session.commit()
 		sys.stderr.write("%s(%s new, %s multi) average values from %s replicates were updated. Done.\n"%\
@@ -8038,7 +8147,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 			rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
 			rm_json.result = rm
 			rm_json.json_data = json_data
-			db_250k.session.save_or_update(rm_json)
+			db_250k.session.add(rm_json)
 			db_250k.session.flush()
 			sys.stderr.write("\n")
 		if commit:
@@ -8056,7 +8165,178 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	
 	"""
 	
+	@classmethod
+	def updateProbeChrPosToTAIR9(cls, db_250k, input_fname, min_no_of_matches=25):
+		"""
+		2010-6-20
+			input_fname is output of MpiBlast.py
+				mpiexec ~/script/variation/Dazhe/src/MpiBlast.py -o ~/script/variation/data/CNV/stock_250k_probes_vs_TAIR9.tsv 
+				-p ~/script/variation/data/CNV/stock_250k_probes.csv -d ~/script/variation/data/CNV/TAIR9/tair9.fas -m 24
+			
+			If one probe has two perfect-matches in TAIR9, its chromosome, position would be set to NULL.
+		"""
+		from pymodule import getColName2IndexFromHeader, PassingData, figureOutDelimiter
+		sys.stderr.write("Reading from %s ... \n"%input_fname)
+		counter = 0
+		real_counter = 0
+		import csv, re
+		reader = csv.reader(open(input_fname), delimiter=figureOutDelimiter(input_fname))
+		header = reader.next()
+		col_name2index = getColName2IndexFromHeader(header)
+		chr_pattern = re.compile(r'.*Chr(\d)')
+		probe_id2new_chr_pos_ls = {}
+		
+		for row in reader:
+			chr = int(row[col_name2index['Chromosome']])
+			pos = int(row[col_name2index['Position']])
+			probe_id = int(row[col_name2index['Probe_ID']])
+			tair9_label = row[col_name2index['Alignment_title']]	#Alignment_title is like "gnl|BL_ORD_ID|0 Chr1"
+			
+			new_chr = int(chr_pattern.search(tair9_label).group(1))
+			
+			no_of_matches = int(row[col_name2index['Number_matches']])
+			alignment_start = int(row[col_name2index['Alignment_start']])
+			alignment_stop = int(row[col_name2index['Alignment_stop']])
+			new_pos = (alignment_start+alignment_stop)/2
+			query_start = int(row[col_name2index['query_start']])
+			if no_of_matches>=min_no_of_matches:
+				if probe_id not in probe_id2new_chr_pos_ls:
+					probe_id2new_chr_pos_ls[probe_id] = []
+				probe_id2new_chr_pos_ls[probe_id].append((new_chr, new_pos))
+				real_counter += 1
+			counter += 1
+			if counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("%s probes, with %s matches from %s lines.\n"%(len(probe_id2new_chr_pos_ls), real_counter, counter))
+		del reader
+		
+		sys.stderr.write("Updating database ... \n")
+		import Stock_250kDB
+		i = 0
+		block_size = 1000
+		no_of_new_chr_pos_updates = 0
+		TableClass = Stock_250kDB.Probes
+		rows = TableClass.query.offset(i).limit(block_size)
+		while rows.count()!=0:
+			for row in rows:
+				new_chr_pos_ls = probe_id2new_chr_pos_ls.get(row.id)
+				if new_chr_pos_ls is None:
+					new_chr_pos = (None, None)
+				elif len(new_chr_pos_ls)==1:
+					new_chr_pos = new_chr_pos_ls[0]
+				else:	#>1 matches in TAIR9
+					new_chr_pos = (None, None)
+				
+				new_chr = new_chr_pos[0]
+				new_pos = new_chr_pos[1]
+				if new_chr!=row.chromosome or new_pos!=row.position:
+					row.chromosome = new_chr
+					row.position = new_pos
+					db_250k.session.add(row)
+					db_250k.session.flush()
+					no_of_new_chr_pos_updates += 1
+				
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, no_of_new_chr_pos_updates))
+			rows = TableClass.query.offset(i).limit(block_size)
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*80, i, no_of_new_chr_pos_updates))
+		sys.stderr.write("Out of %s, %s entries updated to new chr & pos, the rest set to Null. Done.\n"%(i, no_of_new_chr_pos_updates))
+	"""
+	input_fname = os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/stock_250k_probes_vs_TAIR9.tsv')
+	DB250k.updateProbeChrPosToTAIR9(db_250k, input_fname, min_no_of_matches=25)
+	
+	#2010-6-26 the hpc-cmb result is incomplete due to early MPI exit.
+	input_fname = os.path.expanduser('~/script/variation/data/CNV/stock_250k_probes_vs_TAIR9_20100625.tsv')
+	DB250k.updateProbeChrPosToTAIR9(db_250k, input_fname, min_no_of_matches=25)
+	sys.exit(0)
+	
+	# 2010-6-26 After function above has finished, run this sql manually in a mysql client. 
+		update snps s, probes p set s.chromosome=p.chromosome, s.position=p.position where s.id=p.snps_id;
+	"""
+		
+		
 class CNV(object):
+	class Lyrata(object):
+		"""
+		2010-8-2
+		"""
+		def __init__(self):
+			pass
+		
+		@classmethod
+		def getLyrataNormalANDDeletionFromQuanFileInTAIR9(cls, input_fname, output_fname=None):
+			"""
+			2010-8-2
+			"""
+			sys.stderr.write("Getting lyrata sequences or deletions in TAIR9 coordinates ... \n")
+			
+			inf = open(input_fname)
+			chromosome = None
+			position = 0
+			normalSegmentStart = None
+			previousLetter = None
+			normalSegmentLs = []
+			lineNo = 0
+			for line in inf:
+				lineNo += 1
+				line = line.strip()
+				if line[0]=='>':
+					if normalSegmentStart is not None and position>normalSegmentStart:
+						#there's a normal segment in the end of the previous chromosome
+						normal_segment = [chromosome, normalSegmentStart, position]
+						normalSegmentLs.append(normal_segment)
+					chromosome = line[4]
+					position = 0
+					normalSegmentStart = None
+					previousLetter = None
+				else:
+					no_of_letters = len(line)
+					for i in xrange(no_of_letters):
+						position += 1
+						letter = line[i]
+						if previousLetter is None:
+							previousLetter = letter
+						elif previousLetter!='-' and letter=='-':	#from normal to deletion
+							if normalSegmentStart is None:	#beginning of the chromosome
+								normalSegmentStart = 1
+							normal_segment = [chromosome, normalSegmentStart, position-1]
+							normalSegmentLs.append(normal_segment)
+							normalSegmentStart = None
+						elif previousLetter=='-' and letter!='-':	#from deletion to normal
+							normalSegmentStart = position
+						previousLetter = letter
+				if lineNo%10000==0:
+					sys.stderr.write('%s%s\t%s\t%s'%('\x08'*80, 'Chr%s'%chromosome, lineNo, len(normalSegmentLs)))
+			sys.stderr.write('%s%s\t%s\t%s\n'%('\x08'*80, 'Chr%s'%chromosome, lineNo, len(normalSegmentLs)))
+			if normalSegmentStart is not None and position>normalSegmentStart:
+				#there's a normal segment in the end of the previous chromosome
+				normal_segment = [chromosome, normalSegmentStart, position]
+				normalSegmentLs.append(normal_segment)
+			
+			sys.stderr.write("Outputting result ...")
+			import csv
+			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			
+			header_row = ['start_probe_id', 'start_chr_pos', 'stop_probe_id', 'stop_chr_pos', 'no_of_probes', \
+						'length', 'copy_number', 'size_difference']
+			writer.writerow(header_row)
+			for segment in normalSegmentLs:
+				chromosome, normalSegmentStart, stop = segment[:3]
+				data_row = ['NA', '%s_%s'%(chromosome, normalSegmentStart), 'NA', '%s_%s'%(chromosome, stop),\
+						'NA', stop-normalSegmentStart+1, 1, 0]
+				writer.writerow(data_row)
+			del writer
+			sys.stderr.write("Done.\n")
+		
+		"""
+		#2010-8-2
+		input_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.fa')
+		output_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.normaSegment.tsv')
+		CNV.Lyrata.getLyrataNormalANDDeletionFromQuanFileInTAIR9(input_fname, output_fname=output_fname)
+		sys.exit(0)
+		"""
 	class HMMSegmentation(object):
 		"""
 		2010-6-3
@@ -8217,11 +8497,11 @@ class CNV(object):
 			if max_counter and counter>max_counter:
 				break
 	"""
-input_fname = '/Network/Data/250k/tmp-yh/CNV/call_method_17_CNV_array_intensity_chr4_line_no_888148_1107622_norm_GADA_out_amp.tsv'
-from pymodule import SNPData
-snpData = SNPData(input_fname=input_fname, turn_into_integer=1, turn_into_array=1, ignore_2nd_column=1, matrix_data_type=float)
-output_dir = '/Network/Data/250k/tmp-yh/CNV/amp_hist/'
-CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
+		input_fname = '/Network/Data/250k/tmp-yh/CNV/call_method_17_CNV_array_intensity_chr4_line_no_888148_1107622_norm_GADA_out_amp.tsv'
+		from pymodule import SNPData
+		snpData = SNPData(input_fname=input_fname, turn_into_integer=1, turn_into_array=1, ignore_2nd_column=1, matrix_data_type=float)
+		output_dir = '/Network/Data/250k/tmp-yh/CNV/amp_hist/'
+		CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	"""
 	
 	@classmethod
@@ -8377,11 +8657,80 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	"""
 	
 	@classmethod
-	def compareCNVSegmentsAgainstQCHandler(cls, input_fname_ls, ecotype_id2cnv_qc_call_data=None, function_handler=None, \
+	def outputNonOverlappingCNVAsSNP(cls, db_250k, output_fname, cnv_method_id=None, cnv_type_id=None):
+		"""
+		2010-8-7
+		"""
+		sys.stderr.write("Outputting non-overlapping CNVs as SNPs for method %s, type %s ...\n"%(cnv_method_id, \
+																			cnv_type_id))
+		col_id_ls = []
+		col_id2index = {}
+		cnv_id2index = {}
+		import Stock_250kDB
+		query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id).\
+			order_by(Stock_250kDB.CNV.chromosome).order_by(Stock_250kDB.CNV.start).order_by(Stock_250kDB.CNV.stop)
+		
+		for row in query:
+			col_id = '%s_%s_%s'%(row.chromosome, row.start, row.stop)
+			col_id_ls.append(col_id)
+			col_id2index[col_id] = len(col_id2index)
+			cnv_id2index[row.id] = col_id2index[col_id]
+		sys.stderr.write("%s unique CNVs.\n"%(len(col_id2index)))
+		
+		row_id_ls = []
+		row_id2index = {}
+		query = Stock_250kDB.CNVArrayCall.query.filter_by(cnv_method_id=cnv_method_id)
+		
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		data_matrix = []
+		while rows.count()!=0:
+			for row in rows:
+				row_id = (row.array.maternal_ecotype_id, row.array_id)
+				if row_id not in row_id2index:
+					row_id2index[row_id] = len(row_id2index)
+					row_id_ls.append(row_id)
+					data_row = [0]*len(col_id_ls)
+					data_matrix.append(data_row)
+				row_index = row_id2index[row_id]
+				data_row = data_matrix[row_index]
+				col_index = cnv_id2index[row.cnv_id]
+				data_row[col_index] = 1
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
+		
+		from pymodule.SNP import write_data_matrix
+		header = ['ecotype_id', 'array_id'] + col_id_ls
+		strain_acc_list = [row[0] for row in row_id_ls]
+		category_list = [row[1] for row in row_id_ls]
+		write_data_matrix(data_matrix, output_fname, header, strain_acc_list, category_list, rows_to_be_tossed_out=None, \
+			cols_to_be_tossed_out=None, nt_alphabet=0, transform_to_numpy=0,\
+			discard_all_NA_rows=0, strain_acc2other_info=None, delimiter='\t', )
+	"""
+		#2010-8-7
+		CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
+		sys.exit(0)
+	"""
+		
+		
+	
+	@classmethod
+	def compareCNVSegmentsAgainstQCHandler(cls, input_fname_ls, ecotype_id2cnv_qc_call_data=None, afterMatchFunction=None, \
 										param_obj=None, deletion_cutoff=None, max_boundary_diff=10000, \
 										max_diff_perc=0.10, min_no_of_probes=5, count_embedded_segment_as_match=False, \
-										min_reciprocal_overlap=0.6, functor_after_span=None, report=True):
+										min_reciprocal_overlap=0.6, functor_after_span=None, judgeTrueDeletionFunctor=None,\
+										report=True):
 		"""
+		2010-6-17
+			rename argument function_handler to afterMatchFunction
+			add judgeTrueDeletionFunctor, default is isDeletionTrueBasedOnOtherDeletionData
 		2010-1-26
 			value of the ecotype_id2cnv_qc_call_data dictionary is a RBDict (RBTree dictionary) structure.
 		2009-12-8
@@ -8412,6 +8761,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		header = input_handler.readline().strip().split('\t')
 		col_name2index = getColName2IndexFromHeader(header)
 		ecotype_id2span_data = getattr(param_obj, 'ecotype_id2span_data', None)
+		median_col_index = col_name2index.get('median')
 		for line in input_handler:
 			if line.find("array_id")!=-1:
 				continue
@@ -8442,11 +8792,17 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				segment_length = abs(segment_stop_pos-segment_start_pos+1)
 				if deletion_cutoff is not None and amplitude>deletion_cutoff:
 					continue
+				if median_col_index is not None:
+					median_intensity = float(row[median_col_index])
+				else:
+					median_intensity = None
+				
 				cnv_segment_obj = PassingData(ecotype_id=cnv_ecotype_id, start_probe=start_probe, stop_probe=stop_probe,\
 											no_of_probes=no_of_probes, amplitude=amplitude, segment_length=segment_length,\
 											segment_chromosome=segment_chromosome, array_id=array_id,\
 											start_probe_id=start_probe_id, stop_probe_id=stop_probe_id,\
-											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos)
+											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos,\
+											median_intensity=median_intensity)
 				cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=segment_chromosome, span_ls=[segment_start_pos, segment_stop_pos],\
 															min_reciprocal_overlap=min_reciprocal_overlap)
 				
@@ -8461,19 +8817,19 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				if span_data and functor_after_span:	# 2010-2-10
 					functor_after_span(cnv_segment_obj, param_obj)
 				
-				if ecotype_id2cnv_qc_call_data is not None and cnv_ecotype_id in ecotype_id2cnv_qc_call_data:
-					cnv_qc_call_data = ecotype_id2cnv_qc_call_data.get(cnv_ecotype_id)
-					if cnv_qc_call_data:
-						cnv_qc_call = cnv_qc_call_data.get(cnvSegmentKey)
-					else:
-						cnv_qc_call = None
-					if cnv_qc_call:
-						no_of_valid_deletions += 1
-						function_handler(param_obj, cnv_segment_obj, cnv_qc_call)
-					else:
-						function_handler(param_obj, cnv_segment_obj, cnv_qc_call=None)	# this stage, call the handler if it wants to record the number of deletions.
-				elif ecotype_id2cnv_qc_call_data is None:	# 2010-3-16 ecotype_id2cnv_qc_call_data is None, just process this row.
-					function_handler(param_obj, cnv_segment_obj, cnv_qc_call=None)
+				#2010-6-17
+				if judgeTrueDeletionFunctor is None:
+					judgeTrueDeletionFunctor = cls.isDeletionTrueBasedOnOtherDeletionData
+				
+				param_obj.cnvSegmentKey = cnvSegmentKey
+				judgeData = judgeTrueDeletionFunctor(cnv_segment_obj, param_obj)
+				param_obj.isDeletionTrue = judgeData.isDeletionTrue
+				if judgeData and judgeData.isDeletionTrue:
+					no_of_valid_deletions += 1
+					afterMatchFunction(param_obj, cnv_segment_obj, cnv_qc_call=getattr(judgeData, 'cnv_qc_call', None))
+				else:
+					# this stage, call the handler if it wants to record the number of deletions.
+					afterMatchFunction(param_obj, cnv_segment_obj, cnv_qc_call=None)
 				"""
 				for cnv_qc_call in cnv_qc_call_data:
 					qc_chromosome, qc_start, qc_stop = cnv_qc_call[:3]
@@ -8501,7 +8857,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 						#	valid_match = True
 						
 						if valid_match:
-							function_handler(param_obj, cnv_segment_obj, cnv_qc_call, )
+							afterMatchFunction(param_obj, cnv_segment_obj, cnv_qc_call, )
 					elif qc_chromosome>segment_chromosome:
 						break
 				"""
@@ -8514,41 +8870,12 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	@classmethod
 	def putOneCNVSegmentIntoDBFunctor(cls, param_obj, cnv_segment_obj=None, cnv_qc_call=None):
 		"""
+		2010-7-1
+			moved to CNVPredictDeletionBySVM.saveSegmentObj() of CNVPredictionBySVM.py
 		2010-3-16
 		"""
-		import Stock_250kDB
-		if not hasattr(param_obj, 'no_of_total'):
-			setattr(param_obj, 'no_of_total', 0)
-		if not hasattr(param_obj, 'no_of_into_db'):
-			setattr(param_obj, 'no_of_into_db', 0)
-		cnv_method_id = getattr(param_obj, "cnv_method_id", 6)
-		cnv_type_id = getattr(param_obj, "cnv_type_id", 1)
-		session = getattr(param_obj, 'session', None)
-		param_obj.no_of_total += 1
-		if session is None:
-			sys.stderr.write("Error: db session is not available.\n")
-			return
-		array_id = cnv_segment_obj.array_id
-		no_of_probes = cnv_segment_obj.no_of_probes
-		rows = Stock_250kDB.CNVCall.query.filter_by(array_id=array_id).filter_by(start_probe_id=cnv_segment_obj.start_probe_id).\
-				filter_by(stop_probe_id = cnv_segment_obj.stop_probe_id).filter_by(cnv_type_id = cnv_type_id).\
-				filter_by(cnv_method_id=cnv_method_id)
-		if rows.count()==0:	#make sure it's not in db yet.
-			cnv_call = Stock_250kDB.CNVCall(array_id=array_id, chromosome = cnv_segment_obj.segment_chromosome,\
-										start = cnv_segment_obj.segment_start_pos, stop = cnv_segment_obj.segment_stop_pos, \
-										start_probe_id = cnv_segment_obj.start_probe_id, \
-										stop_probe_id = cnv_segment_obj.stop_probe_id, \
-										no_of_probes_covered = cnv_segment_obj.no_of_probes, \
-										size_affected = cnv_segment_obj.segment_length,\
-										amplitude = cnv_segment_obj.amplitude,)
-			cnv_call.cnv_method_id = cnv_method_id
-			cnv_call.cnv_type_id = cnv_type_id
-			session.save(cnv_call)
-			session.flush()
-			param_obj.no_of_into_db += 1
-		report = getattr(param_obj, 'report', False)
-		if report and param_obj.no_of_total%10000==0:
-				sys.stderr.write('\n%sinto db:\t%s\t%s\n'%('\x08'*100, param_obj.no_of_into_db, param_obj.no_of_total))
+		from CNVPredictDeletionBySVM import CNVPredictDeletionBySVM
+		CNVPredictDeletionBySVM.saveSegmentObj(param_obj, cnv_segment_obj)
 	
 	@classmethod
 	def putCNVSegmentIntoDB(cls, db_250k, input_fname_ls, ecotype_id_set=None, cnv_type_id=1, cnv_method_id=6,\
@@ -8556,6 +8883,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 								min_no_of_probes=5, report=True):
 		"""
 		2010-3-16
+			put any GADA segment whose amplitude is below the deletion_cutoff into db
 		"""
 		from pymodule import PassingData
 		if ecotype_id_set is not None:
@@ -8567,32 +8895,267 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		param_obj = PassingData(no_of_valid_deletions=0, session=db_250k.session, cnv_type_id=cnv_type_id, \
 							cnv_method_id=cnv_method_id, no_of_total=0, no_of_into_db=0, report=report)
 		cls.compareCNVSegmentsAgainstQCHandler(input_fname_ls, ecotype_id2cnv_qc_call_data=ecotype_id2cnv_qc_call_data, 
-											function_handler=cls.putOneCNVSegmentIntoDBFunctor, param_obj=param_obj, \
+											afterMatchFunction=cls.putOneCNVSegmentIntoDBFunctor, param_obj=param_obj, \
 											deletion_cutoff=deletion_cutoff, min_no_of_probes=min_no_of_probes, \
 											min_reciprocal_overlap=None, report=report, \
 											functor_after_span=None)
 		ratio = param_obj.no_of_into_db/float(param_obj.no_of_total)
 		sys.stderr.write("%s out of %s (%s) into db.\n"%(param_obj.no_of_into_db, param_obj.no_of_total, ratio))
+		db_250k.session.flush()
 		db_250k.session.commit()
 	
 	"""
-	2010-3-16
-	input_fname_ls = []
-	for i in range(1,6):
-		input_fname_ls.append(os.path.expanduser('~/mnt/panfs/250k/CNV/call_48_CNV_QNormalize_chr%s.GADA_A0.5T4M5.tsv'%i))
-	deletion_cutoff = 2.3
-	min_no_of_probes = 10
-	CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=set([6932, 6909, 8215, 6911, 6977, 6962]), cnv_type_id=1, cnv_method_id=6,\
-								deletion_cutoff=deletion_cutoff, \
-								min_no_of_probes=min_no_of_probes)
-	
-	
+		2010-3-16
+		input_fname_ls = []
+		for i in range(1,6):
+			input_fname_ls.append(os.path.expanduser('~/mnt/panfs/250k/CNV/call_48_CNV_QNormalize_chr%s.GADA_A0.5T4M5.tsv'%i))
+		
+		deletion_cutoff = 2.3
+		min_no_of_probes = 10
+		CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=set([6932, 6909, 8215, 6911, 6977, 6962]), cnv_type_id=1, cnv_method_id=6,\
+									deletion_cutoff=deletion_cutoff, \
+									min_no_of_probes=min_no_of_probes)
+		
+		# 2010-6-27
+		input_fname_ls = [os.path.expanduser('~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_98_arrays_GADA_A0.5T4.0M5.tsv')]
+		deletion_cutoff = -0.1
+		min_no_of_probes = 5
+		CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=None, cnv_type_id=1, cnv_method_id=6,\
+									deletion_cutoff=deletion_cutoff, \
+									min_no_of_probes=min_no_of_probes)
+		sys.exit(0)
+		
+		# 2010-6-28
+		input_fname_ls = [os.path.expanduser('~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_98_arrays_2Flanking_GADA_A0.5T8.0M5.tsv')]
+		deletion_cutoff = -0.1
+		min_no_of_probes = 5
+		cnv_method_id = 8
+		CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=set([6932]), cnv_type_id=1, cnv_method_id=cnv_method_id,\
+									deletion_cutoff=deletion_cutoff, \
+									min_no_of_probes=min_no_of_probes)
+		sys.exit(0)
+		
+		# 2010-7-16 for the TAIR9 "-z banyan.usc.edu"
+		input_fname_ls = [os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_TAIR9_4Flanking_GADA_A0.5T12.0M5.tsv')]
+		deletion_cutoff = -0.1
+		min_no_of_probes = 5
+		cnv_method_id = 7
+		CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=set([6932]), cnv_type_id=1, cnv_method_id=cnv_method_id,\
+									deletion_cutoff=deletion_cutoff, \
+									min_no_of_probes=min_no_of_probes)
+		sys.exit(0)
+		
+		# 2010-7-19 "-z papaya.usc.edu"
+		input_fname_ls = [os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_4Flanking_GADA_A0.5T12.0M5.tsv')]
+		deletion_cutoff = -0.1
+		min_no_of_probes = 5
+		cnv_method_id = 11
+		CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=set([6932]), cnv_type_id=1, cnv_method_id=cnv_method_id,\
+									deletion_cutoff=deletion_cutoff, \
+									min_no_of_probes=min_no_of_probes)
+		sys.exit(0)
+		
+		# 2010-7-16 for the TAIR9 "-z banyan.usc.edu"
+		ecotype_id_ls = CNV.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(data_source_id=13)
+		input_fname_ls = [os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_TAIR9_4Flanking_GADA_A0.5T12.0M5.tsv')]
+		deletion_cutoff = -0.09
+		min_no_of_probes = 5
+		cnv_method_id = 7
+		CNV.putCNVSegmentIntoDB(db_250k, input_fname_ls, ecotype_id_set=set(ecotype_id_ls), \
+							cnv_type_id=1, cnv_method_id=cnv_method_id,\
+							deletion_cutoff=deletion_cutoff, \
+							min_no_of_probes=min_no_of_probes)
+		sys.exit(0)
 	"""
 	
 	@classmethod
-	def getCNVQCDataFromDB(cls, data_source_id=1, ecotype_id=None, cnv_type_id=None, \
-								min_QC_segment_size=None, min_no_of_probes=None, min_reciprocal_overlap=0.6, cmpfn=cmp):
+	def getTAIR8ToTAIR9_in_chr_pos(cls, db_250k, probeType=2, debug=False):
 		"""
+		2010-8-3
+			return a map between tair8 and tair9
+		"""
+		sys.stderr.write("Getting TAIR8 to TAIR9 translation for probeType %s ...\n"%probeType)
+		tair8_chr_pos2tair9_chr_pos = {}
+		import Stock_250kDB
+		probes_table = Stock_250kDB.Probes.table.name
+		
+		sql_query = 'select id, snps_id, chromosome, position, tair8_chromosome, tair8_position from %s '%(probes_table)
+		where_sql_ls = []
+		order_by_sql = ""
+		if probeType==2 or probeType==4:
+			where_sql_ls.append("snps_id is null and chromosome is not null and direction is not null and Tair9Copy=1")
+			order_by_sql = "order by chromosome, position"
+			# 2010-5-5
+		elif probeType==1:	# SNP Probes
+			where_sql_ls.append("snps_id is not null")
+		elif probeType == 5:	# QC probes
+			where_sql_ls.append("snps_id is null and chromosome is null and position is null")
+		else:	#2010-5-5 get all probes
+			order_by_sql = "order by chromosome, position"
+		
+		if where_sql_ls:
+			where_sql = "where %s"%(' and '.join(where_sql_ls))
+		else:
+			where_sql = ""
+		
+		rows = db_250k.metadata.bind.execute("%s %s %s"%(sql_query, where_sql, order_by_sql))
+		
+		counter = 0
+		for row in rows:
+			probe_id = row.id
+			snps_id = row.snps_id
+			chromosome = row.chromosome
+			position = row.position
+			tair8_chr_pos = (row.tair8_chromosome, row.tair8_position)
+			tair9_chr_pos = (row.chromosome, row.position)
+			
+			tair8_chr_pos2tair9_chr_pos[tair8_chr_pos] = tair9_chr_pos
+			
+			counter += 1
+			if counter%5000==0:
+				sys.stderr.write('%s%s'%('\x08'*80, counter,))
+				if debug:
+					break
+		del rows
+		sys.stderr.write("\t %s probes. Done.\n"%(counter))
+		return tair8_chr_pos2tair9_chr_pos
+		
+		
+	@classmethod
+	def putSebastianCallIntoDB(cls, db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
+							cnv_method_id=22, cnv_type_id=1, debug=False):
+		"""
+		2010-8-3
+			File is space-separated matrix.
+			
+			first line is header for array-id.
+			2nd line and onwards look like:
+				analysis_renorm_r30_m10_P0.001_c1.0.txt:CNV 1 type 2 start 1034 position 76629 length 17 end position 78133 frequency 0.184 \
+				Carrier status: 0.00 0.00 0.00 0.00 0.00 0.14 0.00 0.00 0.00 0.00 0.00 0
+		"""
+		sys.stderr.write("Putting Sebastian calls into db ...\n")
+		
+		tair8_chr_pos2tair9_chr_pos = cls.getTAIR8ToTAIR9_in_chr_pos(db_250k, probeType=2, debug=debug)
+		
+		import csv, Stock_250kDB
+		input_fname_ls = os.listdir(input_dir)
+		import re
+		cnvPosPattern = re.compile(r'position (\d+) length (\d+) end position (\d+)')
+		session = db_250k.session
+		counter = 0
+		real_counter = 0
+		no_of_cnvs_skipped = 0
+		for input_fname in input_fname_ls:
+			if input_fname[-3:]=='txt':
+				chromosome = int(input_fname[8])	#'summary_4.txt'
+				sys.stderr.write('Chr %s ... \n'%chromosome)
+				input_fname = os.path.join(input_dir, input_fname)
+				inf = open(input_fname)
+				array_id_ls = inf.readline().strip().split()
+				array_id_ls = map(int, array_id_ls)
+				for line in inf:
+					counter  += 1
+					line = line.strip()
+					part_ls = line.split(':')	#split into 3 parts
+					cnvPosPattern_searchResult = cnvPosPattern.search(part_ls[1])
+					start = int(cnvPosPattern_searchResult.group(1))
+					#probe position is central
+					tair9_chr_start = tair8_chr_pos2tair9_chr_pos.get((chromosome, start))
+					if tair9_chr_start is None or tair9_chr_start[1] is None:	#skip if it's not found
+						no_of_cnvs_skipped += 1
+						continue
+					start = tair9_chr_start[1]-12
+					
+					no_of_probes = int(cnvPosPattern_searchResult.group(2))
+					stop = int(cnvPosPattern_searchResult.group(3))
+					tair9_chr_stop = tair8_chr_pos2tair9_chr_pos.get((chromosome,stop))
+					if tair9_chr_stop is None or tair9_chr_stop[1] is None:
+						no_of_cnvs_skipped += 1
+						continue
+					
+					stop = tair9_chr_stop[1] + 12
+					
+					probability_ls = part_ls[2].strip().split()
+					probability_ls = map(float, probability_ls)
+					
+					cnv = Stock_250kDB.CNV(chromosome=chromosome, start=start, \
+										stop=stop, no_of_probes_covered=no_of_probes, \
+										cnv_method_id=cnv_method_id, cnv_type_id=cnv_type_id)
+					session.add(cnv)
+					for i in xrange(len(array_id_ls)):
+						array_id = array_id_ls[i]
+						probability = probability_ls[i]
+						if probability>=minProbabilityToCallDeletion:
+							cnv_array_call = Stock_250kDB.CNVArrayCall(array_id=array_id, cnv_method_id=cnv_method_id,\
+														score=probability)
+							cnv_array_call.cnv = cnv
+							session.add(cnv_array_call)
+							real_counter += 1
+							if real_counter%10000==0:
+								session.flush()
+								session.expunge_all()
+					if counter%5000==0:
+						sys.stderr.write('%s%s\t%s\t%s'%('\x08'*80, counter, real_counter, no_of_cnvs_skipped))
+		sys.stderr.write('%s%s\t%s\t%s\n'%('\x08'*80, counter, real_counter, no_of_cnvs_skipped))
+		session.flush()
+		session.expunge_all()
+	
+	"""
+		#2010-8-3
+		input_dir = os.path.expanduser()
+		CNV.putSebastianCallIntoDB(db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
+							cnv_method_id=22, cnv_type_id=1)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def mergeTwoCNVQCSegments(cls, segment, next_segment):
+		"""
+		2010-7-19
+			called by getCNVQCDataFromDB()
+			
+			segment = (row.chromosome, row.start, row.stop, \
+					row.size_affected, row.no_of_probes_covered, row.copy_number, row.id, row.ecotype_id)
+		"""
+		new_segment_stop = max(segment[2], next_segment[2])
+		
+		# to get the no_of_probes_covered for the merged segment
+		if segment[4] is not None and next_segment[4] is not None:
+			overlapping_len = float(segment[2]-next_segment[1])	# it could be negative, which would end up increasing the no_of_probes_covered
+			import numpy
+			# estimate the number of probes in the overlapping region for each segment, take the average
+			no_of_probes_in_the_overlapping_of_s1 = int(round(segment[4]*overlapping_len/segment[3]))
+			no_of_probes_in_the_overlapping_of_s2 = int(round(next_segment[4]*overlapping_len/next_segment[3]))
+			no_of_probes_in_the_overlapping = numpy.mean([no_of_probes_in_the_overlapping_of_s1, no_of_probes_in_the_overlapping_of_s2])
+			no_of_probes_covered = segment[4] + next_segment[4] - no_of_probes_in_the_overlapping
+		else:
+			no_of_probes_covered = None
+		
+		new_segment = [segment[0], segment[1], new_segment_stop, new_segment_stop-segment[1]+1, no_of_probes_covered] + \
+					segment[5:]
+		return new_segment
+	
+	@classmethod
+	def getCNVQCDataFromDB(cls, db_250k=None, data_source_id=1, ecotype_id=None, cnv_type_id=None, \
+						min_QC_segment_size=None, min_no_of_probes=None, min_reciprocal_overlap=0.6, \
+						cmpfn=cmp, mergeOverlappingSegments=True, parseNumOfReadsFromComment=False, \
+						cnv_method_id=None, ecotype_id_ls=None):
+		"""
+		2010-8-4
+			fetch the accession-id & ecotype-id info in advance to avoid table-joining involving potentially
+				large-data operation (busting the disk space left by creating a huge temporary file in /tmp)
+		2010-7-22
+			add argument cnv_method_id, ecotype_id_ls to restrict QC
+				ecotype_id_ls will be used only if ecotype_id is None.
+		2010-7-21
+			add argument parseNumOfReadsFromComment.
+				If True, number of reads will be parsed out of CNVQCCall.comment and put into segment as score.
+		2010-7-19
+			add argument mergeOverlappingSegments.
+				If True, segments that are overlapping or next to each other will be merged before being put into RBDict.
+				
+		2010-6-27
+			add an overlooked argument db_250k, which was a global variable before.
 		2010-2-9
 			add argument cmpfn
 		2010-1-26
@@ -8605,52 +9168,138 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		"""
 		sys.stderr.write("Getting CNV QC data ... \n")
 		import Stock_250kDB
-		sql_string = "select a.ecotype_id, c.chromosome, c.start, c.stop, c.size_affected, c.no_of_probes_covered, c.copy_number, c.id from %s c,\
-						%s a where c.accession_id=a.id and a.data_source_id=%s"%\
-						(Stock_250kDB.CNVQCCall.table.name, Stock_250kDB.CNVQCAccession.table.name, data_source_id)
-						
+		
+		if ecotype_id is not None and not ecotype_id_ls:
+			ecotype_id_ls = [ecotype_id]
+		
+		accession_id_ls = cls.getAccessionIDLsFromCNVQCAccessionGivenEcotypeIDLs(db_250k, ecotype_id_ls, \
+									data_source_id=data_source_id)
+		accession_id2ecotype_id = cls.getAccessionID2EcotypeIDFromCNVQCAccessionGivenDataSourceID(db_250k, \
+									data_source_id=data_source_id)
+		
+		"""
+		sql_string = "select a.ecotype_id, c.chromosome, c.start, c.stop, c.size_affected, c.no_of_probes_covered, \
+				c.copy_number, c.id, c.score, c.comment from %s c,\
+				%s a where c.accession_id=a.id and a.data_source_id=%s \
+				and (c.chromosome=c.stop_chromosome or c.stop_chromosome is null)"%\
+				(Stock_250kDB.CNVQCCall.table.name, Stock_250kDB.CNVQCAccession.table.name, data_source_id)
+		"""
+		str_accession_id_ls = map(str, accession_id_ls)
+		sql_string = "select c.accession_id, c.chromosome, c.start, c.stop, c.size_affected, c.no_of_probes_covered, \
+				c.copy_number, c.id, c.score, c.comment from %s c where c.accession_id in (%s) \
+				and (c.chromosome=c.stop_chromosome or c.stop_chromosome is null)"%\
+				(Stock_250kDB.CNVQCCall.table.name, ','.join(str_accession_id_ls))
 		if cnv_type_id is not None:
 			sql_string += " and c.cnv_type_id=%s"%cnv_type_id
+		"""
 		if ecotype_id is not None:
 			sql_string += " and a.ecotype_id=%s"%ecotype_id
+		elif ecotype_id_ls:
+			str_ecotype_id_ls = map(str, ecotype_id_ls)
+			sql_string += " and a.ecotype_id in (%s)"%','.join(str_ecotype_id_ls)
+		"""
+		
 		if min_no_of_probes is not None:
 			sql_string += " and c.no_of_probes_covered>=%s"%min_no_of_probes
 		if min_QC_segment_size is not None:
-			sql_string += " and (c.stop-c.start)>=%s"%min_QC_segment_size
+			sql_string += " and (c.stop-c.start+1)>=%s"%min_QC_segment_size
+		if cnv_method_id is not None:
+			sql_string += " and c.cnv_method_id=%s"%cnv_method_id
 		
-		sql_string += " order by RAND()"	# 2010-1-26 random ordering to optimize the binary_tree, not needed for RBDict.
+		if mergeOverlappingSegments:	# 2010-7-19	#assume mapping from accession to ecotype_id is one-to-one mapping for one data source 
+			sql_string += " order by accession_id, chromosome, start, stop"
+		else:
+			sql_string += " order by RAND()"	# 2010-1-26 random ordering to optimize the binary_tree, not needed for RBDict.
 		
 		rows = db_250k.metadata.bind.execute(sql_string)
-		count = 0
+		counter = 0
 		ecotype_id2cnv_qc_call_data = {}
 		#from pymodule.BinarySearchTree import binary_tree	#2010-1-26 replace the list structure of cnv_qc_call_data \
 															# in ecotype_id2cnv_qc_call_data with binary_tree structure
 		from pymodule.RBTree import RBDict	# 2010-1-26 RBDict is more efficiency than binary_tree.
 		from pymodule.CNV import CNVSegmentBinarySearchTreeKey
-		for row in rows:
-			if row.ecotype_id not in ecotype_id2cnv_qc_call_data:
-				#ecotype_id2cnv_qc_call_data[row.ecotype_id] = binary_tree()
-				ecotype_id2cnv_qc_call_data[row.ecotype_id] = RBDict(cmpfn=cmpfn)
-			
-			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, span_ls=[row.start, row.stop], \
-													min_reciprocal_overlap=min_reciprocal_overlap)
-			ecotype_id2cnv_qc_call_data[row.ecotype_id][segmentKey] = (row.chromosome, row.start, row.stop, row.size_affected, row.no_of_probes_covered, row.copy_number, row.id)
-			
-			#cnv_qc_call_data = ecotype_id2cnv_qc_call_data[row.ecotype_id]
-			#cnv_qc_call_data.append((row.chromosome, row.start, row.stop, row.size_affected, row.no_of_probes_covered, row.copy_number, row.id))
-			count += 1
 		
+		# 2010-7-19
+		ecotype_id2segment_ls = {}
+		no_of_original_segments = 0
+		
+		# 2010-7-20 temporary. extract num_Reads out  of comment
+		import re
+		num_Reads_re = re.compile(r'num_Reads (\d+),')
+		
+		for row in rows:	#segments are sorted in chromosomal order
+			no_of_original_segments += 1
+			ecotype_id = accession_id2ecotype_id.get(row.accession_id)
+			if ecotype_id is None:	#2010-8-4 ignore acessions with no ecotype id
+				continue
+			if ecotype_id not in ecotype_id2segment_ls:
+				ecotype_id2segment_ls[ecotype_id] = []
+			
+			if parseNumOfReadsFromComment:
+				num_Reads_search_result = num_Reads_re.search(row.comment)
+				if num_Reads_search_result:
+					num_Reads = int(num_Reads_search_result.group(1))
+				else:
+					num_Reads = -1
+				score = num_Reads
+			else:
+				score = row.score
+			segment = [row.chromosome, row.start, row.stop, \
+					row.size_affected, row.no_of_probes_covered, row.copy_number, row.id, score, ecotype_id]
+			
+			segment_ls = ecotype_id2segment_ls.get(ecotype_id)
+			if len(segment_ls)>0:
+				previous_segment = segment_ls[-1]
+			else:
+				previous_segment = None
+			
+			if previous_segment is not None and mergeOverlappingSegments and previous_segment[0]==segment[0] and previous_segment[2]>=segment[1]-1:
+				previous_segment = cls.mergeTwoCNVQCSegments(previous_segment, segment)
+				segment_ls[-1] = previous_segment
+			else:
+				segment_ls.append(segment)
+			ecotype_id2segment_ls[ecotype_id] = segment_ls
+			if counter%5000==0:
+				sys.stderr.write('%s%s'%('\x08'*80, counter,))
+		sys.stderr.write('%s%s\n'%('\x08'*80, counter,))
+		
+		ecotype_id2data = {}
+		from pymodule import PassingData
+		counter = 0
+		for ecotype_id, segment_ls in ecotype_id2segment_ls.iteritems():
+			for segment in segment_ls:
+				ecotype_id = segment[-1]
+				chromosome, start, stop = segment[:3]
+				if ecotype_id not in ecotype_id2cnv_qc_call_data:
+					#ecotype_id2cnv_qc_call_data[row.ecotype_id] = binary_tree()
+					ecotype_id2cnv_qc_call_data[ecotype_id] = RBDict(cmpfn=cmpfn)
+					ecotype_id2data[ecotype_id] = PassingData(length=0, length_affected=0, no_of_segments=0)
+				ecotype_id2data[ecotype_id].length += abs(stop-start)+1
+				ecotype_id2data[ecotype_id].length_affected += segment[3]
+				ecotype_id2data[ecotype_id].no_of_segments += 1
+				
+				segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, span_ls=[start, stop], \
+														min_reciprocal_overlap=min_reciprocal_overlap)
+				ecotype_id2cnv_qc_call_data[ecotype_id][segmentKey] = segment
+				
+				#cnv_qc_call_data = ecotype_id2cnv_qc_call_data[row.ecotype_id]
+				#cnv_qc_call_data.append((row.chromosome, row.start, row.stop, row.size_affected, row.no_of_probes_covered, row.copy_number, row.id))
+				counter += 1
+				if counter%5000==0:
+					sys.stderr.write('%s%s'%('\x08'*80, counter,))
+		sys.stderr.write('%s%s\n'%('\x08'*80, counter,))
 		
 		import math
 		for ecotype_id, tree in ecotype_id2cnv_qc_call_data.iteritems():
 			print "\tDepth of Ecotype %s's tree: %d" % (ecotype_id, tree.depth())
 			print "\tOptimum Depth: %f (%d) (%f%% depth efficiency)" % (tree.optimumdepth(), math.ceil(tree.optimumdepth()),
-															  math.ceil(tree.optimumdepth()) / tree.depth())
+													math.ceil(tree.optimumdepth()) / tree.depth())
 			#cnv_qc_call_data.sort()
 			#ecotype_id2cnv_qc_call_data[ecotype_id] = cnv_qc_call_data
 		
-		sys.stderr.write("\t%s cnv qc calls for %s ecotypes. Done.\n"%(count, len(ecotype_id2cnv_qc_call_data)))
-		return ecotype_id2cnv_qc_call_data
+		sys.stderr.write("\t%s cnv qc calls out of %s segments for %s ecotypes. Done.\n"%\
+						(counter, no_of_original_segments, len(ecotype_id2cnv_qc_call_data)))
+		return PassingData(ecotype_id2cnv_qc_call_data=ecotype_id2cnv_qc_call_data, ecotype_id2data=ecotype_id2data)
 	
 	
 	@classmethod
@@ -8690,10 +9339,20 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	@classmethod
 	def countMatchedDeletionsFunctor(cls, param_obj, cnv_segment_obj=None, cnv_qc_call=None):
 		"""
+		used in countNoOfCNVDeletionsMatchQC() to be passed to compareCNVSegmentsAgainstQCHandler()
+		
 		2009-12-9
 			store qc data in param_obj.array_id2qc_data
 		2009-11-4
 			a functor to be called in 
+			
+			cnv_segment_obj = PassingData(ecotype_id=cnv_ecotype_id, start_probe=start_probe, stop_probe=stop_probe,\
+											no_of_probes=no_of_probes, amplitude=amplitude, segment_length=segment_length,\
+											segment_chromosome=segment_chromosome, array_id=array_id,\
+											start_probe_id=start_probe_id, stop_probe_id=stop_probe_id,\
+											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos)
+			cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=segment_chromosome, span_ls=[segment_start_pos, segment_stop_pos],\
+															min_reciprocal_overlap=min_reciprocal_overlap)
 		"""
 		from pymodule import PassingData
 		if not hasattr(param_obj, 'no_of_valid_deletions'):
@@ -8736,11 +9395,65 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			
 			param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes].cnv_qc_call_id_set.add(cnv_qc_call_id)
 			param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes].no_of_valid_deletions += 1
-	
+
+	@classmethod
+	def countDeletionsMatchedByNormalCoverage(cls, param_obj, cnv_segment_obj=None, **keywords):
+		"""
+		2010-6-17
+			similar to countMatchedDeletionsFunctor, but 
+			
+			used in countNoOfCNVDeletionsMatchQC() to be passed to compareCNVSegmentsAgainstQCHandler()
+			
+			
+			cnv_segment_obj = PassingData(ecotype_id=cnv_ecotype_id, start_probe=start_probe, stop_probe=stop_probe,\
+											no_of_probes=no_of_probes, amplitude=amplitude, segment_length=segment_length,\
+											segment_chromosome=segment_chromosome, array_id=array_id,\
+											start_probe_id=start_probe_id, stop_probe_id=stop_probe_id,\
+											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos)
+			cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=segment_chromosome, span_ls=[segment_start_pos, segment_stop_pos],\
+															min_reciprocal_overlap=min_reciprocal_overlap)
+		"""
+		isDeletionTrue = param_obj.isDeletionTrue
+		
+		from pymodule import PassingData
+		if not hasattr(param_obj, 'no_of_valid_deletions'):
+			setattr(param_obj, 'no_of_valid_deletions', 0)
+		if not hasattr(param_obj, "array_id2qc_data"):
+			param_obj.array_id2qc_data = {}
+		if not hasattr(param_obj, "array_id2no_of_probes2qc_data"):	# for FPR per no_of_probes
+			param_obj.array_id2no_of_probes2qc_data = {}
+		if not hasattr(param_obj, "array_id2qc_no_of_probes2qc_data"):	# for FNR per no_of_probes
+			param_obj.array_id2qc_no_of_probes2qc_data = {}
+		
+		array_id = cnv_segment_obj.array_id
+		no_of_probes = int(cnv_segment_obj.no_of_probes/float(cnv_segment_obj.segment_length/1000.))	#2010-6-17 number of probes per kb
+		if array_id not in param_obj.array_id2qc_data:
+			param_obj.array_id2qc_data[array_id] = PassingData(ecotype_id=cnv_segment_obj.ecotype_id, \
+															no_of_valid_deletions=0,\
+															no_of_deletions=0,\
+															cnv_qc_call_id_set=set())
+			param_obj.array_id2no_of_probes2qc_data[array_id] = {}
+			param_obj.array_id2qc_no_of_probes2qc_data[array_id] = {}
+		if no_of_probes not in param_obj.array_id2no_of_probes2qc_data[array_id]:
+			param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes] = PassingData(ecotype_id=cnv_segment_obj.ecotype_id, \
+															no_of_valid_deletions=0,\
+															no_of_deletions=0,\
+															cnv_qc_call_id_set=set())
+		# 2010-1-26 increase the no_of_deletions counter no matter whether there's a corresponding cnv_qc_call or not
+		param_obj.array_id2qc_data[array_id].no_of_deletions += 1
+		param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes].no_of_deletions += 1
+		if isDeletionTrue:
+			cnv_qc_call_id = len(param_obj.array_id2qc_data[array_id].cnv_qc_call_id_set)
+			param_obj.array_id2qc_data[array_id].cnv_qc_call_id_set.add(cnv_qc_call_id)
+			param_obj.array_id2qc_data[array_id].no_of_valid_deletions += 1
+			
+			param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes].cnv_qc_call_id_set.add(cnv_qc_call_id)
+			param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes].no_of_valid_deletions += 1
+			
 	@classmethod
 	def aggregateEnoughDataPoints(cls, no_of_data_points_ls=[], lists_to_be_summed=[], \
 								lists_to_be_sampled=[], lists_to_be_concatenated=[],\
-								min_no_of_data_points=10):
+								min_no_of_data_points=20):
 		"""
 		2010-2-9
 			Given a range of indices (aggregating_start_index:aggregating_stop_index) which amass enough data points,
@@ -8861,9 +9574,9 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			no_of_valid_deletions = qc_data.no_of_valid_deletions
 			no_of_deletions = qc_data.no_of_deletions
 			no_of_non_valid_deletions = no_of_deletions-no_of_valid_deletions
-			false_positive_rate = no_of_non_valid_deletions/float(no_of_deletions)
-			sys.stderr.write("Array %s false positive rate: %s/%s(%s).\n"%(array_id, \
-							no_of_non_valid_deletions, no_of_deletions, false_positive_rate))
+			FDR = no_of_non_valid_deletions/float(no_of_deletions)
+			sys.stderr.write("Array %s false discovery rate: %s/%s(%s).\n"%(array_id, \
+							no_of_non_valid_deletions, no_of_deletions, FDR))
 			if getattr(param_obj, 'array_id2no_of_probes2qc_data', None):
 				no_of_probes2qc_data = param_obj.array_id2no_of_probes2qc_data[array_id]
 				no_of_probes_ls = no_of_probes2qc_data.keys()
@@ -8877,29 +9590,41 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 					no_of_non_valid_deletions = no_of_deletions-no_of_valid_deletions
 					no_of_non_valid_deletions_ls.append(no_of_non_valid_deletions)
 					no_of_deletions_ls.append(no_of_deletions)
-					false_positive_rate = no_of_non_valid_deletions/float(no_of_deletions)
+					#false_positive_rate = no_of_non_valid_deletions/float(no_of_deletions)
 					
-					sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(no_of_probes, \
-									no_of_non_valid_deletions, no_of_deletions, false_positive_rate))
+					#sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(no_of_probes, \
+					#				no_of_non_valid_deletions, no_of_deletions, false_positive_rate))
 				
 				if getattr(param_obj, 'output_fname_prefix', None):
+					sys.stderr.write("Drawing the FDR plot ...")
 					output_fname = '%s_array_%s_FPR.png'%(param_obj.output_fname_prefix, array_id)
 					aggregateReturnData = cls.aggregateEnoughDataPoints(no_of_deletions_ls, \
-																	[no_of_non_valid_deletions_ls], \
-																	[no_of_probes_ls])
+									[no_of_non_valid_deletions_ls], [no_of_probes_ls],\
+									min_no_of_data_points=getattr(param_obj, 'min_no_of_data_points', 30))
 					
 					new_no_of_deletions_ls = aggregateReturnData.no_of_data_points_ls
 					new_no_of_non_valid_deletions_ls = aggregateReturnData.lists_to_be_summed[0]
 					new_no_of_probes_ls = aggregateReturnData.lists_to_be_sampled[0]
-					divide_functor = lambda x: x[1]/float(x[0])
-					FPR_ls = map(divide_functor, zip(new_no_of_deletions_ls, new_no_of_non_valid_deletions_ls))
+					divide_functor = lambda x: x[0]/float(x[1])
+					FPR_ls = map(divide_functor, zip(new_no_of_non_valid_deletions_ls, new_no_of_deletions_ls))
 					import pylab
 					pylab.clf()
 					pylab.plot(new_no_of_probes_ls, FPR_ls, '.')
-					pylab.title('array %s'%array_id)
-					pylab.xlabel('No of Probes')
-					pylab.ylabel('FPR')
+					# make a title for the figure
+					array_id2label = getattr(param_obj, 'array_id2label', None)
+					if array_id2label:
+						title = array_id2label.get(array_id)
+						title += ' FDR %.3f %s objs.'%(FDR, sum(no_of_deletions_ls))
+					else:
+						title = None
+					if not title:
+						title = 'array %s'%array_id
+					
+					pylab.title(title, size='small')
+					pylab.xlabel(getattr(param_obj, 'xlabel', 'No of Probes'))
+					pylab.ylabel(getattr(param_obj, 'ylabel', 'FDR'))
 					pylab.savefig(output_fname, dpi=300)
+					sys.stderr.write("Done.\n")
 	
 	@classmethod
 	def outputCNVSegmentObj(cls, cnv_segment_obj, param_obj):
@@ -8931,13 +9656,159 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		cnv_segment_output_writer.writerow(new_row)
 	
 	@classmethod
+	def isDeletionTrueBasedOnOtherDeletionData(cls, cnv_segment_obj, param_obj):
+		"""
+		2010-6-17
+			be used in countNoOfCNVDeletionsMatchQC() to pass it to compareCNVSegmentsAgainstQCHandler()
+		
+			cnv_segment_obj = PassingData(ecotype_id=cnv_ecotype_id, start_probe=start_probe, stop_probe=stop_probe,\
+											no_of_probes=no_of_probes, amplitude=amplitude, segment_length=segment_length,\
+											segment_chromosome=segment_chromosome, array_id=array_id,\
+											start_probe_id=start_probe_id, stop_probe_id=stop_probe_id,\
+											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos)
+			cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=segment_chromosome, span_ls=[segment_start_pos, segment_stop_pos],\
+															min_reciprocal_overlap=min_reciprocal_overlap)
+		"""
+		from pymodule import PassingData
+		ecotype_id = cnv_segment_obj.ecotype_id
+		cnvSegmentKey = param_obj.cnvSegmentKey
+		ecotype_id2cnv_qc_call_data = getattr(param_obj, "ecotype_id2cnv_qc_call_data", None)
+		
+		if ecotype_id2cnv_qc_call_data is not None and ecotype_id in ecotype_id2cnv_qc_call_data:
+			cnv_qc_call_data = ecotype_id2cnv_qc_call_data.get(ecotype_id)
+			if cnv_qc_call_data:
+				cnv_qc_call = cnv_qc_call_data.get(cnvSegmentKey)
+			else:
+				cnv_qc_call = None
+			if cnv_qc_call:
+				return PassingData(isDeletionTrue=True, cnv_qc_call=cnv_qc_call)
+			else:
+				return PassingData(isDeletionTrue=False, cnv_qc_call=None)
+		elif ecotype_id2cnv_qc_call_data is None:
+			return PassingData(isDeletionTrue=False, cnv_qc_call=None)
+	
+	@classmethod
+	def isDeletionTrueBasedOnNormalCoverage(cls, cnv_segment_obj=None, param_obj=None, ecotype_id=None):
+		"""
+		2010-6-27
+			add argument ecotype_id to be invoked in updateCNVCallPercUnCoveredByLerContig()
+		2010-6-17
+			be used in countNoOfCNVDeletionsMatchQC() to pass it to compareCNVSegmentsAgainstQCHandler()
+		
+			cnv_segment_obj = PassingData(ecotype_id=cnv_ecotype_id, start_probe=start_probe, stop_probe=stop_probe,\
+											no_of_probes=no_of_probes, amplitude=amplitude, segment_length=segment_length,\
+											segment_chromosome=segment_chromosome, array_id=array_id,\
+											start_probe_id=start_probe_id, stop_probe_id=stop_probe_id,\
+											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos)
+			cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=segment_chromosome, span_ls=[segment_start_pos, segment_stop_pos],\
+															min_reciprocal_overlap=min_reciprocal_overlap)
+		"""
+		#cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=cnv_segment_obj.segment_chromosome, \
+		#									span_ls=[cnv_segment_obj.segment_start_pos, cnv_segment_obj.segment_stop_pos],\
+		#									min_reciprocal_overlap=param_obj.min_reciprocal_overlap)
+		from pymodule import PassingData
+		cnvSegmentKey = param_obj.cnvSegmentKey
+		ecotype_id2normal_data = param_obj.ecotype_id2normal_data
+		maxNormalPercInDeletion = param_obj.maxNormalPercInDeletion
+		
+		if ecotype_id is not None:
+			ecotype_id = ecotype_id
+		elif cnv_segment_obj is not None:
+			ecotype_id = getattr(cnv_segment_obj, 'ecotype_id', None)
+		
+		if ecotype_id is None:
+			return None
+		normal_data_RBDict = ecotype_id2normal_data.get(ecotype_id)
+		node_ls = []
+		normal_data_RBDict.findNodes(cnvSegmentKey, node_ls)
+		
+		from pymodule.CNV import get_overlap_ratio
+		normalPerc = 0.0
+		overlap_ratio_ls = []
+		for node in node_ls:
+			key = node.key
+			overlap1, overlap2 = get_overlap_ratio(cnvSegmentKey.span_ls, key.span_ls)[:2]
+			normalPerc += overlap1
+			overlap_ratio_ls.append((overlap1, overlap2))
+		
+		if normalPerc<=maxNormalPercInDeletion:
+			return PassingData(isDeletionTrue=True, normalPerc=normalPerc, overlap_ratio_ls=overlap_ratio_ls)
+		else:
+			return PassingData(isDeletionTrue=False, normalPerc=normalPerc, overlap_ratio_ls=overlap_ratio_ls)
+		
+	
+	@classmethod
+	def isDeletionTrueBasedOnDeletedFraction(cls, cnv_segment_obj=None, param_obj=None, ecotype_id=None):
+		"""
+		2010-7-20
+			opposite of isDeletionTrueBasedOnNormalCoverage()
+		
+			cnv_segment_obj = PassingData(ecotype_id=cnv_ecotype_id, start_probe=start_probe, stop_probe=stop_probe,\
+											no_of_probes=no_of_probes, amplitude=amplitude, segment_length=segment_length,\
+											segment_chromosome=segment_chromosome, array_id=array_id,\
+											start_probe_id=start_probe_id, stop_probe_id=stop_probe_id,\
+											segment_start_pos=segment_start_pos, segment_stop_pos=segment_stop_pos)
+			cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=segment_chromosome, span_ls=[segment_start_pos, segment_stop_pos],\
+															min_reciprocal_overlap=min_reciprocal_overlap)
+		"""
+		#cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=cnv_segment_obj.segment_chromosome, \
+		#									span_ls=[cnv_segment_obj.segment_start_pos, cnv_segment_obj.segment_stop_pos],\
+		#									min_reciprocal_overlap=param_obj.min_reciprocal_overlap)
+		from pymodule import PassingData
+		cnvSegmentKey = param_obj.cnvSegmentKey
+		ecotype_id2qc_data = param_obj.ecotype_id2qc_data
+		minDeletedFraction = param_obj.minDeletedFraction
+		
+		if ecotype_id is not None:
+			ecotype_id = ecotype_id
+		elif cnv_segment_obj is not None:
+			ecotype_id = getattr(cnv_segment_obj, 'ecotype_id', None)
+		
+		if ecotype_id is None:
+			return None
+		qc_data_RBDict = ecotype_id2qc_data.get(ecotype_id)
+		node_ls = []
+		qc_data_RBDict.findNodes(cnvSegmentKey, node_ls)
+		
+		from pymodule.CNV import get_overlap_ratio
+		deletedFraction = 0.0
+		overlap_ratio_ls = []
+		for node in node_ls:
+			key = node.key
+			overlap1, overlap2 = get_overlap_ratio(cnvSegmentKey.span_ls, key.span_ls)[:2]
+			deletedFraction += overlap1
+			overlap_ratio_ls.append((overlap1, overlap2))
+		
+		if deletedFraction>=minDeletedFraction:
+			return PassingData(isDeletionTrue=True, deletedFraction=deletedFraction, overlap_ratio_ls=overlap_ratio_ls)
+		else:
+			return PassingData(isDeletionTrue=False, deletedFraction=deletedFraction, overlap_ratio_ls=overlap_ratio_ls)
+		
+	
+	@classmethod
 	def countNoOfCNVDeletionsMatchQC(cls, db_250k, input_fname_ls, output_fname_prefix=None, ecotype_id=6909, \
 								data_source_id=3, cnv_type_id=1, \
 								min_QC_segment_size=200, deletion_cutoff=-0.33, max_boundary_diff=10000, \
 								max_diff_perc=0.10, min_no_of_probes=5,\
-								count_embedded_segment_as_match=True, min_reciprocal_overlap=0.6, \
-								outputDeletionWithinSpan=False):
+								count_embedded_segment_as_match=True, min_reciprocal_overlap=0.0000001,\
+								maxNormalPercInDeletion=0.4,\
+								outputDeletionWithinSpan=False, judgeTrueDeletionFunctor=None, afterMatchFunction=None):
 		"""
+		2010-6-17
+			add argument maxNormalPercInDeletion
+				judgeTrueDeletionFunctor
+					options:
+						isDeletionTrueBasedOnNormalCoverage()
+						isDeletionTrueBasedOnOtherDeletionData()
+					default is cls.isDeletionTrueBasedOnNormalCoverage
+				afterMatchFunction:
+					options:
+						countDeletionsMatchedByNormalCoverage()
+						countMatchedDeletionsFunctor()
+			
+			Argument min_reciprocal_overlap is no longer used to check whether one CNV deletion matches the QC deletion.
+				Now it's used to check if any normal data from ecotype_id2normal_data has any overlapping with a CNV deletion.
+				So it's just barely above zero.
 		2010-2-10
 			add argument outputDeletionWithinSpan, output_fname_prefix
 		2010-1-26
@@ -8948,47 +9819,81 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		2009-10-29
 			for all CNV deletions, check how many are in QC dataset.
 		"""
-		ecotype_id2cnv_qc_call_data = cls.getCNVQCDataFromDB(data_source_id, ecotype_id, cnv_type_id=cnv_type_id, \
-									min_QC_segment_size=min_QC_segment_size, \
-									min_no_of_probes=min_no_of_probes,\
-									min_reciprocal_overlap=min_reciprocal_overlap)
-		#ecotype_id2span_data = cls.getLerContigSpanDataFromDB(data_source_id=11, ecotype_id=ecotype_id, \
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp, rightWithinLeftAlsoEqualCmp
+		
+		#ecotype_id2cnv_qc_call_data = cls.getCNVQCDataFromDB(data_source_id, ecotype_id, cnv_type_id=cnv_type_id, \
+		#							min_QC_segment_size=min_QC_segment_size, \
+		#							min_no_of_probes=min_no_of_probes,\
+		#							min_reciprocal_overlap=min_reciprocal_overlap)
+		ecotype_id2cnv_qc_call_data = None
+		
+		"""
+		2010-4
+		#ecotype_id2span_data = cls.getLerContigSpanDataFromDB(db_250k, data_source_id=11, ecotype_id=ecotype_id, \
 		#													min_QC_segment_size=min_QC_segment_size, min_no_of_probes=min_no_of_probes, \
 		#													min_reciprocal_overlap=min_reciprocal_overlap)	# 2010-1-28 special data_source_id 11
+		"""
 		
-		# 2010-6-8 new span data from CNV.LerContig.discoverLerDeletionDuplication()
-		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp
-		ecotype_id2span_data = cls.getCNVQCDataFromDB(data_source_id=11, ecotype_id=ecotype_id, cnv_type_id=6, \
-													min_QC_segment_size=None, min_no_of_probes=5,\
-													min_reciprocal_overlap=0.8, cmpfn=leftWithinRightAlsoEqualCmp)
+		"""
+		2010-6-8 new span data from CNV.LerContig.discoverLerDeletionDuplication()
+		"""
+		#ecotype_id2span_data = cls.getCNVQCDataFromDB(data_source_id=11, ecotype_id=ecotype_id, cnv_type_id=6, \
+		#											min_QC_segment_size=None, min_no_of_probes=5,\
+		#											min_reciprocal_overlap=0.8, cmpfn=leftWithinRightAlsoEqualCmp)
 						# 2010-6-8 special data_source_id 11, set min_reciprocal_overlap to 0.8 ().
 						# leftWithinRightAlsoEqualCmp is key to judge whether a segment is in a span or not
-		for ecotype_id, cnv_qc_call_data in ecotype_id2cnv_qc_call_data.iteritems():
-			if ecotype_id in ecotype_id2span_data:
-				span_data = ecotype_id2span_data.get(ecotype_id)
-				sys.stderr.write("Ecotype %s\n"%ecotype_id)
-				cls.checkOverlapOfTwoCNVSegmentRBTree(cnv_qc_call_data, span_data)
+		ecotype_id2span_data=None
+		
+		"""2010-6-17
+			This data_source_id 15 is nucmer, maxmatch coords results. Overlapping fragments have all been merged.
+			min_reciprocal_overlap=0.0001 because if there's any overlapping between CNV segment and stored nodes,
+				that node should be returned.
+			ecotype_id2normal_data is used to disqaulify a CNV deletion if it has too many normal data within.
+		"""
+		cnvQCData = cls.getCNVQCDataFromDB(db_250k, data_source_id=15, ecotype_id=ecotype_id, cnv_type_id=None, \
+													min_QC_segment_size=None, min_no_of_probes=None,\
+													min_reciprocal_overlap=min_reciprocal_overlap, \
+													cmpfn=rightWithinLeftAlsoEqualCmp)
+		ecotype_id2normal_data = cnvQCData.ecotype_id2cnv_qc_call_data
+		
+		if ecotype_id2cnv_qc_call_data and ecotype_id2span_data:
+			for ecotype_id, cnv_qc_call_data in ecotype_id2cnv_qc_call_data.iteritems():
+				if ecotype_id in ecotype_id2span_data:
+					span_data = ecotype_id2span_data.get(ecotype_id)
+					sys.stderr.write("Ecotype %s\n"%ecotype_id)
+					cls.checkOverlapOfTwoCNVSegmentRBTree(cnv_qc_call_data, span_data)
 				
 		from pymodule import PassingData
-		output_fname_tag = 'ecotype_%s_data_source_%s_min_QC_segment_size_%s_deletion_cutoff_%s_min_no_of_probes_%s_min_reciprocal_overlap_%s'%\
-			(ecotype_id, data_source_id, min_QC_segment_size, deletion_cutoff, min_no_of_probes, min_reciprocal_overlap)
+		output_fname_tag = 'ecotype_%s_data_source_%s_deletion_cutoff_%s_min_no_of_probes_%s_min_reciprocal_overlap_%s_maxNormalPercInDeletion%s'%\
+			(ecotype_id, data_source_id, deletion_cutoff, min_no_of_probes, min_reciprocal_overlap, maxNormalPercInDeletion)
 		param_obj = PassingData(no_of_valid_deletions=0, cnv_qc_call_id_set=set(), array_id2qc_data={}, \
-							ecotype_id2span_data = ecotype_id2span_data, \
-							cnv_segment_output_fname_prefix = output_fname_prefix+'deletions_within_span_%s'%output_fname_tag)
+							ecotype_id2span_data = ecotype_id2span_data, ecotype_id2normal_data=ecotype_id2normal_data, \
+							cnv_segment_output_fname_prefix = output_fname_prefix+'deletions_within_span_%s'%output_fname_tag,\
+							maxNormalPercInDeletion=maxNormalPercInDeletion, min_reciprocal_overlap=min_reciprocal_overlap,\
+							minDeletedFraction=1-maxNormalPercInDeletion)
 		if outputDeletionWithinSpan:
 			functor_after_span = cls.outputCNVSegmentObj
 		else:
 			functor_after_span = None
-		cls.compareCNVSegmentsAgainstQCHandler(input_fname_ls, ecotype_id2cnv_qc_call_data, cls.countMatchedDeletionsFunctor, param_obj, \
-											deletion_cutoff, max_boundary_diff, max_diff_perc, min_no_of_probes, \
-											count_embedded_segment_as_match=count_embedded_segment_as_match, \
-											min_reciprocal_overlap=min_reciprocal_overlap, report=False, \
-											functor_after_span=functor_after_span)
-		sys.stderr.write("For ecotype_id %s, data_source_id %s, min_QC_segment_size %s, deletion_cutoff: %s, min_no_of_probes: %s, min_reciprocal_overlap: %s.\n"%\
-						(ecotype_id, \
-						data_source_id, min_QC_segment_size, deletion_cutoff, min_no_of_probes, min_reciprocal_overlap))
+		if judgeTrueDeletionFunctor is None:
+			judgeTrueDeletionFunctor=cls.isDeletionTrueBasedOnNormalCoverage
+		
+		cls.compareCNVSegmentsAgainstQCHandler(input_fname_ls, ecotype_id2cnv_qc_call_data=ecotype_id2normal_data, \
+						param_obj=param_obj, \
+						deletion_cutoff=deletion_cutoff, max_boundary_diff=max_boundary_diff, \
+						max_diff_perc=max_diff_perc, min_no_of_probes=min_no_of_probes, \
+						afterMatchFunction=afterMatchFunction,\
+						count_embedded_segment_as_match=count_embedded_segment_as_match, \
+						min_reciprocal_overlap=min_reciprocal_overlap, report=False, \
+						functor_after_span=functor_after_span,\
+						judgeTrueDeletionFunctor=judgeTrueDeletionFunctor)
+		sys.stderr.write("For ecotype_id %s, data_source_id %s, min_QC_segment_size %s, deletion_cutoff: %s, \n\
+						min_no_of_probes: %s, min_reciprocal_overlap: %s, maxNormalPercInDeletion %s.\n"%\
+						(ecotype_id, data_source_id, min_QC_segment_size, deletion_cutoff, \
+						min_no_of_probes, min_reciprocal_overlap, maxNormalPercInDeletion))
 		param_obj.ecotype_id2cnv_qc_call_data = ecotype_id2cnv_qc_call_data
 		
+		"""
 		param_obj.ecotype_id2qc_no_of_probes2cnv_qc_call_id_set = {}
 		for ecotype_id, cnv_qc_call_data in ecotype_id2cnv_qc_call_data.iteritems():
 			qc_no_of_probes2cnv_qc_call_id_set = {}
@@ -8999,10 +9904,11 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 					qc_no_of_probes2cnv_qc_call_id_set[no_of_probes_covered] = set()
 				qc_no_of_probes2cnv_qc_call_id_set[no_of_probes_covered].add(cnv_qc_call_id)
 			param_obj.ecotype_id2qc_no_of_probes2cnv_qc_call_id_set[ecotype_id] = qc_no_of_probes2cnv_qc_call_id_set
+		"""
 		
 		param_obj.output_fname_prefix = output_fname_prefix+output_fname_tag
 		cls.outputFalsePositiveRate(param_obj)
-		cls.outputFalseNegativeRate(param_obj)
+		#cls.outputFalseNegativeRate(param_obj)
 		
 		
 	"""
@@ -9077,8 +9983,1413 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 										min_no_of_probes=min_no_of_probes,\
 										count_embedded_segment_as_match=count_embedded_segment_as_match,\
 										min_reciprocal_overlap=min_reciprocal_overlap, outputDeletionWithinSpan=True)
+	
+		#input_fname_ls = []
+		#for i in range(1,6):
+		#	input_fname_ls.append(os.path.expanduser('~/mnt/panfs/250k/CNV/call_method_48_CNV_intensity_QNorm_sub_ref_chr%s.GADA_A0.5T4M5.tsv'%i))
+		#input_fname_ls = [os.path.expanduser('~/mnt/panfs/250k/CNV/call_method_48_CNV_intensity_QNorm_sub_ref_chr1.GADA_A0.5T4M5.tsv')]
+		#input_fname_ls = []
+		#for i in range(1,6):
+		#	input_fname_ls.append(os.path.expanduser('~/mnt2/panfs//250k/CNV/GADA_output/call_method_48_CNV_intensity_QNorm_sub_ref_chr%s_A2.0T8.0M5.tsv'%i))
+		# 2010-6-25 use CNV.isDeletionTrueBasedOnNormalCoverage() and CNV.countDeletionsMatchedByNormalCoverage()
+		common_prefix = '~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_98_arrays_GADA2_A0.5T4.0M5'
+		input_fname = os.path.expanduser('%s.tsv'%common_prefix)
+		input_fname_ls = [input_fname]
+		ecotype_id_data_source_id_ls = [(6932, 13)]	# use LerDeletionInOnly1Contig
+		min_QC_segment_size = None
+		min_no_of_probes = 5
+		count_embedded_segment_as_match = True
+		maxNormalPercInDeletion=0.4
+		min_reciprocal_overlap = 0.000000001
+		output_fname_prefix=os.path.expanduser('~/tmp/LerContig/%s_NoOfProbesPKB_'%(os.path.basename(common_prefix)))
+		for ecotype_id, data_source_id in ecotype_id_data_source_id_ls:
+			for deletion_cutoff in [-0.33, -0.5]:
+				for maxNormalPercInDeletion in [0.2, 0.4, 0.6]:	#, 0.8]:
+					CNV.countNoOfCNVDeletionsMatchQC(db_250k, input_fname_ls, \
+							output_fname_prefix=output_fname_prefix,\
+							ecotype_id=ecotype_id, data_source_id=data_source_id, \
+							cnv_type_id=1,\
+							min_QC_segment_size=min_QC_segment_size, deletion_cutoff=deletion_cutoff, \
+							min_no_of_probes=min_no_of_probes,\
+							count_embedded_segment_as_match=count_embedded_segment_as_match,\
+							min_reciprocal_overlap=min_reciprocal_overlap, outputDeletionWithinSpan=True,\
+							maxNormalPercInDeletion=maxNormalPercInDeletion,\
+							judgeTrueDeletionFunctor=CNV.isDeletionTrueBasedOnNormalCoverage,\
+							afterMatchFunction=CNV.countDeletionsMatchedByNormalCoverage)
+		sys.exit(0)
 	"""
 	
+	@classmethod
+	def updateCNVCallPercUnCoveredByLerContig(cls, db_250k, ecotype_id=6932, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=None, run_type=1,\
+								ecotype_id_ls=None):
+		"""
+		2010-7-31
+			run_type:
+				1. update CNVCall.percUnCoveredByLerContig
+				2. update CNVCall.fractionDeletedInPECoverageData
+				3. update CNV.fractionNotCoveredByLyrata
+					ecotype_id has to be -1
+				4. update CNVArrayCall.fractionDeletedInPECoverageData
+		2010-7-28
+			rename cnv_type_id to qc_cnv_type_id
+			
+		2010-7-23
+			add argument qc_cnv_method_id (to restrict CNVQCCall)
+			add run_type
+		2010-7-13
+			add argument cnv_method_id to filter input.
+				update CNVCall.percUnCoveredByLerContig only for the specified cnv_method_id
+		2010-6-27
+			update CNVCall.percUnCoveredByLerContig in db
+		"""
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp, rightWithinLeftAlsoEqualCmp
+		
+		"""2010-6-17
+			This data_source_id 15 is nucmer, maxmatch coords results. Overlapping fragments have all been merged.
+			min_reciprocal_overlap=0.0001 because if there's any overlapping between CNV segment and stored nodes,
+				that node should be returned.
+			ecotype_id2normal_data is used to disqaulify a CNV deletion if it has too many normal data within.
+		"""
+		cnvQCData = cls.getCNVQCDataFromDB(db_250k, data_source_id=qc_data_source_id, ecotype_id=ecotype_id, \
+												cnv_type_id=qc_cnv_type_id, cnv_method_id=qc_cnv_method_id,\
+												min_QC_segment_size=None, min_no_of_probes=None,\
+												min_reciprocal_overlap=min_reciprocal_overlap, \
+												cmpfn=rightWithinLeftAlsoEqualCmp)
+		ecotype_id2normal_data = cnvQCData.ecotype_id2cnv_qc_call_data
+		
+		from pymodule import PassingData
+		param_obj = PassingData(no_of_valid_deletions=0, cnv_qc_call_id_set=set(), array_id2qc_data={}, \
+							ecotype_id2normal_data=ecotype_id2normal_data, ecotype_id2qc_data=ecotype_id2normal_data, \
+							maxNormalPercInDeletion=0.5, min_reciprocal_overlap=min_reciprocal_overlap,\
+							minDeletedFraction=0.6)
+		# maxNormalPercInDeletion=0.5 is a random number. CNV.isDeletionTrueBasedOnNormalCoverage() needs it.
+		# minDeletedFraction is just a place holder because CNV.isDeletionTrueBasedOnDeletedFraction() needs it.
+		sys.stderr.write("Updating CNVCall.percUnCoveredByLerContig (or sth similar ) for method %s ecotype %s ... \n"%\
+						(cnv_method_id, ecotype_id))
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		import Stock_250kDB
+		if run_type==1 or run_type==2:
+			TableClass = Stock_250kDB.CNVCall
+		elif run_type==3:
+			TableClass = Stock_250kDB.CNV
+		elif run_type==4:
+			TableClass = Stock_250kDB.CNVArrayCall
+		else:
+			sys.stderr.write("run_type %s not  supported yet.\n"%run_type)
+			return
+		query = TableClass.query
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if ecotype_id is not None and run_type!=3:
+			query = query.filter(TableClass.array.has(maternal_ecotype_id=ecotype_id))
+		elif ecotype_id_ls and run_type!=3:
+			query = query.filter(TableClass.array.has(Stock_250kDB.ArrayInfo.maternal_ecotype_id.in_(ecotype_id_ls)))
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		while rows.count()!=0:
+			for row in rows:
+				if run_type==3:
+					ecotype_id = -1	#fake the ID to be same as lyrata's ecotype_id
+				else:
+					ecotype_id = row.array.maternal_ecotype_id
+				if ecotype_id in ecotype_id2normal_data:
+					if run_type==4:
+						dbObjWithChr = row.cnv
+					else:
+						dbObjWithChr = row
+					cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=dbObjWithChr.chromosome, \
+												span_ls=[dbObjWithChr.start, dbObjWithChr.stop],\
+												min_reciprocal_overlap=min_reciprocal_overlap)
+					param_obj.cnvSegmentKey = cnvSegmentKey
+					if run_type==1:
+						judgeData = cls.isDeletionTrueBasedOnNormalCoverage(param_obj=param_obj, ecotype_id=ecotype_id)
+					elif run_type==2 or run_type==4:
+						judgeData = cls.isDeletionTrueBasedOnDeletedFraction(param_obj=param_obj, ecotype_id=ecotype_id)
+					elif run_type==3:
+						judgeData = cls.isDeletionTrueBasedOnNormalCoverage(param_obj=param_obj, ecotype_id=ecotype_id)
+					if judgeData:
+						if run_type==1:
+							percUnCoveredByLerContig = 1-judgeData.normalPerc
+							if row.percUnCoveredByLerContig != percUnCoveredByLerContig:
+								row.percUnCoveredByLerContig = percUnCoveredByLerContig
+								session.add(row)
+								real_counter += 1
+						elif run_type==2 or run_type==4:
+							if row.fractionDeletedInPECoverageData != judgeData.deletedFraction:
+								row.fractionDeletedInPECoverageData = judgeData.deletedFraction
+								session.add(row)
+								real_counter += 1
+						elif run_type==3:
+							fractionNotCoveredByLyrata = 1 - judgeData.normalPerc
+							if row.fractionNotCoveredByLyrata != fractionNotCoveredByLyrata:
+								row.fractionNotCoveredByLyrata = fractionNotCoveredByLyrata
+								session.add(row)
+								real_counter += 1
+						
+				i += 1
+			if real_counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+				session.flush()
+				#session.expunge_all()
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
+		session.flush()
+		try:
+			session.commit()
+		except:
+			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+			import traceback
+			traceback.print_exc()
+		
+	"""
+		# 2010-6-28 update everything in CNVCall
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=6932, \
+								qc_data_source_id=15, \
+								min_reciprocal_overlap=0.0000001)
+		sys.exit(0)
+		
+		#2010-7-12 update only CNVCall whose cnv_method_id is 10
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=6932, \
+								qc_data_source_id=15, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=10)
+		sys.exit(0)
+		
+		#2010-7-19 update only CNVCall from specific cnv_method_id
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=6932, \
+								qc_data_source_id=15, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=12)
+		sys.exit(0)
+		
+		#2010-7-16 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=6932, \
+								qc_data_source_id=14, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=8)
+		sys.exit(0)
+		
+		#2010-7-23 for the TAIR9 "-z banyan.usc.edu". ecotype_id=None would exhaust hard disk storage in /tmp/ due to multiple joins.
+		# Run CNV.updateCNVCallFractionDeletedInPECoverageData() instead.
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=7, run_type=2)
+		sys.exit(0)
+		
+		#2010-7-28 update CNVCall.percUnCoveredByLerContig for the TAIR9 "-z banyan.usc.edu", cnv_method_id 11
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=6932, \
+								qc_data_source_id=14, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=11)
+		sys.exit(0)
+		
+		#2010-7-31 update CNV.fractionNotCoveredByLyrata for the TAIR9 "-z banyan.usc.edu", cnv_method_id 18
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=-1, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=18, run_type=3)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def updateCNVFractionNotCoveredByLyrata(cls, db_250k, ecotype_id=-1, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=None, \
+								ecotype_id_ls=None):
+		"""
+		2010-8-2
+			call CNV.updateCNVCallPercUnCoveredByLerContig() with run_type=3
+		"""
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=-1, \
+								qc_data_source_id=qc_data_source_id, qc_cnv_method_id=qc_cnv_method_id,\
+								qc_cnv_type_id=None, \
+								min_reciprocal_overlap=min_reciprocal_overlap, cnv_method_id=cnv_method_id,\
+								run_type=3)
+	"""
+		#2010-8-3
+		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=18)
+		sys.exit(0)
+	"""
+		
+	@classmethod
+	def updateCNVCallFractionDeletedInPECoverageData(cls, db_250k, ecotype_id=6932, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=None):
+		"""
+		2010-7-13
+			add argument cnv_method_id to filter input.
+				update CNVCall.percUnCoveredByLerContig only for the specified cnv_method_id
+		2010-6-27
+			update CNVCall.percUnCoveredByLerContig in db
+		"""
+		if ecotype_id is not None:
+			ecotype_id_ls = [ecotype_id]
+		else:
+			ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		for ecotype_id in ecotype_id_ls:
+			#2010-7-23 for the TAIR9 "-z banyan.usc.edu"
+			CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=ecotype_id, \
+								qc_data_source_id=qc_data_source_id, qc_cnv_method_id=qc_cnv_method_id,\
+								qc_cnv_type_id=qc_cnv_type_id, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id, run_type=2)
+	"""
+		#2010-7-23 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=7)
+		sys.exit(0)
+		
+		#2010-7-23 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=7)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def updateCNVArrayCallFractionDeletedInPECoverageData(cls, db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=None, cnv_method_id_ls=[]):
+		"""
+		# 2010-8-4
+			add argument cnv_method_id_ls
+		2010-08-1
+			similar to CNV.updateCNVCallFractionDeletedInPECoverageData()
+			but updates CNVArrayCall.fractionDeletedInPECoverageData
+		"""
+		
+		
+		if ecotype_id is not None:
+			ecotype_id_ls = [ecotype_id]
+		else:
+			ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		# 2010-8-4
+		if not cnv_method_id_ls:	#empty or None
+			cnv_method_id_ls = []
+		if cnv_method_id is not None:
+			cnv_method_id_ls.append(cnv_method_id)
+		
+		for cnv_method_id in cnv_method_id_ls:
+			for ecotype_id in ecotype_id_ls:
+				#2010-7-23 for the TAIR9 "-z banyan.usc.edu"
+				CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=ecotype_id, \
+									qc_data_source_id=qc_data_source_id, qc_cnv_method_id=qc_cnv_method_id,\
+									qc_cnv_type_id=qc_cnv_type_id, \
+									min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id, run_type=4)
+	"""
+		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=18)
+		sys.exit(0)
+		
+		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=19)
+		sys.exit(0)
+		
+	"""
+	
+	class ProcessCNVForFrequencyUpdate(object):
+		"""
+		2010-8-2
+			used by updateCNVFrequency to be plugged into traverseCNV()
+		"""
+		def __init__(self, **keywords):
+			"""
+			keywords shall include db_250k, no_of_total_arrays
+			"""
+			self.real_counter = 0
+			
+			# 2010-7-29
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+		
+		def run(self, row, param_obj=None):
+			"""
+			"""
+			array_id_set = set()
+			for cnv_array_call in row.cnv_array_call_ls:
+				array_id_set.add(cnv_array_call.array_id)
+			frequency = len(array_id_set)/float(self.no_of_total_arrays)
+			if row.frequency != frequency:
+				row.frequency = frequency
+				self.db_250k.session.add(row)
+				self.real_counter += 1
+				if self.real_counter%5000==0:
+					session = self.db_250k.session
+					session.flush()
+					"""
+					#session.expunge_all()	#2010-8-3 this shouldn't be executed. and session.expire_on_commit = False
+					otherwise, error like this will pop out.
+					
+					sqlalchemy.orm.exc.DetachedInstanceError: Parent instance <CNV at 0x4c53510> is not bound to a Session;
+					"""
+	
+	@classmethod
+	def updateCNVFrequency(cls, db_250k, cnv_method_id=None, run_type=1, cnv_method_id_ls=[]):
+		"""
+		2010-8-1
+			CNV.frequency was set wrongly because of a bug in CNVMergeAcrossArrays.py
+		"""
+		# 2010-8-4
+		if not cnv_method_id_ls:	#empty or None
+			cnv_method_id_ls = []
+		if cnv_method_id is not None:
+			cnv_method_id_ls.append(cnv_method_id)
+		
+		for cnv_method_id in cnv_method_id_ls:
+			sys.stderr.write("Updating CNV.frequency for method %s... \n"%cnv_method_id)
+			import Stock_250kDB
+			
+			rows = db_250k.metadata.bind.execute("select distinct array_id from cnv_array_call where cnv_method_id=%s"%\
+											cnv_method_id)
+			no_of_total_arrays = rows.rowcount	#not count(). different from direct Table query.
+			
+			session = db_250k.session
+			session.expire_on_commit = False
+			processClass = cls.ProcessCNVForFrequencyUpdate
+			processor = processClass(no_of_total_arrays=no_of_total_arrays, db_250k=db_250k)
+			
+			cls.traverseCNV(db_250k, cnv_method_id=cnv_method_id, processClassIns=processor, \
+						param_obj=None)
+			
+			session.flush()
+			try:
+				session.commit()
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+	
+	"""
+	#2010-8-1 "-z banyan"
+	CNV.updateCNVFrequency(db_250k, cnv_method_id=18, run_type=1)
+	CNV.updateCNVFrequency(db_250k, cnv_method_id=19, run_type=1)
+	sys.exit(0)
+	"""
+	
+	@classmethod
+	def traverseCNV(cls, db_250k, cnv_method_id=None, processClassIns=None, param_obj=None):
+		"""
+		2010-8-2
+		"""
+		sys.stderr.write("Traversing CNV for method %s ... \n"%cnv_method_id)
+		import Stock_250kDB
+		
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		import Stock_250kDB
+		TableClass = Stock_250kDB.CNV
+		query = TableClass.query
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		while rows.count()!=0:
+			for row in rows:
+				processClassIns.run(row, param_obj)
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, processClassIns.real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, processClassIns.real_counter))
+	
+	class ProcessCNVForProbeInfoUpdate(object):
+		"""
+		2010-8-2
+			used by CNV.updateCNVProbeInfo() to be plugged into traverseCNV()
+		"""
+		def __init__(self, **keywords):
+			"""
+			keywords shall include db_250k, probeRBDict, min_reciprocal_overlap
+			"""
+			self.real_counter = 0
+			
+			# 2010-7-29
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+		
+		def run(self, row, param_obj=None):
+			"""
+			row is Stock_250kDB.CNV
+			"""
+			from pymodule.CNV import CNVSegmentBinarySearchTreeKey
+			from pymodule.RBTree import RBDict
+			
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, span_ls=[row.start, row.stop], \
+									min_reciprocal_overlap=self.min_reciprocal_overlap, )
+			probeNodes = []
+			self.probeRBDict.findNodes(segmentKey, probeNodes)
+			no_of_probes_covered = len(probeNodes)
+			
+			chr_pos_RBNode_ls = []
+			for i in range(no_of_probes_covered):
+				probeRBNode = probeNodes[i]
+				chr_pos_RBNode_ls.append((probeRBNode.key.chromosome, probeRBNode.key.start, probeRBNode.key.stop, \
+										probeRBNode.key.probe_id))
+			chr_pos_RBNode_ls.sort()
+			
+			row.no_of_probes_covered = no_of_probes_covered
+			if len(chr_pos_RBNode_ls)>0:
+				row.start_probe_id = chr_pos_RBNode_ls[0][-1]
+				row.stop_probe_id = chr_pos_RBNode_ls[-1][-1]
+			self.db_250k.session.add(row)
+			self.real_counter += 1
+			if self.real_counter%5000==0:
+				session = self.db_250k.session
+				session.flush()	#this would cause session to become invalid (Instance error ...)
+				#session.expunge_all()
+	
+	@classmethod
+	def getProbeRBDict(cls, db_250k, probeType=2, min_reciprocal_overlap=0.000001):
+		"""
+		2010-8-2
+			construct a RBDict with each node representing a probe. span_ls = [position, position].
+			probeType (same as run_type of DB_250k2Array.get_probes())
+				1: SNP probes
+				2/4: CNV probes 	(no need to specify function argument snps. Tair9Copy=1)
+				5: QC probes
+				else: all probes (SNP + CNV + QC)
+			
+			example used in CNV.updateCNVProbeInfo()
+		"""
+		sys.stderr.write("Constructing probe RBDict for probeType %s ... \n"%probeType)
+		
+		import Stock_250kDB
+		from DB_250k2Array import DB_250k2Array
+		
+		#DB_250k2Array.debug = True	#2010-8-2 temporary debug purpose
+		
+		probes, xy_ls, chr_pos_ls, probe_id_ls = DB_250k2Array.get_probes(db_250k.metadata.bind, \
+										Stock_250kDB.Probes.table.name, snps=None, run_type=2, \
+										constructChrPos2index=False, constructXY2index=False, need_xy_ls=False,\
+										need_probes=False)[:4]
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey
+		from pymodule.RBTree import RBDict
+		probeRBDict = RBDict()
+		no_of_probes = len(probe_id_ls)
+		no_of_probes_ejected = 0
+		for i in xrange(no_of_probes):
+			probe_id = probe_id_ls[i]
+			chr, pos = chr_pos_ls[i]
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chr, span_ls=[pos, pos], \
+									min_reciprocal_overlap=min_reciprocal_overlap, probe_id=probe_id)
+			if segmentKey not in probeRBDict:
+				probeRBDict[segmentKey] = None
+			else:
+				no_of_probes_ejected += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s ejected"%('\x08'*80, i, no_of_probes_ejected))
+		del chr_pos_ls, probe_id_ls
+		sys.stderr.write("%s%s\t%s ejected. %s items in probeRBDict\n"%('\x08'*80, i, no_of_probes_ejected, len(probeRBDict)))
+		return probeRBDict
+	
+	@classmethod
+	def updateCNVProbeInfo(cls, db_250k, cnv_method_id=None, cnv_method_id_ls=[]):
+		"""
+		2010-8-2
+			
+		"""
+		sys.stderr.write("Updating start_probe_id, stop_probe_id, no_of_probes_covered of table CNV method %s ...\n"%\
+						repr(cnv_method_id_ls))
+		import Stock_250kDB
+		probeRBDict = cls.getProbeRBDict(db_250k, probeType=2, min_reciprocal_overlap=0.000001)
+		
+		# 2010-8-4
+		if not cnv_method_id_ls:	#empty or None
+			cnv_method_id_ls = []
+		if cnv_method_id is not None:
+			cnv_method_id_ls.append(cnv_method_id)
+		
+		session = db_250k.session
+		for cnv_method_id in cnv_method_id_ls:
+			session.expire_on_commit = False
+			processClass = cls.ProcessCNVForProbeInfoUpdate
+			processor = processClass(probeRBDict=probeRBDict, db_250k=db_250k, min_reciprocal_overlap=0.000001)
+			
+			cls.traverseCNV(db_250k, cnv_method_id=cnv_method_id, processClassIns=processor, \
+						param_obj=None)
+			
+			session.flush()
+			try:
+				session.commit()
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+	
+	"""
+		#2010-8-2
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[18, 19])
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(cls, db_250k, output_dir=None, \
+											ecotype_id=6932, minPercUnCoveredByLerContig=0.6, \
+											cnv_method_id=6, useProbeDensity=False, run_type=1, minScore=None):
+		"""
+		2010-8-6
+			add argument run_type
+				1. update CNVCall.percUnCoveredByLerContig
+				2. update CNVCall.fractionDeletedInPECoverageData
+			add argument minScore
+		2010-7-28
+			add argument output_dir
+		2010-7-19
+			add argument useProbeDensity.
+				If true, the number-of-probes variable will be replaced by number-of-probes-per-kb.
+		2010-7-18
+			This function is written to inspect FDR-vs-no of probes curve for the predicted CNV calls. 
+			
+			FDR = False discovery rate = FP/(TP+FP)
+			
+			This function pulls all entries from CNVCall (no amplitude cutoff), then counts one as true deletion
+				or false deletion based on minPercUnCoveredByLerContig.
+			
+			The argument cnv_method_id is intended to be the method encompassing the CNV calls that were predicted
+				by CNVPredictDeletionBySVM.py although it could be any method.
+			
+			
+		"""
+		sys.stderr.write("Plotting FDR vs no of probes for CNVCall method-id=%s ... \n"%cnv_method_id)
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		from pymodule import PassingData
+		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, array_id2qc_data={}, \
+				array_id2no_of_probes2qc_data = {}, \
+				output_fname_prefix = os.path.join(output_dir, 'FDRVsNoOfProbes_cnvMethod%s_minNotCoveredFraction%s_useProbeDensity%s_minScore%s_runType%s'%\
+						(cnv_method_id, minPercUnCoveredByLerContig, useProbeDensity, minScore, run_type)),\
+				minPercUnCoveredByLerContig=minPercUnCoveredByLerContig,\
+				array_id2label={})
+		
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		import Stock_250kDB
+		TableClass = Stock_250kDB.CNVCall
+		query = TableClass.query
+		if ecotype_id is not None:	#2010-8-6
+			query = query.filter(TableClass.array.has(maternal_ecotype_id=ecotype_id))
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if minScore is not None:
+			query = query.filter(TableClass.probability>=minScore)
+		if run_type==1:
+			query = query.filter(TableClass.percUnCoveredByLerContig!=None)
+		elif run_type==2:
+			query = query.filter(TableClass.fractionDeletedInPECoverageData!=None)
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		while rows.count()!=0:
+			for row in rows:
+				array_id = row.array_id
+				ecotype_id = row.array.maternal_ecotype_id
+				nativename = ecotype_id2nativename.get(ecotype_id)
+				param_obj.no_of_deletions += 1
+				if array_id not in param_obj.array_id2qc_data:
+					param_obj.array_id2qc_data[array_id] = PassingData(no_of_deletions=0, no_of_valid_deletions=0,\
+																	segmentSize_ls=[])
+					param_obj.array_id2no_of_probes2qc_data[array_id] = {}
+					param_obj.array_id2label[array_id] = 'aid %s eid %s, %s method %s delCut %s minSco %s'%(array_id, \
+											ecotype_id, nativename, cnv_method_id, minPercUnCoveredByLerContig, minScore)
+				
+				size_affected = row.stop - row.start + 1
+				param_obj.array_id2qc_data[array_id].no_of_deletions += 1
+				param_obj.array_id2qc_data[array_id].segmentSize_ls.append(size_affected)
+				
+				if useProbeDensity:
+					no_of_probes_covered = int(row.no_of_probes_covered*1000/float(row.size_affected))
+				else:
+					no_of_probes_covered = row.no_of_probes_covered
+				
+				if no_of_probes_covered not in param_obj.array_id2no_of_probes2qc_data[array_id]:
+					param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes_covered] = \
+						PassingData(no_of_deletions=0, no_of_valid_deletions=0)
+				param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes_covered].no_of_deletions += 1
+				
+				if run_type==1:
+					percUnCoveredByLerContig = row.percUnCoveredByLerContig
+				elif run_type==2:
+					percUnCoveredByLerContig = row.fractionDeletedInPECoverageData
+				else:
+					percUnCoveredByLerContig = row.percUnCoveredByLerContig
+				if percUnCoveredByLerContig>=minPercUnCoveredByLerContig:
+					param_obj.no_of_valid_deletions += 1
+					param_obj.array_id2qc_data[array_id].no_of_valid_deletions += 1
+					param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes_covered].no_of_valid_deletions += 1
+					real_counter += 1
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
+		
+		for array_id, qc_data in param_obj.array_id2qc_data.iteritems():
+			totalSizeInKB = int(sum(param_obj.array_id2qc_data[array_id].segmentSize_ls)/1000.0)
+			param_obj.array_id2label[array_id] += ' %sKb'%totalSizeInKB
+		
+		param_obj.ylabel = 'FDR'
+		if useProbeDensity:
+			param_obj.xlabel = 'No of probes per kb'
+		else:
+			param_obj.xlabel = 'No of probes'
+		
+		cls.outputFalsePositiveRate(param_obj)
+	"""
+		# 2010-7-18
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
+		CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(db_250k, output_dir=output_dir, \
+											ecotype_id=6932, minPercUnCoveredByLerContig=0.6, \
+											cnv_method_id=8, useProbeDensity=True)
+		sys.exit(0)
+		
+		# 2010-7-18 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
+		CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(db_250k, output_dir=output_dir, \
+											ecotype_id=6932, minPercUnCoveredByLerContig=0.6, \
+											cnv_method_id=11, useProbeDensity=False)
+		sys.exit(0)
+		
+		# 2010-8-6 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
+		CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(db_250k, output_dir=output_dir, \
+											ecotype_id=None, minPercUnCoveredByLerContig=0.4, \
+											cnv_method_id=16, useProbeDensity=False, run_type=2, minScore=None)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def plotCNVArrayCallFDRVsFrequencyNoOfProbes(cls, db_250k, output_dir=None, \
+											ecotype_id=None, ecotype_id_ls=None, qc_data_source_id=13, \
+											minNotCoveredFraction=0.6, \
+											cnv_method_id=18, xDataType=1, draw2D=1, minScore=None, ):
+		"""
+		2010-8-3
+			add argument draw2D
+				1: FDR vs frequency by x-data
+				2: histogram (count) vs frequency by x-data
+				
+				x-data depends on xDataType.
+					1 or 2: log10(no_of_probes_covered)
+					3: probeDensity (#probes per kb)
+			
+			add argument xDataType for 1D FDR figure
+				1: FDR vs frequency
+				2: FDR vs no_of_probes_covered
+				3: FDR vs probeDensity
+		2010-8-1
+			argument qc_data_source_id is used to figure out which arrays to look at.
+			
+			similar to plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig()
+			but for table CNVArrayCall and x-axis is frequency of CNV.
+		"""
+		sys.stderr.write("Plotting FDR vs frequency for CNVArrayCall method-id=%s ... \n"%cnv_method_id)
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		from pymodule import PassingData
+		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, array_id2qc_data={}, \
+				array_id2no_of_probes2qc_data = {}, \
+				output_fname_prefix = os.path.join(output_dir, 'FDRVsXDataType%s_cnvMethod%s_minNotCoveredFraction%s_minScore%s'%\
+						(xDataType, cnv_method_id,minNotCoveredFraction, minScore)),\
+				minPercUnCoveredByLerContig=minNotCoveredFraction,\
+				min_no_of_data_points=60,\
+				array_id2label={})
+		
+		if ecotype_id is None and not ecotype_id_ls:
+			ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		import Stock_250kDB
+		TableClass = Stock_250kDB.CNVArrayCall
+		query = TableClass.query.filter(TableClass.fractionDeletedInPECoverageData!=None)
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if ecotype_id is not None:
+			query = query.filter(TableClass.array.has(maternal_ecotype_id=ecotype_id))
+		elif ecotype_id_ls:
+			query = query.filter(TableClass.array.has(Stock_250kDB.ArrayInfo.maternal_ecotype_id.in_(ecotype_id_ls)))
+		
+		if minScore is not None:
+			query = query.filter(TableClass.score>=minScore)
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		while rows.count()!=0:
+			for row in rows:
+				array_id = row.array_id
+				param_obj.no_of_deletions += 1
+				if array_id not in param_obj.array_id2qc_data:
+					ecotype_id = row.array.maternal_ecotype_id
+					param_obj.array_id2qc_data[array_id] = PassingData(no_of_deletions=0, no_of_valid_deletions=0,\
+										no_of_probes_ls=[], frequency_ls =[], falseDiscoveryOrNot_ls =[],\
+										segmentSize_ls=[])
+					param_obj.array_id2no_of_probes2qc_data[array_id] = {}
+					
+					nativename = ecotype_id2nativename.get(ecotype_id)
+					param_obj.array_id2label[array_id] = 'aid %s eid %s, %s method %s delCut %s minSco %s'%(array_id, \
+											ecotype_id, nativename, cnv_method_id, minNotCoveredFraction, minScore)
+				
+				param_obj.array_id2qc_data[array_id].no_of_deletions += 1
+				
+				no_of_probes_covered = row.cnv.no_of_probes_covered
+				size_affected = row.cnv.stop - row.cnv.start + 1
+				param_obj.array_id2qc_data[array_id].frequency_ls.append(row.cnv.frequency)
+				param_obj.array_id2qc_data[array_id].segmentSize_ls.append(size_affected)
+				if xDataType==1:
+					x_data = row.cnv.frequency
+					param_obj.array_id2qc_data[array_id].no_of_probes_ls.append(math.log10(no_of_probes_covered))
+				elif xDataType==2:
+					x_data = no_of_probes_covered
+					param_obj.array_id2qc_data[array_id].no_of_probes_ls.append(math.log10(no_of_probes_covered))
+				elif xDataType==3:
+					x_data = int(no_of_probes_covered*1000/float(size_affected))
+					param_obj.array_id2qc_data[array_id].no_of_probes_ls.append(x_data)
+				
+				if x_data not in param_obj.array_id2no_of_probes2qc_data[array_id]:
+					param_obj.array_id2no_of_probes2qc_data[array_id][x_data] = \
+						PassingData(no_of_deletions=0, no_of_valid_deletions=0)
+				param_obj.array_id2no_of_probes2qc_data[array_id][x_data].no_of_deletions += 1
+				
+				if row.fractionDeletedInPECoverageData>=minNotCoveredFraction:
+					param_obj.array_id2qc_data[array_id].falseDiscoveryOrNot_ls.append(0)
+					param_obj.no_of_valid_deletions += 1
+					param_obj.array_id2qc_data[array_id].no_of_valid_deletions += 1
+					param_obj.array_id2no_of_probes2qc_data[array_id][x_data].no_of_valid_deletions += 1
+					real_counter += 1
+				else:
+					param_obj.array_id2qc_data[array_id].falseDiscoveryOrNot_ls.append(1)
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
+		
+		param_obj.ylabel = 'FDR'
+		
+		if xDataType==1:
+			param_obj.xlabel = 'CNV frequency'
+			xlabel_in_2D = 'log10(no of probes)'
+		elif xDataType==2:
+			param_obj.xlabel = 'No of probes'
+			xlabel_in_2D = 'log10(no of probes)'
+		elif xDataType==3:
+			param_obj.xlabel = 'No of probes per kb'
+			xlabel_in_2D = param_obj.xlabel
+		
+		for array_id, qc_data in param_obj.array_id2qc_data.iteritems():
+			totalSizeInKB = int(sum(param_obj.array_id2qc_data[array_id].segmentSize_ls)/1000.0)
+			param_obj.array_id2label[array_id] += ' %sKb'%totalSizeInKB
+			
+		cls.outputFalsePositiveRate(param_obj)
+		
+		import numpy
+		if draw2D:
+			for array_id, qc_data in param_obj.array_id2qc_data.iteritems():
+				if len(qc_data.no_of_probes_ls)>0:
+					x_ls = qc_data.no_of_probes_ls
+					y_ls = qc_data.frequency_ls
+					if draw2D==2:
+						C_ls = [1]*len(y_ls)
+						reduce_C_function = CNV.logSum
+						colorBarLabel='log10(count)'
+					else:
+						C_ls = qc_data.falseDiscoveryOrNot_ls
+						reduce_C_function = numpy.mean
+						colorBarLabel='FDR'
+					#
+					fig_fname = os.path.join(output_dir, \
+						'FDRVsFrequencyByNoOfProbes_cnvMethod%s_minNotCoveredFraction%s_xDataType%s_minScore%s_2D%s_array%s.png'%\
+						(cnv_method_id, minNotCoveredFraction, xDataType, minScore, draw2D, array_id))
+					sys.stderr.write("Plotting FDR vs frequency X no-of-probes for array %s..."%array_id)
+					cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+							title='%s'%param_obj.array_id2label.get(array_id), \
+							xlabel = xlabel_in_2D, \
+							ylabel = 'frequency',\
+							colorBarLabel=colorBarLabel, reduce_C_function= reduce_C_function)
+					sys.stderr.write("Done.\n")
+	"""
+		# 2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+											ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.6, \
+											cnv_method_id=18, xDataType=1)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu (1D FDR vs frequency, 2D FDR vs frequency by no-of-probes)
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+											ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+											cnv_method_id=21, xDataType=1, draw2D=True)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		minScore = 0.95
+		cnv_method_id = 21
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+		# 2010-8-1 -z banyan.usc.edu (just FDR vs no-of-probes)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		# 2010-8-1 -z banyan.usc.edu
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=3, draw2D=True, minScore=minScore)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		minScore = None
+		cnv_method_id = 21
+		draw2D = 1
+		minNotCoveredFraction = 0.8
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=draw2D, minScore=minScore)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		minScore = None
+		cnv_method_id = 18
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def getEcotypeIDListInCNVQCAccessionGivenDataSourceID(cls, data_source_id=13):
+		"""
+		2010-7-20
+			called by plotCNVCallVsQC_OverlappingRatio2DHistogram()
+			
+		"""
+		import sys
+		sys.stderr.write("Getting list of ecotype IDs for data source %s from CNVQCAccession ..."%data_source_id)
+		# get a list of ecotype ids which are present in CNVQCAccession
+		import Stock_250kDB
+		query = Stock_250kDB.CNVQCAccession.query.filter_by(data_source_id=data_source_id)
+		ecotype_id_ls = []
+		for row in query:
+			ecotype_id_ls.append(row.ecotype_id)
+		sys.stderr.write("%s ecotypes.\n"%(len(ecotype_id_ls)))
+		return ecotype_id_ls
+	
+	@classmethod
+	def getAccessionID2EcotypeIDFromCNVQCAccessionGivenDataSourceID(cls, db_250k, data_source_id=13):
+		"""
+		2010-8-4
+			get a map from accession_id to ecotype_id from CNVQCAccession.
+			This function is called by CNV.getCNVQCDataFromDB().
+		"""
+		import sys
+		sys.stderr.write("Getting accession_id2ecotype_id for data source %s from CNVQCAccession ..."%data_source_id)
+		import Stock_250kDB
+		query = Stock_250kDB.CNVQCAccession.query.filter_by(data_source_id=data_source_id)
+		accession_id2ecotype_id = {}
+		for row in query:
+			accession_id2ecotype_id[row.id] = row.ecotype_id
+		sys.stderr.write("%s accessions.\n"%(len(accession_id2ecotype_id)))
+		return accession_id2ecotype_id
+	
+	@classmethod
+	def getAccessionIDLsFromCNVQCAccessionGivenEcotypeIDLs(cls, db_250k, ecotype_id_ls=[], data_source_id=None):
+		"""
+		2010-8-4
+			get a list of accession IDs given ecotype id list from CNVQCAccession.
+			This function is called by CNV.getCNVQCDataFromDB().
+		"""
+		import sys
+		sys.stderr.write("Getting the list of accession ids for %s ecotypes, data source %s from CNVQCAccession ..."%\
+						(len(ecotype_id_ls), data_source_id))
+		import Stock_250kDB
+		query = Stock_250kDB.CNVQCAccession.query.filter(Stock_250kDB.CNVQCAccession.ecotype_id.in_(ecotype_id_ls))
+		if data_source_id is not None:	# 2010-8-4
+			query = query.filter_by(data_source_id=data_source_id)
+		accession_id_ls = []
+		for row in query:
+			accession_id_ls.append(row.id)
+		sys.stderr.write("%s accessions.\n"%(len(accession_id_ls)))
+		return accession_id_ls
+	
+	@classmethod
+	def plotCNVCallVsQC_OverlappingRatio2DHistogram(cls, db_250k, cnv_type_id=None, cnv_method_id=None, output_dir=None,\
+									qc_data_source_id=13, qc_cnv_method_id=3, ecotype_id=None, ecotype_id_ls = None, \
+									min_reciprocal_overlap=0.000000001, minDeletedFraction=0.6, \
+									useProbeDensity=False):
+		"""
+		2010-8-6
+			This program involves computing fractionDeletedInPECoverageData on the fly.
+			CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig() fetches the pre-computed
+				fractionDeletedInPECoverageData from db and plot FDR vs no-of-probes.
+		2010-7-22
+			add argument ecotype_id_ls to restrict the ecotypes to look at.
+				ecotype_id_ls is only used when ecotype_id is None.
+		2010-7-19
+			draw a FDR vs no of probes (or probe density) plot for each array
+			draw a 2D histogram of overlap ratio (ratio in CNVQCAccession vs ratio in CNVCall)
+			
+		"""
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp, rightWithinLeftAlsoEqualCmp
+		
+		cnvQCData = cls.getCNVQCDataFromDB(db_250k, data_source_id=qc_data_source_id, \
+										ecotype_id=ecotype_id, ecotype_id_ls=ecotype_id_ls, cnv_type_id=cnv_type_id, \
+										min_QC_segment_size=None, min_no_of_probes=None,\
+										min_reciprocal_overlap=min_reciprocal_overlap, \
+										cmpfn=rightWithinLeftAlsoEqualCmp,\
+										cnv_method_id=qc_cnv_method_id)
+		ecotype_id2qc_data = cnvQCData.ecotype_id2cnv_qc_call_data
+		
+		if ecotype_id is None and not ecotype_id_ls:
+			ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		
+		from pymodule import PassingData
+		import Stock_250kDB
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		TableClass = Stock_250kDB.CNVCall
+		query = TableClass.query
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if ecotype_id is not None:
+			query = query.filter(TableClass.array.has(maternal_ecotype_id=ecotype_id))
+		elif ecotype_id_ls:
+			query = query.filter(TableClass.array.has(Stock_250kDB.ArrayInfo.maternal_ecotype_id.in_(ecotype_id_ls)))
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		
+		minPercUnCoveredByLerContig = minDeletedFraction
+		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, array_id2qc_data={}, \
+				array_id2no_of_probes2qc_data = {}, \
+				output_fname_prefix = output_dir+'FDRVsNoOfProbes_QCDataSource%s_QCCNVMethod%s_CNVMethod%s_minDeletedFraction%s_useProbeDensity%s'%\
+						(qc_data_source_id, qc_cnv_method_id, cnv_method_id, minDeletedFraction, useProbeDensity),\
+				minPercUnCoveredByLerContig=minPercUnCoveredByLerContig,\
+				ecotype_id2qc_data=ecotype_id2qc_data, minDeletedFraction=minDeletedFraction)
+		
+		array_id2overlap_ratio_ls = {}
+		array_id2ecotype_id = {}
+		while rows.count()!=0:
+			for row in rows:
+				if row.array.maternal_ecotype_id in ecotype_id2qc_data:
+					qc_data = ecotype_id2qc_data.get(row.array.maternal_ecotype_id)
+					cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, span_ls=[row.start, row.stop],\
+												min_reciprocal_overlap=min_reciprocal_overlap)
+					
+					param_obj.cnvSegmentKey = cnvSegmentKey
+					judgeData = cls.isDeletionTrueBasedOnDeletedFraction(param_obj=param_obj, \
+														ecotype_id=row.array.maternal_ecotype_id)
+					
+					array_id = row.array_id
+					param_obj.no_of_deletions += 1
+					array_id2ecotype_id[array_id] = row.array.maternal_ecotype_id
+					
+					if array_id not in param_obj.array_id2qc_data:
+						param_obj.array_id2qc_data[array_id] = PassingData(no_of_deletions=0, no_of_valid_deletions=0)
+						param_obj.array_id2no_of_probes2qc_data[array_id] = {}
+					
+					param_obj.array_id2qc_data[array_id].no_of_deletions += 1
+					
+					if useProbeDensity:
+						no_of_probes_covered = int(row.no_of_probes_covered*1000/float(row.size_affected))
+					else:
+						no_of_probes_covered = row.no_of_probes_covered
+					
+					if no_of_probes_covered not in param_obj.array_id2no_of_probes2qc_data[array_id]:
+						param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes_covered] = \
+							PassingData(no_of_deletions=0, no_of_valid_deletions=0)
+					param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes_covered].no_of_deletions += 1
+					
+					if judgeData and judgeData.isDeletionTrue:
+						if array_id not in array_id2overlap_ratio_ls:
+							array_id2overlap_ratio_ls[array_id] = []
+						
+						array_id2overlap_ratio_ls[array_id] += judgeData.overlap_ratio_ls
+						param_obj.no_of_valid_deletions += 1
+						param_obj.array_id2qc_data[array_id].no_of_valid_deletions += 1
+						param_obj.array_id2no_of_probes2qc_data[array_id][no_of_probes_covered].no_of_valid_deletions += 1
+						real_counter += 1
+				i += 1
+			if real_counter%100==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
+		
+		# get label for each array
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		array_id2label = {}
+		for array_id, ecotype_id in array_id2ecotype_id.iteritems():
+			nativename = ecotype_id2nativename.get(ecotype_id)
+			label = 'a-id %s, e-id %s, %s'%(array_id, ecotype_id, nativename)
+			array_id2label[array_id] = label
+		
+		param_obj.ylabel = 'FDR'
+		if useProbeDensity:
+			param_obj.xlabel = 'No of probes per kb'
+		else:
+			param_obj.xlabel = 'No of probes'
+		param_obj.array_id2label = array_id2label
+		
+		cls.outputFalsePositiveRate(param_obj)
+		
+		for array_id, overlap_ratio_ls in array_id2overlap_ratio_ls.iteritems():
+			if len(overlap_ratio_ls)>0:
+				x_ls = [row[0] for row in overlap_ratio_ls]
+				y_ls = [row[1] for row in overlap_ratio_ls]
+				C_ls = [1]*len(y_ls)
+				fig_fname = output_dir+'OverlapRatio2DHistogram_QCDataSource%s_QCCNVMethod%s_CNVMethod%s_useProbeDensity%s_array%s.png'%\
+								(qc_data_source_id, qc_cnv_method_id, cnv_method_id, useProbeDensity, array_id)
+				cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+						title='%s overlap-ratio 2D histogram'%array_id2label.get(array_id), \
+						xlabel='overlapRatioInCNVCall', \
+						ylabel='overlapRatioInCNVQCCall',\
+						colorBarLabel='log10(count)', reduce_C_function=CNV.logSum)
+			
+	
+	"""
+		# 2010-7-20	QC against BreakDancer-derived deletions
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallVsQC_OverlapRatio2DHistogram/')
+		# only for banyan.usc.edu's stock_250k db, which is in TAIR9.
+		CNV.plotCNVCallVsQC_OverlappingRatio2DHistogram(db_250k, cnv_type_id=1, cnv_method_id=8, \
+									output_dir=output_dir, \
+									qc_data_source_id=13, qc_cnv_method_id=3, \
+									min_reciprocal_overlap=0.000000001, minDeletedFraction=0.4, useProbeDensity=False)
+		sys.exit(0)
+		
+		# 2010-7-20	QC against BreakDancer-derived deletions
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallVsQC_OverlapRatio2DHistogram/')
+		# only for banyan.usc.edu's stock_250k db, which is in TAIR9.
+		CNV.plotCNVCallVsQC_OverlappingRatio2DHistogram(db_250k, cnv_type_id=1, cnv_method_id=8, \
+									output_dir=output_dir, \
+									qc_data_source_id=13, qc_cnv_method_id=3, ecotype_id=None,\
+									min_reciprocal_overlap=0.000000001, minDeletedFraction=0.6, useProbeDensity=True)
+		sys.exit(0)
+		
+		# 2010-7-22 QC against PE-data coverage-derived deletions
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallVsQC_OverlapRatio2DHistogram/')
+		# only for banyan.usc.edu's stock_250k db, which is in TAIR9.
+		ecotype_id_ls = [8256, 6900, 6901, 5830, 5831]
+		CNV.plotCNVCallVsQC_OverlappingRatio2DHistogram(db_250k, cnv_type_id=1, cnv_method_id=8, \
+									output_dir=output_dir, \
+									qc_data_source_id=13, qc_cnv_method_id=9, ecotype_id_ls=ecotype_id_ls,\
+									min_reciprocal_overlap=0.000000001, minDeletedFraction=0.6, \
+									useProbeDensity=False)
+		sys.exit(0)
+		
+		# 2010-7-22 QC against PE-data coverage-derived deletions
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallVsQC_OverlapRatio2DHistogram/')
+		# only for banyan.usc.edu's stock_250k db, which is in TAIR9.
+		ecotype_id_ls = [8256, 6900, 6901, 5830, 5831]
+		CNV.plotCNVCallVsQC_OverlappingRatio2DHistogram(db_250k, cnv_type_id=1, cnv_method_id=8, \
+									output_dir=output_dir, \
+									qc_data_source_id=13, qc_cnv_method_id=3, ecotype_id_ls=ecotype_id_ls,\
+									min_reciprocal_overlap=0.000000001, minDeletedFraction=0.95, \
+									useProbeDensity=False)
+		sys.exit(0)
+		
+		# 2010-7-28 QC against PE-data coverage-derived deletions
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallVsQC_OverlapRatio2DHistogram/')
+		# only for banyan.usc.edu's stock_250k db, which is in TAIR9.
+		qc_data_source_id = 13
+		ecotype_id_ls = CNV.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		for ecotype_id in ecotype_id_ls:
+			CNV.plotCNVCallVsQC_OverlappingRatio2DHistogram(db_250k, cnv_type_id=1, cnv_method_id=11, \
+									output_dir=output_dir, \
+									qc_data_source_id=qc_data_source_id, qc_cnv_method_id=9, ecotype_id=ecotype_id, \
+									min_reciprocal_overlap=0.000000001, minDeletedFraction=0.6, \
+									useProbeDensity=False)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def outputCNVQCVsCNVCallStats(cls, db_250k, qc_data_source_id=None, cnv_type_id=1, cnv_method_id=8, \
+						output_fname=None, \
+						ecotype_id=None, min_no_of_probes=None, min_QC_segment_size=None):
+		"""
+		2010-7-20
+			output tsv data for pymodule.DataMatrixGuiXYProbe.py to view.
+		"""
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp, rightWithinLeftAlsoEqualCmp
+		cnvQCData = cls.getCNVQCDataFromDB(db_250k, data_source_id=qc_data_source_id, \
+												ecotype_id=ecotype_id, cnv_type_id=cnv_type_id, \
+												min_QC_segment_size=None, min_no_of_probes=None,\
+												min_reciprocal_overlap=0.0000001, \
+												cmpfn=rightWithinLeftAlsoEqualCmp)
+		ecotype_id2qc_data = cnvQCData.ecotype_id2cnv_qc_call_data
+		ecotype_id2data = cnvQCData.ecotype_id2data
+		
+		ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		
+		from pymodule import PassingData
+		import Stock_250kDB
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		TableClass = Stock_250kDB.CNVCall
+		query = TableClass.query
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if ecotype_id is not None:
+			query = query.filter(TableClass.array.has(maternal_ecotype_id=ecotype_id))
+		else:
+			query = query.filter(TableClass.array.has(Stock_250kDB.ArrayInfo.maternal_ecotype_id.in_(ecotype_id_ls)))
+		
+		rows = query.offset(i).limit(block_size)
+		
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		array_id2data = {}
+		while rows.count()!=0:
+			for row in rows:
+				if row.array.maternal_ecotype_id in ecotype_id2qc_data:
+					array_id = row.array_id
+					ecotype_id = row.array.maternal_ecotype_id
+					if array_id not in array_id2data:
+						nativename = ecotype_id2nativename.get(ecotype_id)
+						array_id2data[array_id] = PassingData(no_of_deletions=0, deletion_size=0, ecotype_id=ecotype_id,\
+															nativename=nativename)
+					array_id2data[array_id].no_of_deletions += 1
+					array_id2data[array_id].deletion_size += (row.stop-row.start+1.0)
+					
+					
+					real_counter += 1
+				i += 1
+				if i%5000==0:
+					sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
+		
+		sys.stderr.write("Outputting deletion stats ...")
+		import csv
+		writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+		header = ['array_id', 'nativename', 'ecotype_id', 'tiling_no_of_deletions', 'tiling_deletion_size', 'qc_no_of_deletions',\
+				'qc_deletion_size', 'qc_length_total']
+		writer.writerow(header)
+		for array_id, stat_data in array_id2data.iteritems():
+			qc_stat_data = ecotype_id2data.get(stat_data.ecotype_id)
+			row = [array_id, stat_data.nativename, stat_data.ecotype_id, stat_data.no_of_deletions, stat_data.deletion_size,\
+				qc_stat_data.no_of_segments, qc_stat_data.length_affected, qc_stat_data.length]
+			writer.writerow(row)
+		del writer
+		sys.stderr.write("Done.\n")
+	
+	"""
+		
+		# 2010-7-20
+		qc_data_source_id=13
+		cnv_type_id=1;
+		cnv_method_id=8
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/CNVQC_source%s_vs_CNVCall_Method%s_stats.tsv'%\
+										(qc_data_source_id, cnv_method_id))
+		CNV.outputCNVQCVsCNVCallStats(db_250k, qc_data_source_id=qc_data_source_id, cnv_type_id=cnv_type_id, \
+									cnv_method_id=cnv_method_id, output_fname=output_fname,)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(cls, db_250k, array_id=None, output_dir=None, \
+											minPercUnCoveredByLerContig=0.6, gridsize=10, cnv_method_id=6, \
+											replaceAmpWithMedianIntensity=False, deletedFractionType=1,\
+											colorBarLabel='percentage uncovered by Contig Sequence', \
+											replaceNoOfProbesWithProbeDensity=False):
+		"""
+		2010-7-24
+			add argument deletedFractionType.
+				1: percUnCoveredByLerContig
+				2: fractionDeletedInPECoverageData
+			add argument colorBarLabel and replaceNoOfProbesWithProbeDensity
+		2010-6-29
+			add argument replaceAmpWithMedianIntensity
+		2010-6-27
+			
+		"""
+		sys.stderr.write("Inspecting relationship between probe density, amplitude, number of probes, for each cnv call... \n")
+		i = 0
+		block_size = 5000
+		real_counter = 0
+		import Stock_250kDB
+		TableClass = Stock_250kDB.CNVCall
+		query = TableClass.query.filter_by(array_id=array_id).filter_by(cnv_method_id=cnv_method_id)
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		
+		no_of_probes_ls = []
+		probeDensityLs = []
+		amplitude_ls = []
+		percUnCoveredByLerContig_ls = []
+		ecotype_id = None
+		import math
+		from pymodule.DrawMatrix import Value2Color
+		import ImageColor
+		c_ls = []
+		while rows.count()!=0:
+			for row in rows:
+				ecotype_id = row.array.maternal_ecotype_id
+				if deletedFractionType==1:
+					deletedFraction = row.percUnCoveredByLerContig
+				else:
+					deletedFraction = row.fractionDeletedInPECoverageData
+					
+				if deletedFraction is not None:
+					#x_ls.append(row.amplitude)
+					no_of_probes_ls.append(math.log10(row.no_of_probes_covered))
+					probeDensity = row.no_of_probes_covered*1000.0/(row.stop-row.start+1.0)
+					probeDensityLs.append(probeDensity)
+					if deletedFraction>=minPercUnCoveredByLerContig:
+						isDeletionTrue = 1
+						real_counter += 1
+					else:
+						isDeletionTrue = 0
+					if replaceAmpWithMedianIntensity:
+						amp = row.median_intensity
+					else:
+						amp = row.amplitude
+					amplitude_ls.append(amp)
+					hslColor = Value2Color.value2HSLcolor(deletedFraction, min_value=0., max_value=1.,\
+											treat_above_max_as_NA=False)
+					fc = ImageColor.getrgb(hslColor)
+					fc = [color_value/255. for color_value in fc]	#matplotlib accepts rgb in [0-1] range
+					c_ls.append(fc)
+					percUnCoveredByLerContig_ls.append(deletedFraction)
+				
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*80, i, real_counter))
+		
+		import pylab
+		import matplotlib
+		from matplotlib import cm
+		import numpy
+		if replaceAmpWithMedianIntensity:
+			xlabel = 'median intensity'
+			xName = 'MedianIntensity'
+		else:
+			xlabel = 'mean intensity'
+			xName = 'MeanIntensity'
+		if replaceNoOfProbesWithProbeDensity:
+			ylabel = 'no of probes per kb'
+			yName = 'ProbeDensity'
+		else:
+			ylabel = 'no of probes'
+			yName = 'NoOfProbes'
+		
+		if len(no_of_probes_ls)>100:
+			c_ls = numpy.array(c_ls)
+			sys.stderr.write(" gridSize: %s "%gridsize)
+			if output_dir and not os.path.isdir(output_dir):	#2010-5-5 test if output_dir is something
+				os.makedirs(output_dir)
+			common_fig_fname = 'array_%s_ecotype_%s_cnvMethod%s.png'%(array_id, ecotype_id, cnv_method_id)
+			from pymodule.utils import addExtraLsToFilenamePrefix, addExtraToFilenamePrefix
+			fig_fname = addExtraToFilenamePrefix(common_fig_fname, '%sAsX_%sAsY_minNotCoveredFraction%s_gridsize_%s'%\
+												(xName, yName, minPercUnCoveredByLerContig, gridsize))
+			"""
+			fig_fname = addExtraToFilenamePrefix(common_fig_fname, 'AmplitudeAsX_NoOfProbesAsY_minUncoverPerc%s_gridsize_%s'%\
+												(minPercUnCoveredByLerContig, gridsize))
+			"""
+			fig_fname = os.path.join(output_dir, fig_fname)
+			title = "array %s e-id %s minFrac %s gridsize %s"%(array_id, ecotype_id, minPercUnCoveredByLerContig, gridsize)
+			
+			"""
+			ylabel = 'No of probes per kb'
+			xlabel = 'No of probes'
+			max_phenotype = numpy.nanmax(percUnCoveredByLerContig_ls)
+			min_phenotype = numpy.nanmin(percUnCoveredByLerContig_ls)
+			phenotype_gap = max_phenotype - min_phenotype
+			phenotype_jitter = phenotype_gap/10.
+			norm = matplotlib.colors.Normalize(vmin=min_phenotype-phenotype_jitter, vmax=max_phenotype+phenotype_jitter)
+			
+			import pylab
+			from mpl_toolkits.mplot3d import Axes3D
+			fig = pylab.figure()
+			ax = Axes3D(fig)
+			ax.scatter(no_of_probes_ls, probeDensityLs, amplitude_ls,c=c_ls)
+			pylab.title(title)
+			pylab.xlabel(xlabel)
+			pylab.ylabel(ylabel)
+			pylab.show()
+			"""
+			if replaceNoOfProbesWithProbeDensity:
+				y_ls = probeDensityLs
+			else:
+				y_ls = no_of_probes_ls
+			cls.drawHexbin(amplitude_ls, y_ls, percUnCoveredByLerContig_ls, fig_fname=fig_fname, \
+				gridsize=gridsize, title=title, \
+						xlabel=xlabel, \
+						ylabel=ylabel, colorBarLabel=colorBarLabel,\
+						reduce_C_function=numpy.mean)
+			sys.stderr.write("\n")
+	
+	"""
+		#2010-6-28
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callCutoff/')
+		for array_id in [3,4,41,150,151]:
+			for gridsize in [20, 40, 60, 100]:
+				CNV.inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(db_250k, array_id=array_id, output_dir=output_dir, \
+											minPercUnCoveredByLerContig=0.6, gridsize=gridsize)
+		sys.exit(0)
+		
+		# replace mean intensity of probes in one segment (amplitude) with median intensity instead 
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callCutoff/')
+		cnv_method_id = 9
+		for array_id in [3,4,41,150,151]:
+			for gridsize in [20, 40, 60, 100]:
+				CNV.inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(db_250k, array_id=array_id, output_dir=output_dir, \
+											minPercUnCoveredByLerContig=0.6, gridsize=gridsize, cnv_method_id=cnv_method_id,\
+											replaceAmpWithMedianIntensity=True)
+		sys.exit(0)
+		
+		#2010-7-24 banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/CNVCallLabelVsIntensityByNoOfProbes/')
+		cnv_method_id = 7
+		rows = db_250k.metadata.bind.execute("select distinct array_id from cnv_call where cnv_method_id=7 and percUnCoveredByLerContig is null order by array_id")
+		array_id_ls = []
+		for row in rows:
+			array_id_ls.append(row.array_id)
+		for array_id in array_id_ls:
+			for gridsize in [20, 40, 60, 100]:
+				CNV.inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(db_250k, array_id=array_id, output_dir=output_dir, \
+											minPercUnCoveredByLerContig=0.6, gridsize=gridsize, cnv_method_id=cnv_method_id,\
+											replaceAmpWithMedianIntensity=False, colorBarLabel='FractionNotCoveredByPEData', \
+											deletedFraction=2)
+		sys.exit(0)
+		
+	"""
 	@classmethod
 	def addAmplitudeFunctor(cls, param_obj, cnv_segment_obj, cnv_qc_call=None):
 		"""
@@ -9102,11 +11413,11 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		2009-11-4
 			draw histogram of amplitude of segments who are validated according to certain QC data
 		"""
-		ecotype_id2cnv_qc_call_data = cls.getCNVQCDataFromDB(data_source_id, cnv_type_id=cnv_type_id, \
+		cnvQCData = cls.getCNVQCDataFromDB(data_source_id, cnv_type_id=cnv_type_id, \
 															min_QC_segment_size=min_QC_segment_size,\
 															min_no_of_probes=min_no_of_probes, \
 															min_reciprocal_overlap=min_reciprocal_overlap)
-		
+		ecotype_id2cnv_qc_call_data = cnvQCData.ecotype_id2cnv_qc_call_data
 		from pymodule import PassingData
 		param_obj = PassingData(amp_ls=[], cnv_qc_call_id_set=set())
 		cls.compareCNVSegmentsAgainstQCHandler(input_fname_ls, ecotype_id2cnv_qc_call_data, cls.addAmplitudeFunctor, param_obj, \
@@ -9347,8 +11658,12 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	
 	@classmethod
 	def drawGADAOutputAmpHist(cls, db_250k,input_fname, output_fname_prefix, max_amplitude=None,\
-											drawKernelDensity=False):
+											drawKernelDensity=False, gridsize=40):
 		"""
+		#2010-7-1
+			if argument drawKernelDensity == 2:
+				draw a 2D histogram, density by color
+			add argument gridsize 40 for drawKernelDensity == 2
 		2010-6-7
 			It draws a histogram of "copy-number" (amplitude) of segments outputted by discoverLerDeletionDuplication (using GADA).
 			
@@ -9357,7 +11672,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			argument max_amplitude is used to filter out segments whose amplitude is above this.
 				purpose is to avoid saturation of histogram by normal fragments.
 		"""
-		import csv
+		import csv, math
 		from pymodule import figureOutDelimiter, getColName2IndexFromHeader
 		reader = csv.reader(open(input_fname), delimiter=figureOutDelimiter(input_fname))
 		header = reader.next()
@@ -9365,56 +11680,661 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		copy_number_col_index = col_name2index.get('amplitude')
 		ecotype_id_col_index = col_name2index.get('ecotype_id')
 		array_id_col_index = col_name2index.get('array_id')
+		no_of_probes_col_index = col_name2index.get('length')
+		
 		array_id2ecotype_id_amplitude_ls = {}
 		for row in reader:
 			ecotype_id = int(row[ecotype_id_col_index])
 			array_id = row[array_id_col_index]
 			if array_id not in array_id2ecotype_id_amplitude_ls:
-				array_id2ecotype_id_amplitude_ls[array_id] = [ecotype_id, []]
+				array_id2ecotype_id_amplitude_ls[array_id] = [ecotype_id, [], []]
 			amplitude = float(row[copy_number_col_index])
 			if max_amplitude is not None and amplitude>max_amplitude:
 				continue
+			no_of_probes = int(row[no_of_probes_col_index])
 			array_id2ecotype_id_amplitude_ls[array_id][1].append(amplitude)
+			array_id2ecotype_id_amplitude_ls[array_id][2].append(math.log10(no_of_probes))
 		
 		from common import get_ecotypeid2nativename
 		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		import Stock_250kDB
 		
 		import pylab
 		for array_id, ecotype_id_amplitude_ls in array_id2ecotype_id_amplitude_ls.iteritems():
 			pylab.clf()
-			ecotype_id, amplitude_ls =  ecotype_id_amplitude_ls
+			ecotype_id, amplitude_ls, no_of_probes_ls =  ecotype_id_amplitude_ls
 			nativename = ecotype_id2nativename.get(ecotype_id)
-			title = 'Array %s, e %s, %s'%(array_id, ecotype_id, nativename)
+			array = Stock_250kDB.ArrayInfo.get(array_id)
+			
+			title = 'Array %s, e %s, %s median %s'%(array_id, ecotype_id, nativename, array.median_intensity)
 			pylab.title(title)
-			if drawKernelDensity:
+			xlabel = 'segment mean intensity'
+			ylabel = 'density'
+			if drawKernelDensity==True or drawKernelDensity==1:
 				import statistics	# 2010-5-30 package from Michiel De Hoon
 				y, x = statistics.pdf(amplitude_ls)
 				pylab.plot(x, y, alpha=0.7)
+			elif drawKernelDensity==2:	#2010-7-1	draw a 2D histogram, density by color
+				import matplotlib.cm as cm
+				pylab.hexbin(amplitude_ls, no_of_probes_ls, C=[1]*len(amplitude_ls), \
+							gridsize=gridsize, reduce_C_function=CNV.logSum, cmap=cm.jet)
+				ylabel = 'log10(no of probes)'
+				cb = pylab.colorbar()
+				cb.set_label("log10(count)")
 			else:
 				pylab.hist(amplitude_ls, 35)
-			pylab.ylabel('density')
-			pylab.xlabel('LerContig probe copy number amplitude')
+			pylab.xlabel(xlabel)
+			pylab.ylabel(ylabel)
+			pylab.xlim([-1.5, 1])
 			pylab.savefig('%s_e%s_a%s.png'%(output_fname_prefix, ecotype_id, array_id), dpi=300)
 			sys.stderr.write("Done.\n")
 	
 	"""
 
-	max_amplitude = 3	# 0.6
-	drawKernelDensity = True
-	common_prefix = '~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_98_arrays_GADA2_A0.5T4.0M5'
-	input_fname = os.path.expanduser('%s.tsv'%common_prefix)
-	if drawKernelDensity is False:
-		common_prefix += '_hist'
-	if max_amplitude is not None:
-		common_prefix += '_maxAmp%.1f'%max_amplitude
-	output_fname_prefix = os.path.expanduser('%s'%(common_prefix))
-	CNV.drawGADAOutputAmpHist(db_250k, input_fname, output_fname_prefix, \
-										max_amplitude=max_amplitude, drawKernelDensity=drawKernelDensity)
-	sys.exit(0)
+		max_amplitude = 3	# 0.6
+		drawKernelDensity = True
+		common_prefix = '~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_98_arrays_GADA2_A0.5T4.0M5'
+		input_fname = os.path.expanduser('%s.tsv'%common_prefix)
+		if drawKernelDensity is False:
+			common_prefix += '_hist'
+		if max_amplitude is not None:
+			common_prefix += '_maxAmp%.1f'%max_amplitude
+		output_fname_prefix = os.path.expanduser('%s'%(common_prefix))
+		CNV.drawGADAOutputAmpHist(db_250k, input_fname, output_fname_prefix, \
+											max_amplitude=max_amplitude, drawKernelDensity=drawKernelDensity)
+		sys.exit(0)
 
+
+		#2010-7-1
+		max_amplitude = 3	# 0.6
+		drawKernelDensity = True
+		common_prefix = 'call_53_WABQN_b100_j50_lts_2Flanking_GADA_A0.5T12.0M5'
+		input_dir = os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/')
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/GADAOutputAmpHist/')
+		input_fname = os.path.join(input_dir, '%s.tsv'%common_prefix)
+		if drawKernelDensity is False:
+			common_prefix += '_hist'
+		if max_amplitude is not None:
+			common_prefix += '_maxAmp%.1f'%max_amplitude
+		output_fname_prefix = os.path.join(output_dir, common_prefix)
+		CNV.drawGADAOutputAmpHist(db_250k, input_fname, output_fname_prefix, \
+											max_amplitude=max_amplitude, drawKernelDensity=drawKernelDensity)
+		sys.exit(0)
+		
+		#2010-7-1
+		max_amplitude = 3	# 0.6
+		drawKernelDensity = 2
+		common_prefix = 'call_53_WABQN_b100_j50_lts_2Flanking_GADA_A0.5T12.0M5'
+		input_dir = os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/')
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/GADAOutputAmpHist/')
+		input_fname = os.path.join(input_dir, '%s.tsv'%common_prefix)
+		if drawKernelDensity is False:
+			common_prefix += '_hist'
+		if max_amplitude is not None:
+			common_prefix += '_maxAmp%.1f'%max_amplitude
+		output_fname_prefix = os.path.join(output_dir, common_prefix)
+		CNV.drawGADAOutputAmpHist(db_250k, input_fname, output_fname_prefix, \
+								max_amplitude=max_amplitude, drawKernelDensity=drawKernelDensity, gridsize=40)
+		sys.exit(0)
+	"""
+	@classmethod
+	def traverseCNVCall(cls, db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, ecotype_id_ls=None,\
+					min_no_of_probes=None, min_segment_size=None, processClassIns=None, \
+					order_by_string='order by array_id, chromosome, start, stop', param_obj=None):
+		"""
+		2010-7-29
+			bugfix.
+				start to use cnv_method_id to restrict query.
+		2010-7-21
+			a common function which traverses through all CNVCalls.
+		"""
+		from pymodule import PassingData
+		import Stock_250kDB
+		sql_string = "select a.maternal_ecotype_id as ecotype_id, c.array_id, c.chromosome, c.start, c.stop, c.size_affected, \
+					c.no_of_probes_covered, c.amplitude, c.probability, c.percUnCoveredByLerContig, c.cnv_type_id, \
+					c.cnv_method_id, c.comment from %s c, %s a \
+					where c.array_id=a.id "%\
+					(Stock_250kDB.CNVCall.table.name, Stock_250kDB.ArrayInfo.table.name)
+					
+		if cnv_type_id is not None:
+			sql_string += " and c.cnv_type_id=%s"%cnv_type_id
+		if cnv_method_id is not None:	#2010-7-29 bugfix
+			sql_string += " and c.cnv_method_id=%s"%cnv_method_id
+		
+		if ecotype_id is not None:
+			sql_string += " and a.maternal_ecotype_id=%s"%ecotype_id
+		elif ecotype_id_ls:
+			str_ecotype_id_ls = map(str, ecotype_id_ls)
+			sql_string += ' and a.maternal_ecotype_id in (%s)'%(','.join(str_ecotype_id_ls))
+		if min_no_of_probes is not None:
+			sql_string += " and c.no_of_probes_covered>=%s"%min_no_of_probes
+		if min_segment_size is not None:
+			sql_string += " and (c.stop-c.start+1)>=%s"%min_segment_size
+		
+		#2010-7-30 offer custom order_by string
+		sql_string += ' %s'%order_by_string
+		
+		#sql_string += " order by RAND()"	# 2010-1-26 random ordering to optimize the binary_tree, not needed for RBDict.
+		
+		rows = db_250k.metadata.bind.execute(sql_string)
+		count = 0
+		for row in rows:	#segments are sorted in chromosomal order
+			count += 1
+			processClassIns.run(row, param_obj)
+			if count%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, count, processClassIns.real_counter))
+		sys.stderr.write("%s%s\t%s Done.\n"%('\x08'*80, count, processClassIns.real_counter))
+	
+	class ProcessAdjacentCNVCallGapHistogram(object):
+		"""
+		2010-7-22
+			used by drawCNVCallSizeHistogram which plugs it into traverseCNVCall()
+			This class gets size of gaps between adjacent deletions on each chromosome for each array. 
+		"""
+		def __init__(self, ecotype_id2nativename=None, **keywords):
+			"""
+			2010-7-29
+				add argument **keywords
+			"""
+			self.array_id2data = {}
+			self.ecotype_id2nativename = ecotype_id2nativename
+			self.real_counter = 0
+			
+			self.previous_row = None
+			self.previous_array_id = None
+			
+			self.dataType = 1 # 2010-7-29
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+			
+		def run(self, row, param_obj=None):
+			"""
+			This function assumes row comes in 
+			"""
+			from pymodule import PassingData
+			import math
+			array_id = row.array_id
+			ecotype_id = row.ecotype_id
+			if array_id not in self.array_id2data:
+				nativename = self.ecotype_id2nativename.get(ecotype_id)
+				self.array_id2data[array_id] = PassingData(x_ls=[], y_ls=[], ecotype_id=ecotype_id,\
+													nativename=nativename)
+			if self.previous_row is not None:
+				if self.previous_array_id == row.array_id and self.previous_row.chromosome==row.chromosome:
+					try:
+						# abs() is used here because there is one case two deletions are overlapping.
+						gap_length = abs(row.start - self.previous_row.stop + 1)
+						gap_ratio1 = math.log10(float(gap_length)/row.size_affected)
+						gap_ratio2 = math.log10(float(gap_length)/self.previous_row.size_affected)
+						if self.dataType==1:
+							data_x = gap_ratio1
+							data_y = gap_ratio2
+						elif self.dataType ==2:
+							data_x = min(gap_ratio1, gap_ratio2)
+							data_y = math.log10(gap_length)
+					except:
+						"""
+						# two deletions below overlap with each other because the central positions of two probes are only 3-base apart. 
+						#array_id: 65
+						previous_row: (6918L, 65L, 2L, 5939417L, 5942609L, 3193L, 18L, -0.38029299999999999, 0.75223399999999996, None, 1L, 8L, None)
+						row: (6918L, 65L, 2L, 5942588L, 5943887L, 1300L, 9L, -0.563971, 0.75422900000000004, None, 1L, 8L, None)
+						"""
+						print "array_id:", array_id
+						print "previous_row:", self.previous_row
+						print "row:", row 
+						sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+						import traceback
+						traceback.print_exc()
+					self.array_id2data[array_id].x_ls.append(data_x)
+					self.array_id2data[array_id].y_ls.append(data_y)
+					#self.array_id2data[array_id].y_ls.append(abs(row.amplitude-self.previous_row.amplitude))
+					self.real_counter += 1
+			
+			self.previous_row = row
+			self.previous_array_id = row.array_id
+	
+	@classmethod
+	def drawCNVCallGapHistogram(cls, db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13,\
+								output_dir=None, xlabel='log10(gap/segment2)', \
+								ylabel_in_2D='log10(gap/segment1)', drawType=1, fileNamePrefix='CNVCallGapHist', dataType=1):
+		"""
+		2010-7-29
+			add argument dataType
+				1: gap_ratio1 in x_ls, gap_ratio2 in y_ls
+				2: min(gap-ratio1, gap-ratio2) in x_ls, gap-length in y_ls
+		2010-7-20
+			drawType
+				1: 1D histogram of gap ratio 1
+				2: 2D histogram of both gap ratio 1 and gap ratio 2
+		"""
+		# for the gap ratio
+		cls.drawCNVCallSizeHistogram(db_250k, cnv_method_id=cnv_method_id, cnv_type_id=cnv_type_id, \
+								ecotype_id=ecotype_id, qc_data_source_id=qc_data_source_id,\
+								output_dir=output_dir, drawType=drawType, xlabel=xlabel, \
+								ylabel_in_2D=ylabel_in_2D, processClass=cls.ProcessAdjacentCNVCallGapHistogram,\
+								xlim_in_1D=None,fileNamePrefix=fileNamePrefix, dataType=dataType)
+		"""
+		# for the gap size. need to change cls.ProcessAdjacentCNVCallGapHistogram.run()
+		cls.drawCNVCallSizeHistogram(db_250k, cnv_method_id=cnv_method_id, cnv_type_id=cnv_type_id, \
+								ecotype_id=ecotype_id, qc_data_source_id=qc_data_source_id,\
+								output_dir=output_dir, drawType=drawType, xlabel='log10(gap size)', \
+								ylabel_in_2D='amplitude delta', processClass=cls.ProcessAdjacentCNVCallGapHistogram,\
+								xlim_in_1D=None)
+		"""
+	"""
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallGapSizeHist/')
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=1, fileNamePrefix='CNVCallGapRatioHist', dataType=1)
+		sys.exit(0)
+		
+		# 2010-7-29
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallGapRatioHist/')
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=11, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, xlabel='min(gap_ratio1, gap_ratio2)', \
+								ylabel_in_2D='gap_length', drawType=1, fileNamePrefix='CNVCallGapRatioVsGapLenHist', dataType=2)
+		sys.exit(0)
+		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallGapRatioHist/')
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=11, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=2, fileNamePrefix='CNVCallGapRatioHist', dataType=1)
+		sys.exit(0)
+		
 	"""
 	
+	class ProcessAcrossArrayCNVCallOverlapHistogram(object):
+		"""
+		2010-7-22
+			used by drawAcrossArrayCNVCallOverlapRatioHistogram() which plugs it into traverseCNVCall()
+			This class gets size of gaps between adjacent deletions on each chromosome for each array. 
+		"""
+		def __init__(self, ecotype_id2nativename=None, **keywords):
+			"""
+			2010-7-29
+				add argument **keywords
+			"""
+			self.array_id2data = {}
+			self.ecotype_id2nativename = ecotype_id2nativename
+			self.real_counter = 0
+			
+			self.previous_row = None
+			self.previous_array_id = None
+			
+			self.dataType = 1 # 2010-7-29
+			self.logRatio = False	#2010-7-30
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+			
+			self.aheadSegmentLs = []
+			self.x_ls = []
+			self.y_ls = []
+			
+		def run(self, row, param_obj=None):
+			"""
+			This function assumes row comes in chromosomal order. all arrays mixed up.
+			"""
+			from pymodule import PassingData
+			from pymodule.CNV import get_overlap_ratio
+			import math
+			array_id = row.array_id
+			ecotype_id = row.ecotype_id
+			if array_id not in self.array_id2data:
+				nativename = self.ecotype_id2nativename.get(ecotype_id)
+				self.array_id2data[array_id] = PassingData(x_ls=[], y_ls=[], ecotype_id=ecotype_id,\
+													nativename=nativename)
+			
+			segment = [row.chromosome, row.start, row.stop, row.no_of_probes_covered, \
+					row.size_affected,\
+					row.amplitude, row.probability, row.array_id]
+			self.aheadSegmentLs.append(segment)
+			
+			segmentOverlapIndex = 0	#this is the index in aheadSegmentLs for the new aheadSegmentLs to start
+			no_of_segments = len(self.aheadSegmentLs)
+			if no_of_segments>1:	#more than 1 segments
+				#calcualte the overlap ratio between the current segments and all previous potentially overlapping segments
+				for i in range(no_of_segments-1):
+					aheadSegment = self.aheadSegmentLs[i]
+					if aheadSegment[0]!=segment[0]:		#on different chromosomes, ignore
+						segmentOverlapIndex = i+1
+						continue
+					overlap1, overlap2, overlap_length = get_overlap_ratio([aheadSegment[1], aheadSegment[2]], \
+																[segment[1], segment[2]])[:3]
+					if overlap1==0 or overlap2==0:
+						segmentOverlapIndex = i+1
+					elif overlap1<0 or overlap2<0:
+						sys.stderr.write("aheadSegment %s.\n"%repr(aheadSegment))
+						sys.stderr.write("segment %s.\n"%repr(segment))
+						sys.stderr.write("Error: overlap1 %s or overlap2 %s is zero.\n"%(overlap1, overlap2)) 
+					else:
+						if self.logRatio:
+							overlap1 = math.log10(overlap1)
+							overlap2 = math.log10(overlap2)
+						self.x_ls.append(overlap1)
+						if self.dataType==1:
+							self.y_ls.append(overlap2)
+						elif self.dataType==2:
+							self.y_ls.append(math.log10(overlap_length))
+						self.real_counter += 1
+				self.aheadSegmentLs = self.aheadSegmentLs[segmentOverlapIndex:]	#remove segments that are not overlapping with the current.
 	
+	@classmethod
+	def drawAcrossArrayCNVCallOverlapRatioHistogram(cls, db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13,\
+								output_dir=None, drawType=1, xlabel='log10(overlap ratio1)', ylabel_in_2D='log10(overlap ratio2)',\
+								processClass=None, xlim_in_1D=None, fileNamePrefix='AcrossArrayCNVCallOverlapHist', **keywords):
+		"""
+		2010-7-30
+			dataType (hidden argument in **keywords)
+				1: overlap ratio1 and overlap ratio2
+				2: overlap ratio1 and overlap_length
+			argument drawType is useless.
+		"""
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		if qc_data_source_id is not None and ecotype_id is None:
+			ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		else:
+			ecotype_id_ls = None
+		
+		from pymodule import PassingData
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		import math
+		if processClass is None:
+			processClass = cls.ProcessAcrossArrayCNVCallOverlapHistogram
+		processor = processClass(ecotype_id2nativename=ecotype_id2nativename, **keywords)
+		
+		order_by_string='order by chromosome, start, stop'
+		param_obj = PassingData(order_by_string=order_by_string)
+		
+		cls.traverseCNVCall(db_250k, cnv_method_id=cnv_method_id, cnv_type_id=cnv_type_id, \
+					ecotype_id=ecotype_id, ecotype_id_ls=ecotype_id_ls,\
+					min_no_of_probes=None, min_segment_size=None, processClassIns=processor, \
+					order_by_string=order_by_string, param_obj=param_obj)
+		
+		from pymodule.utils import addExtraLsToFilenamePrefix
+		
+		sys.stderr.write("drawing ...")
+		x_ls = processor.x_ls
+		y_ls = processor.y_ls
+		
+		import pylab
+		pylab.clf()
+		output_fname = os.path.join(output_dir, '%s_CNVMethod%s_CNVType%s_dataType%s_logRatio%s.png'%(fileNamePrefix, \
+									cnv_method_id,	cnv_type_id, getattr(processor, 'dataType', 1), \
+									getattr(processor, 'logRatio', False) ))
+		title = '%s type %s objects.'%(len(x_ls), cnv_type_id)
+		
+		pylab.title(title)
+		"""
+		import statistics	# 2010-5-30 package from Michiel De Hoon
+		y, x = statistics.pdf(x_ls)
+		pylab.loglog(x, y, alpha=0.7)
+		pylab.grid(True, alpha=0.6)
+		"""
+		pylab.hist(x_ls, 20, log=True)
+		if xlim_in_1D:
+			pylab.xlim(xlim_in_1D)
+		
+		pylab.xlabel(xlabel)
+		pylab.ylabel('Count')
+		#
+		pylab.savefig(output_fname, dpi=300)
+		
+		pylab.clf()
+		C_ls = [1]*len(y_ls)
+		fig_fname = addExtraLsToFilenamePrefix(output_fname, ['2D'])
+		cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+				title=title, \
+				xlabel=xlabel, \
+				ylabel=ylabel_in_2D, \
+				colorBarLabel='log10(count)', reduce_C_function=CNV.logSum)
+		sys.stderr.write("Done.\n")
+	
+	"""
+		# 2010-7-30
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/AcrossArrayCNVCallOverlapRatioHist/')
+		CNV.drawAcrossArrayCNVCallOverlapRatioHistogram(db_250k, cnv_method_id=13, cnv_type_id=1, ecotype_id=None, \
+				qc_data_source_id=13, \
+				output_dir=output_dir, drawType=2, fileNamePrefix='AcrossArrayCNVCallOverlapRatioHist', dataType=1)
+		sys.exit(0)
+		
+		# 2010-7-30
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/AcrossArrayCNVCallOverlapRatioHist/')
+		CNV.drawAcrossArrayCNVCallOverlapRatioHistogram(db_250k, cnv_method_id=13, cnv_type_id=1, ecotype_id=None, \
+				qc_data_source_id=13, xlabel='overlap ratio1', ylabel_in_2D='log10(overlap_length)',\
+				output_dir=output_dir, drawType=2, fileNamePrefix='AcrossArrayCNVCallOverlapRatioHist', \
+				dataType=2, logRatio=True)
+		sys.exit(0)
+		# 2010-7-30
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/AcrossArrayCNVCallOverlapRatioHist/')
+		CNV.drawAcrossArrayCNVCallOverlapRatioHistogram(db_250k, cnv_method_id=16, cnv_type_id=1, ecotype_id=None, \
+				qc_data_source_id=13, \
+				output_dir=output_dir, drawType=2, fileNamePrefix='AcrossArrayCNVCallOverlapRatioHist', \
+				dataType=1, logRatio=False)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def logSum(cls, ls):
+		import math
+		return math.log10(sum(ls))
+	
+	class ProcessCNVCallSizeHistogram(object):
+		"""
+		2010-7-21
+			used by drawCNVCallSizeHistogram to be plugged into traverseCNVCall()
+		"""
+		def __init__(self, ecotype_id2nativename=None, **keywords):
+			"""
+			2010-7-29
+				add argument **keywords
+			"""
+			self.array_id2data = {}
+			self.ecotype_id2nativename = ecotype_id2nativename
+			self.real_counter = 0
+			
+			# 2010-7-29
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+		
+		def run(self, row, param_obj=None):
+			"""
+			"""
+			from pymodule import PassingData
+			import math
+			array_id = row.array_id
+			ecotype_id = row.ecotype_id
+			if array_id not in self.array_id2data:
+				nativename = self.ecotype_id2nativename.get(ecotype_id)
+				self.array_id2data[array_id] = PassingData(x_ls=[], y_ls=[], ecotype_id=ecotype_id,\
+													nativename=nativename)
+			self.array_id2data[array_id].x_ls.append(math.log10(row.stop - row.start + 1))
+			self.array_id2data[array_id].y_ls.append(row.probability)
+			
+			self.real_counter += 1
+	
+	@classmethod
+	def drawCNVCallSizeHistogram(cls, db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13,\
+								output_dir=None, drawType=1, xlabel='log10(segment size)', ylabel_in_2D='score',\
+								processClass=None, xlim_in_1D=[1.5, 6], fileNamePrefix='CNVCallSizeHist', **keywords):
+		"""
+		2010-7-29
+			add argument fileNamePrefix, **keywords
+		2010-7-21
+			add argument xlabel to allow customization by drawCNVCallGapHistogram()
+		2010-7-20
+		"""
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		if qc_data_source_id is not None and ecotype_id is None:
+			ecotype_id_ls = cls.getEcotypeIDListInCNVQCAccessionGivenDataSourceID(qc_data_source_id)
+		else:
+			ecotype_id_ls = None
+		
+		from pymodule import PassingData
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		import math
+		if processClass is None:
+			processClass = cls.ProcessCNVCallSizeHistogram
+		processor = processClass(ecotype_id2nativename=ecotype_id2nativename, **keywords)
+		
+		cls.traverseCNVCall(db_250k, cnv_method_id=cnv_method_id, cnv_type_id=cnv_type_id, \
+					ecotype_id=ecotype_id, ecotype_id_ls=ecotype_id_ls,\
+					min_no_of_probes=None, min_segment_size=None, processClassIns=processor, \
+					param_obj=None)
+		from pymodule.utils import addExtraLsToFilenamePrefix
+		
+		for array_id, data in processor.array_id2data.iteritems():
+			sys.stderr.write("array %s ..."%array_id)
+			x_ls = data.x_ls
+			y_ls = data.y_ls
+			
+			import pylab
+			pylab.clf()
+			output_fname = os.path.join(output_dir, '%s_CNVMethod%s_CNVType%s_a_id%s_e_id%s_%s.png'%(fileNamePrefix, \
+										cnv_method_id, \
+										cnv_type_id, array_id, data.ecotype_id, data.nativename))
+			title = 'a-id %s, e-id %s, %s, %s type %s objects.'%(array_id, data.ecotype_id, data.nativename, \
+														len(x_ls), cnv_type_id)
+			
+			pylab.title(title)
+			"""
+			import statistics	# 2010-5-30 package from Michiel De Hoon
+			y, x = statistics.pdf(x_ls)
+			pylab.loglog(x, y, alpha=0.7)
+			pylab.grid(True, alpha=0.6)
+			"""
+			pylab.hist(x_ls, 20)
+			if xlim_in_1D:
+				pylab.xlim(xlim_in_1D)
+			
+			pylab.xlabel(xlabel)
+			pylab.ylabel('Count')
+			#
+			pylab.savefig(output_fname, dpi=300)
+			
+			C_ls = [1]*len(y_ls)
+			fig_fname = addExtraLsToFilenamePrefix(output_fname, ['2D'])
+			cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+					title=title, \
+					xlabel=xlabel, \
+					ylabel=ylabel_in_2D, \
+					colorBarLabel='log10(count)', reduce_C_function=CNV.logSum)
+			sys.stderr.write("Done.\n")
+	"""
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCall_SegmentSizeHist/')
+		CNV.drawCNVCallSizeHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=1)
+		sys.exit(0)
+		
+		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCall_SegmentSizeHist/')
+		CNV.drawCNVCallSizeHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=2)
+		sys.exit(0)
+		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallSegmentSizeHist/')
+		CNV.drawCNVCallSizeHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=1)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def drawCNVQCCallSizeHistogram(cls, db_250k, qc_data_source_id=13, cnv_type_id=1, ecotype_id=None, \
+								output_dir=None, drawType=1, parseNumOfReadsFromComment=False):
+		"""
+		2010-7-20
+			draw CNVQCCall segment size histogram
+			
+			drawType
+				1: 1D histogram of segment size
+				2: 2D histogram of segment size X score
+					if parseNumOfReadsFromComment is True, score is replaced with number of reads.
+		"""
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp, rightWithinLeftAlsoEqualCmp
+		cnvQCData = cls.getCNVQCDataFromDB(db_250k, data_source_id=qc_data_source_id, \
+										ecotype_id=ecotype_id, cnv_type_id=cnv_type_id, \
+										min_QC_segment_size=None, min_no_of_probes=None,\
+										min_reciprocal_overlap=0.0000001, \
+										cmpfn=rightWithinLeftAlsoEqualCmp, parseNumOfReadsFromComment=parseNumOfReadsFromComment)
+		ecotype_id2qc_data = cnvQCData.ecotype_id2cnv_qc_call_data
+		ecotype_id2data = cnvQCData.ecotype_id2data
+		
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		x_ls = []
+		y_ls = []
+		import math
+		def getSegmentSize(rb_node):
+			x_ls.append(math.log10(rb_node.key.span_ls[1]-rb_node.key.span_ls[0]+1))
+			y_ls.append(rb_node.value[7])
+		
+		
+		from pymodule.utils import addExtraLsToFilenamePrefix
+		
+		for ecotype_id, qc_data in ecotype_id2qc_data.iteritems():
+			sys.stderr.write("ecotype %s ..."%ecotype_id)
+			x_ls = []
+			y_ls = []
+			qc_data.traverseTree(getSegmentSize)
+			
+			import pylab
+			pylab.clf()
+			nativename = ecotype_id2nativename.get(ecotype_id)
+			output_fname = os.path.join(output_dir, 'dataSource%s_CNVType%s_e_id%s_%s.png'%(qc_data_source_id, \
+																cnv_type_id, ecotype_id, nativename))
+			title = 'e-id %s, %s, %s type %s segments.'%(ecotype_id, nativename, len(x_ls), cnv_type_id)
+			
+			if drawType==1:
+				pylab.title(title)
+				"""
+				import statistics	# 2010-5-30 package from Michiel De Hoon
+				y, x = statistics.pdf(x_ls)
+				pylab.loglog(x, y, alpha=0.7)
+				pylab.grid(True, alpha=0.6)
+				"""
+				pylab.hist(x_ls, 20)
+				pylab.xlim([1.5, 6])
+				
+				pylab.xlabel('log10(segment size)')
+				pylab.ylabel('Count')
+				#
+				pylab.savefig(output_fname, dpi=300)
+			elif drawType==2:
+				C_ls = [1]*len(y_ls)
+				if parseNumOfReadsFromComment:
+					fig_fname = addExtraLsToFilenamePrefix(output_fname, ['2D_SizeVsNumReads'])
+					ylabel='num_Reads'
+				else:
+					fig_fname = addExtraLsToFilenamePrefix(output_fname, ['2D'])
+					ylabel = 'score'
+				cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+						title=title, \
+						xlabel='log10(segment size)', \
+						ylabel=ylabel, \
+						colorBarLabel='log10(count)', reduce_C_function=CNV.logSum)
+			sys.stderr.write("Done.\n")
+			
+			
+	
+	"""
+	
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVQCCall_SegmentSizeHist/')
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		CNV.drawCNVQCCallSizeHistogram(db_250k, qc_data_source_id=13, cnv_type_id=1, ecotype_id=None, \
+								output_dir=output_dir)
+		sys.exit(0)
+	"""
 	@classmethod
 	def fillDeletionInCNVQCProbeCall(cls, db_250k, data_source_id=1, commit=False):
 		"""
@@ -9463,7 +12383,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 														position=probe.position, \
 														size_affected=size_affected, target_position=target_position, \
 														cnv_qc_call_id = qc_call_id, cnv_type_id=1)
-					session.save(db_entry)
+					session.add(db_entry)
 					session.flush()
 					no_of_encounters += 1
 				elif chromosome<probe.chromosome:	# skip
@@ -9666,7 +12586,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				array_quartile.last_decile = stats.scoreatpercentile(chr2intensity_ls[chr], 90)
 				array_quartile.maximum = numpy.max(chr2intensity_ls[chr])
 				
-				session.save_or_update(array_quartile)
+				session.add(array_quartile)
 				
 				# find and store the outliers
 				IQR = array_quartile.upper_quartile - array_quartile.lower_quartile
@@ -9678,7 +12598,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 						probe_id = chr2probe_id_ls[chr][i]
 						array_quartile_outlier = Stock_250kDB.ArrayQuartileOutlier(probe_id=probe_id, intensity=intensity)
 						array_quartile_outlier.array_quartile = array_quartile
-						session.save_or_update(array_quartile_outlier)
+						session.add(array_quartile_outlier)
 				session.flush()
 			counter += 1
 			sys.stderr.write("Done.\n")
@@ -9846,6 +12766,151 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	sys.exit(0)
 	
 	"""
+	
+	class QuanLongPairedEndSolexaData(object):
+		"""
+		2010-7-22
+			the class has functions dealing with Quan's PE data
+		"""
+		
+		def __init__(self):
+			pass
+		
+		@classmethod
+		def discoverDeletionOrNonDeletionFromCoverageData(cls, input_dir=None, output_fname=None, max_coverage_deemed_missing=1.0,\
+											copy_number=0, windowSize=100):
+			"""
+			2010-7-22
+				any 100bp window whose coverage is below max_coverage_deemed_missing is regarded as deletion/missing.
+				
+				argument copy_number controls whether to discover deletions (=0) or non-deletions (>0).
+			"""
+			import os, sys, csv
+			sys.stderr.write("Discovering deletions from Quan's PE coverage data ...\n")
+			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			header = ['original_id','ecotype_id', 'chromosome', 'start', 'stop', 'size_affected', 'copy_number', 'mean_coverage', ]
+			writer.writerow(header)
+			for fname in os.listdir(input_dir):
+				sys.stderr.write('%s ...'%fname)
+				missing_start_pos = None
+				last_missing_pos = None
+				coverage_sum = 0.0
+				input_fname = os.path.join(input_dir, fname)
+				reader = csv.reader(open(input_fname), delimiter='\t')
+				
+				original_id, ecotype_id, chr = fname.split('.')[:3]
+				ecotype_id = int(ecotype_id)
+				count = 0
+				for row in reader:
+					position, coverage = row[:2]
+					position = int(position)*windowSize	#coverage is caculated in 100-base window.
+					coverage = float(coverage)
+					
+					if copy_number==0:
+						condition = coverage<=max_coverage_deemed_missing
+					elif copy_number>0:
+						condition = coverage>max_coverage_deemed_missing
+					
+					if condition:
+						if missing_start_pos is None:
+							missing_start_pos = position - (windowSize-1)
+						last_missing_pos = position
+						coverage_sum += coverage*windowSize
+					else:
+						if last_missing_pos is not None and missing_start_pos is not None:
+							segment_length = last_missing_pos-missing_start_pos+1
+							mean_coverage = coverage_sum/float(segment_length)
+							data_row = [original_id, ecotype_id, chr, missing_start_pos, last_missing_pos, segment_length, \
+									copy_number, mean_coverage]
+							writer.writerow(data_row)
+							count += 1
+						missing_start_pos = None
+						last_missing_pos = None
+						coverage_sum = 0.0
+				# catch the deletion at the end of the chromosome
+				if last_missing_pos is not None and missing_start_pos is not None:
+					segment_length = last_missing_pos-missing_start_pos+1
+					mean_coverage = coverage_sum/float(segment_length)
+					data_row = [original_id, ecotype_id, chr, missing_start_pos, last_missing_pos,  segment_length, \
+							copy_number, mean_coverage]
+					writer.writerow(data_row)
+					count += 1
+				del reader
+				sys.stderr.write(' %s deletions. Done.\n'%count)
+			del writer
+		"""
+		# 2010-7-22 discover deletions out of coverage data
+		input_dir = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu/')
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu_deletions.tsv')
+		CNV.QuanLongPairedEndSolexaData.discoverDeletionOrNonDeletionFromCoverageData(input_dir=input_dir, \
+										output_fname=output_fname, max_coverage_deemed_missing=1.0)
+		sys.exit(0)
+		
+		
+		# 2010-7-22 discover normal segments out of coverage data
+		input_dir = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu/')
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu_NonDeletions.tsv')
+		CNV.QuanLongPairedEndSolexaData.discoverDeletionOrNonDeletionFromCoverageData(input_dir=input_dir, \
+										output_fname=output_fname, max_coverage_deemed_missing=1.0, copy_number=1)
+		sys.exit(0)
+		"""
+		
+		
+		
+		@classmethod
+		def drawCoverageHistogram(cls, input_dir, output_dir, xlim_in_1D=None):
+			"""
+			2010-7-22
+			"""
+			import csv, os
+			if not os.path.isdir(output_dir):
+				os.makedirs(output_dir)
+			
+			for fname in os.listdir(input_dir):
+				sys.stderr.write('%s ...'%fname)
+				input_fname = os.path.join(input_dir, fname)
+				reader=csv.reader(open(input_fname, 'r'), delimiter='\t')
+				coverage_ls = []
+				for row in reader:
+					coverage = float(row[1])
+					if coverage>0:
+						coverage_ls.append(math.log10(coverage))
+					else:
+						coverage_ls.append(-3)
+				
+				import pylab
+				pylab.clf()
+				title = '%s'%os.path.splitext(fname)[0]
+				xlabel = 'log10(coverage)'
+				pylab.title(title)
+				"""
+				import statistics	# 2010-5-30 package from Michiel De Hoon
+				y, x = statistics.pdf(x_ls)
+				pylab.loglog(x, y, alpha=0.7)
+				pylab.grid(True, alpha=0.6)
+				"""
+				pylab.hist(coverage_ls, 20, log=True)
+				if xlim_in_1D:
+					pylab.xlim(xlim_in_1D)
+				
+				pylab.xlabel(xlabel)
+				pylab.ylabel('Count')
+				output_fname = os.path.join(output_dir, '%s_coverage_hist.png'%os.path.splitext(fname)[0])
+				pylab.savefig(output_fname, dpi=300)
+				sys.stderr.write('Done.\n')
+			
+		"""
+		input_dir = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu/')
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu_hist/')
+		CNV.QuanLongPairedEndSolexaData.drawCoverageHistogram(input_dir, output_dir, xlim_in_1D=None)
+		sys.exit(0)
+		
+		# 2010-7-22
+		input_dir = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu/')
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/coverage4Yu_hist/')
+		CNV.QuanLongPairedEndSolexaData.drawCoverageHistogram(input_dir, output_dir, xlim_in_1D=None)
+		sys.exit(0)
+		"""
 	
 	class OneCNV(object):
 		def __init__(self, max_boundary_diff=20000, max_diff_perc=0.2, min_reciprocal_overlap=0.6):
@@ -10159,7 +13224,90 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			ax.set_title(title)
 		if output_fname_prefix:
 			pylab.savefig('%s.png'%output_fname_prefix, dpi=300)
+	
+	@classmethod
+	def drawCNVFrequencyHist(cls, db_250k, output_dir=None, cnv_method_id=None, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=None, logHist=False,
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=None):
+		"""
+		2010-8-4
+			add argument
+				minFractionNotCoveredByLyrata: to get SFS/sequence frequency spectrum of ancestral deletions/new insertions,
+					usually >0.5
+				maxFractionNotCoveredByLyrata: get SFS of new deletions, usually <0.5
+		2010-8-1
 		
+		"""
+		sys.stderr.write("Getting data related to CNV frequency ...\n")
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		import Stock_250kDB, math
+		query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id)
+		extraFileSuffixLs = []
+		if minFractionNotCoveredByLyrata is not None:
+			query = query.filter(Stock_250kDB.CNV.fractionNotCoveredByLyrata>=minFractionNotCoveredByLyrata)
+			extraFileSuffixLs.append('newInsertions_minFractionNotCoveredByLyrata%s'%minFractionNotCoveredByLyrata)
+		if maxFractionNotCoveredByLyrata is not None:
+			query = query.filter(Stock_250kDB.CNV.fractionNotCoveredByLyrata<=maxFractionNotCoveredByLyrata)
+			extraFileSuffixLs.append('newDeletions_maxFractionNotCoveredByLyrata%s'%maxFractionNotCoveredByLyrata)
+		x_ls = []
+		y_ls = []
+		for row in query:
+			x_ls.append(row.frequency)
+			y_ls.append(math.log10(row.size_affected))
+		sys.stderr.write("Done.\n")
+		
+		sys.stderr.write("Drawing ...")
+		import pylab
+		from pymodule.utils import addExtraLsToFilenamePrefix
+		pylab.clf()
+		output_fname = os.path.join(output_dir, '%s_CNVMethod%s.png'%(fileNamePrefix, \
+									cnv_method_id,))
+		output_fname = addExtraLsToFilenamePrefix(output_fname, extraFileSuffixLs)
+		title = '%s method %s objects.'%(len(x_ls), cnv_method_id)
+		
+		pylab.title(title)
+		"""
+		import statistics	# 2010-5-30 package from Michiel De Hoon
+		y, x = statistics.pdf(x_ls)
+		pylab.loglog(x, y, alpha=0.7)
+		pylab.grid(True, alpha=0.6)
+		"""
+		pylab.hist(x_ls, 30, log=logHist)
+		if xlim_in_1D:
+			pylab.xlim(xlim_in_1D)
+		
+		pylab.xlabel(xlabel)
+		pylab.ylabel('Count')
+		#
+		if logHist:
+			fig_fname = addExtraLsToFilenamePrefix(output_fname, ['logHist'])
+		else:
+			fig_fname = output_fname
+		pylab.savefig(fig_fname, dpi=300)
+		
+		C_ls = [1]*len(y_ls)
+		fig_fname = addExtraLsToFilenamePrefix(output_fname, ['2D'])
+		cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+				title=title, \
+				xlabel=xlabel, \
+				ylabel=ylabel_in_2D, \
+				colorBarLabel='log10(count)', reduce_C_function=CNV.logSum)
+		sys.stderr.write("Done.\n")
+	
+	"""
+	
+		#2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
+		cnv_method_id=22
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=False,\
+							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=False,\
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
+		sys.exit(0)
+	"""
 	@classmethod
 	def drawArrayQuartile(cls, db_250k, output_dir, call_method_id=None):
 		"""
@@ -10276,7 +13424,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 																description=seq_record.description,\
 																sequence=seq_record.seq.tostring())
 				sequence_fragment.accession = acc_obj
-				session.save(sequence_fragment)
+				session.add(sequence_fragment)
 			session.flush()
 			sys.stderr.write("Done.\n")
 		
@@ -10496,6 +13644,8 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		def mergeTwoSegments(cls, segment, next_segment):
 			"""
 			2010-6-8
+				segment = ['start_probe_id', 'start_chr_pos', 'stop_probe_id', 'stop_chr_pos', 'no_of_probes', \
+						'length', 'copy_number', 'contig', 'size_difference']
 			"""
 			new_contig_id = '%s,%s'%(segment[7], next_segment[7])
 			if segment[8] is not None and next_segment[8] is not None:
@@ -10780,7 +13930,16 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	output_fname = '/tmp/Ler-deletions.tsv'
 	CNV.LerContig.discoverLerDeletionDuplication(db_250k, ler_blast_result_fname, output_fname, deletion_only=True)
 	sys.exit(0)
-		
+	
+	max_deletion_copy_amp = 0.1
+	ler_blast_result_fname = os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/cnv_probe_blast_against_ler_contig.tsv')
+	output_fname_prefix = os.path.expanduser('~/script/variation/data/CNV/CNVProbeBlastAgainstLerContig_maxDelAmp%s_bugfix'%(max_deletion_copy_amp))
+	CNV.LerContig.discoverLerDeletionDuplication(db_250k, ler_blast_result_fname, output_fname_prefix, \
+												deletion_only=True, max_deletion_copy_amp=max_deletion_copy_amp, \
+												IO_thru_file=False)
+	sys.exit(0)
+	
+	
 		"""
 		@classmethod
 		def drawLerDelDupByGADAOutputCopyNumberHist(cls, discoverLerDelDupByGADA_output_fname, output_fname, max_amplitude=None,\
@@ -10851,10 +14010,10 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				The algorithm:
 					for each contig, get all the probes that perfectly match some part of it.
 						sort the probes in chromosomal order
-						set the start-probe to the 1st probe
-							for stop-probe in [last probe, ..., 2nd probe]:
+						set the start-probe to be the 1st probe of all probes matched to the contig
+							for stop-probe in [last probe, ..., 2nd probe]:	# in the reverse order
 								if [start-probe, stop-probe] and [alignment-start, alignment-stop] meet the condition:
-									col-span of this ler contig = the chromosomal positions of [start-probe, stop-probe]
+									col-span of this Ler contig = the chromosomal positions of [start-probe, stop-probe]
 				
 				The condition is either the length delta is <= max_length_delta, or either of the two delta ratios
 					(delta/length1, delta/length2) <= max_delta_ratio.
@@ -10954,8 +14113,9 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			len1 = abs(ref_pos[2] - ref_pos[1] + 1)
 			len2 = abs(next_ref_pos[2] - next_ref_pos[1] + 1)
 			
-			for i in [2,3]:	#for ref_stop and input_data_index, use next_ref_pos's value 
-				ref_pos[i] = next_ref_pos[i]
+			#take the maximum of two stops
+			ref_pos[2] = max(ref_pos[2], next_ref_pos[2])
+			
 			
 			# combine two contig_id_set
 			ref_pos[4] = ref_pos[4]|next_ref_pos[4]
@@ -10986,51 +14146,283 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			return [chr, deletion_start, deletion_stop, 'NA', contig_id_set, 'NA', "NA", 0]
 		
 		@classmethod
+		def calGapRatioOfTwoSegments(cls, segment, next_segment):
+			"""
+			2010-6-11
+			"""
+			current_chr = segment[0]
+			current_start = segment[1]
+			current_end = segment[2]
+				
+			next_chr = next_segment[0]
+			next_start = next_segment[1]
+			next_end = next_segment[2]
+			
+			gap_len = None
+			mergedLength = None
+			if next_chr==current_chr:
+				gap_len = next_start - current_end - 1
+				len1 = current_end - current_start + 1
+				len2 = next_end - next_start + 1
+				mergedLength = next_end - current_start + 1
+				perc1 = gap_len/float(len1)
+				perc2 = gap_len/float(len2)
+				gap_ratio = min(perc1, perc2)
+			else:
+				gap_ratio = None
+			return (gap_len, gap_ratio, mergedLength,)
+		
+		@classmethod
+		def isTwoSegmentsMergable(cls, segment, next_segment, max_reciprocal_gap_ratio=0.1, max_gap_len=10000,
+								maxDeletionLength=50000):
+			"""
+			2010-6-11
+			"""
+			current_chr = segment[0]
+			next_chr = next_segment[0]
+			
+			mergable = False
+			gap_ratio = None
+			if next_chr==current_chr:
+				gap_len, gap_ratio, mergedLength = cls.calGapRatioOfTwoSegments(segment, next_segment)[:3]
+				if mergedLength<=maxDeletionLength:
+					if gap_len<=0:
+						#+1 because if they are next to each other, merge them as well
+						mergable = True
+						gap_ratio = 0
+					elif gap_ratio<=max_reciprocal_gap_ratio and gap_len<=max_gap_len:
+						mergable = True
+			return (gap_ratio, mergable)
+		
+		@classmethod
+		def findChromosomeNeighbor(cls, i, segment_ls, direction=1, max_gap_len=10000):
+			"""
+			2010-6-11
+				finding neighbors of segment_ls[i] on the chromosome in certain direction within max_gap_len.
+				max direction
+					-1: go left
+					+1: go right
+			"""
+			segment = segment_ls[i]
+			current_chr = segment[0]
+			current_start = segment[1]
+			current_end = segment[2]
+			
+			count = 0
+			next_segment = None
+			no_of_segments = len(segment_ls)
+			neighbor_index_ls = []
+			while 1:
+				count += 1
+				new_index = i + count*direction
+				if new_index<0 or new_index>=no_of_segments:
+					next_segment = None
+					break
+				next_segment = segment_ls[new_index]
+				if next_segment:
+					next_chr = next_segment[0]
+					next_start = next_segment[1]
+					next_end = next_segment[2]
+					if next_chr!=current_chr:	#beyond this chromosome, no neighbor. break
+						next_segment = None
+						break
+					
+					if direction>0:	#to the right 
+						gap_len = (next_start - current_end) - 1
+					else:	#to the left
+						gap_len = current_start - next_end - 1
+					if gap_len>max_gap_len:	# too far. stop here
+						next_segment = None
+						break
+					neighbor_index_ls.append(new_index)
+			return neighbor_index_ls
+			
+			
+		@classmethod
+		def mergeOverlappingORCloseSegmentsByGraph(cls, segment_ls, max_reciprocal_gap_ratio=0.1, max_gap_len=100, \
+										mergeFunc=None, maxDeletionLength=50000):
+			"""
+			2010-6-11
+				a graph-based counterpart to mergeOverlappingORCloseMummerCoords()
+				
+				each segment =
+					[chr, ref_start, ref_stop, input_data_index, contig_id_set, query_start, query_stop, identity_perc]
+			"""
+			sys.stderr.write("Merging overlapping or close-by %s segments by graph ... \n"%(len(segment_ls)))
+			if mergeFunc is None:
+				mergeFunc=cls.mergeTwoMummerCoords
+			segment_ls.sort()
+			no_of_segments = len(segment_ls)
+			import networkx as nx
+			G=nx.Graph()
+			
+			from heapq import heappush, heappop
+			edgeHeap = []
+			sys.stderr.write("Constructing graph ... \n")
+			counter  = 0
+			real_counter = 0
+			for i in xrange(no_of_segments):
+				segment = segment_ls[i]
+				current_chr = segment[0]
+				current_start = segment[1]
+				current_end = segment[2]
+				G.add_node(i)
+				for j in xrange(i+1, no_of_segments):
+					next_segment = segment_ls[j]
+					
+					next_chr = next_segment[0]
+					next_start = next_segment[1]
+					next_end = next_segment[2]
+					gap_ratio, mergable = cls.isTwoSegmentsMergable(segment, next_segment, \
+										max_reciprocal_gap_ratio=max_reciprocal_gap_ratio, max_gap_len=max_gap_len,\
+										maxDeletionLength=maxDeletionLength)[:2]
+					if mergable:
+						G.add_edge(i, j, gap_ratio)
+						#heappush(edgeHeap, (gap_ratio, i,j))
+						real_counter += 1
+				counter += 1
+				if counter%1000==0:
+					sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+			sys.stderr.write(" . %s nodes, %s edges. Done.\n"%(G.number_of_nodes(), G.number_of_edges()))
+			
+			sys.stderr.write("Greedy graph algorithm to merge segments ...\n")
+			counter = 0
+			real_counter = 0
+			import random
+			while G.number_of_edges()>0:
+				no_of_edges = G.number_of_edges()
+				edge_index = random.randint(1, no_of_edges)
+				#edge_index = 1
+				i, j = G.edges()[edge_index-1]
+				try:
+					neighbor_set = set(G.neighbors(i))
+					neighbor_set |= set(G.neighbors(j))
+					
+					neighbor_set |= set(cls.findChromosomeNeighbor(i, segment_ls, direction=-1, max_gap_len=max_gap_len))
+					
+					neighbor_set |= set(cls.findChromosomeNeighbor(i, segment_ls, direction=+1, max_gap_len=max_gap_len))
+					
+					neighbor_set |= set(cls.findChromosomeNeighbor(j, segment_ls, direction=-1, max_gap_len=max_gap_len))
+					
+					neighbor_set |= set(cls.findChromosomeNeighbor(j, segment_ls, direction=+1, max_gap_len=max_gap_len))
+					
+					segment = segment_ls[i]
+					next_segment = segment_ls[j]
+					
+					segment = mergeFunc(segment, next_segment)
+					segment_ls[i] = segment
+					segment_ls[j] = None
+					
+					# remove the two old nodes and affiliated edges
+					G.remove_node(i)
+					G.remove_node(j)
+					
+					# add one node back
+					G.add_node(i)
+					
+					#i or j could be added when they are next to each other on chromosome
+					neighbor_set.remove(i)
+					neighbor_set.remove(j)
+					
+					for node in neighbor_set:
+						if i<node:
+							first_segment_index = i
+							snd_segment_index = node
+						elif i>node:
+							first_segment_index = node
+							snd_segment_index = i
+						else:
+							continue
+						segment = segment_ls[first_segment_index]
+						next_segment = segment_ls[snd_segment_index]
+						gap_ratio, mergable = cls.isTwoSegmentsMergable(segment, next_segment, \
+										max_reciprocal_gap_ratio=max_reciprocal_gap_ratio, max_gap_len=max_gap_len,\
+										maxDeletionLength=maxDeletionLength)[:2]
+						if mergable:
+							G.add_edge(first_segment_index, snd_segment_index, gap_ratio)
+							#heappush(edgeHeap, (gap_ratio, first_segment_index, snd_segment_index))
+				except:
+					sys.stderr.write('Except type at counter=%s, real_counter=%s: %s\n'%(counter, real_counter, repr(sys.exc_info())))
+					import traceback
+					traceback.print_exc()
+					for eH in edgeHeap:
+						print eH
+					print "%s nodes:"%(G.number_of_nodes())
+					for node in G.nodes():
+						print node
+					print "%s edges:"%(G.number_of_edges())
+					for edge in G.edges():
+						print edge
+					raise
+				counter  += 1
+				if counter%1000==0:
+					sys.stderr.write("%s %s nodes %s edges"%('\x08'*80, G.number_of_nodes(), G.number_of_edges()))
+			sys.stderr.write("%s %s nodes %s edges. Done.\n"%('\x08'*80, G.number_of_nodes(), G.number_of_edges()))
+			
+			return_ls = []
+			for segment in segment_ls:
+				if segment is not None:
+					return_ls.append(segment)
+			sys.stderr.write("shrinked to %s segments. Done.\n"%(len(return_ls)))
+			return return_ls
+		
+		@classmethod
 		def mergeOverlappingORCloseMummerCoords(cls, refCoverTuple_ls, max_reciprocal_gap_ratio=0.1, max_gap_len=100):
 			"""
+			2010-6-11
+				need to repeatedly to do routine until no more segments could be merged.
 			2010-6-10
 				
 			"""
-			sys.stderr.write("Merging overlapping or close-by %s mummer coords ..."%len(refCoverTuple_ls))
-			refCoverTuple_ls.sort()
-			return_ls = []
-			refCoverTuple = refCoverTuple_ls.pop(0)	# start from beginning
-			while refCoverTuple_ls:
-				refCoverTuple_chr = refCoverTuple[0]
-				refCoverTuple_start = refCoverTuple[1]
-				refCoverTuple_end = refCoverTuple[2]
-				
-				next_refCoverTuple = refCoverTuple_ls.pop(0)	# start from beginning
-				next_refCoverTuple_chr = next_refCoverTuple[0]
-				next_refCoverTuple_start = next_refCoverTuple[1]
-				next_refCoverTuple_end = next_refCoverTuple[2]
-				mergeTwo = False
-				if next_refCoverTuple_chr==refCoverTuple_chr:
-					if next_refCoverTuple_start<=refCoverTuple_end:
-						mergeTwo = True
+			no_of_old_tuples = len(refCoverTuple_ls)
+			no_of_new_tuples = 0
+			round = 0
+			while no_of_new_tuples!=no_of_old_tuples:
+				no_of_old_tuples = len(refCoverTuple_ls)
+				round += 1
+				sys.stderr.write("Round %s Merging overlapping or close-by %s mummer coords ..."%(round, len(refCoverTuple_ls)))
+				refCoverTuple_ls.sort()
+				return_ls = []
+				refCoverTuple = refCoverTuple_ls.pop(0)	# start from beginning
+				while refCoverTuple_ls:
+					refCoverTuple_chr = refCoverTuple[0]
+					refCoverTuple_start = refCoverTuple[1]
+					refCoverTuple_end = refCoverTuple[2]
+					
+					next_refCoverTuple = refCoverTuple_ls.pop(0)	# start from beginning
+					next_refCoverTuple_chr = next_refCoverTuple[0]
+					next_refCoverTuple_start = next_refCoverTuple[1]
+					next_refCoverTuple_end = next_refCoverTuple[2]
+					mergable = False
+					if next_refCoverTuple_chr==refCoverTuple_chr:
+						if next_refCoverTuple_start<=refCoverTuple_end+1:
+							#+1 because if they are next to each other, merge them as well
+							mergable = True
+						else:
+							try:
+								gap_len = next_refCoverTuple_start - refCoverTuple_end - 1
+								len1 = refCoverTuple_end - refCoverTuple_start + 1
+								len2 = next_refCoverTuple_end - next_refCoverTuple_start + 1
+								perc1 = gap_len/float(len1)
+								perc2 = gap_len/float(len2)
+								if gap_len<=max_gap_len and perc1<=max_reciprocal_gap_ratio and perc2<=max_reciprocal_gap_ratio:
+									mergable = True
+							except:
+								import traceback
+								sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+								traceback.print_exc()
+								
+					if mergable:
+						refCoverTuple = cls.mergeTwoMummerCoords(refCoverTuple, next_refCoverTuple)
 					else:
-						try:
-							gap_len = next_refCoverTuple_start - refCoverTuple_end + 1
-							len1 = refCoverTuple_end - refCoverTuple_start + 1
-							len2 = next_refCoverTuple_end - next_refCoverTuple_start + 1
-							perc1 = gap_len/float(len1)
-							perc2 = gap_len/float(len2)
-							if gap_len<=max_gap_len and perc1<=max_reciprocal_gap_ratio and perc2<=max_reciprocal_gap_ratio:
-								mergeTwo = True
-						except:
-							import traceback
-							sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
-							traceback.print_exc()
-							
-				if mergeTwo:
-					refCoverTuple = cls.mergeTwoMummerCoords(refCoverTuple, next_refCoverTuple)
-				else:
-					return_ls.append(refCoverTuple)
-					refCoverTuple = next_refCoverTuple
-			# don't forget the last refCoverTuple
-			return_ls.append(refCoverTuple)
-			sys.stderr.write("shrinked to %s segments. Done.\n"%(len(return_ls)))
-			return return_ls
+						return_ls.append(refCoverTuple)
+						refCoverTuple = next_refCoverTuple
+				# don't forget the last refCoverTuple
+				return_ls.append(refCoverTuple)
+				sys.stderr.write("shrinked to %s segments. Done.\n"%(len(return_ls)))
+				no_of_new_tuples = len(return_ls)
+				refCoverTuple_ls = return_ls
+			return refCoverTuple_ls
 		
 		@classmethod
 		def outputMummerCoords(cls, writer, ref_pos_ls, copy_number='NA'):
@@ -11049,16 +14441,18 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				start_chr_pos = '%s_%s'%(chr, ref_start)
 				stop_chr_pos = '%s_%s'%(chr, ref_stop)
 				contig_id_ls = list(contig_id_set)
+				contig_id_ls.sort()
 				contig_id = ','.join(contig_id_ls)
 				length = ref_stop - ref_start + 1
-				size_difference = int(length*(1-identity_perc))
+				size_difference = -int(length*(1-identity_perc))
 				data_row = ['NA', start_chr_pos, 'NA', stop_chr_pos, 'NA', length, copy_number, contig_id, size_difference]
 				writer.writerow(data_row)
 			sys.stderr.write("Done.\n")
 		
 		@classmethod
 		def discoverLerDeletionAndSpanFromMummerCoordsOutput(cls, nucmer_coords_fname, output_fname_prefix, \
-											min_identity_perc=0.9, maxDeletionLength=50000, debug=False):
+											min_identity_perc=0.9, maxDeletionLength=50000,\
+											max_reciprocal_gap_ratio=0.1, max_gap_len=10000, debug=False):
 			"""
 			2010-6-7
 				The idea is similar to discoverLerDeletionDuplication().
@@ -11095,24 +14489,71 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				query_start = int(row[query_start_col_index])
 				query_stop = int(row[query_stop_col_index])
 				
-				identity_perc = float(row[identity_col_index])
+				identity_perc = float(row[identity_col_index])/100.
 				if identity_perc<min_identity_perc:
 					continue
 				ref_query_tag_ls = row[ref_query_tag_col_index:]
 				chr = ref_query_tag_ls[0]
 				chr = int(chr[3])
 				contig_id = ref_query_tag_ls[1]
+				"""
 				if contig_id not in contig_id2chr2input_index_ls:
 					contig_id2chr2input_index_ls[contig_id] = {}
 				if chr not in contig_id2chr2input_index_ls[contig_id]:
 					contig_id2chr2input_index_ls[contig_id][chr] = []
+				"""
 				contig_id_set = set([contig_id])
 				data = [chr, ref_start, ref_stop, count, contig_id_set, query_start, query_stop, identity_perc]
-				contig_id2chr2input_index_ls[contig_id][chr].append(count)
+				#contig_id2chr2input_index_ls[contig_id][chr].append(count)
 				input_data_ls.append(data)
 				count += 1
 			sys.stderr.write("%s segments. Done.\n"%(len(input_data_ls)))
 			
+			sys.stderr.write("Discovering deletions ...\n")
+			counter = 0
+			real_counter = 0
+			MinSegLen = 5
+			refCoverTuple_ls = []
+			deletion_ls = []
+			ref_pos = input_data_ls[0]
+			no_of_segments = len(input_data_ls)
+			for i in range(1, no_of_segments):
+				current_ref_start = ref_pos[1]
+				current_ref_stop = ref_pos[2]
+				next_ref_pos = input_data_ls[i]
+				next_ref_start = next_ref_pos[1]
+				next_ref_stop = next_ref_pos[2]
+				
+				if ref_pos[0]==next_ref_pos[0] and next_ref_start<=current_ref_stop+1:
+					#+1 because if they are next to each other, merge them as well
+					#merge the two
+					ref_pos = cls.mergeTwoMummerCoords(ref_pos, next_ref_pos)
+				elif ref_pos[0]!=next_ref_pos[0]:	# different chromosome, skip to next_ref_pos
+					refCoverTuple_ls.append(ref_pos)
+					ref_pos = next_ref_pos
+				else:	#there's gap between two
+					refCoverTuple_ls.append(ref_pos)
+					deletion  = cls.getGapBetweenTwoMummerCoords(ref_pos, next_ref_pos)
+					deletion_length = deletion[2]-deletion[1] + 1
+					if deletion_length<=maxDeletionLength and deletion_length>0:
+						real_counter += 1
+						deletion_ls.append(deletion)
+					elif deletion_length<=0:
+						sys.stderr.write("Error: Deletion length %s <=0.\n"%(deletion_length))
+						print "ref_pos:", ref_pos
+						print "next_ref_pos:", next_ref_pos
+						sys.exit(1)
+					ref_pos = next_ref_pos
+				counter += 1
+				if debug and counter==2000:	# in debug mode. break now
+					break
+				if counter%1000==0:
+					sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+			#don't forget the last ref_pos
+			refCoverTuple_ls.append(ref_pos)
+			sys.stderr.write("%s ref coverage tuples, %s deletions. Done.\n"%(len(refCoverTuple_ls), len(deletion_ls)))
+			
+			"""
 			sys.stderr.write("Discovering deletions ...\n")
 			counter = 0
 			real_counter = 0
@@ -11165,13 +14606,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				if counter%1000==0:
 					sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
 			sys.stderr.write("%s ref coverage tuples, %s deletions. Done.\n"%(len(refCoverTuple_ls), len(deletion_ls)))
-			
-			merged_deletion_ls = cls.mergeOverlappingORCloseMummerCoords(deletion_ls, \
-											max_reciprocal_gap_ratio=0.33, max_gap_len=10000)
-			
-			refCoverTuple_ls += merged_deletion_ls
-			merged_refCoverTuple_ls = cls.mergeOverlappingORCloseMummerCoords(refCoverTuple_ls, \
-											max_reciprocal_gap_ratio=0.1, max_gap_len=100)
+			"""
 			
 			sys.stderr.write("Outputting reference coverage ...")
 			delDupWriter = csv.writer(open('%s_delDup.tsv'%output_fname_prefix, 'w'), delimiter='\t')
@@ -11181,17 +14616,52 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 						'length', 'copy_number', 'contig', 'size_difference']
 			for writer in [delDupWriter, refCoveredWriter]:
 				writer.writerow(header_row)
-			cls.outputMummerCoords(delDupWriter, merged_deletion_ls, copy_number=0)
-			cls.outputMummerCoords(refCoveredWriter, merged_refCoverTuple_ls)
+			
+			"""
+			deletion_ls = cls.mergeOverlappingORCloseSegmentsByGraph(deletion_ls, \
+							max_reciprocal_gap_ratio=max_reciprocal_gap_ratio, max_gap_len=max_gap_len,\
+							maxDeletionLength=maxDeletionLength)
+			"""
+			cls.outputMummerCoords(delDupWriter, deletion_ls, copy_number=0)
+			#refCoverTuple_ls += deletion_ls
+			"""
+			refCoverTuple_ls = cls.mergeOverlappingORCloseSegmentsByGraph(refCoverTuple_ls, \
+							max_reciprocal_gap_ratio=max_reciprocal_gap_ratio, max_gap_len=max_gap_len,
+							maxDeletionLength=maxDeletionLength)
+			"""
+			cls.outputMummerCoords(refCoveredWriter, refCoverTuple_ls, copy_number=1)
 			del delDupWriter, refCoveredWriter
 			sys.stderr.write("Done.\n")
 		"""
-	common_prefix = '~/script/variation/data/CNV/mummer/TAIR8_LerContig_maxmatch_maxgap40_mincluster60'
-	nucmer_coords_fname = os.path.expanduser('%s.coords'%(common_prefix))
-	output_fname_prefix = os.path.expanduser('%s'%(common_prefix))
-	CNV.LerContig.discoverLerDeletionAndSpanFromMummerCoordsOutput(nucmer_coords_fname, output_fname_prefix, \
-													min_identity_perc=0.9, maxDeletionLength=50000)
-	sys.exit(0)
+		common_prefix = '~/script/variation/data/CNV/mummer/TAIR8_LerContig_maxmatch_maxgap40_mincluster60'
+		#common_prefix = '~/script/variation/data/CNV/mummer/TAIR8_LerContig_mum_maxgap40k_mincluster60'
+		common_prefix = '~/script/variation/data/CNV/mummer/TAIR8_LerContig_mum_maxgap40_mincluster60'
+		nucmer_coords_fname = os.path.expanduser('%s.coords'%(common_prefix))
+		max_reciprocal_gap_ratio = 0.1
+		max_gap_len = 10000
+		min_identity_perc = 0.9
+		output_fname_prefix = os.path.expanduser('%s_min_identity_perc%s_max_reciprocal_gap_ratio%s_max_gap_len%s_randomEdge'%\
+									(common_prefix, min_identity_perc, max_reciprocal_gap_ratio, max_gap_len))
+		CNV.LerContig.discoverLerDeletionAndSpanFromMummerCoordsOutput(nucmer_coords_fname, output_fname_prefix, \
+							min_identity_perc=min_identity_perc, maxDeletionLength=50000, \
+							max_reciprocal_gap_ratio=max_reciprocal_gap_ratio, max_gap_len=max_gap_len, debug=debug)
+		sys.exit(0)
+		
+		
+		# 2010-7-15 TAIR9
+		common_prefix = '~/script/variation/data/CNV/mummer/TAIR9_LerContig_maxmatch_maxgap40_mincluster60'
+		common_prefix = '~/script/variation/data/CNV/mummer/TAIR9_Lyrata_maxmatch_maxgap40_mincluster60'
+		nucmer_coords_fname = os.path.expanduser('%s.coords'%(common_prefix))
+		max_reciprocal_gap_ratio = 0.1
+		max_gap_len = 10000
+		min_identity_perc = 0.9
+		output_fname_prefix = os.path.expanduser('%s_min_identity_perc%s'%\
+									(common_prefix, min_identity_perc))
+		CNV.LerContig.discoverLerDeletionAndSpanFromMummerCoordsOutput(nucmer_coords_fname, output_fname_prefix, \
+							min_identity_perc=min_identity_perc, maxDeletionLength=50000, \
+							max_reciprocal_gap_ratio=max_reciprocal_gap_ratio, max_gap_len=max_gap_len, debug=self.debug)
+		sys.exit(0)
+		
 		"""
 		
 		@classmethod
@@ -11581,10 +15051,10 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			cnv_type_id = None means all cnv types.
 		"""
 		from pymodule.CNV import leftWithinRightAlsoEqualCmp
-		ecotype_id2cnv_qc_call_data = cls.getCNVQCDataFromDB(data_source_id, ecotype_id, cnv_type_id, \
+		cnvQCData = cls.getCNVQCDataFromDB(data_source_id, ecotype_id, cnv_type_id, \
 															min_reciprocal_overlap=min_reciprocal_overlap,\
 															cmpfn=leftWithinRightAlsoEqualCmp, min_no_of_probes=min_no_of_probes)
-		
+		ecotype_id2cnv_qc_call_data = cnvQCData.ecotype_id2cnv_qc_call_data
 		import Stock_250kDB
 		from DB_250k2Array import DB_250k2Array
 		probes, xy_ls, chr_pos_ls, total_probe_id_ls = DB_250k2Array.get_probes(db_250k.metadata.bind, Stock_250kDB.Probes.table.name, \
@@ -11917,6 +15387,8 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	@classmethod
 	def markCNVProbeTAIR9CopyNumber(cls, db_250k, tair9_blast_result_fname, min_no_of_matches=25):
 		"""
+		2010-6-23
+			deal with the possibility that one probe has mutliple copies
 		2010-5-23
 			tair9_blast_result_fname is output of 
 				~/scriptvariation/Dazhe/src/MpiBlast.py -o ~/script/variation/data/CNV/cnv_probe_blast_against_tair9.tsv -m 25
@@ -11933,6 +15405,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		reader = csv.reader(open(tair9_blast_result_fname), delimiter=figureOutDelimiter(tair9_blast_result_fname))
 		header = reader.next()
 		col_name2index = getColName2IndexFromHeader(header)
+		probe_id2copy_number = {}
 		for row in reader:
 			counter += 1
 			chr = int(row[col_name2index['Chromosome']])
@@ -11944,21 +15417,52 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			alignment_start = int(row[col_name2index['Alignment_start']])
 			query_start = int(row[col_name2index['query_start']])
 			if no_of_matches>=min_no_of_matches:
-				probe = Stock_250kDB.Probes.get(probe_id)
-				probe.Tair9Copy = 1
-				session.save_or_update(probe)
+				if probe_id not in probe_id2copy_number:
+					probe_id2copy_number[probe_id] = 0
+				probe_id2copy_number[probe_id] += 1
 				real_counter += 1
-			if counter % 5000==0:
+			if counter%5000==0:
 				sys.stderr.write("%s\t%s\t%s"%('\x08'*80, counter, real_counter))
-				session.flush()
 		del reader
+		sys.stderr.write("%s\t%s\t%s perfect matches for %s distinct probes. Done.\n"%('\x08'*80, \
+													counter, real_counter, len(probe_id2copy_number)))
+		
+		sys.stderr.write("Updating the database ...\n")
+		i = 0
+		block_size = 1000
+		real_counter = 0
+		TableClass = Stock_250kDB.Probes
+		rows = TableClass.query.offset(i).limit(block_size)
+		while rows.count()!=0:
+			for row in rows:
+				copy_number = probe_id2copy_number.get(row.id)
+				if row.Tair9Copy!=copy_number:	# copy_number could be None, which sets Tair9Copy to NULL.
+					row.Tair9Copy = copy_number
+					session.add(row)
+					real_counter += 1
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+				session.flush()
+				session.expunge_all()
+			rows = TableClass.query.offset(i).limit(block_size)
 		session.flush()
 		session.commit()
-		sys.stderr.write("\t%s\t%sDone.\n"%(counter, real_counter))
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, real_counter))
 	
 	"""
 	tair9_blast_result_fname = os.path.expanduser("~/script/variation/data/CNV/cnv_probe_blast_against_tair9.tsv")
 	CNV.markCNVProbeTAIR9CopyNumber(db_250k, tair9_blast_result_fname)
+	sys.exit(0)
+	
+	input_fname = os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/stock_250k_probes_vs_TAIR9.tsv')
+	CNV.markCNVProbeTAIR9CopyNumber(db_250k, input_fname)
+	sys.exit(0)
+	
+	#2010-6-26 the hpc-cmb result is incomplete due to early MPI exit.
+	input_fname = os.path.expanduser('~/script/variation/data/CNV/stock_250k_probes_vs_TAIR9_20100625.tsv')
+	CNV.markCNVProbeTAIR9CopyNumber(db_250k, input_fname)
+	sys.exit(0)
 	"""
 	
 	@classmethod
@@ -11978,8 +15482,402 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 		if output_fname:
 			pylab.savefig(output_fname, dpi=300)
 	
-	
-	
+	class CNVPredictionBySVM(object):
+		"""
+			2010-6-30
+		"""
+		def __init__(self):
+			"""
+			2010-6-30
+			"""
+			pass
+		
+		@classmethod
+		def outputDeletionStatForEachArrayData(cls,  db_250k, cnv_type_id=1, cnv_method_id=10, \
+						replaceAmpWithMedianIntensity=False, output_fname=None, debug=False):
+			"""
+			2010-7-2
+				output no_of_deletions, total_genome_size_deleted for each array, along with ecotype id and name
+			"""
+			i = 0
+			block_size = 5000
+			real_counter = 0
+			import Stock_250kDB
+			TableClass = Stock_250kDB.CNVCall
+			query = TableClass.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id)
+			rows = query.offset(i).limit(block_size)
+			session = db_250k.session
+			array_id2data = {}
+			
+			from pymodule import PassingData
+			from common import get_ecotypeid2nativename
+			ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+			ecotype_id = None
+			percUnCoveredByLerContig_ls = []
+			feature_data = []
+			class_label_ls = []
+			c_ls = []
+			while rows.count()!=0:
+				for row in rows:
+					ecotype_id = row.array.maternal_ecotype_id
+					array_id = row.array_id
+					if array_id not in array_id2data:
+						nativename = ecotype_id2nativename.get(ecotype_id)
+						array_id2data[array_id] = PassingData(no_of_deletions=0, deletion_size=0, ecotype_id=ecotype_id,\
+															nativename=nativename)
+					array_id2data[array_id].no_of_deletions += 1
+					array_id2data[array_id].deletion_size += (row.stop-row.start+1.0)
+					i += 1
+				if i%5000==0:
+					sys.stderr.write("%s%s\t%s"%('\x08'*80, i, real_counter))
+					if debug:
+						break
+				rows = query.offset(i).limit(block_size)
+			sys.stderr.write("%s%s\t%s\n"%('\x08'*80, i, real_counter))
+			
+			sys.stderr.write("Outputting deletion stats ...")
+			import csv
+			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			header = ['array_id', 'nativename', 'ecotype_id', 'no_of_deletions', 'deletion_size']
+			writer.writerow(header)
+			for array_id, stat_data in array_id2data.iteritems():
+				row = [array_id, stat_data.nativename, stat_data.ecotype_id, stat_data.no_of_deletions, stat_data.deletion_size]
+				writer.writerow(row)
+			del writer
+			sys.stderr.write("Done.\n")
+		"""
+		#2010-7-2
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/cnv_method_10_deletion_stat.tsv')
+		CNV.CNVPredictionBySVM.outputDeletionStatForEachArrayData(db_250k, \
+						cnv_type_id=1, cnv_method_id=10, \
+						replaceAmpWithMedianIntensity=False, output_fname=output_fname)
+			
+		"""
+		@classmethod
+		def getCNVFeatureData(cls,  db_250k, array_id=None, \
+						minPercUnCoveredByLerContig=0.6, cnv_method_id=6, \
+						replaceAmpWithMedianIntensity=False):
+			"""
+			2010-7-1
+				moved to CNVPredictDeletionBySVM.py
+			2010-6-30
+			"""
+			from CNVPredictDeletionBySVM import CNVPredictDeletionBySVM
+			"""
+			2010-7-1 "from variation.src.CNVPredictDeletionBySVM import CNVPredictDeletionBySVM" doesn't work
+				because  db_250k in this misc.py is directly imported from Stock_250kDB, rather than variation.src.Stock_250kDB.
+			"""
+			return CNVPredictDeletionBySVM.getCNVFeatureData(db_250k, array_id=array_id, \
+						minPercUnCoveredByLerContig=minPercUnCoveredByLerContig, cnv_method_id=cnv_method_id, \
+						replaceAmpWithMedianIntensity=replaceAmpWithMedianIntensity)
+		
+		@classmethod
+		def getCNVPredictionErrorBySVMCrossValidation(cls, db_250k, output_dir=None, array_id=None, \
+						minPercUnCoveredByLerContig=0.6, cnv_method_id=6, \
+						replaceAmpWithMedianIntensity=False, gridsize=40):
+			"""
+			2010-6-30
+			"""
+			import sys
+			cnvFeatureData = cls.getCNVFeatureData(db_250k, array_id=array_id, \
+						minPercUnCoveredByLerContig=minPercUnCoveredByLerContig, cnv_method_id=cnv_method_id, \
+						replaceAmpWithMedianIntensity=replaceAmpWithMedianIntensity)
+			
+			from svm import svm_parameter, LINEAR, POLY, RBF
+			import numpy
+			class_label_ls = cnvFeatureData.class_label_ls
+			size = len(class_label_ls)
+			if size<100:
+				return
+			sys.stderr.write("Starting the prediciton ...\n")
+			total_correct = 0.
+			kernels2kname = {LINEAR:'linear', POLY:'polynomial', RBF:'rbf'}
+			kernels2kname = {RBF:'rbf'}	# 2009- 11-18 only polynomial
+			mute_device = open('/dev/null', 'w')
+			eps = 1e-2
+			param = svm_parameter(C = 10, eps=eps)	#,nr_weight = 2,weight_label = [1,0],weight = [10,1])
+			C_ls = [100, 10, 1, 0.1, 0.01]	# tried 1000, 10, 1, 0.1 ,0.01
+			C_ls = [10]
+			gamma_ls = [100, 10, 1, 0.1, 0.0001, 0]
+			gamma_ls = [0.]	# test shows that gamma affects rbf quite a bit
+			nr_fold = 10	# 10 fold cross validation
+			for k, kname in kernels2kname.iteritems():
+				for C in C_ls:
+					for gamma in gamma_ls:
+						param.gamma = gamma
+						param.C = C
+						param.kernel_type = k;
+						param.eps = eps
+						
+						fitResult = cls.fitAndPredictBySVM(param, cnvFeatureData.feature_data, class_label_ls,\
+											crossValidationNrFold=nr_fold)
+						cls.drawSVMClassPrediction(output_dir, cnvFeatureData.feature_data, fitResult.prediction_ls, \
+							gridsize=gridsize, \
+							extraFileNameTag = 'ByCrossValidation', \
+							extraTitle='ByCV, PPV %.3f TP %s TPR %.3f FPR %.3f'%(fitResult.precision, \
+											fitResult.TP, \
+											fitResult.sensitivity, fitResult.FPR),\
+							class_label_name='segment label', \
+							array_id=array_id, ecotype_id=cnvFeatureData.ecotype_id, cnv_method_id=cnv_method_id, \
+							minPercUnCoveredByLerContig=minPercUnCoveredByLerContig)
+		"""
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callPredictedBySVM/')
+		CNV.CNVPredictionBySVM.getCNVPredictionErrorBySVMCrossValidation(db_250k, array_id=array_id, \
+						minPercUnCoveredByLerContig=0.6, cnv_method_id=6, \
+						replaceAmpWithMedianIntensity=False)
+		
+		cnv_method_id = 9
+		for array_id in [3,4,41,150,151]:
+			CNV.CNVPredictionBySVM.getCNVPredictionErrorBySVMCrossValidation(db_250k, array_id=array_id, \
+					minPercUnCoveredByLerContig=0.6, cnv_method_id=cnv_method_id, \
+					replaceAmpWithMedianIntensity=False)
+		sys.exit(0)
+		
+		#2010-6-30
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callPredictedBySVM/')
+		gridsize = 40
+		cnv_method_id = 8
+		for array_id in [3, 4, 41, 150, 151]:
+			for minPercUnCoveredByLerContig in [0.4, 0.6, 0.8]:
+				CNV.CNVPredictionBySVM.getCNVPredictionErrorBySVMCrossValidation(db_250k, output_dir=output_dir,\
+						array_id=array_id, \
+						minPercUnCoveredByLerContig=minPercUnCoveredByLerContig, cnv_method_id=cnv_method_id, \
+						replaceAmpWithMedianIntensity=False, gridsize=gridsize)
+		sys.exit(0)
+
+		"""
+		@classmethod
+		def fitAndPredictBySVM(cls, param, training_feature_data, training_class_label_ls, test_feature_data=None, \
+							test_class_label_ls=None, crossValidationNrFold=0):
+			"""
+			2010-6-30
+				either do cross_validation using training_feature_data & training_class_label_ls
+				
+				or use training_* to train the model and then predict for the test_* data 
+			"""
+			import sys
+			mute_device = open('/dev/null', 'w')
+			sys.stderr = mute_device
+			sys.stdout = mute_device
+			from svm import svm_problem, svm_parameter, svm_model, cross_validation, LINEAR, POLY, RBF
+			problem = svm_problem(training_class_label_ls, training_feature_data)
+			isCrossValidationMode = False 
+			if (crossValidationNrFold is None or crossValidationNrFold ==0) and (test_feature_data is not None \
+				and test_class_label_ls is not None):
+				model = svm_model(problem, param)
+				class_label_ls = test_class_label_ls
+				_prediction_ls = None
+			elif crossValidationNrFold is not None and crossValidationNrFold >0:
+				_prediction_ls = cross_validation(problem, param, crossValidationNrFold)
+				class_label_ls = training_class_label_ls
+				model = None
+			else:
+				return None
+			sys.stderr = sys.__stderr__
+			sys.stdout = sys.__stdout__
+			
+			errors = 0.
+			no_of_cnvs = len(class_label_ls)
+			prediction_ls = []
+			probability_ls = []
+			TP = 0	# True positive
+			FP = 0
+			FN = 0
+			TN = 0
+			for i in range(no_of_cnvs):
+				probability = None
+				if model is not None:
+					if param.probability:
+						prediction, probability = model.predict_probability(test_feature_data[i])
+						probability_ls.append(probability[prediction])
+					else:
+						prediction = model.predict(test_feature_data[i])
+				else:
+					prediction = _prediction_ls[i]
+				prediction_ls.append(prediction)
+				"""
+				# this is for continuous class label (mse estimate)
+				errors += (prediction-class_label_ls[i])*(prediction-class_label_ls[i])
+				"""
+				if class_label_ls[i]==-1 and prediction==-1:
+					TP += 1
+				elif class_label_ls[i]==-1 and prediction==1:
+					FN += 1
+				elif class_label_ls[i]==1 and prediction==-1:
+					FP += 1
+				elif class_label_ls[i]==1 and prediction==1:
+					TN += 1
+				
+				if (class_label_ls[i] != prediction):
+					errors = errors + 1
+			errors = errors/float(no_of_cnvs)
+			precision = TP/float(FP+TP)
+			sensitivity = TP/float(TP+FN)
+			FPR = FP/float(FP+TN)
+			print "##########################################"
+			print " kernel %s, C %s, gamma %s eps %s: error rate = %s" % (param.kernel_type, param.C, param.gamma, param.eps, errors)
+			print "##########################################"
+			from pymodule import PassingData
+			return PassingData(prediction_ls=prediction_ls, errors= errors, probability_ls=probability_ls,\
+							TP=TP, FP=FP, FN=FN, TN=TN, precision=precision, sensitivity=sensitivity, FPR=FPR)
+			
+		@classmethod
+		def applyOneArraySVMModelToAnotherArray(cls, db_250k, output_dir=None, array1_id=None, array2_id=None,\
+						minPercUnCoveredByLerContig=0.6, cnv_method_id=6, \
+						replaceAmpWithMedianIntensity=False, gridsize=40):
+			"""
+			2010-6-30
+			"""
+			array1FeatureData = cls.getCNVFeatureData(db_250k, array_id=array1_id, \
+						minPercUnCoveredByLerContig=minPercUnCoveredByLerContig, cnv_method_id=cnv_method_id, \
+						replaceAmpWithMedianIntensity=replaceAmpWithMedianIntensity)
+			array2FeatureData = cls.getCNVFeatureData(db_250k, array_id=array2_id, \
+						minPercUnCoveredByLerContig=minPercUnCoveredByLerContig, cnv_method_id=cnv_method_id, \
+						replaceAmpWithMedianIntensity=replaceAmpWithMedianIntensity)
+			if len(array1FeatureData.feature_data)<100 or len(array2FeatureData.feature_data)<100:
+				return
+			import sys
+			from svm import svm_parameter, LINEAR, POLY, RBF
+			
+			total_correct = 0.
+			kernels2kname = {LINEAR:'linear', POLY:'polynomial', RBF:'rbf'}
+			kernels2kname = {POLY:'polynomial'}	# 2009- 11-18 only polynomial
+			kernels2kname = {RBF:'rbf'}
+			
+			param = svm_parameter(C = 10, eps=1e-2, probability = 1)	#,nr_weight = 2,weight_label = [1,0],weight = [10,1])
+			C_ls = [100, 10, 1, 0.1, 0.01]	# tried 1000, 10, 1, 0.1 ,0.01
+			C_ls = [10]
+			#gamma_ls = [100, 10, 1, 0.1, 0.0001, 0]
+			gamma_ls = [0]	# test shows that gamma affects rbf quite a bit
+			nr_fold = 10	# 10 fold cross validation
+			for k, kname in kernels2kname.iteritems():
+				for C in C_ls:
+					for gamma in gamma_ls:
+						#param.gamma = gamma
+						param.C = C
+						param.kernel_type = k;
+						fitResult = cls.fitAndPredictBySVM(param, array1FeatureData.feature_data, \
+											array1FeatureData.class_label_ls,\
+											test_feature_data = array2FeatureData.feature_data, \
+											test_class_label_ls = array2FeatureData.class_label_ls, \
+											crossValidationNrFold=0)
+						cls.drawSVMClassPrediction(output_dir, array2FeatureData.feature_data, fitResult.prediction_ls, \
+								gridsize=gridsize, \
+								extraFileNameTag = 'SVMModelFromArray%s'%array1_id, \
+								extraTitle='M-a %s, PPV %.3f TP %s TPR %.3f FPR %.3f'%(array1_id, fitResult.precision, \
+											fitResult.TP, \
+											fitResult.sensitivity, fitResult.FPR),\
+								class_label_name='segment label', \
+								array_id=array2_id, ecotype_id=array2FeatureData.ecotype_id, cnv_method_id=cnv_method_id, \
+								minPercUnCoveredByLerContig=minPercUnCoveredByLerContig)
+						#fitResult.FP, fitResult.FN, fitResult.TN, 
+		"""
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callPredictedBySVM/')
+		cnv_method_id = 8
+		gridsize = 40
+		CNV.CNVPredictionBySVM.applyOneArraySVMModelToAnotherArray(db_250k, array1_id=3, array2_id=150,\
+						minPercUnCoveredByLerContig=0.6, cnv_method_id=cnv_method_id, \
+						replaceAmpWithMedianIntensity=False, output_dir=output_dir, gridsize=gridsize)
+		sys.exit(0)
+		
+		# 2010-6-30
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callPredictedBySVM/')
+		cnv_method_id = 8
+		gridsize = 40
+		for array1_id in [3,41,150,151]:
+			for array2_id in [3,41,150,151]:
+				for gridsize in [60, 100]:
+					CNV.CNVPredictionBySVM.applyOneArraySVMModelToAnotherArray(db_250k, array1_id=array1_id, \
+								array2_id=array2_id,\
+								minPercUnCoveredByLerContig=0.6, cnv_method_id=cnv_method_id, \
+								replaceAmpWithMedianIntensity=False, output_dir=output_dir, gridsize=gridsize)
+		sys.exit(0)
+		
+		# 2010-6-30
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/figures/callPredictedBySVM/')
+		cnv_method_id = 6
+		gridsize = 40
+		for array1_id in [3,41,150,151]:
+			for array2_id in [3,41,150,151]:
+				for gridsize in [40, 60, 100]:
+					for minPercUnCoveredByLerContig in [0.4, 0.6, 0.8]:
+						CNV.CNVPredictionBySVM.applyOneArraySVMModelToAnotherArray(db_250k, array1_id=array1_id, \
+								array2_id=array2_id,\
+								minPercUnCoveredByLerContig=minPercUnCoveredByLerContig, cnv_method_id=cnv_method_id, \
+								replaceAmpWithMedianIntensity=False, output_dir=output_dir, gridsize=gridsize)
+		sys.exit(0)
+		
+		
+		"""
+		@classmethod
+		def drawSVMClassPrediction(cls, output_dir, feature_data, class_label_ls, \
+								extraFileNameTag = '', extraTitle='',\
+								feature_column_name_ls=['amplitude', 'no of probes', 'ProbeDensity'], \
+								class_label_name='fraction uncovered by Contig Sequence', gridsize=40, \
+								array_id=None, ecotype_id=None, cnv_method_id=None, minPercUnCoveredByLerContig=0.6):
+			"""
+			2010-7-1
+				pass this to drawHexbin()
+					reduce_C_function=numpy.mean
+			2010-6-30
+			"""
+			import pylab
+			import matplotlib
+			from matplotlib import cm
+			import numpy
+			from pymodule.utils import addExtraLsToFilenamePrefix, addExtraToFilenamePrefix
+			
+			if len(class_label_ls)>100:
+				feature_data = numpy.array(feature_data)
+				sys.stderr.write(" gridSize: %s "%gridsize)
+				if output_dir and not os.path.isdir(output_dir):	#2010-5-5 test if output_dir is something
+					os.makedirs(output_dir)
+				common_fig_fname = 'array_%s_ecotype_%s_cnvMethod%s.png'%(array_id, ecotype_id, cnv_method_id)
+				if extraFileNameTag is not None:
+					fig_fname = addExtraToFilenamePrefix(common_fig_fname, extraFileNameTag)
+				"""
+				fig_fname = addExtraToFilenamePrefix(common_fig_fname, 'AmplitudeAsX_ProbeDensityAsY_minUncoverPerc%s_gridsize_%s'%\
+													(minPercUnCoveredByLerContig, gridsize))
+				fig_fname = addExtraToFilenamePrefix(common_fig_fname, 'AmplitudeAsX_NoOfProbesAsY_minUncoverPerc%s_gridsize_%s'%\
+													(minPercUnCoveredByLerContig, gridsize))
+				"""
+				fig_fname = addExtraToFilenamePrefix(fig_fname, 'MeanIntensityAsX_NoOfProbesAsY_minUncoverPerc%s_gridsize_%s'%\
+													(minPercUnCoveredByLerContig, gridsize))
+				fig_fname = os.path.join(output_dir, fig_fname)
+				title = "array %s minPerc %s gsize %s %s"%(array_id, minPercUnCoveredByLerContig, gridsize, extraTitle)
+				
+				"""
+				ylabel = 'No of probes per kb'
+				xlabel = 'No of probes'
+				max_phenotype = numpy.nanmax(percUnCoveredByLerContig_ls)
+				min_phenotype = numpy.nanmin(percUnCoveredByLerContig_ls)
+				phenotype_gap = max_phenotype - min_phenotype
+				phenotype_jitter = phenotype_gap/10.
+				norm = matplotlib.colors.Normalize(vmin=min_phenotype-phenotype_jitter, vmax=max_phenotype+phenotype_jitter)
+				
+				import pylab
+				from mpl_toolkits.mplot3d import Axes3D
+				fig = pylab.figure()
+				ax = Axes3D(fig)
+				ax.scatter(no_of_probes_ls, probeDensityLs, amplitude_ls,c=c_ls)
+				pylab.title(title)
+				pylab.xlabel(xlabel)
+				pylab.ylabel(ylabel)
+				pylab.show()
+				"""
+				"""
+				cls.drawHexbin(amplitude_ls, probeDensityLs, percUnCoveredByLerContig_ls, fig_fname=fig_fname, \
+					gridsize=gridsize, title=title, \
+							xlabel='amplitude', \
+							ylabel='no of probes per kb', colorBarLabel='percentage uncovered by Contig Sequence')
+				"""
+				CNV.drawHexbin(feature_data[:,0], feature_data[:, 1], class_label_ls, fig_fname=fig_fname, \
+					gridsize=gridsize, title=title, \
+					xlabel=feature_column_name_ls[0], \
+					ylabel=feature_column_name_ls[1], colorBarLabel=class_label_name,\
+					reduce_C_function=numpy.mean)
+				sys.stderr.write("\n")
+		
 	class Normalize(object):
 		@classmethod
 		def outputKinshipVsIntensityCorrelation(cls, db_250k, kinship_output_fname=None, coefficient_fname=None, output_fname=None,\
@@ -12227,11 +16125,11 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
     2.57460976,  2.43136382,  2.39005065,  2.70027065,  3.04452848,\
     2.28555727,  2.71933126,  2.6468935 ,  2.54157925], dtype=numpy.float)
     
-	fit_y_ls = CNV.Normalize.ltsFit(x_ls, y_ls)
+	fitResult = CNV.Normalize.ltsFit(x_ls, y_ls)
 	
 	import pylab
 	pylab.plot(x_ls, y_ls, '.')
-	pylab.plot(x_ls, fit_y_ls, '.')
+	pylab.plot(x_ls, fitResult.fit_y_ls, '.')
 	pylab.legend(['raw data','fitted'])
 	pylab.show()
 	sys.exit(0)
@@ -12582,7 +16480,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 				no_of_valid_points = sum(weight_ls)
 				if no_of_valid_points<no_of_probes_to_span:
 					sys.stderr.write("Only %s points for array %s within the range [%s, %s]. Ignored.\n"%(no_of_valid_points, \
-																									array_id, min_intensity, max_intensity))
+																	array_id, min_intensity, max_intensity))
 					continue
 				loessFitSpan = no_of_probes_to_span/float(no_of_valid_points)
 				
@@ -12807,22 +16705,44 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	output_fname = addExtraToFilenamePrefix(input_fname, '%sFlanking'%noOfFlankingProbes)
 	CNV.Normalize.medianSmooth(input_fname, output_fname, noOfFlankingProbes=noOfFlankingProbes)
 	sys.exit(0)
-		"""
 	
-	@classmethod
-	def drawHexbin(cls, x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None):
+		
+		#2010-6-30
+		input_fname = os.path.expanduser('~/panfs/250k/CNV/call_53_WABQN_b100_j50_lts_TAIR9.tsv')
+		input_fname = os.path.expanduser('~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts.tsv')
+		input_fname = os.path.expanduser('~/panfs/250k/CNV/call_53_WABQN_b100_j50_lts.tsv')
+		noOfFlankingProbes = 4
+		from pymodule.utils import addExtraToFilenamePrefix, addExtraLsToFilenamePrefix
+		output_fname = addExtraToFilenamePrefix(input_fname, '%sFlanking'%noOfFlankingProbes)
+		CNV.Normalize.medianSmooth(input_fname, output_fname, noOfFlankingProbes=noOfFlankingProbes)
+		sys.exit(0)
+		
 		"""
+	@classmethod
+	def drawHexbin(cls, x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabel=None, ylabel=None,\
+				colorBarLabel=None, reduce_C_function=numpy.median):
+		"""
+		2010-7-1
+			add argument reduce_C_function()
+		2010-6-28
+			add argument xlabel & ylabel
 		2010-5-11
 		"""
 		import pylab, numpy
 		import matplotlib.cm as cm
 		pylab.clf()
-		pylab.hexbin(x_ls, y_ls, C=C_ls, gridsize=gridsize, reduce_C_function=numpy.median, cmap=cm.jet)
+		pylab.hexbin(x_ls, y_ls, C=C_ls, gridsize=gridsize, reduce_C_function=reduce_C_function, cmap=cm.jet)
 		pylab.axis([min(x_ls), max(x_ls), min(y_ls), max(y_ls)])
 		if title is None:
 			title = "gridsize %s, %s probes."%(gridsize, len(x_ls))
 		pylab.title(title)
+		if xlabel:
+			pylab.xlabel(xlabel)
+		if ylabel:
+			pylab.ylabel(ylabel)
 		cb = pylab.colorbar()
+		if colorBarLabel:
+			cb.set_label(colorBarLabel)
 		if fig_fname:
 			pylab.savefig(fig_fname, dpi=300)
 	
@@ -12886,7 +16806,7 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 	"""
 	
 	@classmethod
-	def drawArrayIntensity2DAndHist(cls, db_250k, curs, array_id_ls, output_dir=None, gridsize_ls=[50,100,200,400], \
+	def drawArrayIntensity2DAndHist(cls, db_250k, curs=None, array_id_ls=None, output_dir=None, gridsize_ls=[50,100,200,400], \
 							x_range=None, y_range=None, probeType=None, drawHist=True):
 		"""
 		2010-5-9
@@ -13018,6 +16938,13 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			CNV.drawArrayIntensity2DAndHist(db_250k, curs, array_id_ls, output_dir, x_range=x_range, y_range=y_range, \
 				gridsize_ls=[block_size], probeType=2)
 	sys.exit(0)
+		
+		#2010-8-6 a few arrays whose number of deletions per chromosome varies greatly among chromosomes
+		array_id_ls = ["182", "442", "559", "560", "562", "567", "692", "907", "988", "1019"]
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/ArrayIntesntiy2DPlot/')
+		CNV.drawArrayIntensity2DAndHist(db_250k, array_id_ls=array_id_ls, output_dir=output_dir, gridsize_ls=[100])
+		sys.exit(0)
+		
 	
 	"""
 	
@@ -13164,6 +17091,250 @@ CNV.drawCNVAmpHist(snpData, output_dir, max_counter=1000)
 			ref_fname_ls.append(ref_fname)
 		CNV.drawArrayIntensity2DFromLeiLiNormalizationResult(input_fname_ls, output_dir, ref_fname_ls)
 	sys.exit(0)
+	"""
+	
+	@classmethod
+	def plotCNVCallGivenCNV(cls, CNV_ins, array_id2cnv_call_index_ls, extra_cnv_call_index_ls, output_dir=None, param_obj=None):
+		"""
+		2010-8-6
+			called by CNV.drawMergedAcrossArraysCNVSpanningMultipleCNVCallsFromOneArray()
+		"""
+		sys.stderr.write("Plotting CNV %s (%s, %s-%s) ..."%(CNV_ins.id, CNV_ins.chromosome, CNV_ins.start, CNV_ins.stop))
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		if not hasattr(param_obj, 'baseYPos'):	#2010-8-10
+			setattr(param_obj, 'baseYPos', 0)
+		if not hasattr(param_obj, 'clearPlotEveryTime'):	#2010-8-10
+			setattr(param_obj, 'clearPlotEveryTime', False)
+		if not hasattr(param_obj, 'yticks'):	#2010-8-12
+			setattr(param_obj, 'yticks', [])
+		
+		output_fname = os.path.join(output_dir, 'CNV_method%s_%s_%s_%s_%s.png'%(CNV_ins.cnv_method_id, CNV_ins.id, \
+															CNV_ins.chromosome, CNV_ins.start, CNV_ins.stop))
+		import pylab
+		
+		if param_obj.clearPlotEveryTime:	#2010-8-10
+			pylab.clf()
+		
+		no_of_arrays = len(array_id2cnv_call_index_ls)
+		title = 'CNV %s (%s, %s-%s), %s CNVCalls from %s arrays. method %s, type %s'%(CNV_ins.id, CNV_ins.chromosome, \
+							CNV_ins.start, CNV_ins.stop, len(CNV_ins.cnv_call_ls), no_of_arrays,\
+							CNV_ins.cnv_method_id, CNV_ins.cnv_type_id)
+		pylab.title(title)
+		ytick = 'CNV %s'%(CNV_ins.id)
+		yticks = [ytick]
+		param_obj.yticks.append(ytick)
+		
+		param_obj.baseYPos += 1
+		pylab.plot([CNV_ins.start, CNV_ins.stop], [param_obj.baseYPos, param_obj.baseYPos], linewidth=5, alpha=0.3)	#extra thick
+		
+		#array_id_ls = array_id2cnv_call_index_ls.keys()
+		#array_id_ls.sort()	#sorted in ecotype_id order
+		extra_cnv_call_index_ls.sort()
+		for i in xrange(len(extra_cnv_call_index_ls)):
+			start, stop, ecotype_id, array_id, cnv_call_index = extra_cnv_call_index_ls[i][:5]
+			#ecotype_id, array_id = array_id_ls[i][:2]
+			
+			#cnv_call_index_ls = array_id2cnv_call_index_ls.get(array_id_ls[i])
+			#for cnv_call_index in cnv_call_index_ls:
+			cnv_call = CNV_ins.cnv_call_ls[cnv_call_index]
+			ytick = 'aid %s eid %s %s %s'%(array_id, ecotype_id, param_obj.ecotype_id2nativename.get(ecotype_id), cnv_call.id)
+			param_obj.yticks.append(ytick)
+			yticks.append(ytick)
+			param_obj.baseYPos += 1
+			pylab.plot([cnv_call.start, cnv_call.stop], [param_obj.baseYPos, param_obj.baseYPos])
+		
+		no_of_yticks = len(yticks)
+		pylab.ylim([-10, param_obj.baseYPos+10])
+		if param_obj.clearPlotEveryTime:	#2010-8-10 save it every time if this is true.
+			yticks_index_ls = range(1, param_obj.baseYPos+1)
+			pylab.yticks(yticks_index_ls, yticks, size=2)
+			if hasattr(param_obj,'start') and hasattr(param_obj, 'stop'):
+				pylab.axvspan(param_obj.start, param_obj.stop, facecolor='g', alpha=0.3)
+			pylab.savefig(output_fname, dpi=400)
+		sys.stderr.write("Done.\n")
+	
+	@classmethod
+	def drawMergedAcrossArraysCNVSpanningMultipleCNVCallsFromOneArray(cls, db_250k, output_dir=None,\
+											cnv_method_id=None, cnv_type_id=None):
+		"""
+		2010-8-6
+			draw original CNVCall from which the merged CNV is derived from.
+		"""
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		from pymodule import PassingData
+		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, \
+				array_id2label={}, ecotype_id2nativename=ecotype_id2nativename,\
+				clearPlotEveryTime=True, baseYPos=0)
+		
+		sys.stderr.write("Drawing Merged-across-array CNVs that span multiple CNV Calls from one array. method %s type %s ...\n"%\
+						(cnv_method_id, cnv_type_id))
+		
+		
+		import Stock_250kDB
+		
+		TableClass=Stock_250kDB.CNV
+		query = TableClass.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id)
+		counter = 0 
+		for row in query:
+			counter += 1
+			array_id2cnv_call_index_ls = {}	#the key is (ecotype_id, array_id) in order to sort in terms of ecotype_id
+			extra_cnv_call_index_ls = []
+			no_of_cnv_calls = 0
+			for i in xrange(len(row.cnv_call_ls)):
+				cnv_call = row.cnv_call_ls[i]
+				extra_cnv_call_index_ls.append((cnv_call.start, cnv_call.stop, cnv_call.array.maternal_ecotype_id, cnv_call.array_id, i))
+				key = (cnv_call.array.maternal_ecotype_id, cnv_call.array_id,)
+				if key not in array_id2cnv_call_index_ls:
+					array_id2cnv_call_index_ls[key] = []
+				array_id2cnv_call_index_ls[key].append(i)
+				no_of_cnv_calls += 1
+			if len(array_id2cnv_call_index_ls)!=no_of_cnv_calls:
+				param_obj.baseYPos = 0	# 2010-8-10 param_obj.clearPlotEveryTime=True. so reset the y-position to zero.
+				cls.plotCNVCallGivenCNV(row, array_id2cnv_call_index_ls, extra_cnv_call_index_ls, output_dir=output_dir, param_obj=param_obj)
+			if counter%5000==0:
+				sys.stderr.write("%s%s"%('\x08'*80, counter))
+	"""
+		#2010-8-6
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNVSpanningMultipleCNVCallsFromOneArray/')
+		CNV.drawMergedAcrossArraysCNVSpanningMultipleCNVCallsFromOneArray(db_250k, output_dir=output_dir,\
+									cnv_method_id=22, cnv_type_id=1)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def drawMergedAcrossArraysCNVGivenPosition(cls, db_250k, output_dir=None,\
+											cnv_method_id=None, cnv_type_id=None, chromosome=None, start=None, stop=None):
+		"""
+		2010-8-10
+			draw original CNVCall from which the merged CNV is derived from.
+		"""
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		from pymodule import PassingData
+		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, \
+				array_id2label={}, ecotype_id2nativename=ecotype_id2nativename, \
+				clearPlotEveryTime=False, baseYPos=0, start=start, stop=stop, chromosome=chromosome, yticks=[])
+		
+		sys.stderr.write("Drawing Merged-across-array CNVs that overlap with Chr %s (%s-%s). method %s type %s ...\n"%\
+						(cnv_method_id, cnv_type_id, chromosome, start, stop))
+		
+		
+		import Stock_250kDB
+		
+		TableClass=Stock_250kDB.CNV
+		query = TableClass.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id)
+		
+		query = db_250k.limitQueryByChrPosition(query, TableClass, chr=chromosome, start=start, stop=stop)
+		
+		counter = 0
+		no_of_total_cnv_calls = 0
+		array_id_set = set()
+		for row in query:
+			counter += 1
+			array_id2cnv_call_index_ls = {}	#the key is (ecotype_id, array_id) in order to sort in terms of ecotype_id
+			extra_cnv_call_index_ls = []
+			no_of_cnv_calls = 0
+			for i in xrange(len(row.cnv_call_ls)):
+				cnv_call = row.cnv_call_ls[i]
+				extra_cnv_call_index_ls.append((cnv_call.start, cnv_call.stop, cnv_call.array.maternal_ecotype_id, cnv_call.array_id, i))
+				key = (cnv_call.array.maternal_ecotype_id, cnv_call.array_id,)
+				if key not in array_id2cnv_call_index_ls:
+					array_id2cnv_call_index_ls[key] = []
+				array_id2cnv_call_index_ls[key].append(i)
+				array_id_set.add(cnv_call.array_id)
+				no_of_cnv_calls += 1
+			no_of_total_cnv_calls += no_of_cnv_calls
+			cls.plotCNVCallGivenCNV(row, array_id2cnv_call_index_ls, extra_cnv_call_index_ls, \
+								output_dir=output_dir, param_obj=param_obj)
+			if counter%5000==0:
+				sys.stderr.write("%s%s"%('\x08'*80, counter))
+		if not param_obj.clearPlotEveryTime:
+			import pylab
+			output_fname = os.path.join(output_dir, 'CNV_method%s_%s_%s_%s.png'%(cnv_method_id, \
+															chromosome, start, stop))
+			title = '%s CNVs covering %s CNVCalls in %s arrays. method %s type %s'%(counter, \
+							no_of_total_cnv_calls, len(array_id_set), cnv_method_id, cnv_type_id)
+			pylab.title(title)
+			yticks_index_ls = range(1, param_obj.baseYPos+1)
+			pylab.yticks(yticks_index_ls, param_obj.yticks, size=2)
+			pylab.axvspan(start, stop, facecolor='g', alpha=0.3)
+			pylab.savefig(output_fname, dpi=400)
+	"""
+		#2010-8-10
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
+									cnv_method_id=23, cnv_type_id=1, chromosome=1, start=6159423, stop=6160879)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def drawCNVCallWithinRegion(cls, db_250k, output_dir=None,\
+							cnv_method_id=None, cnv_type_id=None, chromosome=None, start=None, stop=None):
+		"""
+		2010-8-10
+			draw original CNVCall which falls into chromosome, (start-stop)
+		"""
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		
+		from pymodule import PassingData
+		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, \
+				array_id2label={}, ecotype_id2nativename=ecotype_id2nativename, \
+				clearPlotEveryTime=False, baseYPos=0, start=start, stop=stop, chromosome=chromosome)
+		
+		sys.stderr.write("Drawing CNVCalls that overlap with Chr %s (%s-%s). method %s type %s ...\n"%\
+						(cnv_method_id, cnv_type_id, chromosome, start, stop))
+		
+		
+		import Stock_250kDB
+		
+		TableClass=Stock_250kDB.CNVCall
+		query = TableClass.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id)
+		
+		query = db_250k.limitQueryByChrPosition(query, TableClass, chr=chromosome, start=start, stop=stop)
+		
+		query = query.order_by(TableClass.chromosome).order_by(TableClass.start).order_by(TableClass.stop)
+		counter = 0
+		no_of_total_cnv_calls = 0
+		array_id_set = set()
+		ecotype_id_set = set()
+		yticks = []
+		import pylab
+		pylab.clf()
+		for row in query:
+			counter += 1
+			no_of_total_cnv_calls += 1
+			array_id_set.add(row.array_id)
+			ecotype_id = row.array.maternal_ecotype_id
+			ecotype_id_set.add(ecotype_id)
+			ytick = 'aid %s eid %s %s'%(row.array_id, ecotype_id, param_obj.ecotype_id2nativename.get(ecotype_id))
+			yticks.append('%s %s'%(ytick, row.id))
+			pylab.plot([row.start, row.stop], [counter, counter])
+			if counter%10==0:
+				sys.stderr.write("%s%s"%('\x08'*80, counter))
+		sys.stderr.write("%s%s\n"%('\x08'*80, counter))
+		no_of_yticks = len(yticks)
+		yticks_index_ls = range(1, counter+1)
+		pylab.yticks(yticks_index_ls, yticks, size=2)
+		pylab.ylim([-10, no_of_yticks+10])
+
+		output_fname = os.path.join(output_dir, 'CNV_method%s_%s_%s_%s.png'%(cnv_method_id, \
+														chromosome, start, stop))
+		title = '%s CNVCalls in %s arrays (%s ecotypes). method %s type %s'%\
+				(no_of_total_cnv_calls, len(array_id_set), len(ecotype_id_set), cnv_method_id, cnv_type_id)
+		pylab.title(title)
+		pylab.axvspan(start, stop, facecolor='g', alpha=0.3)
+		pylab.savefig(output_fname, dpi=400)
+	"""
+		#2010-8-10
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
+							cnv_method_id=23, cnv_type_id=1, chromosome=1, start=6159423, stop=6160879)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -14115,24 +18286,644 @@ To live, to err, to fall, to triumph, to recreate life out of life. James Joyce 
 	sys.exit(0)
 	"""
 	
+class DBGenome(object):
+	__doc__ = __doc__
+	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+							('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
+							('dbname', 1, ): ['genome', 'd', 1, 'database name', ],\
+							('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
+							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
+							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+							('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
+							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	def __init__(self, **keywords):
+		"""
+		2010-6-22
+		"""
+		from pymodule import ProcessOptions
+		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		from pymodule import GenomeDB
+		self.db = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
+				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
+		self.db.setup(create_tables=False)	#2010-6-22
+		
+	def filterValue(self, value, data_type=None, NA_str="-"):
+		"""
+		2010-6-22
+			NCBI's gene_info.gz has '-' as NA.
+		"""
+		if value==NA_str:
+			value = None
+		if value is not None and data_type is not None:
+			value = data_type(value)
+		return value
 	
+	def fillTableGene(self, inputFname):
+		"""
+		2010-6-22
+			inputFname could be gene_info.gz or not.
+			downloaded from ftp://ftp.ncbi.nlm.nih.gov/gene/
+			
+			plone doc /research/annot/tf/genomedb/README has information.
+		"""
+		sys.stderr.write("Filling table gene with data from %s ...\n"%(inputFname))
+		session = self.db.session
+		import csv
+		from pymodule import figureOutDelimiter, getColName2IndexFromHeader
+		if inputFname[-2:]=='gz':	#turn on the gzip flag based on the filename extension
+			import gzip
+			inf = gzip.open(inputFname, 'r')
+		else:
+			inf = open(inputFname, 'r')
+		reader = csv.reader(inf, delimiter='\t')
+		header = reader.next()
+		"""
+		## 2010-6-22 header looks like this.
+		#Format: tax_id GeneID Symbol LocusTag Synonyms dbXrefs chromosome map_location description
+		type_of_gene Symbol_from_nomenclature_authority Full_name_from_nomenclature_authority
+		Nomenclature_status Other_designations Modification_date (tab is used as a separator, pound sign - start of a comment)
+		"""
+		from pymodule import GenomeDB
+		from datetime import datetime
+		header = header[0].split(' ')[1:]
+		col_name2index = getColName2IndexFromHeader(header)
+		counter = 0
+		real_counter = 0
+		for row in reader:
+			counter += 1
+			if row[0][0]=='#':	#ignore comments
+				continue
+			gene_id = self.filterValue(row[col_name2index['GeneID']], int)
+			gene = GenomeDB.Gene.get(gene_id)
+			if gene:	# already in db
+				continue
+			gene = Gene()
+			gene.tax_id = self.filterValue(row[col_name2index['tax_id']], int)
+			gene.gene_id = gene_id
+			gene.gene_symbol = self.filterValue(row[col_name2index['Symbol']])
+			gene.locustag = self.filterValue(row[col_name2index['LocusTag']])
+			gene.synonyms = self.filterValue(row[col_name2index['Synonyms']])
+			gene.dbxrefs = self.filterValue(row[col_name2index['dbXrefs']])
+			gene.chromosome = self.filterValue(row[col_name2index['chromosome']])
+			gene.map_location = self.filterValue(row[col_name2index['map_location']])
+			gene.description = self.filterValue(row[col_name2index['description']])
+			gene.type_of_gene = self.filterValue(row[col_name2index['type_of_gene']])
+			gene.symbol_from_nomenclature_authority = self.filterValue(row[col_name2index['Symbol_from_nomenclature_authority']])
+			gene.full_name_from_nomenclature_authority = self.filterValue(row[col_name2index['Full_name_from_nomenclature_authority']])
+			gene.nomenclature_status = self.filterValue(row[col_name2index['Nomenclature_status']])
+			gene.other_designations = self.filterValue(row[col_name2index['Other_designations']])
+			gene.modification_date = self.filterValue(row[col_name2index['Modification_date']])
+			if gene.modification_date:
+				gene.modification_date = datetime.strptime(gene.modification_date, '%Y%m%d')	#20080317
+			real_counter += 1
+			session.add(gene)
+			if real_counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+				session.flush()
+				session.expunge_all()	# 2010-6-22 sqlalchemy 0.6
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*80, counter, real_counter))
+	
+	"""
+	hostname='localhost'
+	dbname='genome'
+	dbGenome = DBGenome(drivername=drivername, db_user=db_user,
+					db_passwd=db_passwd, hostname=hostname, dbname=dbname, schema=schema)
+	inputFname = os.path.expanduser('~/script/variation/data/genome/gene_info.gz')
+	dbGenome.fillTableGene(inputFname)
+	sys.exit(0)
+	"""
+	
+	def fillTableGene2go(self, inputFname):
+		"""
+		2010-6-22
+			inputFname is gene2go.gz, downloaded from ftp://ftp.ncbi.nlm.nih.gov/gene/
+			
+			plone doc /research/annot/tf/genomedb/README has information.
+		"""
+		session = self.db.session
+		sys.stderr.write("Filling table gene2go with data from %s ...\n"%(inputFname))
+		import csv
+		from pymodule import figureOutDelimiter, getColName2IndexFromHeader
+		if inputFname[-2:]=='gz':	#turn on the gzip flag based on the filename extension
+			import gzip
+			inf = gzip.open(inputFname, 'r')
+		else:
+			inf = open(inputFname, 'r')
+		reader = csv.reader(inf, delimiter='\t')
+		header = reader.next()
+		"""
+		## 2010-6-22 header looks like this.
+#Format: tax_id GeneID GO_ID Evidence Qualifier GO_term PubMed Category (tab is used as a separator, pound sign - start of a comment)
+		"""
+		from pymodule import GenomeDB
+		from datetime import datetime
+		header = header[0].split(' ')[1:]
+		col_name2index = getColName2IndexFromHeader(header)
+		counter = 0
+		real_counter = 0
+		for row in reader:
+			counter += 1
+			if row[0][0]=='#':	#ignore comments
+				continue
+			db_entry = GenomeDB.Gene2go()
+			db_entry.tax_id = self.filterValue(row[col_name2index['tax_id']], int)
+			db_entry.gene_id = self.filterValue(row[col_name2index['GeneID']], int)
+			db_entry.go_id = self.filterValue(row[col_name2index['GO_ID']])
+			db_entry.evidence = self.filterValue(row[col_name2index['Evidence']])
+			db_entry.go_qualifier = self.filterValue(row[col_name2index['Qualifier']])
+			db_entry.go_description = self.filterValue(row[col_name2index['GO_term']])
+			db_entry.pubmed_ids = self.filterValue(row[col_name2index['PubMed']])
+			db_entry.category = self.filterValue(row[col_name2index['Category']])
+			real_counter += 1
+			session.add(db_entry)
+			if real_counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+				session.flush()
+				session.expunge_all()	# 2010-6-22 sqlalchemy 0.6
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*80, counter, real_counter))
+	
+	"""
+		hostname='localhost'
+		dbname='genome'
+		dbGenome = DBGenome(drivername=drivername, db_user=db_user,
+						db_passwd=db_passwd, hostname=hostname, dbname=dbname, schema=schema)
+		inputFname = os.path.expanduser('~/script/variation/data/genome/gene2go.gz')
+		dbGenome.fillTableGene2go(inputFname)
+		sys.exit(0)
+		
+		hostname='localhost'
+		dbname='genome'
+		dbGenome = DBGenome(drivername=drivername, db_user=db_user,
+						db_passwd=db_passwd, hostname=hostname, dbname=dbname, schema=schema)
+		inputFname = os.path.expanduser('~/script/variation/data/genome/gene_info.gz')
+		dbGenome.fillTableGene(inputFname)
+		inputFname = os.path.expanduser('~/script/variation/data/genome/gene2go.gz')
+		dbGenome.fillTableGene2go(inputFname)
+		sys.exit(0)
+	
+	"""
+	
+	def getGeneFamily(self, session, family_name=None, family_type=None, super_family=None):
+		"""
+		2010-8-19
+			used by addTEGenesAndFamilyInfo()
+		"""
+		from pymodule import GenomeDB
+		family = GenomeDB.GeneFamily.query.filter_by(short_name=family_name).first()
+		if not family:
+			family = GenomeDB.GeneFamily(short_name=family_name, family_type=family_type)
+			family.super_family = super_family
+			session.add(family)
+			session.flush()
+		return family
+	
+	def addTEGenesAndFamilyInfo(self, inputFname, tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT', family_type='TE'):
+		"""
+		2010-8-19
+			inputFname, TAIR9_Transposable_Elements.txt is downloaded from 
+				ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR9_genome_release/TAIR9_Transposable_Elements.txt
+				
+			add genes into Gene, EntrezgeneMapping
+			add family into GeneFamily, Gene2Family
+			add new symbols into Gene_symbol2id
+		"""
+		sys.stderr.write("Adding TE genes/fragments and family info into db ...")
+		import csv
+		from pymodule import GenomeDB
+		reader = csv.reader(open(inputFname), delimiter='\t')
+		header = reader.next()
+		no_of_total = 0
+		no_of_into_db = 0
+		no_of_genes_already_in_db = 0
+		no_of_entrezgene_mappings_already_in_db = 0
+		counter = 0
+		session = self.db.session
+		for row in reader:
+			counter += 1
+			transposon_name, orientation_is_5prime, Transposon_min_Start, Transposon_max_End,\
+				Transposon_Family, Transposon_Super_Family = row[:6]
+			chromosome = transposon_name[2]
+			if orientation_is_5prime=='true':
+				strand = '+1'
+			else:
+				strand = '-1'
+			start = int(Transposon_min_Start)
+			stop = int(Transposon_max_End)
+			
+			annot_assembly = GenomeDB.AnnotAssembly.query.filter_by(chromosome=chromosome).filter_by(tax_id=tax_id).first()
+			if not annot_assembly:
+				sys.stderr.write(" Warning: chromosome %s tax_id=%s not in db yet. all TEs from this chromosome are ignored.\n"%\
+								(chromosome, tax_id))
+				continue
+			gene = GenomeDB.Gene.query.filter_by(tax_id=tax_id).filter_by(chromosome=chromosome).\
+				filter_by(strand=strand).filter_by(start=start).filter_by(stop=stop).first()
+			if gene:
+				if gene.gene_symbol!=transposon_name and gene.locustag!=transposon_name:
+					gene_symbol2id = GenomeDB.Gene_symbol2id(tax_id=tax_id, gene_symbol=transposon_name, symbol_type='TE_name')
+					gene_symbol2id.gene = gene
+					session.add(gene_symbol2id)
+					no_of_into_db += 1
+				no_of_genes_already_in_db += 1
+			else:
+				gene = GenomeDB.Gene(gene_symbol=transposon_name, tax_id=tax_id, locustag=transposon_name, \
+					chromosome=chromosome,\
+					type_of_gene=type_of_gene, description='TE Family %s Super-Family %s'%(Transposon_Family, Transposon_Super_Family), \
+					strand=strand, start=start, stop=stop)
+				session.add(gene)
+				no_of_into_db += 1
+			
+			entrezgene_type = GenomeDB.EntrezgeneType.query.filter_by(type=type_of_gene).first()	#query the db to see if it exists or not
+			if not entrezgene_type:
+				entrezgene_type = GenomeDB.EntrezgeneType(type=type_of_gene)
+				session.add(entrezgene_type)
+				session.flush()
+				no_of_into_db += 1
+			
+			if gene.gene_id:
+				entrezgene_mapping = GenomeDB.EntrezgeneMapping.query.filter_by(gene_id=gene.gene_id).first()
+			else:
+				entrezgene_mapping = None
+			if not entrezgene_mapping:
+				entrezgene_mapping = GenomeDB.EntrezgeneMapping(tax_id=tax_id, chromosome=chromosome,\
+												start=start, stop=stop, strand=strand,)
+				entrezgene_mapping.genomic_annot_assembly = annot_assembly
+				entrezgene_mapping.gene = gene
+				entrezgene_mapping.entrezgene_type = entrezgene_type
+				
+				session.add(entrezgene_mapping)
+				no_of_into_db += 1
+			else:
+				no_of_entrezgene_mappings_already_in_db += 1
+			
+			super_family = self.getGeneFamily(session, family_name=Transposon_Super_Family, family_type=family_type, \
+									super_family=None)
+			family = self.getGeneFamily(session, family_name=Transposon_Family, family_type=family_type, \
+									super_family=super_family)
+			gene2family = GenomeDB.Gene2Family(family=family)
+			gene2family.gene = gene
+			session.add(gene2family)
+			no_of_into_db += 1
+			
+			if no_of_into_db>2000:
+				session.flush()
+				no_of_total += no_of_into_db
+				no_of_into_db = 0
+				sys.stderr.write('\t %s into db out of %s genes. %s gene(s) already_in_db. %s entrezgene_mapping(s) already_in_db.\n'%\
+						(no_of_total, counter, no_of_genes_already_in_db,\
+						no_of_entrezgene_mappings_already_in_db,))
+		sys.stderr.write('\t %s into db out of %s genes. %s gene(s) already_in_db. %s entrezgene_mapping(s) already_in_db.\n'%\
+						(no_of_total, counter, no_of_genes_already_in_db,\
+						no_of_entrezgene_mappings_already_in_db,))
+		session.flush()
+		session.expunge_all()	# 2010-6-22 sqlalchemy 0.6
+	"""
+	
+		# 2010-8-19
+		hostname='banyan'
+		dbname='genome_tair'
+		dbGenome = DBGenome(drivername=self.drivername, db_user=self.db_user,
+						db_passwd=self.db_passwd, hostname=hostname, dbname=dbname, schema=self.schema)
+		inputFname = os.path.expanduser('~/script/variation/data/TAIR9/TAIR9_genome_release/TAIR9_Transposable_Elements.txt')
+		dbGenome.addTEGenesAndFamilyInfo(inputFname, tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT')
+		sys.exit(0)
+		
+	"""
+class Main(object):
+	__doc__ = __doc__
+	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
+							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
+							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
+							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
+							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+							('input_fname', 0, ): ['', 'i', 1, 'common input file.', ],\
+							('output_fname', 0, ): ['', 'o', 1, 'common output file', ],\
+							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	
+	def __init__(self, **keywords):
+		"""
+		2008-12-05
+		This class is the entry to all others.
+		"""
+		from pymodule import ProcessOptions
+		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+	
+	def run(self,):
+		if self.debug:	# 2010-4-18 enter debug mode "~/.../variation/misc.py -b"
+			import pdb
+			pdb.set_trace()
+			debug = True
+		else:
+			debug =False
+		
+		
+		import Stock_250kDB
+		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
+						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
+		db_250k.setup(create_tables=False)
+		
+		#import MySQLdb
+		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
+		#curs = conn.cursor()
+		
+		
+		##### 2010-3-26 add FRI-FLC interaction to 4 block-only full model
+		# 2010-4-6
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
+		#phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_tg_ecotypeid.tsv')
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_tg_ecotypeid.tsv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_impute.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		#kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
+		kinship_fname = None
+		kinship_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship.tsv')	#two FRI allele shall not make a difference.
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_pairwise_cofactor.tsv')
+		#vg=1451.803; ve=331.4423; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
+		vg=None
+		ve=None
+		vg=1534.10171646	# 2010-3-24 estimates from ~/mnt/panfs/250k/dataset/call_method_49_core482.tsv
+		ve=499.58683376
+		#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
+		
+		
+		# 2010-4-1 final full model with FRI-FLC, and FT-FLC
+		cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
+		cholesky_inverse_fname = None
+		vg=None
+		ve=None
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_intersection_yanSNPData_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
+		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_full_model_without_GXE_YanSNP.tsv')
+		interaction_snp_id_in_base_formula_ls = [('4_264496', '5_3188328'), ('1_24345319','5_3188328')]	# FRI-FLC, FT-FLC
+		interaction_snp_id_in_base_formula_ls = [('1_24345319','5_3188328')]	# FT-FLC
+		interaction_snp_id_in_base_formula_ls = []
+		#interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
+		#special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
+								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_199214', '4_264496',  '4_268809', '4_269962', '4_286905', '4_387727', \
+								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_268809', '4_269962', '5_18620282', '5_25376551', '5_3188328']	
+		
+		
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+									'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
+									'4_429928',  '5_18620282', '5_25376551', '5_3188328']
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
+								'5_18620282', '5_25376551', '5_3188328']
+		#snp_id_to_be_included_ls = []
+		
+		special_interaction_snp_id_ls = []	# 2010-3-26 
+		vg=None
+		ve=None
+		
+		
+		loc_value_ls = ['spain', 'sweden']
+		planting_value_ls = ['spring', 'summer']
+		for planting_value in planting_value_ls:
+			for loc_value in loc_value_ls:
+				for logPhenotype in [True]:
+					#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
+					cholesky_inverse_fname = None
+					output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_12SNP_%s_%s.tsv'%\
+													(loc_value, planting_value))
+					JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+												output_fname, vg=vg, ve=ve, \
+												snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+												includeInteraction=True, kinship_fname=kinship_fname, \
+												cholesky_inverse_fname = cholesky_inverse_fname,\
+												interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+												special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
+												planting_value=planting_value, loc_value=loc_value,\
+												logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
+		
+		sys.exit(0)
+		
+		for logPhenotype in [True]:
+			#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
+			cholesky_inverse_fname = None
+			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_12SNP.tsv')
+			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+										output_fname, vg=vg, ve=ve, \
+										snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
+										includeInteraction = True, kinship_fname = kinship_fname, \
+										cholesky_inverse_fname = cholesky_inverse_fname,\
+										interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+										special_interaction_snp_id_ls = special_interaction_snp_id_ls,\
+										planting_value = None, loc_value = None,\
+										logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
+		sys.exit(0)
+		
+		# 2010-8-6 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
+		for cnv_method_id in [27]:
+			CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(db_250k, output_dir=output_dir, \
+											ecotype_id=None, minPercUnCoveredByLerContig=0.4, \
+											cnv_method_id=cnv_method_id, useProbeDensity=False, run_type=2, minScore=None)
+		sys.exit(0)
+		
+		#2010-8-6 for the TAIR9 "-z banyan.usc.edu"
+		for cnv_method_id in [27]:
+			CNV.updateCNVCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id)
+		sys.exit(0)
+		
+		#2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
+		cnv_method_id=22
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
+		sys.exit(0)
+		
+		#2010-8-10
+		for cnv_method_id in [18, 19, 22]:
+			output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+			CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
+									cnv_method_id=cnv_method_id, cnv_type_id=1, chromosome=1, start=6156000, stop=6162000)
+		sys.exit(0)
+		
+		#2010-7-31 update CNV.fractionNotCoveredByLyrata for the TAIR9 "-z banyan.usc.edu", cnv_method_id 18
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=-1, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=18, run_type=3)
+		sys.exit(0)
+		
+		
+		
+		#2010-8-1 "-z banyan"
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[23, 24])
+		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
+		for cnv_method_id in [23, 24]:
+			CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id)
+			minScore = None
+			minNotCoveredFraction = 0.4
+			output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+			CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+									ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+									cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+			CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+									ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+									cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		#2010-8-10
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
+									cnv_method_id=24, cnv_type_id=1, chromosome=2, start=7063000, stop=7065260)
+		sys.exit(0)
+		
+		#2010-8-12
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
+									cnv_method_id=16, cnv_type_id=1, chromosome=2, start=7063400, stop=7065260)
+		sys.exit(0)
+		
+		
+		
+		
+		#2010-8-7
+		cnv_method_id = 20
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod%s.tsv'%cnv_method_id)
+		CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
+		sys.exit(0)
+		
+		
+		
+		
+		# 2010-8-1 -z banyan.usc.edu
+		minScore = None
+		cnv_method_id = 22
+		minNotCoveredFraction = 0.4
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		
+		
+		
+		#2010-8-3	qc_data_source_id 16 is too much for mysql to handle, exhaust disk usage in /tmp
+		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
+								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=22)
+		sys.exit(0)
+		
+		#2010-8-1 "-z banyan"
+		#CNV.updateCNVFrequency(db_250k, cnv_method_id=22, run_type=1)
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[22])
+		sys.exit(0)
+		
+		
+		
+		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=22)
+		sys.exit(0)
+		
+		
+		#2010-8-3
+		input_dir = os.path.expanduser('~/script/variation/data/CNV/SebastianHMMSummaryCalls/')
+		CNV.putSebastianCallIntoDB(db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
+							cnv_method_id=21, cnv_type_id=1, debug=debug)
+		sys.exit(0)
+		
+		#2010-8-2
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[18, 19])
+		sys.exit(0)
+		
+		#2010-8-2
+		input_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.fa')
+		output_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.normaSegment.tsv')
+		CNV.Lyrata.getLyrataNormalANDDeletionFromQuanFileInTAIR9(input_fname, output_fname=output_fname)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+											ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+											cnv_method_id=19, xDataType=2)
+		sys.exit(0)
+		
+		
+		# 2010-7-29
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallGapRatioHist/')
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=17, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, xlabel='min(gap_ratio1, gap_ratio2)', \
+								ylabel_in_2D='gap_length', fileNamePrefix='CNVCallGapRatioVsGapLenHist', dataType=2)
+		sys.exit(0)
+		
+		
+		
+		#2010-7-24 banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallLabelVsIntensityByNoOfProbes/')
+		cnv_method_id = 10
+		rows = db_250k.metadata.bind.execute("select distinct array_id from cnv_call where cnv_method_id=%s and \
+			percUnCoveredByLerContig is null order by array_id"%cnv_method_id)
+		array_id_ls = []
+		for row in rows:
+			array_id_ls.append(row.array_id)
+		print "%s arrays"%len(array_id_ls)
+		for array_id in array_id_ls:
+			for gridsize in [40, 60,]:
+				CNV.inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(db_250k, array_id=array_id, output_dir=output_dir, \
+									minPercUnCoveredByLerContig=0.6, gridsize=gridsize, cnv_method_id=cnv_method_id,\
+									deletedFractionType=2, colorBarLabel='FractionNotCoveredByPEData',\
+									replaceNoOfProbesWithProbeDensity=True)
+		sys.exit(0)
+		
+		
+		
+		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCall_GapRatioHist/')
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=1)
+		sys.exit(0)
+		
+
+
 #2007-03-05 common codes to initiate database connection
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
 if bit_number>40:       #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/annot/bin')))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/test/python')))
+	#sys.path.insert(0, os.path.expanduser('~/lib64/python'))
+	#sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/annot/bin')))
+	#sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/test/python')))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/variation/src')))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
 else:   #32bit
-	sys.path.insert(0, os.path.expanduser('~/lib/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/test/python')))
+	#sys.path.insert(0, os.path.expanduser('~/lib/python'))
+	#sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
+	#sys.path.insert(0, os.path.join(os.path.expanduser('~/script/test/python')))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/variation/src')))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import matplotlib; matplotlib.use("Agg")	#to avoid popup and collapse in X11-disabled environment
+#import matplotlib; matplotlib.use("Agg")	#to avoid popup and collapse in X11-disabled environment
 
 """
 from codense.common import db_connect, form_schema_tables
@@ -14179,77 +18970,9 @@ db_149.setup(create_tables=False)
 """
 
 if __name__ == '__main__':
-	ecotype_table = 'ecotype'
-	calls_table = 'calls'
-	#strain_snp_pair_set1, inconsistent_dup_strain_snp_pair_set1 = check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table)
-	#strain_snp_pair_set2, inconsistent_dup_strain_snp_pair_set2 = check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table, strainname_type=2)
-	#strain_snp_pair_set3, inconsistent_dup_strain_snp_pair_set3 = check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table, strainname_type=3)
+	from pymodule import ProcessOptions
+	main_class = Main
+	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	
-	#### 2009-5-2 code to check enrichment data by 3D plot. run by mayavi2 -x misc.py
-	hostname='papaya.usc.edu'
-	dbname='stock_250k'
-	db_user='yh'
-	db_passwd = 'yh324'
-
-	drivername='mysql'
-	schema = None
-	import Stock_250kDB
-	db_250k = Stock_250kDB.Stock_250kDB(drivername=drivername, username=db_user,
-					password=db_passwd, hostname=hostname, database=dbname, schema=schema)
-	db_250k.setup(create_tables=False)
-	
-	import MySQLdb
-	#conn = MySQLdb.connect(db=dbname, host=hostname, user = db_user, passwd = db_passwd)
-	#curs = conn.cursor()
-	
-	if len(sys.argv)>=2 and sys.argv[1]=='-b':	# 2010-4-18 enter debug mode "~/.../variation/misc.py -b"
-		import pdb
-		pdb.set_trace()
-		debug = True
-	else:
-		debug = False
-	
-	common_prefix = '~/script/variation/data/CNV/mummer/TAIR8_LerContig_maxmatch_maxgap40_mincluster60'
-	nucmer_coords_fname = os.path.expanduser('%s.coords'%(common_prefix))
-	output_fname_prefix = os.path.expanduser('%s_max_reciprocal_del_gap_ratio0.3'%(common_prefix))
-	CNV.LerContig.discoverLerDeletionAndSpanFromMummerCoordsOutput(nucmer_coords_fname, output_fname_prefix, \
-													min_identity_perc=0.9, maxDeletionLength=50000, debug=debug)
-	sys.exit(0)
-	
-	max_deletion_copy_amp = 0.1
-	ler_blast_result_fname = os.path.expanduser('~/mnt/hpc-cmb/script/variation/data/CNV/cnv_probe_blast_against_ler_contig.tsv')
-	output_fname_prefix = os.path.expanduser('~/script/variation/data/CNV/CNVProbeBlastAgainstLerContig_maxDelAmp%s_bugfix'%(max_deletion_copy_amp))
-	CNV.LerContig.discoverLerDeletionDuplication(db_250k, ler_blast_result_fname, output_fname_prefix, \
-												deletion_only=True, max_deletion_copy_amp=max_deletion_copy_amp, \
-												IO_thru_file=False)
-	sys.exit(0)
-	
-	# 2010-4-30 use min_reciprocal_overlap
-	input_fname_ls = []
-	for i in range(1,6):
-		input_fname_ls.append(os.path.expanduser('~/mnt/panfs/250k/CNV/call_method_48_CNV_intensity_QNorm_sub_ref_chr%s.GADA_A0.5T4M5.tsv'%i))
-	#input_fname_ls = [os.path.expanduser('~/mnt/panfs/250k/CNV/call_method_48_CNV_intensity_QNorm_sub_ref_chr1.GADA_A0.5T4M5.tsv')]
-	#input_fname_ls = []
-	#for i in range(1,6):
-	#	input_fname_ls.append(os.path.expanduser('~/mnt2/panfs//250k/CNV/GADA_output/call_method_48_CNV_intensity_QNorm_sub_ref_chr%s_A2.0T8.0M5.tsv'%i))
-	
-	common_prefix = '~/script/variation/data/CNV/call_53_WABQN_b100_j50_lts_98_arrays_GADA2_A0.5T4.0M5'
-	input_fname = os.path.expanduser('%s.tsv'%common_prefix)
-	input_fname_ls = [input_fname]
-	ecotype_id_data_source_id_ls = [(6932, 13)]	# use LerDeletionInOnly1Contig
-	min_QC_segment_size = None
-	min_no_of_probes = 5
-	count_embedded_segment_as_match = True
-	output_fname_prefix=os.path.expanduser('~/tmp/LerContig/call_53_WABQN_b100_j50_lts_98_arrays_GADA2_A0.5T4.0M5')
-	for ecotype_id, data_source_id in ecotype_id_data_source_id_ls:
-		for deletion_cutoff in [-0.33, -0.5]:
-			for min_reciprocal_overlap in [0.4, 0.8]:
-				CNV.countNoOfCNVDeletionsMatchQC(db_250k, input_fname_ls, \
-						output_fname_prefix=output_fname_prefix,\
-						ecotype_id=ecotype_id, data_source_id=data_source_id, \
-						cnv_type_id=1,\
-						min_QC_segment_size=min_QC_segment_size, deletion_cutoff=deletion_cutoff, \
-						min_no_of_probes=min_no_of_probes,\
-						count_embedded_segment_as_match=count_embedded_segment_as_match,\
-						min_reciprocal_overlap=min_reciprocal_overlap, outputDeletionWithinSpan=True)
-	sys.exit(0)
+	instance = main_class(**po.long_option2value)
+	instance.run()
