@@ -10,6 +10,36 @@ def getRanks(values,withTies=True):
 	srt_vals = zip(values[:],range(len(values)))
 	srt_vals.sort()
 	srt_ranks = np.zeros(len(srt_vals))
+	if withTies:	
+		i = 0
+		while i < len(srt_vals):
+			curVal =  srt_vals[i][0]
+			j = 1
+			while i+j < len(srt_vals) and srt_vals[i+j][0]==curVal:
+				j += 1
+			rank = i+(j+1)/2.0
+			max_i = i+j
+			while i<max_i:
+				srt_ranks[i]=rank
+				i+=1
+
+	else:
+		srt_ranks = np.arange(len(srt_vals))
+			
+	ranks = np.zeros(len(srt_vals))
+	
+	for i,(val,val_index) in enumerate(srt_vals):
+		ranks[val_index] = srt_ranks[i]
+	return ranks
+
+
+def _kw_get_ranks_(values,withTies=True):
+	"""
+	returns ranks (large values w. large ranks)
+	"""
+	srt_vals = zip(values[:],range(len(values)))
+	srt_vals.sort()
+	srt_ranks = np.zeros(len(srt_vals))
 	group_counts = []
 	if withTies:	
 		i = 0
@@ -42,7 +72,7 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 	s1 = time.time()	
 	assert len(snps[0])==len(phenVals),"SNPs and phenotypes are not equal length."
 	
-	ranks, group_counts = getRanks(phenVals)
+	ranks, group_counts = _kw_get_ranks_(phenVals)
 	assert len(group_counts) == len(set(ranks)),'Somethings wrong..'
 	tieCorrection = 1.0
 	if useTieCorrection:

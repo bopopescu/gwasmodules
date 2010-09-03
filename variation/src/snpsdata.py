@@ -1794,11 +1794,12 @@ class SNPsData(_SnpsData_):
                                 newArrayIds.append(self.arrayIds[i])
                 num_accessions = len(indicesToKeep)
                 for i in range(len(self.snps)):
-                        snp = self.snps[i]
-                        newSnp = np.empty(num_accessions,dtype='int8')
-                        for j,k in enumerate(indicesToKeep):
-                                newSnp[j] = snp[k]
-                        self.snps[i] = newSnp
+			self.snps[i] = self.snps[i][indicesToKeep]
+#                        snp = self.snps[i]
+#                        newSnp = np.empty(num_accessions,dtype='int8')
+#                        for j,k in enumerate(indicesToKeep):
+#                                newSnp[j] = snp[k]
+#                        self.snps[i] = newSnp
                 self.accessions = newAccessions
                 if self.arrayIds:
                         #print "removeAccessionIndices: has array IDs: self.arrayIds =",self.arrayIds
@@ -2313,9 +2314,7 @@ class SnpsData(_SnpsData_):
 
 
 
-class SNPsDataSet:
-	#Log 110708 - bjarni: old name was SnpsDataSet
-	
+class SNPsDataSet:	
 	"""
 	A class that encompasses multiple _SnpsData_ chromosomes objects (chromosomes), and can deal with them as a whole.
 
@@ -2743,6 +2742,13 @@ class SNPsDataSet:
 				chr_pos_list.append((chr,pos))
 		return chr_pos_list
 		
+	def get_chr_list(self):
+		chr_list = []
+		for i, snpsd in enumerate(self.snpsDataList):
+			chr_list.extend([i+1]*len(snpsd.positions))
+		return chr_list
+		
+
 	def get_mafs(self):
 		"""
 		Returns the mafs and marfs as a dictionary..  (changed from before, so might cause errors).

@@ -6,19 +6,19 @@ Option:
 	-o ..., --outputFile=...		Output files, one 'name'.rData file, and one 'name'.pvals file.
 	-h, --help				show this help
 	-a ..., --mapping_method=...		kw, emmax, lm
-	--parallel=...				Run analysis on the cluster with standard parameters.  The arguement is used for runid 
+	-p ..., --parallel=...			Run analysis on the cluster with standard parameters.  The arguement is used for runid 
 						as well as output files.  Note that if this option is used then no output file should be specified.
 	--parallelAll				Apply to all phenotypes.
-	--numberPerRun=...			Number of SNPs (phenotypes) per node, default is 100
-	--filter=...				Random fraction (given as parameters) of phenotypes will be used.
+	-n ..., --numberPerRun=...              Number of SNPs (phenotypes) per node, default is 100
+	-f ..., --filter=...			Random fraction (given as parameters) of phenotypes will be used.
 	--local=...				Do a local GWA with the given windowsize (bases).
 	--pvalueThreshold=...			Discard all pvalues larger than the given one.  (Default is no threshold)
 	
 	--maf_filter=...			Generate the phenotypes on the fly, using SNPs with MAF greater than the given value.
-	--latent_variable=...			Type of latent variable: swedish, north_swedish, northern.
+	-l ..., --latent_variable=...		Type of latent variable: swedish, north_swedish, northern.
 	--latent_corr=...			Sample randomly from all real genomic markers which have correlation with 
 						the latent allel, greater than the given one.
-	--phenotype_model=... 			How to generate the phenotypes: additive, xor, or
+	-m ..., --phenotype_model=... 		How to generate the phenotypes: additive, xor, or
 	--score_file=...			Score file (e.g. selection scores), from which the top filter % SNPs will be used for the simulation. 			
 
 	--noPvals				Don't write pvalue files.  (saves space and time) DEPRECATED!
@@ -26,9 +26,11 @@ Option:
 	--summarizeRuns				Collect results and plot things (Does not generate pvalue files...) 
 	--plot_all_models			Plot all phenotype models when summarizing results.
 	
-	--kinship_file=...			Necessary for running EMMAX.
+	-k ..., --kinship_file=...		Necessary for running EMMAX.
 	--phenotype_error=...			Percentage of variance, due to error.
-	--kinship_error=...			Fraction of error, du to kinship term.
+	--kinship_error=...		        Fraction of error, du to kinship term.
+	
+	--plot_pvals           			Plot the p-values
 	
 
 Examples:
@@ -54,12 +56,19 @@ import pdb
 import cPickle
 import scipy as sp
 import scipy.stats as stats
+import linear_models as lm
+import plotResults as pr
+
+anti_decoder = {1:0,0:1}                        
+get_anti_snp = sp.vectorize(lambda x: anti_decoder[x])  #Creating a vectorized function for anti-snp
+
 
 
 def get_latent_snp(latent_variable,accessions,snpsdata=None):	
-	f = open("/home/cmbpanfs-01/bvilhjal/data/eco_dict.pickle")
-	ecotype_info_dict = cPickle.load(f)
-	f.close()
+	ecotype_info_dict = phenotypeData.get_ecotype_id_info_dict()
+	#f = open(env.env['data_dir']+"eco_dict.pickle")
+	#ecotype_info_dict = cPickle.load(f)
+	#f.close()
 	#ecotype_info_dict = phenotypeData._getEcotypeIdInfoDict_()
 	latent_snp = []
 	if latent_variable=="swedish":
@@ -126,9 +135,9 @@ def _run_():
 	long_options_list=["outputFile=", "help", "parallel=", "numberPerRun=", "parallelAll", "filter=","local=",
 			"pvalueThreshold=", "noPvals", "summarizeRuns", "maf_filter=", "latent_variable=",
 			"phenotype_model=", "phenotypeFile=", "runId=", "score_file=","plot_all_models", "latent_corr=",
-			'mapping_method=', 'kinship_file=', 'phenotype_error=', 'kinship_error=']
+			'mapping_method=', 'kinship_file=', 'phenotype_error=', 'kinship_error=', 'plot_pvals']
 	try:
-		opts, args=getopt.getopt(sys.argv[1:], "o:a:h", long_options_list)
+		opts, args=getopt.getopt(sys.argv[1:], "o:a:l:k:f:p:n:m:h", long_options_list)
 
 	except:
 		traceback.print_exc()
@@ -161,6 +170,7 @@ def _run_():
 	kinship_file = None
 	phenotype_error = 0
 	kinship_error = 0
+	plot_pvals = False
 	
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
@@ -168,16 +178,22 @@ def _run_():
 			print __doc__
 		elif opt in ("-o", "--outputFile"):
 			outputFile=arg
-		elif opt in ("--parallel"):
+		elif opt in ('-p',"--parallel"):
 			parallel=arg
 		elif opt in ("--parallelAll"):
 			parallelAll=True
-		elif opt in ("--numberPerRun"):
+		elif opt in ("--plot_pvals"):
+			plot_pvals=True
+		elif opt in ('-n',"--numberPerRun"):
 			numberPerRun=int(arg)
+		elif opt in ('-m',"--phenotype_model"):
+			phenotype_model=int(arg)
 		elif opt in ("--pvalueThreshold"):
 			pvalueThreshold=float(arg)
-		elif opt in ("--filter"):
+		elif opt in ('-f',"--filter"):
 			filter=float(arg)
+		elif opt in ('-l',"--latent_variable"):
+			latent_variable=arg
 		elif opt in ("--local"):
 			local=int(arg)
 		elif opt in ("--noPvals"):
@@ -192,20 +208,16 @@ def _run_():
 			summarizeRuns=True
 		elif opt in ("--maf_filter"):
 			maf_filter=float(arg)
-		elif opt in ("--latent_variable"):
-			latent_variable=arg
 		elif opt in ("--score_file"):
 			score_file=arg
 		elif opt in ("--phenotypeFile"):
 			phenotypeFile=arg
-		elif opt in ("--phenotype_model"):
-			phenotype_model=int(arg)
 		elif opt in ('-a',"--mapping_method"):
 			mapping_method=arg
-		elif opt in ("--kinship_file"):
+		elif opt in ('-k',"--kinship_file"):
 			kinship_file=arg
 		elif opt in ("--phenotype_error"):
-			phenotype_error=arg
+			phenotype_error=float(arg)
 		elif opt in ("--kinship_error"):
 			kinship_error=arg
 		
@@ -243,9 +255,14 @@ def _run_():
 	print "kinship_file:",kinship_file
 	print "phenotype_error:",phenotype_error
 	print "kinship_error:",kinship_error
+	print 'plot_pvals:',plot_pvals
 	print "runId:",runId
 
+	
 	def runParallel(phen_index,numberPerRun=0,runId=None,phenotypeFile=None,phenotype_model=None):
+		"""
+		Run if summarizing or setting up parallel jobs.
+		"""
 		#Cluster specific parameters
 		if not runId:
 			outputFile=env.env['results_dir']+"TLS_"+parallel+"_"+str(phen_index)+"_"+str(numberPerRun)
@@ -602,7 +619,6 @@ def _run_():
 	if phenotypeFile:
 		phenotype_file = phenotypeFile
 	else:
-		print "Generating phenotype"
 		phenotype_file = env.env['tmp_dir']+parallel+".phen"
 
 	if phenotype_model:  #If phenotype model is specified, then use that, otherwise run all..
@@ -610,9 +626,10 @@ def _run_():
 	else:
 		phenotype_models = range(1,5)
 
+	assert not (parallelAll and summarizeRuns), 'Invalid options' 
 		
 	if parallelAll:
-		#Generating the phenotype
+		#Generating the phenotype  (ONLY IF PARALLEL ALL?)
 #		if score_file:
 #			snps_dataset = dataParsers.parse_snp_data(snpsDataFile,format=0)
 #			#1. Load the score file...
@@ -642,28 +659,26 @@ def _run_():
 			latent_corr = 1
 		if filter:
 			snps_dataset.sample_snps(filter)
-		snps_list = snps_dataset.getSnps()
-		num_lines = len(snps_list[0])  #Number of lines
-		anti_decoder = {1:0,0:1}                        
-		get_anti_snp = sp.vectorize(lambda x: anti_decoder[x])  #Creating a vectorized function
-		chr_pos_list = snps_dataset.getChrPosList()
+		
+		print 'Generating the phenotypes'
+		num_lines = len(snps_dataset.accessions)  #Number of lines
+		chr_pos_snp_list = snps_dataset.getChrPosSNPList()
 		mafs = snps_dataset.get_mafs()["marfs"]
 
 		phen_dict = {}
-		for phenotype_model in phenotype_models:
+                for phenotype_model in phenotype_models:
 			phenotypes = []
 			phen_positions = []
 			phen_chr_pos = []
 			phen_mafs = []
 			latent_loci_snp_chr_pos_mafs = []
-			for i, snp in enumerate(snps_list):
-				(chr,pos) = chr_pos_list[i]
+			for i, (chr,pos,snp) in enumerate(chr_pos_snp_list):
 				maf = mafs[i]
 				anti_snp = get_anti_snp(snp) #Retrieving the anti-snp
 				if latent_corr:
 					lsd = random.choice(latent_snp_chr_pos_maf)
 					(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
-					while latent_snp==snp: #Make sure the two SNPs aren't identical.
+					while sp.all(latent_snp==snp): #Make sure the two SNPs aren't identical.
 						lsd = random.choice(latent_snp_chr_pos_maf)
 						(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
 				if latent_variable=="random":
@@ -693,12 +708,11 @@ def _run_():
 				
 				#Check whether phenotype is OK.
 				#SHOULD THIS CHECK BE SKIPPED???
-				if len(sp.bincount(phenotype))>1:
+				if len(sp.unique(phenotype))>1:
 					if phenotype_error>0.0:
 						phen_var = sp.var(phenotype,ddof=1)
-                                                error_var = (phenotype_error/(1-phenotype_error))*phen_var
-                                                phen_errors = sp.array([stats.norm.rvs(0,error_var) for i in range(num_lines)])
-						phenotype = phenotype+phen_errors
+						error_std = math.sqrt((phenotype_error/(1-phenotype_error))*phen_var)
+						phenotype = phenotype++sp.random.normal(0,error_std,size=num_lines)
 					phenotypes.append(phenotype)
 					#print phenotype
 					phen_positions.append(pos)
@@ -709,7 +723,11 @@ def _run_():
 	
 				else:
 					print "Found problematic phenotype"
-				if len(set(anti_phenotype))>1:
+				if len(sp.unique(anti_phenotype))>1:
+                                        if phenotype_error>0.0:
+                                                phen_var = sp.var(phenotype,ddof=1)
+                                                error_std = math.sqrt((phenotype_error/(1-phenotype_error))*phen_var)
+                                                anti_phenotype = anti_phenotype+sp.random.normal(0,error_std,size=num_lines)
 					phenotypes.append(anti_phenotype)		
 					#print anti_phenotype
 					phen_positions.append(pos)
@@ -719,7 +737,7 @@ def _run_():
 						latent_loci_snp_chr_pos_mafs.append(lsd)
 				else:
 					print "Found problematic anti-phenotype"
-				if anti_phenotype == phenotype:
+				if sp.all(anti_phenotype == phenotype):
 					print "Phenotype and anti-phenotype are the same!?!?!?"
 				
 			print "Phenotypes generated for phenotype model:",phenotype_model
@@ -732,52 +750,53 @@ def _run_():
 				"latent_snp":latent_snp, "phen_mafs":phen_mafs, "latent_loci_snp_chr_pos_mafs":[]}
 			phen_dict[phenotype_model]=d
 			#phenotype_models for loop ends.
-		f = open(phenotype_file,"w")
+		f = open(phenotype_file,"wb")
 		print "dumping phenotypes to file:",f
-		cPickle.dump(phen_dict,f)
+		cPickle.dump(phen_dict,f,protocol=2)
 		f.close()
 		
 		
 		
-	elif not (summarizeRuns and parallel):	
-		f = open(phenotype_file,"r")
-
-		phen_dict = cPickle.load(f)
-		print f
-		print phen_dict.keys
-		print phenotype_models[0]
-		print phenotype_models
-		d = phen_dict[phenotype_models[0]]
-		phenotypes = d["phenotypes"]
-		phen_positions = d["phen_positions"]
-		phen_chr_pos = d["phen_chr_pos"]
-		latent_snp = d["latent_snp"]
-		phen_mafs = d["phen_mafs"]
-		latent_loci_snp_chr_pos_mafs = d["latent_loci_snp_chr_pos_mafs"]
-		f.close()
-	else: #Submitting a summary run to the cluster!
+	elif summarizeRuns and parallel: #Set up a summary run (on the cluster)
 		runParallel("summary",numberPerRun, runId=parallel, phenotypeFile=phenotype_file)
-		return
+		return #Exiting
+
+	if latent_variable=='random_snp':
+		latent_corr=1
+		
+	print 'Loading phenotypes and related data'
+        f = open(phenotype_file,"rb")
+	phen_dict = cPickle.load(f)
+	print f
+	print phen_dict.keys
+	print phenotype_models[0]
+	print phenotype_models
+	d = phen_dict[phenotype_models[0]]
+	phenotypes = d["phenotypes"]
+	phen_positions = d["phen_positions"]
+	phen_chr_pos = d["phen_chr_pos"]
+	latent_snp = d["latent_snp"]
+	phen_mafs = d["phen_mafs"]
+	latent_loci_snp_chr_pos_mafs = d["latent_loci_snp_chr_pos_mafs"]
+	f.close()
+        print 'Loading done..'
 
 			
 	num_phenotypes = len(phenotypes) 
 	print "num_phenotypes:",num_phenotypes
-		
-	
-	if parallelAll and not summarizeRuns:  #Running on the cluster..
+
+	if parallelAll:  #Running on the cluster..
 		phen_indices = range(0,num_phenotypes,numberPerRun)
 		for phenotype_model in phenotype_models:
 			print "Submitting jobs for phenotype model:",phenotype_model
 			for phen_index in phen_indices:
 				runParallel(phen_index,numberPerRun,phenotypeFile=phenotype_file,phenotype_model=phenotype_model)
-		return
+		return #Exiting
 
 	elif summarizeRuns:		
-		#summarizeAllRuns(phenotypes,phen_positions,phen_chr_pos,phen_mafs,latent_snp)
-		
 		for phenotype_model in phenotype_models:
 			summarizeAllRuns(runId, phenotype_model)
-		return
+		return #Exiting
 	else:
 		phen_index=int(args[1])
 	print "phen_index:",phen_index
@@ -799,15 +818,15 @@ def _run_():
 	print "Loading SNPS dataset (again)" 
 	snps_dataset = dataParsers.parse_binary_snp_data(snpsDataFile)
 	snps_positions = snps_dataset.getPositions()
+	snps_chromosomes = snps_dataset.get_chr_list()
 	snps_list = snps_dataset.getSnps()
 	chr_pos_list = snps_dataset.getChrPosList()
-	#Run KW
 	results = [] #[num_of_phen][num_of_snps]
 	print "Running Analysis"
         
         #Loading K if necessary
         if mapping_method=='emmax':
-                k = load_kinship_from_file(kinship_file,snps_dataset.accessions)
+                k = lm.load_kinship_from_file(kinship_file,snps_dataset.accessions)
                 
 	if local:
 		
@@ -828,29 +847,38 @@ def _run_():
 			print len(snps),prefix_num,suffix_num
 			return (snps,prefix_num,suffix_num)
 
-		for i in range(0,len(phenotypes)):
+		for i in range(len(phenotypes)):
 			#Find local snps & fix results
 			(snps,prefix_num,suffix_num) = _get_local_snps_(phen_positions[i],local)
 			phenotype = phenotypes[i]
-			print "KW is being applied to the "+str(i)+"'th phenotype (locally)."
+			print "KW is being applied to the "+str(phen_index+i)+"'th phenotype (locally)."
 			pvals = [2]*prefix_num
 			pvals += util.kruskal_wallis(snps,phenotype)["ps"]
 			pvals += [2]*suffix_num
 			results.append(pvals)
 
 	else: #Global run
-		print "len(chr_pos_list):",len(chr_pos_list)
-		print "len(snps_list):",len(snps_list)
-		for i in range(0,len(phenotypes)):
-			phenotype = phenotypes[i]
+                print 'Setting up global runs'
+		for i, phenotype in enumerate(phenotypes):
+			highlight_loci = [phen_chr_pos[i]]
+			if latent_loci_snp_chr_pos_mafs:
+				latent_chr_pos = (latent_loci_snp_chr_pos_mafs[i][1],latent_loci_snp_chr_pos_mafs[i][2])
+				highlight_loci.append(latent_chr_pos)
+                        print highlight_loci   
+                        print "\nThe %d'th phenotype, variance=%0.3f :\n"%(i+phen_index,phenotype.var(ddof=1))
+                        print phenotype
+			sys.stdout.flush()	    
+                        
        			if mapping_method=='kw':
-				sys.stdout.write("KW is being applied to the "+str(i)+"'th phenotype.\n")
 	       			sys.stdout.flush()
 			       	pvals = util.kruskal_wallis(snps_list,phenotype)["ps"]
 			elif mapping_method=='emmax':
 				pvals = lm.emmax(snps_list,phenotype,k)['ps']
 			elif mapping_method=='lm':
                                 pvals = lm.linear_model(snps_list,phenotype)['ps']
+			if plot_pvals:
+        			gwa_plot_file = '%s_%s_%d.png'%(outputFile,mapping_method,i+phen_index)
+        			pr.plot_raw_result(pvals,snps_chromosomes,snps_positions,png_file=gwa_plot_file,highlight_loci=highlight_loci)
 			results.append(pvals)
 	print "len(results):",len(results)
 
@@ -881,7 +909,7 @@ def _run_():
 		sign_pval_chr_pos = []	
 		for j, pval in enumerate(pvals):
 			tot_count += 1
-			if math.log10(pval)<-6.6354837468149119:
+			if pval<(0.05/len(snps_list)):
 				sign_count +=1
 				sign_pval_chr_pos.append((pval,chr_pos_list[j][0],chr_pos_list[j][1]))
 			pval_chr_pos.append((pval,chr_pos_list[j][0],chr_pos_list[j][1]))
@@ -890,7 +918,13 @@ def _run_():
 		
 		min_pval = min(pvals)
 		min_pvals.append(min_pval)
-		j = pvals.index(min_pval)
+		min_pvals_indices = list(*sp.where(pvals==min_pval))
+		if len(min_pvals_indices)>1:
+			print 'Found two minimum p-values:'
+			for j in min_pvals_indices:
+				print phen_chr_pos[i]
+			print 'Using the first one.'
+		j = min_pvals_indices[0]
 		
 		#chromosome and position of the causative SNP
 		(phen_chr,phen_pos) = phen_chr_pos[i]
@@ -903,16 +937,17 @@ def _run_():
 		else:
 			distances_to_min_pval.append(-abs(int(phen_chr)-int(chr)))
 		try:
-			snp_i = chr_pos_list.index((phen_chr,phen_pos))
-			obs_pval = pvals[snp_i]
-			obs_pvals.append(obs_pval)
-			r_list = util.getRanks(pvals)
-			snp_rank = r_list[snp_i]
-			true_snps_ranks.append(snp_rank)
+        		snp_i = chr_pos_list.index((phen_chr,phen_pos))
+        		obs_pval = pvals[snp_i]
+        		obs_pvals.append(obs_pval)
+        		r_list = util.getRanks(pvals)
+        		snp_rank = int(r_list[snp_i])
+        		true_snps_ranks.append(snp_rank)
+		
 		except Exception, err_str:
-			print "Didn't find causative SNP:",phen_pos
-			print err_str
-			true_snps_ranks.append(-1)
+        		print "Didn't find causative SNP:",phen_pos
+        		print err_str
+        		true_snps_ranks.append(-1)
 
 		if latent_corr:
 			(latent_snp,latent_chr,latent_pos,latent_maf) = latent_loci_snp_chr_pos_mafs[i]
@@ -924,7 +959,7 @@ def _run_():
 				latent_snp_i = chr_pos_list.index((latent_chr,latent_pos))
 				obs_pval = pvals[latent_snp_i]
 				latent_pvals.append(obs_pval)
-				latent_rank = r_list[latent_snp_i]
+				latent_rank = int(r_list[latent_snp_i])
 				latent_snps_ranks.append(latent_rank)
 			except Exception, err_str:
 				print "Didn't find latent causative SNP:",phen_pos

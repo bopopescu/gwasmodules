@@ -394,7 +394,12 @@ def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_v
 	new_positions = []
 	for i, p in enumerate(p_vals):
 		if p<=p_value_filter:
-			scores.append(-math.log10(p))
+			try:
+				s = -math.log10(p)
+			except Exception, err_str:
+				print p, err_str
+				s = 324
+			scores.append(s)
 			new_positions.append(positions[i])
 			new_chromosomes.append(chromosomes[i])
 	positions = new_positions
