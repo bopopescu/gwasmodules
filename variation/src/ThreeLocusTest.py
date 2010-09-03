@@ -865,7 +865,7 @@ def _run_():
 				latent_chr_pos = (latent_loci_snp_chr_pos_mafs[i][1],latent_loci_snp_chr_pos_mafs[i][2])
 				highlight_loci.append(latent_chr_pos)
                         print highlight_loci   
-                        print "\nThe %d'th phenotype, variance=%0.3f :\n"%(i+phen_index,phenotype.var(ddof=1))
+                        print "\nThe %d'th phenotype, variance=%0.3f :"%(i+phen_index,phenotype.var(ddof=1))
                         print phenotype
 			sys.stdout.flush()	    
                         
