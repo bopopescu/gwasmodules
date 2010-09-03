@@ -488,6 +488,10 @@ class LinearMixedModel(LinearModel):
                                 continue
                         rss_list[i] = rss[0]                
                         betas_list[i] = map(float,list(betas))
+                        if (i+1)%(num_snps/10)==0:
+                        	sys.stdout.write('.')
+                        	sys.stdout.flush()
+                sys.stdout.write('\n')
                 rss_ratio = h0_rss/rss_list
                 var_perc = 1-1/rss_ratio
                 f_stats = (rss_ratio-1)*n_p/float(q)
