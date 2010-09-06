@@ -3334,7 +3334,7 @@ class JBDataGWA(object):
 		Z = cls.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, kinshipData.row_id_ls)
 		
 		new_K = numpy.dot(numpy.dot(Z, kinshipData.data_matrix), numpy.transpose(Z))
-		return new_K, JBData	#2010-8-22 return JBData as well
+		return new_K, JBData, Z	#2010-8-22 return JBData as well
 		
 	@classmethod
 	def getCholeskyInverseData(cls, L_inverse_fname, kinship_output_fname=None, genotype_fname_to_generate_kinship=None,\
@@ -3356,17 +3356,18 @@ class JBDataGWA(object):
 		from Association import Association
 		from pymodule import PassingData
 		import numpy, os
+		Z = None
 		if os.path.isfile(L_inverse_fname):
 			L_inverse_Data = SNPData(input_fname=L_inverse_fname, ignore_2nd_column=1, matrix_data_type=float, turn_into_array=1)
 			L_inverse = L_inverse_Data.data_matrix
 			if needKinship:
-				new_K, JBData = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
+				new_K, JBData, Z = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
 			else:
 				new_K = None
 		else:
-			new_K, JBData = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
+			new_K, JBData, Z = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
 			if vg is None or ve is None:
-				phenotype_ls = cls.getPhenotypeLsOutOfJBData(JBData, logPhenotype=logPhenotype)
+				phenotype_ls = cls.getPhenotypeLsOutOfJBData(JBData, logPhenotype=logPhenotype,)
 				non_NA_genotype_ls = []
 				if preEMMAXCofactor_ls:
 					JBDataEnvEncoded = cls.extractCovariateDataFromJBData(JBData, env_variable_coding_ls=env_variable_coding_ls)
@@ -3388,7 +3389,7 @@ class JBDataGWA(object):
 			L_inverse_Data = SNPData(row_id_ls=JBData.row_id_ls, col_id_ls=JBData.row_id_ls, data_matrix=L_inverse)
 			L_inverse_Data.tofile(L_inverse_fname)
 		sys.stderr.write("Done.\n")
-		return PassingData(L_inverse_Data=L_inverse_Data , kinship_matrix = new_K, JBData = JBData)
+		return PassingData(L_inverse_Data=L_inverse_Data , kinship_matrix = new_K, JBData = JBData, Z=Z)
 	
 	@classmethod
 	def outputPhenotypePrediction(cls, output_fname, covariateData=None, phenotype_ls=[], \
@@ -3520,7 +3521,7 @@ class JBDataGWA(object):
 			return None
 		
 		JBData = SNPData(input_fname=phenotype_genotype_fname, turn_into_array=1, ignore_2nd_column=1, \
-						    data_starting_col=2, turn_into_integer=False)
+							data_starting_col=2, turn_into_integer=False)
 		
 		L_inverse_fname_additional_parts = []
 		if planting_value:
@@ -3538,6 +3539,10 @@ class JBDataGWA(object):
 		environment_variate_name_ls.append('TopOrNot')
 		environment_variate_name_ls.append('MiddleOrNot')
 		#environment_variate_name_ls.append('lat')
+		
+		# 2010-9-2 temporary to exclude environmental variables altogether
+		#environment_variate_name_ls = []
+		
 		if addEnvAsCofactorInPreEMMAX:
 			preEMMAXCofactor_ls = []
 			for env_name in environment_variate_name_ls:
@@ -3574,6 +3579,10 @@ class JBDataGWA(object):
 								('planting', 'planting', {'spring':0, 'summer':1}),\
 								('shelfHeight', 'TopOrNot', {'bottom':0, 'bottom-middle':0, 'top':1, 'top-middle':1}),\
 								('shelfHeight', 'MiddleOrNot', {'bottom':0, 'bottom-middle':1, 'top':0, 'top-middle':1})]
+		
+		# 2010-9-2 temporary , remove env variables altogether
+		#env_variable_coding_ls = []
+		
 		# 2010-4-21 the reverse of env_variable_coding_ls used in outputPhenotypePrediction
 		env_variable_reverse_code_ls = []
 		for env_variable, new_variable_name, encode_dict in env_variable_coding_ls:
@@ -3601,6 +3610,7 @@ class JBDataGWA(object):
 		L_inverse_Data = returnData.L_inverse_Data
 		kinship_matrix = returnData.kinship_matrix
 		JBData = returnData.JBData	#2010-8-22
+		Z = returnData.Z # 2010-9-1
 		if useYanSNPData:
 			selectSNPDataWithReplicates = None	# 2010-4-2 use SNP data from yan's file
 			JBData = JBData.removeRowsNotInTargetSNPData(L_inverse_Data)
@@ -3627,7 +3637,8 @@ class JBDataGWA(object):
 				selectSNPDataWithReplicates.tofile(selectSNPDataWithReplicates_genotype_fname)
 		
 		L_inverse = L_inverse_Data.data_matrix
-		phenotype_ls = cls.getPhenotypeLsOutOfJBData(JBData, logPhenotype=logPhenotype)
+		phenotype_ls = cls.getPhenotypeLsOutOfJBData(JBData, logPhenotype=logPhenotype, )
+		
 		phenotype_variance = numpy.var(phenotype_ls)	# 2010-4-18 to calculate the variance explained without cholesky transformation
 		non_NA_phenotype_ar = numpy.array(phenotype_ls)
 		non_NA_phenotype_ar = numpy.dot(L_inverse, non_NA_phenotype_ar)	# numpy.dot and numpy.inner has subtle difference.
@@ -3657,7 +3668,7 @@ class JBDataGWA(object):
 			GXE_environment_variate_name_ls = environment_variate_name_ls
 		else:
 			GXE_environment_variate_name_ls = []
-		extraVariateNameLs = ['S_square', 'var_perc','var_perc_real']	#2010-4-18 explicitly set the extra columns to be outputted
+		extraVariateNameLs = ['S_square', 'var_perc','var_perc_real', 'heritability',]	#2010-4-18 explicitly set the extra columns to be outputted
 		writer = cls.writeHeaderJBData(output_fname, base_formula, \
 							GXE_environment_variate_name_ls=GXE_environment_variate_name_ls,\
 							special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
@@ -4190,7 +4201,68 @@ class JBDataGWA(object):
 		
 		sys.exit(0)
 		
-	
+		#################### 2010-9-6 for PNAS revisions
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_tg_ecotypeid.tsv')
+		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
+		vg=None
+		ve=None
+		interaction_snp_id_in_base_formula_ls = []
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
+								'5_18620282', '5_25376551', '5_3188328']
+		
+		special_interaction_snp_id_ls = []	# 2010-3-26 
+		vg=None
+		ve=None
+		
+		
+		#snp_id_to_be_included_ls = []
+		loc_value_ls = ['spain', 'sweden']
+		planting_value_ls = ['spring', 'summer']
+		for planting_value in planting_value_ls:
+			for loc_value in loc_value_ls:
+				for logPhenotype in [True]:
+					#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
+					cholesky_inverse_fname = None
+					output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_noSNP_%s_%s.tsv'%\
+													(loc_value, planting_value))
+					JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+												output_fname, vg=vg, ve=ve, \
+												snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
+												includeInteraction=True, kinship_fname=kinship_fname, \
+												cholesky_inverse_fname = cholesky_inverse_fname,\
+												interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+												special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
+												planting_value=planting_value, loc_value=loc_value,\
+												logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, run_type=4)
+		
+		sys.exit(0)
+		
+		# 2010-9-2 get snp_id from some file 
+		snp_id_to_be_included_ls = []
+		import csv
+		reader = csv.reader(open(os.path.expanduser("~/Downloads/69SNPs.csv")))
+		reader.next()
+		for row in reader:
+			snp_id_to_be_included_ls.append(row[0])
+		
+		for logPhenotype in [True]:
+			#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
+			cholesky_inverse_fname = None
+			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_69SNP.tsv')
+			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
+										output_fname, vg=vg, ve=ve, \
+										snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
+										includeInteraction = True, kinship_fname = kinship_fname, \
+										cholesky_inverse_fname = cholesky_inverse_fname,\
+										interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
+										special_interaction_snp_id_ls = special_interaction_snp_id_ls,\
+										planting_value = None, loc_value = None,\
+										logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
+		sys.exit(0)
 	"""
 	
 	
@@ -18628,102 +18700,6 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		
-		##### 2010-3-26 add FRI-FLC interaction to 4 block-only full model
-		# 2010-4-6
-		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF.tsv')
-		#phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_tg_ecotypeid.tsv')
-		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_tg_ecotypeid.tsv')
-		
-		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482.tsv')
-		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_impute.tsv')
-		genotype_fname_to_generate_kinship = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-		#kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/K.tsv')
-		kinship_fname = None
-		kinship_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship.tsv')	#two FRI allele shall not make a difference.
-		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
-		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_pairwise_cofactor.tsv')
-		#vg=1451.803; ve=331.4423; 	# 2010-3-24 estimates from ~/script/variation/data/JBLabSeasonFlowering/K.tsv
-		vg=None
-		ve=None
-		vg=1534.10171646	# 2010-3-24 estimates from ~/mnt/panfs/250k/dataset/call_method_49_core482.tsv
-		ve=499.58683376
-		#JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, output_fname, vg=vg, ve=ve, kinship_fname=kinship_fname)
-		
-		
-		# 2010-4-1 final full model with FRI-FLC, and FT-FLC
-		cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_7224_replicates_L_inverse.tsv')
-		cholesky_inverse_fname = None
-		vg=None
-		ve=None
-		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_intersection_yanSNPData_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
-		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_core482_new_K_new_vg_ve_full_model_plus_FT_FLC_and_FRI_FLC_epistasis.tsv')
-		#output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering/d4DTF_full_model_without_GXE_YanSNP.tsv')
-		interaction_snp_id_in_base_formula_ls = [('4_264496', '5_3188328'), ('1_24345319','5_3188328')]	# FRI-FLC, FT-FLC
-		interaction_snp_id_in_base_formula_ls = [('1_24345319','5_3188328')]	# FT-FLC
-		interaction_snp_id_in_base_formula_ls = []
-		#interaction_snp_id_in_base_formula_ls = ['4_264496', '5_3188328']	# FRI-FLC
-		#special_interaction_snp_id_ls = ['1_24345319','5_3188328']	# 2010-3-26 FT-FLC
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
-								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-		
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_158958', '4_199214', '4_264496',  '4_268809', '4_269962', '4_286905', '4_387727', \
-								'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_268809', '4_269962', '5_18620282', '5_25376551', '5_3188328']	
-		
-		
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-									'4_1356197',  '4_158958', '4_199214', '4_264496', '4_286905', '4_387727', \
-									'4_429928',  '5_18620282', '5_25376551', '5_3188328']
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
-								'5_18620282', '5_25376551', '5_3188328']
-		#snp_id_to_be_included_ls = []
-		
-		special_interaction_snp_id_ls = []	# 2010-3-26 
-		vg=None
-		ve=None
-		
-		
-		loc_value_ls = ['spain', 'sweden']
-		planting_value_ls = ['spring', 'summer']
-		for planting_value in planting_value_ls:
-			for loc_value in loc_value_ls:
-				for logPhenotype in [True]:
-					#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
-					cholesky_inverse_fname = None
-					output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_12SNP_%s_%s.tsv'%\
-													(loc_value, planting_value))
-					JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-												output_fname, vg=vg, ve=ve, \
-												snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-												includeInteraction=True, kinship_fname=kinship_fname, \
-												cholesky_inverse_fname = cholesky_inverse_fname,\
-												interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-												special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
-												planting_value=planting_value, loc_value=loc_value,\
-												logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
-		
-		sys.exit(0)
-		
-		for logPhenotype in [True]:
-			#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
-			cholesky_inverse_fname = None
-			output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_12SNP.tsv')
-			JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-										output_fname, vg=vg, ve=ve, \
-										snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
-										includeInteraction = True, kinship_fname = kinship_fname, \
-										cholesky_inverse_fname = cholesky_inverse_fname,\
-										interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-										special_interaction_snp_id_ls = special_interaction_snp_id_ls,\
-										planting_value = None, loc_value = None,\
-										logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
-		sys.exit(0)
 		
 		# 2010-8-6 -z banyan.usc.edu
 		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
