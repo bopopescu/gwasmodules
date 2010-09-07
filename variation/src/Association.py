@@ -653,6 +653,8 @@ class Association(Kruskal_Wallis):
 	@classmethod
 	def emma(cls, non_NA_genotype_ls=None, non_NA_phenotype_ls=None, kinship_matrix=None, eig_L = None):
 		"""
+		2010-9-6
+			return heritability
 		2010-4-23
 			source the emma.R first if it's not sourced yet.
 		2009-12-19
@@ -694,9 +696,12 @@ class Association(Kruskal_Wallis):
 		random_effect_and_residual_ls = list(numpy.array(non_NA_phenotype_ls)-numpy.inner(genotype_matrix, coeff_ar))
 		coeff_list.extend(random_effect_and_residual_ls)
 		"""
+		ve=one_marker_rs['ve']
+		vg=one_marker_rs['vg']
+		heritability = vg/(vg+ve)
 		pdata = PassingData(pvalue=one_marker_rs['pvalue'], var_perc=one_marker_rs['genotype_var_perc'][0][0], \
-						coeff_list=coeff_list, coeff_p_value_list=coeff_p_value_list, ve=one_marker_rs['ve'], \
-						vg=one_marker_rs['vg'])	# vg is the variance for the random effect (multi-small-effect-gene effect), ve is the residual variance. 
+						coeff_list=coeff_list, coeff_p_value_list=coeff_p_value_list, ve=ve, \
+						vg=vg, heritability=heritability)	# vg is the variance for the random effect (multi-small-effect-gene effect), ve is the residual variance. 
 		return pdata
 	
 	def Emma_whole_matrix(self, data_matrix, phenotype_ls, min_data_point=3, **keywords):
