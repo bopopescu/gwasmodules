@@ -265,6 +265,9 @@ class MPIwrapper(object):
 	
 	def inputNode(self, param_obj, free_computing_nodes, param_generator=None, message_size=1):
 		"""
+		2010-8-8
+			Stop assuming that param_generator has method 'next'.
+			Probe its attributes first. Use 'pop' if it has 'pop' and not 'next'.
 		2010-5-31
 			set message_size default to 1
 			add argument message_size to allow sending >1 param to computing node
@@ -276,13 +279,21 @@ class MPIwrapper(object):
 		sys.stderr.write("Input node(%s) working...\n"%node_rank)
 		counter = 0
 		timeToBreak = 0
+		generatorMethod = 'next'
+		if not hasattr(param_generator, generatorMethod) and hasattr(param_generator, 'pop'):
+			generatorMethod = 'pop'
 		while 1:
 			param_ls = []
 			for i in range(message_size):
 				try:
-					param = param_generator.next()
+					param = getattr(param_generator, generatorMethod)()
 					param_ls.append(param)
 				except:
+					if self.report:
+						sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+						import traceback
+						traceback.print_exc()
+						sys.stderr.write('Input node broke out due to except.\n')
 					timeToBreak = 1
 					break
 			if len(param_ls)>0:
