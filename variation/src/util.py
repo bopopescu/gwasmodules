@@ -1,13 +1,15 @@
 """
 Various useful functions.
 """
+import numpy as np
+
 def getRanks(values,withTies=True):
 	"""
 	returns ranks (large values w. large ranks)
 	"""
-	srt_vals = zip(values[:],range(0,len(values)))
+	srt_vals = zip(values[:],range(len(values)))
 	srt_vals.sort()
-	srt_ranks = []
+	srt_ranks = np.zeros(len(srt_vals))
 	if withTies:	
 		i = 0
 		while i < len(srt_vals):
@@ -18,72 +20,92 @@ def getRanks(values,withTies=True):
 			rank = i+(j+1)/2.0
 			max_i = i+j
 			while i<max_i:
-				srt_ranks.append(rank)
+				srt_ranks[i]=rank
 				i+=1
+
 	else:
-		srt_ranks = range(1,len(srt_vals))
+		srt_ranks = np.arange(len(srt_vals))
 			
-	ranks = [0.0]*len(srt_vals)
+	ranks = np.zeros(len(srt_vals))
 	
-	for i in range(0,len(srt_vals)):
-		(val,val_index) = srt_vals[i]		
+	for i,(val,val_index) in enumerate(srt_vals):
 		ranks[val_index] = srt_ranks[i]
 	return ranks
+
+
+def _kw_get_ranks_(values,withTies=True):
+	"""
+	returns ranks (large values w. large ranks)
+	"""
+	srt_vals = zip(values[:],range(len(values)))
+	srt_vals.sort()
+	srt_ranks = np.zeros(len(srt_vals))
+	group_counts = []
+	if withTies:	
+		i = 0
+		while i < len(srt_vals):
+			curVal =  srt_vals[i][0]
+			j = 1
+			while i+j < len(srt_vals) and srt_vals[i+j][0]==curVal:
+				j += 1
+			rank = i+(j+1)/2.0
+			max_i = i+j
+			group_counts.append(j)
+			while i<max_i:
+				srt_ranks[i]=rank
+				i+=1
+
+	else:
+		srt_ranks = np.arange(len(srt_vals))
+		group_counts = [1]*len(srt_vals)
+			
+	ranks = np.zeros(len(srt_vals))
+	
+	for i,(val,val_index) in enumerate(srt_vals):
+		ranks[val_index] = srt_ranks[i]
+	return ranks, np.array(group_counts)
 			
 
 def kruskal_wallis(snps,phenVals,useTieCorrection=True):
-	#from rpy2.robjects import r
-	#from rpy2.rpy_classic import r
-	#from rpy2.rpy_classic import r
 	from scipy import stats
+	import time
+	s1 = time.time()	
 	assert len(snps[0])==len(phenVals),"SNPs and phenotypes are not equal length."
-	def _kw_test_(snp,ranks,tieCorrection):
-		n = len(snp)
-		group_vals = list(set(snp))
-		g = len(group_vals)
-		snp_ranks = zip(snp,ranks)
-		ns = [0]*g
-		rs = [0.0]*g
-		for (nt,rank) in snp_ranks:
-			i = 0
-			while group_vals[i] != nt:
-				i += 1
-			ns[i]+=1
-			rs[i]+=rank
-		nominator = 0.0
-		mean_r = (n+1)/2.0
-		for i in range(0,g):
-			v = (rs[i]/ns[i])-mean_r
-			nominator += ns[i]*v*v
-
-		d = ((12.0/(n*(n+1))) * nominator)*tieCorrection
-		p =  stats.chi2.sf(d,g-1)
-		#print p 
-		#p = r.pchisq(d,g-1,lower_tail = False)
-		return (d,p)
-
 	
-	ranks = getRanks(phenVals)
+	ranks, group_counts = _kw_get_ranks_(phenVals)
+	assert len(group_counts) == len(set(ranks)),'Somethings wrong..'
 	tieCorrection = 1.0
 	if useTieCorrection:
 		n_total = len(ranks)
-		groups = list(set(ranks))
-		n_groups = len(groups)
-		s = 0
-		for g in groups:
-			t = ranks.count(g)
-			s += t*(t*t-1.0)
-		s = float(s)/(n_total*(n_total*n_total-1))
+		ones_array = np.repeat(1.0,len(group_counts))
+		s = np.sum(group_counts*(group_counts*group_counts-ones_array))
+		s = s/(n_total*(n_total*n_total-1.0))
 		tieCorrection = 1.0/(1-s)
-		#print "tieCorrection:", tieCorrection
-		
-	ds = []
-	ps = []
-	for snp in snps:		
-		(d,p) = _kw_test_(snp, ranks,tieCorrection=tieCorrection)
-		ds.append(d)
-		ps.append(p)
+	
+	n = len(phenVals)
+	ds = np.zeros(len(snps))
+	c = 12.0/(n*(n+1))
+	for i, snp in enumerate(snps):		
+		ns = np.bincount(snp)
+		rs = np.array([0.0,np.sum(snp*ranks)])
+		rs[0] = np.sum(ranks)-rs[1]
+		nominator = 0.0
+		mean_r = (n+1)/2.0
+		for j in range(2):
+			v = (rs[j]/ns[j])-mean_r
+			nominator += ns[j]*v*v
+		ds[i] = (c * nominator)*tieCorrection
+
+	ps =  stats.chi2.sf(ds,1)
+
 	#print ps
+	secs = time.time()-s1
+	if secs>60:
+		mins = int(secs)/60
+		secs = secs - mins*60
+		print 'Took %d mins and %f seconds.'%(mins,secs)
+	else:
+		print 'Took %f seconds.'%(secs)
 	return {"ps":ps,"ds":ds}
 
 
@@ -209,6 +231,21 @@ def bin_counts(values,bins):
 		print "These values were OOB:",out_of_bounds_values
 	return counts
 
+
+def r_list_2_dict(rList):
+	pyDict = {}
+	for name,value in zip([i for i in rList.getnames()],[i for i in rList]):
+	    	if len(value) == 1: 
+	    		pyDict[name] = value[0]
+	    	else: 
+	    		pyDict[name] = [i for i in value]
+	return pyDict
+
+
+
+anti_decoder = {1:0,0:1}
+def anti_binary_snp(snp):
+	return [anti_decoder[nt] for nt in snp]
 
 if __name__=='__main__':
 	l = [1,2,3,3,3,2,3,4,1,0,3,3,3]

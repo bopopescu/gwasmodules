@@ -648,7 +648,7 @@ emma.ML.LRT <- function(ys, xs, K, Z=NULL, X0 = NULL, ngrids=100, llim=-10, ulim
 
 													   
 													   
-emma.REML.t <- function(ys, xs, K, y_var, ngrids=100, llim=-4, ulim=10, esp=1e-6, debug=FALSE) {
+emma.REML.t <- function(ys, xs, K, y_var, ngrids=50, llim=-4, ulim=10, esp=1e-6, debug=FALSE) {
   if ( is.null(dim(ys)) || ncol(ys) == 1 ) {
     ys <- matrix(ys,1,length(ys))
   }

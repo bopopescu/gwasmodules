@@ -4,6 +4,7 @@ This library offers functions to parse different types of SNPs data from multipl
 Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
 import time, sys, random
+import os
 
 from snpsdata import *
 
@@ -200,7 +201,6 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 	
 
 	print "Reading and processing (cutting & merging) raw call files"
-	import os
 	import tempfile
 	tempfile.tempdir='/tmp'
 	tmpFiles = []
@@ -753,10 +753,7 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 		
 	sys.stderr.write("Loading file: %s ... \n"%datafile)
 	decoder = nt_decoder
-	decoder[missingVal]=missing_val
-	#decoder={missingVal:'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T', 'N':'N',
-	#		 'AG':'NA', 'AC':'NA', 'GT':'NA', 'CT':'NA', 'AT':'NA', 'CG':'NA', '-':'-', '|':'NA'}	#05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched)	
-	
+	decoder[missingVal]=missing_val	
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
@@ -769,7 +766,6 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 	chromosomes = []
 	positionsList = []
 	snpsList = []
-	accessions = []
 	arrayIds = None
 	line = lines[1].split(deliminator)
 	i=0
@@ -843,6 +839,8 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 		return snpsd_ls
 
 	
+
+
 	
 
 
@@ -1617,14 +1615,176 @@ def parseMSDataFilter(filename, baseScale=1000000,sampleNum=None, fixPos=True, f
 	return data
 	
 
+def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None, use_pickle=True):
+	"""
+	A sped-up version, to load a binary file in binary format.
+	
+	If pickle is used then more memory is required, but it speeds up.
+	"""
+	import numpy as np
+	import random
+	import cPickle
+	import time
+	pickle_file = data_file+'.pickled'
+	if use_pickle: 
+		if os.path.isfile(pickle_file):
+			print 'Loading pickled object.'
+			t_ = time.time()
+			f = open(pickle_file,'rb')
+			sd = cPickle.load(f)
+			f.close()
+			print 'Loading done'
+			if filter_accessions and set(filter_accessions)!=set(sd.accessions):
+				print 'Filtering accessions.'
+				sd.filter_accessions(filter_accessions)
+			print 'Loading genotype data took %.2f s...'%(time.time()-t_)
+			return sd
+		else:
+			filter_accessions_ = filter_accessions
+			filter_accessions = None
+	sys.stderr.write("Loading binary SNPs data file: %s \n"%data_file)
+	accessions = []
+	snpsd_ls = []
+	chromosomes = []
+	
+	#Reading accession data
+	f = open(data_file, 'rb')
+	line = f.next().split(delimiter)
+	for acc in line[2:]:
+		accessions.append(acc.strip())
+	print "Found",len(accessions),"arrays/strains."
+	
+	if filter_accessions:
+		indices_to_include = []
+		new_accessions = []
+		for i, acc in enumerate(accessions):
+			if acc in filter_accessions:
+				indices_to_include.append(i) 
+				new_accessions.append(acc)
+		accessions = new_accessions
+		print "Loading only",len(accessions),"arrays/strains."
 
-def parse_snp_data(datafile, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,id=None):
+	num_accessions = len(accessions)
+
+	positions = []
+	snps = []
+	line = f.next().split(delimiter)
+	old_chromosome = int(line[0])
+	positions.append(int(line[1]))
+	snps.append(np.array(line[2:],dtype='int8'))
+	#snps.append(map(int,line[2:]))
+	i = 0 
+	
+	if filter<1.0:
+		if filter_accessions: 
+			for i, line in enumerate(f):
+				if random.random()>filter: continue
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				l_list = line_list[2:]
+				#snp = [int(l_list[j]) for j in indices_to_include]
+				snp = np.array([l_list[j] for j in indices_to_include],dtype='int8')
+				snps.append(snp)
+		else:
+			for i, line in enumerate(f):
+				if random.random()>filter: continue
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				#snps.append(map(int,line_list[2:]))
+				snps.append(np.array(line_list[2:],dtype='int8'))
+	else:
+		if filter_accessions: 
+			for i, line in enumerate(f):		
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				l_list = line_list[2:]
+				#snp = [int(l_list[j]) for j in indices_to_include]
+				snp = np.array([l_list[j] for j in indices_to_include],dtype='int8')
+				snps.append(snp)
+		else:
+			for i, line in enumerate(f):		
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome!=old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n"%i)
+				positions.append(int(line_list[1]))
+				#snps.append(map(int,line_list[2:]))
+				snps.append(np.array(line_list[2:],dtype='int8'))
+
+		
+
+	f.close()
+	snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+	snpsd_ls.append(snpsd)
+	chromosomes.append(old_chromosome)
+	sys.stderr.write("Loaded %s SNPs.\n"%i)
+	sd = SNPsDataSet(snpsd_ls,chromosomes)
+	if use_pickle:
+		print 'Saving a pickled version of genotypes.'
+		f = open(pickle_file,'wb')
+		cPickle.dump(sd, f, protocol=2)
+		f.close()
+		sd.filter_accessions(filter_accessions_)
+	return sd
+
+
+
+
+def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,
+		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None):
 	"""
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
- 	snpsds = parseCSVData(datafile, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
-	return SNPsDataSet(snpsds,[1,2,3,4,5])
+	if format==0 and look_for_binary:
+		sd_binary_file = data_file+'.binary'
+		if os.path.isfile(sd_binary_file):
+			sd = parse_binary_snp_data(sd_binary_file, delimiter = delimiter, 
+					      missing_val = missingVal, filter = filter,
+					      filter_accessions=filter_accessions)
+		else:
+			sd = parse_snp_data(data_file , format = 0, delimiter = delimiter, 
+					      missingVal = missingVal, filter = filter, look_for_binary=False,
+					      filter_accessions=filter_accessions)
+			print 'Save a binary snps data file:',sd_binary_file
+			sd.writeToFile(sd_binary_file,binary_format=True)
+	else:
+		snpsds = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
+		sd = SNPsDataSet(snpsds,[1,2,3,4,5])
+ 	return sd
 
 
 def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",", 
@@ -1712,11 +1872,28 @@ def _testDBParser_():
 
 if __name__ == "__main__":
 
-	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
-	print len(snpsds)
-	for i in range(0,len(snpsds)):
-		print len(snpsds[i].snps)
-
+#	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
+#	print len(snpsds)
+#	for i in range(0,len(snpsds)):
+#		print len(snpsds[i].snps)
+#	sd = parse_snp_data('/Users/bjarni.vilhjalmsson/Projects/Data/250k/250K_t54.csv',look_for_binary=False)
+#	sd = parse_binary_snp_data('/Users/bjarni.vilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
+	import cPickle
+	import time
+	import random
+#	t_ = time.time()
+#	f = open('/tmp/test.pickled','wb')
+#	cPickle.dump(sd, f, protocol=2)
+#	print 'Took %.2f s...'%(time.time()-t_)
+#	f.close()
+	
+	f = open('/tmp/test.pickled','rb')
+	t_ = time.time()
+	sd = cPickle.load(f)
+	f_accessions = random.sample(sd.accessions,900)
+	sd.filter_accessions(f_accessions)
+	print 'Took %.2f s...'%(time.time()-t_)
+	f.close()
 	
 	#get250KDataFromDb(user="bvilhjal", passwd="bamboo123")
 	

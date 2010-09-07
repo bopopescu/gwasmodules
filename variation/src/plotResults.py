@@ -109,7 +109,7 @@ def plotResult(result,pdfFile=None,pngFile=None,minScore=None,maxScore=8.4,
 					cgs.append(cg)
 			chr_cand_genes.append(cgs)
 		
-	result = result.clone()
+	result = result.clone() #Very slow and memory inefficient
 
 	result.filterPercentile(percentile/100.0)
 
@@ -370,7 +370,7 @@ def plotResultWithSecondRun(result,secondRunResult,pdfFile=None,pngFile=None,min
 	"""
 
 
-def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_value_filter=0.02,min_score=None,max_score=None,plot_bonferroni=True,ylab="$-$log$_{10}(p-$value$)$"):		
+def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_value_filter=0.02,min_score=None,max_score=None,plot_bonferroni=True,highlight_loci=None,ylab="$-$log$_{10}(p-$value$)$"):		
 	"""
 	Plots a 'Manhattan' style GWAs plot.
 	"""
@@ -394,7 +394,12 @@ def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_v
 	new_positions = []
 	for i, p in enumerate(p_vals):
 		if p<=p_value_filter:
-			scores.append(-math.log10(p))
+			try:
+				s = -math.log10(p)
+			except Exception, err_str:
+				print p, err_str
+				s = 324
+			scores.append(s)
 			new_positions.append(positions[i])
 			new_chromosomes.append(chromosomes[i])
 	positions = new_positions
@@ -411,8 +416,12 @@ def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_v
 	if not min_score:		
 		min_score = 0
 	
+	
 	score_range = max_score - min_score
+	min_y = min_score-0.05*score_range
+	max_y = max_score+0.05*score_range
 	offset = 0
+	chr_offsets = []
 	ticksList1 = []
 	ticksList2 = []
 	textPos = []
@@ -420,6 +429,7 @@ def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_v
 	plt.axes([0.045,0.15,0.95,0.71])
 	starPoints = [[],[],[]]
 	for i in range(len(chromosome_ends)):
+		chr_offsets.append(offset)
 		index1 = chromosome_splits[i]
 		index2 = chromosome_splits[i+1]
 		scoreList = scores[index1:index2]
@@ -449,6 +459,11 @@ def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_v
 				ticksList2.append("")
 		
 		
+	if highlight_loci:
+		for c,p in highlight_loci:
+			x_pos = chr_offsets[c-1]+p
+			plt.axvline(x=x_pos, ymin=min_y, ymax=max_y,color='#33ee66')
+		
 		
 	plt.plot(starPoints[0],starPoints[1],".",color="#ee9922",markersize=6)
 	if len(starPoints[0])>0:
@@ -470,7 +485,7 @@ def plot_raw_result(p_vals,chromosomes,positions,pdf_file=None,png_file=None,p_v
 		bonferroni_threshold = -math.log10(1.0/(num_scores*20.0))
 		plt.plot([0,sum(chromosome_ends)],[bonferroni_threshold,bonferroni_threshold],"k-.")
 
-	plt.axis([0,sum(chromosome_ends),min_score-0.05*score_range,max_score+0.05*scoreRange])
+	plt.axis([0,sum(chromosome_ends),min_y,max_y])
 	plt.xticks(ticksList1,ticksList2)
 	if not ylab:
 		if type=="pvals":

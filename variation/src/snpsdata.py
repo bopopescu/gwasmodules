@@ -8,6 +8,8 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 
 import sys,warnings
 import pdb
+import numpy as np
+
 
 IUPAC_alphabet = ['A','C','G','T','-','Y','R','W','S','K','M','D','H','V','B','X','N']
 
@@ -820,7 +822,7 @@ class _SnpsData_(object):
 			newAccessions.append(self.accessions[i])
 			if self.arrayIds:
 				newArrayIds.append(self.arrayIds[i])
-		for i in range(0, len(self.snps)):
+		for i in range(len(self.snps)):
 			snp = self.snps[i]
 			newSnp = []
 			for j in indicesToKeep:
@@ -968,26 +970,26 @@ class _SnpsData_(object):
 		return (new_snp,new_phen_vals)
 		
 
-	def get_mafs(self):
-		"""
-		Returns MAFs and MARFs
-		
-		Assumes that this is a binary allele.
-		"""		
-		mafs = []
-		marfs = []
-		for snp in self.snps:
-			missing_count = snp.count(self.missingVal)
-			num_nts = len(snp)-missing_count
-			nts = set(snp)
-			if missing_count:
-				nts.remove(self.missingVal)
-			c = snp.count(nts.pop())/float(num_nts)
-			if c>0.5:
-				c = 1.0-c
-			marfs.append(c)
-			mafs.append(int(c*num_nts))
-		return {"mafs":mafs, "marfs":marfs}
+        def get_mafs(self):
+                """
+                Returns MAFs and MARFs
+                
+                Assumes that this is a binary allele.
+                """                
+                mafs = []
+                marfs = []
+                for snp in self.snps:
+                        missing_count = list(snp).count(self.missingVal)
+                        num_nts = len(snp)-missing_count
+                        nts = set(snp)
+                        if missing_count:
+                                nts.remove(self.missingVal)
+                        c = list(snp).count(nts.pop())/float(num_nts)
+                        if c>0.5:
+                                c = 1.0-c
+                        marfs.append(c)
+                        mafs.append(int(c*num_nts))
+                return {"mafs":mafs, "marfs":marfs}
 		
 
 
@@ -1759,8 +1761,105 @@ class RawSnpsData(_SnpsData_):
 		pass
 
 
-	
- 
+class SNPsData(_SnpsData_):	
+        """
+        Efficient genotype data, using the numpy class.
+        
+        An alternative to the old SnpsData class.
+        """ 
+        alphabet = [-1,0,1,2,3]  #Here -1 is thought to be missing data value.
+        def __init__(self,snps,positions, accessions=None, arrayIds=None, chromosome=None,
+                        alignment_positions=None, id=None, marker_types=None, missing_val=-1):
+                self.snps = snps 
+                self.positions = positions
+                self.accessions=accessions
+                self.arrayIds = arrayIds
+                self.chromosome=chromosome
+                self.alignment_positions = alignment_positions
+                self.marker_types = marker_types #Where do these markers come frome, what type are they?  Useful for later analysis.
+                self.id = id
+                self.missingVal = missing_val
+
+
+
+        def removeAccessionIndices(self,indicesToKeep):
+                """
+                Removes accessions from the data.
+                """
+                newAccessions = []
+                newArrayIds = []
+                for i in indicesToKeep:
+                        newAccessions.append(self.accessions[i])
+                        if self.arrayIds:
+                                newArrayIds.append(self.arrayIds[i])
+                num_accessions = len(indicesToKeep)
+                for i in range(len(self.snps)):
+			self.snps[i] = self.snps[i][indicesToKeep]
+#                        snp = self.snps[i]
+#                        newSnp = np.empty(num_accessions,dtype='int8')
+#                        for j,k in enumerate(indicesToKeep):
+#                                newSnp[j] = snp[k]
+#                        self.snps[i] = newSnp
+                self.accessions = newAccessions
+                if self.arrayIds:
+                        #print "removeAccessionIndices: has array IDs: self.arrayIds =",self.arrayIds
+                        self.arrayIds = newArrayIds
+                        #print "len(self.arrayIds):",len(self.arrayIds)
+                #pdb.set_trace()
+                #print "len(self.accessions):",len(self.accessions)
+
+
+        def onlyBinarySnps(self):
+                """
+                Removes all but binary SNPs.  (I.e. monomorphic, tertiary and quaternary alleles SNPs are removed.)
+                """
+                new_positions = []
+                new_snps = []
+                for i, (snp, pos) in enumerate(zip(self.snps,self.positions)):
+                        if 0 in snp and 1 in snp:
+                                new_snps.append(snp)
+                                new_positions.append(pos)
+                num_removed = len(self.positions)-len(new_positions)
+                self.no_of_nonbinary_snps_removed = num_removed
+                self.snps = new_snps
+                self.positions = new_positions
+                print "Removed %d non-binary SNPs, leaving %d SNPs in total."%(num_removed,len(self.snps))                
+                return num_removed
+
+
+
+        def get_mafs(self,w_missing=False):
+                """
+                Returns MAFs and MARFs
+                
+                Assumes that this is a binary allele.
+                """                
+                mafs = []
+                marfs = []
+                num_nts = len(self.snps[0])
+                for snp in self.snps:
+                        if w_missing and self.missingVal in snp:
+                                missing_count = list(snp).count(self.missingVal)
+                                num_nts = len(snp)-missing_count
+                                nts = set(snp)
+                                nts.remove(self.missingVal)
+                                c = list(snp).count(nts.pop())/float(num_nts)
+                                if c>0.5:
+                                        c = 1.0-c
+                                marfs.append(c)
+                                mafs.append(int(c*num_nts))
+                        else:
+                                l = np.bincount(snp)
+                                maf = min(l)
+                                mafs.append(maf)
+                                marfs.append(maf/float(num_nts))
+                                
+                return {"mafs":mafs, "marfs":marfs}
+                
+
+
+
+
  
 class SnpsData(_SnpsData_):
 	"""
@@ -2215,9 +2314,7 @@ class SnpsData(_SnpsData_):
 
 
 
-class SNPsDataSet:
-	#Log 110708 - bjarni: old name was SnpsDataSet
-	
+class SNPsDataSet:	
 	"""
 	A class that encompasses multiple _SnpsData_ chromosomes objects (chromosomes), and can deal with them as a whole.
 
@@ -2242,7 +2339,7 @@ class SNPsDataSet:
 			if self.accessions != self.snpsDataList[i].accessions:
 				raise Exception("Accessions (or order) are different between SNPs datas")
 		if not is_binary:
-			self.is_binary = snpsds[0].snps[0].count(0) or snpsds[0].snps[0].count(1)				 		
+			self.is_binary = list(snpsds[0].snps[0]).count(0) or list(snpsds[0].snps[0]).count(1)				 		
 		else:
 			self.is_binary = is_binary
 
@@ -2397,7 +2494,8 @@ class SNPsDataSet:
                 
 
 
-	def writeToFile(self, filename, delimiter=", ", missingVal = "NA", accDecoder=None, withArrayIds = False, decoder=None, callProbFile=None):
+	def writeToFile(self, filename, delimiter=", ", missingVal = "NA", accDecoder=None, 
+                        withArrayIds = False, decoder=None, callProbFile=None, binary_format=False):
 		"""
 		Writes data to a file. 
 		
@@ -2423,7 +2521,10 @@ class SNPsDataSet:
 			for acc in self.snpsDataList[i].accessions:
 				fieldStrings.append(str(acc))
 		outStr += delimiter.join(fieldStrings)+"\n"
-		f = open(filename,"w")
+		if binary_format:
+                        f = open(filename,"wb")
+                else:
+                        f = open(filename,"w")
 		f.write(outStr)
 		if decoder:
 			for i in range(0,len(self.chromosomes)):
@@ -2575,7 +2676,24 @@ class SNPsDataSet:
 				snplist += snpsd.snps
 		return snplist
 		
-	def getPositions(self):
+        def get_snp_at(self,chromosome,position):
+                """
+                Returns the SNP at the given position, if it exits.
+                """
+                c_i = self.chromosomes.index(chromosome)
+                sd = self.snpsDataList[c_i]
+                i = 0
+                while sd.positions[i] < position:
+                        i += 1
+                if sd.positions[i] == position:
+                        print 'Found the SNP.'
+                        return sd.snps[i]
+                else:
+                        print "Didn't find the SNP on chromosome %d, at position %d"%(chromosome,position)
+                        return None                
+
+	
+        def getPositions(self):
 		poslist = []
 		for snpsd in self.snpsDataList:
 			for pos in snpsd.positions:
@@ -2624,6 +2742,13 @@ class SNPsDataSet:
 				chr_pos_list.append((chr,pos))
 		return chr_pos_list
 		
+	def get_chr_list(self):
+		chr_list = []
+		for i, snpsd in enumerate(self.snpsDataList):
+			chr_list.extend([i+1]*len(snpsd.positions))
+		return chr_list
+		
+
 	def get_mafs(self):
 		"""
 		Returns the mafs and marfs as a dictionary..  (changed from before, so might cause errors).
@@ -2649,6 +2774,31 @@ class SNPsDataSet:
 				snp = snpsd.snps[j]
 				chr_pos_snp_list.append((chr,pos,snp))
 		return chr_pos_snp_list
+                
+        
+        def get_region_pos_snp_dict(self,chromosome,start_pos=None,end_pos=None):
+                """
+                Returns a dict containing a list of positions and snps.
+                """
+                positions = []
+                snps = []
+                for snpsd in self.snpsDataList:
+                        if snpsd.chromosome==chromosome:
+                                break
+                assert snpsd.chromosome==chromosome, "SNPs data with appropriate chromosomes wasn't found"
+                i = 0
+                while i<len(snpsd.positions) and snpsd.positions[i]<start_pos:
+                        i+=1
+                if end_pos:
+                        while i<len(snpsd.positions) and snpsd.positions[i]<end_pos:
+                                positions.append(snpsd.positions[i])
+                                snps.append(snpsd.snps[i])
+                                i += 1
+                else:
+                        positions = snpsd.positions[i:]
+                        snps = snpsd.snps[i:]
+                return {'positions':positions, 'snps':snps}
+                  
 
 
 	def get_pc(self,pc_num=1, random_fraction=0.1):

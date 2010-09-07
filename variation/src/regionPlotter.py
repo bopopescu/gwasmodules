@@ -225,7 +225,7 @@ class RegionPlotter():
 				raise Exception("Can't plot results from different chromosomes.")
 
 		#Preprocess positions, scores, and colors.
-		default_colors = ['b','r']
+		default_colors = ['b','r','g']
 		
 		scores = []
 		positions = []
@@ -1388,6 +1388,74 @@ def flc_test():
 ##	rp.plotRegion(5, 18107728, 19107728,80,pngFile='/Users/bjarni/tmp/DOG1_80_LN10.png',labels=["Wilcoxon","Emma",],plotColors=['b','r'],highlightGenes=["AT5G45830"])
 ##	rp.plotRegion(4, 998770, 1998770,7,pngFile='/Users/bjarni/tmp/DFL2_7_FT22C.png',labels=["Wilcoxon","Emma",],plotColors=['b','r'],highlightGenes=["AT4G03400"])
 ##	rp.plotRegion(5, 2678615, 3678615,82,pngFile='/Users/bjarni/tmp/FLC_82_LN22C.png',labels=["Wilcoxon","Emma",],plotColors=['b','r'],highlightGenes=["AT5G10140"])
+
+
+def plot_simple_region(scores_list,positions_list,chromosome=0,caption='',plot_genes=True,
+			png_file=None,pdf_file=None,tair_file=None):
+	reg_res_list = []
+	for scores,positions in zip(scores_list,positions_list):
+		num_snps = len(scores)
+		reg_res_list.append(gwaResults.Result(scores=scores,chromosomes=[chromosome]*num_snps,positions=positions))
+	plotter = RegionPlotter()
+	plotter.plot_small_result(reg_res_list,png_file=png_file,pdf_file=pdf_file,caption=caption,
+				tair_file=tair_file,plot_genes=plot_genes)
+				
+
+#def plot_simple_region(snps,positions,scores):
+#	def _plot_simple_result_(self,scores,positions,caption="",pdf_file=None,png_file=None,plot_genestair_genes=None,
+#				highlight_genes=None,max_val=None,min_val=None,bonferroni_level=None,color=None):
+#		"""
+#		A helper function actually drawing the simple plot.
+#		"""
+#		
+#		print "Plotting",len(scores),"SNPs."
+#		
+#		x_max = max(positions)
+#		x_min = min(positions)
+#		x_range = x_max-x_min
+#		y_min = min(scores)
+#		y_max = max(scores)
+#		y_range = y_max-y_min
+#		x_buffer = 0.05
+#		y_buffer = 0.05
+#					
+#		
+#		#plot box boundaries [mix_x,max_x,min_y,max_y]
+#
+#
+#		if tair_genes:
+#			pylab.figure(figsize=(8,6))			
+#			plot_range = [min_x-x_buffer*x_range, max_x+x_buffer*x_range, 
+#				y_min-y_range*(y_buffer+0.25), y_max+y_range*y_buffer] 
+#		else:
+#			pylab.figure(figsize=(8,4))	
+#			plot_range = [min_x-x_buffer*x_range, max_x+x_buffer*x_range, 
+#				y_min-y_range*y_buffer, y_max+y_range*y_buffer] 
+#			
+#		pylab.axes([0.06, 0.10, 0.90, 0.82])
+#		#for (position,score,color) in zip(positions,scores,colors):
+#		#	print "drawing.."
+#		#	pylab.plot(position,score,color=color,marker=".",ls="",alpha=0.8)
+#		pylab.plot(positions,scores,marker=".",ls="",alpha=0.8)
+#		#pylab.text(endPos-0.025*posRange,maxVal-0.15*rangeVal,l,size="x-large")							
+#		#pylab.legend(numpoints=1,handlelen=0.005,prop=fontProp)
+#		if bonferroni_level:
+#			pylab.plot([plot_range[0],plot_range[1]],[bonferroni_level,bonferroni_level],"k-.")
+#		if tair_genes:
+#			num_rows = max(3,min(6,1+len(tair_genes)/10))
+#			print "Drawing TAIR genes"
+#			drawGenes(tair_genes,gene_position_cycle=num_rows,rangeVal=y_range*1.5)
+#		pylab.axis(plot_range)
+#		if pdf_file:
+#			pylab.savefig(pdf_file,format="pdf")
+#		if png_file:
+#			pylab.savefig(png_file,format="png",dpi=300)
+#		if not (pdf_file or png_file):
+#			pylab.show()
+#		pylab.close()
+#		
+#		
+#	
 
 
 

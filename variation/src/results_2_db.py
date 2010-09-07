@@ -128,20 +128,33 @@ def _run_():
 	addResultsToDB(resultsFile, callMethodID,phenotypeMethodID,analysisMethodID,
 		       createdBy,shortName,resultsMethodID,methodDescription,dataDescription,comment,commit=commit)
 
-def add_results_to_db(resultsFile,shortName,callMethodID,phenotypeMethodID,analysisMethodID,
-		      resultsMethodID=1,methodDescription="",dataDescription="",comment=""):
- 	
 
+
+
+def add_results_to_db(results_file, short_name, call_method_id, phenotype_method_id, analysis_method_id,
+		      transformation_method_id, remove_outliers=0, transformation_parameters='null', 
+		      results_method_type_id=1, method_description="", data_description="", comment="", 
+		      pseudo_heritability=None):
+ 	
         #Connect to DB
         import dbutils
-        conn = dbutils.connect_to_papaya()
+        #conn = dbutils.connect_to_papaya()
+	conn = dbutils.connect_to_default_insert()
 	cursor = conn.cursor()
-	
+	db_result_dir = "/Network/Data/250k/db/results/type_1/"
+	if transformation_parameters=='null':
+		transformation_parameters_str = 'is null'
+	else:
+		transformation_parameters_str = "= '%s'"%transformation_parameters
+		 
         
 	print "Checking whether result is in DB."
 	sql_statement = "SELECT id FROM stock_250k.results_method \
-			WHERE phenotype_method_id=%d AND call_method_id=%d AND analysis_method_id=%d"\
-			%(phenotypeMethodID,callMethodID,analysisMethodID)
+			WHERE phenotype_method_id=%d AND call_method_id=%d AND analysis_method_id=%d \
+			AND results_method_type_id=%d AND transformation_method_id=%d AND remove_outliers=%d \
+			AND transformation_parameters %s"\
+			%(phenotype_method_id, call_method_id, analysis_method_id, results_method_type_id,\
+				transformation_method_id,remove_outliers,str(transformation_parameters_str))
 	print sql_statement
 	cursor.execute(sql_statement)
 	row = cursor.fetchone()
@@ -152,23 +165,25 @@ def add_results_to_db(resultsFile,shortName,callMethodID,phenotypeMethodID,analy
 	else:
 		print "Inserting results into DB."
 		#Insert info
-		sql_statement = "insert into stock_250k.results_method (short_name, original_filename, method_description,\
-		data_description, phenotype_method_id, call_method_id, results_method_type_id, comment, \
-		analysis_method_id) values"
-		sql_statement += "('"+shortName+"','"+resultsFile+"','"+methodDescription+"','"+dataDescription+"',"+\
-		       str(phenotypeMethodID)+","+str(callMethodID)+","+str(resultsMethodID)+",'"+comment+"',"+\
-		       str(analysisMethodID)+");"
+		sql_statement = "INSERT into stock_250k.results_method \
+				(short_name, original_filename, method_description, data_description, \
+				phenotype_method_id, call_method_id, results_method_type_id, comment, \
+				analysis_method_id, transformation_method_id, remove_outliers, transformation_parameters) \
+				values ('%s', '%s', '%s', '%s', %d, %d, %d, '%s', %d, %d, %d, '%s');"\
+			       %(short_name, results_file, method_description, data_description, phenotype_method_id, \
+				call_method_id, results_method_type_id, comment, analysis_method_id, transformation_method_id,\
+				remove_outliers,str(transformation_parameters))
 		print sql_statement
 		cursor.execute(sql_statement)	
 		
-		sql_statement = "SELECT id FROM stock_250k.results_method WHERE short_name='"+shortName+"'"
+		sql_statement = "SELECT id FROM stock_250k.results_method WHERE short_name like '"+short_name+"'"
 		print sql_statement
 		cursor.execute(sql_statement)
 		row = cursor.fetchone()
 		results_id = int(row[0])
 		
 		#Updating filename
-		db_file = "/Network/Data/250k/db/results/type_1/"+str(results_id)+"_results.tsv"
+		db_file = db_result_dir+str(results_id)+"_results.tsv"
 		sql_statement = "UPDATE stock_250k.results_method SET filename='%s' WHERE id=%d"%(db_file,results_id)
 		print sql_statement
 		cursor.execute(sql_statement)	
@@ -176,29 +191,36 @@ def add_results_to_db(resultsFile,shortName,callMethodID,phenotypeMethodID,analy
 		print "Committing transaction (making changes permanent)."
 		conn.commit()
 		
-	print "Closing connection."
+	print "Closing connection.\n"
         cursor.close()
 	conn.close()
 
 	
-	print "Reading results file:",resultsFile
+	print "Reading results file:",results_file
 	#Convert resultsfile to a tsv file.
-	f = open(resultsFile,"r")
+	f = open(results_file,"r")
 	lines = f.readlines()
 	f.close()
  
         #Write to a designated place.
-	resultsDir = "/home/cmbpanfs-01/bvilhjal/data/result_files/"#FIXME
-	file_name=resultsDir+str(results_id)+"_results.tsv"
+	results_dir = env.env['db_results_dir'] #'/home/cmbpanfs-01/bvilhjal/data/result_files/'
+	file_name=results_dir+str(results_id)+"_results.tsv"
 	print "Writing tsv file:",file_name
-	f = open(file_name,"w")
-	for line in lines:
-		line = line.replace(",","\t")
-		f.write(line)
-	f.close()
-	
-	print "Remember to copy files: scp %s* bjarni@bamboo.usc.edu:/Network/Data/250k/db/results/type_1/"%(resultsDir)
-
+	try:
+		f = open(file_name,"w")
+		for line in lines:
+			line = line.replace(",","\t")
+			f.write(line)
+		f.close()
+		
+	except Exception, err_str:
+		print 'Failed at writing the result files to the designated results directory:',err_str
+		print "Make sure the 'db_results_dir' path is correct in ~/.gwa_config\n"
+	if db_result_dir!=results_dir:
+		print "Remember to copy the result file: scp %s user_name@arabidopsis.gmi.oeaw.ac.at:%s\n"\
+			%(file_name,db_result_dir)
+		
+		
 
 if __name__ == '__main__':
 	#_test1_()
