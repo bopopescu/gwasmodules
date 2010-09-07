@@ -152,7 +152,10 @@ class MpiLD(MPIwrapper):
 		min_index2, stop2 = col2_range
 		for i in range(min_index1, stop1):
 			for j in range(max(i+1, min_index2), stop2):	#the lower bound of j is the bigger one of i+1 and min_index2
-				u = random.random()
+				if param_obj.discard_perc==0:
+					u = 1
+				else:	#sample a uniform unless discard_perc is not 0
+					u = random.random()
 				if u>=param_obj.discard_perc:	#
 					col_id1 = snpData.col_id_ls[i]
 					col_id2 = snpData.col_id_ls[j]

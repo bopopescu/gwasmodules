@@ -76,7 +76,7 @@ class CallPC2DB(object):
 				except:
 					import pdb
 					pdb.set_trace()
-				pc_db_entry = Stock_250kDB.CallInfoPCValues(which_pc=j+1, pc_value=PC_data.PC_matrix[i][j])
+				pc_db_entry = Stock_250kDB.CallInfoPCValue(which_pc=j+1, pc_value=PC_data.PC_matrix[i][j])
 				pc_db_entry.call_info = call_info
 				db.session.save(pc_db_entry)
 				db.session.flush()
@@ -91,7 +91,8 @@ class CallPC2DB(object):
 		for i in range(len(eigen_value_ls)):
 			eigen_value = eigen_value_ls[i]
 			variance_perc = explained_var[i]
-			db_entry = Stock_250kDB.CallMethodEigenValues(which_eigen=i+1, eigen_value=eigen_value, variance_perc=variance_perc, call_method_id=call_method_id)
+			db_entry = Stock_250kDB.CallMethodEigenValue(which_eigen=i+1, eigen_value=eigen_value, variance_perc=variance_perc,\
+														call_method_id=call_method_id)
 			db.session.save(db_entry)
 			db.session.flush()
 		sys.stderr.write("Done.\n")

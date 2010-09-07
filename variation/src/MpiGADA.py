@@ -143,6 +143,7 @@ class MpiGADA(RunGADA, MPIwrapper):
 				ins = GADA.GADA(self.debug)
 				GADA_output = ins.run(map(float, intensity_ls), aAlpha, TBackElim, MinSegLen)	#intensity_ls cell type is numpy.float32.
 					#convert it to python float, which is recognized by GADA.GADA.run().
+				self.addMedianToGADAOutput(GADA_output, intensity_ls)
 				del ins
 			if GADA_output:
 				result_ls.append((one_parameter, GADA_output))

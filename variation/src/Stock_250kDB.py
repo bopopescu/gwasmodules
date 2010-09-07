@@ -36,7 +36,7 @@ from sqlalchemy import and_, or_, not_
 from datetime import datetime
 
 from pymodule import SNPData
-from pymodule.db import ElixirDB
+from pymodule.db import ElixirDB, TableClass
 import os
 import hashlib 
 
@@ -46,7 +46,7 @@ __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 
 __metadata__ = MetaData()
 
-class README(Entity):
+class README(Entity, TableClass):
 	#2008-08-07
 	title = Field(String(2000))
 	description = Field(String(60000))
@@ -157,12 +157,18 @@ class GeneList(Entity):
 
 
 class Snps(Entity):
+	"""
+	2010-6-17
+		add argument tair8_chromosome, tair8_position
+	"""
 	name = Field(String(200), unique=True, nullable = False)
 	chromosome = Field(Integer)
 	position = Field(Integer)
 	end_position = Field(Integer)
 	allele1 = Field(String(1))
 	allele2 = Field(String(2))
+	tair8_chromosome = Field(Integer)
+	tair8_position = Field(Integer)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
@@ -276,23 +282,7 @@ class PhenotypeMethod(Entity):
 			clause = or_(clause,PhenotypeMethod.owner == user, PhenotypeMethod.users.any(Users.id == user.id),PhenotypeMethod.groups.any(Groups.id.in_([group.id for group in user.groups])))
 		query = query.filter(clause)
 		return query
-	
-	def checkACL(self,user):
-		if self.access == 'public':
-			return True
-		if user is None:
-			return False
-		if user.isAdmin == 'Y':
-			return True
-		if self.owner == user: 
-			return True
-		if user in self.users:
-			return True
-		if [group in self.groups for group in user.groups]: 
-			return True
-		return False
-		
-		
+
 class AnalysisMethod(Entity):
 	"""
 	2009-5-14
@@ -726,8 +716,10 @@ class CallQC(Entity):
 	using_options(tablename='call_qc', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
-class Probes(Entity):
+class Probes(Entity, TableClass):
 	"""
+	2010-6-17
+		add argument tair8_chromosome, tair8_position
 	2010-5-23
 		add field Tair9Copy, filled in by this function from misc.py
 			tair9_blast_result_fname = os.path.expanduser("~/script/variation/data/CNV/cnv_probe_blast_against_tair9.tsv")
@@ -762,6 +754,8 @@ class Probes(Entity):
 	intergenic = Field(Boolean)
 	downstream = Field(Boolean)
 	cda = Field(Boolean)
+	tair8_chromosome = Field(Integer)
+	tair8_position = Field(Integer)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
@@ -1352,6 +1346,54 @@ class DataSource(Entity):
 	using_options(tablename='data_source', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
+class CNV(Entity):
+	"""
+	2010-7-28
+		table storing all types of copy number variation
+	"""
+	chromosome = Field(Integer)
+	start = Field(Integer)
+	stop = Field(Integer)
+	start_probe = ManyToOne("%s.Probes"%__name__, colname='start_probe_id', ondelete='CASCADE', onupdate='CASCADE')
+	stop_probe = ManyToOne("%s.Probes"%__name__, colname='stop_probe_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_probes_covered = Field(Integer)
+	size_affected = Field(Integer)
+	score = Field(Float)
+	score_std = Field(Float)
+	frequency = Field(Float)
+	fractionNotCoveredByLyrata = Field(Float)
+	comment = Field(String(8124))
+	cnv_type =  ManyToOne('%s.CNVType'%__name__, colname='cnv_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_method = ManyToOne('%s.CNVMethod'%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_call_ls = ManyToMany("CNVCall", tablename='cnv2cnv_call', ondelete='CASCADE', onupdate='CASCADE')	#2010-7-31
+	cnv_array_call_ls = OneToMany("CNVArrayCall")
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='cnv', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('chromosome', 'start', 'stop', 'cnv_type_id', 'cnv_method_id'))
+
+class CNVArrayCall(Entity):
+	"""
+	2010-7-28
+		
+	"""
+	array = ManyToOne("%s.ArrayInfo"%__name__, colname='array_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv = ManyToOne("%s.CNV"%__name__, colname='cnv_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_method = ManyToOne('%s.CNVMethod'%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	score = Field(Float)
+	fractionDeletedInPECoverageData = Field(Float)	#2010-8-1
+	comment = Field(String(8124))
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='cnv_array_call', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('array_id', 'cnv_id', 'cnv_method_id'))
+
 class CNVMethod(Entity):
 	"""
 	2009-10-26
@@ -1384,14 +1426,17 @@ class CNVType(Entity):
 
 class CNVQCCall(Entity):
 	"""
+	2010-6-24
+		add chromosome_stop, and change the unique constraint
 	2009-12-8
 		add copy_number to distinguish CNVs that have multiple copies
 	2009-10-26
 		the CNV data collected from other sources to verify our calls
 	"""
 	accession = ManyToOne('CNVQCAccession', colname='accession_id', ondelete='CASCADE', onupdate='CASCADE')
-	chromosome = Field(Integer)
+	chr = ManyToOne('Chromosome', colname='chromosome', ondelete='CASCADE', onupdate='CASCADE')	#chr must be different from field name.
 	start = Field(Integer)
+	stopChromosome = ManyToOne('Chromosome', colname='stop_chromosome', ondelete='CASCADE', onupdate='CASCADE')
 	stop = Field(Integer)
 	size_affected = Field(Integer)
 	score = Field(Float)
@@ -1407,7 +1452,8 @@ class CNVQCCall(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='cnv_qc_call', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('accession_id', 'chromosome', 'start', 'stop', 'cnv_type_id', 'cnv_method_id'))
+	using_table_options(UniqueConstraint('accession_id', 'chromosome', 'start', 'stop_chromosome', 'stop',\
+										'cnv_type_id', 'cnv_method_id'))
 
 class CNVQCProbeCall(Entity):
 	"""
@@ -1436,6 +1482,10 @@ class CNVQCProbeCall(Entity):
 
 class CNVCall(Entity):
 	"""
+	2010-7-1
+		add column probability
+	2010-6-29
+		add column median_intensity
 	2010-3-16
 		call_info_id becomes array_id
 		add column no_of_probes_covered
@@ -1451,7 +1501,11 @@ class CNVCall(Entity):
 	no_of_probes_covered = Field(Integer)
 	size_affected = Field(Integer)
 	amplitude = Field(Float)
+	median_intensity = Field(Float)
 	score = Field(Float)
+	probability = Field(Float)	# 2010-7-1
+	percUnCoveredByLerContig = Field(Float)	#2010-6-27
+	fractionDeletedInPECoverageData = Field(Float)	#2010-7-23
 	comment = Field(String(8124))
 	cnv_type =  ManyToOne('%s.CNVType'%__name__, colname='cnv_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	cnv_method = ManyToOne('%s.CNVMethod'%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -1462,6 +1516,55 @@ class CNVCall(Entity):
 	using_options(tablename='cnv_call', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('array_id', 'start_probe_id', 'stop_probe_id', 'cnv_type_id', 'cnv_method_id'))
+
+class CNVContext(Entity):
+	"""
+	2010-8-18
+		update on a few columns
+	2010-7-31
+		context for CNVs
+	"""
+	cnv = ManyToOne('CNV', colname='cnv_id', ondelete='CASCADE', onupdate='CASCADE')
+	term5_disp_pos = Field(Float)	#[0,1) is for within gene fraction, <=-1 is upstream. >=1 is downstream
+	term3_disp_pos = Field(Float)	#(0,1] is for within gene fraction, null if no overlap/outside.
+	gene_id = Field(Integer)
+	gene_strand = Field(String(1))
+	overlap_length = Field(Integer)
+	overlap_fraction_in_gene = Field(Float)
+	overlap_fraction_in_cnv = Field(Float)
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='cnv_context', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('cnv_id', 'gene_id'))
+
+class CNVAnnotation(Entity):
+	"""
+	2010-8-18
+		store details of CNVContext, which exon, which intron. which CDS, which UTR, etc.
+	"""
+	cnv = ManyToOne('CNV', colname='cnv_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_context = ManyToOne('CNVContext', colname='cnv_context_id', ondelete='CASCADE', onupdate='CASCADE')
+	gene_commentary_id = Field(Integer)
+	gene_segment_id = Field(Integer)
+	label = Field(Text)
+	utr_number = Field(Integer)
+	cds_number = Field(Integer)
+	intron_number = Field(Integer)
+	exon_number = Field(Integer)
+	overlap_length = Field(Integer)
+	overlap_fraction_in_gene = Field(Float)
+	overlap_fraction_in_cnv = Field(Float)
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='cnv_annotation', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('cnv_id', 'cnv_context_id', 'gene_commentary_id', 'gene_segment_id'))
+
 
 class SequenceFragment(Entity):
 	"""
@@ -1485,6 +1588,9 @@ class SequenceFragment(Entity):
 
 class SequenceFragmentRefPos(Entity):
 	"""
+	2010-6-14
+		change the unqiue constraint
+		add column version to differentiate between different version of SequenceFragmentRefPos data
 	2010-1-27
 		the position of sequence fragments mapped onto the reference genome (which is Col)
 	"""
@@ -1499,6 +1605,7 @@ class SequenceFragmentRefPos(Entity):
 	fragment_start = Field(Integer)
 	fragment_stop = Field(Integer)
 	copy_number = Field(Integer)
+	version = Field(Integer)
 	comment = Field(String(8124))
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -1506,7 +1613,7 @@ class SequenceFragmentRefPos(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='sequence_fragment_ref_pos', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('sequence_fragment_id', 'start_probe_id', 'stop_probe_id', 'fragment_start', 'fragment_stop'))
+	using_table_options(UniqueConstraint('sequence_fragment_id', 'start', 'stop', 'fragment_start', 'fragment_stop', 'version'))
 
 
 class SequenceFragment2Probe(Entity):
@@ -1738,7 +1845,21 @@ class Users(Entity):
 
 		return hashed_password
 
-
+class Chromosome(Entity):
+	"""
+	2010-6-24
+		a dedicated table to translate between chromosome names and numbers
+	"""
+	name = Field(String(255))
+	description = Field(String(6000))
+	tax_id = Field(Integer)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_table_options(UniqueConstraint('name', 'tax_id'))
+	using_options(tablename='chromosome', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
 
 class Stock_250kDB(ElixirDB):
 	__doc__ = __doc__
@@ -1814,9 +1935,13 @@ class Stock_250kDB(ElixirDB):
 		return snpData
 	
 	@classmethod
-	def getCNVQCInGWA(cls, accession_id=None, cnv_type_id=None, min_size=50, min_no_of_probes=None,\
-					chr=None, start=None, stop=None):
+	def getCNVQCInGWA(cls, accession_id=None, cnv_type_id=None, min_size=None, min_no_of_probes=None,\
+					chr=None, start=None, stop=None, cnv_method_id=None):
 		"""
+		2010-7-22
+			add argument cnv_method_id
+		2010-6-18
+			replace (TableClass.size_affected>=min_size) with (TableClass.stop-TableClass.start+1)>=min_size
 		2010-4-28
 			add argument chr, start, stop
 		2010-3-14
@@ -1824,16 +1949,18 @@ class Stock_250kDB(ElixirDB):
 		2009-10-30
 			get CNV QC calls from db in GWA format
 		"""
-		sys.stderr.write("Getting CNVQC calls for accession %s, cnv_type %s, min_size %s, min_no_of_probes %s ..."%\
-						(accession_id, cnv_type_id, min_size, min_no_of_probes))
+		sys.stderr.write("Getting CNVQC calls for accession %s, method_id %s, cnv_type %s, min_size %s, min_no_of_probes %s ..."%\
+						(accession_id, cnv_method_id, cnv_type_id, min_size, min_no_of_probes))
 		TableClass = CNVQCCall
 		query = TableClass.query.filter_by(accession_id=accession_id)
 		if min_size is not None:
-			query = query.filter(TableClass.size_affected>=min_size)
+			query = query.filter((TableClass.stop-TableClass.start+1)>=min_size)
 		if cnv_type_id is not None:
 			query = query.filter_by(cnv_type_id=cnv_type_id)
 		if min_no_of_probes is not None:
 			query = query.filter(TableClass.no_of_probes_covered>=min_no_of_probes)
+		if cnv_method_id is not None:
+			query = query.filter_by(cnv_method_id=cnv_method_id)
 		
 		# 2010-4-28
 		query = cls.limitQueryByChrPosition(query, TableClass, chr, start, stop)
@@ -1841,7 +1968,8 @@ class Stock_250kDB(ElixirDB):
 		from pymodule import GenomeWideResult, DataObject
 		cnv_qc_accession = CNVQCAccession.get(accession_id)
 		
-		gwr_name = "CNVQCCall %s (%s)"%(cnv_qc_accession.original_id, cnv_qc_accession.id)
+		gwr_name = "CNVQCCall %s (%s) type %s, method %s"%(cnv_qc_accession.original_id, cnv_qc_accession.id, \
+										cnv_type_id, cnv_method_id)
 		if cnv_qc_accession.ecotype_id:
 			gwr_name += " e-id: %s"%(cnv_qc_accession.ecotype_id)
 		gwr = GenomeWideResult(name=gwr_name)
@@ -1857,20 +1985,11 @@ class Stock_250kDB(ElixirDB):
 		
 		for row in query:
 			data_obj = DataObject(chromosome=row.chromosome, position=row.start, stop_position=row.stop, value=row.cnv_type_id*2-3)
-			"""
-			if column_4th is not None:
-				data_obj.maf = column_4th
-			if column_5th is not None:
-				data_obj.mac = column_5th
-			if column_6 is not None:
-				data_obj.genotype_var_perc = column_6
-			if rest_of_row:
-				data_obj.extra_col_ls = rest_of_row
-			"""
-			data_obj.comment = 'cnv_type: %s, size_affected %s, no_of_probes_covered %s, copy_number %s'%\
-								(row.cnv_type_id, row.size_affected, row.no_of_probes_covered, row.copy_number)
+			data_obj.comment = 'cnv_type: %s, cnv_method %s, size_affected %s, no_of_probes_covered %s, copy_number %s, score %s.\n'%\
+								(row.cnv_type_id, row.cnv_method_id, row.size_affected, row.no_of_probes_covered, row.copy_number,\
+								row.score)
 			if row.comment:
-				data_obj.comment += row.comment
+				data_obj.comment += '\n' + row.comment
 			data_obj.genome_wide_result_name = gwr_name
 			data_obj.genome_wide_result_id = genome_wide_result_id
 			gwr.add_one_data_obj(data_obj)
@@ -1881,10 +2000,135 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write(" %s segments. Done.\n"%(len(gwr.data_obj_ls)))
 		return gwr
 	
-	@classmethod
-	def getSequenceRefPosInGWA(cls, accession_id=None, min_size=50, min_no_of_probes=None,\
-							chr=None, start=None, stop=None):
+	def getCNVInGWA(self, cnv_method_id=None,cnv_type_id=None, chr=None, start=None, \
+						stop=None, min_size=None, min_no_of_probes=None):
 		"""
+		2010-8-5
+		"""
+		sys.stderr.write("Getting CNV calls for cnv_type %s, min_size %s, min_no_of_probes %s method_id %s ..."%\
+						(cnv_type_id, min_size, min_no_of_probes, cnv_method_id))
+		TableClass = CNV
+		query = TableClass.query
+		if min_size is not None:
+			query = query.filter((TableClass.stop-TableClass.start+1)>=min_size)
+		if cnv_type_id is not None:
+			query = query.filter_by(cnv_type_id=cnv_type_id)
+		if min_no_of_probes is not None:
+			query = query.filter(TableClass.no_of_probes_covered>=min_no_of_probes)
+		if cnv_method_id is not None:
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		
+		# 2010-4-28
+		query = cls.limitQueryByChrPosition(query, TableClass, chr, start, stop)
+			
+		from pymodule import GenomeWideResult, DataObject
+		
+		gwr_name = "CNV type %s, method %s"%(cnv_type_id, cnv_method_id)
+		
+		gwr = GenomeWideResult(name=gwr_name)
+		gwr.data_obj_ls = []	#list and dictionary are crazy references.
+		gwr.data_obj_id2index = {}
+		# 2010-3-18 custom
+		gwr.array_id = None
+		
+		genome_wide_result_id = id(gwr)
+		
+		for row in query:
+			data_obj = DataObject(chromosome=row.chromosome, position=row.start, stop_position=row.stop, value=row.cnv_type_id*2-3)
+			data_obj.comment = 'cnv_type: %s, cnv_method %s, size_affected %s, no_of_probes_covered %s, score %s.\n'%\
+								(row.cnv_type_id, row.cnv_method_id, row.size_affected, row.no_of_probes_covered,\
+								row.score)
+			if row.comment:
+				data_obj.comment += '\n' + row.comment
+			data_obj.genome_wide_result_name = gwr_name
+			data_obj.genome_wide_result_id = genome_wide_result_id
+			gwr.add_one_data_obj(data_obj)
+		if gwr.max_value<3:	# insertion at y=3
+			gwr.max_value=3
+		if gwr.min_value>-1:	# deletion at y = -1
+			gwr.min_value = -1
+		sys.stderr.write(" %s segments. Done.\n"%(len(gwr.data_obj_ls)))
+		return gwr
+	
+	def getCNVArrayCallInGWA(self, array_id=None, cnv_method_id=None,cnv_type_id=None, \
+							chr=None, start=None, stop=None, \
+							min_size=None, min_no_of_probes=None):
+		"""
+		2010-8-5
+		"""
+		sys.stderr.write("Getting CNVArrayCall for array %s, method_id %s, cnv_type %s, min_size %s, min_no_of_probes %s ..."%\
+						(array_id, cnv_method_id, cnv_type_id, min_size, min_no_of_probes))
+		TableClass = CNVArrayCall
+		query = TableClass.query.filter_by(array_id=array_id)
+		if min_size is not None:
+			query = query.filter(TableClass.cnv.has((CNV.stop-CNV.start+1)>=min_size))
+		if cnv_type_id is not None:
+			query = query.filter(TableClass.cnv.has(cnv_type_id=cnv_type_id))
+		if min_no_of_probes is not None:
+			query = query.filter(TableClass.cnv.has(CNV.no_of_probes_covered>=min_no_of_probes))
+		if cnv_method_id is not None:
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if chr:
+			query = query.filter(TableClass.cnv.has(chromosome=chr))
+		
+		if start and stop:
+			query = query.filter(or_(and_(TableClass.cnv.has(CNV.start>=start), TableClass.cnv.has(CNV.start<=stop)), \
+									and_(TableClass.cnv.has(CNV.stop>=start), TableClass.cnv.has(CNV.stop<=stop))))
+		
+		from pymodule import GenomeWideResult, DataObject
+		array = ArrayInfo.get(array_id)
+		
+		try:
+			rows = CNVArrayCall.table.metadata.bind.execute("select * from view_array where array_id=%s"%array_id)
+		except:
+			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()[0]))
+			traceback.print_exc()
+			sys.stderr.write("Error in running select * from view_array where array_id=%s via CNVArrayCall.table.metadata.bind.execute\n"%\
+							array_id)
+			rows = self.metadata.bind.execute("select * from view_array where array_id=%s"%array_id)
+		ecotype_nativename = None
+		for row in rows:
+			ecotype_nativename = row.maternal_nativename
+			break
+		
+		gwr_name = "CNVArrayCall type %s of %s (a-id %s, e-id %s) by method %s"%(cnv_type_id, ecotype_nativename, \
+												array.id, array.maternal_ecotype_id, cnv_method_id)
+		gwr = GenomeWideResult(name=gwr_name)
+		gwr.data_obj_ls = []	#list and dictionary are crazy references.
+		gwr.data_obj_id2index = {}
+		# 2010-3-18 custom
+		gwr.array_id = array.id
+		gwr.ecotype_id = array.maternal_ecotype_id
+		gwr.nativename = ecotype_nativename
+		
+		genome_wide_result_id = id(gwr)
+		
+		for row in query:
+			data_obj = DataObject(chromosome=row.cnv.chromosome, position=row.cnv.start, stop_position=row.cnv.stop, value=row.cnv.cnv_type_id*2-3)
+			data_obj.comment = 'cnv_type: %s, cnv_method %s, size_affected %s, no_of_probes_covered %s, score %s.\n'%\
+								(row.cnv.cnv_type_id, row.cnv_method_id, row.cnv.size_affected, row.cnv.no_of_probes_covered, \
+								row.score)
+			if row.comment:
+				data_obj.comment += '\n' + row.comment
+			data_obj.genome_wide_result_name = gwr_name
+			data_obj.genome_wide_result_id = genome_wide_result_id
+			gwr.add_one_data_obj(data_obj)
+		if gwr.max_value<3:	# insertion at y=3
+			gwr.max_value=3
+		if gwr.min_value>-1:	# deletion at y = -1
+			gwr.min_value = -1
+		sys.stderr.write(" %s segments. Done.\n"%(len(gwr.data_obj_ls)))
+		return gwr
+		
+	
+	@classmethod
+	def getSequenceRefPosInGWA(cls, accession_id=None, min_size=None, min_no_of_probes=None,\
+							chr=None, start=None, stop=None, version=1):
+		"""
+		2010-6-18
+			change default of min_size to None
+		2010-6-17
+			add argument version
 		2010-4-28
 			add argument chr, start, stop
 		2010-3-13
@@ -1893,7 +2137,8 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("Getting positions of sequences from accession %s on ref genome, min_size %s, min_no_of_probes %s ..."%\
 						(accession_id, min_size, min_no_of_probes))
 		TableClass = SequenceFragmentRefPos
-		query = TableClass.query.filter(SequenceFragmentRefPos.sequence_fragment.has(accession_id=accession_id))
+		query = TableClass.query.filter(SequenceFragmentRefPos.sequence_fragment.has(accession_id=accession_id)).\
+			filter_by(version=version)
 		
 		if min_size is not None:
 			query = query.filter((TableClass.stop-TableClass.start+1)>=min_size)
@@ -1924,7 +2169,7 @@ class Stock_250kDB(ElixirDB):
 			data_obj = DataObject(chromosome=row.chromosome, position=row.start, stop_position=row.stop, value=1,\
 								target_seq_id=row.sequence_fragment_id, target_start=row.fragment_start, \
 								target_stop=row.fragment_stop)
-			data_obj.comment = 'genome span %s, size_difference %s, fragment id %s (%s, size=%s), fragment start %s, fragment stop %s, fragment span %s.'%\
+			data_obj.comment = 'genome span %s, size_difference %s, fragment id %s (%s, size=%s), fragment start %s, fragment stop %s, fragment span %s.\n'%\
 										(row.stop-row.start, row.size_difference, row.sequence_fragment_id, \
 										row.sequence_fragment.short_name, row.sequence_fragment.size, \
 										row.fragment_start, row.fragment_stop, abs(row.fragment_stop-row.fragment_start))
@@ -1941,8 +2186,12 @@ class Stock_250kDB(ElixirDB):
 		return gwr
 	
 	@classmethod
-	def getOneSequenceRefPosInGWA(cls, sequence_fragment_id=None, min_size=50, min_no_of_probes=None):
+	def getOneSequenceRefPosInGWA(cls, sequence_fragment_id=None, min_size=None, min_no_of_probes=None, version=1):
 		"""
+		2010-6-18
+			change default of min_size to None
+		2010-6-14
+			add version
 		2010-4-15
 			get ref genome position data of only one sequence fragment from db in GWA format
 				fragment positions are treated as y-axis values.
@@ -1951,7 +2200,7 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("Getting positions of sequences from sequence fragment %s on ref genome, min_size %s, min_no_of_probes %s ..."%\
 						(sequence_fragment_id, min_size, min_no_of_probes))
 		TableClass = SequenceFragmentRefPos
-		query = TableClass.query.filter(TableClass.sequence_fragment.has(id=sequence_fragment_id))
+		query = TableClass.query.filter(TableClass.sequence_fragment.has(id=sequence_fragment_id)).filter_by(version=version)
 		
 		if min_size is not None:
 			query = query.filter((TableClass.stop-TableClass.start+1)>=min_size)
@@ -2000,8 +2249,10 @@ class Stock_250kDB(ElixirDB):
 		return gwr
 	
 	def getSequenceRefPosInMultiGWA(self, accession_id=None, min_size=None, min_no_of_probes=None,\
-							chr=None, start=None, stop=None):
+							chr=None, start=None, stop=None, version=1):
 		"""
+		2010-6-14
+			add version
 		2010-4-28
 			for each sequence fragment from accession_id that meets the requirement
 				get ref genome position data of only one sequence fragment from db in GWA format
@@ -2012,8 +2263,8 @@ class Stock_250kDB(ElixirDB):
 			called by GenomeBrowser.py
 		"""
 		
-		sql_string = "select distinct t.sequence_fragment_id from %s t, %s s where s.id=t.sequence_fragment_id "%\
-					(SequenceFragmentRefPos.table.name, SequenceFragment.table.name)
+		sql_string = "select distinct t.sequence_fragment_id from %s t, %s s where s.id=t.sequence_fragment_id and t.version=%s"%\
+					(SequenceFragmentRefPos.table.name, SequenceFragment.table.name, version)
 		
 		condition_ls = []
 		if accession_id:
@@ -2164,24 +2415,30 @@ class Stock_250kDB(ElixirDB):
 			TestResultClass = None
 		return (ResultsClass, TestResultClass)
 	
-	def getCNVCallInGWA(self, array_id=None, cnv_type_id=None, cnv_method_id=None, min_size=50, min_no_of_probes=None,\
+	def getCNVCallInGWA(self, array_id=None, cnv_type_id=None, cnv_method_id=None, min_size=None, min_no_of_probes=None,\
 					chr=None, start=None, stop=None):
 		"""
+		2010-7-28
+			fix a bug. argument cnv_method_id wasn't used before.
+		2010-6-18
+			replace (TableClass.size_affected>=min_size) with (TableClass.stop-TableClass.start+1)>=min_size
 		2010-4-28
 			add argument chr, start, stop
 		2010-3-17
 			get CNV calls from db in GWA format
 		"""
-		sys.stderr.write("Getting CNV calls for array_id %s, cnv_type %s, cnv method %s, min_size %s, min_no_of_probes %s ..."%\
-						(array_id, cnv_type_id, cnv_method_id, min_size, min_no_of_probes))
+		sys.stderr.write("Getting CNV calls for array_id %s, cnv_type %s, cnv method %s, min_size %s, min_no_of_probes %s chr %s start %s stop %s ..."%\
+						(array_id, cnv_type_id, cnv_method_id, min_size, min_no_of_probes, chr, start, stop ))
 		TableClass = CNVCall
 		query = TableClass.query.filter_by(array_id=array_id)
 		if min_size is not None:
-			query = query.filter(TableClass.size_affected>=min_size)
+			query = query.filter((TableClass.stop-TableClass.start+1)>=min_size)
 		if cnv_type_id is not None:
 			query = query.filter_by(cnv_type_id=cnv_type_id)
 		if min_no_of_probes is not None:
 			query = query.filter(TableClass.no_of_probes_covered>=min_no_of_probes)
+		if cnv_method_id is not None:
+			query = query.filter_by(cnv_method_id=cnv_method_id)
 		
 		# 2010-4-28
 		query = self.limitQueryByChrPosition(query, TableClass, chr, start, stop)
@@ -2203,7 +2460,8 @@ class Stock_250kDB(ElixirDB):
 			ecotype_nativename = row.maternal_nativename
 			break
 		
-		gwr_name = "CNV call of %s (a-id %s, e-id %s)"%(ecotype_nativename, array.id, array.maternal_ecotype_id)
+		gwr_name = "CNV type %s of %s (a-id %s, e-id %s) by method %s"%(cnv_type_id, ecotype_nativename, \
+												array.id, array.maternal_ecotype_id, cnv_method_id)
 		gwr = GenomeWideResult(name=gwr_name)
 		gwr.data_obj_ls = []	#list and dictionary are crazy references.
 		gwr.data_obj_id2index = {}
@@ -2218,11 +2476,11 @@ class Stock_250kDB(ElixirDB):
 			data_obj = DataObject(chromosome=row.chromosome, position=row.start, stop_position=row.stop, \
 								value=row.amplitude)
 			data_obj.comment = 'cnv_type: %s, cnv_method: %s, size_affected %s, no_of_probes_covered %s, amplitude %s.\n'%\
-								(row.cnv_type_id, row.cnv_method_id, row.size_affected, row.no_of_probes_covered, row.amplitude)
+								(row.cnv_type.short_name, row.cnv_method.short_name, row.size_affected, row.no_of_probes_covered, row.amplitude)
 			data_obj.comment += 'start_probe_id %s, stop_probe_id %s.\n'%\
 								(row.start_probe_id, row.stop_probe_id)
 			if row.comment:
-				data_obj.comment += row.comment
+				data_obj.comment += '\n'+row.comment
 			data_obj.genome_wide_result_name = gwr_name
 			data_obj.genome_wide_result_id = genome_wide_result_id
 			gwr.add_one_data_obj(data_obj)
@@ -2234,8 +2492,10 @@ class Stock_250kDB(ElixirDB):
 		return gwr
 	
 	def getSequenceFragmentRefPosFromDBInRBDict(self, data_source_id=None, ecotype_id=None, \
-								min_QC_segment_size=None, min_no_of_probes=None, min_reciprocal_overlap=0.6):
+								min_QC_segment_size=None, min_no_of_probes=None, min_reciprocal_overlap=0.6, version=1):
 		"""
+		2010-6-14
+			add argument version
 		2010-3-17 copied from CNV.getLerContigSpanDataFromDB() of misc.py
 		2010-1-28
 			This data provides information regarding which parts of Col genome are actually covered by the Ler contigs,
@@ -2244,10 +2504,11 @@ class Stock_250kDB(ElixirDB):
 			
 		"""
 		sys.stderr.write("Getting SequenceFragmentRefPos data ... \n")		
-		sql_string = "select a.ecotype_id, p.chromosome, p.start, p.stop, p.size_difference, p.no_of_probes_covered, p.sequence_fragment_id, p.id \
-						from %s p, %s f, %s a where f.accession_id=a.id and p.sequence_fragment_id=f.id"%\
-						(SequenceFragmentRefPos.table.name, SequenceFragment.table.name, \
-						CNVQCAccession.table.name)
+		sql_string = "select a.ecotype_id, p.chromosome, p.start, p.stop, p.size_difference, p.no_of_probes_covered,\
+					p.sequence_fragment_id, p.id \
+					from %s p, %s f, %s a where f.accession_id=a.id and p.sequence_fragment_id=f.id and p.version=%s"%\
+					(SequenceFragmentRefPos.table.name, SequenceFragment.table.name, \
+					CNVQCAccession.table.name, version)
 		if data_source_id is not None:
 			sql_string += " and a.data_source_id=%s"%data_source_id
 		if ecotype_id is not None:
@@ -2347,13 +2608,16 @@ class Stock_250kDB(ElixirDB):
 				(CNVQCCall.table.name, CNVQCAccession.table.name)
 		return self.getAccessionIDInfoGivenSQLQuery(sql_string)
 	
-	def getArrayIDInfoWithDataInCNVCall(self,):
+	def getArrayIDInfoWithDataInGivenTable(self, TableClass=CNVCall):
 		"""
+		2010-8-5
+			change name from getArrayIDInfoWithDataInCNVCall to getArrayIDInfoWithDataInGivenTable
+			add argument TableClass
 		2010-4-27
 			for auto completion in GenomeBrowser.py
 		"""
 		sql_string = "select distinct v.* from %s c, view_array v where c.array_id=v.array_id "%\
-					(CNVCall.table.name)
+					(TableClass.table.name)
 		rows = self.metadata.bind.execute(sql_string)
 		count = 0
 		
@@ -2369,17 +2633,78 @@ class Stock_250kDB(ElixirDB):
 		return PassingData(list_id_ls=list_id_ls, list_id2index=list_id2index, list_label_ls=list_label_ls)
 	
 	@classmethod
-	def limitQueryByChrPosition(cls, query, TableClass, chr, start, stop):
+	def limitQueryByChrPosition(cls, query, TableClass, chr=None, start=None, stop=None):
 		"""
+		2010-7-28
+			chr and (start&stop) conditions get separated.
+			One could just specify chr to get stuff on that particular chromosome.
 		# 2010-4-28
 			common function invoked by other member functions.
 		"""
-		if chr and start and stop:
+		if chr:
 			query = query.filter(TableClass.chromosome==chr)
+		
+		if start and stop:
 			query = query.filter(or_(and_(TableClass.start>=start, TableClass.start<=stop), \
 									and_(TableClass.stop>=start, TableClass.stop<=stop)))
 		return query
+	
+	def getSeqFragmentRefPosVersionInfo(self):
+		"""
+		2010-6-14
+			for GenomeBrowser.py to autocomplete comboboxentry_seq_ref_pos_version
+		"""
+		sql_string = "select distinct version from %s srp"%\
+					(SequenceFragmentRefPos.table.name)
+		rows = self.metadata.bind.execute(sql_string)
+		count = 0
 		
+		list_id_ls = []
+		list_id2index = {}
+		list_label_ls = []
+		for row in rows:
+			SFRP_object = SequenceFragmentRefPos.query.filter_by(version=row.version).first()
+			list_id_ls.append(SFRP_object.version)
+			label = '%s %s'%(row.version, SFRP_object.comment)
+			list_label_ls.append(label)
+			list_id2index[row.version] = len(list_id2index)
+		from pymodule import PassingData
+		return PassingData(list_id_ls=list_id_ls, list_id2index=list_id2index, list_label_ls=list_label_ls)
+	
+	def getIDShortNameInfoGivenSQLQuery(self, sql_string):
+		"""
+		2010-7-23
+		"""
+		rows = self.metadata.bind.execute(sql_string)
+		count = 0
+		
+		list_id_ls = []
+		list_id2index = {}
+		list_label_ls = []
+		for row in rows:
+			list_id_ls.append(row.id)
+			label = '%s %s'%(row.id, row.short_name)
+			list_label_ls.append(label)
+			list_id2index[row.id] = len(list_id2index)
+		from pymodule import PassingData
+		return PassingData(list_id_ls=list_id_ls, list_id2index=list_id2index, list_label_ls=list_label_ls)
+	
+	def getCNVMethodOrTypeInfoDataInCNVCallOrQC(self, TableClass=CNVMethod, CNVTableClass=CNVCall):
+		"""
+		2010-7-23
+			set TableClass = CNVType to get type info.
+			set CNVTableClass=CNVQCCall to get info for the QC table
+		"""
+		if TableClass==CNVType:
+			field_name = 'cnv_type_id'
+		elif TableClass==CNVMethod:
+			field_name = 'cnv_method_id'
+		else:
+			field_name = 'cnv_method_id'
+		sql_string = "select distinct m.* from %s m, %s c where m.id=c.%s"%\
+					(TableClass.table.name, CNVTableClass.table.name, field_name)
+		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
+	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
 	main_class = Stock_250kDB
@@ -2388,6 +2713,31 @@ if __name__ == '__main__':
 	instance.setup()
 	import pdb
 	pdb.set_trace()
+	
+	#2010-8-6 complex query
+	TableClass = CNVArrayCall
+	array_id = 612
+	query = TableClass.query.filter_by(array_id=array_id)
+	min_size = 100
+	query = query.filter(TableClass.cnv.has((CNV.stop-CNV.start+1)>=min_size))
+	cnv_type_id = 1
+	query = query.filter(TableClass.cnv.has(cnv_type_id=cnv_type_id))
+	min_no_of_probes = 5
+	query = query.filter(TableClass.cnv.has(CNV.no_of_probes_covered>=min_no_of_probes))
+	cnv_method_id = 22
+	query = query.filter_by(cnv_method_id=cnv_method_id)
+	chr = 1
+	query = query.filter(TableClass.cnv.has(chromosome=chr))
+	start =25000
+	stop = 2500000
+	query = query.filter(or_(and_(TableClass.cnv.has(CNV.start>=start), TableClass.cnv.has(CNV.start<=stop)), \
+								and_(TableClass.cnv.has(CNV.stop>=start), TableClass.cnv.has(CNV.stop<=stop))))
+	counter = 0
+	for row in query:
+		print row.id, row.array_id, row.cnv_id
+		counter += 1
+		if counter>=10:
+			break
 	
 	import sqlalchemy
 	s = sqlalchemy.sql.select([AssociationOverlappingStat.table.c.call_method_id.distinct()])

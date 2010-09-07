@@ -284,14 +284,14 @@ class Results2DB_250k(object):
 					#construct a new marker
 					marker = SNPs(name=marker_name, chromosome=chr, position=start_pos, end_position=stop_pos, created_by=user)
 					#save it in database to get id
-					session.add(marker)
+					session.save(marker)
 					cls.marker_pos2snp_id[key] = marker	#for the next time to encounter same marker
 					cls.is_new_marker_added = True	#set this flag as new marker was inputted into the dict
 					r = Results(score=score)
 					r.snps = marker
 					del marker
 				r.results_method = rm
-				session.add(r)
+				session.save(r)
 				del r
 			no_of_lines += 1
 		
@@ -369,7 +369,7 @@ class Results2DB_250k(object):
 		rmt = session.query(ResultsMethodType).get(results_method_type_id)
 		if not rmt and results_method_type_short_name is not None:	#create a new results method type
 			rmt = ResultsMethodType(short_name=results_method_type_short_name)
-			session.add(rmt)
+			session.save(rmt)
 		
 		if not rmt:
 			sys.stderr.write("No results method type available for results_method_type_id=%s.\n"%results_method_type_id)
@@ -407,7 +407,7 @@ class Results2DB_250k(object):
 		rm.call_method = cm
 		rm.analysis_method = am
 		
-		session.add(rm)
+		session.save(rm)
 		if rmt:
 			rm.results_method_type = rmt
 		
@@ -422,23 +422,29 @@ class Results2DB_250k(object):
 			else:
 				return_value = cls.submit_results(db, input_fname, rm, user, rm.filename)
 			if return_value:
-				session.add(rm)
+				session.save_or_update(rm)
 				# 2010-5-3 store the json structure of top 10000 SNPs from the rm into db
 				no_of_top_snps = 10000
 				if rm.analysis_method.min_maf is not None:
 					min_MAF = rm.analysis_method.min_maf
 				else:
 					min_MAF = 0
-				json_data = getOneResultJsonData(rm, min_MAF, no_of_top_snps)
-				rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
-				rm_json.result = rm
-				rm_json.json_data = json_data
-				session.add(rm_json)
+				try:
+					json_data = getOneResultJsonData(rm, min_MAF, no_of_top_snps)
+					rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
+					rm_json.result = rm
+					rm_json.json_data = json_data
+					session.save_or_update(rm_json)
+				except:
+					sys.stderr.write('Except in saving results_method_json (aborted): %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+					session.delete(rm_json)
 			else:	#bad thing happend when getting data out of the file. don't save this results_method.
 				session.delete(rm)
 			session.flush()
 			session.commit()
-			session.close()
+			session.clear()
 			cls.reset_marker_pos2snp_id()
 		else:	#default is also rollback(). to demonstrate good programming
 			session.rollback()

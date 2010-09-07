@@ -540,7 +540,7 @@ class DB_250k2Array(object):
 				median_intensity = numpy.median(intensity_array)
 				array_info_entry = Stock_250kDB.ArrayInfo.get(array_id)
 				array_info_entry.median_intensity = median_intensity
-				session.save_or_update(array_info_entry)
+				session.add(array_info_entry)
 			else:
 				sys.stderr.write("Error: run_type %s is not supported.\n"%run_type)
 				sys.exit(3)
@@ -659,7 +659,7 @@ class DB_250k2Array(object):
 					attribute_name = 'dlr_%s'%summary_name
 					setattr(array_quartile, attribute_name, summary_value)
 				
-				session.save_or_update(array_quartile)
+				session.add(array_quartile)
 				
 				
 				# find and store the outliers
@@ -679,7 +679,7 @@ class DB_250k2Array(object):
 						if not array_quartile_outlier:	# not in db. add it to db
 							array_quartile_outlier = Stock_250kDB.ArrayQuartileOutlier(probe_id=probe_id, intensity=intensity)
 							array_quartile_outlier.array_quartile = array_quartile
-							session.save_or_update(array_quartile_outlier)
+							session.add(array_quartile_outlier)
 							no_of_outliers_saved += 1
 				
 				session.flush()

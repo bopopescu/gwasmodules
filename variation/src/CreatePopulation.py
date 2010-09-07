@@ -24,6 +24,7 @@ from codense.common import db_connect
 from common import nt2number, number2nt
 from sets import Set
 import networkx as nx
+from pymodule import calGreatCircleDistance
 
 class CreatePopulation:
 	__doc__ = __doc__
@@ -49,23 +50,7 @@ class CreatePopulation:
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
-	def cal_great_circle_distance(self, lat1, lon1, lat2, lon2, earth_radius=6372.795):
-		"""
-		2007-06-17 copied from 2007-07-11
-		http://en.wikipedia.org/wiki/Great-circle_distance
-		"""
-		import math
-		lat1_rad = lat1*math.pi/180
-		lon1_rad = lon1*math.pi/180
-		lat2_rad = lat2*math.pi/180
-		lon2_rad = lon2*math.pi/180
-		long_diff = abs(lon1_rad-lon2_rad)
-		sin_lat1 = math.sin(lat1_rad)
-		cos_lat1 = math.cos(lat1_rad)
-		sin_lat2 = math.sin(lat2_rad)
-		cos_lat2 = math.cos(lat2_rad)
-		spheric_angular_diff = math.atan2(math.sqrt(math.pow(cos_lat2*math.sin(long_diff),2) + math.pow(cos_lat1*sin_lat2-sin_lat1*cos_lat2*math.cos(long_diff),2)), sin_lat1*sin_lat2+cos_lat1*cos_lat2*math.cos(long_diff))
-		return earth_radius*spheric_angular_diff
+	cal_great_circle_distance = calGreatCircleDistance
 	
 	def get_pos2ecotypeid_ls(self, curs, strain_info_table):
 		"""

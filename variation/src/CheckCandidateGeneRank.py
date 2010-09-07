@@ -43,14 +43,6 @@ from sets import Set
 from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
 from DrawSNPRegion import DrawSNPRegion
 #from sqlalchemy.orm import join
-from matplotlib import rcParams
-rcParams['font.size'] = 6
-rcParams['legend.fontsize'] = 4
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 10
-rcParams['axes.titlesize'] = 12
-rcParams['xtick.labelsize'] = 8
-rcParams['ytick.labelsize'] = 8
 import pylab
 import StringIO
 from common import get_total_gene_ls
@@ -97,6 +89,8 @@ class CheckCandidateGeneRank(GeneListRankTest):
 	def getResultsIDLs(self, db, ResultsClass, results_type, phenotype_id_ls, min_distance=20000, get_closest=0, \
 					min_MAF=None, call_method_id=None, analysis_method_id_set=None):
 		"""
+		2009-4-16
+			doc: results_id_ls for each phenotype is sorted ascendingly by analysis_method_id
 		2008-11-19
 			add option analysis_method_id_set, for PlotCmpTwoAnalysisMethods.py to call.
 			call_method_id filtering has effect only when call_method_id is not None or not zero.
@@ -485,6 +479,15 @@ class CheckCandidateGeneRank(GeneListRankTest):
 		"""
 		
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 6
+	rcParams['legend.fontsize'] = 4
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 10
+	rcParams['axes.titlesize'] = 12
+	rcParams['xtick.labelsize'] = 8
+	rcParams['ytick.labelsize'] = 8
+	
 	from pymodule import ProcessOptions
 	main_class = CheckCandidateGeneRank
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

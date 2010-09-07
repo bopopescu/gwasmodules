@@ -6,7 +6,10 @@ Examples:
 	
 	#SNP pairs from the same gene.
 	PlotGenePairAssoResult.py -i /Network/Data/250k/tmp-yh/FTGenePair/ft_gene_pair_itself.tsv -s ./mnt2/panfs/250k/snps_context_g0_m5000 -I /Network/Data/250k/db/results/type_1/2559_results.tsv -u yh -p pass*** -q 1  -o /Network/Data/250k/tmp-yh/FTGenePair/ -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf
-
+	
+	#SNP pairs from two different genes. call method 22, phenotype 7, analysis_method 1
+	PlotGenePairAssoResult.py -i /Network/Data/250k/tmp-yh/FTGenePair/gene_pairs_dorm_ft_germ.tsv -s ./mnt2/panfs/250k/snps_context_g0_m10000 -I ./mnt2/panfs/250k/Inter_DOG1_LM/SNPpair_7_FT_22C.tsv -u yh -p pass*** -q 7 -a  1 -e 22 -o /Network/Data/250k/tmp-yh/SNPPair_LM_DOG1 -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf
+	
 Description:
 	2008-11-30 program to plot association significance results of SNP pairs (BooleanSNPPair method) from two genes.
 	
@@ -43,16 +46,6 @@ from Kruskal_Wallis import Kruskal_Wallis
 from DrawSNPRegion import DrawSNPRegion
 from GeneListRankTest import SnpsContextWrapper
 
-
-from matplotlib import rcParams
-rcParams['font.size'] = 6
-rcParams['legend.fontsize'] = 6
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 6
-rcParams['axes.titlesize'] = 8
-rcParams['xtick.labelsize'] = 6
-rcParams['ytick.labelsize'] = 6
-
 class PlotGenePairAssoResult(DrawSNPRegion):
 	__doc__ = __doc__
 	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
@@ -72,7 +65,7 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 							('snps_context_picklef',1, ): [None, 's', 1, 'a file containing a pickled snps_context_wrapper. outputted by GeneListRankTest.constructDataStruc()'],\
 							('phenotype_fname', 0, ): [None, 'N', 1, 'phenotype file, if snp_matrix_fname is given, this is needed as well.', ],\
 							("output_dir", 1, ): [None, 'o', 1, 'directory to store all images'],\
-							('call_method_id', 0, int):[17, '', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
+							('call_method_id', 0, int):[17, 'e', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 							('analysis_method_id', 0, ):['1', 'a', 1, 'Restrict results based on this list of analysis_method. Default is no such restriction.'],\
 							('phenotype_method_id', 1, ):[None, 'q', 1, 'Restrict results based on this list of phenotype_method. Default is no such restriction.'],\
 							('no_of_top_hits', 1, int): [1000, 'f', 1, 'how many number of top hits based on score or -log(pvalue).'],\
@@ -80,6 +73,7 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 							("gene_annotation_picklef", 0, ): [None, 'j', 1, 'given the option, If the file does not exist yet, store a pickled gene_annotation into it. If the file exists, load gene_annotation out of it.'],\
 							("draw_LD_relative_to_center_SNP", 0, int): [0, '', 0, 'toggle this to draw LD between other SNPs and the center SNP'],\
 							("plot_type_short_name", 0, ): [None, 'y', 1, 'A short name (<256 chars) to characterize the type of all the plots. it could have existed in table SNPRegionPlotType'],\
+							('snp_matrix_fname', 0, ): ['', 'J', 1, 'genotype matrix. Strain X SNP format.', ],\
 							('commit', 0, int):[0, 'c', 0, 'commit the db operation. this commit happens after every db operation, not wait till the end.'],\
 							('debug', 0, int):[0, 'b', 0, 'debug mode. 1=level 1 (pdb mode). 2=level 2 (same as 1 except no pdb mode)'],\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
@@ -118,17 +112,21 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 		sys.stderr.write("Getting gene pairs from %s ..."%input_fname)
 		reader = csv.reader(open(input_fname), delimiter=figureOutDelimiter(input_fname))
 		gene_id_pair_ls = []
+		gene_id_set = Set()
 		for row in reader:
 			gene1_id = int(row[0])
 			gene2_id = int(row[1])
 			gene_id_pair_ls.append((gene1_id, gene2_id))
-		
+			gene_id_set.add(gene1_id)
+			gene_id_set.add(gene2_id)
 		sys.stderr.write("Done.\n")
-		return gene_id_pair_ls
+		return gene_id_pair_ls, gene_id_set
 	
 	def loadDataStructure(self, gene_annotation_picklef, min_MAF=0, min_distance=20000, \
-						list_type_id=None):
+						list_type_id=None, snp_matrix_fname=None, snp_matrix_data_type=1):
 		"""
+		2009-5-30
+			add argument snp_matrix_fname
 		2008-11-25
 		2008-10-01
 			wrap a few functions up, convenient for both run() and drawSNPRegion()
@@ -145,69 +143,112 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 		else:
 			candidate_gene_set = Set()
 		
+		if snp_matrix_fname:
+			if snp_matrix_data_type==3:
+				matrix_data_type=float		#2009-3-23 for CNV amplitude file
+			else:
+				matrix_data_type=int
+			snpData = SNPData(input_fname=snp_matrix_fname, turn_into_integer=1, turn_into_array=1, ignore_2nd_column=1, matrix_data_type=matrix_data_type)			
+			#2008-12-05 fake a snp_info for findSNPsInRegion
+			self.construct_chr_pos2index_forSNPData(snpData)
+		else:
+			snpData = None
+			
 		return_data = PassingData(gene_annotation=gene_annotation, snp_info=snp_info, \
-								candidate_gene_set=candidate_gene_set)
+								candidate_gene_set=candidate_gene_set, snpData=snpData)
 		return return_data
 	
-	def get_snp_pair2value_type(self, boolean_pair_fname):
+	def get_snp_pair2value_type(self, boolean_pair_fname, gene_id_set=None):
 		"""
+		2009-1-20
+			add argument gene_id_set, to limit input only to those genes
+			report the progress
 		2008-11-25
 		"""
-		sys.stderr.write("Getting snp_pair2value_type ...")
+		sys.stderr.write("Getting snp_pair2value_type ...\n")
 		snp_pair2value_type = {}
 		reader = csv.reader(open(boolean_pair_fname), delimiter=figureOutDelimiter(boolean_pair_fname))
 		reader.next()
 		min_value = None
 		max_value = None
+		counter = 0
+		real_counter = 0
 		for row in reader:
-			snp1_id, gene1_id, snp2_id, gene2_id, bool_type, pvalue, count1, count2 = row
+			snp1_id, gene1_id, snp2_id, gene2_id, bool_type, pvalue, count1, count2 = row[:8]
+			counter += 1
 			if not snp2_id:
 				snp2_id = snp1_id
 				continue	#2008-11-26 skip a row if it's pvalue from single SNP.
-			
+			gene1_id = int(gene1_id)
 			if not gene2_id:
 				gene2_id = gene1_id
-			
-			snp1_id = snp1_id.split('_')
-			snp1_id = map(int, snp1_id)
-			
-			snp2_id = snp2_id.split('_')
-			snp2_id = map(int, snp2_id)
-			
-			snp_pair = [tuple(snp1_id), tuple(snp2_id)]
-			snp_pair.sort()
-			snp_pair = tuple(snp_pair)
-			pvalue = -math.log10(float(pvalue))
+			else:
+				gene2_id = int(gene2_id)
+			pvalue = float(pvalue)
+			if pvalue==0:
+				pvalue = 15
+				bool_type = -1
+			else:
+				pvalue = -math.log10(float(pvalue))
 			
 			value = pvalue
 			if min_value is None:
 				min_value =value
 			elif value<min_value:
 				min_value = value
-				
+			
 			if max_value is None:
 				max_value = value
 			elif value>max_value:
 				max_value = value
 			
-			bool_type = int(bool_type)
+			if gene_id_set is not None and (gene1_id not in gene_id_set or gene2_id not in gene_id_set):
+				continue
+			real_counter += 1
+			
+			snp1_id = snp1_id.split('_')
+			snp1_id = map(int, snp1_id)
+			if len(snp1_id)==2:
+				snp1_id.append(0)
+			
+			snp2_id = snp2_id.split('_')
+			snp2_id = map(int, snp2_id)
+			if len(snp2_id)==2:
+				snp2_id.append(0)
+			
+			snp_pair = [tuple(snp1_id), tuple(snp2_id)]
+			snp_pair.sort()
+			snp_pair = tuple(snp_pair)
+			
+			if bool_type:
+				bool_type = int(bool_type)
+			else:
+				bool_type = 0
 			if snp_pair not in snp_pair2value_type:
 				snp_pair2value_type[snp_pair] = (pvalue, bool_type)
 			else:
 				if pvalue>snp_pair2value_type[snp_pair][0]:	#only take maximum
 					snp_pair2value_type[snp_pair] = (pvalue, bool_type)
+			sys.stderr.write("%s%s\t%s"%('\x08'*40, counter, real_counter))
 		del reader
 		sys.stderr.write("Done.\n")
 		return snp_pair2value_type, min_value, max_value
 	
-	bool_type2marker_and_name = {1: ('v', 'AND'),
-					2: ('+', 'Inhibition'),
-					4: ('o', 'Inhibition'),
-					6: ('^', 'XOR'),
-					7: ('D', 'OR')}
+	#color_ls = ['r', 'g', 'c', 'b', 'y', 'k']
+	
+	bool_type2marker_and_name = {-1:	('+', 'LM pvalue=0', 'r'),
+								0:	('o', 'LM', 'b'),
+								1: ('v', 'AND', 'r'),
+					2: ('+', 'Inhibition', 'g'),
+					4: ('o', 'Inhibition', 'c'),
+					6: ('^', 'XOR', 'b'),
+					7: ('D', 'OR', 'y')}
+	#each value is (marker for pylab.plot, marker name, marker color)
 		
-	def drawSNPPairPvalue(self, axe_pvalue, snps_region1, snps_region2, snp_pair2value_type, phenotype_cmap, phenotype_norm):
+	def drawSNPPairPvalue(self, axe_pvalue, snps_region1, snps_region2, snp_pair2value_type, phenotype_cmap, phenotype_norm, min_value=5):
 		"""
+		2009-5-30
+			add argument min_value
 		"""
 		sys.stderr.write("Drawing snp pair pvalue.\n")
 		pscatter_ls = []
@@ -219,13 +260,15 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 					snp_pair = (min(chr_pos1, chr_pos2),max(chr_pos1, chr_pos2))
 					if snp_pair in snp_pair2value_type:
 						value, bool_type = snp_pair2value_type[snp_pair]
+						if value<min_value:	#2009-5-30 temporarily ignore values below this point
+							continue
 						if bool_type not in bool_type2counter:
 							bool_type2counter[bool_type] = 0
 						bool_type2counter[bool_type] += 1
 						
 						facecolor = phenotype_cmap(phenotype_norm(value))
-						marker, bool_type_name = self.bool_type2marker_and_name[bool_type]
-						pscatter = axe_pvalue.plot([chr_pos1[1]], [chr_pos2[1]], marker=marker, markersize=3, linewidth=0.6, markeredgecolor=facecolor, markerfacecolor=facecolor)
+						marker, bool_type_name = self.bool_type2marker_and_name[bool_type][:2]
+						pscatter = axe_pvalue.plot([chr_pos1[1]], [chr_pos2[1]], marker=marker, markersize=2, linewidth=0.6, markeredgecolor=facecolor, markerfacecolor=facecolor)
 						#markersize=8
 						if bool_type2counter[bool_type] ==1:	#first time to draw this bool type
 							legend_ls.append(bool_type_name)
@@ -234,14 +277,16 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 		return legend_ls, pscatter_ls
 	
 	def drawSNPLinesCrossGenesAndPvalue(self, axe_gene_model, snps_within_this_region, gene_model_min_y,\
-				gene_model_max_y, gene_width, gwr, phenotype_cmap, phenotype_norm, rotate_xy=False):
+				gene_model_max_y, gene_width, gwr, phenotype_cmap, phenotype_norm, rotate_xy=False, min_value=2.5):
 		"""
+		2009-1-20
+			fill up dots with same color as its edgecolor in the pvalue scatter plot
 		2008-11-25
 		"""
 		sys.stderr.write("\t Drawing LD info  ...")
 		no_of_snps = len(snps_within_this_region.chr_pos_ls)
-		left_chr, left_pos = snps_within_this_region.chr_pos_ls[0]
-		right_chr, right_pos = snps_within_this_region.chr_pos_ls[-1]
+		left_chr, left_pos = snps_within_this_region.chr_pos_ls[0][:2]
+		right_chr, right_pos = snps_within_this_region.chr_pos_ls[-1][:2]
 		#ax1.hlines(y_value, left_pos, right_pos, linewidth=0.3)
 		for i in range(no_of_snps):
 			#draw the SNP line first
@@ -253,7 +298,7 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 			
 			#put the pvalue dot there
 			data_obj = gwr.get_data_obj_by_chr_pos(chr_pos1[0], chr_pos1[1])
-			if data_obj is not None:
+			if data_obj is not None and data_obj.value>min_value:	#2009-5-30 add min_value filter
 				edgecolor = phenotype_cmap(phenotype_norm(data_obj.value))
 				if rotate_xy:
 					xpos_ls = [gene_model_max_y-gene_width/4.]	#-gene_width/4. makes it a bit down
@@ -261,7 +306,7 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 				else:
 					ypos_ls = [gene_model_max_y-gene_width/4.]
 					xpos_ls = [chr_pos1[1]]
-				axe_gene_model.scatter(xpos_ls, ypos_ls, s=10, linewidth=0.6, edgecolor=edgecolor, facecolor='w')
+				axe_gene_model.scatter(xpos_ls, ypos_ls, s=10, linewidth=0.6, edgecolor=edgecolor, facecolor=edgecolor)
 			
 		sys.stderr.write("Done.\n")
 	
@@ -270,9 +315,10 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 						output_dir, min_value, max_value, snp_region=None, min_distance=40000, list_type_id=None, label_gene=0,
 						draw_LD_relative_to_center_SNP=0, commit=0):
 		"""
-		
+		2009-5-30
+			draw associations pvalues involving SNPs between one gene-pair
 		"""
-		sys.stderr.write("drawing one pair ...")
+		sys.stderr.write("Drawing one gene-pair ...")
 		phenotype = Stock_250kDB.PhenotypeMethod.get(phenotype_method_id)
 		gene1_id, gene2_id = gene_id_pair
 		gene1_model = gene_annotation.gene_id2model.get(gene1_id)
@@ -386,18 +432,20 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 		png_data = None
 		svg_data = None
 		png_output_fname = None
-		if commit:	#2008-10-24
-			png_data = StringIO.StringIO()
-			svg_data = StringIO.StringIO()
-			pylab.savefig(png_data, format='png', dpi=400)
-			pylab.savefig(svg_data, format='svg', dpi=300)
-		else:
-			png_output_fname = '%s.png'%output_fname_prefix
-			pylab.savefig(png_output_fname, dpi=500)
-			
-			pylab.savefig('%s.svg'%output_fname_prefix, dpi=300)
-		if self.debug:
-			pylab.show()
+		
+		if len(legend_ls)>0:	#make sure there're pairwise pvalues drawn on the plot
+			if commit:	#2008-10-24
+				png_data = StringIO.StringIO()
+				svg_data = StringIO.StringIO()
+				pylab.savefig(png_data, format='png', dpi=400)
+				pylab.savefig(svg_data, format='svg', dpi=300)
+			else:
+				png_output_fname = '%s.png'%output_fname_prefix
+				pylab.savefig(png_output_fname, dpi=500)
+				
+				pylab.savefig('%s.svg'%output_fname_prefix, dpi=300)
+			if self.debug:
+				pylab.show()
 		
 		sys.stderr.write("Done.\n")
 		
@@ -412,7 +460,7 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 			os.makedirs(self.output_dir)
 			
 		grand_dataStructure = self.loadDataStructure(self.gene_annotation_picklef, \
-							self.min_MAF, self.min_distance, self.list_type_id)
+							self.min_MAF, self.min_distance, self.list_type_id, snp_matrix_fname=self.snp_matrix_fname)
 		param_data = grand_dataStructure
 		
 		snps_context_wrapper = self.dealWithSnpsContextWrapper(self.snps_context_picklef, self.min_distance, self.get_closest)
@@ -420,8 +468,8 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 		gene_id2snps_id_ls = self.get_gene_id2snps_id_ls(snps_context_wrapper)
 		del snps_context_wrapper
 		
-		gene_id_pair_ls = self.read_input_fname(self.input_fname)
-		snp_pair2value_type, min_value, max_value = self.get_snp_pair2value_type(self.boolean_pair_fname)
+		gene_id_pair_ls, gene_id_set = self.read_input_fname(self.input_fname)
+		snp_pair2value_type, min_value, max_value = self.get_snp_pair2value_type(self.boolean_pair_fname, gene_id_set)
 		
 		analysis_method_id2gwr = self.getSimilarGWResultsGivenResultsByGene(self.phenotype_method_id, self.call_method_id, \
 																		self.results_directory, analysis_method_id_ls=[1])
@@ -434,11 +482,21 @@ class PlotGenePairAssoResult(DrawSNPRegion):
 		for gene_id_pair in gene_id_pair_ls:
 			#self.drawOneGenePair(snp_pair2value_type, gene_id2snps_id_ls, gene_id_pair, param_data)
 			self.drawOneGenePair(snp_pair2value_type, gene_id2snps_id_ls, gene_id_pair, \
-						self.phenotype_method_id, param_data.candidate_gene_set, param_data.gene_annotation, param_data.snp_info, gwr, \
+						self.phenotype_method_id, param_data.candidate_gene_set, param_data.gene_annotation, param_data.snpData, gwr, \
 						self.output_dir, min_value, max_value, min_distance=self.min_distance, list_type_id=None, label_gene=1,
 						draw_LD_relative_to_center_SNP=0, commit=self.commit)
+				#2009-5-30 temporarily replace param_data.snp_info with param_data.snpData
 
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 6
+	rcParams['legend.fontsize'] = 6
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 6
+	rcParams['axes.titlesize'] = 8
+	rcParams['xtick.labelsize'] = 6
+	rcParams['ytick.labelsize'] = 6
+	
 	from pymodule import ProcessOptions
 	main_class = PlotGenePairAssoResult
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

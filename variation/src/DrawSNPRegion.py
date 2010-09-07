@@ -2,46 +2,72 @@
 """
 Examples:
 	#output SNP plots by ranks according to results_by_gene's id=260 (one particular phenotype).
-	DrawSNPRegion.py -e 260 -l 28 -L /Network/Data/250k/tmp-yh/call_method_17_LD_m0.2.tsv  -o /Network/Data/250k/tmp-yh/snp_region/ -i phenotype_1_c10_f200
+	DrawSNPRegion.py -e 260 -l 28 -L /Network/Data/250k/tmp-yh/call_method_17_LD_m0.2.tsv  -o /Network/Data/250k/tmp-yh/snp_region/
+		-i phenotype_1_c10_f200
 	
 	#output SNP plots by ranks according to results_by_gene (analysis_method_id=7-Emma, call_method_id=17) (covering all phenotypes)
-	DrawSNPRegion.py -l 28 -L /Network/Data/250k/tmp-yh/call_method_17_LD_m0.2.tsv -o /Network/Data/250k/tmp-yh/snp_region_all/ -i phenotype_1_c10_f200
+	DrawSNPRegion.py -l 28 -L /Network/Data/250k/tmp-yh/call_method_17_LD_m0.2.tsv -o /Network/Data/250k/tmp-yh/snp_region_all/
+		-i phenotype_1_c10_f200
 	
 	#take LD_info and gene_annotation from a file contains the pickled data structure
-	DrawSNPRegion.py -i ./banyan_fs/tmp/GWA_res_FT.csv -l 28 -D /Network/Data/250k/tmp-yh/call_method_17_LD_m0.1_n0.1_m40000 -o /Network/Data/250k/tmp-yh/snp_region/  -j /tmp/at_gene_model_pickelf
+	DrawSNPRegion.py -i ./banyan_fs/tmp/GWA_res_FT.csv -l 28 -D /Network/Data/250k/tmp-yh/call_method_17_LD_m0.1_n0.1_m40000
+		-o /Network/Data/250k/tmp-yh/snp_region/  -j /tmp/at_gene_model_pickelf
 	
 	#get SNPs from ResultsByGene, which are associated with a top percentage of candidate genes
-	DrawSNPRegion.py -q 1 -a 7 -y Top30PercCandidateGene  -l 28 -j /tmp/at_gene_model_pickelf  -D /Network/Data/250k/tmp-yh/call_method_17_LD_pickle_dummy_n0.1_m20000 -o /tmp/snp_region -u yh 
+	DrawSNPRegion.py -q 1 -a 7 -y Top30PercCandidateGene  -l 28 -j /tmp/at_gene_model_pickelf
+		-D /Network/Data/250k/tmp-yh/call_method_17_LD_pickle_dummy_n0.1_m20000 -o /tmp/snp_region -u yh 
 	
 	#replace LD axe with axe_snp_matrix, axe_strain_pca, axe_map, axe_phenotype
 	#draw gene labels for every gene, not just candidate genes
-	DrawSNPRegion.py -i /tmp/DrawSNPRegion_snps.csv -I /Network/Data/250k/tmp-yh/call_method_17.tsv -N /tmp/phenotype.tsv -l 28 -o /tmp/snp_region/ -j /tmp/at_gene_model_pickelf  -u yh -s
+	DrawSNPRegion.py -i /tmp/DrawSNPRegion_snps.csv -I /Network/Data/250k/tmp-yh/call_method_17.tsv -N /tmp/phenotype.tsv
+		-l 28 -o /tmp/snp_region/ -j /tmp/at_gene_model_pickelf  -u yh -s
 	
 	#ditto but highlight imputed genotypes with blue color
-	DrawSNPRegion.py -i /tmp/DrawSNPRegion_snps.csv -I /Network/Data/250k/tmp-yh/call_method_17.tsv -J /Network/Data/250k/tmp-yh/call_method_17_from_18_before_imputation.tsv -N /tmp/phenotype.tsv -l 28 -o /tmp/snp_region/ -j /tmp/at_gene_model_pickelf -e 17 -u yh -s
+	DrawSNPRegion.py -i /tmp/DrawSNPRegion_snps.csv -I /Network/Data/250k/tmp-yh/call_method_17.tsv
+		-J /Network/Data/250k/tmp-yh/call_method_17_from_18_before_imputation.tsv -N /tmp/phenotype.tsv -l 28
+		-o /tmp/snp_region/ -j /tmp/at_gene_model_pickelf -e 17 -u yh -s
 	
 	#database commit, specify plot_type_short_name by '-y'
-	DrawSNPRegion.py -i $tmp_fname -I /Network/Data/250k/tmp-yh/call_method_17.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 17 -u yh -s -y SuziHandPick20081209 -c
+	DrawSNPRegion.py -i $tmp_fname -I /Network/Data/250k/tmp-yh/call_method_17.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv
+		-l 28 -o /Network/Data/250k/tmp-yh/snp_region -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 17 -u yh -s
+		-y SuziHandPick20081209 -c
 	
 	#use CNV discrete calls (1/-1) as SNP matrix
-	DrawSNPRegion.py -i /tmp/CycB25CycB23Region.tsv -I /Network/Data/250k/tmp-yh/CNV/call_method_17_CNV_array_intensity_norm_chr1_GADA_M10_discrete_m.3125.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region_CNV_M10_discrete_m.3125 -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 17 -u yh -s -V 2
+	DrawSNPRegion.py -i /tmp/CycB25CycB23Region.tsv -I /Network/Data/250k/tmp-yh/CNV/call_method_17_CNV_array_intensity_norm_chr1_GADA_M10_discrete_m.3125.tsv
+		-N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region_CNV_M10_discrete_m.3125
+		-j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 17 -u yh -s -V 2
 	
 	#use CNV amplitude (float) output as SNP matrix
-	DrawSNPRegion.py -i /tmp/CycB25CycB23Region.tsv -I /Network/Data/250k/tmp-yh/CNV/call_method_17_CNV_array_intensity_norm_chr1_GADA_M10_out_amp.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region_CNV_M10_amp -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 17 -u yh -s -V 3
+	DrawSNPRegion.py -i /tmp/CycB25CycB23Region.tsv -I /Network/Data/250k/tmp-yh/CNV/call_method_17_CNV_array_intensity_norm_chr1_GADA_M10_out_amp.tsv
+		-N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region_CNV_M10_amp
+		-j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 17 -u yh -s -V 3
 	
 	# 2010-2-2 draw SNP regions with gene labels (-s), exclude accession with NA phenotype from the SNP matrix (-E), use KW & RF scores (-a 1,6)
-	DrawSNPRegion.py -i /tmp/AdnanePNASRegionsToDraw.csv -I /Network/Data/250k/db/dataset/call_method_32.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv -l 148 -o /Network/Data/250k/tmp-yh/snp_region -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 32 -u yh -s -a 1,6 -E
+	DrawSNPRegion.py -i /tmp/AdnanePNASRegionsToDraw.csv -I /Network/Data/250k/db/dataset/call_method_32.tsv 
+		-N /Network/Data/250k/tmp-yh/phenotype.tsv -l 148 -o /Network/Data/250k/tmp-yh/snp_region
+		-j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -e 32 -u yh -s -a 1,6 -E
 	
 Description:
 	2008-09-24 program to draw pvalues, gene-models, LD around one SNP.
 		Top panel is pvalues from all different methods. Margarita and RF's values will be normalized in range of KW.
 		Middle panel is gene model. Displaying CDS, intron, strand.
-		Bottom panel is LD of all pairwise SNPs in that range.
+		Bottom panel is haplotype plot representing all SNPs in that range.
 	
 	The input file contains at least 3 columns, chromosome/chr, position/pos, phenotype_id/phenot_id. tab or comma-delimited.
 		The 1st row is a header telling which column is which. No particular order is required. The name could either be full (chromosome) or short(chr).
 		Output of FindTopSharedGenes.py conforms to this standard.
-	2009-3-10 call_method_id (-e) has to match the input file (-I). GWA results would get into trouble in matching SNPs from the input SNP matrix. 
+	2009-3-10 call_method_id (-e) has to match the input file (-I). GWA results would get into trouble in matching SNPs from the input SNP matrix.
+	
+	argument snp_matrix_data_type (-V)
+	if snp_matrix_data_type==3:	#2009-3-23 for CNV amplitude data
+		need_convert_alleles2binary = False
+		useAlleleToDetermineAlpha = True
+	elif snp_matrix_data_type==4:	#2009-3-27, for arbitrary non-diallelic SNP matrix
+		need_convert_alleles2binary = False
+		useAlleleToDetermineAlpha = False
+	else:	# all other cases
+		need_convert_alleles2binary = True
+		useAlleleToDetermineAlpha = False
 """
 
 import sys, os, math
@@ -276,8 +302,11 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 							("draw_LD_relative_to_center_SNP", 0, int): [1, '', 0, 'toggle this to draw LD between other SNPs and the center SNP'],\
 							("drawMap", 0, int): [0, 'M', 0, 'toggle this to draw a map (require toolkits.basemap) right to the SNP matrix to show geo-location of each accession/row'],\
 							("plot_type_short_name", 0, ): [None, 'y', 1, 'A short name (<256 chars) to characterize the type of all the plots. it could have existed in table SNPRegionPlotType'],\
-							('snp_matrix_data_type', 1, int):[1, 'V', 1, 'what type of data in snp_matrix_fname? 1: SNP data (snps are subset of what db has). 2: CNV discrete call data (1 or -1); 3: CNV amplitude data; 4: arbitrary non-diallelic SNP data (SNPs are not required to be included in db). input file has to contain start, stop position for 2 & 3. Providing central position works only for SNP data.'],\
+							('snp_matrix_data_type', 1, int):[1, 'V', 1, 'what type of data in snp_matrix_fname? 1: SNP data (snps are subset of what db has). 2: CNV discrete call data (1 or -1); 3: CNV amplitude data; 4: arbitrary non-diallelic SNP data (SNPs are not required to be included in db). input file has to contain start, stop position for 2 & 3. Providing central position in input works only for SNP data.'],\
 							('exclude_accessions_with_NA_phenotype', 0, int):[0, 'E', 0, 'toggle to exclude accessions from the SNP matrix to be drawn'],\
+							('markSNPInGenes', 0, int):[0, 'P', 0, 'toggle to mark the SNPs in gene models'],\
+							('drawGrid', 0, int):[0, 'G', 0, 'toggle to draw a grid for the SNP-matrix/haplotype'],\
+							('phenotypeDrawType', 1, int):[1, '', 1, 'phenotype drawing type. 1: same color but the length varies by magnitude. 2: same length but color varies'],\
 							('commit', 0, int):[0, 'c', 0, 'commit the db operation. this commit happens after every db operation, not wait till the end.'],\
 							('debug', 0, int):[0, 'b', 1, 'debug mode. 1=level 1 (pdb mode). 2=level 2 (same as 1 except no pdb mode)'],\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
@@ -385,6 +414,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 	@classmethod	
 	def dealWithGeneAnnotation(cls, gene_annotation_picklef, tax_id=3702, cls_with_db_args=None):
 		"""
+		2010-4-20
+			use os.access to test whether the gene_annotation_picklef is writeable or not before dumping the db-fetched annotaion into it.
 		2009-1-15
 			add argument cls_with_db_args to be passed to getGeneAnnotation()
 		2008-12-16
@@ -401,9 +432,10 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				del picklef
 			else:	#if the file doesn't exist, but the filename is given, pickle into it
 				gene_annotation = cls.getGeneAnnotation(tax_id=tax_id, cls_with_db_args=cls_with_db_args)	#min_gap is 2 X min_distance + a few more bases
-				picklef = open(gene_annotation_picklef, 'w')
-				cPickle.dump(gene_annotation, picklef, -1)
-				picklef.close()
+				if os.access(gene_annotation_picklef, os.W_OK):	# 2010-4-20 make sure the file is writable
+					picklef = open(gene_annotation_picklef, 'w')
+					cPickle.dump(gene_annotation, picklef, -1)
+					picklef.close()
 		else:
 			gene_annotation = cls.getGeneAnnotation(tax_id=tax_id, cls_with_db_args=cls_with_db_args)
 		sys.stderr.write("Done.\n")
@@ -598,9 +630,12 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		return x_ls, y_ls
 	
 	@classmethod
-	def drawPvalue(cls, ax1, axe_to_put_pvalue_legend, axe_LD_center_SNP, snps_within_this_region, analysis_method_id2gwr, LD_info=None, \
+	def drawPvalue(cls, axe_pvalue, axe_to_put_pvalue_legend, axe_LD_center_SNP, snps_within_this_region, analysis_method_id2gwr, LD_info=None, \
 				which_LD_statistic=2, draw_LD_relative_to_center_SNP=0, legend_loc='upper right'):
 		"""
+		2010-4-19
+			add the ylable for axe_LD_center_SNP only when LD stat is actually drawn
+		2010-4-15 set the legend box semi-transparent
 		2010-4-14
 			add "fancybox=True" to axe_to_put_pvalue_legend.legend()
 		2010-4-13
@@ -622,7 +657,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 			gwr = analysis_method_id2gwr[analysis_method_id]
 			x_ls, y_ls = cls.getXY(snps_within_this_region, analysis_method_id2gwr, analysis_method_id)
 			if x_ls and y_ls:
-				pscatter = ax1.scatter(x_ls, y_ls, s=10, linewidth=0.6, edgecolor=cls.analysis_method_id2color[analysis_method_id], facecolor='none', alpha=1)
+				pscatter = axe_pvalue.scatter(x_ls, y_ls, s=4, linewidth=0.6, edgecolor=cls.analysis_method_id2color[analysis_method_id], facecolor='none', alpha=1)
 				
 				#legend_ls.append(cls.analysis_method_id2name[analysis_method_id])
 				legend_ls.append(gwr.rm.analysis_method.short_name)	# 2010-2-2 get the analysis method name from db
@@ -633,9 +668,13 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				apl = axe_LD_center_SNP.plot(x_ls, y_ls, 'k-o', linewidth=0.5, markersize=2, alpha=0.3, markerfacecolor='w')
 				legend_ls.append(r'$%s$ with center SNP'%LD_statistic.get_label(which_LD_statistic))
 				pscatter_ls.append(apl[0])
-		ax1.set_ylabel(r'-log(pvalue)/normalized score')
-		axe_LD_center_SNP.set_ylabel(r'$%s$ with center SNP'%LD_statistic.get_label(which_LD_statistic))
-		axe_to_put_pvalue_legend.legend(pscatter_ls, legend_ls, loc=legend_loc, fancybox=True, handlelen=0.02)	#cut the legend length to 0.02, default 0.05 (5% of x-axis).
+				# 2010-4-19 add the ylable for axe_LD_center_SNP only when LD stat is actually drawn
+				axe_LD_center_SNP.set_ylabel(r'$%s$ with center SNP'%LD_statistic.get_label(which_LD_statistic))				
+		axe_pvalue.set_ylabel(r'-log(pvalue)/normalized score')
+		legend = axe_to_put_pvalue_legend.legend(pscatter_ls, legend_ls, loc=legend_loc, fancybox=True, handlelen=0.02)	#cut the legend length to 0.02, default 0.05 (5% of x-axis).
+		frame  = legend.get_frame()  
+		frame.set_alpha(0.60)	#2010-4-15 set the legend box semi-transparent
+		
 		sys.stderr.write("Done.\n")
 		#return legend_ls
 	
@@ -678,6 +717,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				element = getattr(gene_model, 'chromosome', '')
 			else:
 				element = getattr(gene_commentary, gene_desc_name, '')
+				if not element:	#2010-8-19 if gene_commentary doesn't have anything, try gene_model itself
+					element = getattr(gene_model, gene_desc_name, '')
 			if cutoff_length is not None and type(element)==str and len(element)>cutoff_length:	#only 20 characters
 				element = element[:cutoff_length]
 			if replaceNoneElemWithEmptyStr and element is None:
@@ -742,7 +783,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 					this_chr_starting_pos_on_plot = 0
 				y_value = base_y_value+param_data.no_of_genes_drawn%param_data.gene_position_cycle	#cycling through the y position to avoid clogging
 				
-				g_artist = ExonIntronCollection(box_ls, y=y_value, strand=gene_model.strand, width=param_data.gene_width, alpha=0.3, \
+				g_artist = ExonIntronCollection(box_ls, y=y_value, strand=gene_model.strand, width=param_data.gene_width, alpha=0.7, \
 											picker=True, linewidths=0.7, box_line_widths=0.3, rotate_xy=param_data.rotate_xy)
 				ax.add_artist(g_artist)	# 2010-4-12 new ExonIntronCollection is a pathPatch. add_patch and add_artist are same
 				
@@ -818,8 +859,10 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 	
 	@classmethod
 	def drawLD(cls, axe_gene_model, ax2, snps_within_this_region, LD_info, gene_model_min_y,\
-				gene_model_max_y, which_LD_statistic=1):
+				gene_model_max_y, which_LD_statistic=1, markSNPInGenes=True):
 		"""
+		2010-4-23
+			add argument markSNPInGenes, whether to draw vertical lines in the axe_gene_model
 		2009-4-30
 			handle chr,pos,offset in snps_within_this_region.chr_pos_ls by ignoring the offset bit
 		2008-09-28
@@ -832,10 +875,11 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		no_of_snps = len(snps_within_this_region.chr_pos_ls)
 		left_chr, left_pos = snps_within_this_region.chr_pos_ls[0][:2]
 		right_chr, right_pos = snps_within_this_region.chr_pos_ls[-1][:2]
-		#ax1.hlines(y_value, left_pos, right_pos, linewidth=0.3)
+		#axe_pvalue.hlines(y_value, left_pos, right_pos, linewidth=0.3)
 		for i in range(no_of_snps):
 			chr_pos1 = snps_within_this_region.chr_pos_ls[i]
-			axe_gene_model.vlines(chr_pos1[1], gene_model_min_y, gene_model_max_y, linestyle='dashed', alpha=0.3, linewidth=0.3)
+			if markSNPInGenes:	#2010-4-23
+				axe_gene_model.vlines(chr_pos1[1], gene_model_min_y, gene_model_max_y, linestyle='dashed', alpha=0.3, linewidth=0.3)
 			if not LD_info:	#skip drawng LD boxes
 				continue
 			for j in range(i+1, no_of_snps):
@@ -918,8 +962,16 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 							list_type_id=None, label_gene=0,\
 							draw_LD_relative_to_center_SNP=0, commit=0, snpData=None, phenData=None, ecotype_info=None,\
 							snpData_before_impute=None, snp_matrix_data_type=1, call_method_id=None,\
-							drawMap=False):
+							drawMap=False, drawStrainPCA=True, markSNPInGenes=True, drawGrid=False, phenotypeDrawType=1):
 		"""
+		2010-4-26
+			add argument phenotypeDrawType
+				1: the length of each accession's stick varies according to phenotype magnitude but same color
+				2: the length of each stick is same but color varies according to the phenotype hsv bar
+		2010-4-23
+			add argument markSNPInGenes, drawGrid
+		2010-4-19
+			add argument drawStrainPCA, and adjust axe width if this part is not drawn.
 		2010-4-13
 			add argument drawMap. controlling whether to draw a geographic map or not.
 		2010-1-22 if call_method_id is not specified, try cls.call_method_id. if still no, just use 'Unknown'.
@@ -940,8 +992,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		2008-10-24
 			handle option commit to return png_data & svg_data
 		2008-10-01
-			remove the frame of ax1 and add a grid to ax1
-			leave axe_gene_model's xticks there as otherwise ax1's xticks will go with it as they share xticks.
+			remove the frame of axe_pvalue and add a grid to axe_pvalue
+			leave axe_gene_model's xticks there as otherwise axe_pvalue's xticks will go with it as they share xticks.
 		2008-10-01
 			draw gene models on a separate axe,
 			add a twinx axe to draw LD w.r.t the center SNP
@@ -974,31 +1026,34 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		pylab.clf()
 		#fig = pylab.figure()
 		axe_y_offset1 = 0.05	#y_offset for axe_LD, axe_strain_pca, axe_phenotype, axe_map
-		axe_height1 = 0.55	#height of axe_LD or axe_snp_matrix
-		axe_y_offset2 = axe_y_offset1+axe_height1
-		axe_height2 = 0.1	#height of axe_gene_model
-		axe_y_offset3 = axe_y_offset2+axe_height2
-		axe_height3 = 0.25	#height of ax1
-		axe_y_offset4 = axe_y_offset3+axe_height3
+		axe_y_offset2 = 0.6
+		axe_height1 = axe_y_offset2 - axe_y_offset1	#height of axe_LD or axe_snp_matrix
+		axe_y_offset3 = 0.7
+		axe_height2 = axe_y_offset3 - axe_y_offset2	#height of axe_gene_model
+		axe_y_offset4 = 0.95
+		axe_height3 = axe_y_offset4 - axe_y_offset3	#height of axe_pvalue
 		
 		axe_x_offset1 = 0.02	#
-		axe_width1 = 0.2	#width of axe_strain_pca
-		axe_x_offset2 = axe_x_offset1 + axe_width1
-		axe_width2 = 0.55	#width of ax1, axe_LD, or axe_snp_matrix
-		axe_x_offset3 = axe_x_offset2 + axe_width2
-		axe_width3 = 0.02	#width of axe_phenotype
-		axe_x_offset4 = axe_x_offset3 + axe_width3
-		axe_width4 = 0.2	#width of axe_map, axe_map_frame
-		axe_x_offset5 = axe_x_offset4 + axe_width4
+		if drawStrainPCA:	#2010-4-19
+			axe_x_offset2 = axe_x_offset1 + 0.2
+		else:
+			axe_x_offset2 = axe_x_offset1
+		axe_width1 = axe_x_offset2 - axe_x_offset1	#width of axe_strain_pca
+		axe_x_offset3 = 0.77
+		axe_width2 = axe_x_offset3 - axe_x_offset2	#width of axe_pvalue, axe_LD, or axe_snp_matrix
+		axe_x_offset4 = 0.79 
+		axe_width3 = axe_x_offset4 - axe_x_offset3	#width of axe_phenotype
+		axe_x_offset5 = 0.99
+		axe_width4 = axe_x_offset5 - axe_x_offset4	#width of axe_map, axe_map_frame
 		no_of_axes_drawn = 0
 		
-		ax1 = pylab.axes([axe_x_offset2, axe_y_offset3, axe_width2, axe_height3], frameon=False)	#left gap, bottom gap, width, height, axes for pvalue, gene models
-		ax1.grid(True, alpha=0.3)
-		ax1.set_xticklabels([])	#remove xtick labels on ax1 because axe_LD's xtick labels cover this.
-		axe_LD_center_SNP = pylab.twinx()	#axes for LD with center SNP, copy ax1's
+		axe_pvalue = pylab.axes([axe_x_offset2, axe_y_offset3, axe_width2, axe_height3], frameon=False)	#left gap, bottom gap, width, height, axes for pvalue, gene models
+		axe_pvalue.grid(True, alpha=0.3)
+		axe_pvalue.set_xticklabels([])	#remove xtick labels on axe_pvalue because axe_LD's xtick labels cover this.
+		axe_LD_center_SNP = pylab.twinx()	#axes for LD with center SNP, copy axe_pvalue's
 		axe_LD_center_SNP.set_xticklabels([])
-		axe_gene_model = pylab.axes([axe_x_offset2, axe_y_offset2, axe_width2, axe_height2], frameon=False, sharex=ax1)
-		#axe_gene_model.set_xticks([])	#this will set ax1's xticks off as well because the x-axis is shared.
+		axe_gene_model = pylab.axes([axe_x_offset2, axe_y_offset2, axe_width2, axe_height2], frameon=False, sharex=axe_pvalue)
+		#axe_gene_model.set_xticks([])	#this will set axe_pvalue's xticks off as well because the x-axis is shared.
 		axe_gene_model.set_yticks([])
 		
 		snp_region_tup = [snps_within_this_region_snpData.chr_pos_ls[0][0], snps_within_this_region_snpData.chr_pos_ls[0][1],\
@@ -1072,48 +1127,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 										orientation='horizontal')
 			cb.set_label('Phenotype Legend On the Map')
 			
-			axe_strain_map = None	#no strain map
-			axe_strain_pca = pylab.axes([axe_x_offset1, axe_y_offset1, axe_width1, axe_height1], frameon=False)
-			axe_strain_map_pca_cover = None	#not used.
-			axe_strain_pca_xlim = [-0.05,1.05]
-			axe_strain_pca_ylim = [0, 1]
-			axe_strain_pca.set_xlim(axe_strain_pca_xlim)
-			axe_strain_pca.set_ylim(axe_strain_pca_ylim)
-			
-			axe_strain_pca.grid(True, alpha=0.3)
-			axe_strain_pca.set_xticks([])
-			axe_strain_pca.set_yticks([])
-			axe_strain_pca_legend =None
-			
-			cls.drawStrainPCA(axe_strain_pca, axe_strain_map, axe_strain_map_pca_cover, axe_strain_pca_legend, StrainID2PCAPosInfo, \
-							ecotype_info, phenData, \
-						phenotype_col_index, phenotype_cmap, phenotype_norm, rightmost_x_value=axe_strain_pca_xlim[1],\
-						country_order_name='', strain_color_type=2, draw_axe_strain_map=False)
-			
-			axe_strain_pca.set_xlim(axe_strain_pca_xlim)
-			axe_strain_pca.set_ylim(axe_strain_pca_ylim)
-			no_of_axes_drawn += 1
-			if getattr(cls, "debug", False):
-				pylab.savefig('%s_%s.png'%(output_fname_prefix, no_of_axes_drawn), dpi=400)
-			
-			if drawMap:
-				#mark ecotypes on the map colored according to phenotype
-				axe_map = pylab.axes([axe_x_offset4, axe_y_offset1, axe_width4, axe_height1], frameon=False)
-				#axe_map_frame is used to connect strains from axe_phenotype to dot on the axe_map (another axe due to reasons stated in drawMap())
-				axe_map_frame = pylab.axes([axe_x_offset4, axe_y_offset1, axe_width4, axe_height1], frameon=False, sharey=axe_strain_pca)
-				axe_map_frame.set_xticks([])
-				axe_map_frame.set_yticks([])
-				cls.drawMap(axe_map_frame, axe_map, StrainID2PCAPosInfo, phenData, phenotype_col_index, phenotype_method_id, \
-						ecotype_info, phenotype_cmap, phenotype_norm)
-			
-			#axe_map.set_ylim([0,1])
-			
-			no_of_axes_drawn += 1
-			if getattr(cls, "debug", False):
-				pylab.savefig('%s_%s.png'%(output_fname_prefix, no_of_axes_drawn), dpi=400)
-			
-			
-			axe_snp_matrix = pylab.axes([axe_x_offset2, axe_y_offset1, axe_width2, axe_height1], frameon=False, sharey=axe_strain_pca)
+			axe_snp_matrix = pylab.axes([axe_x_offset2, axe_y_offset1, axe_width2, axe_height1], frameon=False)
 			#axe_snp_matrix.set_xticks([])
 			axe_snp_matrix.set_yticks([])
 			cls.drawSNPMtrix(axe_snp_matrix, subSNPData, top_snp_data, StrainID2PCAPosInfo, SNPID2PCAPosInfo, \
@@ -1122,16 +1136,61 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 							draw_snp_id_label=False, snpData_before_impute=snpData_before_impute, \
 							strain_snp_label_font_size=1, \
 							useAlleleToDetermineAlpha=useAlleleToDetermineAlpha, \
-							snp_value2color=snp_value2color)	#2008-11-14 turn draw_snp_id_label off
+							snp_value2color=snp_value2color, drawGrid=drawGrid)	#2008-11-14 turn draw_snp_id_label off
 			#axe_snp_matrix.set_xlim([0,1])
 			#axe_snp_matrix.set_ylim([0,1])
 			no_of_axes_drawn += 1
 			#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
 			
+			if drawStrainPCA:	#2010-4-19
+				axe_strain_map = None	#no strain map
+				axe_strain_pca = pylab.axes([axe_x_offset1, axe_y_offset1, axe_width1, axe_height1], frameon=False, sharey=axe_snp_matrix)
+				axe_strain_map_pca_cover = None	#not used.
+				axe_strain_pca_xlim = [-0.05,1.05]
+				axe_strain_pca_ylim = [0, 1]
+				axe_strain_pca.set_xlim(axe_strain_pca_xlim)
+				axe_strain_pca.set_ylim(axe_strain_pca_ylim)
+				
+				axe_strain_pca.grid(True, alpha=0.3)
+				axe_strain_pca.set_xticks([])
+				axe_strain_pca.set_yticks([])
+				axe_strain_pca_legend =None
+				
+				cls.drawStrainPCA(axe_strain_pca, axe_strain_map, axe_strain_map_pca_cover, axe_strain_pca_legend, StrainID2PCAPosInfo, \
+								ecotype_info, phenData, \
+							phenotype_col_index, phenotype_cmap, phenotype_norm, rightmost_x_value=axe_strain_pca_xlim[1],\
+							country_order_name='', strain_color_type=2, draw_axe_strain_map=False)
+				
+				axe_strain_pca.set_xlim(axe_strain_pca_xlim)
+				axe_strain_pca.set_ylim(axe_strain_pca_ylim)
+				no_of_axes_drawn += 1
+				if getattr(cls, "debug", False):
+					pylab.savefig('%s_%s.png'%(output_fname_prefix, no_of_axes_drawn), dpi=400)
+			
+			if drawMap:
+				#mark ecotypes on the map colored according to phenotype
+				axe_map = pylab.axes([axe_x_offset4, axe_y_offset1, axe_width4, axe_height1], frameon=False)
+				#axe_map_frame is used to connect strains from axe_phenotype to dot on the axe_map (another axe due to reasons stated in drawMap())
+				axe_map_frame = pylab.axes([axe_x_offset4, axe_y_offset1, axe_width4, axe_height1], frameon=False, sharey=axe_snp_matrix)
+				axe_map_frame.set_xticks([])
+				axe_map_frame.set_yticks([])
+				cls.drawMap(axe_map_frame, axe_map, StrainID2PCAPosInfo, phenData, phenotype_col_index, phenotype_method_id, \
+						ecotype_info, phenotype_cmap, phenotype_norm)
+			
+				#axe_map.set_ylim([0,1])
+				no_of_axes_drawn += 1
+				if getattr(cls, "debug", False):
+					pylab.savefig('%s_%s.png'%(output_fname_prefix, no_of_axes_drawn), dpi=400)
+			
 			axe_phenotype = pylab.axes([axe_x_offset3, axe_y_offset1, axe_width3, axe_height1], frameon=False, sharey=axe_snp_matrix)
 			axe_phenotype.set_yticks([])
 			axe_phenotype.set_xticklabels([])	#no tick labels (axe_map_phenotype_legend has it already)
-			cls.drawPhenotype(axe_phenotype, StrainID2PCAPosInfo, phenData, phenotype_col_index, phenotype_method_id, ecotype_info,
+			if phenotypeDrawType==1:	#2010-4-26
+				cls.drawPhenotype(axe_phenotype, StrainID2PCAPosInfo, phenData, phenotype_col_index, \
+								phenotype_method_id, ecotype_info)
+			else:
+				cls.drawPhenotype(axe_phenotype, StrainID2PCAPosInfo, phenData, phenotype_col_index, phenotype_method_id, \
+								ecotype_info,\
 							phenotype_cmap=phenotype_cmap, phenotype_norm=phenotype_norm)	# 2010-2-5 add phenotype_cmap & phenotype_norm
 			no_of_axes_drawn += 1
 			axe_phenotype.set_ylim([0,1])
@@ -1140,7 +1199,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 			axe_snp_matrix.set_ylim([0,1])	#without this, ylim of all 3 axes are set to [0,0.9] because axe_map automatically adjust to 0-0.9
 			#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
 			
-			axe_to_put_pvalue_legend = ax1	#axe_LD is gone. put legend into ax1 itself.
+			axe_to_put_pvalue_legend = axe_pvalue	#axe_LD is gone. put legend into axe_pvalue itself.
 			legend_loc = 'upper right'
 			axe_LD = None
 			axe_LD_legend = None
@@ -1151,10 +1210,10 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		if getattr(this_snp, 'stop', None):
 			fig_title += ' - %s. '%this_snp.stop
 		fig_title += "Phenotype %s (id=%s)."%(phenotype.short_name, phenotype.id)
-		ax1.title.set_text(fig_title)	#main title using this snp.
+		axe_pvalue.title.set_text(fig_title)	#main title using this snp.
 		
 		#2009-5-29 temporarily snps_within_this_region is replaced by snps_within_this_region_snpData below
-		cls.drawPvalue(ax1, axe_to_put_pvalue_legend, axe_LD_center_SNP, snps_within_this_region_snpData, analysis_method_id2gwr, LD_info, \
+		cls.drawPvalue(axe_pvalue, axe_to_put_pvalue_legend, axe_LD_center_SNP, snps_within_this_region_snpData, analysis_method_id2gwr, LD_info, \
 					which_LD_statistic, draw_LD_relative_to_center_SNP=draw_LD_relative_to_center_SNP, legend_loc=legend_loc)
 		gene_position_cycle = 5
 		base_y_value = 1
@@ -1179,22 +1238,23 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		
 		if not skip_gene_model:
 			cls.drawLD(axe_gene_model, axe_LD, _snps_within_this_region, LD_info, gene_model_min_y=gene_model_min_y,\
-					gene_model_max_y=gene_model_max_y, which_LD_statistic=which_LD_statistic)
+					gene_model_max_y=gene_model_max_y, which_LD_statistic=which_LD_statistic, \
+					markSNPInGenes=markSNPInGenes)
 		if LD_info:
 			cls.drawLDLegend(axe_LD_legend, which_LD_statistic)
 		#adjust x, y limits and etc
-		ax1.set_xlim(axe_pvalue_xlim)
-		ax1_ylim = ax1.get_ylim()
-		ax1.set_ylim((0, ax1_ylim[1]))	#set ax1 to 0 to sit right above axe_gene_model
+		axe_pvalue.set_xlim(axe_pvalue_xlim)
+		axe_pvalue_ylim = axe_pvalue.get_ylim()
+		axe_pvalue.set_ylim((0, axe_pvalue_ylim[1]))	#set axe_pvalue to 0 to sit right above axe_gene_model
 		axe_gene_model.set_ylim((gene_model_min_y, gene_model_max_y))	#LD panel right under gene models
 		
 		if LD_info:
-			axe_LD.set_xlim(ax1.get_xlim())	#make the axe_LD and ax1 within the same X range
+			axe_LD.set_xlim(axe_pvalue.get_xlim())	#make the axe_LD and axe_pvalue within the same X range
 			axe_LD_x_span = (axe_LD.get_xlim()[1]-axe_LD.get_xlim()[0])
 			axe_LD.set_ylim((-axe_LD_x_span/2., 0))	#has to force here, don't know why. otherwise it's (0,1)
 			axe_LD.set_yticks([])	#remove all Y ticks on LD plot
 		elif snpData:
-			axe_snp_matrix.set_xlim(ax1.get_xlim())
+			axe_snp_matrix.set_xlim(axe_pvalue.get_xlim())
 		
 		png_data = None
 		svg_data = None
@@ -1220,7 +1280,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				#pylab.savefig('%s.pdf'%output_fname_prefix, dpi=300)	# 2010-2-7 swedish letters can't be saved in pdf.
 		if getattr(cls, "debug", False):
 			pylab.show()
-		del ax1, axe_LD_center_SNP, axe_gene_model, axe_LD, axe_LD_legend
+		del axe_pvalue, axe_LD_center_SNP, axe_gene_model, axe_LD, axe_LD_legend
 		sys.stderr.write("Done.\n")
 		after_plot_data = PassingData(png_output_fname=png_output_fname, matrix_of_gene_descriptions=matrix_of_gene_descriptions, \
 									png_data=png_data,\
@@ -1278,12 +1338,16 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		for row in reader:
 			if not row:	# 2010-2-5 ignore empty rows
 				continue
+			if row[0].find('#')==0:	#2010-4-28 ignore lines beginned with '#'
+				continue
 			phenotype_need_split = 0
 			phenotype_id_index = col_name2index.get('phenotype_id')
 			if phenotype_id_index == None:
 				phenotype_id_index = col_name2index.get('phenot_id')
 			if phenotype_id_index == None:
 				phenotype_id_index = col_name2index.get('phenotype')
+			if phenotype_id_index == None:	#2010-4-22
+				phenotype_id_index = col_name2index.get('phenotype_method_id')
 			if phenotype_id_index==None:	#2008-10-27 suzi's input '/Network/Data/250k/tmp-Suzi/sig_marker_ft_files/sig_marker_1_LD.csv' use 'phen' and the phenotype identifier, '1_LD', needs split to get id.
 				phenotype_id_index = col_name2index.get('phen')
 				phenotype_need_split = 1
@@ -1477,7 +1541,11 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				matrix_data_type=float		#2009-3-23 for CNV amplitude file
 			else:
 				matrix_data_type=int
-			snpData = SNPData(input_fname=snp_matrix_fname, turn_into_integer=1, turn_into_array=1, ignore_2nd_column=1, matrix_data_type=matrix_data_type)
+			snpData = SNPData(input_fname=snp_matrix_fname, turn_into_integer=1, turn_into_array=1, ignore_2nd_column=1,\
+							matrix_data_type=matrix_data_type)
+			if snpData.data_matrix is None:
+				sys.stderr.write("Error. snpData.data_matrix is None.\n")
+				sys.exit(3)
 			header_phen, strain_acc_list_phen, category_list_phen, data_matrix_phen = read_data(phenotype_fname, turn_into_integer=0)
 			
 			phenData = SNPData(header=header_phen, strain_acc_list=snpData.strain_acc_list, data_matrix=data_matrix_phen)
@@ -1554,6 +1622,9 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 	def handleOneGeneOnePhenotype(cls, db, phenotype_id2analysis_method_id2gwr, phenotype_id, this_snp, input_data, \
 								param_data, latex_f=None, delete_gwr=False, plot_type=None, commit=0):
 		"""
+		2010-4-26
+			pass param_data.drawMap, param_data.markSNPInGenes, param_data.drawGrid, param_data.phenotypeDrawType
+				to drawRegionAroundThisSNP()
 		2010-2-2
 			deal with param_data.exclude_accessions_with_NA_phenotype, an argument controlling whether the SNP matrix
 				would contain accessions with NA phenotype or not
@@ -1602,7 +1673,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 								commit=commit, snpData=snpData, phenData=phenData, \
 								ecotype_info=param_data.ecotype_info, snpData_before_impute=snpData_before_impute,\
 								snp_matrix_data_type=param_data.snp_matrix_data_type, call_method_id=param_data.call_method_id,\
-								drawMap=param_data.drawMap)
+								drawMap=param_data.drawMap, markSNPInGenes=param_data.markSNPInGenes, \
+								drawGrid=param_data.drawGrid, phenotypeDrawType=param_data.phenotypeDrawType)
 		param_data.no_of_snps_drawn += 1
 		if commit and after_plot_data:
 			#2008-10-24 first check if it's in db or not
@@ -1710,6 +1782,10 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		param_data.analysis_method_id_ls = self.analysis_method_id_ls
 		param_data.exclude_accessions_with_NA_phenotype = self.exclude_accessions_with_NA_phenotype
 		param_data.drawMap = self.drawMap	#2010-4-13
+		param_data.markSNPInGenes = self.markSNPInGenes	#2010-4-23
+		param_data.drawGrid = self.drawGrid	#2010-4-23
+		param_data.phenotypeDrawType = self.phenotypeDrawType	# 2010-4-26
+		
 		no_of_genes_handled = 0
 		
 		#2008-10-23 handle plot_type

@@ -52,14 +52,7 @@ from common import get_total_gene_ls
 from CheckCandidateGeneRank import CheckCandidateGeneRank
 from TopSNPTest import TopSNPTest
 from matplotlib.patches import Polygon, CirclePolygon, Ellipse, Wedge
-from matplotlib import rcParams
-rcParams['font.size'] = 8
-rcParams['legend.fontsize'] = 8
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 8
-rcParams['axes.titlesize'] = 10
-rcParams['xtick.labelsize'] = 8
-rcParams['ytick.labelsize'] = 8
+
 
 class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 	__doc__ = __doc__
@@ -449,7 +442,7 @@ class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 				non_cand_snp_index_ls = pvalue_matching_data.pvalue_int_pair2non_cand_snp_index_ls.get(pvalue_int_pair, numpy.array([], numpy.int))
 				top_snp_index_ls = numpy.hstack((cand_snp_index_ls, non_cand_snp_index_ls))
 				if len(top_snp_index_ls)==0:
-					pvalue = 1.
+					pvalue = None
 				else:
 					return_data = self.get_enrichment_pvalue_by_gw_looping(candidate_sample_size, top_snp_index_ls, candidate_gene_set, \
 											snps_context_wrapper, \
@@ -665,6 +658,15 @@ class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 			session.commit()
 
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 8
+	rcParams['legend.fontsize'] = 8
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 8
+	rcParams['axes.titlesize'] = 10
+	rcParams['xtick.labelsize'] = 8
+	rcParams['ytick.labelsize'] = 8
+	
 	from pymodule import ProcessOptions
 	main_class = PlotCmpTwoAnalysisMethods
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

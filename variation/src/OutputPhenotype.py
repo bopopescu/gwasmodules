@@ -158,7 +158,7 @@ class OutputPhenotype(object):
 				phenotype_method_table='phenotype_method'):
 		"""
 		2010-1-26
-			Comment out the code below, inserted on 2009-9-2, since its purpose is to avoid truncation and 
+			Comment out the code inserted on 2009-9-2 (right below), since its purpose is to avoid truncation and 
 				the truncation wasn't due to the value being too small.
 			It was that the conversion of a 2D list containing character 'NA' into a numpy array renders the whole 2D list
 				being converted into a character numpy array. The conversion was default in write_data_matrix() if
