@@ -152,7 +152,7 @@ def get_perm_pvals(snps,phen_vals,mapping_method='kw',num_perm=100,snps_filter=0
 	if mapping_method=='kw':
 		for i in range(num_perm):
 			random.shuffle(phen_vals)
-			kw_res = util.kruskal_wallis(snps,phen_vals)
+			kw_res = util.kruskal_wallis(snps,phen_vals,verbose=False)
 			pvals.extend(kw_res['ps'])	
 	elif mapping_method=='ft':
 		for i in range(num_perm):
@@ -227,8 +227,6 @@ def _run_():
 			run_id=arg
 		elif opt in ("-p", "--parallel"):
 			parallel=arg
-		elif opt =="--addToDB":
-			addToDB=True
 		elif opt in ('-t', "--callMethodID"):
 			callMethodID=int(arg)
 		elif opt in ('-r', "--phen_file"):
@@ -251,6 +249,8 @@ def _run_():
 			specific_transformations = arg.split(",")
 		elif opt in ('-k', "--kinship_file"):
 			kinship_file = arg
+		elif opt =="--addToDB":
+			addToDB=True
 		elif opt == "--remove_outliers":
 			remove_outliers = int(arg)
 		elif opt == "--analysis_plots":

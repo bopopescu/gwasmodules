@@ -66,10 +66,11 @@ def _kw_get_ranks_(values,withTies=True):
 	return ranks, np.array(group_counts)
 			
 
-def kruskal_wallis(snps,phenVals,useTieCorrection=True):
+def kruskal_wallis(snps,phenVals,useTieCorrection=True,verbose=True):
 	from scipy import stats
-	import time
-	s1 = time.time()	
+	if verbose:
+		import time
+		s1 = time.time()	
 	assert len(snps[0])==len(phenVals),"SNPs and phenotypes are not equal length."
 	
 	ranks, group_counts = _kw_get_ranks_(phenVals)
@@ -99,13 +100,14 @@ def kruskal_wallis(snps,phenVals,useTieCorrection=True):
 	ps =  stats.chi2.sf(ds,1)
 
 	#print ps
-	secs = time.time()-s1
-	if secs>60:
-		mins = int(secs)/60
-		secs = secs - mins*60
-		print 'Took %d mins and %f seconds.'%(mins,secs)
-	else:
-		print 'Took %f seconds.'%(secs)
+	if verbose:
+		secs = time.time()-s1
+		if secs>60:
+			mins = int(secs)/60
+			secs = secs - mins*60
+			print 'Took %d mins and %f seconds.'%(mins,secs)
+		else:
+			print 'Took %f seconds.'%(secs)
 	return {"ps":ps,"ds":ds}
 
 
@@ -253,4 +255,47 @@ if __name__=='__main__':
 	print ranks
 	print "Done!"
 
+
+def snp_kinship_correlation(binary_snps,k,num_perm=0,permutation_snps=None,kinship_type='emma.R'):
+	"""
+	Performs the Mantel's test between the snps and the kinship matrix
+	
+	Currently only one kinship matrix is supported
+	"""
+	#Construct a distance matrix using the snps.	
+	
+	import scipy as sp
+	import scipy.spatial as spat
+	num_snps = len(binary_snps)
+	num_lines = len(binary_snps[0])
+	if kinship_type=='emma.R':
+		import linear_models as lm
+		snps_k = lm.calc_kinship_old(binary_snps)
+		snp_dists = []
+		for i in range(num_lines):
+			#c = i*((num_lines-1)-(i+1)/2)-1
+			for j in range(i+1,num_lines):
+				snp_dists.append(snps_k[i,j])
+		snp_dists = sp.array(snp_dists)
+	elif kinship_type=='minkowski':
+		binary_snps = sp.mat(binary_snps).T
+		snp_dists = spat.distance.pdist(binary_snps,'minkowski')/num_snps
+	k_dists = []#sp.ones(num_lines*(num_lines-1)/2)
+	for i in range(num_lines):
+		#c = i*((num_lines-1)-(i+1)/2)-1
+		for j in range(i+1,num_lines):
+			k_dists.append(k[i,j])
+	k_dists = sp.array(k_dists)
+	corr = sp.corrcoef(snp_dists,k_dists)[1,0]
+	pval = None
+	if num_perm:
+		import random
+		assert permutation_snps!=None,'Currently SNPs are needed for permutation.'
+		print "Starting Mantel's permutation test."
+		raise NotImplementedError
+#		for i in range(num_perm):
+#			random.sample()
+	return {'corr':corr,'pval':pval}
+			
+			
 	

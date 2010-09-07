@@ -9,6 +9,7 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 import sys,warnings
 import pdb
 import numpy as np
+import env
 
 
 IUPAC_alphabet = ['A','C','G','T','-','Y','R','W','S','K','M','D','H','V','B','X','N']
@@ -3348,6 +3349,16 @@ def write_out_01_dataset():
 def get_JB_datasets():
         pass
 
+
+def get_call_method_dataset_file(call_method_id,binary_format=False):
+	if binary_format:
+		return env.env['data_dir']+'250K_t'+str(call_method_id)+'.csv.binary'
+	else:
+		return env.env['data_dir']+'250K_t'+str(call_method_id)+'.csv'
+
+def get_call_method_kinship_file(call_method_id):
+	return env.env['data_dir']+'kinship_matrix_cm'+str(call_method_id)+'.pickled'
+	
 
 def get_bergelssons_region_datasets():
         import phenotypeData as pd
