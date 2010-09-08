@@ -4202,8 +4202,8 @@ class JBDataGWA(object):
 		sys.exit(0)
 		
 		#################### 2010-9-6 for PNAS revisions
-		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_tg_ecotypeid.tsv')
 		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
+		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_tg_ecotypeid.tsv')
 		
 		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
 		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
@@ -5535,7 +5535,171 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 			cofactors=[], cofactor_phenotype_id_ls=cofactor_phenotype_id_ls, run_type=run_type)
 	
 	"""
-	
+	@classmethod
+	def investigateBjarniEMMAX(cls, genotype_fname, phenotype_fname, output_fname, kinship_fname, phenotypeColName='ft_spspring', \
+					cofactors=[], snp_id_to_be_included_ls=[],\
+					run_type=1, genotype_cofactor_interaction=False, run_genome_scan=True):
+		"""
+		2010-9-6
+			try to see why Bjarni's EMMAX and mine are different.
+			
+			test with justin's phenotype data, kinship matrix, because kinship is already calculated.
+			
+			argument run_type:
+				1: pure_linear_model
+				2: emma
+				3: pure_linear_model via R
+				4: generalized least square with specified variance matrix
+				
+				5: bjarni's emmax
+			
+			1. read in the genotype file
+			2. read in the phenotype file
+			3. read in the kinship matrix.
+			4. remove accessions in phenotype file which are not in kinship matirx file
+			5. create a incidence matrix mapping each accession in phenotype to the kinship matrix
+			6. extract genotype data contained in genotype file which are phenotyped
+		"""
+		from pymodule.SNP import SNPData
+		from Association import Association
+		import numpy, math
+		from pymodule.utils import addExtraToFilenamePrefix
+		
+		if os.path.isfile(output_fname):
+			sys.stderr.write("Error: File %s already exits.\n"%output_fname)
+			return None
+		
+		JBData = SNPData(input_fname=phenotype_fname, turn_into_array=1, ignore_2nd_column=1, \
+							data_starting_col=2, turn_into_integer=False)
+		
+		if kinship_fname:
+			kinship_output_fname = kinship_fname
+		else:
+			kinship_output_fname = os.path.splitext(genotype_fname)[0]+'_kinship.tsv'
+		
+		
+		Z = None	# to check whether Z would be computed or not
+		
+		kinship_matrix, JBData, Z = JBDataGWA.getExpandedKinship(kinship_output_fname, genotype_fname, JBData)
+		phenotype_ls = JBDataGWA.getPhenotypeLsOutOfJBData(JBData, logPhenotype=False, phenotypeColName=phenotypeColName)
+		
+		#2010-3-31 create a snpData with only selected columns
+		selectSNPData = SNPData(input_fname=genotype_fname, turn_into_array=1, ignore_2nd_column=1, \
+						col_id_key_set=set(snp_id_to_be_included_ls))
+		selectSNPData, allele_index2allele_ls = selectSNPData.convert2Binary(row_id_as_major_allele="6909")	# Col-0 as the 
+		# expand the selectSNPData to include replicates
+		if Z is None:
+			JBData = JBData.removeRowsNotInTargetSNPData(selectSNPData)
+			Z = JBDataGWA.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, selectSNPData.row_id_ls)
+		snp_matrix_with_replicates = numpy.dot(Z, selectSNPData.data_matrix)
+		selectSNPDataWithReplicates = SNPData(row_id_ls=JBData.row_id_ls, col_id_ls=selectSNPData.col_id_ls, \
+											data_matrix=snp_matrix_with_replicates)
+		L_inverse = None
+		non_NA_phenotype_ar = numpy.array(phenotype_ls)
+		if run_type==5:
+			import linear_models
+			"""
+			# 2010-9-7 check lls/dlls vs logdelta
+			lmm = linear_models.LinearMixedModel(phenotype_ls)
+			lmm.add_random_effect(kinship_matrix)
+			K = lmm.random_effects[1][1]
+			eig_L = lmm._get_eigen_L_(K)
+			res = lmm.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
+			log_deltas = res['log_deltas']
+			lls = res['lls']
+			dlls = res['dlls']
+			import pylab
+			pylab.clf()
+			pylab.plot(log_deltas, lls)
+			pylab.show()
+			import pdb
+			pdb.set_trace()
+			
+			pylab.clf()
+			pylab.plot(log_deltas, dlls)
+			pylab.show()
+			"""
+			res = linear_models.emmax(selectSNPDataWithReplicates.data_matrix.T, phenotype_ls, kinship_matrix, cofactors=None, \
+							with_interactions=False,int_af_threshold=15)
+			import csv
+			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			writer.writerow(['snp_id', 'pvalue', 'beta'])
+			for i , col_id in enumerate(selectSNPDataWithReplicates.col_id_ls):
+				data_row = (col_id, res["ps"][i], res["betas"][i])
+				writer.writerow(data_row)
+			sys.stderr.write("Exit after run type 5.\n")
+			return
+		elif run_type==4:
+			non_NA_genotype_ls = []
+			preEMMAX_data = Association.preEMMAX(phenotype_ls, kinship_matrix, non_NA_genotype_ls=None, debug=True)
+			variance_matrix = preEMMAX_data.variance_matrix
+			non_NA_phenotype_ar = preEMMAX_data.non_NA_phenotype_ar
+			L_inverse = preEMMAX_data.L_inverse
+		#else:
+		#	sys.stderr.write("Exit.\n")
+		#	return
+		
+		phenotype_variance = numpy.var(phenotype_ls)	# 2010-4-18 to calculate the variance explained without cholesky transformation
+		#non_NA_phenotype_ar = numpy.dot(L_inverse, non_NA_phenotype_ar)	# numpy.dot and numpy.inner has subtle difference.
+		
+		extraVariateNameLs = ['S_square', 'var_perc','var_perc_real', 'vg', 've', 'delta', 'heritability',]	#2010-4-18 explicitly set the extra columns to be outputted
+		writer = JBDataGWA.writeHeaderJBData(output_fname, base_formula=[], \
+							GXE_environment_variate_name_ls=[],\
+							special_interaction_snp_id_ls=[],\
+							run_genome_scan=True, extraVariateNameLs=extraVariateNameLs)
+		counter = 0
+		real_counter = 0
+		if run_genome_scan==1 or run_genome_scan==True:
+			snpData = selectSNPDataWithReplicates
+			Z = JBDataGWA.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, snpData.row_id_ls)
+			results = []
+			no_of_cols = snpData.data_matrix.shape[1]
+			snp_id_ls = snpData.col_id_ls
+			for snp_id in snp_id_ls:
+				j = snpData.col_id2col_index[snp_id]
+				genotype_ls = snpData.data_matrix[:,j]
+				genotype_matrix = genotype_ls.reshape([len(genotype_ls), 1])
+				genotype_matrix = numpy.dot(Z, genotype_matrix)
+				snp_id = snpData.col_id_ls[j]
+				
+				pdata = Association.linear_model(genotype_matrix, non_NA_phenotype_ar, min_data_point=3, \
+												snp_index=snp_id, \
+									kinship_matrix=kinship_matrix, eig_L=None, run_type=run_type, \
+									counting_and_NA_checking=True,\
+									variance_matrix=None, lower_triangular_cholesky_inverse=L_inverse)
+				
+				# counting_and_NA_checking=True to get MAF and MAC. doesn't matter if it's False.
+				if pdata is not None:
+					results.append(pdata)
+					Association.output_multi_variate_lm_results([pdata], writer, run_genome_scan=run_genome_scan,\
+															extraVariateNameLs=extraVariateNameLs)
+					real_counter += 1
+				counter += 1
+				if counter%2000==0:
+					sys.stderr.write("%s\t%s\t%s"%('\x08'*40, counter, real_counter))
+			sys.stderr.write("%s\t%s\t%s\n"%('\x08'*40, counter, real_counter))
+			return
+	"""
+		#2010-9-6
+		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
+		interaction_snp_id_in_base_formula_ls = []
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
+								'5_18620282', '5_25376551', '5_3188328']
+		
+		
+		run_type = 5
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/investigateBjarniEMMAX_DTF16replicates_%s.tsv'%\
+			(run_type))
+		GWA.investigateBjarniEMMAX(genotype_fname_to_generate_kinship, phenotype_genotype_fname, \
+								output_fname, kinship_fname,\
+								snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
+								run_type=run_type)
+		sys.exit(0)
+	"""
 	@classmethod
 	def linkEcotypeID2TargetEcotypeID(cls, db, JBd4DTF_fname, output_fname):
 		"""
@@ -18700,6 +18864,25 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
+		#2010-9-6
+		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
+		interaction_snp_id_in_base_formula_ls = []
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
+								'5_18620282', '5_25376551', '5_3188328']
+		
+		
+		run_type = 5
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/investigateBjarniEMMAX_DTF16replicates_%s.tsv'%\
+			(run_type))
+		GWA.investigateBjarniEMMAX(genotype_fname_to_generate_kinship, phenotype_genotype_fname, \
+								output_fname, kinship_fname,\
+								snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
+								run_type=run_type)
+		sys.exit(0)
 		
 		# 2010-8-6 -z banyan.usc.edu
 		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
