@@ -1,20 +1,19 @@
 """
 Contains functions to perform various linear regression schemes, such as simple, and mixed models.
 """
+#import numpy as np
 from scipy import *
 from scipy import linalg
 from scipy import stats
 from scipy import optimize
-from scipy import weave
 import math
-import time
 import warnings
 import pdb
-#import pickle
 import cPickle
 import os
 import sys
 import multiprocessing as mp
+import time
 
 
 class LinearModel(object):
@@ -481,8 +480,10 @@ class LinearMixedModel(LinearModel):
                 rss_list = repeat(h0_rss,num_snps)
                 betas_list = [h0_betas]*num_snps
                 var_perc = zeros(num_snps)
+                H = array(H_sqrt_inv.T)
                 for i, snp in enumerate(snps):
-                        (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,H_sqrt_inv*(matrix(snp).T)]),Y)
+                	X_1 = dot(snp,H)
+                        (betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,matrix(X_1).T]),Y)
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
                                 continue
@@ -502,6 +503,64 @@ class LinearMixedModel(LinearModel):
                         'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
 
+
+	def emmax_f_test_2(self,snps):
+		"""
+		EMMAX implementation (in python)
+		Single SNPs
+		
+		With interactions between SNP and possible cofactors.
+		"""
+		q = 1  # Single SNP is being tested
+		p = len(self.X.T)+q
+		n = self.n
+		n_p = n-p				
+
+		K = self.random_effects[1][1]
+		eig_L = self._get_eigen_L_(K)
+		res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
+		delta = res['delta']
+		print 'pseudo_heritability:',1.0/(1+delta)
+		H_sqr = res['H_sqrt']
+		H_sqrt_inv = H_sqr.I
+		Y = H_sqrt_inv*self.Y	#The transformed outputs.
+		h0_X = H_sqrt_inv*self.X
+		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
+		h0_betas = map(float,list(h0_betas))
+		num_snps = len(snps)
+		rss_list = repeat(h0_rss,num_snps)
+		betas_list = [h0_betas]*num_snps
+		var_perc = zeros(num_snps)
+		chunk_size = len(Y)
+		#ndot = lambda x,y: linalg.blas.get_blas_funcs(['gemm'])[0](1,x,y)
+		#H = array(H_sqrt_inv.T)
+		for i in range(0,len(snps),chunk_size):
+			snps_chunk = matrix(snps[i:i+chunk_size])
+			Xs = snps_chunk*(H_sqrt_inv.T)
+        		#snps_chunk = array(snps[i:i+chunk_size])
+			#Xs = ndot(snps_chunk,H)
+        		for j in range(len(Xs)):
+        			(betas, rss, p, sigma) = linalg.lstsq(hstack([h0_X,matrix(Xs[j]).T]),Y)
+        			if not rss:
+        				print 'No predictability in the marker, moving on...'
+        				continue
+        			rss_list[i+j] = rss[0]		
+        			betas_list[i+j] = map(float,list(betas))
+        			if (i+j+1)%(num_snps/10)==0:
+        				sys.stdout.write('.')
+        				sys.stdout.flush()
+		sys.stdout.write('\n')
+		rss_ratio = h0_rss/rss_list
+		var_perc = 1-1/rss_ratio
+		f_stats = (rss_ratio-1)*n_p/float(q)
+		p_vals = stats.f.sf(f_stats,q,n_p)
+
+		      
+		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
+			'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
+
+
+        
         def emmax_simple_f_test(self,snps):
                 """
                 EMMAX implementation (in python)
@@ -532,7 +591,10 @@ class LinearMixedModel(LinearModel):
                                 print 'No predictability in the marker, moving on...'
                                 continue
                         rss_list[i] = rss[0]                
-                rss_ratio = h0_rss/rss_list
+			if (i+1)%(num_snps/10)==0:
+				sys.stdout.write('.')
+				sys.stdout.flush()
+		rss_ratio = h0_rss/rss_list
                 f_stats = (rss_ratio-1)*n_p/float(q)
                 p_vals = stats.f.sf(f_stats,q,n_p)
 
@@ -1047,7 +1109,7 @@ def emmax(snps,phenotypes,K,cofactors=None,with_interactions=False,int_af_thresh
         if with_interactions:
                 res = lmm.emmax_f_test_w_interactions(snps,int_af_threshold=int_af_threshold)
         else:
-                res = lmm.emmax_f_test(snps)        
+                res = lmm.emmax_f_test_2(snps)        
         secs = time.time()-s1
         if secs>60:
                 mins = int(secs)/60
@@ -1355,6 +1417,8 @@ def load_kinship_from_file(kinship_file,accessions=None):
 def calc_kinship(snps):
         """
         Requires EMMA to be installed.
+        
+        Uses rpy2 
         """
         import rpy2.robjects as robjects
         import rpy2.robjects.numpy2ri
@@ -1368,6 +1432,18 @@ def calc_kinship(snps):
         #r.source(script_dir+"emma_fast.R")
         #return r.emma_kinship(a)
 
+
+def calc_kinship_old(snps):
+        """
+        Requires EMMA to be installed.
+        
+        Uses the old rpy
+        """
+	import env
+	a = array(snps)
+	from rpy import r 
+        r.source(env.env['script_dir']+"emma_fast.R")
+        return r.emma_kinship(a)
 
 
 def _test_two_snps_emma_():
