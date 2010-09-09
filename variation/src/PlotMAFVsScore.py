@@ -23,14 +23,6 @@ import matplotlib as mpl; mpl.use("Agg")
 import csv, stat, getopt
 import traceback, gc, subprocess
 import Stock_250kDB
-from matplotlib import rcParams
-rcParams['font.size'] = 6
-rcParams['legend.fontsize'] = 6
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 6
-rcParams['axes.titlesize'] = 8
-rcParams['xtick.labelsize'] = 6
-rcParams['ytick.labelsize'] = 6
 import pylab
 import StringIO
 
@@ -138,6 +130,14 @@ class PlotMAFVsScore(object):
 		"""
 
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 6
+	rcParams['legend.fontsize'] = 6
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 6
+	rcParams['axes.titlesize'] = 8
+	rcParams['xtick.labelsize'] = 6
+	rcParams['ytick.labelsize'] = 6
 	from pymodule import ProcessOptions
 	main_class = PlotMAFVsScore
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

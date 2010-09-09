@@ -144,13 +144,19 @@ class RBTreeIter(object):
 		self.stopped = False
 
 	def __iter__ (self):
-		""" Return the current item in the container
 		"""
-		return self.node.value
+		#2010-8-2 return the whole node, rather than node.value
+		
+		Return the current item in the container
+		"""
+		return self.node	#2010-8-2 return the whole node, rather than node.value
 
 	def next (self):
-		""" Return the next item in the container
-			Once we go off the list we stay off even if the list changes
+		"""
+		#2010-8-2 return the whole node, rather than node.value
+		
+		Return the next item in the container
+		Once we go off the list we stay off even if the list changes
 		"""
 		if self.stopped or (self.index + 1 >= self.tree.__len__()):
 			self.stopped = True
@@ -161,7 +167,7 @@ class RBTreeIter(object):
 			self.node = self.tree.firstNode()
 		else:
 			self.node = self.tree.nextNode (self.node)
-		return self.node.value
+		return self.node	#2010-8-2 return the whole node, rather than node.value
 
 
 class RBTree(object):
@@ -790,11 +796,29 @@ class RBDict(RBTree):
 		RBTree.__init__(self, cmpfn)
 		for key, value in dict.items():
 			self[key]=value
-
+		# changing the comparison function for an existing tree is dangerous!
+		self.__cmp = cmpfn
+	
 	def __str__(self):
+		"""
+		2010-6-17
+			better str() function
+		"""
 		# eval(str(self)) returns a regular dictionary
-		return '{'+ string.join(map(str, self.nodes()), ', ')+'}'
-
+		return_ls = []
+		tree = self
+		return_ls.append("Node Count: %d" % len(self))
+		return_ls.append("Depth: %d" % tree.depth())
+		return_ls.append("Optimum Depth: %f (%d) (%f%% depth efficiency)" % (tree.optimumdepth(), \
+																math.ceil(tree.optimumdepth()),
+																 math.ceil(tree.optimumdepth()) / tree.depth()))
+		
+		return_ls.append("Efficiency: %f%% (total possible used: %d, total wasted: %d): " % (tree.efficiency() * 100,
+																		len(tree) / tree.efficiency(),
+																		(len(tree) / tree.efficiency()) - len(tree)))
+		
+		return '\n'.join(return_ls)
+	
 	def __repr__(self):
 		return "<RBDict object " + str(self) + ">"
 
@@ -868,7 +892,40 @@ class RBDict(RBTree):
 			return self[key]
 		self[key] = value
 		return value
+	
+	def findNodes(self, key, node_ls=[], current=None, compareIns=None):
+		"""
+		2010-8-17
+			add argument compareIns, an instance of a class which has function cmp().
+			
+		2010-6-17
+			find all nodes whose key could be matched and put them into node_ls
+		"""
+		# we aren't interested in the value, we just
+		# want the TypeError raised if appropriate
+		hash(key)
+		if current is None:
+			current = self.root
 
+		while current != self.sentinel:
+			# GJB added comparison function feature
+			# slightly improved by JCG: don't assume that ==
+			# is the same as self.__cmp(..) == 0
+			if compareIns is not None:	#2010-8-17
+				rc = compareIns.cmp(key, current.key)
+			else:
+				rc = self.__cmp(key, current.key)
+			if rc == 0:
+				node_ls.append(current)
+				self.findNodes(key, node_ls, current=current.left)
+				self.findNodes(key, node_ls, current=current.right)
+				break
+			else:
+				if rc < 0:
+					current = current.left
+				else:
+					current = current.right
+		return None
 
 """ ----------------------------------------------------------------------------
 	TEST ROUTINES

@@ -39,7 +39,20 @@ class PassingData(object):
 		"""
 		for argument_key, argument_value in keywords.iteritems():
 			setattr(self, argument_key, argument_value)
-
+	
+	def __str__(self):
+		"""
+		2010-6-17
+			a string-formatting function
+		"""
+		return_ls = []
+		for attribute_name in dir(self):
+			if attribute_name.find('__')==0:	#ignore the 
+				continue
+			return_ls.append("%s = %s"%(attribute_name, getattr(self, attribute_name, None)))
+		
+		return ", ".join(return_ls)
+		
 def importNumericArray():
 	"""
 	2008-07-09
@@ -107,7 +120,7 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ','],
 		line = inf.readline()
 		delimiter_chosen = cs.sniff(line).delimiter
 	else:
-		line = inf.read(200)	##binary file doesn't have readline(). have to use this dumb approach due to '\n' might mess up sniff()
+		line = inf.read(20000)	##binary file doesn't have readline(). have to use this dumb approach due to '\n' might mess up sniff()
 		delimiter_chosen = None
 		for delimiter in delimiter_choice_ls:
 			delimiter_count = line.count(delimiter)

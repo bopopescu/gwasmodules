@@ -20,7 +20,8 @@ else:   #32bit
 import time, csv, getopt
 import warnings, traceback
 from pymodule import ProcessOptions, PassingData
-from variation.src.Stock_250kDB import Stock_250kDB, QCMethod, CallQC, Snps, README, SnpsContext
+import Stock_250kDB
+#from Stock_250kDB import Stock_250kDB, Snps, SnpsContext
 from pymodule.db import formReadmeObj
 from transfac.src.TFBindingSiteParse import TFBindingSiteParse
 from annot.bin.codense.common import get_entrezgene_annotated_anchor
@@ -49,9 +50,11 @@ class FindSNPContext(object):
 		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
-	def find_SNP_context(self, db, curs, snp_locus_table, snp_locus_context_table, chromosome2anchor_gene_tuple_ls, gene_id2coord,\
+	def find_SNP_context(self, db_250k, curs, snp_locus_table, snp_locus_context_table, chromosome2anchor_gene_tuple_ls, gene_id2coord,\
 						max_upstream_distance=50000, max_downstream_distance=50000, need_commit=0, debug=0):
 		"""
+		2010-8-1
+			make sure chromosome & position is not null in snp_locus_context_table
 		2008-08-12
 			add max_upstream_distance and max_downstream_distance
 			take target genes, which the SNP touches, is upstream or is downstream (within distance allowed)
@@ -72,9 +75,12 @@ class FindSNPContext(object):
 		4,268809,0
 		4,269962,8
 		4,270712,0
-		curs.execute("select id, chromosome, position from %s where end_position is null and chromosome=4 and (position=268809 or position=269962 or position=270712)"%(snp_locus_table))	#only SNPs, not segments
+		curs.execute("select id, chromosome, position from %s where end_position is null and chromosome=4 and \
+			(position=268809 or position=269962 or position=270712)"%(snp_locus_table))	#only SNPs, not segments
 		"""
-		curs.execute("select id, chromosome, position from %s where end_position is null"%(snp_locus_table))	#only SNPs, not segments
+		curs.execute("select id, chromosome, position from %s where end_position is null and chromosome is not null\
+					and position is not null"%(snp_locus_table))	#make sure chromosome & position is not null
+			#only SNPs, not segments
 		rows = curs.fetchall()
 		offset_index = 0
 		block_size = 5000
@@ -138,12 +144,16 @@ class FindSNPContext(object):
 		#chromosome2anchor_gene_tuple_ls, gene_id2coord = getEntrezgeneAnnotatedAnchor(genome_db, tax_id=3702)
 		#del genome_db
 		
-		db = Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, hostname=self.hostname, database=self.dbname)
+		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
+									hostname=self.hostname, database=self.dbname)
+		db_250k.setup(create_tables=False)
 		mysql_conn.autocommit(True)
 		entrezgene_mapping_table='genome.entrezgene_mapping'
 		annot_assembly_table='genome.annot_assembly'
-		chromosome2anchor_gene_tuple_ls, gene_id2coord = get_entrezgene_annotated_anchor(mysql_curs, self.tax_id, entrezgene_mapping_table, annot_assembly_table)
-		self.find_SNP_context(db, mysql_curs, Snps.table.name, SnpsContext.table.name, chromosome2anchor_gene_tuple_ls, gene_id2coord,\
+		chromosome2anchor_gene_tuple_ls, gene_id2coord = get_entrezgene_annotated_anchor(mysql_curs, self.tax_id, \
+													entrezgene_mapping_table, annot_assembly_table)
+		self.find_SNP_context(db_250k, mysql_curs, Stock_250kDB.Snps.table.name, Stock_250kDB.SnpsContext.table.name, \
+							chromosome2anchor_gene_tuple_ls, gene_id2coord,\
 							max_upstream_distance=self.max_upstream_distance,\
 							max_downstream_distance=self.max_downstream_distance, need_commit=self.commit, debug=self.debug)
 

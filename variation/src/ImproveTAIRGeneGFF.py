@@ -42,7 +42,8 @@ class ImproveTAIRGeneGFF(object):
 		from pymodule import ProcessOptions
 		self.ad=ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
-	gene_desc_names = ['gene_symbol', 'type_of_gene', 'protein_label', 'protein_comment', 'protein_text']
+	#2010-9-6 add "description" to gene_desc_names
+	gene_desc_names = ['gene_symbol', 'type_of_gene', 'description', 'protein_label', 'protein_comment', 'protein_text', ]
 	
 	def improveTAIRGeneGFF(self, input_fname, gene_symbol2gene_id_set, gene_annotation, output_fname):
 		"""

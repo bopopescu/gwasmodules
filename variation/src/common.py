@@ -295,7 +295,7 @@ def get_ecotypeid2nativename(curs, ecotype_table='stock.ecotype'):
 		else:
 			ecotypeid, nativename = row
 		ecotypeid2nativename[ecotypeid] = nativename
-	sys.stderr.write("Done.\n")
+	sys.stderr.write("%s entries. Done.\n"%(len(ecotypeid2nativename)))
 	return ecotypeid2nativename
 
 def getNativename2EcotypeIDLs(curs, ecotype_table='stock.ecotype', turnUpperCase=False):

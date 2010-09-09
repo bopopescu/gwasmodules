@@ -337,8 +337,9 @@ def SNPData2RawSnpsData_ls(snpData, use_number2nt=1, need_transposeSNPData=0, re
 	return rawSnpsData_ls
 
 def write_data_matrix(data_matrix, output_fname, header, strain_acc_list, category_list, rows_to_be_tossed_out=None, \
-					cols_to_be_tossed_out=None, nt_alphabet=0, transform_to_numpy=0,\
-					discard_all_NA_rows=0, strain_acc2other_info=None, delimiter='\t', predefined_header_row=['strain', 'duplicate', 'latitude', 'longitude', 'nativename', 'stockparent', 'site', 'country']):
+			cols_to_be_tossed_out=None, nt_alphabet=0, transform_to_numpy=0,\
+			discard_all_NA_rows=0, strain_acc2other_info=None, delimiter='\t', \
+			predefined_header_row=['strain', 'duplicate', 'latitude', 'longitude', 'nativename', 'stockparent', 'site', 'country']):
 	"""
 	Arguments:
 		strain_acc_list (and category_list) are initial 2 columns in the output.

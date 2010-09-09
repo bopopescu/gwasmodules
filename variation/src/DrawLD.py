@@ -20,14 +20,6 @@ import warnings, traceback
 from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr
 from sets import Set
 import matplotlib; matplotlib.use("Agg")	#to avoid popup and collapse in X11-disabled environment
-from matplotlib import rcParams
-rcParams['font.size'] = 6
-rcParams['legend.fontsize'] = 6
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 6
-rcParams['axes.titlesize'] = 8
-rcParams['xtick.labelsize'] = 6
-rcParams['ytick.labelsize'] = 6
 
 from matplotlib.patches import Polygon
 from DrawSNPRegion import DrawSNPRegion, LD_statistic
@@ -160,6 +152,15 @@ class DrawLD(DrawSNPRegion):
 		#pylab.savefig('%s.svg'%self.output_fname_prefix, dpi=300)
 
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 6
+	rcParams['legend.fontsize'] = 6
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 6
+	rcParams['axes.titlesize'] = 8
+	rcParams['xtick.labelsize'] = 6
+	rcParams['ytick.labelsize'] = 6
+	
 	from pymodule import ProcessOptions
 	main_class = DrawLD
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

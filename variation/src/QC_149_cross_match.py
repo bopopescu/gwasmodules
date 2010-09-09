@@ -76,14 +76,17 @@ class QC_149_cross_match(QC_149):
 					target_id = row_id2[1]
 				else:
 					target_id = row_id2
-				qc_cross_match = StockDB.QCCrossMatch(strainid=row_id[1], target_id=target_id, mismatch_rate=mismatch_rate, no_of_mismatches=no_of_mismatches,\
-									no_of_non_NA_pairs=no_of_non_NA_pairs)
-				qc_cross_match.qc_method_id = QC_method_id
-				qc_cross_match.readme = readme
-				session.save(qc_cross_match)
-				real_counter += 1
-				if commit:
-					session.flush()
+				db_entries = StockDB.QCCrossMatch.query.filter_by(strainid=row_id[1]).filter_by(target_id=target_id).filter_by(qc_method_id=QC_method_id)
+				if db_entries.count()==0:	# 2009-10-5 not in db yet.
+					qc_cross_match = StockDB.QCCrossMatch(strainid=row_id[1], target_id=target_id, mismatch_rate=mismatch_rate, \
+														no_of_mismatches=no_of_mismatches,\
+														no_of_non_NA_pairs=no_of_non_NA_pairs)
+					qc_cross_match.qc_method_id = QC_method_id
+					qc_cross_match.readme = readme
+					session.save(qc_cross_match)
+					real_counter += 1
+					if commit:
+						session.flush()
 			sys.stderr.write("%s%s/%s=%s inserted into db"%('\x08'*80, real_counter, counter, float(real_counter)/counter))
 		sys.stderr.write("%s/%s=%s inserted into db. Done.\n"%(real_counter, counter, float(real_counter)/counter))
 	

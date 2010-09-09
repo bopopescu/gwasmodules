@@ -21,6 +21,9 @@ from elixir.options import using_table_options_handler	#using_table_options() ca
 from datetime import datetime
 from sqlalchemy.schema import ThreadLocalMetaData, MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy import UniqueConstraint, create_engine
+from sqlalchemy import and_, or_, not_
+
 
 from db import ElixirDB
 
@@ -34,7 +37,7 @@ class SequenceType(Entity):
 	2008-07-27
 		a table storing meta information to be referenced by other tables
 	"""
-	type = Field(String(256), unique=True)
+	type = Field(String(223), unique=True)
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
 	date_created = Field(DateTime, default=datetime.now)
@@ -53,6 +56,7 @@ class RawSequence(Entity):
 	sequence = Field(String(10000))	#each fragment is 10kb
 	using_options(tablename='raw_sequence')
 	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('annot_assembly_gi', 'start', 'stop'))
 
 class AnnotAssembly(Entity):
 	"""
@@ -64,7 +68,7 @@ class AnnotAssembly(Entity):
 	accession = Field(String(32))
 	version = Field(Integer)
 	tax_id = Field(Integer)
-	chromosome = Field(String(256))
+	chromosome = Field(String(128))
 	start = Field(Integer)
 	stop = Field(Integer)
 	orientation = Field(String(1))
@@ -78,13 +82,14 @@ class AnnotAssembly(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='annot_assembly')
 	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('tax_id','chromosome', 'start', 'stop', 'orientation', 'sequence_type_id'))
 
 class EntrezgeneType(Entity):
 	"""
 	2008-07-28
 		store the entrez gene types
 	"""
-	type = Field(String(256), unique=True)
+	type = Field(String(223), unique=True)
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
 	date_created = Field(DateTime, default=datetime.now)
@@ -120,7 +125,7 @@ class GeneCommentaryType(Entity):
 	"""
 	2008-07-28
 	"""
-	type = Field(String(256), unique=True)
+	type = Field(String(223), unique=True)
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
 	date_created = Field(DateTime, default=datetime.now)
@@ -185,10 +190,19 @@ class GeneCommentary(Entity):
 	
 	def construct_mrna_box(self):
 		"""
+		2010-8-18
+			update to fetch exon/mRNA only because introns are now added in GeneSegment.
 		2008-09-22
 		"""
+		
+		gene_commentary_type = GeneCommentaryType.query.filter_by(type='exon').first()
+		if not gene_commentary_type:
+			gene_commentary_type = GeneCommentaryType.query.filter_by(type='mRNA').first()
+			
+		gene_segments = GeneSegment.query.filter_by(gene_commentary_type_id=gene_commentary_type.id).\
+			filter_by(gene_commentary_id=self.id)
 		self.mrna_box_ls = []
-		for gene_segment in self.gene_segments:
+		for gene_segment in gene_segments:
 			self.mrna_box_ls.append([gene_segment.start, gene_segment.stop])
 		self.mrna_box_ls.sort()
 	
@@ -201,12 +215,18 @@ class GeneCommentary(Entity):
 		if len(self.gene_commentaries)==1:
 			gene_commentary = self.gene_commentaries[0]
 		elif len(self.gene_commentaries)>1:
-			print 'Warning: more than 1 gene_commentaries for this commentary id=%s, gene_id=%s.'%(self.id, self.gene_id)
+			sys.stderr.write('Warning: more than 1 gene_commentaries for this commentary id=%s, gene_id=%s.\n'%\
+							(self.id, self.gene_id))
 			gene_commentary = self.gene_commentaries[0]
 		else:
 			gene_commentary = None
 		if gene_commentary:
-			for gene_segment in gene_commentary.gene_segments:
+			gene_commentary_type = GeneCommentaryType.query.filter_by(type='CDS').first()
+			if not gene_commentary_type:
+				gene_commentary_type = GeneCommentaryType.query.filter_by(type='peptide').first()
+			gene_segments = GeneSegment.query.filter_by(gene_commentary_type_id=gene_commentary_type.id).\
+				filter_by(gene_commentary_id=gene_commentary.id)
+			for gene_segment in gene_segments:
 				self.protein_box_ls.append([gene_segment.start, gene_segment.stop])
 			self.protein_label = gene_commentary.label
 			self.protein_comment = gene_commentary.comment
@@ -217,6 +237,42 @@ class GeneCommentary(Entity):
 			self.protein_text = None
 		self.protein_box_ls.sort()
 	
+	def constructAnnotatedBox(self):
+		"""
+		2010-8-18
+			deal with the db populated by TAIRGeneXML2GenomeDB.py
+		"""
+		box_ls = []	#each entry is a tuple, (start, stop, box_type, is_translated, protein_box_index)
+		if len(self.gene_commentaries)==1:	#it's translated into protein.
+			protein_commentary = self.gene_commentaries[0]
+		elif len(self.gene_commentaries)>1:
+			sys.stderr.write('Warning: more than 1 gene_commentaries for this commentary id=%s, gene_id=%s.\n'%\
+							(self.id, self.gene_id))
+			protein_commentary = self.gene_commentaries[0]
+		else:
+			protein_commentary = None
+		
+		query = GeneSegment.query.filter_by(gene_commentary_id=self.id)
+		if protein_commentary:	#restrict the gene segment to intron only. exons will be covered by CDS and UTR.
+			gene_commentary_type = GeneCommentaryType.query.filter_by(type='intron').first()
+			if gene_commentary_type:
+				query = query.filter_by(gene_commentary_type_id=gene_commentary_type.id)
+		
+		for gene_segment in query:
+			box_ls.append([gene_segment.start, gene_segment.stop, gene_segment.gene_commentary_type.type, \
+							0, gene_segment.id, None])
+		if protein_commentary:
+			for gene_segment in protein_commentary.gene_segments:
+				if gene_segment.gene_commentary_type.type.find('UTR')!=-1:
+					is_translated = 0
+				else:
+					is_translated = 1
+				
+				box_ls.append([gene_segment.start, gene_segment.stop, gene_segment.gene_commentary_type.type, \
+								is_translated, gene_segment.id,  None])
+		box_ls.sort()
+		return box_ls
+		
 	def construct_annotated_box(self):
 		"""
 		2008-10-01
@@ -263,7 +319,6 @@ class GeneCommentary(Entity):
 									(prot_start, prot_stop, self.gene_id, mrna_start, mrna_stop))
 			else:
 				self.box_ls.append((mrna_start, mrna_stop, 'exon', 0, None))
-		
 	
 class GeneSegment(Entity):
 	"""
@@ -281,6 +336,7 @@ class GeneSegment(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='gene_segment')
 	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('gene_commentary_id', 'start', 'stop', 'gene_commentary_type_id'))
 
 class Gene(Entity):
 	"""
@@ -293,7 +349,10 @@ class Gene(Entity):
 	locustag = Field(String(128))
 	synonyms = Field(Text)
 	dbxrefs = Field(Text)
-	chromosome = Field(String(256))
+	chromosome = Field(String(115))
+	strand = Field(String(4))	#2010-8-12 add strand, start, stop
+	start = Field(Integer)
+	stop = Field(Integer)
 	map_location = Field(String(256))
 	description = Field(Text)
 	type_of_gene = Field(String(128))
@@ -308,6 +367,7 @@ class Gene(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='gene')
 	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('tax_id', 'locustag', 'chromosome', 'strand', 'start', 'stop', 'type_of_gene'))
 
 class Gene2go(Entity):
 	"""
@@ -328,6 +388,39 @@ class Gene2go(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='gene2go')
 	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('tax_id', 'gene_id', 'go_id', 'evidence', 'category'))
+
+class Gene2Family(Entity):
+	"""
+	2010-8-19
+		a table recording which family TE belongs to
+	"""
+	gene = ManyToOne('Gene', colname='gene_id', ondelete='CASCADE', onupdate='CASCADE')
+	family = ManyToOne('GeneFamily', colname='family_id', ondelete='CASCADE', onupdate='CASCADE')
+	created_by = Field(String(256))
+	updated_by = Field(String(256))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='gene2family')
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('gene_id', 'family_id', ))
+
+
+class GeneFamily(Entity):
+	"""
+	2010-8-19
+		family names and etc.
+	"""
+	short_name = Field(String(212), unique=True)
+	super_family = ManyToOne('GeneFamily', colname='super_family_id', ondelete='SET NULL', onupdate='CASCADE')
+	family_type = Field(String(256))
+	description = Field(Text)
+	created_by = Field(String(256))
+	updated_by = Field(String(256))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='gene_family')
+	using_table_options(mysql_engine='InnoDB')
 
 class README(Entity):
 	title = Field(Text)
@@ -341,6 +434,8 @@ class README(Entity):
 
 class Gene_symbol2id(Entity):
 	"""
+	2010-6-21
+		add created_by, updated_by, date_created, date_updated
 	2008-07-27
 		a derived table from Gene in order to map all available gene names (symbol, locustag, synonym) to gene-id
 	"""
@@ -348,8 +443,13 @@ class Gene_symbol2id(Entity):
 	gene_symbol = Field(String(256))
 	gene = ManyToOne('Gene', colname='gene_id', ondelete='CASCADE', onupdate='CASCADE')
 	symbol_type = Field(String(64))
+	created_by = Field(String(256))
+	updated_by = Field(String(256))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
 	using_options(tablename='gene_symbol2id')
 	using_table_options(mysql_engine='InnoDB')
+
 
 def getEntrezgeneAnnotatedAnchor(db, tax_id):
 	"""
@@ -433,7 +533,8 @@ class GenomeDatabase(ElixirDB):
 					gene_id2model[gene_id] = GeneModel(gene_id=gene_id, chromosome=chromosome, gene_symbol=row.gene.gene_symbol,\
 													locustag=row.gene.locustag, map_location=row.gene.map_location,\
 													type_of_gene=row.entrezgene_type.type, type_id=row.entrezgene_type_id,\
-													start=row.start, stop=row.stop, strand=row.strand, tax_id=row.tax_id)
+													start=row.start, stop=row.stop, strand=row.strand, tax_id=row.tax_id,\
+													description =row.gene.description)	#2010-8-19 add description
 					for gene_commentary in row.gene_commentaries:
 						if not gene_commentary.gene_commentary_id:	#ignore gene_commentary that are derived from other gene_commentaries. they'll be handled within the parental gene_commentary.
 							gene_commentary.construct_annotated_box()
@@ -450,8 +551,8 @@ class GenomeDatabase(ElixirDB):
 														mrna_box_ls=gene_commentary.mrna_box_ls,\
 														protein_box_ls=gene_commentary.protein_box_ls,\
 														box_ls=gene_commentary.box_ls,
-														cds_sequence=gene_commentary.cds_sequence,
-														mrna_sequence=gene_commentary.mrna_sequence)
+														cds_sequence = getattr(gene_commentary, 'cds_sequence', None),
+														mrna_sequence = getattr(gene_commentary, 'mrna_sequence', None))
 							gene_id2model[gene_id].gene_commentaries.append(new_gene_commentary)
 				else:
 					sys.stderr.write("Error: gene %s already exists in gene_id2model.\n"%(gene_id))
@@ -487,7 +588,7 @@ if __name__ == '__main__':
 	gene_annotation.gene_id2model = gene_id2model
 	gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
 	import cPickle
-	picklef = open('/tmp/at_gene_model_pickelf', 'w')
+	picklef = open(os.path.expanduser('~/at_gene_model_pickelf'), 'w')
 	cPickle.dump(gene_annotation, picklef, -1)
 	picklef.close()
 	

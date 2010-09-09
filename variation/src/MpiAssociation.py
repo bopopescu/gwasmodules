@@ -2,7 +2,14 @@
 """
 
 Examples:
-	mpiexec ~/script/variation/src/MpiAssociation.py -i ~/panfs/250k/dataset/call_method_17_test.tsv -p ~/panfs/250k/phenotype.tsv -o ~/panfs/250k/association_results/call_method_17_test_y3.tsv -y3 -w 187-190,210-221
+	mpiexec ~/script/variation/src/MpiAssociation.py -i ~/panfs/250k/dataset/call_method_17_test.tsv
+		-p ~/panfs/250k/phenotype.tsv -o ~/panfs/250k/association_results/call_method_17_test_y3.tsv -y3 -w 187-190,210-221
+
+
+	#2010-8-8 association on CNV. watch the "-n" argument
+	mpiexec ~/script/variation/src/MpiAssociation.py -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -p ~/panfs/250k/phenotype/phenotype.tsv
+		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y3_pheno.tsv
+		-y3 -w 39-59,80-82,210-212,32-38,65-74,183-186,191-194,260-263,362-380,161-176,264-267,849-947 -n
 
 Description:
 	MPI version of Association.py, doesn't support test_type==5 or test_type==6.
@@ -50,6 +57,9 @@ class MpiAssociation(Association, MPIwrapper):
 	
 	def computing_node_handler(self, communicator, data, param_obj):
 		"""
+		2010-8-8
+			Some changes in MPIwrapper.inputNode() make the data a list of parameters, instead of just one parameter before.
+			adjust this function to deal with multiple parameters.
 		2009-3-20
 		"""
 		node_rank = communicator.rank
@@ -60,32 +70,34 @@ class MpiAssociation(Association, MPIwrapper):
 		initData = param_obj.initData
 		min_data_point = param_obj.min_data_point
 		which_PC_index_ls = param_obj.which_PC_index_ls
-		which_phenotype = data
-		environment_matrix = None
-		gene_environ_interaction = False
-		results = self.run_whole_matrix[param_obj.test_type](initData.snpData.data_matrix, initData.phenData.data_matrix[:, which_phenotype], \
-													min_data_point, PC_matrix=initData.PC_matrix, \
-													which_PC_index_ls=which_PC_index_ls, environment_matrix=environment_matrix, \
-													gene_environ_interaction=gene_environ_interaction)
-		result_ls.append([which_phenotype, results])
+		for which_phenotype in data:	#2010-8-8
+			environment_matrix = None
+			gene_environ_interaction = False
+			results = self.run_whole_matrix[param_obj.test_type](initData.snpData.data_matrix, initData.phenData.data_matrix[:, which_phenotype], \
+														min_data_point, PC_matrix=initData.PC_matrix, \
+														which_PC_index_ls=which_PC_index_ls, environment_matrix=environment_matrix, \
+														gene_environ_interaction=gene_environ_interaction)
+			result_ls.append([which_phenotype, results])
 		sys.stderr.write("Node no.%s done with %s results.\n"%(node_rank, len(result_ls)))
 		return result_ls
 	
 	def output_node_handler(self, communicator, param_obj, data):
 		"""
+		2010-8-8
+			adjust to deal with the multi-phenotype results from computing_node_handler
 		2009-3-20
 			doesn't support self.test_type==5 or self.test_type==6
 		"""
 		result_ls = cPickle.loads(data)
-		which_phenotype, results = result_ls[0]
-		phenotype_name = param_obj.phenotypeColIDLs[which_phenotype]
-		phenotype_name = phenotype_name.replace('/', '_')	#'/' will be recognized as directory in output_fname
-		output_fname='%s_pheno_%s.tsv'%(os.path.splitext(param_obj.output_fname)[0], phenotype_name)	#make up a new name corresponding to this phenotype
-		
-		output_results_func = self.output_results.get(param_obj.test_type)
-		if output_results_func is None:
-			output_results_func = self.output_lm_results
-		output_results_func(results, param_obj.snpDataColIDLs, output_fname, param_obj.minus_log_pvalue)
+		for which_phenotype, results in result_ls:	#2010-8-8
+			phenotype_name = param_obj.phenotypeColIDLs[which_phenotype]
+			phenotype_name = phenotype_name.replace('/', '_')	#'/' will be recognized as directory in output_fname
+			output_fname='%s_pheno_%s.tsv'%(os.path.splitext(param_obj.output_fname)[0], phenotype_name)	#make up a new name corresponding to this phenotype
+			
+			output_results_func = self.output_results.get(param_obj.test_type)
+			if output_results_func is None:
+				output_results_func = self.output_lm_results
+			output_results_func(results, param_obj.snpDataColIDLs, output_fname, param_obj.minus_log_pvalue)
 	
 	def run(self):
 		if self.debug:
@@ -99,7 +111,10 @@ class MpiAssociation(Association, MPIwrapper):
 		output_node_rank = self.communicator.size-1
 		
 		if node_rank == 0:
-			initData = self.readInData(self.phenotype_fname, self.input_fname, self.eigen_vector_fname, self.phenotype_method_id_ls, self.test_type, self.report)
+			initData = self.readInData(self.phenotype_fname, self.input_fname, self.eigen_vector_fname, \
+								phenotype_method_id_ls=self.phenotype_method_id_ls, \
+								test_type=self.test_type, report=self.report, \
+								snpAlleleOrdinalConversion=1-self.noSNPAlleleOrdinalConversion)
 			initDataPickle = cPickle.dumps(initData, -1)
 			which_phenotype_ls = initData.which_phenotype_ls
 			

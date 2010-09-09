@@ -468,8 +468,10 @@ def _run_():
 			sign_fractions = []
 			sign_statistics = []
 			if mapping_method == 'emmax':
-				
-			
+				est_heritabilities = []
+				pseudo_heritabilities = []
+				k_correlations = []
+				ks_statistics = []			
 				
 			while True: #phen_index<len(phen_mafs)-numberPerRun:
 				phen_index += numberPerRun
@@ -700,8 +702,11 @@ def _run_():
 				maf = mafs[i]
 				anti_snp = get_anti_snp(snp) #Retrieving the anti-snp
 				if latent_corr:
-					lsd = random.choice(latent_snp_chr_pos_maf)
-					(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
+					(latent_snp,latent_chr,latent_pos,latent_maf) = \
+								random.choice(latent_snp_chr_pos_maf)
+					if random.random()<0.5:
+						latent_snp=get_anti_snp(latent_snp)
+					lsd = (latent_snp,latent_chr,latent_pos,latent_maf)
 					while sp.all(latent_snp==snp): #Make sure the two SNPs aren't identical.
 						lsd = random.choice(latent_snp_chr_pos_maf)
 						(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
@@ -712,7 +717,7 @@ def _run_():
 							latent_snp.append(1)
 						else:
 							latent_snp.append(0)								
-				#Constructing empty arrays
+
 				if phenotype_model == 1:#xor
 					phenotype = snp ^ latent_snp
 					anti_phenotype = anti_snp ^ latent_snp
@@ -758,7 +763,7 @@ def _run_():
 						anti_phenotype = anti_phenotype+error_vector	
 						error_var = sp.var(error_vector,ddof=1)
 						#heritability
-						h_est = sp.var(error_vector,ddof=1)/sp.var(anti_phenotype,ddof=1)				
+						h_est = 1-sp.var(error_vector,ddof=1)/sp.var(anti_phenotype,ddof=1)				
 						h_estimates.append(h_est)
 											
 					phenotypes.append(anti_phenotype)		

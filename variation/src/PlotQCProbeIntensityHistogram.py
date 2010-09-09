@@ -126,7 +126,8 @@ class PlotQCProbeIntensityHistogram:
 			intensity_ls.append(intensity)
 		return intensity_ls
 	
-	def _plot(self, intensity_ls, array_id, figure_ofname, no_of_bins=25, max_intensity=25000, xlim=None):
+	@classmethod
+	def plotHistogram(cls, intensity_ls, array_id, figure_ofname, no_of_bins=25, max_intensity=25000, xlim=None):
 		"""
 		2010-5-6
 			add xlabel, ylabel
@@ -138,7 +139,7 @@ class PlotQCProbeIntensityHistogram:
 		pylab.clf()
 		pylab.xlabel('log10(intensity)')
 		pylab.ylabel('count')
-		pylab.title("Array: %s. max intensity: %s"%(array_id, max_intensity))
+		pylab.title("Array: %s. %s probes. max intensity: %s"%(array_id, len(intensity_ls), max_intensity))
 		pylab.hist(intensity_ls, no_of_bins)
 		if xlim and len(xlim)==2:
 			pylab.xlim(xlim)
@@ -182,7 +183,7 @@ class PlotQCProbeIntensityHistogram:
 																	logTransform=self.logTransform)
 				if intensity_ls:
 					figure_ofname = '%s_%s.png'%(self.figure_ofname_prefix, array_id)
-					self._plot(intensity_ls, array_id, figure_ofname, no_of_bins=self.no_of_bins, \
+					self.plotHistogram(intensity_ls, array_id, figure_ofname, no_of_bins=self.no_of_bins, \
 						max_intensity=self.max_intensity, \
 						xlim=self.xlim)
 				else:

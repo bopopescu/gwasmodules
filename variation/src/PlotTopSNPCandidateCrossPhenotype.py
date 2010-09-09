@@ -12,11 +12,18 @@ Examples:
 	-x /Network/Data/250k/tmp-yh/TopSNPCandidateCrossPhenotype/figures/TopSNPCandidate_m$m\_q$q\_disease_phenotype_list$l\.png 
 	-o /Network/Data/250k/tmp-yh/TopSNPCandidateCrossPhenotype/Disease_m$m\_q$q\_list$l\_ratio.tsv -C1 -B1
 	
-	#2009-10-4 wilcox (q=1) on all flowering time, call method 32, gw-looping permutation pvalue (C=2), enrichment ratio (B=1)
+	# 2009-10-4 wilcox (q=1) on all flowering time, call method 32, gw-looping permutation pvalue (C=2), enrichment ratio (B=1)
 	m=20000; q=1; l=145; C=2; B=1; j=32; ~/script/variation/src/PlotTopSNPCandidateCrossPhenotype.py -m$m -e $q -l $l
 	-A 1-7,39-59,80-82 
 	-x /tmp/TopSNPCandidate_m$m\_q$q\_flower_phenotype_j$j\_list$l\_C$C\B$B\.png 
 	-o /tmp/Flower_j$j\_m$m\_q$q\_list$l\_C$C\B$B\.tsv -C$C -B$B -j $j -u yh
+	
+	# 2010-2-24 miRNA enrichment
+	A=1-35,39-48,57-82,158-159,161-179,182-186,272-274,277-283; m=20000; q=1; l=208; C=2; B=1; j=32;
+	~/script/variation/src/PlotTopSNPCandidateCrossPhenotype.py -m $m -e $q -l $l -A $A
+	-x /tmp/TopSNPCandidate_m$m\_q$q\_Phenotype_$A\_j$j\_list$l\_C$C\B$B\.png
+	-o /tmp/TopSNPCandidate_Phenotype_$A\_j$j\_m$m\_q$q\_list$l\_C$C\B$B\.tsv -C$C -B$B -j $j -u yh
+	
 	
 Description:
 	2008-11-11
@@ -35,22 +42,13 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import pylab
 
 from DrawTopSNPTest2DMapForOneRM import DrawTopSNPTest2DMapForOneRM
-from matplotlib import rcParams
-rcParams['font.size'] = 4
-rcParams['legend.fontsize'] = 8
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 4
-rcParams['axes.titlesize'] = 4
-rcParams['xtick.labelsize'] = 4
-rcParams['ytick.labelsize'] = 4
-rcParams['lines.linewidth'] = 0.3	#2008-10-31 make the linewidth of boxplot smaller
-
 import csv
 import numpy
 from pymodule import PassingData, getListOutOfStr, write_data_matrix
 import StringIO
 from MpiGeneListRankTest import MpiGeneListRankTest
-import matplotlib.axes3d as axes3d
+#import matplotlib.axes3d as axes3d
+from mpl_toolkits.mplot3d import Axes3D
 import Stock_250kDB
 from sets import Set
 
@@ -63,10 +61,8 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 	
 	def init_3d_plot(self):
 		pylab.clf()
-		ax = axes3d.Axes3D(pylab.figure(), azim=60,elev=50)	#pylab.gcf() doesn't work. have to use pylab.figure()
-		ax.set_xlabel('cutoff')
-		ax.set_ylabel('result')
-		ax.set_zlabel('data')
+		#ax = Axes3D(pylab.figure(), azim=60,elev=50)	#pylab.gcf() doesn't work. have to use pylab.figure()
+		ax = Axes3D(pylab.figure())
 		return ax
 	
 	color_ls = ['b', 'g','r', 'c', 'm', 'y']
@@ -110,6 +106,8 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 				elif min_score>pd.max_x:
 					pd.max_x = min_score
 				"""
+				min_score = no_of_top_snps_info.id_ls[i]	# 2010-2-24 use the number of top SNPs as x-axis
+				
 				candidate_sample_size = rdata.data_matrix_candidate_sample_size[i][which_min_distance]
 				if prev_candidate_sample_size==None:
 					score_cutoff_jump_pt_ls.append(min_score)
@@ -154,13 +152,14 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 		if score_cutoff_ls:
 			color_index = result_index%len(self.color_ls)
 			if score_cutoff_take_log:
-				bar_width = (max(score_cutoff_ls)-min(score_cutoff_ls))/float(len(score_cutoff_ls))
+				bar_width = (max(score_cutoff_ls)-min(score_cutoff_ls))/float(len(score_cutoff_ls))	# bar width is equally divided by the number bars.
 			else:
 				bar_width = 0.1
-			ax.bar(score_cutoff_ls, data_ls, z=result_index, dir='y',color=self.color_ls[color_index], width=bar_width, alpha=0.8, linewidth=0.5)
+				bar_width = (max(score_cutoff_ls)-min(score_cutoff_ls))/float(len(score_cutoff_ls))	# 2010-2-24	
+			ax.bar(score_cutoff_ls, data_ls, zs=result_index, zdir='y', color=self.color_ls[color_index], width=bar_width, alpha=0.8, linewidth=0.5)
 			
 			#ax.set_yticks([30,20,10,0], ['30z', '20z', '10z', '0z'])	#2008-11-11 it reduces 3d into 1 line
-			ax.text3D(0,result_index, 0, title, size=4)	#add title for this line of bars
+			ax.text(0, 0, result_index, title, zdir='y')	#add title for this line of bars
 			return (score_cutoff_ls, data_ls)
 		else:
 			return False
@@ -229,12 +228,18 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 								results_type=self.results_type)
 		params_ls = MpiGeneListRankTest.generate_params(param_obj)
 		
+		ResultsClass, TestResultClass = Stock_250kDB.Stock_250kDB.getResultsAndTestResultsClass(results_type=self.results_type)
+		
+		if ResultsClass is None or TestResultClass is None:
+			sys.stderr.write("Invalid results type : %s.\n"%pd.results_type)
+			sys.exit(3)
+		
 		ax = self.init_3d_plot()
 		result_index = 0
 		data_to_output_label_ls = []
 		data_to_output_ls = []
 		for results_id, list_type_id in params_ls:
-			rm = Stock_250kDB.ResultsMethod.get(results_id)
+			rm = ResultsClass.get(results_id)
 			list_type = Stock_250kDB.GeneListType.get(list_type_id)
 			title = '%s on %s_%s (%s)'%\
 				(rm.analysis_method.short_name, rm.phenotype_method.id, rm.phenotype_method.short_name, results_id)
@@ -258,7 +263,7 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 				sys.exit(3)
 			TopSNPTestType_id_ls_str = map(str, TopSNPTestType_id_ls)
 			from_where_clause = "from %s t, %s y where t.type_id=y.id and t.results_id=%s and t.list_type_id=%s and y.id in (%s)"%\
-				(Stock_250kDB.CandidateGeneTopSNPTestRM.table.name, Stock_250kDB.CandidateGeneTopSNPTestRMType.table.name,\
+				(TestResultClass.table.name, Stock_250kDB.CandidateGeneTopSNPTestRMType.table.name,\
 				results_id, list_type_id, ','.join(TopSNPTestType_id_ls_str))
 			
 			no_of_top_snps_info = self.get_no_of_top_snps_info(db, from_where_clause)
@@ -276,6 +281,9 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 				data_to_output_label_ls.append(output_label)
 				data_to_output_ls.append(return_code)
 				result_index += 1
+		ax.set_xlabel('cutoff')
+		ax.set_ylabel('result')
+		ax.set_zlabel('data')
 		if self.fig_fname:
 			pylab.savefig(self.fig_fname, dpi=300)
 			pylab.savefig('%s.svg'%os.path.splitext(self.fig_fname)[0], dpi=300)
@@ -285,6 +293,16 @@ class PlotTopSNPCandidateCrossPhenotype(DrawTopSNPTest2DMapForOneRM):
 		
 
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 4
+	rcParams['legend.fontsize'] = 8
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 4
+	rcParams['axes.titlesize'] = 4
+	rcParams['xtick.labelsize'] = 4
+	rcParams['ytick.labelsize'] = 4
+	rcParams['lines.linewidth'] = 0.3	#2008-10-31 make the linewidth of boxplot smaller
+	
 	from pymodule import ProcessOptions
 	main_class = PlotTopSNPCandidateCrossPhenotype
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

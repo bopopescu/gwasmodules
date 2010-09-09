@@ -15,8 +15,10 @@ from sqlalchemy.engine.url import URL
 from sqlalchemy import Table, create_engine
 from sqlalchemy.orm import mapper, relation
 from sqlalchemy.orm import scoped_session, sessionmaker
+from elixir import using_table_options
 
 class TableClass(object):
+	using_table_options(mysql_engine='InnoDB')
 	"""
 	2008-05-03
 		a base class for any class to hold a db table.
@@ -25,7 +27,19 @@ class TableClass(object):
 	def __init__(self, **keywords):
 		for key, value in keywords.iteritems():
 			setattr(self, key, value)
-
+	
+	def __str__(self):
+		"""
+		2010-6-17
+			a string-formatting function
+		"""
+		return_ls = []
+		for attribute_name in dir(self):
+			if attribute_name.find('__')==0:	#ignore the 
+				continue
+			return_ls.append("%s = %s"%(attribute_name, getattr(self, attribute_name, None)))
+		
+		return ", ".join(return_ls)
 
 class Database(object):
 	__doc__ = __doc__

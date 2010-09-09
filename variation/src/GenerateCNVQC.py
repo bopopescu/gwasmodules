@@ -19,7 +19,7 @@ if bit_number>40:       #64bit
 else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-import getopt, numpy
+import getopt, numpy, cPickle
 from variation.src.common import nt2number, number2nt
 from sets import Set
 from pymodule import ProcessOptions, SNPData, PassingData
@@ -38,6 +38,7 @@ class GenerateCNVQC(object):
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('probes_table', 1, ): ['probes', 'e', 1, 'table where the CNV probes are'],\
 							("input_fname", 0, ): [None, 'i', 1, 'StrainXSNP matrix file to be converted into CNV probe QC matrix'],\
+							("cnv_input_fname", 0, ): [None, 'n', 1, 'CVN intensity matrix file'],\
 							('output_fname_prefix',1,): ['', 'o', 1, 'filename prefix for mismatch_matrix and deletion_matrix'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
@@ -77,13 +78,13 @@ class GenerateCNVQC(object):
 				if left_probe[1]+12<snp_pos<right_probe[1]-12:	#falls in between, no CNV probe for it
 					return None
 				elif left_probe[1]-12<=snp_pos<=left_probe[1]+12:
-					return left_probe
+					return left_probe, abs(snp_pos-left_probe[1])
 				elif right_probe[1]-12<=snp_pos<=right_probe[1]+12:
-					return right_probe
+					return right_probe, abs(snp_pos-right_probe[1])
 			middle_index = (left_probe_index+right_probe_index)/2
 			probe = probe_ls[middle_index]
 			if probe[1]-12<=snp_pos<=probe[1]+12:
-				return probe
+				return probe, abs(snp_pos-probe[1])
 			elif snp_pos<probe[1]-12:
 				right_probe_index = middle_index
 			elif snp_pos>probe[1]+12:
@@ -98,11 +99,12 @@ class GenerateCNVQC(object):
 			snp_id_tup = snp_id.split('_')
 			snp_id_tup = map(int, snp_id_tup)
 			snp_id2tup[snp_id] = snp_id_tup
-			CNV_probe_id = self.findCNVprobe(chr2CNV_probe_ls, snp_id_tup)
-			if CNV_probe_id is not None:
+			CNV_probe_found = self.findCNVprobe(chr2CNV_probe_ls, snp_id_tup)
+			if CNV_probe_found is not None:
+				CNV_probe_id, disp_pos = CNV_probe_found
 				if CNV_probe_id not in probe_id2snp_id_ls:
 					probe_id2snp_id_ls[CNV_probe_id] = []
-				probe_id2snp_id_ls[CNV_probe_id].append(snp_id)
+				probe_id2snp_id_ls[CNV_probe_id].append((snp_id, disp_pos))
 		sys.stderr.write("Done.\n")
 		return PassingData(probe_id2snp_id_ls=probe_id2snp_id_ls, snp_id2tup=snp_id2tup)
 	
@@ -119,7 +121,7 @@ class GenerateCNVQC(object):
 		sys.stderr.write("Done.\n")
 		return SNP2Col_allele
 	
-	def getCNVQCMatrix(self, probe_id2snp_id_ls, snp_id2tup, snpData, SNP2Col_allele):
+	def getCNVQCMatrix(self, probe_id2snp_id_ls, snp_id2tup, snpData, SNP2Col_allele, cnvIntensityData):
 		"""
 		2009-2-12
 		"""
@@ -130,46 +132,75 @@ class GenerateCNVQC(object):
 		insertion_matrix[:] = -2
 		deletion_matrix = numpy.zeros(mismatch_matrix.shape, numpy.int)
 		deletion_matrix[:] = -2
+		qc_matrix = numpy.zeros(mismatch_matrix.shape, numpy.int)
+		qc_matrix[:] = -2
+		
 		cnv_probe_ls = probe_id2snp_id_ls.keys()
 		cnv_probe_ls.sort()
 		cnv_probe2index = dict(zip(cnv_probe_ls, range(len(cnv_probe_ls))))
 		
+		total_disp_pos_ls = []
+		total_intensity_ls = []
+		total_mismatch_ls = []
+		total_insertion_ls = []
+		total_deletion_ls = []
+		total_mis_ls = []
 		for i in range(mismatch_matrix.shape[0]):
-			for probe_id, snp_id_ls in probe_id2snp_id_ls.iteritems():
-				col_index = cnv_probe2index[probe_id]
-				no_of_mismatches = 0
-				no_of_deletions = 0
-				no_of_insertions = 0
-				is_this_probe_NA = 1
-				for snp_id in snp_id_ls:
-					snp_id_tup = snp_id2tup[snp_id]
-					snp_col_index = snpData.col_id2col_index[snp_id]
-					allele = snpData.data_matrix[i][snp_col_index]
-					col_allele = SNP2Col_allele[snp_id]
-					if allele==-2 or allele==0:
-						continue
-					else:
-						is_this_probe_NA = 0
-						if snp_id_tup[2]!=0:	#the offset is not 0
-							if allele!=-1:	#if it's deleted, then it's nothing
-								no_of_insertions += 1								
-						elif allele==-1:
-							no_of_deletions+=1
-						elif col_allele==-2 or col_allele==0:
-							sys.stderr.write("allele for this accession %s at snp %s is %s while reference allele is NA: %s.\n"%\
-											(snpData.row_id_ls[i], snp_id, allele, col_allele))
-						elif allele!=col_allele:
-							no_of_mismatches += 1
-							
-				if not is_this_probe_NA:
-					mismatch_matrix[i][col_index] = no_of_mismatches
-					insertion_matrix[i][col_index] = no_of_insertions
-					deletion_matrix[i][col_index] = no_of_deletions
+			row_id = snpData.row_id_ls[i]
+			if row_id in cnvIntensityData.row_id2row_index:
+				cnv_row_index = cnvIntensityData.row_id2row_index[row_id]
+				for probe_id, snp_id_ls in probe_id2snp_id_ls.iteritems():
+					col_index = cnv_probe2index[probe_id]
+					probe_id_label = '%s_%s'%(probe_id[0],probe_id[1])
+					cnv_col_index = cnvIntensityData.col_id2col_index[probe_id_label]
+					
+					no_of_mismatches = 0
+					no_of_deletions = 0
+					no_of_insertions = 0
+					is_this_probe_NA = 1
+					disp_pos_ls = []
+					for snp_id, disp_pos in snp_id_ls:
+						snp_id_tup = snp_id2tup[snp_id]
+						disp_pos_ls.append(disp_pos)
+						snp_col_index = snpData.col_id2col_index[snp_id]
+						allele = snpData.data_matrix[i][snp_col_index]
+						col_allele = SNP2Col_allele[snp_id]
+						if allele==-2 or allele==0:
+							continue
+						else:
+							is_this_probe_NA = 0
+							if snp_id_tup[2]!=0:	#the offset is not 0
+								if allele!=-1:	#if it's deleted, then it's nothing
+									no_of_insertions += 1								
+							elif allele==-1:
+								no_of_deletions+=1
+							elif col_allele==-2 or col_allele==0:
+								sys.stderr.write("allele for this accession %s at snp %s is %s while reference allele is NA: %s.\n"%\
+												(snpData.row_id_ls[i], snp_id, allele, col_allele))
+							elif allele!=col_allele:
+								no_of_mismatches += 1
+					if not is_this_probe_NA:
+						mean_disp_pos = numpy.mean(disp_pos_ls)
+						mismatch_matrix[i][col_index] = no_of_mismatches
+						insertion_matrix[i][col_index] = no_of_insertions
+						deletion_matrix[i][col_index] = no_of_deletions
+						total_mis_count = no_of_mismatches + no_of_insertions + no_of_deletions
+						qc_matrix[i][col_index] = total_mis_count
+						total_disp_pos_ls.append(mean_disp_pos)
+						total_intensity_ls.append(cnvIntensityData.data_matrix[cnv_row_index][cnv_col_index])
+						total_mismatch_ls.append(no_of_mismatches)
+						total_insertion_ls.append(no_of_insertions)
+						total_deletion_ls.append(no_of_deletions)
+						total_mis_ls.append(total_mis_count)
+		plotData = PassingData(total_disp_pos_ls=total_disp_pos_ls, total_intensity_ls=total_intensity_ls,\
+							total_mismatch_ls=total_mismatch_ls, total_insertion_ls=total_insertion_ls, total_deletion_ls=total_deletion_ls,\
+							total_mis_ls=total_mis_ls)
 		mismatchData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=cnv_probe_ls, data_matrix=mismatch_matrix)
 		insertionData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=cnv_probe_ls, data_matrix=insertion_matrix)
 		deletionData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=cnv_probe_ls, data_matrix=deletion_matrix)
+		qcData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=cnv_probe_ls, data_matrix=qc_matrix)
 		sys.stderr.write("Done.\n")
-		return PassingData(mismatchData=mismatchData, insertionData=insertionData, deletionData=deletionData)
+		return PassingData(mismatchData=mismatchData, insertionData=insertionData, deletionData=deletionData, qcData=qcData, plotData=plotData)
 	
 	def run(self):
 		"""
@@ -182,15 +213,32 @@ class GenerateCNVQC(object):
 		conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		curs = conn.cursor()
 		
-		chr2CNV_probe_ls = self.get_chr2CNV_probe_ls(curs, self.probes_table)
+		chr2CNV_probe_ls_pickle_fname = '/tmp/chr2CNV_probe_ls.pickle'
+		if not os.path.isfile(chr2CNV_probe_ls_pickle_fname):
+			chr2CNV_probe_ls = self.get_chr2CNV_probe_ls(curs, self.probes_table)
+			picklef = open(chr2CNV_probe_ls_pickle_fname, 'w')
+			cPickle.dump(chr2CNV_probe_ls, picklef, -1)
+			del picklef
+		else:
+			picklef = open(chr2CNV_probe_ls_pickle_fname, 'r')
+			chr2CNV_probe_ls = cPickle.load(picklef)
+			del picklef
 		snpData = SNPData(input_fname=self.input_fname, turn_into_array=1, ignore_2nd_column=1)
 		
 		probeData = self.get_probe_id2snp_id_ls(chr2CNV_probe_ls, snpData.col_id_ls)
 		SNP2Col_allele = self.get_SNP2Col_allele(snpData)
-		cnvQCData = self.getCNVQCMatrix(probeData.probe_id2snp_id_ls, probeData.snp_id2tup, snpData, SNP2Col_allele)
+		
+		cnvIntensityData = SNPData(input_fname=self.cnv_input_fname, turn_into_array=1, ignore_2nd_column=1, matrix_data_type=float)
+		
+		cnvQCData = self.getCNVQCMatrix(probeData.probe_id2snp_id_ls, probeData.snp_id2tup, snpData, SNP2Col_allele, cnvIntensityData)
+		plotdata_pickle_fname = '/tmp/CNV_plot_data.pickle'
+		picklef = open(plotdata_pickle_fname, 'w')
+		cPickle.dump(cnvQCData.plotData, picklef, -1)
+		del picklef
 		cnvQCData.mismatchData.tofile('%s_mismatch.tsv'%self.output_fname_prefix)
 		cnvQCData.insertionData.tofile('%s_insertion.tsv'%self.output_fname_prefix)
 		cnvQCData.deletionData.tofile('%s_deletion.tsv'%self.output_fname_prefix)
+		cnvQCData.qcData.tofile('%s_qc.tsv'%self.output_fname_prefix)
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

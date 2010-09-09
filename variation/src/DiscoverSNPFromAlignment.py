@@ -47,6 +47,30 @@ class DiscoverSNPFromAlignment(object):
 		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
+	def get_snp_pos_ls(cls, sequence, chromosome, start):
+		"""
+		2009-3-26
+			refactored out of getAlignmentMatrix()
+			
+			assuming sequence is from the reference genome. chromosome, start is the genomic position of its starting base.
+			
+		"""
+		snp_pos_ls = []
+		for i in range(len(sequence)):
+			base_number = nt2number[sequence[i]]
+			if base_number!=-1:
+				if i==0:
+					snp_pos_ls.append((chromosome, start, 0))	#the 3rd position is insertion offset relative to Column position
+				else:
+					snp_pos_ls.append((chromosome, snp_pos_ls[i-1][1]+1, 0))
+			else:	#base is deletion
+				if i==0:
+					snp_pos_ls.append((chromosome, start-1, 1))	#this probably doesn't exist in db. it's controversal whether this insertion should be assigned to the previous or alignment's start base
+				else:
+					snp_pos_ls.append((chromosome, snp_pos_ls[i-1][1], snp_pos_ls[i-1][2]+1))	#position doesn't change. offset++
+		return snp_pos_ls
+	get_snp_pos_ls = classmethod(get_snp_pos_ls)
+	
 	def getAlignmentMatrix(self, alignment_id):
 		sys.stderr.write("Getting alignment matrix for alignment=%s ..."%(alignment_id))
 		snp_pos_ls = []
@@ -57,18 +81,7 @@ class DiscoverSNPFromAlignment(object):
 		counter = 0
 		for row in rows:
 			if counter == 0:
-				for i in range(len(row.alignment_obj.target)):
-					base_number = nt2number[row.alignment_obj.target[i]]
-					if base_number!=-1:
-						if i==0:
-							snp_pos_ls.append((row.alignment_obj.chromosome, row.alignment_obj.start, 0))	#the 3rd position is insertion offset relative to Column position
-						else:
-							snp_pos_ls.append((row.alignment_obj.chromosome, snp_pos_ls[i-1][1]+1, 0))
-					else:	#base is deletion
-						if i==0:
-							snp_pos_ls.append((row.alignment_obj.chromosome, row.alignment_obj.start-1, 1))	#this probably doesn't exist in db. it's controversal whether this insertion should be assigned to the previous or alignment's start base
-						else:
-							snp_pos_ls.append((row.alignment_obj.chromosome, snp_pos_ls[i-1][1], snp_pos_ls[i-1][2]+1))	#position doesn't change. offset++
+				snp_pos_ls = self.get_snp_pos_ls(row.alignment_obj.target, row.alignment_obj.chromosome, row.alignment_obj.start)
 			accession_id_ls.append(row.accession)
 			name_ls.append(row.accession_obj.name)
 			data_row = dict_map(nt2number, row.bases)
@@ -79,7 +92,11 @@ class DiscoverSNPFromAlignment(object):
 		sys.stderr.write(' %s accessions, %s bases. Done.\n'%(len(accession_id_ls), len(snp_pos_ls)))
 		return passingdata
 	
-	def pickPolymorphicColumns(self, passingdata):
+	def pickPolymorphicColumns(cls, passingdata):
+		"""
+		2009-3-26
+			converted into a classmethod
+		"""
 		sys.stderr.write("Picking polymorphic SNPs ...")
 		no_of_rows, no_of_cols = passingdata.data_matrix.shape
 		polymorphic_column_index_ls = []
@@ -100,6 +117,7 @@ class DiscoverSNPFromAlignment(object):
 		passingdata.data_matrix = new_data_matrix
 		passingdata.snp_pos_ls = new_snp_pos_ls
 		sys.stderr.write(' %s SNPs chosen. Done.\n'%(len(passingdata.snp_pos_ls)))
+	pickPolymorphicColumns = classmethod(pickPolymorphicColumns)
 	
 	def run(self):
 		db = AtDB(drivername=self.drivername, username=self.db_user,

@@ -172,6 +172,8 @@ class RunGADA(CNVNormalize):
 	@classmethod
 	def output_header(cls, writer, chr_pos_ls=None):
 		"""
+		2010-6-29
+			add the median-output 
 		2010-2-10
 			becomes classmethod
 		2009-10-26
@@ -180,7 +182,8 @@ class RunGADA(CNVNormalize):
 		"""
 		if getattr(cls, 'report', False):
 			sys.stderr.write("Outputting header ...")
-		header = ['ecotype_id', 'array_id', "start_probe", "end_probe", "length", "amplitude", "start_probe_id", "end_probe_id"]
+		header = ['ecotype_id', 'array_id', "start_probe", "end_probe", "length", "amplitude", \
+				"start_probe_id", "end_probe_id", "median"]
 		"""
 		for chr_pos in chr_pos_ls:
 			chr_pos = '_'.join(chr_pos)
@@ -191,9 +194,71 @@ class RunGADA(CNVNormalize):
 			sys.stderr.write("Done.\n")
 	state2number = {'G': 1, 'N':0, 'L':-1}
 	
+	def calculateMannWhitney(self, GADA_output, intensity_ls, segment1_index, segment2_index, segment1OnTheLeft=True,\
+							maxNoOfProbesInSegment1=40):
+		"""
+		2010-6-29
+			segment2_index is the designated deletion segment.
+		"""
+		segment1 = GADA_output[segment1_index]
+		segment2 = GADA_output[segment2_index]
+		segment1_probe1_index, segment1_probe2_index, segment1_length = segment1[:3]
+		if segment1_length>maxNoOfProbesInSegment1:
+			segment1_length = maxNoOfProbesInSegment1
+			if segment1OnTheLeft:
+				segment1_probe1_index = segment1_probe2_index-maxNoOfProbesInSegment1+1
+			else:
+				segment1_probe2_index = segment1_probe1_index+maxNoOfProbesInSegment1-1
+		segment1_intensityLs = intensity_ls[segment1_probe1_index-1:segment1_probe2_index]
+		
+		segment2_probe1_index, segment2_probe2_index, segment2_length = segment2[:3]
+		segment2_intensityLs = intensity_ls[segment2_probe1_index-1:segment2_probe2_index]
+		import rpy
+		result = rpy.r.wilcox_test(segment1_intensityLs, segment2_intensityLs, alternative="g")
+		rho_stat = result['statistic']['W']/(segment1_length*segment2_length)
+		result['rho_stat'] = rho_stat
+		return result
+	
+	def addMedianToGADAOutput(self, GADA_output, intensity_ls, maxDeletionMedianIntensity=-0.1):
+		"""
+		2010-6-29
+		"""
+		no_of_rows = len(GADA_output)
+		for i in range(no_of_rows):
+			row = GADA_output[i]
+			if type(row[0])==str and (row[0].find('#')==0 or row[0].find('Start')==0):	# ignore the comments
+				#skip the first line of real data. it's header "Start   Stop    Lenght  Ampl    State"
+				continue
+			probe1_index, probe2_index, length, amplitude = row[:4]
+			probe1_index = int(probe1_index)-1
+			probe2_index = int(probe2_index)-1
+			median = numpy.median(intensity_ls[probe1_index:probe2_index+1])
+			row.append(median)
+			"""
+			if median<=maxDeletionMedianIntensity:
+				if i>0:
+					leftWilcoxResult = self.calculateMannWhitney(GADA_output, intensity_ls, i-1, i, segment1OnTheLeft=True)
+					leftWilcoxRhoStat = leftWilcoxResult['rho_stat']
+					leftWilcoxPvalue = leftWilcoxResult['p.value']
+				else:
+					leftWilcoxRhoStat = ''
+					leftWilcoxPvalue = ''
+				if i<no_of_rows-1:
+					rightWilcoxResult = self.calculateMannWhitney(GADA_output, intensity_ls, i+1, i, segment1OnTheLeft=False)
+					rightWilcoxRhoStat = rightWilcoxResult['rho_stat']
+					rightWilcoxPvalue = rightWilcoxResult['p.value']
+				else:
+					rightWilcoxRhoStat = ''
+					rightWilcoxPvalue = ''
+				row += [leftWilcoxRhoStat, leftWilcoxPvalue, rightWilcoxRhoStat, rightWilcoxPvalue]
+			"""
+			GADA_output[i] = row
+	
 	def output_GADA_output(self, writer, GADA_output, array_id, ecotype_id, chr_pos_ls=None, probe_id_ls=None,\
 						base_start_index=0):
 		"""
+		2010-6-29
+			add the median-output 
 		2010-6-5
 			add argument base_start_index, default=0
 		2009-11-22
@@ -228,7 +293,7 @@ class RunGADA(CNVNormalize):
 			probe1_id = probe_id_ls[probe1_index]
 			probe2_id = probe_id_ls[probe2_index]
 			
-			new_row = [ecotype_id, array_id, probe1, probe2, length, amplitude, probe1_id, probe2_id]
+			new_row = [ecotype_id, array_id, probe1, probe2, length, amplitude, probe1_id, probe2_id] + row[4:]
 			
 			"""
 			start = int(row[0])

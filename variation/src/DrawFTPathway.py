@@ -17,16 +17,7 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib as mpl; mpl.use("Agg")	#to avoid popup and collapse in X11-disabled environment
-from matplotlib import rcParams
 from PlotGroupOfSNPs import PlotGroupOfSNPs
-rcParams['font.size'] = 6
-rcParams['legend.fontsize'] = 6
-#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-rcParams['axes.labelsize'] = 6
-rcParams['axes.titlesize'] = 9
-rcParams['xtick.labelsize'] = 4
-rcParams['ytick.labelsize'] = 4
-
 import time, csv, cPickle
 import warnings, traceback
 from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, SNPData, read_data,\
@@ -442,6 +433,15 @@ class DrawFTPathway(PlotGroupOfSNPs):
 		pylab.savefig('%s.svg'%self.output_fname_prefix)
 
 if __name__ == '__main__':
+	from matplotlib import rcParams
+	rcParams['font.size'] = 6
+	rcParams['legend.fontsize'] = 6
+	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
+	rcParams['axes.labelsize'] = 6
+	rcParams['axes.titlesize'] = 9
+	rcParams['xtick.labelsize'] = 4
+	rcParams['ytick.labelsize'] = 4
+	
 	from pymodule import ProcessOptions
 	main_class = DrawFTPathway
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

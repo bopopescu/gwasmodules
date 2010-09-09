@@ -35,6 +35,7 @@ if __name__ == '__main__':
 	from variation.src.common import get_chr_pos_from_x_axis_pos
 
 import numpy, traceback
+import matplotlib
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle, Polygon
 from matplotlib.text import Text
@@ -43,11 +44,12 @@ from matplotlib.collections import LineCollection, Collection
 from pymodule.yh_matplotlib_artists import Gene, ExonIntronCollection
 from pymodule.db import TableClass
 from Results2DB_250k import Results2DB_250k
-from pymodule import GenomeWideResults, GenomeWideResult, DataObject, getGenomeWideResultFromFile, PassingData
+from pymodule import GenomeWideResults, GenomeWideResult, DataObject, getGenomeWideResultFromFile, PassingData, CNV, SNP
 from pymodule.CNV import getCNVDataFromFileInGWA
 from DrawSNPRegion import DrawSNPRegion	#2008-12-16 dealWithGeneAnnotation()
 import Stock_250kDB
 from GeneListRankTest import GeneListRankTest
+
 
 class GeneModel:
 	def __init__(self, gene_id=None, chromosome=None, symbol = None, description = None, type_of_gene = None, \
@@ -70,6 +72,9 @@ class GeneModel:
 		self.go_description = go_description
 		self.go_term_type = go_term_type
 
+	
+get1stSplitByUnderscore = lambda x: x.split('_')[0]
+get1stSplitByAnything = lambda x: x.split()[0]
 
 class GenomeBrowser(object):
 	def __init__(self):
@@ -77,21 +82,31 @@ class GenomeBrowser(object):
 		2008-01-30
 		"""
 		program_path = os.path.dirname(sys.argv[0])
-		xml = gtk.glade.XML(os.path.join(program_path, 'GenomeBrowser.glade'))
-		xml.signal_autoconnect(self)
+		xml = gtk.Builder()
+		xml.add_from_file(os.path.join(program_path, 'GenomeBrowser_gtk_builder.glade'))
+		
+		xml.connect_signals(self)
+		xml.connect_signals({ "on_window_destroy" : gtk.main_quit })		
+		self.app1 = xml.get_object("window1")
+
+		#xml = gtk.glade.XML(os.path.join(program_path, 'GenomeBrowser_gtk_builder.glade'))
+		#xml.signal_autoconnect(self)
+		
 		self.xml = xml
 		
-		self.app1 = xml.get_widget("app1")
+		#self.app1 = xml.get_object("app1")
 		self.app1.connect("delete_event", gtk.main_quit)
-		#self.app1.set_default_size(1200, 800)
+		self.app1.set_default_size(1200, 800)
 		
-		self.vbox_matplotlib = xml.get_widget('vbox_matplotlib')
+		self.vbox_matplotlib = xml.get_object('vbox_matplotlib')
 		
 		# matplotlib canvas
 		fig = Figure(figsize=(8,8))
 		self.canvas_matplotlib = FigureCanvas(fig)  # a gtk.DrawingArea
 		self.canvas_matplotlib.set_size_request(600,400)
 		self.canvas_matplotlib.mpl_connect('pick_event', self.on_canvas_pick)
+		self.canvas_matplotlib.props.has_tooltip = True	# 2010-3-15 to enable tooltip
+		#self.canvas_matplotlib.connect("query-tooltip", )
 		self.vbox_matplotlib.pack_start(self.canvas_matplotlib)
 		
 		#matplotlib axes
@@ -120,7 +135,7 @@ class GenomeBrowser(object):
 		self.toolbar = NavigationToolbar(self.canvas_matplotlib, self.app1)
 		self.vbox_matplotlib.pack_start(self.toolbar, False, False)
 		
-		self.textview_output = xml.get_widget('textview_output')
+		self.textview_output = xml.get_object('textview_output')
 		
 		self.textbuffer_output = self.textview_output.get_buffer()
 		
@@ -137,40 +152,93 @@ class GenomeBrowser(object):
 		
 		self.dummy_out = yh_gnome.Dummy_File(self.textbuffer_output, tag_out)
 		self.dummy_err = yh_gnome.Dummy_File(self.textbuffer_output, tag_err)
-		sys.stdout = self.dummy_out
-		sys.stderr = self.dummy_err
 		
 		self.app1.show_all()
 		
-		self.filechooserdialog1 = xml.get_widget("filechooserdialog1")
-		self.entry_min_value_cutoff = xml.get_widget('entry_min_value_cutoff')
-		self.entry_max_value_cutoff = xml.get_widget('entry_max_value_cutoff')
+		self.filechooserdialog1 = xml.get_object("filechooserdialog1")
+		self.entry_min_value_cutoff = xml.get_object('entry_min_value_cutoff')
+		self.entry_max_value_cutoff = xml.get_object('entry_max_value_cutoff')
 		self.filechooserdialog1.connect("delete_event", yh_gnome.subwindow_hide)
 		
 		
-		self.dialog_db_connect = xml.get_widget("dialog_db_connect")
+		self.dialog_db_connect = xml.get_object("dialog_db_connect")
 		self.dialog_db_connect.connect("delete_event", yh_gnome.subwindow_hide)
-		self.entry_mysql_hostname = xml.get_widget("entry_mysql_hostname")
-		self.entry_mysql_dbname = xml.get_widget("entry_mysql_dbname")
-		self.entry_postgres_hostname = xml.get_widget("entry_postgres_hostname")
-		self.entry_postgres_dbname = xml.get_widget("entry_postgres_dbname")
-		self.entry_postgres_schema = xml.get_widget("entry_postgres_schema")
-		self.entry_gene_annotation_picklef = xml.get_widget("entry_gene_annotation_picklef")
-		self.filechooserbutton_gene_annot = xml.get_widget("filechooserbutton_gene_annot")
+		self.entry_mysql_hostname = xml.get_object("entry_mysql_hostname")
+		self.entry_mysql_dbname = xml.get_object("entry_mysql_dbname")
+		self.entry_postgres_hostname = xml.get_object("entry_postgres_hostname")
+		self.entry_postgres_dbname = xml.get_object("entry_postgres_dbname")
+		self.entry_postgres_schema = xml.get_object("entry_postgres_schema")
+		self.entry_gene_annotation_picklef = xml.get_object("entry_gene_annotation_picklef")
+		self.filechooserbutton_gene_annot = xml.get_object("filechooserbutton_gene_annot")
 		
-		self.dialog_preferences = xml.get_widget("dialog_preferences")
+		self.dialog_preferences = xml.get_object("dialog_preferences")
 		self.dialog_preferences.connect("delete_event", yh_gnome.subwindow_hide)
-		self.checkbutton_debug = xml.get_widget("checkbutton_debug")
-		self.checkbutton_stdout = xml.get_widget("checkbutton_stdout")
-		self.checkbutton_stderr = xml.get_widget("checkbutton_stderr")
-		self.entry_gene_width = xml.get_widget("entry_gene_width")
-		self.checkbutton_draw_gene_symbol = xml.get_widget("checkbutton_draw_gene_symbol")
+		self.checkbutton_debug = xml.get_object("checkbutton_debug")
+		self.checkbutton_stdout = xml.get_object("checkbutton_stdout")
+		self.checkbutton_stderr = xml.get_object("checkbutton_stderr")
+		self.entry_gene_width = xml.get_object("entry_gene_width")
+		self.checkbutton_draw_gene_symbol = xml.get_object("checkbutton_draw_gene_symbol")
 		
-		self.aboutdialog1 = xml.get_widget("aboutdialog1")
+		self.aboutdialog1 = xml.get_object("aboutdialog1")
 		self.aboutdialog1.connect("delete_event", yh_gnome.subwindow_hide)
 		
-		self.dialog_cnvqc_db = xml.get_widget("dialog_cnvqc_db")
-		self.filechooserdialog_cnv_gada = xml.get_widget("filechooserdialog_cnv_gada")		
+		self.dialog_cnvqc_db = xml.get_object("dialog_cnvqc_db")
+		
+		vbox_which_cnv_data_from_db = xml.get_object("vbox_which_cnv_data_from_db")
+		self.comboboxentry_which_cnv_data_from_db = gtk.ComboBoxEntry()
+		self.which_cnv_data_from_db_ls = ['CNVQCCall', 'Ref-Coverage by Fragments From One Accession (1D)',\
+								'Ref-Coverage by One Fragment (2D)', 'Ref-Probe-Coverage by one Fragment (2D)',\
+								'CNVCall', 'CNV', 'CNVArrayCall']
+		self.fillComboBox(self.comboboxentry_which_cnv_data_from_db, self.which_cnv_data_from_db_ls)
+		
+		hbox_seq_ref_pos_version = xml.get_object('hbox_seq_ref_pos_version')
+		hbox_seq_ref_pos_version.set_sensitive(False)
+		
+		vbox_which_cnv_data_from_db.pack_start(self.comboboxentry_which_cnv_data_from_db)
+		self.comboboxentry_which_cnv_data_from_db.connect("changed", self.on_comboboxentry_which_cnv_data_from_db_changed)
+		
+		self.entry_cnv_non_ecotype_id = xml.get_object("entry_cnv_non_ecotype_id")
+		self.non_ecotype_id_liststore = gtk.ListStore(gobject.TYPE_STRING)
+		self.entry_cnv_non_ecotype_id.set_model(self.non_ecotype_id_liststore)
+		#self.entry_cnv_non_ecotype_id = gtk.combo_box_entry_new_text()	# combo_box_entry_new_text() is not available through glade.
+		self.entry_cnv_ecotype_id = xml.get_object("entry_cnv_ecotype_id")
+		
+		self.checkbutton_within_coverage = xml.get_object("checkbutton_within_coverage")
+		
+		self.radiobutton_non_ecotype_id = xml.get_object("radiobutton_non_ecotype_id")
+		self.radiobutton_non_ecotype_id.connect("toggled", self.on_radiobutton_cnv_db_id_toggled, "radiobutton_non_ecotype_id")
+		self.radiobutton_ecotype_id = xml.get_object("radiobutton_ecotype_id")
+		self.radiobutton_ecotype_id.connect("toggled", self.on_radiobutton_cnv_db_id_toggled, "radiobutton_ecotype_id")
+		self.radiobutton_ecotype_id.set_group(self.radiobutton_non_ecotype_id)
+		self.radiobutton_non_ecotype_id.toggled()	#2010-4-15 default, this one is active. different from .set_active(True)
+		
+		self.entry_cnv_intensity_fname = self.xml.get_object("entry_cnv_intensity_fname")
+		self.entry_cnv_probe_extend_dist = self.xml.get_object("entry_cnv_probe_extend_dist")
+		self.filechooserbutton_CNV_intensity = self.xml.get_object("filechooserbutton_CNV_intensity")
+		hbox_cnv_intensity = self.xml.get_object("hbox_cnv_intensity")
+		hbox_cnv_intensity.set_sensitive(False)
+		
+		self.filechooserdialog_cnv_gada = xml.get_object("filechooserdialog_cnv_gada")
+		
+		self.dialog_cnv_by_region = xml.get_object("dialog_cnv_by_region")
+		self.comboboxentry_cnv_by_region = xml.get_object("comboboxentry_cnv_by_region")
+		cnv_by_region_data_type_ls = ["Probe Intensity", "Probe-Blast Sequence Fragment (2D)", \
+									"Ref Coverage By Sequences (1D)", "CNVQCCall", "CNVCall",\
+									"Ref Coverage By Sequences (2D)", '100bp Coverage by PESolexaData']
+		self.fillComboBox(self.comboboxentry_cnv_by_region, cnv_by_region_data_type_ls)
+		
+		self.combobox_id_type_cnv_by_region = xml.get_object("combobox_id_type_cnv_by_region")
+		cnv_by_region_id_type_ls = ["array id", "ecotype id", "accession id"]
+		self.fillComboBox(self.combobox_id_type_cnv_by_region, cnv_by_region_id_type_ls)
+		
+		# 2010-7-27 in the dialog_cnvqc_db
+		self.combobox_type_of_nearby_data = xml.get_object("combobox_type_of_nearby_data")
+		type_of_nearby_data_ls = ["", "tiling probe intensity", "PE genome-wide coverage"]
+		self.fillComboBox(self.combobox_type_of_nearby_data, type_of_nearby_data_ls)
+		
+		self.combobox_gada_id_type = xml.get_object("combobox_gada_id_type")
+		id_type_ls = ["array id", "ecotype id"]
+		self.fillComboBox(self.combobox_gada_id_type, id_type_ls)
 		
 		self.mysql_conn = self.mysql_curs = self.postgres_conn = self.postgres_curs = self.db = None
 		self.gene_annotation = None
@@ -198,8 +266,40 @@ class GenomeBrowser(object):
 		self.gene_width = 1.0
 		
 		self.draw_gene_symbol_when_clicked = 0
-		
+				
 		self.debug = 0
+		
+		# 2010-3-18 to cache data
+		self.ecotype_id2RBDictCoverageOfRef = {}
+		self.cnv_intensity_fname2data = {}
+		
+		self.dialog_db_connect.show_all()
+		
+		# 2010-4-27 redirect the stdout & stderr in the end to allow user to see any error message in the __init__()
+		sys.stdout = self.dummy_out
+		sys.stderr = self.dummy_err
+		
+	def fillComboBox(self, widget, str_ls=[]):
+		"""
+		2010-4-27
+			fill a ComboBox or ComboBoxEntry with a list of labels from str_ls
+		"""
+		widget.clear()	#clear previous content. For ComboBoxEntry, it also clears out the CellRendererText()
+		
+		liststore = gtk.ListStore(str)
+		widget.set_model(liststore)
+
+		# this is required for ComboBox. But here also on ComboBoxEntry because of widget.clear().
+		cell = gtk.CellRendererText()
+		widget.pack_start(cell, True)
+		widget.add_attribute(cell, 'text', 0)
+		
+		if hasattr(widget, "set_text_column"):	# it's a ComboBoxEntry.
+			widget.set_text_column(0)	# default is -1, which would render later text-appending invisible.
+		
+		for label in str_ls:
+			widget.append_text(label)
+		
 	
 	def load_data(self, mysql_curs, postgres_curs):
 		"""
@@ -240,8 +340,22 @@ class GenomeBrowser(object):
 		x = this_chr_starting_pos_on_plot + pos
 		return x
 	
-	def plot(self, ax, canvas, genome_wide_result, draw_line_as_point=True, draw_cnv_block=True):
+	def getYposition(self, genome_wide_result, y_value):
 		"""
+		2010-4-15
+			adjust for the genome_wide_result.base_value and genome_wide_result.min_value
+		"""
+		return genome_wide_result.base_value - genome_wide_result.min_value + y_value
+		
+	def plot(self, ax, canvas, genome_wide_result, draw_line_as_point=True, drawType=1):
+		"""
+		2010-4-15
+			argument draw_cnv_block becomes drawType
+				1: CNV
+				2: sequence fragment
+				3: line as point
+		2010-3-14
+			argument draw_cnv_block: each data_obj in genome_wide_result.data_obj_ls is a cnv block.
 		2008-05-28
 			input is genome_wide_result
 			chr_id2cumu_size, chr_id2size, chr_gap hidden from arguments
@@ -255,23 +369,45 @@ class GenomeBrowser(object):
 		genome_wide_result_id = id(genome_wide_result)
 		x_ls = []
 		y_ls = []
-		plot_together = True
-		for data_obj in genome_wide_result.data_obj_ls:
-			y_pos = genome_wide_result.base_value - genome_wide_result.min_value + data_obj.value
+		plot_later = True	# a variable deciding whether to plot the each data_obj on first encounter or later
+		no_of_data_objs = len(genome_wide_result.data_obj_ls)
+		no_of_objs_drawn = 0
+		for i in range(no_of_data_objs):
+			data_obj = genome_wide_result.data_obj_ls[i]
+			y_pos = self.getYposition(genome_wide_result, data_obj.value)
 			x_pos = self.getXposition(data_obj.chromosome, data_obj.position)
-			if data_obj.stop_position is not None and draw_cnv_block==True:
+			if data_obj.stop_position is not None:
 				x_stop_pos = self.getXposition(data_obj.chromosome, data_obj.stop_position)
-				xs = [x_pos, x_stop_pos, x_stop_pos, x_pos]
-				y_base_pos = genome_wide_result.base_value - genome_wide_result.min_value + 0
-				ys = [y_pos, y_pos, y_base_pos, y_base_pos]
-				artist_obj = Polygon(zip(xs,ys), facecolor='g', alpha=0.8, linewidth=0.5) 	#linewidth=0.7
-				ax.add_patch(artist_obj)
-				artist_obj_id = id(artist_obj)
-				plot_together = False
-			if data_obj.stop_position is not None and draw_line_as_point==False:	#bigger than 100k, then a line
-				x_stop_pos = self.getXposition(data_obj.chromosome, data_obj.stop_position)
-				x_ls.append([(x_pos, y_pos), (x_stop_pos, y_pos)])
-				#artist_obj = Line2D([x_pos, y_pos], [x_stop_pos, y_pos], picker=True)
+				if drawType==1:
+					xs = [x_pos, x_stop_pos, x_stop_pos, x_pos]
+					y_base_pos = genome_wide_result.base_value - genome_wide_result.min_value + 0
+					ys = [y_pos, y_pos, y_base_pos, y_base_pos]
+					facecolor = getattr(data_obj, 'color', 'g')
+					artist_obj = Polygon(zip(xs,ys), facecolor=facecolor, alpha=0.8, linewidth=0.5, picker=True) 	#linewidth=0.7
+					ax.add_patch(artist_obj)
+					artist_obj_id = id(artist_obj)
+					self.artist_obj_id2data_obj_key[artist_obj_id] = [genome_wide_result_id, i]
+					plot_later = False
+					no_of_objs_drawn += 1
+				elif drawType==3 or draw_line_as_point==False:
+					x_ls.append([(x_pos, y_pos), (x_stop_pos, y_pos)])
+					#artist_obj = Line2D([x_pos, y_pos], [x_stop_pos, y_pos], picker=True)
+				elif drawType==2:	# 2010-4-15 draw arrows to show corresponding ref genome parts for one sequence fragment
+					#sys.stderr.write("drawing fragment ...")
+					target_start = getattr(data_obj, 'target_start', data_obj.value)
+					target_start = self.getYposition(genome_wide_result, target_start)
+					target_stop = getattr(data_obj, 'target_stop', data_obj.value)
+					target_stop = self.getYposition(genome_wide_result, target_stop)
+					from matplotlib.patches import ConnectionPatch
+					artist_obj = ConnectionPatch(xyA=(x_pos, target_start), xyB=(x_stop_pos, target_stop), coordsA="data", \
+									coordsB="data", picker=True, alpha=0.8, color='b',\
+									arrowstyle="->", shrinkA=0, shrinkB=0, mutation_scale=20)
+					ax.add_artist(artist_obj)
+					artist_obj_id = id(artist_obj)
+					self.artist_obj_id2data_obj_key[artist_obj_id] = [genome_wide_result_id, i]
+					#ax.add_patch(artist_obj)
+					plot_later = False
+					no_of_objs_drawn += 1
 			else:
 				if draw_line_as_point and data_obj.stop_position is not None:
 					x_stop_pos = self.getXposition(data_obj.chromosome, data_obj.stop_position)
@@ -280,14 +416,15 @@ class GenomeBrowser(object):
 				y_ls.append(y_pos)
 					#artist_obj = Circle((x_pos, y_pos), picker=True)
 		
-		if plot_together:
+		if plot_later:
 			if len(y_ls)>0:
-				artist_obj = ax.scatter(x_ls, y_ls, s=10, faceted=False, picker=True)
+				artist_obj = ax.scatter(x_ls, y_ls, s=10, edgecolors='none', picker=True)	#2010-4-12 faceted=False is deprecated
 			else:
 				artist_obj = LineCollection(x_ls, picker=True)
 				ax.add_artist(artist_obj)
 			artist_obj_id = id(artist_obj)
 			self.artist_obj_id2data_obj_key[artist_obj_id] = [genome_wide_result_id, None]
+			no_of_objs_drawn += 1
 		
 		y_base_value = genome_wide_result.base_value
 		y_top_value = genome_wide_result.base_value + genome_wide_result.max_value - genome_wide_result.min_value
@@ -298,45 +435,37 @@ class GenomeBrowser(object):
 		self.yticks.append(y_top_value)
 		ax.set_yticks(self.yticks)
 		
-		self.yticklabels.append('%s %.2f'%(genome_wide_result.name, genome_wide_result.min_value))
-		self.yticklabels.append('%s %.2f'%(genome_wide_result.name, genome_wide_result.max_value))
-		ax.set_yticklabels(self.yticklabels)
+		self.yticklabels.append('%.2f'%(genome_wide_result.min_value))
+		self.yticklabels.append('%.2f'%(genome_wide_result.max_value))
 		
-		"""
-		ax.add_artist(g_artist)
-		artist_obj_id = id(g_artist)
-				self.artist_obj_id2artist_gene_id_ls[artist_obj_id] = [g_artist, gene_id]
-				self.gene_id2artist_object_id[gene_id] = artist_obj_id
-				
-				x_ls = []
-		y_ls = []
-		max_pvalue = 0
-		for i in range(len(snp_pos_ls)):
-			chr, pos = snp_pos_ls[i]
-			chr = str(chr)
-			this_chr_starting_pos_on_plot = chr_id2cumu_size[chr]-chr_id2size[chr]-chr_gap
-			x = this_chr_starting_pos_on_plot + pos
-			x_ls.append(x)
-			pvalue = pvalue_ls[i]
-			if pvalue > max_pvalue:
-				max_pvalue = pvalue
-			y_ls.append(pvalue)
-		ax.plot(x_ls, y_ls, '.', picker=3)	#3 points tolerance
-		"""
+		title_distance = abs(genome_wide_result.max_value-genome_wide_result.min_value)/10.0
+		
+		# 2010-3-17 add the title on top of the plot with a blended transformation
+		# the x coords of this transformation are axes, and the
+		# y coord are data
+		trans = matplotlib.transforms.blended_transform_factory(ax.transAxes, ax.transData)	
+		ax.text(0.5, y_top_value+title_distance, genome_wide_result.name, horizontalalignment='center', verticalalignment='bottom', \
+				transform = trans,  bbox=dict(facecolor='white', alpha=0.4))
+		
+		ax.set_yticklabels(self.yticklabels)
 		#draw the chromosome boundary
 		for chr_id, cumu_size in self.chr_id2cumu_size.iteritems():
 			ax.vlines(cumu_size, y_base_value, y_top_value, color='k')
 		canvas.draw()
-		sys.stderr.write("Done.\n")
+		sys.stderr.write("%s objects drawn. Done.\n"%(no_of_objs_drawn))
 	
 	def respond2GeneObjPicker(self, event, artist_obj_id, artist_obj_id2artist_gene_id_ls, gene_annotation,\
 							ax=None, draw_gene_symbol_when_clicked=False, canvas_matplotlib=None):
 		"""
+		2010-3-15
+			return output_str
 		2008-12-17
 			a common function specifying how to respond to picker events of 
 				both gene models in axe_gene_model and vertical gene spans in ax
 			called by on_canvas_pick()
 		"""
+		output_str = ""
+		
 		gene_id = artist_obj_id2artist_gene_id_ls[artist_obj_id][1]
 		gene_model = gene_annotation.gene_id2model[gene_id]
 		
@@ -358,31 +487,43 @@ class GenomeBrowser(object):
 		else:	#it doesn't have protein, get gene_commentary_type
 			type_of_gene = getattr(gene_commentary, 'gene_commentary_type', '')
 		
-		print '%s (gene id=%s) type_of_gene: %s. chromosome: %s. start: %s. stop: %s. strand: %s.'%\
+		output_str += '%s (gene id=%s) type_of_gene: %s. chromosome: %s. start: %s. stop: %s. strand: %s.\n'%\
 				(gene_model.gene_symbol, gene_id, type_of_gene, gene_model.chromosome, \
 				gene_model.start, gene_model.stop, gene_model.strand)
-		print '\t protein_label: %s.'%protein_label
-		print '\t protein_comment: %s.'%protein_comment
+		output_str += '\t protein_label: %s.\n'%protein_label
+		output_str += '\t protein_comment: %s.\n'%protein_comment
 		
 		if draw_gene_symbol_when_clicked:
 			if ax:
 				ax.text(event.mouseevent.xdata, event.mouseevent.ydata, gene_model.gene_symbol, size=8)
 			if canvas_matplotlib:
 				canvas_matplotlib.draw()
+		
+		return output_str
 	
 	def on_canvas_pick(self, event):
 		"""
+		2010-3-15
+			CNV polygon artists are stored in artist_obj_id2data_obj_key.
+			use self.canvas_matplotlib.set_tooltip_text() to show what was clicked in tooltip.
 		2008-11-12
 			display more information (maf, genotype_var_perc, comment) of data_obj (SNP) if they exist
 		2008-05-28
 			pick from collection
 		2008-01-31 copied from examples/pick_event_demo.py from matplotlib source code
 		"""
+		output_str = ""
 		if self.debug:
-			print dir(event)
-			print event.artist
-			print dir(event.artist)
-			print type(event.artist)
+			output_str += "x: %s\n"%event.mouseevent.x
+			output_str += "y: %s\n"%event.mouseevent.y
+			output_str += "xdata: %s\n"%event.mouseevent.xdata
+			output_str += "ydata: %s\n"%event.mouseevent.ydata
+			output_str += "dir(event): %s\n"%dir(event)
+			output_str += "dir(event.guiEvent): %s\n"%dir(event.guiEvent)
+			output_str += "dir(event.mouseevent): %s\n"%dir(event.mouseevent)
+			output_str += "event.artist: %s\n"%event.artist
+			output_str += "dir(event.artist): %s\n"%dir(event.artist)
+			output_str += "type(event.artist): %s\n"%type(event.artist)
 		"""
 		if isinstance(event.artist, Line2D):
 			thisline = event.artist
@@ -395,57 +536,60 @@ class GenomeBrowser(object):
 			for i in ind:
 				print "snp chromosome: %s, position: %s, pvalue: %s"%(self.snp_pos_ls[i][0], self.snp_pos_ls[i][1], self.pvalue_ls[i])
 		"""
+		artist_obj_id = id(event.artist)
 		if isinstance(event.artist, ExonIntronCollection):	#ExonIntronCollection is also a kind of Collection
-			artist_obj_id = id(event.artist)
 			if artist_obj_id in self.artist_obj_id2artist_gene_id_ls:
-				self.respond2GeneObjPicker(event, artist_obj_id, self.artist_obj_id2artist_gene_id_ls, self.gene_annotation,\
+				output_str += self.respond2GeneObjPicker(event, artist_obj_id, self.artist_obj_id2artist_gene_id_ls, self.gene_annotation,\
 							ax=self.axe_gene_model, draw_gene_symbol_when_clicked=self.draw_gene_symbol_when_clicked, \
 							canvas_matplotlib=self.canvas_matplotlib)
 			else:
 				sys.stderr.write("%s not in artist_obj_id2artist_gene_id_ls.\n"%(artist_obj_id))
 		elif isinstance(event.artist, Collection) or isinstance(event.artist, LineCollection):	#
-			artist_obj_id = id(event.artist)
 			if artist_obj_id in self.artist_obj_id2data_obj_key:
-				genome_wide_result_id, data_obj_id = self.artist_obj_id2data_obj_key[artist_obj_id]
+				genome_wide_result_id, data_obj_index = self.artist_obj_id2data_obj_key[artist_obj_id]
 				genome_wide_result = self.genome_wide_results.get_genome_wide_result_by_obj_id(genome_wide_result_id)
 				for obj_index in event.ind:
 					if isinstance(obj_index, tuple) or isinstance(obj_index, list):
 						obj_index = obj_index[0]
 					data_obj = genome_wide_result.get_data_obj_by_obj_index(obj_index)
-					output_str = "genome result: %s, chromosome: %s, position: %s, "%(genome_wide_result.name, data_obj.chromosome, data_obj.position)
-					if data_obj.stop_position is not None:
-						output_str += "stop position: %s, "%(data_obj.stop_position)
-					output_str += '\n'
-					output_str += "\tscore: %s\n"%(data_obj.value)
-					if data_obj.maf:
-						output_str += "\tmaf: %s\n"%(data_obj.maf)
-					if data_obj.genotype_var_perc:
-						output_str += "\tgenotype_var_perc: %s\n"%(data_obj.genotype_var_perc)
-					if data_obj.comment:
-						output_str += "\tcomment: %s\n"%(data_obj.comment)
-					print output_str
+					output_str += str(data_obj)
 			else:
 				sys.stderr.write("%s not in artist_obj_id2data_obj_key.\n"%(artist_obj_id))
-		elif isinstance(event.artist, Polygon):	#ExonIntronCollection is also a kind of Collection
-			artist_obj_id = id(event.artist)
-			
-			print 'artist ID:', artist_obj_id 
+		elif isinstance(event.artist, Polygon):	#ExonIntronCollection is also a kind of Collection			
 			patch = event.artist
+			if self.debug:
+				output_str += 'artist ID: %s\n'%artist_obj_id
+				output_str += 'onpick1 patch: %s\n'%patch.get_verts()
 			
-			print 'onpick1 patch:', patch.get_verts()
 			if artist_obj_id in self.artist_obj_id2artist_gene_id_ls:
-				self.respond2GeneObjPicker(event, artist_obj_id, self.artist_obj_id2artist_gene_id_ls, self.gene_annotation,\
+				output_str += self.respond2GeneObjPicker(event, artist_obj_id, self.artist_obj_id2artist_gene_id_ls, self.gene_annotation,\
 										ax=self.ax, draw_gene_symbol_when_clicked=self.draw_gene_symbol_when_clicked, \
 										canvas_matplotlib=self.canvas_matplotlib)
+			elif artist_obj_id in self.artist_obj_id2data_obj_key:	# 2010-3-15 CNV artists are stored in artist_obj_id2data_obj_key.
+				genome_wide_result_id, data_obj_index = self.artist_obj_id2data_obj_key[artist_obj_id]
+				genome_wide_result = self.genome_wide_results.get_genome_wide_result_by_obj_id(genome_wide_result_id)
+				data_obj = genome_wide_result.get_data_obj_by_obj_index(data_obj_index)
+				output_str += str(data_obj)
 			else:
 				sys.stderr.write("%s not in artist_obj_id2artist_gene_id_ls.\n"%(artist_obj_id))
-		elif isinstance(event.artist, Rectangle):
-			patch = event.artist
-			print 'onpick1 patch:', patch.get_verts()
-		elif isinstance(event.artist, Text):
-			text = event.artist
-			print 'onpick1 text:', text.get_text()
-		
+		else:	#2010-4-15 for everything else, just check if it's in artist_obj_id2data_obj_key
+			if artist_obj_id in self.artist_obj_id2data_obj_key:
+				genome_wide_result_id, data_obj_index = self.artist_obj_id2data_obj_key[artist_obj_id]
+				genome_wide_result = self.genome_wide_results.get_genome_wide_result_by_obj_id(genome_wide_result_id)
+				data_obj = genome_wide_result.get_data_obj_by_obj_index(data_obj_index)
+				output_str += str(data_obj)
+			else:
+				sys.stderr.write("%s not in artist_obj_id2data_obj_key.\n"%(artist_obj_id))
+			
+			if isinstance(event.artist, Rectangle):
+				patch = event.artist
+				output_str += 'onpick1 rectangle: %s\n'%patch.get_verts()
+			elif isinstance(event.artist, Text):
+				text = event.artist
+				output_str += 'onpick1 text: %s\n'%text.get_text()
+		print output_str
+		self.canvas_matplotlib.set_tooltip_text(output_str)	# 2010-3
+
 	
 	def on_imagemenuitem_quit_activate(self, data=None):
 		"""
@@ -472,6 +616,14 @@ class GenomeBrowser(object):
 		"""
 		self.filechooserdialog_cnv_gada.show_all()
 	
+	def on_imagemenuitem_cnv_by_region_activate(self, event, data=None):
+		"""
+		2010-4-27
+			show the cnv_by_region dialog
+		"""
+		self.dialog_cnv_by_region.show_all()
+		
+		
 	def on_button_filechooser_ok_clicked(self, widget, data=None):
 		"""
 		2008-12-16
@@ -495,7 +647,7 @@ class GenomeBrowser(object):
 			self.db_connect()
 		self.app1.set_title("Genome Browser: %s"%input_fname)
 		
-		checkbutton_log10_transformation = self.xml.get_widget("checkbutton_log10_transformation")
+		checkbutton_log10_transformation = self.xml.get_object("checkbutton_log10_transformation")
 		if checkbutton_log10_transformation.get_active():
 			do_log10_transformation = True
 		else:
@@ -508,13 +660,13 @@ class GenomeBrowser(object):
 		
 		#2008-08-03
 		pdata = PassingData()
-		entry_chromosome = self.xml.get_widget("entry_chromosome")
+		entry_chromosome = self.xml.get_object("entry_chromosome")
 		if entry_chromosome.get_text():
 			pdata.chromosome = int(entry_chromosome.get_text())
-		entry_start = self.xml.get_widget("entry_start")
+		entry_start = self.xml.get_object("entry_start")
 		if entry_start.get_text():
 			pdata.start = int(entry_start.get_text())
-		entry_stop = self.xml.get_widget("entry_stop")
+		entry_stop = self.xml.get_object("entry_stop")
 		if entry_stop.get_text():
 			pdata.stop = int(entry_stop.get_text())
 		
@@ -524,35 +676,35 @@ class GenomeBrowser(object):
 		else:
 			pdata.max_value_cutoff = None
 		# 2009-10-27
-		checkbutton_OR_min_max = self.xml.get_widget("checkbutton_OR_min_max")
+		checkbutton_OR_min_max = self.xml.get_object("checkbutton_OR_min_max")
 		if checkbutton_OR_min_max.get_active():
 			pdata.OR_min_max = True
 		else:
 			pdata.OR_min_max = False
 		
-		checkbutton_4th_col_stop_pos = self.xml.get_widget("checkbutton_4th_col_stop_pos")
+		checkbutton_4th_col_stop_pos = self.xml.get_object("checkbutton_4th_col_stop_pos")
 		if checkbutton_4th_col_stop_pos.get_active():
 			pdata.is_4th_col_stop_pos = True
 		else:
 			pdata.is_4th_col_stop_pos = False
 		
-		checkbutton_draw_line_as_point = self.xml.get_widget("checkbutton_draw_line_as_point")
+		checkbutton_draw_line_as_point = self.xml.get_object("checkbutton_draw_line_as_point")
 		if checkbutton_draw_line_as_point.get_active():
 			draw_line_as_point= True
 		else:
 			draw_line_as_point = False
 		
-		entry_gwr_name = self.xml.get_widget("entry_gwr_name")
+		entry_gwr_name = self.xml.get_object("entry_gwr_name")
 		if entry_gwr_name.get_text():
 			pdata.gwr_name = entry_gwr_name.get_text()
 		else:
 			pdata.gwr_name = None
 		
-		entry_call_method_id = self.xml.get_widget("entry_call_method_id")
+		entry_call_method_id = self.xml.get_object("entry_call_method_id")
 		call_method_id = entry_call_method_id.get_text()
-		entry_analysis_method_id = self.xml.get_widget("entry_analysis_method_id")
+		entry_analysis_method_id = self.xml.get_object("entry_analysis_method_id")
 		analysis_method_id = entry_analysis_method_id.get_text()
-		entry_phenotype_method_id = self.xml.get_widget("entry_phenotype_method_id")
+		entry_phenotype_method_id = self.xml.get_object("entry_phenotype_method_id")
 		phenotype_method_id = entry_phenotype_method_id.get_text()
 		
 		if call_method_id and analysis_method_id and phenotype_method_id:
@@ -573,8 +725,9 @@ class GenomeBrowser(object):
 				rm = rows.first()
 			if rm:
 				input_fname = rm.filename
-				pdata.gwr_name = '%s_%s_%s'%(rm.analysis_method.short_name, rm.phenotype_method_id, rm.phenotype_method.short_name)
-			
+				pdata.gwr_name = '%s_%s_%s_call_%s'%(rm.analysis_method.short_name, \
+													rm.phenotype_method_id, rm.phenotype_method.short_name,\
+													rm.call_method_id)
 		
 		genome_wide_result = getGenomeWideResultFromFile(input_fname, min_value_cutoff, do_log10_transformation, pdata)
 		if len(genome_wide_result.data_obj_ls)>0:
@@ -596,48 +749,277 @@ class GenomeBrowser(object):
 	
 	def on_button_cnvqc_ok_clicked(self, widget, data=None):
 		"""
+		2010-3-14
+			add functionality to deal with checkbutton_sequence_refpos, which allows getting sequence coverage data from db
 		2009-10-30
+			get CNV QC data as a genome_wide_result from db
 		"""
-		self.dialog_cnvqc_db.hide()
 		if not self.mysql_conn or not self.mysql_curs:
 			self.db_connect()
 		
-		entry_cnv_qc_accession_id = self.xml.get_widget("entry_cnv_qc_accession_id")
-		cnv_qc_accession_id = entry_cnv_qc_accession_id.get_text()
-		if cnv_qc_accession_id:
-			cnv_qc_accession_id = int(cnv_qc_accession_id)
+		entry_cnv_non_ecotype_id = self.entry_cnv_non_ecotype_id
+		if entry_cnv_non_ecotype_id.get_property('sensitive'):
+			cnv_non_ecotype_id = yh_gnome.getDataOutOfTextEntry(entry_cnv_non_ecotype_id, data_type=int,\
+															filter_func = get1stSplitByUnderscore)
 		else:
-			sys.stderr.write("Accession id is not given.\n")
-			return
-		entry_cnv_type_id = self.xml.get_widget("entry_cnv_type_id")
-		cnv_type_id = entry_cnv_type_id.get_text()
-		if cnv_type_id:
-			cnv_type_id = int(cnv_type_id)
-		else:
-			cnv_type_id = None
-		entry_cnv_qc_min_size = self.xml.get_widget("entry_cnv_qc_min_size")
-		cnv_qc_min_size = entry_cnv_qc_min_size.get_text()
-		if cnv_qc_min_size:
-			cnv_qc_min_size = int(cnv_qc_min_size)
-		else:
-			cnv_qc_min_size = None
-		entry_cnv_qc_min_no_of_probes = self.xml.get_widget("entry_cnv_qc_min_no_of_probes")
-		cnv_qc_min_no_of_probes = entry_cnv_qc_min_no_of_probes.get_text()
-		if cnv_qc_min_no_of_probes:
-			cnv_qc_min_no_of_probes = int(cnv_qc_min_no_of_probes)
-		else:
-			cnv_qc_min_no_of_probes = None
+			cnv_non_ecotype_id = None
 		
-		genome_wide_result = self.db.getCNVQCInGWA(cnv_qc_accession_id, cnv_type_id=cnv_type_id, min_size=cnv_qc_min_size,\
-												min_no_of_probes=cnv_qc_min_no_of_probes)
-		if len(genome_wide_result.data_obj_ls)>0:
-			self.genome_wide_results.add_genome_wide_result(genome_wide_result)
-			#self.load_data(input_fname, self.mysql_curs, self.postgres_curs)
-			self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], draw_cnv_block=True)
+		entry_cnv_ecotype_id = self.xml.get_object("entry_cnv_ecotype_id")
+		if entry_cnv_ecotype_id.get_property('sensitive'):
+			cnv_ecotype_id = yh_gnome.getDataOutOfTextEntry(entry_cnv_ecotype_id, data_type=int)
 		else:
-			sys.stderr.write("No CNV QC data for accession_id=%s, cnv_type=%s, min_size=%s, min_no_of_probes=%s.\n"%\
-							(cnv_qc_accession_id, cnv_type_id, cnv_qc_min_size, cnv_qc_min_no_of_probes))
+			cnv_ecotype_id = None
+		
+		if cnv_non_ecotype_id is None and cnv_ecotype_id is None:
+			sys.stderr.write("Neither non-ecotype nor ecotype id is given.\n")
+			return
+		
+		cnv_method_id = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_method_id"), data_type=int,\
+													filter_func=get1stSplitByAnything, default=1)
+		
+		cnv_type_id = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_type_id"), data_type=int,\
+													filter_func=get1stSplitByAnything, default=1)
+		
+		cnv_qc_min_size = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_qc_min_size"), data_type=int)
+		
+		cnv_qc_min_no_of_probes = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_qc_min_no_of_probes"), \
+																data_type=int)
+		
+		min_reciprocal_overlap = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_min_reciprocal_overlap"), \
+															data_type=float, default=0.6)
+		
+		chr = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_chr_cnv_from_db"), data_type=int)
+		start = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_start_cnv_from_db"), data_type=int)
+		stop = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_stop_cnv_from_db"), data_type=int)
+		
+		getFstSplitFunc = lambda x: x.split()[0]
+		seq_ref_pos_version = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("comboboxentry_seq_ref_pos_version"), \
+											data_type=int, filter_func=getFstSplitFunc, default=1)
+		
+		type_of_cnv_data = self.comboboxentry_which_cnv_data_from_db.get_active()
+		drawType = 1	# default is to draw CNV (box)
+		local_genome_wide_result_ls = []
+		if type_of_cnv_data==0:	#CNVQCCall
+			genome_wide_result = self.db.getCNVQCInGWA(cnv_non_ecotype_id, cnv_type_id=cnv_type_id, chr=chr, start=start, \
+									stop=stop, \
+									min_size=cnv_qc_min_size, cnv_method_id=cnv_method_id,\
+									min_no_of_probes=cnv_qc_min_no_of_probes)
+			local_genome_wide_result_ls.append(genome_wide_result)
+		elif type_of_cnv_data==1:	# Ref-Coverage by Fragments From One Accession (1D)
+			genome_wide_result = self.db.getSequenceRefPosInGWA(accession_id=cnv_non_ecotype_id, min_size=cnv_qc_min_size, \
+									min_no_of_probes=cnv_qc_min_no_of_probes, version=seq_ref_pos_version)
+			local_genome_wide_result_ls.append(genome_wide_result)
+		elif type_of_cnv_data==2:	# Ref-Coverage by One Fragment (2D)
+			genome_wide_result = self.db.getOneSequenceRefPosInGWA(sequence_fragment_id=cnv_non_ecotype_id, \
+										min_size=cnv_qc_min_size, \
+										min_no_of_probes=cnv_qc_min_no_of_probes, version=seq_ref_pos_version)
+			local_genome_wide_result_ls.append(genome_wide_result)
+			drawType = 2	# draw sequence fragment (arrow)
+		elif type_of_cnv_data==3:	# Ref-Probe-Coverage by one Fragment (2D)
+			genome_wide_result = self.db.getOneSequence2ProbeInGWA(sequence_fragment_id=cnv_non_ecotype_id, \
+									min_no_of_identities=25)
+			drawType = 2	# draw sequence fragment (arrow)
+			local_genome_wide_result_ls.append(genome_wide_result)
+		elif type_of_cnv_data == 4:	# CNVCall
+			array_id_ls = []
+			if cnv_non_ecotype_id:
+				array_id_ls = [cnv_non_ecotype_id]
+			elif cnv_ecotype_id:
+				array_id_ls = self.db.getArrayIDLsGivenEcotypeID(cnv_ecotype_id)
+			for array_id in array_id_ls:
+				genome_wide_result = self.db.getCNVCallInGWA(array_id=array_id, cnv_type_id=cnv_type_id, \
+												chr=chr, start=start, \
+												stop=stop, \
+												cnv_method_id=cnv_method_id, min_size=cnv_qc_min_size, \
+												min_no_of_probes=cnv_qc_min_no_of_probes)
+				if genome_wide_result:
+					local_genome_wide_result_ls.append(genome_wide_result)
+		elif type_of_cnv_data==5: #2010-8-5 CNV
+			genome_wide_result = self.db.getCNVInGWA(cnv_method_id=cnv_method_id,cnv_type_id=cnv_type_id, chr=chr, start=start, \
+										stop=stop, \
+										min_size=cnv_qc_min_size,\
+										min_no_of_probes=cnv_qc_min_no_of_probes)
+			local_genome_wide_result_ls.append(genome_wide_result)
+			
+		elif type_of_cnv_data==6: #2010-8-5 CNVArrayCall
+			array_id_ls = []
+			if cnv_non_ecotype_id:
+				array_id_ls = [cnv_non_ecotype_id]
+			elif cnv_ecotype_id:
+				array_id_ls = self.db.getArrayIDLsGivenEcotypeID(cnv_ecotype_id)
+			for array_id in array_id_ls:
+				genome_wide_result = self.db.getCNVArrayCallInGWA(array_id=array_id, cnv_method_id=cnv_method_id,cnv_type_id=cnv_type_id, \
+										chr=chr, start=start, stop=stop, \
+										min_size=cnv_qc_min_size,\
+										min_no_of_probes=cnv_qc_min_no_of_probes)
+				if genome_wide_result:
+					local_genome_wide_result_ls.append(genome_wide_result)
+		else:
+			sys.stderr.write("Choose which type of CNV data first!\n")
+			return
+		
+		for genome_wide_result in local_genome_wide_result_ls:
+			checkbutton_within_coverage_sensitive_state = self.checkbutton_within_coverage.get_property('sensitive')
+			if checkbutton_within_coverage_sensitive_state and self.checkbutton_within_coverage.get_active():
+				ecotype_id = genome_wide_result.ecotype_id 
+				if ecotype_id not in self.ecotype_id2RBDictCoverageOfRef:
+					self.ecotype_id2RBDictCoverageOfRef.update(self.db.getSequenceFragmentRefPosFromDBInRBDict(data_source_id=None, \
+																			ecotype_id=ecotype_id, \
+									min_QC_segment_size=cnv_qc_min_size, min_no_of_probes=cnv_qc_min_no_of_probes,\
+									min_reciprocal_overlap=min_reciprocal_overlap))
+				RBDictCoverageOfRef = self.ecotype_id2RBDictCoverageOfRef.get(ecotype_id)
+				if RBDictCoverageOfRef:
+					# remove objects from genome_wide_result which fall outside of RBDictCoverageOfRef
+					genome_wide_result.keepGWRObjectsWithinGivenRBDict(RBDictCoverageOfRef, min_reciprocal_overlap=min_reciprocal_overlap)
+			
+			# plot genome_wide_result
+			if len(genome_wide_result.data_obj_ls)>0:
+				self.genome_wide_results.add_genome_wide_result(genome_wide_result)
+				self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], drawType=drawType)
+			else:
+				sys.stderr.write("No CNV QC data for accession_id=%s, cnv_type=%s, min_size=%s, min_no_of_probes=%s.\n"%\
+								(cnv_non_ecotype_id, cnv_type_id, cnv_qc_min_size, cnv_qc_min_no_of_probes))
+				continue
+			combobox_type_of_nearby_data = self.xml.get_object("combobox_type_of_nearby_data")
+			type_of_nearby_data = combobox_type_of_nearby_data.get_active()
+			
+			input_fname = self.entry_cnv_intensity_fname.get_text()
+			
+			extend_dist = self.entry_cnv_probe_extend_dist.get_text()
+			if extend_dist:
+				extend_dist = int(extend_dist)*1000
+			else:
+				extend_dist = 20000
+			rbDict = CNV.turnSegmentGWRIntoRBDict(genome_wide_result, extend_dist=extend_dist, \
+										min_reciprocal_overlap=min_reciprocal_overlap)
+			if type_of_nearby_data==1:	#intensity
+				self.plotProbeIntensityNearGWR(genome_wide_result, rbDict=rbDict, cnv_intensity_fname=input_fname, \
+											min_reciprocal_overlap=min_reciprocal_overlap)
+			elif type_of_nearby_data==2:	#coverage
+				self.plotQuanLongPECoverageWithinRBDict(rbDict, input_fname, \
+							min_reciprocal_overlap=min_reciprocal_overlap, additionalTitle=None)
+		self.dialog_cnvqc_db.hide()
 	
+	def plotProbeIntensityNearGWR(self, genome_wide_result, rbDict=None, cnv_intensity_fname=None, \
+								min_reciprocal_overlap=None):
+		"""
+		2010-4-27
+			split out of on_button_cnvqc_ok_clicked()
+			This function draws intensity of probes which are near or within the genome_wide_result.
+		"""
+		if not os.path.isfile(cnv_intensity_fname):
+			sys.stderr.write("Either CNV probe intensity filename not specified or it doesn't exist.\n")
+			return
+		ecotype_id = getattr(genome_wide_result, 'ecotype_id', None)
+		array_id = getattr(genome_wide_result, 'array_id', None)
+		checkbutton_match_intensity_by_ecotypeid = self.xml.get_object("checkbutton_match_intensity_by_ecotypeid")
+		array_id_ls = []
+		if checkbutton_match_intensity_by_ecotypeid.get_active():	# try ecotype ID first
+			if ecotype_id:
+				array_id_ls = self.db.getArrayIDLsGivenEcotypeID(ecotype_id)
+			elif array_id:	#
+				array_id_ls = [array_id]
+		else:
+			if array_id:
+				array_id_ls = [array_id]
+			elif ecotype_id:
+				array_id_ls = self.db.getArrayIDLsGivenEcotypeID(ecotype_id)
+		if array_id_ls:
+			self.plotIntensityOfProbesWithinRBDict(rbDict, cnv_intensity_fname, array_id_ls, \
+										min_reciprocal_overlap=min_reciprocal_overlap, \
+										additionalTitle=genome_wide_result.name)
+	
+	def plotIntensityOfProbesWithinRBDict(self, rbDict, cnv_intensity_fname, array_id_ls, \
+										min_reciprocal_overlap=0.6, additionalTitle=None):
+		"""
+		2010-4-28
+			split out of plotProbeIntensityNearGWR()
+		"""
+		tilingIntensityData = self.cnv_intensity_fname2data.get(cnv_intensity_fname)
+		if not tilingIntensityData:
+			tilingIntensityData = CNV.TilingProbeIntensityData(cnv_intensity_fname, \
+												min_reciprocal_overlap=min_reciprocal_overlap)
+			"""
+			data_matrix, probe_id_ls, chr_pos_ls, header = CNV.getProbeIntensityData(cnv_intensity_fname)
+			col_id_ls = header[1:-2]
+			col_id_ls = map(int, col_id_ls)
+			tilingIntensityData = SNP.SNPData(row_id_ls=chr_pos_ls, col_id_ls=col_id_ls, data_matrix=data_matrix)
+			tilingIntensityData.probe_id_ls = probe_id_ls
+			"""
+			self.cnv_intensity_fname2data[cnv_intensity_fname] = tilingIntensityData
+		
+		for array_id in array_id_ls:
+			intensity_gwr = tilingIntensityData.getIntensityForOneArrayInGWRGivenRBDict(array_id, rbDict=rbDict,\
+																additionalTitle=additionalTitle)
+			"""
+			intensity_gwr = CNV.fetchIntensityInGWAWithinRBDictGivenArrayIDFromTilingIntensity(tilingIntensityData, \
+																		array_id, rbDict,\
+																		gwr_name=gwr_name,\
+																		min_reciprocal_overlap=min_reciprocal_overlap)
+			"""
+			if intensity_gwr and len(intensity_gwr.data_obj_ls)>0:
+				self.genome_wide_results.add_genome_wide_result(intensity_gwr)
+				self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], drawType=1)
+			else:
+				sys.stderr.write("No intensity data for array %s.\n"%array_id)
+	
+	coverageFname2gwr = {}
+	def plotQuanLongPECoverageWithinRBDict(self, rbDict, input_fname, \
+							min_reciprocal_overlap=0.6, additionalTitle=None, windowSize=100):
+		"""
+		2010-7-28
+			similar to plotIntensityOfProbesWithinRBDict, but replace probe intensity with PE coverage
+		"""
+		coverage_gwr = self.coverageFname2gwr.get(input_fname)
+		from pymodule.CNV import CNVSegmentBinarySearchTreeKey
+		from pymodule.SNP import GenomeWideResult, DataObject
+		if coverage_gwr is None:
+			import re
+			chrPattern = re.compile(r'.*Chr(\d+).coverage')
+			chrPatternSearchResult = chrPattern.search(input_fname)
+			if chrPatternSearchResult:
+				chr = int(chrPatternSearchResult.group(1))
+			else:
+				sys.stderr.write("Can't parse chromosome out of %s. aborted.\n"%input_fname)
+			import csv
+			reader = csv.reader(open(input_fname), delimiter='\t')
+			gwr_name = 'log10(coverage) %s'%os.path.basename(input_fname)
+			if additionalTitle:
+				gwr_name += " "+ additionalTitle
+			
+			coverage_gwr = GenomeWideResult(name=gwr_name)
+			
+			genome_wide_result_id = id(coverage_gwr)
+			
+			for row in reader:
+				position, coverage = row[:2]
+				position = int(position)*windowSize-windowSize/2	#coverage is caculated in 100-base window.
+				coverage = float(coverage)
+				if coverage<=0.0:
+					coverage = -3
+				else:
+					coverage = math.log10(coverage)
+				data_obj = DataObject(chromosome=chr, position=position, value=coverage)
+				data_obj.comment = ''
+				data_obj.genome_wide_result_name = gwr_name
+				data_obj.genome_wide_result_id = genome_wide_result_id
+				coverage_gwr.add_one_data_obj(data_obj)
+			self.coverageFname2gwr[input_fname] = coverage_gwr
+		
+		# restrict the coverage_gwr within rbDict
+		inRBDictCoverageGWR = GenomeWideResult(name=coverage_gwr.name)
+		genome_wide_result_id = id(inRBDictCoverageGWR)
+		for data_obj in coverage_gwr.data_obj_ls:
+			cnvSegmentKey = CNVSegmentBinarySearchTreeKey(chromosome=data_obj.chromosome, span_ls=[data_obj.position],\
+										min_reciprocal_overlap=min_reciprocal_overlap)
+			if cnvSegmentKey in rbDict:
+				inRBDictCoverageGWR.add_one_data_obj(data_obj)
+		
+		if inRBDictCoverageGWR and len(inRBDictCoverageGWR.data_obj_ls)>0:
+			self.genome_wide_results.add_genome_wide_result(inRBDictCoverageGWR)
+			self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], drawType=1)
+		else:
+			sys.stderr.write("No intensity data for array %s.\n"%array_id)
 	
 	def on_button_cnvqc_cancel_clicked(self, widget, data=None):
 		"""
@@ -645,9 +1027,10 @@ class GenomeBrowser(object):
 		"""
 		self.dialog_cnvqc_db.hide()
 		
-		
 	def on_button_cnv_gada_ok_clicked(self, widget, data=None):
 		"""
+		2010-6-3
+			deal with ecotype-id/array-id, chr, start, stop
 		2009-10-30
 			get CNVs from GADA output file
 		"""
@@ -656,50 +1039,52 @@ class GenomeBrowser(object):
 		if not self.mysql_conn or not self.mysql_curs:
 			self.db_connect()
 		
-		entry_cnv_array_id = self.xml.get_widget("entry_cnv_array_id")
-		array_id = entry_cnv_array_id.get_text()
-		if array_id:
-			array_id = int(array_id)
-		else:
-			sys.stderr.write("Array id is not given.\n")
-			return
-		entry_cnv_max_amp = self.xml.get_widget("entry_cnv_max_amp")
-		max_amp = entry_cnv_max_amp.get_text()
-		if max_amp:
-			max_amp = float(max_amp)
-		else:
-			max_amp = None
-		entry_cnv_min_amp = self.xml.get_widget("entry_cnv_min_amp")
-		min_amp = entry_cnv_min_amp.get_text()
-		if min_amp:
-			min_amp = float(min_amp)
-		else:
-			min_amp = None
-		entry_cnv_min_size = self.xml.get_widget("entry_cnv_min_size")
-		min_size = entry_cnv_min_size.get_text()
-		if min_size:
-			min_size = int(min_size)
-		else:
-			min_size = None
+		id_type = yh_gnome.getDataOutOfTextEntry(self.combobox_gada_id_type)
+		gada_id = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_gada_id"), data_type=int)
+		array_id_ls = []
+		if id_type=='ecotype id':
+			array_id_ls = self.db.getArrayIDLsGivenEcotypeID(gada_id)
+			if not array_id_ls:
+				sys.stderr.write("no arrays found for ecotype id %s.\n"%(gada_id))
+				return
+		elif gada_id:
+			array_id_ls.append(gada_id)
 		
-		entry_cnv_min_no_of_probes = self.xml.get_widget("entry_cnv_min_no_of_probes")
-		min_no_of_probes = entry_cnv_min_no_of_probes.get_text()
-		if min_no_of_probes:
-			min_no_of_probes = int(min_no_of_probes)
+		if not array_id_ls:
+			sys.stderr.write("no arrays specified for gada id %s.\n"%(gada_id))
+			return
+		
+		max_amp = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_max_amp"), data_type=float)
+		min_amp = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_min_amp"), data_type=float)
+		min_size = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_min_size"), data_type=int)
+		
+		chr = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_gada_chromosome"), \
+											data_type=int)
+		start = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_gada_start"), data_type=int)
+		stop = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_gada_stop"), data_type=int)
+		
+		min_no_of_probes = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_cnv_min_no_of_probes"), data_type=int)
+		
+		checkbutton_filter_gada_by_cutoff = self.xml.get_object("checkbutton_filter_gada_by_cutoff")
+		if checkbutton_filter_gada_by_cutoff.get_active():
+			filter_gada_by_cutoff = True
 		else:
-			min_no_of_probes = None
+			filter_gada_by_cutoff = False
 		
 		input_fname_ls = [input_fname]
-		genome_wide_result = getCNVDataFromFileInGWA(input_fname_ls, array_id, max_amp=max_amp, min_amp=min_amp, min_size=min_size,\
-							min_no_of_probes=min_no_of_probes)
-		
-		if len(genome_wide_result.data_obj_ls)>0:
-			self.genome_wide_results.add_genome_wide_result(genome_wide_result)
-			#self.load_data(input_fname, self.mysql_curs, self.postgres_curs)
-			self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], draw_cnv_block=True)
-		else:
-			sys.stderr.write("No CNV data for array_id=%s, max_amp=%s, min_amp=%s, min_size=%s, min_no_of_probes=%s.\n"%\
-							(array_id, max_amp, min_amp, min_size, min_no_of_probes))
+		local_genome_wide_result_ls = []
+		for array_id in array_id_ls:
+			genome_wide_result = getCNVDataFromFileInGWA(input_fname_ls, array_id, max_amp=max_amp, \
+									min_amp=min_amp, min_size=min_size,\
+									min_no_of_probes=min_no_of_probes, chr=chr, start=start, stop=stop,\
+									filter_gada_by_cutoff=filter_gada_by_cutoff)
+			if len(genome_wide_result.data_obj_ls)>0:
+				self.genome_wide_results.add_genome_wide_result(genome_wide_result)
+				#self.load_data(input_fname, self.mysql_curs, self.postgres_curs)
+				self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], drawType=1)
+			else:
+				sys.stderr.write("No CNV data for array_id=%s, max_amp=%s, min_amp=%s, min_size=%s, min_no_of_probes=%s.\n"%\
+								(array_id, max_amp, min_amp, min_size, min_no_of_probes))
 	
 	
 	def on_button_cnv_gada_cancel_clicked(self, widget, data=None):
@@ -707,6 +1092,121 @@ class GenomeBrowser(object):
 		2009-10-30
 		"""
 		self.filechooserdialog_cnv_gada.hide()
+
+	def on_button_ok_cnv_by_region_clicked(self, widget, data=None):
+		"""
+		2010-4-27
+		"""
+		cnv_by_region_id = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("comboboxentry_id_cnv_by_region"), \
+												data_type=int, \
+												filter_func=get1stSplitByUnderscore)
+		
+		chr = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_chr_cnv_by_region"), data_type=int)
+		start = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_start_cnv_by_region"), data_type=int)
+		stop = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_stop_cnv_by_region"), data_type=int)	
+		
+		#2010-7-22
+		cnv_method_id = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("comboboxentry_cnv_method_id_by_region"), \
+											data_type=int, \
+											filter_func=get1stSplitByAnything, default=1)
+		cnv_type_id = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("comboboxentry_cnv_type_id_by_region"), \
+											data_type=int, \
+											filter_func=get1stSplitByAnything, default=1)
+		cnv_min_size = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_min_size_by_region"), data_type=int)
+		cnv_min_no_of_probes = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("entry_min_no_of_probes_by_region"), \
+													data_type=int)
+		
+		cnv_by_region_id_type = yh_gnome.getDataOutOfTextEntry(self.combobox_id_type_cnv_by_region)
+		cnv_by_region_data_type = self.comboboxentry_cnv_by_region.get_active()
+		
+		seq_ref_pos_version = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("comboboxentry_seq_ref_pos_version_by_region"), \
+								data_type=int, filter_func=get1stSplitByAnything, default=1)
+		
+		drawType = 1	# default is to draw CNV (box)
+		local_genome_wide_result_ls = []
+		if cnv_by_region_data_type==0:	#Probe Intensity
+			array_id_ls = []
+			additionalTitle = None
+			if cnv_by_region_id_type=='ecotype id':
+				additionalTitle = 'ecotype %s'%cnv_by_region_id
+				array_id_ls = self.db.getArrayIDLsGivenEcotypeID(cnv_by_region_id)
+				if not array_id_ls:
+					sys.stderr.write("no arrays found for ecotype id %s.\n"%(cnv_by_region_id))
+					return
+			elif cnv_by_region_id:
+				array_id_ls.append(cnv_by_region_id)
+			if not array_id_ls:
+				sys.stderr.write("no array id set.\n")
+				return
+			entry_intensity_fname = self.xml.get_object("entry_intensity_fname")
+			cnv_intensity_fname = yh_gnome.getDataOutOfTextEntry(entry_intensity_fname)
+			if not cnv_intensity_fname:
+				sys.stderr.write("Please specify cnv_intensity_fname.\n")
+				return
+			if chr and start and stop:
+				from pymodule.RBTree import RBDict
+				rbDict = RBDict(cmpfn=CNV.leftWithinRightAlsoEqualCmp)
+				segmentKey = CNV.CNVSegmentBinarySearchTreeKey(chromosome=chr, span_ls=[start, stop])
+				rbDict[segmentKey] = (chr, start, stop)
+			else:
+				sys.stderr.write("at least one of chr, start, stop not specified.\n")
+				return
+			if rbDict and cnv_intensity_fname and array_id_ls:
+				self.plotIntensityOfProbesWithinRBDict(rbDict, cnv_intensity_fname, array_id_ls, \
+										additionalTitle=additionalTitle)
+		elif cnv_by_region_data_type==1:	# SequenceFragment Probe-Blast Result	(2D)
+			local_genome_wide_result_ls.extend(self.db.getSequence2ProbeInMultiGWA(accession_id=cnv_by_region_id, \
+														min_no_of_identities=25, chr=chr, start=start, stop=stop))
+			drawType = 2	# draw sequence fragment (arrow)
+		elif cnv_by_region_data_type==2:	# Reference Coverage By SequenceFragment (1D)
+			genome_wide_result = self.db.getSequenceRefPosInGWA(accession_id=cnv_by_region_id, chr=chr, \
+															start=start, stop=stop, version=seq_ref_pos_version)
+			local_genome_wide_result_ls.append(genome_wide_result)
+		elif cnv_by_region_data_type == 3:	# CNVQCCall
+			genome_wide_result = self.db.getCNVQCInGWA(accession_id=cnv_by_region_id, chr=chr, start=start, stop=stop,\
+											cnv_type_id=cnv_type_id, cnv_method_id=cnv_method_id, min_size=cnv_min_size,\
+											min_no_of_probes=cnv_min_no_of_probes)
+			local_genome_wide_result_ls.append(genome_wide_result)
+		elif cnv_by_region_data_type==4:	# CNVCall
+			array_id_ls = []
+			if cnv_by_region_id_type=='ecotype id':
+				array_id_ls = self.db.getArrayIDLsGivenEcotypeID(cnv_by_region_id)
+			elif cnv_by_region_id:
+				array_id_ls.append(cnv_by_region_id)
+			for array_id in array_id_ls:
+				genome_wide_result = self.db.getCNVCallInGWA(array_id=array_id, chr=chr, start=start, stop=stop,\
+											cnv_type_id=cnv_type_id, cnv_method_id=cnv_method_id, min_size=cnv_min_size,\
+											min_no_of_probes=cnv_min_no_of_probes)
+				local_genome_wide_result_ls.append(genome_wide_result)
+		
+		elif cnv_by_region_data_type == 5:	#Ref Coverage By Sequences (2D)
+			local_genome_wide_result_ls.extend(self.db.getSequenceRefPosInMultiGWA(accession_id=cnv_by_region_id, \
+							chr=chr, start=start, stop=stop, version=seq_ref_pos_version))
+			drawType = 2	# draw sequence fragment (arrow)
+		elif cnv_by_region_data_type == 6:	#100bp Coverage by PESolexaData
+			pass
+		else:
+			sys.stderr.write("Type of CNV data %s unknown.\n"%cnv_by_region_data_type)
+			return
+		
+		
+		for genome_wide_result in local_genome_wide_result_ls:
+			# plot genome_wide_result
+			if len(genome_wide_result.data_obj_ls)>0:
+				self.genome_wide_results.add_genome_wide_result(genome_wide_result)
+				self.plot(self.ax, self.canvas_matplotlib, self.genome_wide_results.genome_wide_result_ls[-1], \
+						drawType=drawType)
+			else:
+				sys.stderr.write("No data for id=%s, chr=%s, start=%s, stop=%s.\n"%\
+								(cnv_by_region_id, chr, start, stop))
+				continue
+		self.dialog_cnv_by_region.hide()
+		
+	def on_button_cancel_cnv_by_region_clicked(self, widget, data=None):
+		"""
+		2010-4-27
+		"""
+		self.dialog_cnv_by_region.hide()
 	
 	def db_connect(self):
 		"""
@@ -723,8 +1223,8 @@ class GenomeBrowser(object):
 		self.drivername = 'mysql'
 		self.hostname = self.entry_mysql_hostname.get_text()
 		self.dbname = self.entry_mysql_dbname.get_text()
-		self.db_user = self.xml.get_widget("entry_db_user").get_text()
-		self.db_passwd = self.xml.get_widget("entry_db_passwd").get_text()
+		self.db_user = self.xml.get_object("entry_db_user").get_text()
+		self.db_passwd = self.xml.get_object("entry_db_passwd").get_text()
 		
 		import MySQLdb
 		try:
@@ -830,13 +1330,17 @@ class GenomeBrowser(object):
 				chromosome = gene_model.chromosome
 				this_chr_starting_pos_on_plot = chr_id2cumu_size[chromosome]-chr_id2size[chromosome]-chr_gap
 				if gene_model.strand=="1":
-					g_artist = Gene(c_start_ls, c_end_ls, y=y_value, x_offset=this_chr_starting_pos_on_plot, width=gene_width, alpha=0.3, facecolor='r', picker=True)
-				elif gene_model.strand=="-1":	#to draw opposite strand, 1st is to order c_start_ls and c_end_ls in descending order. 2nd is to swap c_start_ls and c_end_ls.
+					g_artist = Gene(c_start_ls, c_end_ls, y=y_value, x_offset=this_chr_starting_pos_on_plot, \
+								width=gene_width, alpha=0.3, facecolor='r', picker=True)
+				elif gene_model.strand=="-1":	#to draw opposite strand, 1st is to order c_start_ls and c_end_ls 
+					# in descending order. 2nd is to swap c_start_ls and c_end_ls.
 					#c_start_ls.reverse()	#2008-02-04 it's already in descending order in db.
 					#c_end_ls.reverse()	#2008-02-04 it's already in descending order in db.
-					g_artist = Gene(c_end_ls, c_start_ls, y=y_value, x_offset=this_chr_starting_pos_on_plot, width=gene_width, alpha=0.3, facecolor='r', picker=True)
+					g_artist = Gene(c_end_ls, c_start_ls, y=y_value, x_offset=this_chr_starting_pos_on_plot, \
+								width=gene_width, alpha=0.3, facecolor='r', picker=True)
 				else:	#no arrow
-					g_artist = Gene(c_start_ls, c_end_ls, y=y_value, is_arrow=False, x_offset=this_chr_starting_pos_on_plot, width=gene_width, alpha=0.3, facecolor='r', picker=True)
+					g_artist = Gene(c_start_ls, c_end_ls, y=y_value, is_arrow=False, x_offset=this_chr_starting_pos_on_plot, \
+								width=gene_width, alpha=0.3, facecolor='r', picker=True)
 				ax.add_artist(g_artist)
 				artist_obj_id = id(g_artist)
 				self.artist_obj_id2artist_gene_id_ls[artist_obj_id] = [g_artist, gene_id]
@@ -1001,9 +1505,9 @@ class GenomeBrowser(object):
 		if not self.chr_id2size:
 			sys.stderr.write("No genome-wide pvalue plot has been drawn yet. Do it first!\n")
 			return
-		entry_gene_list_id = self.xml.get_widget("entry_gene_list_id")
+		entry_gene_list_id = self.xml.get_object("entry_gene_list_id")
 		list_type_id = entry_gene_list_id.get_text()
-		comboboxentry_bar_color = self.xml.get_widget("comboboxentry_bar_color")
+		comboboxentry_bar_color = self.xml.get_object("comboboxentry_bar_color")
 		bar_color = comboboxentry_bar_color.get_active_text()
 		if not bar_color:	#default is black
 			bar_color = 'k'
@@ -1043,7 +1547,220 @@ class GenomeBrowser(object):
 		self.axe_gene_model.set_ylim([base_y_value-gene_width, gene_position_cycle+gene_width*2])
 		self.canvas_matplotlib.draw()
 	
+	def on_comboboxentry_which_cnv_data_from_db_changed(self, widget, data=None):
+		"""
+		2010-6-14
+			deal with hbox_seq_ref_pos_version
+		2010-3-17
+		"""
+		type_of_cnv_data = self.comboboxentry_which_cnv_data_from_db.get_active()
+		entry_cnv_type_id = self.xml.get_object("entry_cnv_type_id")
+		hbox_seq_ref_pos_version = self.xml.get_object('hbox_seq_ref_pos_version')
+		#2010-7-26
+		hbox_cnv_type_cnvqc_db = self.xml.get_object('hbox_cnv_type_cnvqc_db')
+		hbox_cnv_method_cnvqc_db = self.xml.get_object('hbox_cnv_method_cnvqc_db')
+		entry_cnv_method_id = self.xml.get_object("entry_cnv_method_id")
+		
+		if type_of_cnv_data==0:	# CNVQCCall
+			self.checkbutton_within_coverage.set_sensitive(True)
+			self.radiobutton_non_ecotype_id.set_label("accession id:")
+		elif type_of_cnv_data==1:	# sequence fragments of one accession
+			self.checkbutton_within_coverage.set_sensitive(False)
+			self.radiobutton_non_ecotype_id.set_label("accession id:")
+			self.radiobutton_ecotype_id.set_sensitive(False)
+		elif type_of_cnv_data == 2 or type_of_cnv_data == 3:	# one sequence fragment
+			self.checkbutton_within_coverage.set_sensitive(False)
+			self.radiobutton_non_ecotype_id.set_label("sequence fragment id:")
+			self.radiobutton_ecotype_id.set_sensitive(False)
+			"""
+			self.entry_cnv_non_ecotype_id.append_text("16719")
+			self.entry_cnv_non_ecotype_id.append_text("16720")
+			"""
+		elif type_of_cnv_data == 4:	# CNVCall
+			self.checkbutton_within_coverage.set_sensitive(True)
+			self.radiobutton_non_ecotype_id.set_label("array id:")
+			self.radiobutton_ecotype_id.set_sensitive(True)
+		elif type_of_cnv_data == 5:	# CNV	#2010-8-5
+			self.checkbutton_within_coverage.set_sensitive(True)
+			self.radiobutton_ecotype_id.set_sensitive(False)
+		elif type_of_cnv_data == 6:	# CNVArrayCall
+			self.checkbutton_within_coverage.set_sensitive(True)
+			self.radiobutton_non_ecotype_id.set_label("array id:")
+			self.radiobutton_ecotype_id.set_sensitive(False)
+		
+		if type_of_cnv_data==5:	#2010-8-5 CNV doesn't need any ID
+			self.radiobutton_non_ecotype_id.set_sensitive(False)
+		else:
+			self.radiobutton_non_ecotype_id.set_sensitive(True)
+		
+		data_type_id2CNVTable = {0: Stock_250kDB.CNVQCCall, 4:Stock_250kDB.CNVCall, 5: Stock_250kDB.CNV, 6:Stock_250kDB.CNVArrayCall}
+		if type_of_cnv_data in [0, 4, 5, 6]:	# CNVQCCall or CNVCall
+			CNVTableClass = data_type_id2CNVTable[type_of_cnv_data]
+			
+			hbox_cnv_method_cnvqc_db.set_sensitive(True)
+			cnv_method_info = self.db.getCNVMethodOrTypeInfoDataInCNVCallOrQC(CNVTableClass=CNVTableClass)
+			self.fillComboBox(entry_cnv_method_id, cnv_method_info.list_label_ls)
+			
+			if type_of_cnv_data==6:	#2010-8-5 CNVArrayCall doesn't have cnv type info 
+				hbox_cnv_type_cnvqc_db.set_sensitive(False)
+				self.fillComboBox(entry_cnv_type_id, [])
+			else:
+				hbox_cnv_type_cnvqc_db.set_sensitive(True)
+				cnv_type_info = self.db.getCNVMethodOrTypeInfoDataInCNVCallOrQC(TableClass=Stock_250kDB.CNVType, \
+															CNVTableClass=CNVTableClass)
+				self.fillComboBox(entry_cnv_type_id, cnv_type_info.list_label_ls)
+			
+			if type_of_cnv_data==4:	#CNVCall
+				# fill the comboboxentry_id_cnv_by_region with ids from array_info that have data in CNVCall
+				array_id_info = self.db.getArrayIDInfoWithDataInGivenTable()
+				self.fillComboBox(self.entry_cnv_non_ecotype_id, array_id_info.list_label_ls)
+			elif type_of_cnv_data==0:	#CNVQCCall
+				accession_id_info = self.db.getAccessionIDInfoWithDataInCNVQCCall()
+				self.fillComboBox(self.entry_cnv_non_ecotype_id, accession_id_info.list_label_ls)
+			elif type_of_cnv_data==6:	#CNVArrayCall
+				accession_id_info = self.db.getArrayIDInfoWithDataInGivenTable(TableClass=Stock_250kDB.CNVArrayCall)
+				self.fillComboBox(self.entry_cnv_non_ecotype_id, accession_id_info.list_label_ls)
+		else:
+			# fill the comboboxentry_id_cnv_by_region with nothing
+			self.fillComboBox(self.entry_cnv_non_ecotype_id, [])
+			
+			hbox_cnv_type_cnvqc_db.set_sensitive(False)
+			self.fillComboBox(entry_cnv_type_id, [])
+			hbox_cnv_method_cnvqc_db.set_sensitive(False)
+			self.fillComboBox(entry_cnv_method_id, [])
+			
+			
+		#2010-6-14
+		comboboxentry_seq_ref_pos_version = self.xml.get_object("comboboxentry_seq_ref_pos_version")
+		if type_of_cnv_data == 1 or type_of_cnv_data == 2:	# SequenceFragmentRefPos
+			hbox_seq_ref_pos_version.set_sensitive(True)
+			version_info = self.db.getSeqFragmentRefPosVersionInfo()
+			self.fillComboBox(comboboxentry_seq_ref_pos_version, version_info.list_label_ls)
+		else:
+			hbox_seq_ref_pos_version.set_sensitive(False)
+			self.fillComboBox(comboboxentry_seq_ref_pos_version, [])
+
+	def on_comboboxentry_cnv_by_region_changed(self, widget, data=None):
+		"""
+		2010-4-27
+			cnv_by_region_data_type_ls = ["Probe Intensity", "SequenceFragment Probe-Blast Result", \
+									"Reference Coverage By SequenceFragment", "CNVQCCall", "CNVCall"]
+		"""
+		cnv_by_region_data_type = widget.get_active()
+		comboboxentry_id_cnv_by_region = self.xml.get_object("comboboxentry_id_cnv_by_region")
+		hbox_intensity_fname = self.xml.get_object("hbox_intensity_fname")
+		if cnv_by_region_data_type==0:
+			hbox_intensity_fname.set_sensitive(True)
+		else:
+			hbox_intensity_fname.set_sensitive(False)
+		
+		if cnv_by_region_data_type==0:	#Probe Intensity
+			self.combobox_id_type_cnv_by_region.set_active(0)
+			# fill the comboboxentry_id_cnv_by_region with nothing
+			self.fillComboBox(comboboxentry_id_cnv_by_region, [])
+		elif cnv_by_region_data_type==1:	# SequenceFragment Probe-Blast Result
+			self.combobox_id_type_cnv_by_region.set_active(2)
+			# fill the comboboxentry_id_cnv_by_region with ids from CNVQCAccession that have data in SequenceFragment2Probe
+			accession_id_info = self.db.getAccessionIDInfoWithDataInSequenceFragment2Probe()
+			self.fillComboBox(comboboxentry_id_cnv_by_region, accession_id_info.list_label_ls)
+		elif cnv_by_region_data_type==2:	# Reference Coverage By SequenceFragment
+			self.combobox_id_type_cnv_by_region.set_active(2)
+			# fill the comboboxentry_id_cnv_by_region with ids from CNVQCAccession that have data in SequenceFragmentRefPos
+			accession_id_info = self.db.getAccessionIDInfoWithDataInSequenceFragmentRefPos()
+			self.fillComboBox(comboboxentry_id_cnv_by_region, accession_id_info.list_label_ls)
+		elif cnv_by_region_data_type == 3:	# CNVQCCall
+			self.combobox_id_type_cnv_by_region.set_active(2)
+			# fill the comboboxentry_id_cnv_by_region with ids from CNVQCAccession that have data in CNVQCCall
+			accession_id_info = self.db.getAccessionIDInfoWithDataInCNVQCCall()
+			self.fillComboBox(comboboxentry_id_cnv_by_region, accession_id_info.list_label_ls)
+		elif cnv_by_region_data_type==4:	# CNVCall
+			self.combobox_id_type_cnv_by_region.set_active(0)
+			# fill the comboboxentry_id_cnv_by_region with ids from array_info that have data in CNVCall
+			array_id_info = self.db.getArrayIDInfoWithDataInGivenTable()
+			self.fillComboBox(comboboxentry_id_cnv_by_region, array_id_info.list_label_ls)
+		
+		elif cnv_by_region_data_type == 5:	#Ref Coverage By Sequences (2D)
+			self.combobox_id_type_cnv_by_region.set_active(2)
+			accession_id_info = self.db.getAccessionIDInfoWithDataInSequenceFragmentRefPos()
+			self.fillComboBox(comboboxentry_id_cnv_by_region, accession_id_info.list_label_ls)
+		
+		#2010-6-17
+		hbox_seq_ref_pos_version_by_region = self.xml.get_object('hbox_seq_ref_pos_version_by_region')
+		comboboxentry_seq_ref_pos_version_by_region = self.xml.get_object("comboboxentry_seq_ref_pos_version_by_region")
+		if cnv_by_region_data_type == 2 or cnv_by_region_data_type==5:	# SequenceFragmentRefPos
+			hbox_seq_ref_pos_version_by_region.set_sensitive(True)
+			version_info = self.db.getSeqFragmentRefPosVersionInfo()
+			self.fillComboBox(comboboxentry_seq_ref_pos_version_by_region, version_info.list_label_ls)
+		else:
+			hbox_seq_ref_pos_version_by_region.set_sensitive(False)
+			self.fillComboBox(comboboxentry_seq_ref_pos_version_by_region, [])
+	
+		#2010-7-23
+		hbox_cnv_type_id_by_region = self.xml.get_object('hbox_cnv_type_id_by_region')
+		comboboxentry_cnv_type_id_by_region = self.xml.get_object("comboboxentry_cnv_type_id_by_region")
+		hbox_cnv_method_id_by_region = self.xml.get_object('hbox_cnv_method_id_by_region')
+		comboboxentry_cnv_method_id_by_region = self.xml.get_object("comboboxentry_cnv_method_id_by_region")
+		
+		data_type_id2CNVTable = {3: Stock_250kDB.CNVQCCall, 4:Stock_250kDB.CNVCall}
+		if cnv_by_region_data_type == 3 or cnv_by_region_data_type==4:	# CNVQCCall or CNVCall
+			CNVTableClass = data_type_id2CNVTable[cnv_by_region_data_type]
+			hbox_cnv_type_id_by_region.set_sensitive(True)
+			cnv_type_info = self.db.getCNVMethodOrTypeInfoDataInCNVCallOrQC(TableClass=Stock_250kDB.CNVType, \
+															CNVTableClass=CNVTableClass)
+			self.fillComboBox(comboboxentry_cnv_type_id_by_region, cnv_type_info.list_label_ls)
+			
+			hbox_cnv_method_id_by_region.set_sensitive(True)
+			cnv_method_info = self.db.getCNVMethodOrTypeInfoDataInCNVCallOrQC(CNVTableClass=CNVTableClass)
+			self.fillComboBox(comboboxentry_cnv_method_id_by_region, cnv_method_info.list_label_ls)
+		else:
+			hbox_cnv_type_id_by_region.set_sensitive(False)
+			self.fillComboBox(comboboxentry_cnv_type_id_by_region, [])
+			hbox_cnv_method_id_by_region.set_sensitive(False)
+			self.fillComboBox(comboboxentry_cnv_method_id_by_region, [])
+	
+	def on_radiobutton_cnv_db_id_toggled(self, widget, data=None):
+		"""
+		2010-3-17
+		"""
+		if widget.get_active() == 1:	#only change self.submit_option to the active radiobutton
+			if data=='radiobutton_non_ecotype_id':
+				self.entry_cnv_non_ecotype_id.set_sensitive(True)
+				self.entry_cnv_ecotype_id.set_sensitive(False)
+			elif data=='radiobutton_ecotype_id':
+				self.entry_cnv_non_ecotype_id.set_sensitive(False)
+				self.entry_cnv_ecotype_id.set_sensitive(True)
+	
+	def on_filechooserbutton_CNV_intensity_file_set(self, widget, data=None):
+		"""
+		2010-3-17
+		"""
+		entry_cnv_intensity_fname = self.xml.get_object("entry_cnv_intensity_fname")
+		cnv_intensity_fname = widget.get_filename()
+		entry_cnv_intensity_fname.set_text(cnv_intensity_fname)
+	
+	def on_filechooserbutton_intensity_fname_file_set(self, widget, data=None):
+		"""
+		2010-4-27
+		"""
+		entry_intensity_fname = self.xml.get_object("entry_intensity_fname")
+		cnv_intensity_fname = widget.get_filename()
+		entry_intensity_fname.set_text(cnv_intensity_fname)
+		
+	def on_combobox_type_of_nearby_data_changed(self, widget, data=None):
+		"""
+		2010-7-28
+			renamed from on_checkbutton_plot_cnv_intensity_toggled().
+			check button got replaced by a combo box
+		2010-3-17
+		"""
+		hbox_cnv_intensity = self.xml.get_object("hbox_cnv_intensity")
+		if widget.get_active()>0:
+			hbox_cnv_intensity.set_sensitive(True)
+		else:
+			hbox_cnv_intensity.set_sensitive(False)
+		
+		
 if __name__ == '__main__':
-	prog = gnome.program_init('GenomeBrowser', '0.1')
+	#prog = gnome.program_init('GenomeBrowser', '0.1')	# 2010-3-14 no more gnome part.
 	instance = GenomeBrowser()
 	gtk.main()

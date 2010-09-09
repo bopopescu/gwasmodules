@@ -60,11 +60,13 @@ class PutHaploGroupIntoDB(object):
 		sys.stderr.write("Done.\n")
 		return snp_id_ls
 	
-	def putHaplotypeGroupIntoDB(self, session, input_fname, tg_ecotypeid2row, max_snp_typing_error_rate, snp_id_ls):
+	def putHaplotypeGroupIntoDB(self, session, input_fname, max_snp_typing_error_rate, snp_id_ls):
 		"""
-		2009-3-31
+		2009-4-10
+			remove tg_ecotypeid2row
 		2009-4-4
 			add argument tg_ecotypeid2row
+		2009-3-31
 		"""
 		sys.stderr.write("Constructing haplotype groups ...\n")
 		pattern_ecotypeid = re.compile(r'(?<=\))\d+')
@@ -75,9 +77,10 @@ class PutHaploGroupIntoDB(object):
 		geographic_integrity_idx = col_name2col_index['geographic_integrity']
 		filtered_SNPs_idx = col_name2col_index['filtered_SNPs']
 		counter = 0
-		for tg_ecotypeid, row in tg_ecotypeid2row.iteritems():
+		#for tg_ecotypeid, row in tg_ecotypeid2row.iteritems():
+		for row in reader:
 			ecotypeid = int(row[ecotypeid_idx])
-			ecotypeid = tg_ecotypeid	#2009-4-4 use tg_ecotypeid instead
+			#ecotypeid = tg_ecotypeid	#2009-4-4 use tg_ecotypeid instead
 			haplo_name = row[haplo_name_idx]
 			geographic_integrity_name = row[geographic_integrity_idx]
 			filtered_SNPs = row[filtered_SNPs_idx]
@@ -116,6 +119,8 @@ class PutHaploGroupIntoDB(object):
 	
 	def dropRedundantEcotypes(self, input_fname, ecotypeid2tg_ecotypeid):
 		"""
+		2009-4-10
+			not used. decided to keep all of them.
 		2009-4-4
 			retain only one row out of duplicated ecotype rows based on ecotypeid2tg_ecotypeid.
 				it's not random. usually the one with same ecotype id as tg_ecotypeid unless tg_ecotypeid doesn't appear.
@@ -170,10 +175,10 @@ class PutHaploGroupIntoDB(object):
 		db.setup()
 		session = db.session
 		session.begin()
-		ecotypeid2tg_ecotypeid = get_ecotypeid2tg_ecotypeid(db.metadata.bind, debug=self.debug)
-		tg_ecotypeid2row = self.dropRedundantEcotypes(self.input_fname, ecotypeid2tg_ecotypeid)
+		#ecotypeid2tg_ecotypeid = get_ecotypeid2tg_ecotypeid(db.metadata.bind, debug=self.debug)
+		#tg_ecotypeid2row = self.dropRedundantEcotypes(self.input_fname, ecotypeid2tg_ecotypeid)
 		snp_id_ls = self.getSNPIDLs()
-		self.putHaplotypeGroupIntoDB(session, self.input_fname, tg_ecotypeid2row, self.max_snp_typing_error_rate, snp_id_ls)
+		self.putHaplotypeGroupIntoDB(session, self.input_fname, self.max_snp_typing_error_rate, snp_id_ls)
 		
 		if self.commit:
 			session.commit()
