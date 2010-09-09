@@ -282,7 +282,23 @@ class PhenotypeMethod(Entity):
 			clause = or_(clause,PhenotypeMethod.owner == user, PhenotypeMethod.users.any(Users.id == user.id),PhenotypeMethod.groups.any(Groups.id.in_([group.id for group in user.groups])))
 		query = query.filter(clause)
 		return query
-
+	
+	def checkACL(self,user):
+		if self.access == 'public':
+			return True
+		if user is None:
+			return False
+		if user.isAdmin == 'Y':
+			return True
+		if self.owner == user: 
+			return True
+		if user in self.users:
+			return True
+		if [group in self.groups for group in user.groups]: 
+			return True
+		return False
+		
+		
 class AnalysisMethod(Entity):
 	"""
 	2009-5-14
