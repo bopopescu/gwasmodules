@@ -602,6 +602,8 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000):
 	import gviz_api
 	json_result = {}
 	for chr in chr2data:
+		list = chr2data[chr]
+		list.sort()
 		data_table = gviz_api.DataTable(description)
 		data_table.LoadData(chr2data[chr])
 		json_result[chr] = data_table.ToJSon(columns_order=("position", "value"))
