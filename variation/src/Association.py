@@ -65,6 +65,7 @@ import rpy
 from sets import Set
 #from DrawEcotypeOnMap import DrawEcotypeOnMap
 
+
 class Association(Kruskal_Wallis):
 	debug = 0
 	report = 0
@@ -651,8 +652,11 @@ class Association(Kruskal_Wallis):
 	
 	emma_R_sourced = False	# 2010-4-23
 	@classmethod
-	def emma(cls, non_NA_genotype_ls=None, non_NA_phenotype_ls=None, kinship_matrix=None, eig_L = None):
+	def emma(cls, non_NA_genotype_ls=None, non_NA_phenotype_ls=None, kinship_matrix=None, eig_L = None, Z=None,):
 		"""
+		2010-9-8
+			add argument Z, an incidence matrix mapping accessions from non_NA_phenotype_ls to kinship_matrix
+			return LL, dLL, optLL as well
 		2010-9-6
 			return delta
 		2010-9-6
@@ -686,7 +690,7 @@ class Association(Kruskal_Wallis):
 			else:
 				n = None	# this would cause error
 		genotype_matrix = cls.createDesignMatrix(non_NA_genotype_ls, add_intercept=True, n=n)
-		one_marker_rs = rpy.r.emma_REMLE(non_NA_phenotype_ls, genotype_matrix, kinship_matrix, eig_L=eig_L, cal_pvalue=rpy.r.TRUE)
+		one_marker_rs = rpy.r.emma_REMLE(non_NA_phenotype_ls, genotype_matrix, kinship_matrix, Z=Z, eig_L=eig_L, cal_pvalue=rpy.r.TRUE)
 		coeff_list = [beta[0] for beta in one_marker_rs['beta']]
 		if non_NA_genotype_ls is None:    # no covariate used, so no pvalues
 			coeff_p_value_list=[0.]
@@ -698,12 +702,14 @@ class Association(Kruskal_Wallis):
 		random_effect_and_residual_ls = list(numpy.array(non_NA_phenotype_ls)-numpy.inner(genotype_matrix, coeff_ar))
 		coeff_list.extend(random_effect_and_residual_ls)
 		"""
+		# vg is the variance for the random effect (multi-small-effect-gene effect), ve is the residual variance. 
 		ve=one_marker_rs['ve']
 		vg=one_marker_rs['vg']
 		heritability = vg/(vg+ve)
 		pdata = PassingData(pvalue=one_marker_rs['pvalue'], var_perc=one_marker_rs['genotype_var_perc'][0][0], \
 						coeff_list=coeff_list, coeff_p_value_list=coeff_p_value_list, ve=ve, \
-						vg=vg, heritability=heritability, delta=one_marker_rs['delta'])	# vg is the variance for the random effect (multi-small-effect-gene effect), ve is the residual variance. 
+						vg=vg, heritability=heritability, delta=one_marker_rs['delta'], logdelta=one_marker_rs['logdelta'],\
+						optLL=one_marker_rs['optLL'], dLL=one_marker_rs['dLL'], LL=one_marker_rs['LL'])
 		return pdata
 	
 	def Emma_whole_matrix(self, data_matrix, phenotype_ls, min_data_point=3, **keywords):
@@ -820,8 +826,11 @@ class Association(Kruskal_Wallis):
 		return csSymm
 	
 	@classmethod
-	def preEMMAX(cls, non_NA_phenotype_ls, kinship_matrix, non_NA_genotype_ls=None, debug=False):
+	def preEMMAX(cls, non_NA_phenotype_ls, kinship_matrix, non_NA_genotype_ls=None, debug=False, Z=None):
 		"""
+		2010-9-8
+			add argument Z, an incidence matrix mapping accessions from non_NA_phenotype_ls to kinship_matrix
+			return one_emma_rs from cls.emma()
 		2010-4-16
 			add argument non_NA_genotype_ls, to allow co-factors
 		2010-3-16
@@ -836,7 +845,7 @@ class Association(Kruskal_Wallis):
 			cls.emma_R_sourced = True
 		# run EMMA here to get vg & ve, scalars for the two variance matrices (random effect, residual) 
 		one_emma_rs = cls.emma(non_NA_genotype_ls=non_NA_genotype_ls, \
-			non_NA_phenotype_ls=non_NA_phenotype_ls, kinship_matrix=kinship_matrix, eig_L=None)
+			non_NA_phenotype_ls=non_NA_phenotype_ls, kinship_matrix=kinship_matrix, eig_L=None, Z=Z)
 		vg = one_emma_rs.vg
 		ve = one_emma_rs.ve
 		
@@ -859,7 +868,8 @@ class Association(Kruskal_Wallis):
 		non_NA_phenotype_ar = numpy.array(non_NA_phenotype_ls)		
 		non_NA_phenotype_ar = numpy.dot(L_inverse, non_NA_phenotype_ar)	# numpy.dot and numpy.inner has subtle difference.
 		sys.stderr.write("Done.\n")
-		return PassingData(variance_matrix=variance_matrix, non_NA_phenotype_ar=non_NA_phenotype_ar, L_inverse=L_inverse)
+		return PassingData(variance_matrix=variance_matrix, non_NA_phenotype_ar=non_NA_phenotype_ar, L_inverse=L_inverse, 
+					one_emma_rs = one_emma_rs)
 		
 	def EMMAX(self, data_matrix, phenotype_ls, min_data_point=3, **keywords):
 		"""
