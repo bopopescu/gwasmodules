@@ -381,12 +381,14 @@ emma.REMLE <- function(y, X, K, Z=NULL, ngrids=100, llim=-10, ulim=10,
     etas.1 <- etas[1:(t-q)]
     etas.2 <- etas[(t-q+1):(n-q)]
     etas.2.sq <- sum(etas.2*etas.2)
-  
+    
     logdelta <- (0:ngrids)/ngrids*(ulim-llim)+llim
     m <- length(logdelta)
     delta <- exp(logdelta)
-    Lambdas <- matrix(eig.R$values,t-q,m) + matrix(delta,t-q,m,byrow=TRUE)
+    Lambdas <- matrix(eig.R$values,t-q,m) + matrix(delta, t-q, m, byrow=TRUE)	# lambda + delta
     Etasq <- matrix(etas.1*etas.1,t-q,m)
+    LL <- 0.5*((n-q)*(log((n-q)/(2*pi))-1-log(colSums(Etasq/Lambdas)))-colSums(log(Lambdas)))
+    #dLL <- 0.5*delta*((n-q)*colSums(Etasq/(Lambdas*Lambdas))/colSums(Etasq/Lambdas)-colSums(1/Lambdas))
     dLL <- 0.5*delta*((n-q)*(colSums(Etasq/(Lambdas*Lambdas))+etas.2.sq/(delta*delta))/(colSums(Etasq/Lambdas)+etas.2.sq/delta)-(colSums(1/Lambdas)+(n-t)/delta))
     
     optlogdelta <- vector(length=0)
@@ -488,9 +490,10 @@ emma.REMLE <- function(y, X, K, Z=NULL, ngrids=100, llim=-10, ulim=10,
   {
   	mu = NULL
   }
-  
+  # 2010-9-7 return logdelta, optLL, dLL, LL
   return (list(REML=maxLL,delta=maxdelta,ve=maxve,vg=maxva, beta=beta, x_beta_var=x_beta_var, 
-  	genotype_var_perc=genotype_var_perc, pvalue=pvalue, stat=stat, mu=mu, pvalues=pvalues))
+  	genotype_var_perc=genotype_var_perc, pvalue=pvalue, stat=stat, mu=mu, pvalues=pvalues, 
+  	logdelta=logdelta, optLL=optLL, dLL=dLL, LL=LL))
 }
 
 emma.ML.LRT <- function(ys, xs, K, Z=NULL, X0 = NULL, ngrids=100, llim=-10, ulim=10, esp=1e-10, ponly = FALSE) {
