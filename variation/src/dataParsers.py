@@ -1764,7 +1764,7 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 
 
 
-def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, chromosome=None,
+def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, chromosomes=[1,2,3,4,5],
 		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None):
 	"""
 	format=1: the function return a RawSnpsData object list
@@ -1784,7 +1784,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1
 			sd.writeToFile(sd_binary_file,binary_format=True)
 	else:
 		snpsds = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
-		sd = SNPsDataSet(snpsds,[1,2,3,4,5])
+		sd = SNPsDataSet(snpsds,)
  	return sd
 
 
