@@ -1414,7 +1414,7 @@ def load_kinship_from_file(kinship_file,accessions=None):
 
 
 
-def calc_kinship(snps):
+def calc_kinship_old(snps):
         """
         Requires EMMA to be installed.
         
@@ -1433,7 +1433,7 @@ def calc_kinship(snps):
         #return r.emma_kinship(a)
 
 
-def calc_kinship_old(snps):
+def calc_kinship(snps):
         """
         Requires EMMA to be installed.
         

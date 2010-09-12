@@ -83,6 +83,7 @@ import cPickle
 import linear_models as lm
 
 from numpy import *
+import pdb
 #import rpy2.robjects as robjects
 #import rpy2.robjects.numpy2ri
 #r_source = robjects.r('source')
@@ -594,12 +595,15 @@ def _run_():
 				sys.stdout.write("Retrieving the Kinship matrix K....")
 				sys.stdout.flush()
 				k_file = data_dir+"kinship_matrix_cm"+str(callMethodID)+".pickled"
+				#pdb.set_trace()
 				if not kinship_file and os.path.isfile(k_file): #Check if corresponding call_method_file is available
 					kinship_file = k_file
 				if kinship_file:   #Kinship file was supplied..
+					print '\nLoading SNPs data..'
 					sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 
 								      missingVal = missingVal, filter = debug_filter)
 					num_outliers = prepare_data(sd,phed,p_i,trans_method,remove_outliers)	
+					print '\nLoading supplied kinship'
 					k = lm.load_kinship_from_file(kinship_file,sd.accessions)
 				else:
 					sd=dataParsers.parse_snp_data(snps_data_file , format = 0, delimiter = delim, 

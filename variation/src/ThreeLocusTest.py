@@ -180,6 +180,7 @@ def _run_():
 	plot_pvals = False
 	call_method_id = 54
 	sim_phen=False
+	phen_index=None
 	
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
@@ -240,7 +241,7 @@ def _run_():
 				print __doc__
 			sys.exit(2)
 
-	if len(args)<2 and not parallel:
+	if len(args)<1 and not parallel:
 		if help==0:
 			print "Arguments are missing!!\n"
 			print __doc__
@@ -293,7 +294,7 @@ def _run_():
 		if runId:
 			shstr += "#PBS -l mem=5000m \n"
 		else:
-			shstr += "#PBS -l mem=3000m \n"
+			shstr += "#PBS -l mem=1900m \n"
 		
 		shstr+="#PBS -N TLS_"+str(phen_index)+"_"+parallel+"\n"
 		shstr+="(python "+env.env['script_dir']+"ThreeLocusTest.py -o "+outputFile+" "
@@ -326,8 +327,10 @@ def _run_():
 			shstr+=" --summarizeRuns "			
 		if sim_phen:
 			shstr+=" --sim_phen "			
-		shstr+=" --pvalueThreshold=%f --mapping_method=%s  --phenotype_error=%f  --kinship_error=%f -t %d %d "\
-			%(pvalueThreshold,mapping_method,phenotype_error,kinship_error,call_method_id,phen_index)			
+		shstr+=" --pvalueThreshold=%f --mapping_method=%s  --phenotype_error=%f  --kinship_error=%f -t %d "\
+			%(pvalueThreshold,mapping_method,phenotype_error,kinship_error,call_method_id)
+		if phen_index!=None:
+				shstr+=str(phen_index)+" "		
 		shstr+="> "+outputFile+"_job"+".out) >& "+outputFile+"_job"+".err\n"
 		#print shstr
 
@@ -464,7 +467,11 @@ def _run_():
 			rank_statistics = []
 			sign_fractions = []
 			sign_statistics = []
-			
+			if mapping_method == 'emmax':
+				est_heritabilities = []
+				pseudo_heritabilities = []
+				k_correlations = []
+				ks_statistics = []			
 				
 			while True: #phen_index<len(phen_mafs)-numberPerRun:
 				phen_index += numberPerRun
@@ -695,8 +702,11 @@ def _run_():
 				maf = mafs[i]
 				anti_snp = get_anti_snp(snp) #Retrieving the anti-snp
 				if latent_corr:
-					lsd = random.choice(latent_snp_chr_pos_maf)
-					(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
+					(latent_snp,latent_chr,latent_pos,latent_maf) = \
+								random.choice(latent_snp_chr_pos_maf)
+					if random.random()<0.5:
+						latent_snp=get_anti_snp(latent_snp)
+					lsd = (latent_snp,latent_chr,latent_pos,latent_maf)
 					while sp.all(latent_snp==snp): #Make sure the two SNPs aren't identical.
 						lsd = random.choice(latent_snp_chr_pos_maf)
 						(latent_snp,latent_chr,latent_pos,latent_maf) = lsd
@@ -707,21 +717,17 @@ def _run_():
 							latent_snp.append(1)
 						else:
 							latent_snp.append(0)								
-				#Constructing empty arrays
+
 				if phenotype_model == 1:#xor
-					#print "XOR"					
 					phenotype = snp ^ latent_snp
 					anti_phenotype = anti_snp ^ latent_snp
 				elif phenotype_model == 2:#or
-					#print "OR/AND"
 					phenotype = snp | latent_snp
 					anti_phenotype = anti_snp | latent_snp
 				elif phenotype_model == 3:#plus
-					#print "+"
 					phenotype = snp + latent_snp
 					anti_phenotype = anti_snp + latent_snp
-				elif phenotype_model == 4:#xor plus
-					#print "XOR +0.5"
+				elif phenotype_model == 4:#xor plus 0.5
 					phenotype = (snp ^ latent_snp)+0.5*(snp & latent_snp)
 					anti_phenotype = (anti_snp ^ latent_snp)+0.5*(anti_snp & latent_snp)
 				
@@ -754,11 +760,11 @@ def _run_():
 						phen_var = sp.var(anti_phenotype,ddof=1)
 						error_std = math.sqrt((phenotype_error/(1-phenotype_error))*phen_var)
 						error_vector = sp.random.normal(0,error_std,size=num_lines)
+						anti_phenotype = anti_phenotype+error_vector	
 						error_var = sp.var(error_vector,ddof=1)
 						#heritability
-						h_est = error_var/(error_var+phen_var)				
+						h_est = 1-sp.var(error_vector,ddof=1)/sp.var(anti_phenotype,ddof=1)				
 						h_estimates.append(h_est)
-						anti_phenotype = anti_phenotype+error_vector	
 											
 					phenotypes.append(anti_phenotype)		
 					#print anti_phenotype
@@ -834,7 +840,6 @@ def _run_():
 			summarizeAllRuns(runId, phenotype_model)
 		return #Exiting
 	else:
-		#phen_index=int(args[1])
 		phen_index=int(args[0])
 	print "phen_index:",phen_index
 	print "\nStarting simulation now!\n"
@@ -911,7 +916,7 @@ def _run_():
 				highlight_loci.append(latent_chr_pos)
                         print highlight_loci   
                         print "\nThe %d'th phenotype, variance=%0.3f :"%(i+phen_index,phenotype.var(ddof=1))
-                        print phenotype
+                        #print phenotype
 			sys.stdout.flush()	    
                         
        			if mapping_method=='kw':

@@ -2905,6 +2905,7 @@ class SNPsDataSet:
 			snpsd.filterMonoMorphicSnps()
 
 	def filter_accessions(self,accessions_to_keep,use_accession_names=False):
+		assert len(accessions_to_keep)!=0, "Can't remove all ecotypes."
 		if use_accession_names:
 			import phenotypeData as pd
 			ad = pd._getAccessionToEcotypeIdDict_(accessions_to_keep)
