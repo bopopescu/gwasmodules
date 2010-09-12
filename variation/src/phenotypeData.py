@@ -375,10 +375,7 @@ class PhenotypeData:
 				merge_indices = [self.accessions.index(acc)]
 			acc_map.append(merge_indices)
 		
-		
-				
-		
-
+						
 	def naOutliers(self, phenotypeID,iqrThreshold=10.0):
 		"""
 		Removes outliers from the data
@@ -557,17 +554,12 @@ class PhenotypeData:
 			pylab.show()
 	
 
-
 	def plot_accession_histogram(self,phen_i,marker=None,marker_accessions=None,pdf_file=None,png_file=None,
 				     title=None,marker_score=None,marker_missing_val='NA'):
 		"""
 		Assumes markers accessions and phenotype accessions are synchronized. (Is that safe?)
 		"""
-		
-		
-
-
-	
+			
 	def plot_accession_map(self,p_i,pdf_file=None,png_file=None,color_by=None,map_type="global",
 			       title=None,accessions=None,cmap=None):
 		"""
@@ -649,7 +641,6 @@ class PhenotypeData:
 		if not pdf_file and not png_file:
 			plt.show()
 		
-
 
 	def logTransform(self, pIndex):
 		indexMap = self._getIndexMapping_() #Modified 9/26/08
