@@ -1558,7 +1558,7 @@ class RawSnpsData(_SnpsData_):
                         positions = self.positions    
                         
                 assert len(snps)==len(positions),'Somthing odd with the lengths.'    
-		return SnpsData(snps,positions,accessions=self.accessions,marker_types=self.marker_types,missing_val=missingVal)
+		return SNPsData(snps,positions,accessions=self.accessions,marker_types=self.marker_types,missing_val=missingVal)
 
 
 	def filterBadSnps(self,snpsd,maxNumError=0):
@@ -2533,7 +2533,8 @@ class SNPsDataSet:
 		
 		Note that there is no decoder dictionary option here..
 		"""
-	
+	        import itertools as it
+        
 		print "Writing data to file:",filename
 		numSnps = 0
 		for i in range(0,len(self.chromosomes)):
@@ -2559,31 +2560,45 @@ class SNPsDataSet:
                         f = open(filename,"w")
 		f.write(outStr)
 		if decoder:
-			for i in range(0,len(self.chromosomes)):
+			for chromosome, snpsd in it.izip(self.chromosomes,self.snpsDataList):
 				sys.stdout.write(".")
 				sys.stdout.flush()
-				for j in range(0,len(self.snpsDataList[i].positions)):
-					outStr =""
-					outStr += str(self.chromosomes[i])+delimiter+str(self.snpsDataList[i].positions[j])
-					for k in range(0, len(self.snpsDataList[0].accessions)):
-						outStr += delimiter+str(decoder[self.snpsDataList[i].snps[j][k]])
-					outStr +="\n"
-					f.write(outStr)
+                                for pos,snp in it.izip(snpsd.positions,snpsd.snps):
+                                        outStr = str(chromosome)+delimiter+str(pos)
+                                        for nt in snp:
+                                                outStr += delimiter+str(decoder[snp])
+                                        outStr +="\n"
+                                        f.write(outStr)				
+#                                for j in range(0,len(self.snpsDataList[i].positions)):
+#					outStr =""
+#					outStr += str(self.chromosomes[i])+delimiter+str(self.snpsDataList[i].positions[j])
+#					for k in range(0, len(self.snpsDataList[0].accessions)):
+#						outStr += delimiter+str(decoder[self.snpsDataList[i].snps[j][k]])
+#					outStr +="\n"
+#					f.write(outStr)
 		else:
-			for i in range(0,len(self.chromosomes)):
-				sys.stdout.write(".")
-				sys.stdout.flush()
-				for j in range(0,len(self.snpsDataList[i].positions)):
-					outStr =""
-					outStr += str(self.chromosomes[i])+delimiter+str(self.snpsDataList[i].positions[j])
-					snp = self.snpsDataList[i].snps[j]
-					if len(snp) != len(self.snpsDataList[0].accessions):
-						print "len(snp):",len(snp),", vs. len(self.snpsDataList[0].accessions):",len(self.snpsDataList[0].accessions)
-						raise Exception("The length didn't match")
-					for nt in snp:
-						outStr += delimiter+str(nt)
-					outStr +="\n"
-					f.write(outStr)
+                        for chromosome, snpsd in it.izip(self.chromosomes,self.snpsDataList):
+                                sys.stdout.write(".")
+                                sys.stdout.flush()
+                                for pos,snp in it.izip(snpsd.positions,snpsd.snps):
+                                        outStr = str(chromosome)+delimiter+str(pos)
+                                        for nt in snp: outStr += delimiter+str(nt)
+                                        outStr+="\n"
+                                        f.write(outStr)                                
+#			for i in range(0,len(self.chromosomes)):
+#				sys.stdout.write(".")
+#				sys.stdout.flush()
+#				for j in range(0,len(self.snpsDataList[i].positions)):
+#					outStr =""
+#					outStr += str(self.chromosomes[i])+delimiter+str(self.snpsDataList[i].positions[j])
+#					snp = self.snpsDataList[i].snps[j]
+#					if len(snp) != len(self.snpsDataList[0].accessions):
+#						print "len(snp):",len(snp),", vs. len(self.snpsDataList[0].accessions):",len(self.snpsDataList[0].accessions)
+#						raise Exception("The length didn't match")
+#					for nt in snp:
+#						outStr += delimiter+str(nt)
+#					outStr +="\n"
+#					f.write(outStr)
 		f.close()
 		print ""
 
