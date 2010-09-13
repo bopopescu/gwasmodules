@@ -688,7 +688,7 @@ def _run_():
 					pvals = res['ps']
 					missing_indices = res['missing_indices']
 					if len(missing_indices)>0:
-						sd
+						sd.remove_snps_indices(missing_indices)
 					sys.stdout.write("Done!\n")
 					sys.stdout.flush()
 			

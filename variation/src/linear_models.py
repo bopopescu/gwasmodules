@@ -96,6 +96,7 @@ class LinearModel(object):
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X,self.Y)
                 num_snps = len(snps)
                 rss_list = repeat(h0_rss,num_snps)
+		h0_betas = map(float,list(h0_betas))+[0.0]
                 betas_list = [h0_betas]*num_snps
                 var_perc = zeros(num_snps)
                 q = 1
@@ -477,7 +478,7 @@ class LinearMixedModel(LinearModel):
                 Y = H_sqrt_inv*self.Y        #The transformed outputs.
                 h0_X = H_sqrt_inv*self.X
                 (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-                h0_betas = map(float,list(h0_betas))
+                h0_betas = map(float,list(h0_betas))+[0.0]
                 num_snps = len(snps)
                 rss_list = repeat(h0_rss,num_snps)
                 betas_list = [h0_betas]*num_snps
