@@ -1476,7 +1476,7 @@ class RawSnpsData(_SnpsData_):
 		
 		return [commonSnpsPos, snpErrorRate, commonAccessions, accessionErrorRate, accessionCallRates, arrayIds, accessionCounts, snpCallRate, [naCounts1,naCounts2], [totalCounts,totalFails]]
 
-	def getSnpsData(self, missingVal=-1, reference_ecotype='6909', leave_out_non_binary=True):
+	def getSnpsData(self, missingVal=-1, reference_ecotype='6909', only_non_binary=True):
 		"""
 		Returns a SnpsData object correspoding to this RawSnpsData object.
 
@@ -1507,34 +1507,43 @@ class RawSnpsData(_SnpsData_):
 				if nt in snp:
 					decoder[nt]=k
 					k = k+1
-			if leave_out_non_binary:
-				if k = 2
-			if k!=2 and leave_out_non_binary:
-				continue
-			elif k>2:
-				max1 = 0
-				maxnt1 = ''
-				max2 = 0
-				maxnt2 = ''
-				for nt in alphabet:
-					c = snp.count(nt)
-					if c>max1:
-						max1 = c
-						maxnt1 = nt
-					elif c>max2:
-						max2 = c
-						maxnt2 = nt
-					decoder[nt]=missingVal
-				decoder[maxnt1]=0
-				decoder[maxnt2]=1
-                        new_snp = []
-			for nt in snp:
-				new_snp.append(decoder[nt])
-			snps.append(new_snp)
-
-		accessions = self.accessions
-		positions = self.positions
-		return SnpsData(snps,positions,accessions=accessions,marker_types=self.marker_types,missing_val=missingVal)
+			if only_non_binary:
+				if k == 2:
+                                        positions.append(self.positions[i])
+                                        new_snp = []
+                                        for nt in snp:
+                                                new_snp.append(decoder[nt])
+                                        snps.append(new_snp)
+                                else:
+                                        continue
+			else:
+                                if k>2:
+        				max1 = 0
+        				maxnt1 = ''
+        				max2 = 0
+        				maxnt2 = ''
+        				for nt in alphabet:
+        					c = snp.count(nt)
+        					if c>max1:
+        						max1 = c
+        						maxnt1 = nt
+        					elif c>max2:
+        						max2 = c
+        						maxnt2 = nt
+        					decoder[nt]=missingVal
+        				decoder[maxnt1]=0
+        				decoder[maxnt2]=1
+                                new_snp = []
+        			for nt in snp:
+        				new_snp.append(decoder[nt])
+        			snps.append(new_snp)
+                
+                if only_non_binary:
+                        print 'Removed %d non-binary SNPs out of %d, when converting to binary SNPs.'\
+                                %(len(self.positions)-len(positions),len(self.positions))                
+                else:
+                        positions = self.positions        
+		return SnpsData(snps,positions,accessions=self.accessions,marker_types=self.marker_types,missing_val=missingVal)
 
 
 	def filterBadSnps(self,snpsd,maxNumError=0):

@@ -1765,23 +1765,31 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 
 
 def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, 
-		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None):
+		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None, 
+		use_pickle=True):
 	"""
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
+	import cPickle
 	if format==0 and look_for_binary:
 		sd_binary_file = data_file+'.binary'
 		if os.path.isfile(sd_binary_file):
 			sd = parse_binary_snp_data(sd_binary_file, delimiter = delimiter, 
 					      missing_val = missingVal, filter = filter,
-					      filter_accessions=filter_accessions)
+					      filter_accessions=filter_accessions,use_pickle=use_pickle)
 		else:
 			sd = parse_snp_data(data_file , format = 0, delimiter = delimiter, 
 					      missingVal = missingVal, filter = filter, look_for_binary=False,
 					      filter_accessions=filter_accessions)
 			print 'Save a binary snps data file:',sd_binary_file
 			sd.writeToFile(sd_binary_file,binary_format=True)
+			if use_pickle:
+				pickle_file = sd_binary_file+'.pickled'
+				print 'Saving a pickled version of genotypes.'
+				f = open(pickle_file,'wb')
+				cPickle.dump(sd, f, protocol=2)
+				f.close()			
 	else:
 		(snpsds,chromosomes) = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal, 
 					format=format, filter=filter, id=id, returnChromosomes=True)

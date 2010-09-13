@@ -1,7 +1,6 @@
 #!/bin/csh
-#PBS -l walltime=100:00:00
-#PBS -l nodes=1:ppn=8 
-#PBS -l mem=5000mb
 #PBS -q cmb
-#PBS -N p1_emma_test_emma
-(python /home/cmbpanfs-01/bvilhjal/src/gwa.py --id=/home/cmbpanfs-01/bvilhjal/results/test_pid1_LD_emma  --region_plots=0   --specific_methods=emma --debug_filter=0.005  ../Data/250k/250K_t54.csv ../Data/phenotypes/phen_all_051710.tsv 1 > /home/cmbpanfs-01/bvilhjal/results/test_pid1_LD_emma_job.out) >& /home/cmbpanfs-01/bvilhjal/results/test_pid1_LD_emma_job.err
+#PBS -l walltime=24:00:00
+#PBS -l mem=3000m 
+#PBS -N TLS_400_test
+(python /home/GMI/bjarni.vilhjalmsson/Projects/py_src/ThreeLocusTest.py -o /home/GMI/bjarni.vilhjalmsson/Projects/gwa_results/TLS_test_400_100_pm4  --numberPerRun=100  --latent_corr=1  --phenotypeFile=/tmp/test.phen  --phenotype_model=4  --pvalueThreshold=1.010000 --mapping_method=kw  --phenotype_error=0.500000  --kinship_error=0.000000 -t 54 400 > /home/GMI/bjarni.vilhjalmsson/Projects/gwa_results/TLS_test_400_100_pm4_job.out) >& /home/GMI/bjarni.vilhjalmsson/Projects/gwa_results/TLS_test_400_100_pm4_job.err
