@@ -1543,7 +1543,9 @@ class RawSnpsData(_SnpsData_):
                         print 'Removed %d non-binary SNPs out of %d, when converting to binary SNPs.'\
                                 %(len(self.positions)-len(positions),len(self.positions))                
                 else:
-                        positions = self.positions        
+                        positions = self.positions    
+                        
+                assert len(snps)==len(positions),'Somthing odd with the lengths.'    
 		return SnpsData(snps,positions,accessions=self.accessions,marker_types=self.marker_types,missing_val=missingVal)
 
 
