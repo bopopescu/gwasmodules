@@ -1476,7 +1476,7 @@ class RawSnpsData(_SnpsData_):
 		
 		return [commonSnpsPos, snpErrorRate, commonAccessions, accessionErrorRate, accessionCallRates, arrayIds, accessionCounts, snpCallRate, [naCounts1,naCounts2], [totalCounts,totalFails]]
 
-	def getSnpsData(self, missingVal=-1, reference_ecotype='6909'):
+	def getSnpsData(self, missingVal=-1, reference_ecotype='6909', leave_out_non_binary=True):
 		"""
 		Returns a SnpsData object correspoding to this RawSnpsData object.
 
@@ -1489,8 +1489,11 @@ class RawSnpsData(_SnpsData_):
 		if reference_ecotype in self.accessions:
                         ref_i = self.accessions.index(reference_ecotype)
                 else:
-                        ref_i = 0
+			ref_i = 0
+			import warnings
+			warnings.warn("Given reference ecotype %s wasn't found, using %s as 0-reference."%(reference_ecotype,self.accessions[ref_i]))
                 snps = []
+                positions = []
 		for i, snp in enumerate(self.snps):
                         alphabet = self.alphabet[:]
                    
@@ -1504,7 +1507,11 @@ class RawSnpsData(_SnpsData_):
 				if nt in snp:
 					decoder[nt]=k
 					k = k+1
-			if k > 2:
+			if leave_out_non_binary:
+				if k = 2
+			if k!=2 and leave_out_non_binary:
+				continue
+			elif k>2:
 				max1 = 0
 				maxnt1 = ''
 				max2 = 0

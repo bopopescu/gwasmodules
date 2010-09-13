@@ -1764,7 +1764,8 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 
 
 
-def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, id=None, useDecoder=True, look_for_binary=True, filter_accessions=None):
+def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, 
+		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None):
 	"""
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
