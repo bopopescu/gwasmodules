@@ -1494,6 +1494,7 @@ class RawSnpsData(_SnpsData_):
 			warnings.warn("Given reference ecotype %s wasn't found, using %s as 0-reference."%(reference_ecotype,self.accessions[ref_i]))
                 snps = []
                 positions = []
+                num_lines = len(self.accessions)
 		for i, snp in enumerate(self.snps):
                         alphabet = self.alphabet[:]
                    
@@ -1510,9 +1511,9 @@ class RawSnpsData(_SnpsData_):
 			if only_non_binary:
 				if k == 2:
                                         positions.append(self.positions[i])
-                                        new_snp = []
-                                        for nt in snp:
-                                                new_snp.append(decoder[nt])
+                                        new_snp = np.zeros(num_lines,dtype='int8')
+                                        for j, nt in enumerate(snp):
+                                                new_snp[j] = decoder[nt]
                                         snps.append(new_snp)
                                 else:
                                         continue
