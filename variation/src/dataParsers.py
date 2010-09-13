@@ -1777,11 +1777,11 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1
 		if os.path.isfile(sd_binary_file):
 			sd = parse_binary_snp_data(sd_binary_file, delimiter = delimiter, 
 					      missing_val = missingVal, filter = filter,
-					      filter_accessions=filter_accessions,use_pickle=use_pickle)
+					      filter_accessions = filter_accessions, use_pickle = use_pickle)
 		else:
 			sd = parse_snp_data(data_file , format = 0, delimiter = delimiter, 
 					      missingVal = missingVal, filter = filter, look_for_binary=False,
-					      filter_accessions=filter_accessions)
+					      filter_accessions = filter_accessions)
 			print 'Save a binary snps data file:',sd_binary_file
 			sd.writeToFile(sd_binary_file,binary_format=True)
 			if use_pickle:
