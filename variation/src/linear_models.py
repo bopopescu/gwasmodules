@@ -14,6 +14,7 @@ import os
 import sys
 import multiprocessing as mp
 import time
+from pdb import Pdb
 
 
 class LinearModel(object):
@@ -491,7 +492,6 @@ class LinearMixedModel(LinearModel):
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
                                 continue
-                               	missing_indices.append(i)
                         rss_list[i] = rss[0]                
                         betas_list[i] = map(float,list(betas))
                         if (i+1)%(num_snps/10)==0:
@@ -501,12 +501,13 @@ class LinearMixedModel(LinearModel):
                 rss_ratio = h0_rss/rss_list
                 var_perc = 1-1/rss_ratio
                 f_stats = (rss_ratio-1)*n_p/float(q)
+                print len(f_stats)
                 p_vals = stats.f.sf(f_stats,q,n_p)
-
+                print len(p_vals)
+                pdb.set_trace()
                       
                 return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
-                        'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc,
-                        'missing_indices':missing_indices}
+                        'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
 
 
 

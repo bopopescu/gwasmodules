@@ -585,6 +585,7 @@ class Result(object):
 		self.marfs = self.snp_results['marfs']
 		self.snps=self.snp_results['snps']
 		print "%i scores were removed."%(count-len(self.scores))
+		return len(self.scores)
 
 
 	

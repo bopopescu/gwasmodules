@@ -87,6 +87,7 @@ class PhenotypeData:
 				self.phenotypeNiceNames[index_map[pi]] = " ".join(phenNameList)
 
 
+
 	def _getPhenotypeNameDict_(self):
 		#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/Phenotype_names_061809.csv"
 		filename = "/home/cmbpanfs-01/bvilhjal/data/Phenotype_names_061809.csv"
@@ -98,6 +99,8 @@ class PhenotypeData:
 			ls = line.split(",")
 			name_dict[int(ls[0])]=ls[1].rstrip()
 		return name_dict
+
+
 
 	def get_db_pid(self,pid,conn=None):
 		"""

@@ -686,9 +686,6 @@ def _run_():
 					additional_columns.append('beta0')
 					additional_columns.append('beta1')
 					pvals = res['ps']
-					missing_indices = res['missing_indices']
-					if len(missing_indices)>0:
-						sd.remove_snps_indices(missing_indices)
 					sys.stdout.write("Done!\n")
 					sys.stdout.flush()
 			
@@ -744,11 +741,11 @@ def _run_():
 				res.plot_manhattan(png_file=png_file,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 					       plot_bonferroni=True,cand_genes=cand_genes)
 			else:	
-				res.filter_attr("mafs",15)
-				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
-				res.plot_manhattan(png_file=png_file,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-					       plot_bonferroni=True,cand_genes=cand_genes)
+				if res.filter_attr("mafs",15)>0:
+					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
+					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
+					res.plot_manhattan(png_file=png_file,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
+						       plot_bonferroni=True,cand_genes=cand_genes)
 		else:
 			pass
 		
