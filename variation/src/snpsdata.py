@@ -2925,8 +2925,20 @@ class SNPsDataSet:
 			snpsd.filter_na_snps(max_na_rate=max_na_rate)
 			
 	def remove_snps_indices(self,indices_to_remove):
-		for snpsd in self.snpsDataList:
-			snpsd.remove_snps(indices_to_remove)
+		remove_indices = [[] for i in range(len(self.snpsDataList))]
+		indices_to_remove.sort()
+		offset = 0
+		i = 0
+		for snpsd_i, snpsd in enumerate(self.snpsDataList):
+			max_i = offset+len(snpsd.snps)
+			i2r = indices_to_remove[i]
+			while i<len(indices_to_remove) and i2r < max_i:
+					remove_indices[snpsd_i].append(i2r-offset)
+					i += 1
+					i2r = indices_to_remove[i]
+			offset = max_i				
+		for i, snpsd in enumerate(self.snpsDataList):			
+			snpsd.remove_snps(remove_indices[i])
 
 	
 	def filter_na_accessions(self,max_na_rate=0.2,verbose=False):
