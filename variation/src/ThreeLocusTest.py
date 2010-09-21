@@ -512,7 +512,17 @@ def _run_():
 					latent_loci_snp_chr_pos_mafs += p_d_r_stats.get('latent_loci_snp_chr_pos_mafs',[])
 					rank_statistics += p_d_r_stats.get('rank_statistics',[])
 					
+					if mapping_method=='emmax':
+						est_heritabilities += p_d_r_stats.get('h_estimates',[])
+						pseudo_heritabilities += p_d_r_stats.get('pseudo_heritabilities',[])
+						k_correlations += p_d_r_stats.get('k_correlation',[])
+						ks_statistics += p_d_r_stats.get('ks_statistic',[])			
 						
+					for l in [obs_pval_list,max_pval_list,latent_pvals]:
+						if 0.0 in l:
+							for i, p in enumerate(l):
+								if p==0.0:
+									l[i]=10e-320
 					#print max_pval_list
 					#print "Found",len(max_pval_list),"pvals."
 				except Exception, err_str:
@@ -527,8 +537,19 @@ def _run_():
 			print "len(sign_statistics):",len(sign_statistics)
 			print "len(obs_pval_list), len(latent_pvals):", len(obs_pval_list), len(latent_pvals)
 			print "Mean significant fraction:",sum(sign_fractions)/float(len(sign_fractions))
-
-
+			
+			if mapping_method=='emmax':
+				filename=env.env['results_dir']+"TLS_"+runId+'_pm'+str(phenotype_model)+"_kinship_parameters.pickled"
+				f = open(filename,'w')
+				k_dict = {'est_heritabilities':est_heritabilities, 'pseudo_heritabilities':pseudo_heritabilities, 
+				'k_correlations':k_correlations, 'ks_statistics':ks_statistics}
+				cPickle.dump(k_dict,f)
+				f.close()
+				print 'Dumped kinship results into file:',filename
+				
+				
+			
+			
 			
 		
 			#Setting figure legends, etc.
@@ -1170,7 +1191,7 @@ def _run_():
 	if mapping_method=='emmax':
 		p_d_r_dict['pseudo_heritabilities']=pseudo_heritabilities
 		p_d_r_dict['h_estimates']=h_estimates
-		p_d_r_dict['k_correlation']=k_correlation
+		p_d_r_dict['k_correlation']=k_correlation 
 		p_d_r_dict['ks_statistic']=ks_pval_statistic
 	
 	filename = outputFile+".stats"	
