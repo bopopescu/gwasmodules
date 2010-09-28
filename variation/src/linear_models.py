@@ -42,10 +42,12 @@ class LinearModel(object):
                 (beta, rss, rank, sigma) = linalg.lstsq(self.X, new_x)
                 if float(rss) < lin_depend_thres:
                         warnings.warn('A factor was found to be linearly dependent on the factors already in the X matrix.  Hence skipping it!')
-                        return
+                        return False
                 self.X = sp.hstack([self.X, new_x])
                 self.cofactors.append(x)
                 self.p += 1
+                return True
+
 
 
         def get_hat_matrix(self):
@@ -582,11 +584,12 @@ class LinearMixedModel(LinearModel):
         				continue
         			rss_list[i + j] = rss[0]
         			betas_list[i + j] = map(float, list(betas))
-        			if (i + j + 1) % (num_snps / 10) == 0: #Print dots
+        			if num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
         				sys.stdout.write('.')
         				sys.stdout.flush()
 
-		sys.stdout.write('\n')
+		if num_snps >= 10:
+			sys.stdout.write('\n')
 		rss_ratio = h0_rss / rss_list
 		var_perc = 1 - 1 / rss_ratio
 		f_stats = (rss_ratio - 1) * n_p / float(q)
@@ -1115,17 +1118,33 @@ def emmax(snps, phenotypes, K, cofactors=None, with_interactions=False, int_af_t
         return res
 
 
-def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
+
+def _get_interactions_(isnp, snps, mac_threshold=15):
+	isnps = []
+	cofactor_indices = []
+	anti_isnp = sp.vectorize(lambda x: 1 if x == 0 else 0)(isnp)
+	for i, snp in enumerate(snps):
+		min_count = min(min(sp.bincount(isnp & snp)), min(sp.bincount(isnp | snp)), \
+			min(sp.bincount(snp & anti_isnp)), min(sp.bincount(snp | anti_isnp)))
+		if min_count > mac_threshold and min:
+			isnps.append(isnp & snp)
+			cofactor_indices.append(i)
+	return isnps, cofactor_indices
+
+
+def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
+		chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
+		interaction_pval_thres=0.01, allow_backward_steps=False):
 	"""
         Run EMMAX stepwise.. forward, with one possible backward at each step.
         """
         import plotResults as pr
 
-        sd.filter_mac_snps() #Filter MAF SNPs!
- 	snps = sd.getSnps()
- 	positions = sd.getPositions()
- 	chromosomes = sd.get_chr_list()
-	chr_pos_list = sd.getChrPosList()
+	if sd:
+	 	snps = sd.getSnps()
+	 	positions = sd.getPositions()
+	 	chromosomes = sd.get_chr_list()
+	chr_pos_list = zip(chromosomes, positions)
        	lmm = LinearMixedModel(phenotypes)
         lmm.add_random_effect(K)
 
@@ -1133,7 +1152,9 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
         s1 = time.time()
  	step_info_list = []
 	cofactors = []  #A list of the loci found, together with their statistics.
+	cofactors_str = ''
 	cofactor_snps = []
+	interactions = []
  	step_i = 0
  	num_par = 2 #mean and variance scalar
 
@@ -1143,6 +1164,7 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
         reml_res = lmm.get_REML()
 	H_sqrt = reml_res['H_sqrt']
 	ll = reml_res['max_ll']
+	rss = float(reml_res['rss'])
 	bic = -2 * (reml_res['max_ll']) + num_par * sp.log(lmm.n)
 	extended_bic = bic + \
 		(log_fact(len(snps)) - log_fact(len(snps) - num_par) - log_fact(num_par))
@@ -1150,7 +1172,7 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
 		2 * lmm.n * sp.log(num_par / 2.2 + 1)
 	print 'Step %d: action=None  p_her=%0.4f, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 		(step_i, reml_res['pseudo_heritability'], ll, reml_res['rss'], bic, extended_bic, modified_bic)
-	print 'Cofactors:', cofactors
+	print 'Cofactors:', cofactors_str
 
         for step_i in range(1, num_steps + 1):
                 emmax_res = lmm._emmax_f_test_(snps, H_sqrt, verbose=False)
@@ -1158,31 +1180,65 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
                 min_pval = emmax_res['ps'][min_pval_i]
                 min_pval_chr_pos = chr_pos_list[min_pval_i]
 		print 'Min p-value:', min_pval
-		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':float(reml_res['rss']),
-			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'model':cofactors[:],
-			'ps': emmax_res['ps'], 'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:],
-			'min_pval':min_pval, 'min_pval_pos_chr': min_pval_chr_pos}
+		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss,
+			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
+			'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'cofactors_str':cofactors_str,
+			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 		step_info_list.append(step_info)
 
 		if file_prefix:
 			pdf_file_name = file_prefix + '_step' + str(step_i - 1) + '.pdf'
+			png_file_name = file_prefix + '_step' + str(step_i - 1) + '.png'
 			pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-					pdf_file=pdf_file_name)
+					pdf_file=pdf_file_name, png_file=png_file_name)
 
 
 		#Adding the new SNP as a cofactor
 		cofactors.append((min_pval_chr_pos[0], min_pval_chr_pos[1], min_pval))
+		cofactors_str += '%d_%d,' % (min_pval_chr_pos)
 		cofactor_snps.append(snps[min_pval_i])
 		lmm.add_factor(snps[min_pval_i])
 		reml_res = lmm.get_REML()
 		H_sqrt = reml_res['H_sqrt']
 		ll = reml_res['max_ll']
+		rss = float(reml_res['rss'])
 		num_par += 1
 		action = '+'
 
-		#Try removing a SNP... if likelihood increases.
-		if len(cofactor_snps) > 1:
-			test_ll_s = []
+		#Remove the found SNP from considered SNPs
+		del snps[min_pval_i]
+		del positions[min_pval_i]
+		del chromosomes[min_pval_i]
+		del chr_pos_list[min_pval_i]
+
+		#Try adding an interaction.... 
+		if allow_interactions and len(cofactor_snps) > 1:
+			isnps, cofactor_indices = _get_interactions_(cofactor_snps[-1], cofactor_snps[:-1])
+			if isnps:
+				emmax_res = lmm._emmax_f_test_(isnps, H_sqrt, verbose=False)
+				min_pval_i = sp.argmin(emmax_res['ps'])
+				print emmax_res['ps'][min_pval_i], emmax_res['rss'][min_pval_i]
+				if emmax_res['ps'][min_pval_i] < interaction_pval_thres and emmax_res['rss'][min_pval_i] < rss:
+					if lmm.add_factor(snps[min_pval_i]):
+						cofactor_snps.append(isnps[min_pval_i])
+						interactions.append(((cofactors[min_pval_i][0], cofactors[min_pval_i][1]),
+								(cofactors[-1][0], cofactors[-1][1]), emmax_res['ps'][min_pval_i]))
+						cofactors_str += '%d_%d_X_%d_%d,' \
+								% (cofactors[min_pval_i][0], cofactors[min_pval_i][1],
+								cofactors[-1][0], cofactors[-1][1])
+						step_info['interactions'] = interactions
+						action += 'i'
+						reml_res = lmm.get_REML()
+						H_sqrt = reml_res['H_sqrt']
+						ll = reml_res['max_ll']
+						rss = float(reml_res['rss'])
+						num_par += 1
+						print "Just added an interaction:", interactions
+
+
+		#Try removing a SNP... if RSS decreases.
+		if allow_backward_steps and len(cofactor_snps) > 1:
+			test_rss_list = []
 			for i in range(len(cofactor_snps) - 1):
 			       	test_lmm = LinearMixedModel(phenotypes)
 			        test_lmm.add_random_effect(K)
@@ -1190,18 +1246,22 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
 			        del cfactors[i]
 			        for cf in cfactors: test_lmm.add_factor(cf)
 			        test_reml_res = test_lmm.get_REML()
-			        test_ll_s.append(test_reml_res['max_ll'])
+			        test_rss_list.append(test_reml_res['rss'])
 
-			if max(test_ll_s) > ll:
-				i = sp.argmax(test_ll_s)
+			if min(test_rss_list) < rss:
+				i = sp.argmin(test_rss_list)
 				'Removing a cofactor:', cofactor_snps[i]
 				del cofactor_snps[i]
 				del cofactors[i]
 				lmm = LinearMixedModel(phenotypes)
 				lmm.add_random_effect(K)
-				for cf in cofactor_snps: test_lmm.add_factor(cf)
+				for cf in cofactor_snps: lmm.add_factor(cf)
+				reml_res = lmm.get_REML()
+				H_sqrt = reml_res['H_sqrt']
+				ll = reml_res['max_ll']
+				rss = float(reml_res['rss'])
 				num_par -= 1
-				action = '+-'
+				action += '-'
 
 
 
@@ -1211,24 +1271,25 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
 		modified_bic = bic + \
 			2 * lmm.n * sp.log(num_par / 2.2)
 
-		print 'Step %d: action=%s p_her=%0.4f, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
-			(step_i, action, reml_res['pseudo_heritability'], ll, reml_res['rss'], bic, extended_bic, modified_bic)
-		print 'Cofactors:', cofactors
+		print '\nStep %d: action=%s p_her=%0.4f, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+			(step_i, action, reml_res['pseudo_heritability'], ll, rss, bic, extended_bic, modified_bic)
+		print 'Cofactors:', cofactors_str
 
 	emmax_res = lmm._emmax_f_test_(snps, H_sqrt, verbose=False)
 	min_pval_i = sp.argmin(emmax_res['ps'])
 	min_pval = emmax_res['ps'][min_pval_i]
 	min_pval_chr_pos = chr_pos_list[min_pval_i]
 	print 'Min p-value:', min_pval
-	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':float(reml_res['rss']),
-		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'model':cofactors[:],
-		'ps': emmax_res['ps'], 'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:],
-		'min_pval':min_pval, 'min_pval_pos_chr': min_pval_chr_pos}
+	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss,
+		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
+		'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'cofactors_str':cofactors_str,
+		'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 	step_info_list.append(step_info)
 	if file_prefix:
 		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
+		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
 		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-				pdf_file=pdf_file_name)
+				pdf_file=pdf_file_name, png_file=png_file_name)
 
 
         secs = time.time() - s1
@@ -1253,8 +1314,8 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
 		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
 		for i, si in enumerate(step_info_list):
 			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-			st += ',%d_%d,' % si['min_pval_pos_chr']
-			st += ','.join(['%d_%d' % (c, p) for c, p, pval in si['cofactors']]) + '\n'
+			st += ',%d_%d,' % si['min_pval_chr_pos']
+			st += si['cofactors_str'] + '\n'
 			f.write(st)
 			p_her_list.append(float(si['pseudo_heritability']))
 			rss_list.append(float(si['rss']))
@@ -1265,28 +1326,47 @@ def emmax_step_wise(sd, phenotypes, K, num_steps=10, file_prefix=None):
 			min_pval_list.append(float(si['min_pval']))
 		f.close()
 		import pylab
-		pylab.figure(figsize=(12, 14))
-		pylab.axes([0, 0, 1, 1])
-		pylab.subplots_adjust(wspace=0.3)
-		pylab.subplot(321)
+		pylab.figure(figsize=(6, 4))
+		#pylab.axes([0.05, 0.05, 0.92, 0.95])
 		pylab.plot(range(len(p_her_list)), p_her_list, 'o-')
 		pylab.ylabel('Pseudo-heritability')
-		pylab.subplot(322)
+		pylab.savefig(file_prefix + '_stats_p_her.pdf', format='pdf')
+		pylab.clf()
 		pylab.plot(range(len(rss_list)), rss_list, 'o-')
 		pylab.ylabel('RSS')
-		pylab.subplot(323)
+		pylab.savefig(file_prefix + '_stats_rss.pdf', format='pdf')
+		pylab.clf()
 		pylab.plot(range(len(ll_list)), ll_list, 'o-')
 		pylab.ylabel('Log likelihood')
-		pylab.subplot(324)
+		pylab.savefig(file_prefix + '_stats_ll.pdf', format='pdf')
+		pylab.clf()
 		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-')
 		pylab.ylabel('Min. p-value')
-		pylab.subplot(325)
+		pylab.savefig(file_prefix + '_stats_pval.pdf', format='pdf')
+		pylab.clf()
 		pylab.plot(range(len(bic_list)), bic_list, 'o-')
 		pylab.ylabel('BIC')
-		pylab.subplot(326)
+		pylab.savefig(file_prefix + '_stats_bic.pdf', format='pdf')
+		pylab.clf()
 		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-')
 		pylab.ylabel('Extended BIC')
-		pylab.savefig(file_prefix + '_stats.pdf', format='pdf')
+		pylab.savefig(file_prefix + '_stats_ebic.pdf', format='pdf')
+		pylab.clf()
+		max_rss = max(rss_list)
+		rss_array = sp.array(rss_list) / max_rss
+		p_her_array = rss_array * sp.array(p_her_list)
+		genetic_variance = p_her_array + (1 - rss_array)
+		variance_explained = (1 - rss_array)
+		pylab.figure(figsize=(10, 6))
+		pylab.fill_between([0, num_steps], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.ylabel('Percentage of variance')
+		pylab.xlabel('Step number')
+		pylab.legend(loc=1, ncol=3, shadow=True)
+		pylab.savefig(file_prefix + '_stats_variances2.pdf', format='pdf')
+
+
 
 
 	return step_info_list
@@ -1646,6 +1726,17 @@ def _test_two_snps_emma_():
         chr_pos_list = sd.getChrPosList()
         K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled', phed.accessions)
 
+
+	#Run EMMAX first
+	emmax_res = emmax(snps, phenotypes, K)
+	l = zip(emmax_res['ps'], range(len(snps)))
+	l.sort()
+	top_indices = map(list, zip(*(l[:100])))[1]
+	snps = [snps[i] for i in top_indices]
+	snps = [snps[i] for i in top_indices]
+	snps = [snps[i] for i in top_indices]
+
+
         chromosome = 5
         #r = sd.get_region_pos_snp_dict(4,250000,290000)
         r = sd.get_region_pos_snp_dict(chromosome, 3160000, 3200000)
@@ -1741,21 +1832,23 @@ def _test_stepwise_emmax_():
 	import phenotypeData as pd
 	import util
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_raw_070810.tsv"
-	for pid in [226, 242]:#[264, 266, 267, 5, 6, 7]:
+	for pid, log_trans in [(5, False), (226, True), (264, False), (1025, False)]:
 		phed = pd.readPhenotypeFile(filename)
-		#phed.logTransform(pid)
+		if log_trans:
+			phed.logTransform(pid)
 		phen_name = phed.getPhenotypeName(pid)
 		filter_accessions = phed.getNonNAEcotypes(pid)
 		sd = dp.parse_binary_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
 		sd.coordinate_w_phenotype_data(phed, pid)
-		#sd.sample_snps(0.1)
+	        sd.filter_mac_snps() #Filter MAF SNPs!
 		phenotypes = phed.getPhenVals(pid)
 		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled',
 					phed.accessions)
 
-		info_list = emmax_step_wise(sd, phenotypes, K, \
-					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_' \
-					+ str(pid) + '_' + phen_name)
+		info_list = emmax_step_wise(phenotypes, K, sd=sd, \
+					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_wcf05_' \
+					+ str(pid) + '_' + phen_name, num_steps=12, allow_interactions=True,
+					interaction_pval_thres=0.05)
 
 
 if __name__ == "__main__":
