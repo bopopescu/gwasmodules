@@ -482,7 +482,7 @@ def plot_raw_result(p_vals, chromosomes, positions, pdf_file=None, png_file=None
 				ys.append(max_score)
 			else:
 				ys.append(score)
-		plt.plot(xs, ys, ".", color="#ffaa55", markersize=8, alpha=0.8)
+		plt.plot(xs, ys, ".", color="#ff9944", markersize=9, alpha=0.8)
 
 
 
