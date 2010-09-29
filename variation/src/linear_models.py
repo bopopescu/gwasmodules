@@ -351,11 +351,12 @@ class LinearMixedModel(LinearModel):
                 beta_est = iXX * X.T * (H_inverse * self.Y)
                 x_beta = X * beta_est
                 residuals = self.Y - x_beta
-                rss = residuals.T * H_inverse * residuals
+                mahalanobis_rss = residuals.T * H_inverse * residuals
+		rss = residuals.T * residuals
                 x_beta_var = sp.var(x_beta, ddof=1)
                 var_perc = x_beta_var / self.y_var
                 res_dict = {'max_ll':opt_ll, 'delta':opt_delta, 'beta':beta_est, 've':opt_ve, 'vg':opt_vg,
-                            'var_perc':var_perc, 'rss':rss, 'H_sqrt':H_sqrt,
+                            'var_perc':var_perc, 'rss':rss, 'mahalanobis_rss':mahalanobis_rss, 'H_sqrt':H_sqrt,
                             'pseudo_heritability':1.0 / (1 + opt_delta)}
                 if xs and return_f_stat:
                         q = X.shape[1] - self.X.shape[1]
@@ -1159,28 +1160,41 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
  	num_par = 2 #mean and variance scalar
 
  	#Srinivasa Ramanujan approximation of log(n!)
- 	log_fact = lambda n: n * sp.log(n) - n + (sp.log(n * (1 + 4 * n * (1 + 2 * n))) / 6) + sp.log(sp.pi) / 2
+ 	#log_fact = lambda n: n * sp.log(n) - n + (sp.log(n * (1 + 4 * n * (1 + 2 * n))) / 6) + sp.log(sp.pi) / 2
+ 	def log_choose(n, k):
+ 		if k == 0 or n == k:
+ 			return 0
+ 		if n < k:
+ 			raise Exception('Out of range.')
+ 		return sum(map(sp.log, range(n, n - k, -1))) - sum(map(sp.log, range(k, 0, -1)))
+
 
         reml_res = lmm.get_REML()
 	H_sqrt = reml_res['H_sqrt']
 	ll = reml_res['max_ll']
 	rss = float(reml_res['rss'])
+	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
 	bic = -2 * (reml_res['max_ll']) + num_par * sp.log(lmm.n)
 	extended_bic = bic + \
-		(log_fact(len(snps)) - log_fact(len(snps) - num_par) - log_fact(num_par))
+		2 * log_choose(len(snps), num_par)#(log_fact(len(snps)) - log_fact(len(snps) - num_par) - log_fact(num_par))
 	modified_bic = bic + \
-		2 * lmm.n * sp.log(num_par / 2.2 + 1)
-	print 'Step %d: action=None  p_her=%0.4f, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
-		(step_i, reml_res['pseudo_heritability'], ll, reml_res['rss'], bic, extended_bic, modified_bic)
+		2 * num_par * sp.log(lmm.n / 2.2 + 1)
+	action = 'None'
+	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
+		 bic, extended_bic, modified_bic)
 	print 'Cofactors:', cofactors_str
 
         for step_i in range(1, num_steps + 1):
                 emmax_res = lmm._emmax_f_test_(snps, H_sqrt, verbose=False)
                 min_pval_i = sp.argmin(emmax_res['ps'])
                 min_pval = emmax_res['ps'][min_pval_i]
+                mahalnobis_rss = emmax_res['rss'][min_pval_i]
                 min_pval_chr_pos = chr_pos_list[min_pval_i]
 		print 'Min p-value:', min_pval
-		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss,
+		print 'Min RSS:', mahalnobis_rss
+		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
+			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
 			'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'cofactors_str':cofactors_str,
 			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
@@ -1202,6 +1216,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		H_sqrt = reml_res['H_sqrt']
 		ll = reml_res['max_ll']
 		rss = float(reml_res['rss'])
+		reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
 		num_par += 1
 		action = '+'
 
@@ -1232,6 +1247,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 						H_sqrt = reml_res['H_sqrt']
 						ll = reml_res['max_ll']
 						rss = float(reml_res['rss'])
+						reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
 						num_par += 1
 						print "Just added an interaction:", interactions
 
@@ -1267,20 +1283,25 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 
 		bic = -2 * (reml_res['max_ll']) + num_par * sp.log(lmm.n)
 		extended_bic = bic + \
-			(log_fact(len(snps)) - log_fact(len(snps) - num_par) - log_fact(num_par))
+			2 * log_choose(len(snps), num_par)#(log_fact(len(snps)) - log_fact(len(snps) - num_par) - log_fact(num_par))
 		modified_bic = bic + \
-			2 * lmm.n * sp.log(num_par / 2.2)
+			2 * num_par * sp.log(lmm.n / 2.2)
 
-		print '\nStep %d: action=%s p_her=%0.4f, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
-			(step_i, action, reml_res['pseudo_heritability'], ll, rss, bic, extended_bic, modified_bic)
+		print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, \
+			bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+			(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
+			bic, extended_bic, modified_bic)
 		print 'Cofactors:', cofactors_str
 
 	emmax_res = lmm._emmax_f_test_(snps, H_sqrt, verbose=False)
 	min_pval_i = sp.argmin(emmax_res['ps'])
 	min_pval = emmax_res['ps'][min_pval_i]
+	mahalnobis_rss = emmax_res['rss'][min_pval_i]
 	min_pval_chr_pos = chr_pos_list[min_pval_i]
 	print 'Min p-value:', min_pval
-	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss,
+	print 'Min RSS:', mahalnobis_rss
+	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
+		'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
 		'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'cofactors_str':cofactors_str,
 		'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
@@ -1304,13 +1325,15 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 	if file_prefix:
 		p_her_list = []
 		rss_list = []
+		reml_mahalanobis_rss_list = []
+		mahalanobis_rss_list = []
 		ll_list = []
 		bic_list = []
 		e_bic_list = []
 		m_bic_list = []
 		min_pval_list = []
 		f = open(file_prefix + "_stats.csv", 'w')
-		d_keys = ['pseudo_heritability', 'rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval']
+		d_keys = ['pseudo_heritability', 'rss', 'reml_mahalanobis_rss', 'mahalanobis_rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval']
 		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
 		for i, si in enumerate(step_info_list):
 			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
@@ -1319,6 +1342,8 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 			f.write(st)
 			p_her_list.append(float(si['pseudo_heritability']))
 			rss_list.append(float(si['rss']))
+			reml_mahalanobis_rss_list.append(float(si['reml_mahalanobis_rss']))
+			mahalanobis_rss_list.append(float(si['mahalanobis_rss']))
 			ll_list.append(si['ll'])
 			bic_list.append(si['bic'])
 			e_bic_list.append(si['e_bic'])
@@ -1336,6 +1361,14 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		pylab.ylabel('RSS')
 		pylab.savefig(file_prefix + '_stats_rss.pdf', format='pdf')
 		pylab.clf()
+		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-')
+		pylab.ylabel('REML Mahalanobis RSS')
+		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.pdf', format='pdf')
+		pylab.clf()
+		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-')
+		pylab.ylabel('Mahalanobis RSS')
+		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.pdf', format='pdf')
+		pylab.clf()
 		pylab.plot(range(len(ll_list)), ll_list, 'o-')
 		pylab.ylabel('Log likelihood')
 		pylab.savefig(file_prefix + '_stats_ll.pdf', format='pdf')
@@ -1352,6 +1385,10 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		pylab.ylabel('Extended BIC')
 		pylab.savefig(file_prefix + '_stats_ebic.pdf', format='pdf')
 		pylab.clf()
+		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-')
+		pylab.ylabel('Modified BIC')
+		pylab.savefig(file_prefix + '_stats_mbic.pdf', format='pdf')
+		pylab.clf()
 		max_rss = max(rss_list)
 		rss_array = sp.array(rss_list) / max_rss
 		p_her_array = rss_array * sp.array(p_her_list)
@@ -1365,9 +1402,6 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		pylab.xlabel('Step number')
 		pylab.legend(loc=1, ncol=3, shadow=True)
 		pylab.savefig(file_prefix + '_stats_variances2.pdf', format='pdf')
-
-
-
 
 	return step_info_list
 
@@ -1832,7 +1866,8 @@ def _test_stepwise_emmax_():
 	import phenotypeData as pd
 	import util
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_raw_070810.tsv"
-	for pid, log_trans in [(5, False), (226, True), (264, False), (1025, False)]:
+	mac_threshold = 15
+	for pid, log_trans in [(264, False), (265, False), (266, False), (267, False)]:#[(5, False), (226, True), (264, False), (1025, False)]:
 		phed = pd.readPhenotypeFile(filename)
 		if log_trans:
 			phed.logTransform(pid)
@@ -1840,15 +1875,16 @@ def _test_stepwise_emmax_():
 		filter_accessions = phed.getNonNAEcotypes(pid)
 		sd = dp.parse_binary_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
 		sd.coordinate_w_phenotype_data(phed, pid)
-	        sd.filter_mac_snps() #Filter MAF SNPs!
+	        if mac_threshold:
+	        	sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
 		phenotypes = phed.getPhenVals(pid)
 		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled',
 					phed.accessions)
 
 		info_list = emmax_step_wise(phenotypes, K, sd=sd, \
-					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_wcf05_' \
+					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_' \
 					+ str(pid) + '_' + phen_name, num_steps=12, allow_interactions=True,
-					interaction_pval_thres=0.05)
+					interaction_pval_thres=0.001)
 
 
 if __name__ == "__main__":

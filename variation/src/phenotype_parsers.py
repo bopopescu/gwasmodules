@@ -47,8 +47,8 @@ def load_phentoype_file(filename):
 	phend = pd.PhenotypeData(ecotypes, phenotype_names, phenotypes)
 	phend.writeToFile("/tmp/FLC_phenotypes_102809.tsv", delimiter="\t")
 	return phend
-	
-	
+
+
 def load_phentoype_file_Pecinka():
 	accession_file = "/Users/bjarnivilhjalmsson/Projects/Ales_Pecinka/NatVar-AP-2010-Feb.csv"
 	f = open(accession_file, "r")
@@ -71,7 +71,7 @@ def load_phentoype_file_Pecinka():
 	acc_dict["wd-1"] = acc_dict["nd-1"]
 	print acc_dict
 
-	
+
 	filename = "/Users/bjarnivilhjalmsson/Projects/Ales_Pecinka/NatVar-AP-2010-Feb_phen.csv"
 	#phenotype_names = reader.next()[2:]
 	phenotype_names = ["Absolute_root_growth", "Absolute_root_growth_sd", "Percentage_of_root_elongation", "Percentage_of_bent roots",
@@ -114,7 +114,7 @@ def load_phentoype_file_Pecinka():
 	ecotypes = map(str, new_ecotype_ids)
 	phed = pd.PhenotypeData(ecotypes, phenotype_names, phenotypes)
 	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Ales_Pecinka/phen_pecinka_170310.tsv", delimiter='\t')
-		
+
 
 def load_phentoype_file_wilczek():
 	filename = "/Users/bjarnivilhjalmsson/Projects/Amity_Wilczek/PhenotypeDataWilczek.csv"
@@ -147,13 +147,13 @@ def load_phentoype_file_wilczek():
 	f.write("unique_id, accession_name, ecotype_id, in_250k_data\n")
 	for acc, acc_id in zip(accession_names, accession_ID):
 		if not acc in acc_dict or acc_id == 'karl27' or acc_id == 'karl05':
-			print "(%s, %s) is missing" % (acc, acc_id) 
-		else:			
+			print "(%s, %s) is missing" % (acc, acc_id)
+		else:
 			ecotype = acc_dict[acc]
 			ecotypes.append(ecotype)
 			f.write("%s,%s,%s,%s\n" % (acc_id, acc, str(ecotype), str(str(ecotype) in d250k_sd.accessions)))
 	f.close()
-	
+
 	#phenotype_names = reader.next()[2:]
 	phenotype_indices = range(2, len(phenotype_names) + 2)
 	phenotypes = []	#[acc_id][phenotype_name]
@@ -178,8 +178,8 @@ def load_phentoype_file_wilczek():
 	phed = pd.PhenotypeData(ecotypes, phenotype_names, phenotypes)
 	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Amity_Wilczek/phen_wilzcek_050710.tsv", delimiter='\t')
 	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Amity_Wilczek/phen_wilzcek_050710.csv", delimiter=',')
-	
-	
+
+
 
 
 def load_phentoype_file_nc_resistance():
@@ -213,8 +213,8 @@ def load_phentoype_file_nc_resistance():
 	f.write("unique_id, accession_name, ecotype_id, in_250k_data\n")
 	for acc, acc_id in zip(accession_names, full_accession_names):
 		if not acc in acc_dict or acc_id == 'karl27' or acc_id == 'karl05':
-			print "(%s, %s) is missing" % (acc, acc_id) 
-		else:			
+			print "(%s, %s) is missing" % (acc, acc_id)
+		else:
 			ecotype = acc_dict[acc]
 			ecotypes.append(ecotype)
 			f.write("%s,%s,%s,%s\n" % (acc_id, acc, str(ecotype), str(str(ecotype) in d250k_sd.accessions)))
@@ -240,11 +240,66 @@ def load_phentoype_file_nc_resistance():
 	phed = pd.PhenotypeData(ecotypes, phenotype_names, phenotypes)
 	phed.insert_into_DB(growth_condition='Field', biology_category_id='2')
 	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Amity_Wilczek/nc14_resistance_091610.tsv", delimiter='\t')
-	
 
 
 
-		
+def load_phentoype_file_nc_resistance_2():
+	filename = "/Users/bjarnivilhjalmsson/Projects/Albugo_laibachii_nc14.csv"
+	f = open(filename, "r")
+	line = map(str.strip, f.next().split(','))
+	phenotype_names = line[-1:]
+	print phenotype_names
+	phenotypes = []
+	accession_names = []
+	for l in f:
+		line = map(str.strip, l.split(','))
+		accession_names.append(line[0].lower())
+	f.close()
+	print accession_names
+	acc_dict = pd.get_accession_to_ecotype_id_dict(accession_names)#+["n13","kno-10","kno-10","shahdara","nd-1"])
+#	acc_dict["cibc-5"] = 6908
+#	acc_dict["wa-1"] = 6978
+#	acc_dict["gu-0"] = 7149
+#	acc_dict['Rubezhnoe-1'] = 7323
+	print len(acc_dict), acc_dict
+	import env
+	d250k_file = env.home_dir + "Projects/Data/250k/250K_t54.csv.binary"
+	import dataParsers
+	d250k_sd = dataParsers.parse_binary_snp_data(d250k_file)
+	ecotypes = []
+	for acc in accession_names:
+		if not acc in acc_dict:
+			print "%s is missing" % (acc)
+		else:
+			ecotype = acc_dict[acc]
+			ecotypes.append(ecotype)
+
+	phenotypes = []	#[acc_id][phenotype_name]
+	f = open(filename, "r")
+
+	for l in f:
+		line = map(str.strip, l.split(','))
+		if line[0].lower() in acc_dict:
+			phen_vals = []
+			for pv in line[-1:]:
+				if pv == "NA":
+					pv = 'NA'
+				else:
+					pv = float(pv)
+				phen_vals.append(pv)
+			phenotypes.append(phen_vals)
+		else:
+			print "Missing:", line[0]
+
+	phed = pd.PhenotypeData(ecotypes, phenotype_names, phenotypes)
+	phed.insert_into_DB(growth_condition='Field', biology_category_id='2')
+	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Amity_Wilczek/nc14_resistance_96accessions_092810.tsv", \
+			delimiter='\t')
+
+
+
+
+
 def load_phentoype_file_bergelsson():
 	import env
 	filename = "/Users/bjarnivilhjalmsson/Projects/Joy_Bergelsson/bergelsson_rosette_glucs.csv"
@@ -271,7 +326,7 @@ def load_phentoype_file_bergelsson():
 	for acc, acc_id in zip(accession_names, accession_ID):
 		#if not acc in acc_dict:
 		if not int(acc_id) in ei_2_tgei:
-			print "(%s, %s) is missing in dictionary" % (acc, acc_id) 
+			print "(%s, %s) is missing in dictionary" % (acc, acc_id)
 			a_id = int(acc_id)
 			if a_id in e_info_dict:
 				e_info = e_info_dict[a_id]
@@ -280,7 +335,7 @@ def load_phentoype_file_bergelsson():
 				print "No good guess for it.  Look it up!!\n"
 			#acc_dict[acc] = acc_id
 			ecotypes.append(acc_id)
-		else:			
+		else:
 			#ecotype = acc_dict[acc]
 			ecotype = ei_2_tgei[int(acc_id)]
 			ecotypes.append(ecotype)
@@ -289,7 +344,7 @@ def load_phentoype_file_bergelsson():
 	f = open(filename, "r")
 	reader = csv.reader(f)
 	reader.next()
-	
+
 	print len(set(accession_ID)), len(set(ecotypes))
 
 	for row in reader:
@@ -309,16 +364,16 @@ def load_phentoype_file_bergelsson():
 		#else:
 		#	print "Missing:",row[0]
 
-	
+
 	phed = pd.PhenotypeData(ecotypes, phenotype_names, phenotypes)
 	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Joy_Bergelsson/phen_bergelsson_051710.tsv", delimiter='\t')
 	phed.writeToFile("/Users/bjarnivilhjalmsson/Projects/Joy_Bergelsson/phen_bergelsson_051710.csv", delimiter=',')
-	
-	
-		
 
 
-	
+
+
+
+
 def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, method_descriptions=None, data_descriptions=None, host="papaya.usc.edu", user="bvilhjal", passwd="bjazz32"):
 	"""
 	Insert phenotypes into the DB
@@ -342,7 +397,7 @@ def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, meth
 	cursor = conn.cursor ()
 	#Retrieve the filenames
 	print "Inserting data"
-	
+
 	for i in range(len(phenotype_names)):
 		sql_statement = "INSERT INTO stock_250k.phenotype_method  (id, short_name, only_first_96, biology_category_id, method_description, data_description, data_type) VALUES (" + str(method_ids[i]) + ", '" + phenotype_names[i] + "', true, 1, '" + method_descriptions[i] + "', '" + data_descriptions[i] + "', 'quantitative')"
 		print sql_statement
@@ -350,7 +405,7 @@ def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, meth
 		row = cursor.fetchone()
 		if row:
 			print row
-		
+
 		for j in range(0, len(ecotypes)):
 			val = phenotypes[i][j]
 			if val != "NA":
@@ -363,7 +418,7 @@ def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, meth
 	conn.commit()
 	cursor.close ()
 	conn.close ()
-	
+
 def _run_():
 	pd = load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	phenotypes = pd["phenotypes"]
@@ -382,7 +437,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_nc_resistance()
+	load_phentoype_file_nc_resistance_2()
 	print "Done!"
-	
-	
+
+
