@@ -26,7 +26,7 @@ Marker type suggestions:
   
 """
 
-def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True):
+def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True, snp_format='binary'):
 	"""
 	1. Remove accessions which are not represented in either of the two datasets
 	2. Order the data in same way.
@@ -54,7 +54,8 @@ def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True):
 		sys.stdout.flush()
 		snpsd.removeAccessionIndices(accIndicesToKeep)
 	print ""
-	print numAcc - len(accIndicesToKeep), "accessions removed from genotype data, leaving", len(accIndicesToKeep), "accessions in all."
+	print numAcc - len(accIndicesToKeep), "accessions removed from genotype data, leaving", \
+		len(accIndicesToKeep), "accessions in all."
 
 
 	print "Filtering phenotype data."
@@ -70,8 +71,13 @@ def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True):
 	phed.orderAccessions(accessionMapping)
 
 
-	for snpsd in snpsds:
-		snpsd.onlyBinarySnps()
+	if snp_format == 'binary':
+		total_num = 0
+		removed_num = 0
+		for snpsd in snpsds:
+			total_num += len(snpsd.snps)
+			removed_num += snpsd.onlyBinarySnps()
+		print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
 
 
 class _SnpsData_(object):
@@ -1857,7 +1863,7 @@ class SNPsData(_SnpsData_):
 		self.no_of_nonbinary_snps_removed = num_removed
 		self.snps = new_snps
 		self.positions = new_positions
-		print "Removed %d non-binary SNPs, leaving %d SNPs in total." % (num_removed, len(self.snps))
+		#print "Removed %d non-binary SNPs, leaving %d SNPs in total." % (num_removed, len(self.snps))
 		return num_removed
 
 

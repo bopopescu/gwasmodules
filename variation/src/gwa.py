@@ -1,70 +1,75 @@
 #!/usr/bin/env python2.5
 """
-Usage: gwa.py [OPTIONS] [--id=id_text] [PHENOTYPE_ID]
+Usage: gwa.py [OPTIONS] [--id=id_text]
 
 Option:
 
-	--id=...				ID string, used for output files.
-	-d ..., --delim=...			default is ", "	  
-	-m ..., --missingval=...		default is "NA"
-	-h, --help				show this help
+	-h					Show this help
 
-	-t ..., --callMethodID=...		What data set is used.
-	-r ..., --phen_file=...			Phenotype file, if left out then phenotypes are retireved from the DB (transformed values).
-	-k ..., --kinship_file=...		Specify the path to a file containing the kinship matrix.  (otherwise default file is 
-						used or it's generated.)
+	-d ...					Filter SNPs randomly (speed-up for debugging)
 
-	-a ..., --specific_methods=...		Apply specific methods, otherwise all available are applied:
-						lm,emma,emmax,kw,ft, etc.
-	-b ..., --specific_transformations=... 	Apply a transformation to the data, default is none, other possibilities are 
+	-o ...					ID string, used for output files.
+	-i ...					The phenotype IDs, to be run. 
+	-t ...					What data set is used.  Default is 54.
+	-f ...					Load a specific data file, e.g. for heteroplasmy.
+	-r ...					Phenotype file, if left out then phenotypes are retireved from the DB 
+						(transformed values).
+	-k ...					Specify the file containing the kinship matrix.  
+						(otherwise default file is used or it's generated.)
+
+	-a ...					Apply specific methods, otherwise all available are applied:
+						lm, emma, emmax, kw, ft, emmax_anova, lm_anova etc.
+	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
 						log_trans, box_cox_lambda (where lambda is a number)
-	--remove_outliers=...			Should phenotype outliers be removed.  0 (no fence) is the default, else the outlier fence is 
-						given in IQRs. (An int is required).
-						
-	-p ..., --parallel=...			Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
-						as well as output files.  Note that if this option is used then no output file should be specified.
-						If phenotype index is missing, then all phenotypes are used.
-						 
-	--use_existing_results			Use existing results when possible, to speed up.  (Otherwise existing files are overwritten)
+	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
+						else the outlier fence is given in IQRs. (An int is required).
+												 
+	-u					Use existing results when possible, to speed up.  
+						(Otherwise existing files are overwritten)
+
+	-e					Generate analysis plots, histograms, QQ-plots, test different 
+						transformations, etc.
+	-n					Adds the result(s) to the DB.		
+	--comment=...				Comment for DB. (Only applicable if result is added to DB.)	
+	--no_phenotype_ids			Phenotypes don't have DB id as an prefix in their names.  
+						(The phenotype index should be used instead.)	
 
 	--region_plots=...			Include region plots for the top N (given num) peaks.
-	--cand_genes_file=...			A file with a list of candidate genes.  (added to plots)
-	
-	--analysis_plots			Generate analysis plots, histograms, QQ-plots, test different transformations, etc.
+	--cand_genes_file=...			A file with a list of candidate genes.  (added to plots)	
 
-	--addToDB				Adds the result(s) to the DB.
+	-m ...					MAC threshold which is used for LM, EMMA, EMMAX, etc.  Default is 15.
+	--data_format=...			What type of data should it amil for, binary (default), int, float, etc.
+	
+	
+	#ONLY APPLICABLE FOR CLUSTER RUNS
+	-p ...					Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
+						as well as output files.  Note that if this option is used then no output file should be specified.
+						If phenotype index is missing, then all phenotypes are used.
+	-q ...					Request memory (on cluster), otherwise use defaults 4GB for Kruskal-Wallis, 12GB for Emma.
+	-l ...			 		Request time limit (on cluster), otherwise use defaults
+	--proc_per_node=...			Request number of processors per node, default is 8. (Works only for EMMA.)
 	--only_add_2_db				Does not submit jobs, but only adds available result files to DB. (hack for usc hpc)
 	
-	--data_dir=...				Default is to look for the .gwa_config file in the home folder, and use the 
-						specified directory there.
 	
-	--comment=...				Comment for DB. (Only applicable if result is added to DB.)
 	
-	--no_phenotype_ids			Phenotypes don't have DB id as an prefix in their names.  (The phenotype index should be used instead.)
-	
-	--memReq=...				Request memory (on cluster), otherwise use defaults 4GB for Kruskal-Wallis, 12GB for Emma.
-	--walltimeReq=...			Request time limit (on cluster), otherwise use defaults
-	--proc_per_node=...			Request number of processors per node, default is 8. (Works only for EMMA.)
-	--debug_filter=...			Filter SNPs randomly (speed-up for debugging)
-	
+						
+	#NOT YET IMPLEMENTED
 	--cofactor_chr_pos=...			A list of SNP (chromosome,positions) to be added as co-factors in the analysis.
 	--cofactor_phen_id=...			A list of SNP positions to be added as co-factors in the analysis.
 	--cofactor_file=...			A file specifying the cofactor.
 	--cofactor_no_interact			Exclude interaction terms for cofactors.
-						
 
 Examples:
-~/gwas_data$ python /home/GMI/bjarni.vilhjalmsson/Projects/py_src/gwa.py --id=../gwas_results/pi1 --specific_methods=kw --callMethodID=54 --phenotype_w_db_id --proc_per_node=8 250K_t54.csv phen_all_052010.tsv	
+~/gwas_data$ python gwa.py -o test -i 1,5 -a kw,emmax -r ~/Projects/Data/phenotypes/phen_raw_092910.tsv 
 Description:
   Applies various GWA methods to to phenotypes.
 
   Methods include: Kruskal-Wallis, Fisher's Exact, EMMA, EMMAX, etc.
   
-  If PHENOTYPE_DATA_FILE is left out, then papaya DB is searched and a PHENOTYPE_ID is required.
-  
-  
+  If PHENOTYPE_DATA_FILE is left out, then papaya DB is searched.  
+  A PHENOTYPE_ID is required.
+    
 """
-#from epydoc.docparser import str_prefixes
 import sys, getopt, traceback
 import os
 
@@ -74,30 +79,15 @@ import snpsdata
 import gwaResults
 import util
 import warnings
-import gc
 import multiprocessing as mp
 import time
-#import pickle
 import cPickle
 
 import linear_models as lm
-
 from numpy import *
-import pdb
-#import rpy2.robjects as robjects
-#import rpy2.robjects.numpy2ri
-#r_source = robjects.r('source')
-
-#import rpy2.rpy_classic as rpy  
-#rpy.set_default_mode(rpy.NO_CONVERSION)
-#rpy.set_default_mode(rpy.CLASS_CONVERSION)
-#Switching to rpy2
-
 from env import *
-data_dir = env['data_dir']
-script_dir = env['script_dir']
-results_dir = env['results_dir']
-script_dir = env['script_dir']
+
+import pdb
 
 
 transformation_method_dict = {
@@ -112,24 +102,9 @@ analysis_methods_dict = {"kw":1,
 			 "emma":4,
 			 'lm':16,
 			 "emmax":32,
+			 'emmax_anova':None,
+			 'lm_anova':None,
 			 }
-
-
-def prepare_data(sd, phed, p_i, transformation_type, remove_outliers):
-	"""
-	Coordinates phenotype and snps data for different mapping methods.
-	"""
-	num_outliers_removed = 0
-	if "log_trans" == transformation_type:
-		print 'log transforming phenotypes..'
-		phed.standard_transform(p_i)
-
-	if remove_outliers:
-		print 'removing outliers above IQR fence of', remove_outliers, '..'
-		num_outliers_removed = phed.naOutliers(p_i, iqrThreshold=remove_outliers)
-	sd.coordinate_w_phenotype_data(phed, p_i)
-	return num_outliers_removed
-
 
 
 def _parse_pids_(pid_arg_str):
@@ -143,6 +118,92 @@ def _parse_pids_(pid_arg_str):
 		else:
 			pids.append(int(s))
 	return pids
+
+
+def parse_parameters():
+	'Parse the parameters into a dict, etc.'
+	if len(sys.argv) == 1:
+		print __doc__
+		sys.exit(2)
+
+	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'proc_per_node=',
+			'only_add_2_db', 'data_format=']
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
+
+	except:
+		traceback.print_exc()
+		print __doc__
+		sys.exit(2)
+
+
+	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
+		'call_method_id':54, 'walltime_req':'12:00:00', 'proc_per_node':8,
+		'specific_methods':['kw', 'ft', 'lm', 'emma', 'emmax'], 'specific_transformations':['none'],
+		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
+		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
+		'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15, 'data_file':None,
+		'data_format':'binary'}
+
+
+	for opt, arg in opts:
+		if opt in ("-h"):
+			print __doc__
+			return
+		elif opt in ('-i'): p_dict['pids'] = _parse_pids_(arg)
+		elif opt in ('-o'): p_dict['run_id'] = arg
+		elif opt in ('-p'): p_dict['parallel'] = arg
+		elif opt in ('-t'): p_dict['call_method_id'] = int(arg)
+		elif opt in ('-n'): p_dict['add_to_db'] = True
+		elif opt in ('-m'): p_dict['mac_threshold'] = int(arg)
+		elif opt in ('-f'): p_dict['data_file'] = arg
+		elif opt in ('-r'): p_dict['phen_file'] = arg
+		elif opt in ('-k'): p_dict['kinship_file'] = arg
+		elif opt in ('-a'): p_dict['specific_methods'] = arg.split(',')
+		elif opt in ("-b"): p_dict['specific_transformations'] = arg.split(',')
+		elif opt in ("-c"): p_dict['remove_outliers'] = int(arg)
+		elif opt in ("-d"): p_dict['debug_filter'] = float(arg)
+		elif opt in ('-u'): p_dict['use_existing_results'] = True
+		elif opt in ('-e'): p_dict['analysis_plots'] = True
+		elif opt in ('-q'): p_dict['mem_req'] = arg
+		elif opt in ('-l'): p_dict['walltime_req'] = arg
+		elif opt in ("--comment"): p_dict['comment'] = arg
+		elif opt in ("--no_phenotype_ids"): p_dict['no_phenotype_ids'] = True
+		elif opt in ("--region_plots"): p_dict['region_plots'] = int(arg)
+		elif opt in ("--cand_genes_file"): p_dict['cand_genes_file'] = arg
+		elif opt in ("--proc_per_node"): p_dict['proc_per_node'] = int(arg)
+		elif opt in ("--only_add_2_db"): p_dict['only_add_2_db'] = True
+		elif opt in ("--data_format"): p_dict['data_format'] = arg
+		else:
+			print "Unkown option!!\n"
+			print __doc__
+			sys.exit(2)
+
+	return p_dict, args
+
+
+
+
+def _prepare_transformation_(phed, p_i, transformation_type, remove_outliers):
+	num_outliers_removed = 0
+	if "log_trans" == transformation_type:
+		print 'log transforming phenotypes..'
+		phed.standard_transform(p_i)
+
+	if remove_outliers:
+		print 'removing outliers above IQR fence of', remove_outliers, '..'
+		num_outliers_removed = phed.naOutliers(p_i, iqrThreshold=remove_outliers)
+	return num_outliers_removed
+
+
+def prepare_data(sd, phed, p_i, transformation_type, remove_outliers):
+	"""
+	Coordinates phenotype and snps data for different mapping methods.
+	"""
+	num_outliers_removed = _prepare_transformation_(phed, p_i, transformation_type, remove_outliers)
+	sd.coordinate_w_phenotype_data(phed, p_i)
+	return num_outliers_removed
+
 
 
 def get_perm_pvals(snps, phen_vals, mapping_method='kw', num_perm=100, snps_filter=0.05):
@@ -163,344 +224,159 @@ def get_perm_pvals(snps, phen_vals, mapping_method='kw', num_perm=100, snps_filt
 
 
 
-def _run_():
-	if len(sys.argv) == 1:
-		print __doc__
-		sys.exit(2)
-
-	long_options_list = ["id=", "delim=", "missingval=", "help", "parallel=",
-			   "addToDB", "callMethodID=", "comment=", "memReq=",
-			   "walltimeReq=", "specific_methods=", 'specific_transformations=',
-			   'remove_outliers=', "analysis_plots", 'data_dir=',
-			   "use_existing_results", "region_plots=", "cand_genes_file=",
-			   "debug_filter=", "no_phenotype_ids", "proc_per_node=", 'phen_file=',
-			   'kinship_file=', 'only_add_2_db', 'cofactor_chr_pos',
-			   'cofactor_phen_id', 'cofactor_file', 'cofactor_no_interact' ]
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], "d:m:h:p:a:b:t:r:k:", long_options_list)
-
-	except:
-		traceback.print_exc()
-		print sys.exc_info()
-		print __doc__
-		sys.exit(2)
-
-	run_id = None
-	delim = ","
-	missingVal = "NA"
-	help = 0
-	parallel = None
-	addToDB = False
-	callMethodID = None
-	comment = ""
-
-	memReq = "1800mb"
-	walltimeReq = "12:00:00"
-	proc_per_node = 8
-
-	specific_methods = ['kw', 'ft', 'lm', 'emma', 'emmax']
-	specific_transformations = ['none']
-	remove_outliers = 0
-	data_dir = env['data_dir']
-
-	analysis_plots = False
-	use_existing_results = False
-	region_plots = 0
-	cand_genes_file = None
-	debug_filter = 1
-	no_phenotype_ids = False
-	phen_file = None
-	kinship_file = None
-	only_add_2_db = False
-
-	cofactor_chr_pos = None
-	cofactor_phen_id = None
-	cofactor_file = None
-	cofactor_no_interact = False
-
-	print ''
-
-	for opt, arg in opts:
-		if opt in ("-h", "--help"):
-			help = 1
-			print __doc__
-		elif opt == "--id":
-			run_id = arg
-		elif opt in ("-p", "--parallel"):
-			parallel = arg
-		elif opt in ('-t', "--callMethodID"):
-			callMethodID = int(arg)
-		elif opt in ('-r', "--phen_file"):
-			phen_file = arg
-		elif opt == "--comment":
-			comment = arg
-		elif opt in ("-d", "--delim"):
-			delim = arg
-		elif opt in ("-m", "--missingval"):
-			missingVal = arg
-		elif opt == "--memReq":
-			memReq = arg
-		elif opt == "--walltimeReq":
-			walltimeReq = arg
-		elif opt == "--proc_per_node":
-			proc_per_node = int(arg)
-		elif opt in ('-a', "--specific_methods"):
-			specific_methods = arg.split(",")
-		elif opt in ('-b', "--specific_transformations"):
-			specific_transformations = arg.split(",")
-		elif opt in ('-k', "--kinship_file"):
-			kinship_file = arg
-		elif opt == "--addToDB":
-			addToDB = True
-		elif opt == "--remove_outliers":
-			remove_outliers = int(arg)
-		elif opt == "--analysis_plots":
-			analysis_plots = True
-		elif opt == "--data_dir":
-			data_dir = arg
-		elif opt == "--use_existing_results":
-			use_existing_results = True
-		elif opt == "--region_plots":
-			region_plots = int(arg)
-		elif opt == "--cand_genes_file":
-			cand_genes_file = arg
-		elif opt == "--debug_filter":
-			debug_filter = float(arg)
-		elif opt == "--no_phenotype_ids":
-			no_phenotype_ids = True
-		elif opt == "--only_add_2_db":
-			only_add_2_db = True
-		else:
-			if help == 0:
-				print "Unkown option!!\n"
-				print __doc__
-			sys.exit(2)
-
-	if len(args) < 1 and not parallel:
-		if help == 0:
-			print "Arguments are missing!!\n"
-			print __doc__
-		sys.exit(2)
-
-	print "GWA runs are being set up with the following parameters:"
-	print "run_id:", run_id
-	print "phen_file:", phen_file
-	print "kinship_file:", kinship_file
-	print "parallel:", parallel
-	print "walltimeReq:", walltimeReq
-	print "proc_per_node:", proc_per_node
-	print "memReq:", memReq
-	print "specific_methods:", specific_methods
-	print "specific_transformations:", specific_transformations
-	print "remove_outliers:", remove_outliers
-	print "analysis_plots:", analysis_plots
-	print "addToDB:", addToDB
-	print "callMethodID:", callMethodID
-	print 'phen_file:', phen_file
-	print "data_dir:", data_dir
-	print "comment:", comment
-	print "use_existing_results:", use_existing_results
-	print "region_plots:", region_plots
-	print "cand_genes_file:", cand_genes_file
-	print "debug_filter:", debug_filter
-	print 'no_phenotype_ids:', no_phenotype_ids
-	print 'only_add_2_db:', only_add_2_db
-
-	def run_parallel(p_i, phed, mapping_method="analysis", trans_method='none'):
-		"""
-		If no mapping_method, then analysis run is set up.
-		"""
-
-		if not p_i in phed.phenIds:
-			print "Phenotype ID not found:%i" % p_i
-			return
-		if phed.isBinary(p_i):
-			if trans_method != 'none':
-				return
-			elif mapping_method in ["kw"]:
-				return
-			elif analysis_plots:
-				specific_methods = ["ft", 'lm', "emma", 'emmax']
-		else:
-			if mapping_method in ["ft"]:
-				return
-			elif analysis_plots:
-				specific_methods = ["kw", 'lm', "emma", 'emmax']
-
-		phenotype_name = phed.getPhenotypeName(p_i)
-		#Cluster specific parameters
-		print "Setting up a gwa run for phenotype:%s, pid=%d, using method:%s, with transformation as:%s"\
-			% (phenotype_name, p_i, mapping_method, trans_method)
-		run_id = results_dir + parallel + "_pid" + str(p_i) + "_" + phenotype_name + "_" + mapping_method + "_" + trans_method
-
-		#Add results to DB (a hack for papaya, to add results from main node to DB).
-		if only_add_2_db:
-			pval_file = run_id + ".pvals"
-			score_file = run_id + ".scores"
-			sys.stdout.write("Looking for files %s or %s." % (pval_file, score_file))
-			result_file = None
-			if os.path.isfile(pval_file):
-				result_file = pval_file
-			elif os.path.isfile(score_file):
-				result_file = score_file
-			if result_file:
-				sys.stdout.write("..... found!\n")
-				if no_phenotype_ids:
-					db_pid = phed.get_db_pid(p_i)
-				else:
-					db_pid = p_i
-
-				import results_2_db as rdb
-				short_name = "cm" + str(callMethodID) + "_pid" + str(db_pid) + "_" + phenotype_name + "_" + mapping_method + "_" + trans_method
-				if remove_outliers:
-					short_name += "_no"
-				tm_id = transformation_method_dict[trans_method]
-				rdb.add_results_to_db(result_file, short_name, callMethodID, db_pid, analysis_methods_dict[mapping_method],
-						tm_id, remove_outliers=remove_outliers)
-				return
-			else:
-				sys.stdout.write("Result files not found!\n")
-				sys.stdout.write("Setting up the run.\n")
-				sys.stdout.flush()
-
-
-		if remove_outliers:
-			run_id += '_no' + str(remove_outliers)
-		print "run_id:", run_id
-
-		shstr = "#!/bin/csh\n"
-		shstr += "#PBS -l walltime=" + walltimeReq + "\n"
-		if mapping_method in ['emma']:
-			shstr += "#PBS -l nodes=1:ppn=%d \n" % proc_per_node
-		shstr += "#PBS -l mem=" + memReq + "\n"
-		shstr += "#PBS -q cmb\n"
-
-		shstr += "#PBS -N p" + str(p_i) + "_" + mapping_method + "_" + parallel + "_" + mapping_method \
-			+ "_" + trans_method + "\n"
-		shstr += "(python " + script_dir + "gwa.py --id=" + run_id + "  "
-		shstr += "--region_plots=" + str(region_plots) + "  "
-		shstr += "--proc_per_node=%d  " % proc_per_node
-		shstr += "--data_dir=%s  " % data_dir
-		if use_existing_results:
-			shstr += "--use_existing_results  "
-		if analysis_plots:
-			shstr += "--analysis_plots  -a " + mapping_method + \
-				"  -b " + trans_method + "  "
-		else:
-			shstr += " -a " + mapping_method + " "
-			shstr += " -b " + trans_method + " "
-
-		if phen_file:
-			shstr += "-r " + phen_file + "  "
-		if kinship_file:
-			shstr += "-k " + kinship_file + "  "
-		if cand_genes_file:
-			shstr += "--cand_genes_file=" + cand_genes_file + "  "
-		if no_phenotype_ids:
-			shstr += "--no_phenotype_ids  "
-		if remove_outliers:
-			shstr += '--remove_outliers=' + str(remove_outliers) + '  '
-		if debug_filter:
-			shstr += "--debug_filter=" + str(debug_filter) + "  "
-		if addToDB:
-			shstr += "--addToDB "
-		if callMethodID:
-			shstr += "-t " + str(callMethodID) + "  "
-		if comment:
-			shstr += "--comment=" + str(comment) + "  "
-
-		shstr += str(p_i) + " "  #phenotype ID
-		shstr += "> " + run_id + "_job" + ".out) >& " + run_id + "_job" + ".err\n"
-		#print '\n',shstr,'\n'
-		f = open(parallel + ".sh", 'w')
-		f.write(shstr)
-		f.close()
-
-		#Execute qsub script
-		os.system("qsub " + parallel + ".sh ")
+def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method=None, remove_outliers=None):
+	prefix = env['results_dir'] + id + "_pid" + str(p_i) + "_" + phenotype_name
+	if mapping_method:
+		prefix += "_" + mapping_method
+	if trans_method:
+		prefix += "_" + trans_method
+	if remove_outliers:
+		prefix += '_no' + str(remove_outliers)
+	return prefix
 
 
 
+def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='none'):
+	"""
+	If no mapping_method, then analysis run is set up.
+	"""
 
-
-
-
-	#Load phenotype file
-	if phen_file:
-		print 'Loading phenotypes from file.'
-		phed = phenotypeData.readPhenotypeFile(phen_file, with_db_ids=(not no_phenotype_ids))  #load phenotype file
-	else:
-		print 'Retrieving the phenotypes from the DB.'
-		phed = phenotypeData.getPhenotypes()
-	if parallel:
-		if len(args) == 0:  #phenotype index arguement is missing, hence all phenotypes are run/analyzed.
-			if not phen_file:
-				raise Exception('Phenotype file or phenotype ID is missing.')
-			pids = phed.phenIds
-		elif len(args) == 1:
-			pids = _parse_pids_(args[0])
-		else:
-			raise Exception('Too many arguments..')
-
-		if analysis_plots:  #Running on the cluster..
-			for p_i in pids:
-				run_parallel(p_i, phed)
-		else:
-			for mapping_method in specific_methods:
-				for trans_method in specific_transformations:
-					for p_i in pids:
-						run_parallel(p_i, phed, mapping_method, trans_method)
+	if not p_i in phed.phenIds:
+		print "Phenotype ID not found:%i" % p_i
 		return
+	if phed.isBinary(p_i):
+		if trans_method != 'none':
+			return
+		elif mapping_method in ["kw"]:
+			return
+		elif p_dict['analysis_plots']:
+			specific_methods = ["ft", 'lm', "emma", 'emmax']
 	else:
-		pids = _parse_pids_(args[0])
-		p_i = int(args[0])
+		if mapping_method in ["ft"]:
+			return
+		elif p_dict['analysis_plots']:
+			specific_methods = ["kw", 'lm', "emma", 'emmax']
 
-	phen_is_binary = phed.isBinary(p_i)
 	phenotype_name = phed.getPhenotypeName(p_i)
-	print "Phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
+	#Cluster specific parameters
+	print "Setting up a gwa run for phenotype:%s, pid=%d, using method:%s, with transformation as:%s"\
+		% (phenotype_name, p_i, mapping_method, trans_method)
+	run_id = p_dict['parallel']
 
-	#SNPs data
-	snps_data_file = data_dir + '250K_t' + str(callMethodID) + '.csv'
+	#Add results to DB (a hack for papaya, to add results from main node to DB).
+	if p_dict['only_add_2_db']:
+		file_name_prefix = _get_file_prefix_(p_dict['parallel'], p_i, phenotype_name, mapping_method, \
+						trans_method, p_dict['remove_outliers'])
+		pval_file = file_name_prefix + ".pvals"
+		score_file = file_name_prefix + ".scores"
+		sys.stdout.write("Looking for files %s or %s." % (pval_file, score_file))
+		result_file = None
+		if os.path.isfile(pval_file):
+			result_file = pval_file
+		elif os.path.isfile(score_file):
+			result_file = score_file
+		if result_file:
+			sys.stdout.write("..... found!\n")
+			if p_dict['no_phenotype_ids']:
+				db_pid = phed.get_db_pid(p_i)
+			else:
+				db_pid = p_i
 
-	if analysis_plots:
-		print "\nAnalysing GWAs results jointly... QQ plots etc."
-
-		#Genotype and phenotype data is only used for permutations.
-		sd = dataParsers.parse_snp_data(snps_data_file , format=0, delimiter=delim,
-					      missingVal=missingVal, filter=debug_filter)
-		prepare_data(sd, phed, p_i, trans_method, remove_outliers)
-		snps = sd.getSnps()
-		phen_vals = phed.getPhenVals(p_i)
-
-		try:
-			print "Plotting accession phenotype map"
+			import results_2_db as rdb
+			short_name = "cm" + str(p_dict['call_method_id']) + "_pid" + str(db_pid) + "_" + phenotype_name \
+				+ "_" + mapping_method + "_" + trans_method
+			if p_dict['remove_outliers']:
+				short_name += "_no"
+			tm_id = transformation_method_dict[trans_method]
+			rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid, \
+					analysis_methods_dict[mapping_method], tm_id, \
+					remove_outliers=p_dict['remove_outliers'])
+			return
+		else:
+			sys.stdout.write("Result files not found!\n")
+			sys.stdout.write("Setting up the run.\n")
 			sys.stdout.flush()
-			accession_map_pdf_file = run_id + "_acc_phen_map.pdf"
-			phed.plot_accession_map(p_i, pdf_file=accession_map_pdf_file)
-		except Exception, err_str:
-			print 'Skipping accession-phenotype map... basemap package is probably not installed:', err_str
 
-		#Load gwas results
-		results = {}
-		perm_pvals = None
-		methods_found = []
-		#Iterate over all possible combination of results
-		for mapping_method in specific_methods:
-			for trans_method in specific_transformations:
-#				for remove_outliers in [True,False]:
+
+
+	shstr = "#!/bin/csh\n"
+	shstr += "#PBS -l walltime=%s \n" % p_dict['wall_time_req']
+	if mapping_method in ['emma']:
+		shstr += "#PBS -l nodes=1:ppn=%d \n" % p_dict['proc_per_node']
+	shstr += "#PBS -l mem=%s \n" % p_dict['mem_req']
+	shstr += "#PBS -q cmb\n"
+
+	job_id = '%d_%s_%s_%s' % (p_i, mapping_method, trans_method, p_dict['parallel'])
+	shstr += "#PBS -N p%s \n" % job_id
+	shstr += "(python %s gwa.py -o %s " % (env['script_dir'], run_id)
+	shstr += "-i %d -a %s -b %s -c %d -d %n -t %d -m %d " % (p_i, p_dict['mapping_method'], p_dict['trans_method'],
+					p_dict['remove_outliers'], p_dict['debug_filter'],
+					p_dict['call_method_id'], p_dict['mac_threshold'])
+
+	shstr += "--region_plots=%d --proc_per_node=%d --data_format=%s " % \
+		(p_dict['region_plots'], p_dict['proc_per_node'], p_dict['data_format'])
+
+
+	if p_dict['use_existing_results']: shstr += "--use_existing_results  "
+	if p_dict['analysis_plots']: shstr += "-e "
+	if p_dict['phen_file']: shstr += "-r %s " % p_dict['phen_file']
+	if p_dict['kinship_file']: shstr += "-k %s " % p_dict['kinship_file']
+	if p_dict['cand_genes_file']: shstr += "--cand_genes_file=%s " % p_dict['cand_genes_file']
+	if p_dict['no_phenotype_ids']: shstr += "--no_phenotype_ids "
+	if p_dict['add_to_db']: shstr += "-n "
+	if p_dict['comment']: shstr += "--comment=%s " % comment
+
+	shstr += "> " + run_id + "_job" + ".out) >& " + run_id + "_job" + ".err\n"
+	#print '\n',shstr,'\n'
+	script_file_name = p_dict['parallel'] + ".sh"
+	f = open(script_file_name, 'w')
+	f.write(shstr)
+	f.close()
+
+	#Execute qsub script
+	os.system("qsub " + script_file_name)
+
+
+
+def analysis_plots(snps_data_file, phed, p_dict):
+	print "\nAnalysing GWAs results jointly... QQ plots etc."
+
+	#Genotype and phenotype data is only used for permutations.
+	sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+
+	try:
+		print "Plotting accession phenotype map"
+		for p_i in p_dict['pids']:
+			sys.stdout.flush()
+			file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i))
+			accession_map_pdf_file = file_prefix + "_acc_phen_map.pdf"
+			phed.plot_accession_map(p_i, pdf_file=accession_map_pdf_file)
+	except Exception, err_str:
+		print 'Skipping accession - phenotype map... basemap package is probably not installed:', err_str
+
+	#Load gwas results
+	results = {}
+	perm_pvals = None
+	methods_found = []
+	#Iterate over all possible combination of results
+	for p_i in p_dict['pids']:
+		phenotype_name = phed.getPhenotypeName(p_i)
+		phen_is_binary = phed.isBinary(p_i)
+		print "Plotting analysis plots for phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
+		for trans_method in p_dict['specific_transformations']:
+			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			for mapping_method in p_dict['specific_methods']:
+				file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i),
+							mapping_method, trans_method, p_dict['remove_outliers'])
+				snps = sd.getSnps()
+				phen_vals = phed.getPhenVals(p_i)
+				res_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
 				try:
-					l = run_id.split("_")[:-1]
-					#file_prefix = "_".join(l)+"_"+mapping_method
-					file_prefix = "_".join(l) + "_" + mapping_method + '_' + trans_method
-					if remove_outliers:
-						file_prefix += '_no'
 					file_name = file_prefix + ".pvals"
 					sys.stdout.write("Looking for file %s." % (file_name))
 					if os.path.isfile(file_name):
 						sys.stdout.write("..... found!\n")
-						snps = sd.getSnps()
-						res = gwaResults.Result(result_file=file_name, name=mapping_method + "_" + \
-								        phenotype_name, snps=snps)
+						res = gwaResults.Result(result_file=file_name, name=res_name, snps=snps)
 						pvals = True
 						if mapping_method in ['lm', 'emma', 'emmax']:
 							res.filter_attr("mafs", 15)
@@ -513,9 +389,8 @@ def _run_():
 						sys.stdout.write("Looking for file %s." % (file_name))
 						if os.path.isfile(file_name):
 							sys.stdout.write("..... found!\n")
-							snps = sd.getSnps()
-							res = gwaResults.Result(result_file=file_name, name=mapping_method + \
-									        "_" + phenotype_name, snps=snps)
+							res = gwaResults.Result(result_file=file_name, name=res_name,
+									snps=snps)
 							pvals = False
 							results[mapping_method] = res
 						else:
@@ -541,242 +416,315 @@ def _run_():
                         #Plotting the QQ plots.
 			num_dots = 1000
 			max_log_val = 5
-			gwaResults.qq_plots(results, num_dots, max_log_val, file_prefix, method_types=results.keys(),
+			qq_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i))
+			gwaResults.qq_plots(results, num_dots, max_log_val, qq_file_prefix, method_types=results.keys(),
 					    phen_name=phenotype_name, perm_pvalues=perm_pvals, is_binary=phen_is_binary)
 
-	else: #If not analysis plots...
-		assert len(specific_methods) == 1, \
-			"More than one specific GWA methods cannot be applied unless running on the cluster."
-		mapping_method = specific_methods[0]
-		trans_method = specific_transformations[0]
-
-		result_name = phenotype_name + '_' + mapping_method + "_" + trans_method #(not really important)
-		if remove_outliers:
-			result_name += '_no'
-		res = None
 
 
+def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dict):
+	phenotype_name = phed.getPhenotypeName(p_i)
+	phen_is_binary = phed.isBinary(p_i)
+	file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i),
+				mapping_method, trans_method, p_dict['remove_outliers'])
+	result_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
 
-		#Check whether result already exists.
-		if use_existing_results:
-			if region_plots:
-				sd = dataParsers.parse_snp_data(snps_data_file , format=0, delimiter=delim,
-							      missingVal=missingVal, filter=debug_filter)
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, remove_outliers)
-				if remove_outliers:
-					assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
-
-				snps = sd.getSnps()
-			else:
-				snps = None
-
-			print "\nChecking for existing results."
-			result_file = run_id + ".pvals"
-			if os.path.isfile(result_file):
-				res = gwaResults.Result(result_file=result_file, name=result_name, snps=snps)
-				pvals = True
-			else:
-				result_file = run_id + ".scores"
-				if os.path.isfile(result_file):
-					res = gwaResults.Result(result_file=result_file, name=result_name, snps=snps)
-					pvals = False
-			if res:
-				print "Found existing results.. (%s)" % (result_file)
-			sys.stdout.flush()
-
-
-
-
-
-		if not res: #If results weren't found in a file... then do GWA.
-			gc.collect()
-			#Do we need to calculate the K-matrix?
-			if mapping_method in ['emma', 'emmax']:
-				#Load genotype file (in binary format)
-				sys.stdout.write("Retrieving the Kinship matrix K....")
-				sys.stdout.flush()
-				k_file = data_dir + "kinship_matrix_cm" + str(callMethodID) + ".pickled"
-				#pdb.set_trace()
-				if not kinship_file and os.path.isfile(k_file): #Check if corresponding call_method_file is available
-					kinship_file = k_file
-				if kinship_file:   #Kinship file was supplied..
-					print '\nLoading SNPs data..'
-					sd = dataParsers.parse_snp_data(snps_data_file , format=0, delimiter=delim,
-								      missingVal=missingVal, filter=debug_filter)
-					num_outliers = prepare_data(sd, phed, p_i, trans_method, remove_outliers)
-					print '\nLoading supplied kinship'
-					k = lm.load_kinship_from_file(kinship_file, sd.accessions)
-				else:
-					sd = dataParsers.parse_snp_data(snps_data_file , format=0, delimiter=delim,
-							      missingVal=missingVal, filter=debug_filter)
-					print "No kinship file was found.  Generating kinship file:", k_file
-					snps = sd.getSnps()
-					k_accessions = sd.accessions[:]
-					if debug_filter:
-						import random
-						snps = random.sample(snps, int(debug_filter * len(snps)))
-					k = lm.calc_kinship(snps)
-					f = open(k_file, 'w')
-					cPickle.dump([k, sd.accessions], f)
-					f.close()
-					num_outliers = prepare_data(sd, phed, p_i, trans_method, remove_outliers)
-					k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
-				sys.stdout.flush()
-				gc.collect()
-				sys.stdout.write("Done!.\n")
-			else:
-				sd = dataParsers.parse_snp_data(snps_data_file , format=0, delimiter=delim,
-							      missingVal=missingVal, filter=debug_filter)
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, remove_outliers)
+	res = None
+	#Check whether result already exists.
+	if p_dict['use_existing_results']:
+		if p_dict['region_plots']:
+			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			if p_dict['remove_outliers']:
+				assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
 
 			snps = sd.getSnps()
-			if remove_outliers:
-				assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
-			phen_vals = phed.getPhenVals(p_i)
-
-			print "Applying %s to data." % (mapping_method)
-			sys.stdout.flush()
-			kwargs = {}
-			additional_columns = []
-			if "kw" == mapping_method:
-				#Writing files
-				#phed and phenotype
-
-				if phen_is_binary:
-					warnings.warn("Warning, applying KW to a binary phenotype")
-
-				kw_res = util.kruskal_wallis(snps, phen_vals)
-				pvals = kw_res['ps']
-				kwargs['statistics'] = kw_res['ds']
-				additional_columns.append('statistics')
-
-
-			elif "ft" == mapping_method:
-				pvals, or_est = run_fet(snps, phen_vals)
-				kwargs['odds_ratio_est'] = or_est
-				additional_columns.append('odds_ratio_est')
-
-			else:  #Parametric tests below:		
-
-				if mapping_method in ['emma']:
-					sys.stdout.write("Starting EMMA (fast)\n")
-					sys.stdout.flush()
-					res = run_emma_parallel(snps, phen_vals, k, num_proc=proc_per_node)
-					#res = runEmma(snps,phen_vals,k)
-					kwargs['genotype_var_perc'] = [val[0] for val in res['genotype_var_perc']]
-					kwargs['beta0'] = [val[0] for val in res['beta0_est']]
-					kwargs['beta1'] = [val[0] for val in res['beta1_est']]
-					additional_columns.append('genotype_var_perc')
-					additional_columns.append('beta0')
-					additional_columns.append('beta1')
-					pvals = [pval[0] for pval in res['ps']]
-					sys.stdout.write("Done!\n")
-					sys.stdout.flush()
-				elif mapping_method in ['emmax']:
-					res = lm.emmax(snps, phen_vals, k)
-				elif mapping_method in ['lm']:
-					res = lm.linear_model(snps, phen_vals)
-				elif mapping_method in ['py_emma']:
-					pass
-					#CONNECT TO PYTHON EMMA
-				if mapping_method in ['lm', 'emmax']:
-					kwargs['genotype_var_perc'] = res['var_perc']
-					kwargs['beta0'] = [val[0] for val in res['betas']]
-					kwargs['beta1'] = [val[1] for val in res['betas']]
-					additional_columns.append('genotype_var_perc')
-					additional_columns.append('beta0')
-					additional_columns.append('beta1')
-					pvals = res['ps']
-					sys.stdout.write("Done!\n")
-					sys.stdout.flush()
-
-
-
-			kwargs['correlations'] = calc_correlations(snps, phen_vals)
-			additional_columns.append('correlations')
-
-			res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
-
-			if mapping_method in ["kw", "ft", "emma", 'lm', "emmax"]:
-			 	result_file = run_id + ".pvals"
-			else:
-			 	result_file = run_id + ".scores"
-			res.write_to_file(result_file, additional_columns)
-
-		#add results to DB..
-		if addToDB:
-			if no_phenotype_ids:
-				db_pid = phed.get_db_pid(p_i)
-			else:
-				db_pid = p_i
-
-			import results_2_db as rdb
-			short_name = "cm" + str(callMethodID) + "_pid" + str(db_pid) + "_" + phenotype_name + "_" + mapping_method + "_" + trans_method
-			if remove_outliers:
-				short_name += "_no"
-			#rdb.add_results_to_db(result_file,short_name,callMethodID,db_pid,analysis_methods_dict[mapping_method])
-			tm_id = transformation_method_dict[trans_method]
-			rdb.add_results_to_db(result_file, short_name, callMethodID, db_pid, analysis_methods_dict[mapping_method],
-						tm_id, remove_outliers=remove_outliers)
-
-
-
-		#Load candidate genes from a file, if it is given
-		cand_genes = None
-		if cand_genes_file:
-			cand_genes, tair_ids = gwaResults.load_cand_genes_file(cand_genes_file)
 		else:
-			cand_genes = None
-			tair_ids = None
+			snps = None
 
-
-		print "Generating a GW plot."
+		print "\nChecking for existing results."
+		result_file = file_prefix + ".pvals"
+		if os.path.isfile(result_file):
+			res = gwaResults.Result(result_file=result_file, name=result_name, snps=snps)
+			pvals = True
+		else:
+			result_file = file_prefix + ".scores"
+			if os.path.isfile(result_file):
+				res = gwaResults.Result(result_file=result_file, name=result_name, snps=snps)
+				pvals = False
+		if res:
+			print "Found existing results.. (%s)" % (result_file)
 		sys.stdout.flush()
-		png_file = run_id + "_gwa_plot.png"
-		#png_file_max30 = run_id+"_gwa_plot_max30.png"
-		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax"]:
-			res.neg_log_trans()
-			if mapping_method in ["kw", "ft"]:
+
+
+	if not res: #If results weren't found in a file... then do GWA.
+		#Do we need to calculate the K-matrix?
+		if mapping_method in ['emma', 'emmax', 'emmax_anova']:
+			#Load genotype file (in binary format)
+			sys.stdout.write("Retrieving the Kinship matrix K.\n")
+			sys.stdout.flush()
+			k_file = env['data_dir'] + "kinship_matrix_cm" + str(p_dict['call_method_id']) + ".pickled"
+			kinship_file = p_dict['kinship_file']
+			if not kinship_file and os.path.isfile(k_file): #Check if corresponding call_method_file is available
+				kinship_file = k_file
+			if kinship_file:   #Kinship file was somehow supplied..
+				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+				print 'Loading supplied kinship'
+				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
+			else:
+				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+				print "No kinship file was found.  Generating kinship file:", k_file
+				snps = sd.getSnps()
+				k_accessions = sd.accessions[:]
+				if p_dict['debug_filter']:
+					import random
+					snps = random.sample(snps, int(p_dict['debug_filter'] * len(snps)))
+				k = lm.calc_kinship(snps)
+				f = open(k_file, 'w')
+				cPickle.dump([k, sd.accessions], f)
+				f.close()
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
+			sys.stdout.flush()
+			sys.stdout.write("Done!\n")
+		else:
+			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+
+		snps = sd.getSnps()
+		if p_dict['remove_outliers']:
+			assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
+		phen_vals = phed.getPhenVals(p_i)
+
+		sys.stdout.write("Finished loading and handling data!\n")
+
+		print "Applying %s to data." % (mapping_method)
+		sys.stdout.flush()
+		kwargs = {}
+		additional_columns = []
+		if "kw" == mapping_method:
+
+			if phen_is_binary:
+				warnings.warn("Warning, applying KW to a binary phenotype")
+
+			kw_res = util.kruskal_wallis(snps, phen_vals)
+			pvals = kw_res['ps']
+			kwargs['statistics'] = kw_res['ds']
+			additional_columns.append('statistics')
+
+
+		elif "ft" == mapping_method:
+			pvals, or_est = run_fet(snps, phen_vals)
+			kwargs['odds_ratio_est'] = or_est
+			additional_columns.append('odds_ratio_est')
+
+		else:  #Parametric tests below:		
+
+			if mapping_method in ['emma']:
+				sys.stdout.write("Starting EMMA (fast)\n")
+				sys.stdout.flush()
+				res = run_emma_parallel(snps, phen_vals, k, num_proc=proc_per_node)
+				#res = runEmma(snps,phen_vals,k)
+				kwargs['genotype_var_perc'] = [val[0] for val in res['genotype_var_perc']]
+				kwargs['beta0'] = [val[0] for val in res['beta0_est']]
+				kwargs['beta1'] = [val[0] for val in res['beta1_est']]
+				additional_columns.append('genotype_var_perc')
+				additional_columns.append('beta0')
+				additional_columns.append('beta1')
+				pvals = [pval[0] for pval in res['ps']]
+				sys.stdout.write("Done!\n")
+				sys.stdout.flush()
+			elif mapping_method in ['emmax']:
+				res = lm.emmax(snps, phen_vals, k)
+			elif mapping_method in ['lm']:
+				res = lm.linear_model(snps, phen_vals)
+			elif mapping_method in ['py_emma']:
+				pass
+				#CONNECT TO PYTHON EMMA
+			elif mapping_method in ['emmax_anova']:
+				res = lm.emmax_anova(snps, phen_vals, k)
+			elif mapping_method in ['lm']:
+				res = lm.anova(snps, phen_vals)
+			else:
+				print "Mapping method", mapping_method, 'was not found.'
+				sys.exit(2)
+
+			if mapping_method in ['lm', 'emmax']:
+				kwargs['genotype_var_perc'] = res['var_perc']
+				betas = map(list, zip(*res['betas']))
+				kwargs['beta0'] = betas[0]
+				kwargs['beta1'] = betas[1]
+				additional_columns.append('genotype_var_perc')
+				additional_columns.append('beta0')
+				additional_columns.append('beta1')
+				pvals = res['ps']
+				sys.stdout.write("Done!\n")
+				sys.stdout.flush()
+
+			if mapping_method in ['lm_anova', 'emmax_anova']:
+				kwargs['genotype_var_perc'] = res['var_perc']
+				pvals = res['ps']
+				betas = map(list, zip(*res['betas']))
+				kwargs['beta0'] = betas[0]
+				kwargs['beta1'] = betas[1]
+				#kwargs['beta2'] = betas[2]
+				additional_columns.append('genotype_var_perc')
+				additional_columns.append('beta0')
+				additional_columns.append('beta1')
+				#additional_columns.append('beta2')
+				sys.stdout.write("Done!\n")
+				sys.stdout.flush()
+
+
+		kwargs['correlations'] = calc_correlations(snps, phen_vals)
+		additional_columns.append('correlations')
+
+		res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
+
+		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
+		 	result_file = file_prefix + ".pvals"
+		else:
+		 	result_file = file_prefix + ".scores"
+		res.write_to_file(result_file, additional_columns)
+
+	#add results to DB..
+	if p_dict['add_to_db']:
+		if p_dict['no_phenotype_ids']:
+			db_pid = phed.get_db_pid(p_i)
+		else:
+			db_pid = p_i
+
+		import results_2_db as rdb
+		short_name = 'cm%d_pid%d_%s_%s_%s_%d' % (p_dict['call_method_id'], db_pid, phenotype_name,
+							mapping_method, trans_method, p_dict['remove_outliers'])
+		tm_id = transformation_method_dict[trans_method]
+		rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid,
+					analysis_methods_dict[mapping_method],
+					tm_id, remove_outliers=p_dict['remove_outliers'])
+
+
+
+	#Load candidate genes from a file, if it is given
+	cand_genes = None
+	if p_dict['cand_genes_file']:
+		cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
+	else:
+		cand_genes = None
+		tair_ids = None
+
+
+	print "Generating a GW plot."
+	sys.stdout.flush()
+	png_file = file_prefix + "_gwa_plot.png"
+	#png_file_max30 = file_prefix+"_gwa_plot_max30.png"
+	if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
+		res.neg_log_trans()
+		if mapping_method in ["kw", "ft"] or p_dict['data_format'] != 'binary':
+			#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
+			#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
+			res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
+				       plot_bonferroni=True, cand_genes=cand_genes)
+		else:
+			if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
 				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
+				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
 				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
 					       plot_bonferroni=True, cand_genes=cand_genes)
-			else:
-				if res.filter_attr("mafs", 15) > 0:
-					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
-					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-						       plot_bonferroni=True, cand_genes=cand_genes)
+	else:
+		pass
+
+	print "plotting histogram"
+	hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method, p_dict['remove_outliers'])
+	hist_png_file = hist_file_prefix + "_hist.png"
+	phed.plot_histogram(p_i, pngFile=hist_png_file)
+
+
+
+	if p_dict['region_plots']:
+		import regionPlotter as rp
+		regions_results = res.get_top_region_results(region_plots)
+		plotter = rp.RegionPlotter()
+		print "Starting region plots..."
+		for reg_res in regions_results:
+			chromosome = reg_res.chromosomes[0]
+			caption = phenotype_name + "_c" + str(chromosome) + "_" + mapping_method
+			png_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + ".png"
+			tair_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_tair_info.txt"
+			plotter.plot_small_result([reg_res], png_file=png_file, highlight_gene_ids=tair_ids,
+						  caption=caption, tair_file=tair_file)
+
+			#Plot Box-plot
+			png_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_box_plot.png"
+			(marker, score, chromosome, pos) = reg_res.get_max_snp()
+			marker_accessions = sd.accessions
+			phed.plot_marker_box_plot(p_i, marker=marker, marker_accessions=marker_accessions, png_file=png_file,
+					     title="c" + str(chromosome) + "_p" + str(pos), marker_score=score, marker_missing_val=sd.missing_val)
+
+
+
+
+def _run_():
+
+	p_dict, args = parse_parameters()
+	print "GWA runs are being set up with the following parameters:"
+	for k, v in p_dict.iteritems(): print k + ': ' + str(v)
+	print ''
+
+	#Load phenotype file
+	if p_dict['phen_file']:
+		print 'Loading phenotypes from file.'
+		phed = phenotypeData.readPhenotypeFile(p_dict['phen_file'],
+						with_db_ids=(not p_dict['no_phenotype_ids']))  #load phenotype file
+	else:
+		print 'Retrieving the phenotypes from the DB.'
+		phed = phenotypeData.getPhenotypes()
+
+	#If on the cluster, then set up runs..
+	if p_dict['parallel']:
+		if len(p_dict['pids']) == 0:  #phenotype index arguement is missing, hence all phenotypes are run/analyzed.
+			if not p_dict['phen_file']:
+				raise Exception('Phenotype file or phenotype ID is missing.')
+			p_dict['pids'] = phed.phenIds
 		else:
-			pass
+			raise Exception('Too many arguments..')
 
-		print "plotting histogram"
-		hist_png_file = run_id + "_hist_" + str(trans_method) + "_no" + str(remove_outliers) + ".png"
-		phed.plot_histogram(p_i, pngFile=hist_png_file)
+		if analysis_plots:  #Running on the cluster..
+			for p_i in p_dict['pids']:
+				run_parallel(p_i, phed, p_dict)
+		else:
+			for mapping_method in p_dict['specific_methods']:
+				for trans_method in p_dict['specific_transformations']:
+					for p_i in pids:
+						run_parallel(p_i, phed, p_dict, mapping_method, trans_method)
+		return #Exiting the program...
+
+
+	#SNPs data file name
+	if not p_dict['data_file']:
+		snps_data_file = '%s250K_t%d.csv' % (env['data_dir'], p_dict['call_method_id'])
+	else:
+		snps_data_file = p_dict['data_file']
 
 
 
-		if region_plots:
-			import regionPlotter as rp
-			regions_results = res.get_top_region_results(region_plots)
-			plotter = rp.RegionPlotter()
-			print "Starting region plots..."
-			for reg_res in regions_results:
-				chromosome = reg_res.chromosomes[0]
-				caption = phenotype_name + "_c" + str(chromosome) + "_" + mapping_method
-				png_file = run_id + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + ".png"
-				tair_file = run_id + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_tair_info.txt"
-				plotter.plot_small_result([reg_res], png_file=png_file, highlight_gene_ids=tair_ids,
-							  caption=caption, tair_file=tair_file)
+	#Plot analysis plots...
+	if p_dict['analysis_plots']:
+		analysis_plots(snps_data_file, phed, p_dict)
+	else:
+		#If not analysis plots... then GWAS
+		for p_i in p_dict['pids']:
+			print '-' * 120, '\n'
+			phenotype_name = phed.getPhenotypeName(p_i)
+			print "Performing GWAS for phenotype: %s, phenotype_id: %s" % (phenotype_name, p_i)
+			for trans_method in p_dict['specific_transformations']:
+				print 'Phenotype transformation:', trans_method
 
-				#Plot Box-plot
-				png_file = run_id + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_box_plot.png"
-				(marker, score, chromosome, pos) = reg_res.get_max_snp()
-				marker_accessions = sd.accessions
-				phed.plot_marker_box_plot(p_i, marker=marker, marker_accessions=marker_accessions, png_file=png_file,
-						     title="c" + str(chromosome) + "_p" + str(pos), marker_score=score, marker_missing_val=sd.missing_val)
+				for mapping_method in p_dict['specific_methods']:
+					#DO ANALYSIS
+					print 'Mapping method:', mapping_method
+					map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dict)
 
-	#run function ends here.
 
 
 
@@ -785,7 +733,7 @@ def _run_emma_mp_(in_que, out_que, confirm_que, num_splits=10):
 	args = in_que.get(block=True)
 	#r_source(script_dir+"emma_fast.R")
 	#r_emma_REML_t = robjects.r['emma.REML.t']
-	r.source(script_dir + "emma_fast.R")
+	r.source(env['script_dir'] + "emma_fast.R")
 	phenArray = array([args[2]])
 	snps = args[1]
 	print "Found data nr. %i, starting run.  pid=%d" % (args[0], os.getpid())

@@ -573,7 +573,7 @@ class PhenotypeData:
 		"""
 		if not accessions:
 			accessions = self.accessions
-		eid = _getEcotypeIdInfoDict_()
+		eid = get_ecotype_id_info_dict()
 		lats = []
 		lons = []
 		for e in accessions:
@@ -581,6 +581,7 @@ class PhenotypeData:
 			try:
 				latitude = float(r[2])
 				longitude = float(r[3])
+
 			except Exception, err_str:
 				print "Latitude and Longitude, not found?:", err_str
 				print 'Placing them in the Atlantic.'
@@ -819,8 +820,8 @@ class PhenotypeData:
 			newPhenotVals.append(self.phenotypeValues[i])
 		self.accessions = newAccessions
 		self.phenotypeValues = newPhenotVals
-		print "len(self.accessions):", len(self.accessions)
-		print "len(self.phenotypeValues):", len(self.phenotypeValues)
+#		print "len(self.accessions):", len(self.accessions)
+#		print "len(self.phenotypeValues):", len(self.phenotypeValues)
 		if self.accessionNames:
 			newAccessionNames = []
 			for i in indicesToKeep:

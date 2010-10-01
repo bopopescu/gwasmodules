@@ -143,7 +143,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 	cursor = conn.cursor()
 	db_result_dir = "/Network/Data/250k/db/results/type_1/"
 	if transformation_parameters == 'null':
-		transformation_parameters_str = "(transformation_parameters is 'null' OR transformation_parameters IS NULL)"
+		transformation_parameters_str = "(transformation_parameters = 'null' OR transformation_parameters IS NULL)"
 	else:
 		transformation_parameters_str = "transformation_parameters = '%s'" % transformation_parameters
 

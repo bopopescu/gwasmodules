@@ -16,15 +16,15 @@ resultsdir = ""
 #Standard missing value is NA
 missing_val = 'NA'
 #Standard nt decoding, is using the IUPAC alphabet
-nt_decoder = {'A':'A', 
-	      'C':'C', 
-	      'G':'G', 
-	      'T':'T', 
-	      'AG':'R', 
-	      'AC':'M', 
-	      'GT':'K', 
-	      'CT':'Y', 
-	      'AT':'W', 
+nt_decoder = {'A':'A',
+	      'C':'C',
+	      'G':'G',
+	      'T':'T',
+	      'AG':'R',
+	      'AC':'M',
+	      'GT':'K',
+	      'CT':'Y',
+	      'AT':'W',
 	      'CG':'S',
 	      'Y':'Y',
 	      'R':'R',
@@ -55,10 +55,10 @@ nt_decoder = {'A':'A',
 def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=None, defaultValue=None):
 	class _ecotypeDict_(dict):
 		def __missing__(self, key):
-			return (defaultValue,defaultValue)
+			return (defaultValue, defaultValue)
 
 	import MySQLdb
-	print "Connecting to db, host="+host
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -67,7 +67,7 @@ def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=Non
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
@@ -75,14 +75,14 @@ def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=Non
 	#Retrieve the filenames
 	print "Fetching data"
 	numRows = int(cursor.execute("select distinct ei.tg_ecotypeid, e2a.accession_id, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, at.complete_2010_strains_in_stock2tg_ecotypeid e2a where e2a.tg_ecotypeid=ei.tg_ecotypeid"))
-	
+
 	ecotDict = _ecotypeDict_()
 	while(1):
 		row = cursor.fetchone()
 		if not row:
 			break;
 		ecotypeID = str(int(row[0]))
-		ecotDict[ecotypeID]=(str(int(row[1])),str(row[2]))
+		ecotDict[ecotypeID] = (str(int(row[1])), str(row[2]))
 	cursor.close ()
 	conn.close ()
 	return ecotDict
@@ -123,9 +123,9 @@ def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=Non
 #	conn.close ()
 #	return ecotDict
 
-	 
 
-def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stock_250k", withArrayIds=False, methodId=1, user = None, passwd = None, callProb=False, newBatch=False): 
+
+def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="stock_250k", withArrayIds=False, methodId=1, user=None, passwd=None, callProb=False, newBatch=False):
 	import MySQLdb
 	"""
 	Retrieve 2010 data from DB.  Returns a list of RawSnpsData objects. 
@@ -137,8 +137,8 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 	"""
 	rt = time.time()
 	decoder = RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']!!
-	
-	print "Connecting to db, host="+host
+
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -147,7 +147,7 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = db)
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db=db)
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
@@ -155,10 +155,10 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 	#Retrieve the filenames
 	print "Fetching data"
 	if newBatch:
-		numRows = int(cursor.execute("select distinct ai.maternal_ecotype_id, ai.paternal_ecotype_id, ci.filename, ai.id from call_info ci, array_info ai where ci.array_id=ai.id and ci.method_id="+str(methodId)+" and ai.maternal_ecotype_id is not null and ai.paternal_ecotype_id is not null and ai.id>492 order by ai.id"))  #An ugly hack..
+		numRows = int(cursor.execute("select distinct ai.maternal_ecotype_id, ai.paternal_ecotype_id, ci.filename, ai.id from call_info ci, array_info ai where ci.array_id=ai.id and ci.method_id=" + str(methodId) + " and ai.maternal_ecotype_id is not null and ai.paternal_ecotype_id is not null and ai.id>492 order by ai.id"))  #An ugly hack..
 	else:
-		numRows = int(cursor.execute("select distinct ai.maternal_ecotype_id, ai.paternal_ecotype_id, ci.filename, ai.id from call_info ci, array_info ai where ci.array_id=ai.id and ci.method_id="+str(methodId)+" and ai.maternal_ecotype_id is not null and ai.paternal_ecotype_id is not null order by ai.id"))
-	print "Num rows:",numRows
+		numRows = int(cursor.execute("select distinct ai.maternal_ecotype_id, ai.paternal_ecotype_id, ci.filename, ai.id from call_info ci, array_info ai where ci.array_id=ai.id and ci.method_id=" + str(methodId) + " and ai.maternal_ecotype_id is not null and ai.paternal_ecotype_id is not null order by ai.id"))
+	print "Num rows:", numRows
 
 	dict = {}
 	accessions = []
@@ -170,70 +170,70 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 		row = cursor.fetchone()
 		if not row:
 			break;
-		if int(row[0])==int(row[1]):
+		if int(row[0]) == int(row[1]):
 			accession = str(int(row[0]))
 		else:
-			accession = str(int(row[0]))+"_"+str(int(row[1]))
-		dict[accession]=i
+			accession = str(int(row[0])) + "_" + str(int(row[1]))
+		dict[accession] = i
 		accessions.append(accession)
 		dataFiles.append(row[2])
 		arrayIds.append(str(int(row[3])))
-		i = i+1	
+		i = i + 1
 
 
-	f = open(dataFiles[0],"r")
+	f = open(dataFiles[0], "r")
 	lines = f.readlines()
 	f.close()
 	numSnps = len(lines)
 
 	line = lines[1].split()
-	
+
 	linesList = []
-	for i in range(0,len(accessions)): #Checking files
-		f = open(dataFiles[i],"r")
+	for i in range(0, len(accessions)): #Checking files
+		f = open(dataFiles[i], "r")
 		newLines = f.readlines()
 		f.close()
-		if len(newLines)!=numSnps:
+		if len(newLines) != numSnps:
 			raise Exception("Data files are not equal in length.")
 		del newLines
 
 
-	
+
 
 	print "Reading and processing (cutting & merging) raw call files"
 	import tempfile
-	tempfile.tempdir='/tmp'
+	tempfile.tempdir = '/tmp'
 	tmpFiles = []
 	#Cutting files
-	for i in range(0,len(dataFiles)): #Cutting the SNPs fields
+	for i in range(0, len(dataFiles)): #Cutting the SNPs fields
 		tmpFile = tempfile.mkstemp()
 		os.close(tmpFile[0])
-		st = "cut -f 2 "+str(dataFiles[i])+" > "+tmpFile[1]	   
+		st = "cut -f 2 " + str(dataFiles[i]) + " > " + tmpFile[1]
 		#print st
 		os.system(st)
 		tmpFiles.append(tmpFile[1])
-		
- 
+
+
 	def _mergeFiles_(fileList): #A recursive function that merges the files in the list
 		l = len(fileList)
-		if l>2:
-			tmpFile1 = _mergeFiles_(fileList[:l/2])
-			tmpFile2 = _mergeFiles_(fileList[l/2:])
-		elif l<2:
+		if l > 2:
+			tmpFile1 = _mergeFiles_(fileList[:l / 2])
+			tmpFile2 = _mergeFiles_(fileList[l / 2:])
+		elif l < 2:
 			return fileList[0]
-		elif l==2:
+		elif l == 2:
 			tmpFile1 = fileList[0]
 			tmpFile2 = fileList[1]
-		
+
 		tmpFile = tempfile.mkstemp()
 		os.close(tmpFile[0])
-		st = "paste -d , "+str(tmpFile1)+" "+str(tmpFile2)+" > "+tmpFile[1]+";\n"
-		st += "rm "+str(tmpFile1)+" "+str(tmpFile2)
+		st = "paste -d , " + str(tmpFile1) + " " + str(tmpFile2) + " > " + tmpFile[1] + ";\n"
+		st += "rm " + str(tmpFile1) + " " + str(tmpFile2)
 		#print st
 		os.system(st)
 		return tmpFile[1]
 
-	
+
 	print "Merging files"
 	fileName = _mergeFiles_(tmpFiles)  #Merge all the fields
 	print fileName
@@ -249,10 +249,10 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 		probTmpFiles = []
 		#Cut the call probability fields
 		print "Cutting call prob. files"
-		for i in range(0,len(dataFiles)): #Cutting the SNPs fields
+		for i in range(0, len(dataFiles)): #Cutting the SNPs fields
 			tmpFile = tempfile.mkstemp()
 			os.close(tmpFile[0])
-			st = "cut -f 3 "+str(dataFiles[i])+" > "+tmpFile[1]	   
+			st = "cut -f 3 " + str(dataFiles[i]) + " > " + tmpFile[1]
 			#print st
 			os.system(st)
 			probTmpFiles.append(tmpFile[1])
@@ -260,20 +260,20 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 		print "Merging call prob. files"
 		probFileName = _mergeFiles_(probTmpFiles)  #Merge all the fields
 		print probFileName
-		probFile = open(probFileName,"r")
+		probFile = open(probFileName, "r")
 		probFile.readline()
 		callProbabilityList = []
-		
+
 		#Read file with call probabilities
 		print "Starting to read file (snps and probabilities)"
-		f = open(fileName,"r")
+		f = open(fileName, "r")
 		f.readline()
 		i = 1  #Skipping first line!
 		while i < len(lines):
 			chromosomes.append(int(newChr))
 			oldChr = newChr
 			positions = []
-			snps =[]
+			snps = []
 			callProbs = []
 			while i < len(lines) and newChr == oldChr:
 				line = lines[i].split()
@@ -284,7 +284,7 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 				snpProbs = []
 				newLine = f.readline().split(",")
 				newProbLine = probFile.readline().split(",")
-				for j in range(0,len(accessions)):
+				for j in range(0, len(accessions)):
 					nt = newLine[j].rstrip()
 					prob = float(newProbLine[j].rstrip())
 					snp.append(nt)
@@ -297,24 +297,24 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 					newChr = int(line[0].split("_")[0])
 				else:
 					break
-		
-			print "Fetched ",i,"SNPs of",len(lines)
+
+			print "Fetched ", i, "SNPs of", len(lines)
 			positionsList.append(positions)
 			snpsList.append(snps)
 			callProbabilityList.append(callProbs)
 		probFile.close()
-		os.system("rm "+probFileName)
+		os.system("rm " + probFileName)
 
 
 	else: #Without call probabilities
 		print "Starting to read file"
-		f = open(fileName,"r")
+		f = open(fileName, "r")
 		f.readline()
 		while i < len(lines):
 			chromosomes.append(int(newChr))
 			oldChr = newChr
 			positions = []
-			snps =[]
+			snps = []
 			while i < len(lines) and newChr == oldChr:
 				line = lines[i].split()
 				chrPos = line[0].split("_")
@@ -322,7 +322,7 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 				positions.append(int(chrPos[1]))
 				snp = []
 				newLine = f.readline().split(",")
-				for j in range(0,len(accessions)):
+				for j in range(0, len(accessions)):
 					nt = newLine[j].rstrip()
 					snp.append(nt)
 				snps.append(snp)
@@ -332,33 +332,33 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1,2,3,4,5], db = "stoc
 					newChr = int(line[0].split("_")[0])
 				else:
 					break
-		
-			print "Fetched ",i,"SNPs of",len(lines)
+
+			print "Fetched ", i, "SNPs of", len(lines)
 			positionsList.append(positions)
 			snpsList.append(snps)
-		
+
 	f.close()
-	os.system("rm "+fileName)
-	
+	os.system("rm " + fileName)
+
 
 	snpsds = []
 	if callProb:
 		for i in chromosomes:
-			snpsds.append(RawSnpsData(snpsList[i-1], positionsList[i-1], accessions=accessions, arrayIds=arrayIds, callProbabilities = callProbabilityList[i-1]))
-			print "callProbabilityList length=",len(callProbabilityList[i-1])
+			snpsds.append(RawSnpsData(snpsList[i - 1], positionsList[i - 1], accessions=accessions, arrayIds=arrayIds, callProbabilities=callProbabilityList[i - 1]))
+			print "callProbabilityList length=", len(callProbabilityList[i - 1])
 	else:
 		for i in chromosomes:
-			snpsds.append(RawSnpsData(snpsList[i-1], positionsList[i-1], accessions=accessions, arrayIds=arrayIds))
+			snpsds.append(RawSnpsData(snpsList[i - 1], positionsList[i - 1], accessions=accessions, arrayIds=arrayIds))
 	dif = int(time.time() - rt)
-	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
+	print "It took " + str(dif / 60) + " min. and " + str(dif % 60) + " sec. to fetch data."
 	cursor.close ()
 	conn.close ()
 	return snpsds
 
 
 
-  
-def get149DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", only96accessions=False, user = None,passwd = None):
+
+def get149DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at", only96accessions=False, user=None, passwd=None):
 	import MySQLdb
 	"""
 	Retrieve 149 data from DB.  Returns a list of RawSnpsData objects. 
@@ -366,8 +366,8 @@ def get149DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", o
 	"""
 	rt = time.time()
 	decoder = RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']:
-	
-	print "Connecting to db, host="+host
+
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -376,39 +376,39 @@ def get149DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", o
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = db)
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db=db)
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
 	cursor = conn.cursor ()
 	if only96accessions:
-		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version="+dataVersion+" and l.offset=0 and g.accession=eva.accession_id and eva.accession_id<97 and l.chromosome=1 order by eva.nativename"))
+		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version=" + dataVersion + " and l.offset=0 and g.accession=eva.accession_id and eva.accession_id<97 and l.chromosome=1 order by eva.nativename"))
 	else:
-		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version="+dataVersion+" and l.offset=0 and g.accession=eva.accession_id and l.chromosome=1 order by eva.nativename"))
+		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version=" + dataVersion + " and l.offset=0 and g.accession=eva.accession_id and l.chromosome=1 order by eva.nativename"))
 
 	dict = {}
 	accessions = []
 	i = 0
-	print "numRows",numRows
+	print "numRows", numRows
 	while(1):
 		row = cursor.fetchone()
 		if not row:
 			break;
-		dict[int(row[1])]=i
+		dict[int(row[1])] = i
 		accessions.append(str(int(row[0])))
-		i = i+1
+		i = i + 1
 
-	print len(accessions)," accessions found."
+	print len(accessions), " accessions found."
 
-	print "Fetching 2010 data (version "+dataVersion+"):"
-	snpsds=[]
+	print "Fetching 2010 data (version " + dataVersion + "):"
+	snpsds = []
 	for chromosome in chromosomes:
-		print "	Chromosome",chromosome
+		print "	Chromosome", chromosome
 		if only96accessions:
-			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>="+dataVersion+" and l.offset=0 and g.accession=eva.accession_id and eva.accession_id<97 and l.chromosome="+str(chromosome)+" order by l.position, eva.nativename"))
+			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>=" + dataVersion + " and l.offset=0 and g.accession=eva.accession_id and eva.accession_id<97 and l.chromosome=" + str(chromosome) + " order by l.position, eva.nativename"))
 		else:
-			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>="+dataVersion+" and l.offset=0 and g.accession=eva.accession_id and l.chromosome="+str(chromosome)+" order by l.position, eva.nativename"))
-		print "	",numRows,"rows retrieved."
+			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>=" + dataVersion + " and l.offset=0 and g.accession=eva.accession_id and l.chromosome=" + str(chromosome) + " order by l.position, eva.nativename"))
+		print "	", numRows, "rows retrieved."
 		positions = []
 		snps = []
 		if numRows > 0:
@@ -420,36 +420,36 @@ def get149DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", o
 				print row
 				positions.append(newPosition)
 				oldPosition = newPosition
-				snp = ['NA']*len(accessions)  #Initialize to missing data.
-				while(oldPosition==newPosition):
-					snp[dict[int(row[1])]]=decoder[row[3]]
+				snp = ['NA'] * len(accessions)  #Initialize to missing data.
+				while(oldPosition == newPosition):
+					snp[dict[int(row[1])]] = decoder[row[3]]
 					row = cursor.fetchone()
 					if not row:
 						break;
 					newPosition = int(row[0])
 				snps.append(snp)
 
-		snpsd = RawSnpsData(snps,positions,accessions=accessions)
+		snpsd = RawSnpsData(snps, positions, accessions=accessions)
 		snpsds.append(snpsd)
-				
+
 	cursor.close ()
 	conn.close ()
 	dif = int(time.time() - rt)
-	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
+	print "It took " + str(dif / 60) + " min. and " + str(dif % 60) + " sec. to fetch data."
 
 	return snpsds
 
 
 
-def get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", only96accessions=False, user = None,passwd = None):
-	import MySQLdb,sys
+def get2010DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at", dataVersion="3", only96accessions=False, user=None, passwd=None):
+	import MySQLdb, sys
 	"""
 	Retrieve 2010 data from DB.  Returns a list of RawSnpsData objects. 
 	"""
 	rt = time.time()
 	decoder = RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
-	
-	print "Connecting to db, host="+host
+
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -458,23 +458,23 @@ def get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", 
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = db)
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db=db)
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
 	cursor = conn.cursor ()
-	
-	locStr = " and l.offset=0 "  
-	if int(dataVersion)==4:		   #If using version=4, then allow any locus.offset.
+
+	locStr = " and l.offset=0 "
+	if int(dataVersion) == 4:		   #If using version=4, then allow any locus.offset.
 		locStr = ""
 
 	#Get distinct accessions and their id.
 	if only96accessions:
 		print 'starting'
-		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version="+dataVersion+locStr+" and g.accession=eva.accession_id and eva.accession_id<97 order by eva.nativename"))
+		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version=" + dataVersion + locStr + " and g.accession=eva.accession_id and eva.accession_id<97 order by eva.nativename"))
 		print 'done'
 	else:
-		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version="+dataVersion+locStr+" and g.accession=eva.accession_id order by eva.nativename"))
+		numRows = int(cursor.execute("select distinct eva.ecotype_id, eva.accession_id, eva.nativename from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version=" + dataVersion + locStr + " and g.accession=eva.accession_id order by eva.nativename"))
 
 	dict = {}
 	accessions = []
@@ -483,62 +483,62 @@ def get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", 
 		row = cursor.fetchone()
 		if not row:
 			break;
-		dict[int(row[1])]=i
+		dict[int(row[1])] = i
 		accessions.append(str(int(row[0])))
-		i = i+1
+		i = i + 1
 
-	print len(accessions)," accessions found."
+	print len(accessions), " accessions found."
 
-	print "Fetching 2010 data (version "+dataVersion+"):"
-	snpsds=[]
+	print "Fetching 2010 data (version " + dataVersion + "):"
+	snpsds = []
 	for chromosome in chromosomes:
-		print "	Chromosome",chromosome
+		print "	Chromosome", chromosome
 		if only96accessions:
-			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>="+dataVersion+locStr+" and g.accession=eva.accession_id and eva.accession_id<97 and l.chromosome="+str(chromosome)+" order by l.position, eva.nativename"))
+			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>=" + dataVersion + locStr + " and g.accession=eva.accession_id and eva.accession_id<97 and l.chromosome=" + str(chromosome) + " order by l.position, eva.nativename"))
 		else:
-			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>="+dataVersion+locStr+" and g.accession=eva.accession_id and l.chromosome="+str(chromosome)+" order by l.position, eva.nativename"))
-		print "	",numRows,"rows retrieved."
+			numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>=" + dataVersion + locStr + " and g.accession=eva.accession_id and l.chromosome=" + str(chromosome) + " order by l.position, eva.nativename"))
+		print "	", numRows, "rows retrieved."
 		positions = []
 		snps = []
 		if numRows > 0:
 			row = cursor.fetchone()
 			newPosition = int(row[0])
 			while(1):
-				if not row: 
+				if not row:
 					break;
 				positions.append(newPosition)
 				oldPosition = newPosition
-				snp = ['NA']*len(accessions)  #Initialize to missing data.
-				while(oldPosition==newPosition):
-					snp[dict[int(row[1])]]=decoder[row[3]]
+				snp = ['NA'] * len(accessions)  #Initialize to missing data.
+				while(oldPosition == newPosition):
+					snp[dict[int(row[1])]] = decoder[row[3]]
 					row = cursor.fetchone()
 					if not row:
 						break;
 					newPosition = int(row[0])
 				snps.append(snp)
 
-		snpsd = RawSnpsData(snps,positions,accessions=accessions)
+		snpsd = RawSnpsData(snps, positions, accessions=accessions)
 		snpsd.alphabet.append('-')
 		snpsds.append(snpsd)
-				
+
 	cursor.close ()
 	conn.close ()
 	dif = int(time.time() - rt)
-	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
+	print "It took " + str(dif / 60) + " min. and " + str(dif % 60) + " sec. to fetch data."
 
 	return snpsds
 
 
 
 def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc",
-				chromosomes=[1,2,3,4,5], dataVersion="3"):
+				chromosomes=[1, 2, 3, 4, 5], dataVersion="3"):
 	"""
 	Returns a list of AlignmentData objects.
 	"""
 	rt = time.time()
 	decoder = RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
-	
-	print "Connecting to db, host="+host
+
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -547,17 +547,17 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
 	cursor = conn.cursor ()
-	
-	locStr = " and l.offset=0 "  
-	if int(dataVersion)==4:		   #If using version=4, then allow any locus.offset.
+
+	locStr = " and l.offset=0 "
+	if int(dataVersion) == 4:		   #If using version=4, then allow any locus.offset.
 		locStr = ""
 
-		
+
 	#Get distinct accessions and their id.
 
 	numRows = int(cursor.execute("select distinct eva.accession_id, eva.nativename, eva.ecotype_id, e2tge.tg_ecotypeid from at.accession2tg_ecotypeid eva, stock.ecotypeid2tg_ecotypeid e2tge where eva.ecotype_id = e2tge.ecotypeid order by eva.accession_id"))
@@ -566,16 +566,16 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 		row = cursor.fetchone()
 		if not row:
 			break;
-		aid_dict[int(row[0])]=(row[1],row[2],row[3])
+		aid_dict[int(row[0])] = (row[1], row[2], row[3])
 
-	numRows = int(cursor.execute("select distinct an.id, an.chromosome, an.start, an.end, an.version from at.alignment an where an.version>="+dataVersion+locStr+" order by an.chromosome, an.start"))
+	numRows = int(cursor.execute("select distinct an.id, an.chromosome, an.start, an.end, an.version from at.alignment an where an.version>=" + dataVersion + locStr + " order by an.chromosome, an.start"))
 	alignment_datas = []
 	i = 0
 	while(1):
 		row = cursor.fetchone()
 		if not row:
 			break;
-		
+
 		a_id = int(row[0])
 		a_chr = int(row[1])
 		a_start = int(row[2])
@@ -583,51 +583,51 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 		sequences = []
 		positions = []
 		offsets = []
-		numRows = int(cursor.execute("select distinct l.id, l.position, l.offset, from at.locus l where l.alignment="+str(a_id)+" order by l.position, l.offset"))
-		
+		numRows = int(cursor.execute("select distinct l.id, l.position, l.offset, from at.locus l where l.alignment=" + str(a_id) + " order by l.position, l.offset"))
 
 
 
-	print "Fetching 2010 data (version "+dataVersion+"):"
-	snpsds=[]
+
+	print "Fetching 2010 data (version " + dataVersion + "):"
+	snpsds = []
 	for chromosome in chromosomes:
-		print "	Chromosome",chromosome
-		numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>="+dataVersion+locStr+" and g.accession=eva.accession_id and l.chromosome="+str(chromosome)+" order by l.position, eva.nativename"))
-		print "	",numRows,"rows retrieved."
+		print "	Chromosome", chromosome
+		numRows = int(cursor.execute("select distinct l.position, g.accession, eva.nativename, al.base from at.genotype g, at.allele al, at.locus l, at.alignment an, at.accession2tg_ecotypeid eva where g.allele=al.id and l.id=al.locus and l.alignment=an.id  and an.version>=" + dataVersion + locStr + " and g.accession=eva.accession_id and l.chromosome=" + str(chromosome) + " order by l.position, eva.nativename"))
+		print "	", numRows, "rows retrieved."
 		positions = []
 		snps = []
 		if numRows > 0:
 			row = cursor.fetchone()
 			newPosition = int(row[0])
 			while(1):
-				if not row: 
+				if not row:
 					break;
 				positions.append(newPosition)
 				oldPosition = newPosition
-				snp = ['NA']*len(accessions)  #Initialize to missing data.
-				while(oldPosition==newPosition):
-					snp[dict[int(row[1])]]=decoder[row[3]]
+				snp = ['NA'] * len(accessions)  #Initialize to missing data.
+				while(oldPosition == newPosition):
+					snp[dict[int(row[1])]] = decoder[row[3]]
 					row = cursor.fetchone()
 					if not row:
 						break;
 					newPosition = int(row[0])
 				snps.append(snp)
 
-		snpsd = RawSnpsData(snps,positions,accessions=accessions)
+		snpsd = RawSnpsData(snps, positions, accessions=accessions)
 		snpsd.alphabet.append('-')
 		snpsds.append(snpsd)
-				
+
 	cursor.close ()
 	conn.close ()
 	dif = int(time.time() - rt)
-	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
+	print "It took " + str(dif / 60) + " min. and " + str(dif % 60) + " sec. to fetch data."
 
 	return snpsds
 
 
 
 
-def getPerlgenDataFromDb(host="papaya.usc.edu", db = "chip", chromosomes=[1,2,3,4,5], user = None,passwd = None):
+def getPerlgenDataFromDb(host="papaya.usc.edu", db="chip", chromosomes=[1, 2, 3, 4, 5], user=None, passwd=None):
 	import MySQLdb
 	"""
 	Retrieve Perlgen data from DB.  Returns a list of RawSnpsData objects. 
@@ -635,26 +635,26 @@ def getPerlgenDataFromDb(host="papaya.usc.edu", db = "chip", chromosomes=[1,2,3,
 	"""
 
 	rt = time.time()
-	perlgenTo2010 = {'bay-0':'Bay-0','bor-4':'Bor-4','br-0':'Br-0','bur-0':'Bur-0',
-					 'c24':'C24','col-0':'Col-0','cvi-0':'Cvi-0','est-1':'Est-1',
-					 'fei-0':'Fei-0','got-7':'Got-7','ler-1':'Ler-1','lov-5':'L\xf6v-5',
-					 'nfa-8':'NFA-8','rrs-10':'RRS-10','rrs-7':'RRS-7','sha':'Sha',
-					 'tamm-2':'Tamm-2','ts-1':'Ts-1','tsu-1':'Tsu-1','van-0':'Van-0'}
-	
+	perlgenTo2010 = {'bay-0':'Bay-0', 'bor-4':'Bor-4', 'br-0':'Br-0', 'bur-0':'Bur-0',
+					 'c24':'C24', 'col-0':'Col-0', 'cvi-0':'Cvi-0', 'est-1':'Est-1',
+					 'fei-0':'Fei-0', 'got-7':'Got-7', 'ler-1':'Ler-1', 'lov-5':'L\xf6v-5',
+					 'nfa-8':'NFA-8', 'rrs-10':'RRS-10', 'rrs-7':'RRS-7', 'sha':'Sha',
+					 'tamm-2':'Tamm-2', 'ts-1':'Ts-1', 'tsu-1':'Tsu-1', 'van-0':'Van-0'}
+
 	perlgenAccessionToId = {}  #Get accession id's (or ecotype id?)  from DB
 	e2n = getEcotypeToNameDictionary(host=host, user=user, passwd=passwd)
 	n2e = {}
 	#accessions = []
 	for e in e2n:
-		n2e[e2n[e]]=e
+		n2e[e2n[e]] = e
 		#accessions.append(e2n[e])
 	#print n2e
 	#accessions.sort()
 	#print accessions
-	
-	
-	decoder = {'N':'NA','A':'A','C':'C','G':'G','T':'T'} 
-	print "Connecting to db, host="+host
+
+
+	decoder = {'N':'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T'}
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -663,7 +663,7 @@ def getPerlgenDataFromDb(host="papaya.usc.edu", db = "chip", chromosomes=[1,2,3,
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = db)
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db=db)
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
@@ -677,16 +677,16 @@ def getPerlgenDataFromDb(host="papaya.usc.edu", db = "chip", chromosomes=[1,2,3,
 		row = cursor.fetchone()
 		if not row:
 			break;
-		dict[row[0]]=i
+		dict[row[0]] = i
 		accessions.append(n2e[perlgenTo2010[row[0]]])
-		i = i+1
+		i = i + 1
 
 	print "Fetching Perlgen data:"
-	snpsds=[]
+	snpsds = []
 	for chromosome in chromosomes:
-		print "	Chromosome",chromosome
-		numRows = int(cursor.execute("select distinct d.position, d.ecotype, d.mbml98 from snp_combined_may_9_06_no_van d where d.chromosome="+str(chromosome)+" and d.mbml98 is not null order by d.position, d.ecotype;"))
-		print "	",numRows,"rows retrieved."
+		print "	Chromosome", chromosome
+		numRows = int(cursor.execute("select distinct d.position, d.ecotype, d.mbml98 from snp_combined_may_9_06_no_van d where d.chromosome=" + str(chromosome) + " and d.mbml98 is not null order by d.position, d.ecotype;"))
+		print "	", numRows, "rows retrieved."
 		positions = []
 		snps = []
 		if numRows > 0:
@@ -697,21 +697,21 @@ def getPerlgenDataFromDb(host="papaya.usc.edu", db = "chip", chromosomes=[1,2,3,
 					break;
 				positions.append(newPosition)
 				oldPosition = newPosition
-				snp = ['NA']*20  #Initialize to missing data.
-				while(oldPosition==newPosition):
-					snp[dict[row[1]]]=decoder[row[2]]
+				snp = ['NA'] * 20  #Initialize to missing data.
+				while(oldPosition == newPosition):
+					snp[dict[row[1]]] = decoder[row[2]]
 					row = cursor.fetchone()
 					if not row:
 						break;
 					newPosition = int(row[0])
 				snps.append(snp)
-		snpsd = RawSnpsData(snps,positions,accessions=accessions)
+		snpsd = RawSnpsData(snps, positions, accessions=accessions)
 		snpsds.append(snpsd)
 
 	cursor.close ()
 	conn.close ()
 	dif = int(time.time() - rt)
-	print "It took "+str(dif/60)+" min. and "+str(dif%60)+" sec. to fetch data."
+	print "It took " + str(dif / 60) + " min. and " + str(dif % 60) + " sec. to fetch data."
 	return snpsds
 
 
@@ -719,7 +719,7 @@ def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA')
 	accessions = []
 	f = open(datafile, 'r')
 	line = f.readline()
- 	withArrayIds = line=="Chromosome"
+ 	withArrayIds = line == "Chromosome"
 	if withArrayIds:
 		line = line.split(deliminator)
 		arrayIds = []
@@ -730,13 +730,13 @@ def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA')
 	line = line.split(deliminator)
 	for acc in line[2:]:
 		accessions.append(acc.strip())
-	print "Found",len(accessions),"arrays/strains."
+	print "Found", len(accessions), "arrays/strains."
 	if withArrayIds:
-		return accessions,arrayIds
+		return accessions, arrayIds
 	else:
 		return accessions
 
-def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2number=0, 
+def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2number=0,
 		returnChromosomes=False, useDecoder=True, filter=1, id=None, marker_type=None):
 	"""
 	05/12/08 yh. add argument use_nt2number, to turn nucleotide into numbers. default is not
@@ -750,26 +750,26 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
-		
-	sys.stderr.write("Loading file: %s ... \n"%datafile)
+
+	sys.stderr.write("Loading file: %s ... \n" % datafile)
 	decoder = nt_decoder
-	decoder[missingVal]=missing_val	
+	decoder[missingVal] = missing_val
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
-	
+
 	#Reading column data
 	f = open(datafile, 'r')
 	lines = f.readlines()
 	f.close()
-		
+
 	chromosomes = []
 	positionsList = []
 	snpsList = []
 	arrayIds = None
 	line = lines[1].split(deliminator)
-	i=0
-	if line[0]=="Chromosome":
+	i = 0
+	if line[0] == "Chromosome":
 		line = lines[i].split(deliminator)
 		arrayIds = []
 		for arrayId in line[2:]:
@@ -778,22 +778,22 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 	line = lines[i].split(deliminator)
 	for acc in line[2:]:
 		accessions.append(acc.strip())
-	print "Found",len(accessions),"arrays/strains."
+	print "Found", len(accessions), "arrays/strains."
 	i += 1
 	line = lines[i].split(deliminator)
 	newChr = int(line[0])
-	
+
 	no_of_headers = i
 	snpsd_ls = []
 	while i < len(lines):
 		chromosomes.append(int(newChr))
 		oldChr = newChr
-		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds,id=id)	#05/11/2008 yh. use rawSnpsData
+		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds, id=id)	#05/11/2008 yh. use rawSnpsData
 		rawSnpsData.snps = []
 		rawSnpsData.positions = []
 		rawSnpsData.chromosome = oldChr
 		while i < len(lines) and newChr == oldChr:
-			if filter<1 and random.random()>filter:
+			if filter < 1 and random.random() > filter:
 	  			i += 1
 				if i < len(lines):
 					line = lines[i].split(deliminator)
@@ -801,7 +801,7 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 			       	else:
 					break
  				continue
-			
+
 			line = lines[i].split(deliminator)
 			#print i,":",lines[i]
 			oldChr = int(line[0])
@@ -820,28 +820,28 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 				newChr = int(line[0])
 			else:
 				break
-		
-		sys.stderr.write("Loaded %s of %s SNPs.\n"%(i-no_of_headers, len(lines)-no_of_headers))
+
+		sys.stderr.write("Loaded %s of %s SNPs.\n" % (i - no_of_headers, len(lines) - no_of_headers))
 		#Adding marker
 		if marker_type:
-			marker_types = [marker_type]*len(rawSnpsData.snps)
+			marker_types = [marker_type] * len(rawSnpsData.snps)
 			rawSnpsData.marker_types = marker_types
 		snpsd_ls.append(rawSnpsData)
 		del rawSnpsData
-	if format==0:
+	if format == 0:
 		print "Converting raw SNPs data to binary SNPs."
-		for i in range(0,len(chromosomes)):
+		for i in range(0, len(chromosomes)):
 			snpsd_ls[i] = snpsd_ls[i].getSnpsData()
-	sys.stderr.write( "\n")
+	sys.stderr.write("\n")
 	if returnChromosomes:
-		return (snpsd_ls,chromosomes)
+		return (snpsd_ls, chromosomes)
 	else:
 		return snpsd_ls
 
-	
 
 
-	
+
+
 
 
 def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", missingVal='NA', withArrayIds=False):
@@ -851,13 +851,13 @@ def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", 
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
-	sys.stderr.write("Loading file: %s ...\n"%datafile)
-	decoder={missingVal:'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T'}
-	
+	sys.stderr.write("Loading file: %s ...\n" % datafile)
+	decoder = {missingVal:'NA', 'A':'A', 'C':'C', 'G':'G', 'T':'T'}
+
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
-	
+
 	#Reading column data
 	f = open(datafile, 'r')
 	lines = f.readlines()
@@ -865,14 +865,14 @@ def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", 
 	numLines = len(lines)
 	f = open(datafile, 'r')
 	probFile = open(callProbFile, 'r')
-	
+
 	chromosomes = []
 	positionsList = []
 	snpsList = []
 	accessions = []
 	callProbList = []
 	arrayIds = None
-	i=0
+	i = 0
 	if withArrayIds:
 		line = (f.readline()).split(deliminator)
 		probFile.readline()
@@ -885,13 +885,13 @@ def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", 
 	for acc in line[2:]:
 		accessions.append(acc.strip())
 	i += 1
-	
+
 	newChr = lines[3].split(deliminator)[0]
 	while i < numLines:
 		chromosomes.append(int(newChr))
 		oldChr = newChr
 		positions = []
-		snps =[]
+		snps = []
 		probsList = []
 		while i < numLines and newChr == oldChr:
 			line = (f.readline()).split(deliminator)
@@ -900,7 +900,7 @@ def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", 
 			positions.append(int(line[1]))
 			snp = []
 			probs = []
-			for j in range(2,len(line)):
+			for j in range(2, len(line)):
 				nt = line[j]
 				snp.append(decoder[nt.strip()])
 				probs.append(float(probLine[j]))
@@ -912,20 +912,20 @@ def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", 
 				newChr = int(line[0])
 			else:
 				break
-		sys.stderr.write("Loaded %s of %s SNPs.\n"%(i, len(lines)))
+		sys.stderr.write("Loaded %s of %s SNPs.\n" % (i, len(lines)))
 		positionsList.append(positions)
 		snpsList.append(snps)
 		callProbList.append(probsList)
 	f.close()
 	probFile.close()
-	
+
 	snpsds = []
-	for i in range(0,len(chromosomes)):
-		snpsds.append(RawSnpsData(snpsList[i],positionsList[i],accessions=accessions,arrayIds=arrayIds,callProbabilities=callProbList[i]))
-	if format==0:
-		for i in range(0,len(chromosomes)):
+	for i in range(0, len(chromosomes)):
+		snpsds.append(RawSnpsData(snpsList[i], positionsList[i], accessions=accessions, arrayIds=arrayIds, callProbabilities=callProbList[i]))
+	if format == 0:
+		for i in range(0, len(chromosomes)):
 			snpsds[i] = snpsds[i].getSnpsData()
-	sys.stderr.write( "\n")
+	sys.stderr.write("\n")
 	return(snpsds)
 
 
@@ -938,43 +938,43 @@ def parse2010Data(datafile=None):
 	"""
 
 	#Imputed data
-	datadir = homedir+"Projects/data/2010-Zhao_et_al/"
+	datadir = homedir + "Projects/data/2010-Zhao_et_al/"
 	if not datafile:
-		datafile = datadir+"SNPs.csv"
-	
+		datafile = datadir + "SNPs.csv"
+
 	#Initialization
 	accessions = []
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
-	for i in range(0,5):
+	for i in range(0, 5):
 		positions.append([])
-	
-	
+
+
 	chromosomes = []
 	f = open(datafile, 'r')
 	lines = f.readlines()
 	f.close()
 	for chr in (lines[0].strip()).split(",")[1:]:
-		chromosomes.append(int(chr)-1)
-	
+		chromosomes.append(int(chr) - 1)
+
 	line = (lines[1].strip()).split(",")[1:]
-	for i in range(0,len(chromosomes)):
+	for i in range(0, len(chromosomes)):
 		positions[chromosomes[i]].append(int(line[i]))
 
-	for j in range(0,5):
+	for j in range(0, 5):
 		l = []
-		for k in range(0,len(positions[j])):
+		for k in range(0, len(positions[j])):
 			l.append([])
 		genotypes.append(l)
-			
+
 
 	accessions = []
-	for i in range(2,len(lines)):
+	for i in range(2, len(lines)):
 		line = (lines[i].strip()).split(",")
 		accessions.append(line[0])
 		line = line[1:]
-		for j in range(0,5):
-			for k in range(0,len(positions[j])):
+		for j in range(0, 5):
+			for k in range(0, len(positions[j])):
 				genotypes[j][k].append(line[i])
 
 	print accessions
@@ -982,22 +982,22 @@ def parse2010Data(datafile=None):
 	import random
 	#Converting genotype and filtering.
 	countAll = 0
-	countGood = 0 
+	countGood = 0
 	countStupid = 0
 	decoder = {'.':'NA'}
-	newgenotypes = [[],[],[],[],[]]
-	newpositions = [[],[],[],[],[]]
-	for i in range(0,len(genotypes)):
-		for j in range(0,len(positions[i])):
-			countAll = countAll+1
+	newgenotypes = [[], [], [], [], []]
+	newpositions = [[], [], [], [], []]
+	for i in range(0, len(genotypes)):
+		for j in range(0, len(positions[i])):
+			countAll = countAll + 1
 			k = 0
 			ntl = [] #list of observed nucleotides.
-			for nt in ['0','1','2','3']:
+			for nt in ['0', '1', '2', '3']:
 				if nt in genotypes[i][j]:
-					decoder[nt]=k
+					decoder[nt] = k
 					ntl.append(nt)
-					k = k+1
-			if k==2:
+					k = k + 1
+			if k == 2:
 				countGood = countGood + 1
 				l = []
 				for nt in genotypes[i][j]:
@@ -1005,13 +1005,13 @@ def parse2010Data(datafile=None):
 				newgenotypes[i].append(l)
 				newpositions[i].append(positions[i][j])
 			else:
-				if k==1:
-					countStupid = countStupid+1
-	print countAll," SNPs in all"
-	print countGood," SNPs used"
-	print countStupid," Stupid SNPs thrown away"
+				if k == 1:
+					countStupid = countStupid + 1
+	print countAll, " SNPs in all"
+	print countGood, " SNPs used"
+	print countStupid, " Stupid SNPs thrown away"
 
-	for i in range(0,5):
+	for i in range(0, 5):
 		print newpositions[i][-1]
 	del positions
 	del genotypes
@@ -1020,9 +1020,9 @@ def parse2010Data(datafile=None):
 
 
 	chromasomes = []
-	for i in range(0,5):
-		chromasomes.append(SnpsData(genotypes[i],positions[i],accessions=accessions))
-			
+	for i in range(0, 5):
+		chromasomes.append(SnpsData(genotypes[i], positions[i], accessions=accessions))
+
 	#print positions[4]
 	return(chromasomes)
 
@@ -1248,48 +1248,48 @@ def parseMSFile(filename):
 	f = open(filename, 'r')
 	lines = f.readlines()
 	f.close()
-	i=0
+	i = 0
 	data = []
-	while i	< len(lines):
+	while i	 < len(lines):
 		line = lines[i]
 		if line.startswith("//"):
-			num =0
+			num = 0
 			positions = []
 			snps = []
-			i = i+1			
+			i = i + 1
 			while i < len(lines) and not lines[i].startswith("//"):
-				line = lines[i]	
+				line = lines[i]
 				if line.startswith("segsites:"):
 					num = int(line[9:].rstrip())
 				if line.startswith("positions:"):
 					l1 = line[10:].rstrip().split()
-					l2 = [0.0]*len(l1)
-					for j in range(0,len(l1)):
-						l2[j]=float(l1[j])
+					l2 = [0.0] * len(l1)
+					for j in range(0, len(l1)):
+						l2[j] = float(l1[j])
 						snps.append([])		#Initializing the snps.
 					positions = l2
 				if line[0].isdigit():
 					line = line.rstrip()
 					snps[0].append(int(line[0]))
-					for j in range(1,len(positions)):
+					for j in range(1, len(positions)):
 						snps[j].append(int(line[j]))
-									
-				i = i+1
+
+				i = i + 1
 			newSnps = []
 			newPositions = []
-			if len(positions)>0:
+			if len(positions) > 0:
 				newSnps.append(snps[0])
 				newPositions.append(positions[0])
-			k = 0 
-			for j in range(1,len(positions)):
+			k = 0
+			for j in range(1, len(positions)):
 				newSnps.append(snps[j])
 				newPositions.append(positions[j])
-					
-			newSnpsd = SnpsData(newSnps,newPositions)
+
+			newSnpsd = SnpsData(newSnps, newPositions)
 			#print newSnpsd.snps
 			data.append(newSnpsd)
 		else:
-			i = i+1
+			i = i + 1
 	#print len(data[0].snps)
 	return data
 
@@ -1305,319 +1305,320 @@ def parseMSFileBasescale(filename, baseScale=100000):
 	f = open(filename, 'r')
 	lines = f.readlines()
 	f.close()
-	i=0
+	i = 0
 	data = []
-	invBaseScale = 1/float(baseScale)
-	while i	< len(lines):
+	invBaseScale = 1 / float(baseScale)
+	while i	 < len(lines):
 		line = lines[i]
 		if line.startswith("//"):
-			num =0
+			num = 0
 			positions = []
 			snps = []
-			i = i+1			
+			i = i + 1
 			while i < len(lines) and not lines[i].startswith("//"):
-				line = lines[i]	
+				line = lines[i]
 				if line.startswith("segsites:"):
 					num = int(line[9:].rstrip())
 				if line.startswith("positions:"):
 					l1 = line[10:].rstrip().split()
-					l2 = [0.0]*len(l1)
-					for j in range(0,len(l1)):
-						l2[j]=float(l1[j])
+					l2 = [0.0] * len(l1)
+					for j in range(0, len(l1)):
+						l2[j] = float(l1[j])
 						snps.append([])		#Initializing the snps.
 					positions = l2
 				if line[0].isdigit():
 					line = line.rstrip()
 					snps[0].append(int(line[0]))
-					for j in range(1,len(positions)):
+					for j in range(1, len(positions)):
 						snps[j].append(int(line[j]))
-									
-				i = i+1
+
+				i = i + 1
 			newSnps = []
 			newPositions = []
-			if len(positions)>0:
+			if len(positions) > 0:
 				newSnps.append(snps[0])
 				newPositions.append(positions[0])
-			k = 0 
-			for j in range(1,len(positions)):
-				if (positions[j]-positions[j-1])>=invBaseScale:
+			k = 0
+			for j in range(1, len(positions)):
+				if (positions[j] - positions[j - 1]) >= invBaseScale:
 					newSnps.append(snps[j])
 					newPositions.append(positions[j])
 				else:
-					if baseScale>10000 and k<=j:  #The precision of ms is 1/10000 (sometimes we have many more snps)
-						k = j+1
-						while(k < len(positions) and (positions[k]-positions[j-1])<invBaseScale):
-							k = k+1
+					if baseScale > 10000 and k <= j:  #The precision of ms is 1/10000 (sometimes we have many more snps)
+						k = j + 1
+						while(k < len(positions) and (positions[k] - positions[j - 1]) < invBaseScale):
+							k = k + 1
 						last = 0.0
-						for h in range(0,k-j): # Order statistic 
-							last = random.betavariate(1,k-j-h)*(1-last)+last
-							positions[j+h] = positions[j+h]+last/10000
-						if (positions[j]-positions[j-1])>=invBaseScale:
+						for h in range(0, k - j): # Order statistic 
+							last = random.betavariate(1, k - j - h) * (1 - last) + last
+							positions[j + h] = positions[j + h] + last / 10000
+						if (positions[j] - positions[j - 1]) >= invBaseScale:
 							newSnps.append(snps[j])
 							newPositions.append(positions[j])
-			
-			newSnpsd = SnpsData(newSnps,newPositions,baseScale)
+
+			newSnpsd = SnpsData(newSnps, newPositions, baseScale)
 			#print newSnpsd.snps
 			data.append(newSnpsd)
 		else:
-			i = i+1
+			i = i + 1
 	#print len(data[0].snps)
 	return data
 
 
 def parseMSFileFilter(filename, baseScale=1000000, fixPos=True, filterProb=1.0):
 	f = open(filename, 'r')
-	lines =	f.readlines()
+	lines = 	f.readlines()
 	f.close()
-	i=0
+	i = 0
 	data = []
-	invBaseScale = 1/float(baseScale)
-	while i	< len(lines):
+	invBaseScale = 1 / float(baseScale)
+	while i	 < len(lines):
 		line = lines[i]
 		if line.startswith("//"):
-			num =0
+			num = 0
 			positions = []
 			snps = []
-			i = i+1			
-			while i	< len(lines) and not lines[i].startswith("//"):
-				line = lines[i]	
+			i = i + 1
+			while i	 < len(lines) and not lines[i].startswith("//"):
+				line = lines[i]
 				if line.startswith("segsites:"):
 					num = int(line[9:].rstrip())
 				if line.startswith("positions:"):
 					l1 = line[10:].rstrip().split()
-					l2 = [0.0]*len(l1)
-					for j in range(0,len(l1)):
-						l2[j]=float(l1[j])
+					l2 = [0.0] * len(l1)
+					for j in range(0, len(l1)):
+						l2[j] = float(l1[j])
 						snps.append([])		#Initializing the snps.
 					positions = l2
 				if line[0].isdigit():
 					line = line.rstrip()
 					snps[0].append(int(line[0]))
-					for j in range(1,len(positions)):
+					for j in range(1, len(positions)):
 						snps[j].append(int(line[j]))
-									
-				i = i+1
+
+				i = i + 1
 			newSnps = []
 			newPositions = []
 			l = 0
 			pos = -1
-			for j in range(0,len(positions)):
-				if random.random()<=filterProb:
+			for j in range(0, len(positions)):
+				if random.random() <= filterProb:
 					npos = positions[j]
-					if (npos-pos)>=invBaseScale:
+					if (npos - pos) >= invBaseScale:
 						newSnps.append(snps[j])
 						newPositions.append(npos)
 					else:
-						if fixPos and baseScale>10000 and l<=j :  #The precision of ms
-							l = j+1
-							while(l<len(positions) and (positions[l]-pos)<invBaseScale):
-								l = l+1
+						if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
+							l = j + 1
+							while(l < len(positions) and (positions[l] - pos) < invBaseScale):
+								l = l + 1
 							last = 0.0
-							for h in range(0,l-j): # Order statistic 
-								last = random.betavariate(1,l-j-h)*(1-last)+last
-								positions[j+h] = positions[j+h]+last/10000
-												
-							if (npos-pos)>=invBaseScale:
+							for h in range(0, l - j): # Order statistic 
+								last = random.betavariate(1, l - j - h) * (1 - last) + last
+								positions[j + h] = positions[j + h] + last / 10000
+
+							if (npos - pos) >= invBaseScale:
 								newSnps.append(snps[j])
 								newPositions.append(npos)
 					pos = positions[j]
-			data.append(SnpsData(newSnps,newPositions,baseScale))
+			data.append(SnpsData(newSnps, newPositions, baseScale))
 		else:
-			i = i+1
+			i = i + 1
 	return data
 
 
 
-def parseMSData(filename, baseScale=1000000,sampleNum=None, fixPos=True):
+def parseMSData(filename, baseScale=1000000, sampleNum=None, fixPos=True):
 	""" 
 	Parses randomly chosen ms outputs from previously calculated files.  Depends on the datafiles!
 	"""
 	f = open(filename, 'r')
-	lines =	f.readlines()
+	lines = 	f.readlines()
 	totSampleNum = int(lines[0].split()[2])
 	f.close()
-	i=0
+	i = 0
 	klist = []
 	if sampleNum:
 		k = 0
 		while k < sampleNum:
-			val = int(random.random()*totSampleNum+1)
+			val = int(random.random()*totSampleNum + 1)
 			if not val in klist:
 				klist.append(val)
-				k = k+1
+				k = k + 1
 	else:
-		klist = range(0,totSampleNum)
+		klist = range(0, totSampleNum)
 	k = -1
 	data = []
-	invBaseScale = 1/float(baseScale)
+	invBaseScale = 1 / float(baseScale)
 	while i < len(lines):
 		line = lines[i]
 		if line.startswith("//"):
-			k = k+1
-			i = i+1	
+			k = k + 1
+			i = i + 1
 			if k in klist:
-				num =0
+				num = 0
 				positions = []
-				snps = []						
-				while i	< len(lines) and not lines[i].startswith("//"):
-					line = lines[i]	
+				snps = []
+				while i	 < len(lines) and not lines[i].startswith("//"):
+					line = lines[i]
 					if line.startswith("segsites:"):
 						num = int(line[9:].rstrip())
 					if line.startswith("positions:"):
 						l1 = line[10:].rstrip().split()
-						l2 = [0.0]*len(l1)
-						for j in range(0,len(l1)):
-							l2[j]=float(l1[j])
+						l2 = [0.0] * len(l1)
+						for j in range(0, len(l1)):
+							l2[j] = float(l1[j])
 							snps.append([])		#Initializing the snps.
 						positions = l2
 					if line[0].isdigit():
 						line = line.rstrip()
 						snps[0].append(int(line[0]))
-						for j in xrange(1,len(positions)):
+						for j in xrange(1, len(positions)):
 							snps[j].append(int(line[j]))
-											
-					i = i+1
+
+					i = i + 1
 				newSnps = []
 				newPositions = []
-				if len(positions)>0:
+				if len(positions) > 0:
 					newSnps.append(snps[0])
 					newPositions.append(positions[0])
 					pos = positions[0]
 				l = 0
-				for j in range(1,len(positions)):
+				for j in range(1, len(positions)):
 					npos = positions[j]
-					if (npos-pos)>=invBaseScale:
+					if (npos - pos) >= invBaseScale:
 						newSnps.append(snps[j])
 						newPositions.append(npos)
 					else:
-						if fixPos and baseScale>10000 and l<=j :  #The precision of ms
-							l = j+1
-							while(l<len(positions) and (positions[l]-pos)<invBaseScale):
-								l = l+1
+						if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
+							l = j + 1
+							while(l < len(positions) and (positions[l] - pos) < invBaseScale):
+								l = l + 1
 							last = 0.0
-							for h in range(0,l-j): # Order statistic 
-								last = random.betavariate(1,l-j-h)*(1-last)+last
-								positions[j+h] = positions[j+h]+last/10000
-													
-							if (npos-pos)>=invBaseScale:
+							for h in range(0, l - j): # Order statistic 
+								last = random.betavariate(1, l - j - h) * (1 - last) + last
+								positions[j + h] = positions[j + h] + last / 10000
+
+							if (npos - pos) >= invBaseScale:
 								newSnps.append(snps[j])
 								newPositions.append(npos)
 					pos = positions[j]
-				data.append(SnpsData(newSnps,newPositions,baseScale))
+				data.append(SnpsData(newSnps, newPositions, baseScale))
 		else:
-			i = i+1
+			i = i + 1
 	return data
-	
 
-def parseMSDataFilter(filename, baseScale=1000000,sampleNum=None, fixPos=True, filterProb = 1.0):
+
+def parseMSDataFilter(filename, baseScale=1000000, sampleNum=None, fixPos=True, filterProb=1.0):
 	""" 
 	Parses randomly chosen ms outputs from previously calculated files.  Depends on the datafiles!
 	"""
 	#print filename
 	f = open(filename, 'r')
-	lines =	f.readlines()
+	lines = 	f.readlines()
 	totSampleNum = int(lines[0].split()[2])
 	f.close()
-	i=0
+	i = 0
 	klist = []
 	if sampleNum:
 		k = 0
 		while k < sampleNum:
-			val = int(random.random()*totSampleNum+1)
+			val = int(random.random()*totSampleNum + 1)
 			if not val in klist:
 				klist.append(val)
-				k = k+1
+				k = k + 1
 	else:
-		klist = range(0,totSampleNum)
+		klist = range(0, totSampleNum)
 	k = -1
 	data = []
-	invBaseScale = 1/float(baseScale)
-	while i	< len(lines):
+	invBaseScale = 1 / float(baseScale)
+	while i	 < len(lines):
 		line = lines[i]
 		if line.startswith("//"):  #New data
-			k = k+1
-			i = i+1	
+			k = k + 1
+			i = i + 1
 			if k in klist:
-				num =0
+				num = 0
 				positions = []
-				snps = []						
-				while i	< len(lines) and not lines[i].startswith("//"):
-					line = lines[i]	
+				snps = []
+				while i	 < len(lines) and not lines[i].startswith("//"):
+					line = lines[i]
 					if line.startswith("segsites:"):
 						num = int(line[9:].rstrip())
 					if line.startswith("positions:"):
 						l1 = line[10:].rstrip().split()
-						l2 = [0.0]*len(l1)
-						for j in range(0,len(l1)):
-							l2[j]=float(l1[j])
+						l2 = [0.0] * len(l1)
+						for j in range(0, len(l1)):
+							l2[j] = float(l1[j])
 							snps.append([])		#Initializing the snps.
 						positions = l2
 					if line[0].isdigit():
-						if len(positions)==len(line.rstrip()):  #Hack added to fix ms generated errors in files!
+						if len(positions) == len(line.rstrip()):  #Hack added to fix ms generated errors in files!
 							line = line.rstrip()
 								#snps[0].append(int(line[0]))
-							for j in xrange(0,len(line)):
+							for j in xrange(0, len(line)):
 								snps[j].append(int(line[j]))
 						else:
-							print "line nr.",i
-							print "positions:",positions
-							print "line:",line.rstrip()
-							print "old line:",line
+							print "line nr.", i
+							print "positions:", positions
+							print "line:", line.rstrip()
+							print "old line:", line
 							raise Exception()
-					i = i+1
+					i = i + 1
 				newSnps = []
 				newPositions = []
 				l = 0
 				pos = -1
 				debug1 = positions[:]
 				debug2 = snps[:]
-				r = 0				
-				for j in range(0,len(positions)):
-					if random.random()<=filterProb:
+				r = 0
+				for j in range(0, len(positions)):
+					if random.random() <= filterProb:
 						r = r + 1
 						npos = positions[j]
-						if (npos-pos)>=invBaseScale:
+						if (npos - pos) >= invBaseScale:
 							newSnps.append(snps[j])
 							newPositions.append(npos)
 						else:
-							if fixPos and baseScale>10000 and l<=j :  #The precision of ms
-								l = j+1
-								while(l<len(positions) and (positions[l]-pos)<invBaseScale):
-									l = l+1
+							if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
+								l = j + 1
+								while(l < len(positions) and (positions[l] - pos) < invBaseScale):
+									l = l + 1
 								last = 0.0
-								for h in range(0,l-j): # Order statistic 
-									last = random.betavariate(1,l-j-h)*(1-last)+last
-									positions[j+h] = positions[j+h]+last/10000
-				
-								if (npos-pos)>=invBaseScale:
+								for h in range(0, l - j): # Order statistic 
+									last = random.betavariate(1, l - j - h) * (1 - last) + last
+									positions[j + h] = positions[j + h] + last / 10000
+
+								if (npos - pos) >= invBaseScale:
 									newSnps.append(snps[j])
 									newPositions.append(npos)
 						pos = positions[j]
-				if r ==0 :
+				if r == 0 :
 					print "No luck"
 					print len(positions)
-				if len(newSnps)==0 or len(newSnps[0])==0:
+				if len(newSnps) == 0 or len(newSnps[0]) == 0:
 					print "data is empty!!!"
-					print "It succeded ",r,"number of times."
+					print "It succeded ", r, "number of times."
 					print debug1
 					print newPositions
 					print newSnps
 					print debug2
-				snpsd = SnpsData(newSnps,newPositions,baseScale)
-				if len(snpsd.snps)==0 or len(snpsd.snps[0])==0:
+				snpsd = SnpsData(newSnps, newPositions, baseScale)
+				if len(snpsd.snps) == 0 or len(snpsd.snps[0]) == 0:
 					print snpsd.positions
 					print snpsd.snps
 				data.append(snpsd)
 		else:
-			i = i+1
-	if data[0]==[]:
-		print 
+			i = i + 1
+	if data[0] == []:
+		print
 	return data
-	
 
-def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None, use_pickle=True):
+
+def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None,
+			use_pickle=True, dtype='int8'):
 	"""
-	A sped-up version, to load a binary file in binary format.
+	A sped-up version, to load a int (e.g. binary) file.
 	
 	If pickle is used then more memory is required, but it speeds up.
 	"""
@@ -1625,44 +1626,42 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 	import random
 	import cPickle
 	import time
-	pickle_file = data_file+'.pickled'
-	if use_pickle: 
+	pickle_file = data_file + '.pickled'
+	if use_pickle:
 		if os.path.isfile(pickle_file):
-			print 'Loading pickled object.'
 			t_ = time.time()
-			f = open(pickle_file,'rb')
+			f = open(pickle_file, 'rb')
 			sd = cPickle.load(f)
 			f.close()
-			print 'Loading done'
-			if filter_accessions and set(filter_accessions)!=set(sd.accessions):
+			if filter_accessions and set(filter_accessions) != set(sd.accessions):
 				print 'Filtering accessions.'
 				sd.filter_accessions(filter_accessions)
-			print 'Loading genotype data took %.2f s...'%(time.time()-t_)
+			print 'Loading genotype data took %.2f s...' % (time.time() - t_)
 			return sd
 		else:
 			filter_accessions_ = filter_accessions
 			filter_accessions = None
-	sys.stderr.write("Loading binary SNPs data file: %s \n"%data_file)
+	sys.stderr.write("Loading binary SNPs data file: %s \n" % data_file)
 	accessions = []
 	snpsd_ls = []
 	chromosomes = []
-	
+
 	#Reading accession data
 	f = open(data_file, 'rb')
 	line = f.next().split(delimiter)
 	for acc in line[2:]:
 		accessions.append(acc.strip())
-	print "Found",len(accessions),"arrays/strains."
-	
+	print "Found", len(accessions), "arrays/strains."
+
 	if filter_accessions:
 		indices_to_include = []
 		new_accessions = []
 		for i, acc in enumerate(accessions):
 			if acc in filter_accessions:
-				indices_to_include.append(i) 
+				indices_to_include.append(i)
 				new_accessions.append(acc)
 		accessions = new_accessions
-		print "Loading only",len(accessions),"arrays/strains."
+		print "Loading only", len(accessions), "arrays/strains."
 
 	num_accessions = len(accessions)
 
@@ -1671,90 +1670,90 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 	line = f.next().split(delimiter)
 	old_chromosome = int(line[0])
 	positions.append(int(line[1]))
-	snps.append(np.array(line[2:],dtype='int8'))
+	snps.append(np.array(line[2:], dtype=dtype))
 	#snps.append(map(int,line[2:]))
-	i = 0 
-	
-	if filter<1.0:
-		if filter_accessions: 
-			for i, line in enumerate(f):
-				if random.random()>filter: continue
-				line_list = line.split(delimiter)
-				chromosome = int(line_list[0])
-				if chromosome!=old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
-					snpsd_ls.append(snpsd)
-					chromosomes.append(old_chromosome)
-					positions = []
-					snps = []
-					old_chromosome = chromosome
-					sys.stderr.write("Loaded %s SNPs.\n"%i)
-				positions.append(int(line_list[1]))
-				l_list = line_list[2:]
-				#snp = [int(l_list[j]) for j in indices_to_include]
-				snp = np.array([l_list[j] for j in indices_to_include],dtype='int8')
-				snps.append(snp)
-		else:
-			for i, line in enumerate(f):
-				if random.random()>filter: continue
-				line_list = line.split(delimiter)
-				chromosome = int(line_list[0])
-				if chromosome!=old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
-					snpsd_ls.append(snpsd)
-					chromosomes.append(old_chromosome)
-					positions = []
-					snps = []
-					old_chromosome = chromosome
-					sys.stderr.write("Loaded %s SNPs.\n"%i)
-				positions.append(int(line_list[1]))
-				#snps.append(map(int,line_list[2:]))
-				snps.append(np.array(line_list[2:],dtype='int8'))
-	else:
-		if filter_accessions: 
-			for i, line in enumerate(f):		
-				line_list = line.split(delimiter)
-				chromosome = int(line_list[0])
-				if chromosome!=old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
-					snpsd_ls.append(snpsd)
-					chromosomes.append(old_chromosome)
-					positions = []
-					snps = []
-					old_chromosome = chromosome
-					sys.stderr.write("Loaded %s SNPs.\n"%i)
-				positions.append(int(line_list[1]))
-				l_list = line_list[2:]
-				#snp = [int(l_list[j]) for j in indices_to_include]
-				snp = np.array([l_list[j] for j in indices_to_include],dtype='int8')
-				snps.append(snp)
-		else:
-			for i, line in enumerate(f):		
-				line_list = line.split(delimiter)
-				chromosome = int(line_list[0])
-				if chromosome!=old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
-					snpsd_ls.append(snpsd)
-					chromosomes.append(old_chromosome)
-					positions = []
-					snps = []
-					old_chromosome = chromosome
-					sys.stderr.write("Loaded %s SNPs.\n"%i)
-				positions.append(int(line_list[1]))
-				#snps.append(map(int,line_list[2:]))
-				snps.append(np.array(line_list[2:],dtype='int8'))
+	i = 0
 
-		
+	if filter < 1.0:
+		if filter_accessions:
+			for i, line in enumerate(f):
+				if random.random() > filter: continue
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome != old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n" % i)
+				positions.append(int(line_list[1]))
+				l_list = line_list[2:]
+				#snp = [int(l_list[j]) for j in indices_to_include]
+				snp = np.array([l_list[j] for j in indices_to_include], dtype=dtype)
+				snps.append(snp)
+		else:
+			for i, line in enumerate(f):
+				if random.random() > filter: continue
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome != old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n" % i)
+				positions.append(int(line_list[1]))
+				#snps.append(map(int,line_list[2:]))
+				snps.append(np.array(line_list[2:], dtype=dtype))
+	else:
+		if filter_accessions:
+			for i, line in enumerate(f):
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome != old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n" % i)
+				positions.append(int(line_list[1]))
+				l_list = line_list[2:]
+				#snp = [int(l_list[j]) for j in indices_to_include]
+				snp = np.array([l_list[j] for j in indices_to_include], dtype=dtype)
+				snps.append(snp)
+		else:
+			for i, line in enumerate(f):
+				line_list = line.split(delimiter)
+				chromosome = int(line_list[0])
+				if chromosome != old_chromosome: #Then save snps_data
+					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd_ls.append(snpsd)
+					chromosomes.append(old_chromosome)
+					positions = []
+					snps = []
+					old_chromosome = chromosome
+					sys.stderr.write("Loaded %s SNPs.\n" % i)
+				positions.append(int(line_list[1]))
+				#snps.append(map(int,line_list[2:]))
+				snps.append(np.array(line_list[2:], dtype=dtype))
+
+
 
 	f.close()
-	snpsd = SNPsData(snps,positions,accessions=accessions,chromosome=old_chromosome)
+	snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
 	snpsd_ls.append(snpsd)
 	chromosomes.append(old_chromosome)
-	sys.stderr.write("Loaded %s SNPs.\n"%i)
-	sd = SNPsDataSet(snpsd_ls,chromosomes)
+	sys.stderr.write("Loaded %s SNPs.\n" % i)
+	sd = SNPsDataSet(snpsd_ls, chromosomes)
 	if use_pickle:
 		print 'Saving a pickled version of genotypes.'
-		f = open(pickle_file,'wb')
+		f = open(pickle_file, 'wb')
 		cPickle.dump(sd, f, protocol=2)
 		f.close()
 	if filter_accessions_:
@@ -1763,83 +1762,96 @@ def parse_binary_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, 
 
 
 
-
-def parse_snp_data(data_file, delimiter=",", missingVal='NA', format=1, filter=1, 
-		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None, 
+def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotides', filter=1,
+		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None,
 		use_pickle=True):
 	"""
 	format=1: the function return a RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
+	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
 	import cPickle
-	if format==0 and look_for_binary:
-		sd_binary_file = data_file+'.binary'
+	if format == 'binary' and look_for_binary:
+		sd_binary_file = data_file + '.binary'
 		if os.path.isfile(sd_binary_file):
-			sd = parse_binary_snp_data(sd_binary_file, delimiter = delimiter, 
-					      missing_val = missingVal, filter = filter,
-					      filter_accessions = filter_accessions, use_pickle = use_pickle)
+			sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
+						filter=filter, filter_accessions=filter_accessions,
+						use_pickle=use_pickle, dtype='int8')
 		else:
-			sd = parse_snp_data(data_file , format = 0, delimiter = delimiter, 
-					      missingVal = missingVal, filter = filter, look_for_binary=False,
-					      filter_accessions = filter_accessions)
-			print 'Save a binary snps data file:',sd_binary_file
-			sd.writeToFile(sd_binary_file,binary_format=True)
+			sd = parse_snp_data(data_file , format=data_format_dict[format], delimiter=delimiter,
+					      missingVal=missingVal, filter=filter, look_for_binary=False,
+					      filter_accessions=filter_accessions)
+			print 'Save a binary snps data file:', sd_binary_file
+			sd.writeToFile(sd_binary_file, binary_format=True)
 			if use_pickle:
-				pickle_file = sd_binary_file+'.pickled'
+				pickle_file = sd_binary_file + '.pickled'
 				print 'Saving a pickled version of genotypes.'
-				f = open(pickle_file,'wb')
+				f = open(pickle_file, 'wb')
 				cPickle.dump(sd, f, protocol=2)
-				f.close()			
+				f.close()
+	elif format == 'int':
+		sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
+					filter=filter, filter_accessions=filter_accessions,
+					use_pickle=use_pickle, dtype='int8')
+	elif format == 'float':
+		sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
+					filter=filter, filter_accessions=filter_accessions,
+					use_pickle=use_pickle, dtype='float32')
+	elif format == 'nucleotides':
+		(snpsds, chromosomes) = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal,
+					format=data_format_dict[format], filter=filter, id=id, returnChromosomes=True)
+		sd = SNPsDataSet(snpsds, chromosomes)
 	else:
-		(snpsds,chromosomes) = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal, 
-					format=format, filter=filter, id=id, returnChromosomes=True)
-		sd = SNPsDataSet(snpsds,chromosomes)
+		print "Unknown file format!"
+		raise Exception()
  	return sd
 
 
-def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",", 
-			missingVal='NA', format=1, filter=1,id=None):
+
+
+def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",",
+			missingVal='NA', format=1, filter=1, id=None):
 	"""
 	Return a region of snpsd.
 	"""
-	snpsds = parseCSVData(datafile, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter,id=id)
-	snpsd = SNPsDataSet(snpsds,[1,2,3,4,5])
-	return snpsd.get_region_snpsd(chromosome,start_pos,end_pos)
+	snpsds = parseCSVData(datafile, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter, id=id)
+	snpsd = SNPsDataSet(snpsds, [1, 2, 3, 4, 5])
+	return snpsd.get_region_snpsd(chromosome, start_pos, end_pos)
 
-	
+
 
 def parse_chr_pos_list(datafile, delimiter=",", min_marf=0.0):
 	"""
 	Return a chr_pos list without loading all data...
 	"""
-		
-	sys.stderr.write("Loading file: %s ... \n"%datafile)
-	       
+
+	sys.stderr.write("Loading file: %s ... \n" % datafile)
+
 	chr_pos_list = []
-	
+
 	#Reading column data
 	f = open(datafile, 'r')
 	lines = f.readlines()
 	f.close()
-		
+
 	line = lines[1].split(delimiter)
-	withArrayIds = line[0]=="Chromosome"
-	i=1
+	withArrayIds = line[0] == "Chromosome"
+	i = 1
 	if withArrayIds:
 		i += 1
 	while i < len(lines):
 		line = lines[i].split(delimiter)
-		chr_pos_list.append((int(line[0]),int(line[1])))
+		chr_pos_list.append((int(line[0]), int(line[1])))
 		i += 1
-	sys.stderr.write( "Chromosomes and positions read\n")
+	sys.stderr.write("Chromosomes and positions read\n")
 	return chr_pos_list
-	
+
 
 
 #--------------------------------------------------------------------------------#
 
 def _testDBParser_():
-	
+
 	snpsDatas250 = parse250DataRaw()
 
 
@@ -1848,15 +1860,15 @@ def _testDBParser_():
 	print len(snpsDatasPerlgen)
 	for snpsd in snpsDatasPerlgen:
 		print len(snpsd.positions)
-	
-	
+
+
 	snpsDatas250[0].compareWith(snpsDatasPerlgen[0])
 
 	merged250nPerlgen = []
-	for i in range(0,len(snpsDatas250)):
+	for i in range(0, len(snpsDatas250)):
 		merged250nPerlgen.append(snpsDatasPerlgen[i].mergeData(snpsDatas250[i]))
-	
-	writeRawSnpsDatasToFile("Perlgen_250.out",merged250nPerlgen)
+
+	writeRawSnpsDatasToFile("Perlgen_250.out", merged250nPerlgen)
 
 	snpsDatas2010 = get2010DataFromDb()
 	print len(snpsDatas2010)
@@ -1867,12 +1879,12 @@ def _testDBParser_():
 	snpsDatas2010[0].compareWith(snpsDatasPerlgen[0])
 
 	merged250n2010nPerlgen = []
-	for i in range(0,len(merged250nPerlgen)):
+	for i in range(0, len(merged250nPerlgen)):
 		merged250n2010nPerlgen.append(snpsDatas2010[i].mergeData(merged250nPerlgen[i]))
 
-	writeRawSnpsDatasToFile("2010_Perlgen_250.out",merged250n2010nPerlgen)
+	writeRawSnpsDatasToFile("2010_Perlgen_250.out", merged250n2010nPerlgen)
 
-   
+
 	"""  
 	snpErrorRate = []
 	for chr in [0,1,2,3,4]:
@@ -1896,16 +1908,16 @@ if __name__ == "__main__":
 #	cPickle.dump(sd, f, protocol=2)
 #	print 'Took %.2f s...'%(time.time()-t_)
 #	f.close()
-	
-	f = open('/tmp/test.pickled','rb')
+
+	f = open('/tmp/test.pickled', 'rb')
 	t_ = time.time()
 	sd = cPickle.load(f)
-	f_accessions = random.sample(sd.accessions,900)
+	f_accessions = random.sample(sd.accessions, 900)
 	sd.filter_accessions(f_accessions)
-	print 'Took %.2f s...'%(time.time()-t_)
+	print 'Took %.2f s...' % (time.time() - t_)
 	f.close()
-	
+
 	#get250KDataFromDb(user="bvilhjal", passwd="bamboo123")
-	
+
 	#pass
 	#_testDBParser_()

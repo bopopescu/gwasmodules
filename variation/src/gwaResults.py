@@ -9,54 +9,54 @@ Contains classes to handle results of GWAS
 """
 
 
-import pdb,gc
+import pdb, gc
 import dbutils
 import csv
 import math
 
 #A dictionary for loaded results.. to avoid reloading. 
 #Use carefully to avoid memory leaks!
-loaded_results = {}  
+loaded_results = {}
 
 
 
 class ResultType(object):
-	def __init__(self,resultType=None,fileType=None,datasetName=None,resultDir=None,mafCutoff=0,logTransform=None,name=None):
-		self.resultType=resultType
-		self.fileType=fileType
-		self.datasetName=datasetName
-		self.resultDir=resultDir
+	def __init__(self, resultType=None, fileType=None, datasetName=None, resultDir=None, mafCutoff=0, logTransform=None, name=None):
+		self.resultType = resultType
+		self.fileType = fileType
+		self.datasetName = datasetName
+		self.resultDir = resultDir
 		self.mafCutoff = mafCutoff
 		self.logTransform = logTransform
-		if self.logTransform==None:
-			self.logTransform = self.fileType==".pvals"
+		if self.logTransform == None:
+			self.logTransform = self.fileType == ".pvals"
 		self.name = name
 		if not name and datasetName:
-			self.name = resultType+"_"+datasetName
+			self.name = resultType + "_" + datasetName
 		if resultDir and datasetName:
-			self.filenamePrefix = resultDir+resultType+"_"+datasetName+"_"
-		
-		
-	def getFileName(self,phed,phenotypeID,secondRun=False):
+			self.filenamePrefix = resultDir + resultType + "_" + datasetName + "_"
+
+
+	def getFileName(self, phed, phenotypeID, secondRun=False):
 		print phenotypeID
 		if secondRun:
-			filename = self.filenamePrefix+str(phed.getPhenotypeName(phenotypeID))+".sr"+self.fileType
+			filename = self.filenamePrefix + str(phed.getPhenotypeName(phenotypeID)) + ".sr" + self.fileType
 		else:
-			filename = self.filenamePrefix+str(phed.getPhenotypeName(phenotypeID))+self.fileType
+			filename = self.filenamePrefix + str(phed.getPhenotypeName(phenotypeID)) + self.fileType
 		return filename
 
 	def __str__(self):
-		return self.resultType+"_"+self.datasetName
-		
+		return self.resultType + "_" + self.datasetName
+
 
 class Region(object):
-	
-	def __init__(self,chromosome,startPos,endPos,snps=None,snpsd_indices=None,snpsInfo=None,name=""):
-		self.name=name
+
+	def __init__(self, chromosome, startPos, endPos, snps=None, snpsd_indices=None, snpsInfo=None, name=""):
+		self.name = name
 		self.chromosome = chromosome
 		self.startPos = startPos
 		self.endPos = endPos
-		self.size = endPos-startPos
+		self.size = endPos - startPos
 		self.snps = []
 		if snps:
 			self.snps = snps
@@ -66,82 +66,82 @@ class Region(object):
 		self.snpsInfo = {}       #E.g. a dictionary of information about the snps.  
 		if snpsInfo:
 			self.snpsInfo = snpsInfo
-			
-	def __cmp__(self,other):
-		return cmp((self.chromosome,self.startPos),(other.chromosome,other.startPos))
+
+	def __cmp__(self, other):
+		return cmp((self.chromosome, self.startPos), (other.chromosome, other.startPos))
 
 	def __str__(self):
-		return "Chr.:"+str(self.chromosome)+", start pos.:"+str(self.startPos)+", end pos.:"+str(self.endPos)
-		
+		return "Chr.:" + str(self.chromosome) + ", start pos.:" + str(self.startPos) + ", end pos.:" + str(self.endPos)
+
 	def get_chr_pos_str(self):
-		return str(self.chromosome)+"_"+str(self.startPos)+"_"+str(self.endPos)
-	
-	def overlapping(self,region):
+		return str(self.chromosome) + "_" + str(self.startPos) + "_" + str(self.endPos)
+
+	def overlapping(self, region):
 		if self.chromosome != region.chromosome:
 			return False
 		else:
 			if self.startPos < region.startPos:
-				return self.endPos>=region.startPos
+				return self.endPos >= region.startPos
 			else:
-				return region.endPos>=self.startPos
-		
-	def merge(self,region):
+				return region.endPos >= self.startPos
+
+	def merge(self, region):
 		if not self.overlapping(region):
 			raise Exception
-		new_start = min(self.startPos,region.startPos)
-		new_stop = max(self.endPos,region.endPos)
+		new_start = min(self.startPos, region.startPos)
+		new_stop = max(self.endPos, region.endPos)
 		self.startPos = new_start
 		self.endPos = new_stop
-		self.size = self.endPos-self.startPos
-		
+		self.size = self.endPos - self.startPos
 
-fri_region_small = Region(4,220000,320000,name="FRI_small")
-flc_region_small = Region(5,3130000,3230000,name="FLC_small")
 
-fri_region = Region(4,120000,550000,name="FRI_large")
-flc_region = Region(5,2100000,3300000,name="FLC_large")
+fri_region_small = Region(4, 220000, 320000, name="FRI_small")
+flc_region_small = Region(5, 3130000, 3230000, name="FLC_small")
+
+fri_region = Region(4, 120000, 550000, name="FRI_large")
+flc_region = Region(5, 2100000, 3300000, name="FLC_large")
 
 fri_flc_regions = [fri_region_small, fri_region, flc_region_small, flc_region]
 
-def getRegions(regionSet,window=[25000,25000]):
+def getRegions(regionSet, window=[25000, 25000]):
 	"""
 	Converts a set of crh_pos into a list of regions objects.
 	"""
-	
+
 	res_ls = list(regionSet)
 	res_ls.sort()
-	
+
 	oldPos = 0
 	countRegions = 0
 	chr = -1
 	regions = []
 	curPosList = []
-	for i in range(0,len(res_ls)):
+	for i in range(0, len(res_ls)):
 		pos = res_ls[i][1]
-		if chr!=res_ls[i][0]:
+		if chr != res_ls[i][0]:
 			if len(curPosList):
 				regions.append(curPosList)
-			curPosList=[]
+			curPosList = []
 			countRegions += 1
 			chr = res_ls[i][0]
-		elif pos-oldPos>sum(window):
+		elif pos - oldPos > sum(window):
 			if len(curPosList):
 				regions.append(curPosList)
-			curPosList=[]
+			curPosList = []
 			countRegions += 1
-		
-		curPosList.append((chr,pos))
+
+		curPosList.append((chr, pos))
 		oldPos = pos
-	
-	print countRegions,len(regions)
-	
+
+	print countRegions, len(regions)
+
 	regionList = []
 	for region in regions:
 		chr = region[0][0]
 		positions = []
-		for (chr,pos) in region:
+		for (chr, pos) in region:
 			positions.append(pos)
-		regionList.append(Region(chr,min(positions)-window[0],max(positions)+window[1]))
+		regionList.append(Region(chr, min(positions) - window[0], max(positions) + window[1]))
 	regionList.sort()
 	return regionList
 
@@ -165,31 +165,32 @@ class Result(object):
 		recall_snps: if this is flagged, then the result object stores all the SNPs, 
 			otherwise SNP data is just uesd for MAF calculations. 
 		"""
-		
+
 		#Contain various information for every snp and position
 		#FIXME: To replace older lists.. such as positions, chromosomes, scores, etc. 
-		self.snp_results = {} 		                      
-		
+		self.snp_results = {}
+
 		self.phen_id = phen_id
-		self.result_type=result_type
+		self.result_type = result_type
 		self.name = name
-		self.scores = list(scores) #Scores or p-values
 		self.positions = positions
 		self.chromosomes = chromosomes
 		self.marfs = marfs #Minor allele relative frequencies.
 		self.mafs = mafs
 		self.snps = snps
 		self.accessions = accessions
-		if not self.scores:
-			self.scores = [] 
+		if scores != None:
+			self.scores = list(scores) #Scores or p-values
+		else:
+			self.scores = []
 		if not self.positions:
 			self.positions = []
 		if not self.chromosomes:
-			self.chromosomes = []		
+			self.chromosomes = []
 		if not self.marfs:
-			self.marfs = [] 
+			self.marfs = []
 		if not self.mafs:
-			self.mafs = [] 
+			self.mafs = []
 		if not self.snps:
 			self.snps = []
 		if not self.accessions:
@@ -204,7 +205,7 @@ class Result(object):
 		elif snps_data:
 			self._load_snps_data_(snps_data)
 
-		self.snp_results['chromosomes']	= self.chromosomes	
+		self.snp_results['chromosomes']	 = self.chromosomes
 		self.snp_results['scores'] = self.scores
 		self.snp_results['positions'] = self.positions
 		self.snp_results['marfs'] = self.marfs
@@ -212,25 +213,25 @@ class Result(object):
 		self.snp_results['snps'] = self.snps
 		if snp_results_info:
 			for info in snp_results_info:
-				self.snp_results[info]=snp_results_info[info]
+				self.snp_results[info] = snp_results_info[info]
 
 
 
-	def _load_result_(self,resultFile):
-		f = open(resultFile,"r")
+	def _load_result_(self, resultFile):
+		f = open(resultFile, "r")
 		lines = f.readlines()
-		print "Loading",len(lines),"lines of results."
-		try_delims = [",","\t"," ",]
+		print "Loading", len(lines), "lines of results."
+		try_delims = [",", "\t", " ", ]
 		i = 0
 		delim = try_delims[i]
-		while len(lines[0].split(delim))==1:
+		while len(lines[0].split(delim)) == 1:
 			i += 1
 			delim = try_delims[i]
-		if len(lines[0].split(delim))==1:
+		if len(lines[0].split(delim)) == 1:
 			raise Exception("Appropriate delimiter wasn't found.")
 		#print "Delimiter used:",str(delim)	
 		line = lines[0].split(delim)
-		withMAF = len(line)>3
+		withMAF = len(line) > 3
 		#print "withMAF:", withMAF
 		start = 0
 		currChrom = -1
@@ -240,10 +241,10 @@ class Result(object):
 			#print "Header detected"
 			#print line[0].strip()
 		if not withMAF:
-			for i in range(start,len(lines)):
+			for i in range(start, len(lines)):
 				line = lines[i].split(delim)
 				newChrom = int(line[0].strip())
-				if newChrom!=currChrom:
+				if newChrom != currChrom:
 					currChrom = newChrom
 					if lastPos:
 						self.chromosome_ends.append(lastPos)
@@ -252,10 +253,10 @@ class Result(object):
 				self.positions.append(lastPos)
 				self.scores.append(float(line[2].strip()))
 		else:
-			for i in range(start,len(lines)):
+			for i in range(start, len(lines)):
 				line = lines[i].split(delim)
 				newChrom = int(line[0].strip())
-				if newChrom!=currChrom:
+				if newChrom != currChrom:
 					currChrom = newChrom
 					if lastPos:
 						self.chromosome_ends.append(lastPos)
@@ -265,26 +266,26 @@ class Result(object):
 				self.scores.append(float(line[2].strip()))
 				self.marfs.append(float(line[3].strip()))
 				self.mafs.append(float(line[4].strip()))
-			
-			assert len(self.positions)==len(self.mafs)==len(self.scores),\
+
+			assert len(self.positions) == len(self.mafs) == len(self.scores), \
 			     "length of scores, positions, mafs, isn't equal"
-								
+
 		self.chromosome_ends.append(lastPos)
 		self._rank_scores_()
 
-	
-	def _load_snps_data_(self,snps_data):
+
+	def _load_snps_data_(self, snps_data):
 		self.chromosome_ends = []
 		for i, snpsd in enumerate(snps_data.snpsDataList):
-			self.chromosomes.extend([snps_data.chromosomes[i]]*len(snpsd.positions))
+			self.chromosomes.extend([snps_data.chromosomes[i]] * len(snpsd.positions))
 			self.positions.extend(snpsd.positions)
 			self.snps.extend(snpsd.snps)
 			self.chromosome_ends.append(snpsd.positions[-1])
 		maf_d = snps_data.get_mafs()
 		self.mafs = maf_d['mafs']
-		self.marfs = maf_d['marfs']		
-		
-	
+		self.marfs = maf_d['marfs']
+
+
 	def _rank_scores_(self):
 		"""
 		Generates two data structures: 
@@ -295,21 +296,21 @@ class Result(object):
 		rank_ls.sort(reverse=True)
 		self.orders = []
 		for j in range(len(rank_ls)):
-			(s,i) = rank_ls[j]
+			(s, i) = rank_ls[j]
 			self.orders.append(i)
-			rank_ls[j] = (i,j)
+			rank_ls[j] = (i, j)
 
 		rank_ls.sort()
 		self.ranks = []
-		for (i,j) in rank_ls:
-			self.ranks.append(j+1)
+		for (i, j) in rank_ls:
+			self.ranks.append(j + 1)
 
 
 	def _sort_by_chr_pos_(self):
 		if self.snps:
-			res_ls = zip(self.chromosomes,self.positions,self.scores,self.mafs,self.marfs,self.snps)
+			res_ls = zip(self.chromosomes, self.positions, self.scores, self.mafs, self.marfs, self.snps)
 		else:
-			res_ls = zip(self.chromosomes,self.positions,self.scores,self.mafs,self.marfs)
+			res_ls = zip(self.chromosomes, self.positions, self.scores, self.mafs, self.marfs)
 		res_ls.sort()
 		newScores = []
 		newPositions = []
@@ -336,133 +337,133 @@ class Result(object):
 
 
 
-	def plot_manhattan(self,pdf_file=None,png_file=None,min_score=None,max_score=None,
-		       percentile=98,type="pvals",ylab="$-$log$_{10}(p-$value$)$", 
-		       plot_bonferroni=False,cand_genes=None):
-		
+	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
+		       percentile=98, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
+		       plot_bonferroni=False, cand_genes=None):
+
 		import matplotlib
 		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
 		"""
 		Plots a 'Manhattan' style GWAs plot.
 		"""
-	
-		"Plotting a Manhattan-style plot with %i markers."%len(self.scores)
+
+		"Plotting a Manhattan-style plot with %i markers." % len(self.scores)
 		if cand_genes:
 			#processing candidate genes by chromosome
 			chr_cand_genes = []
-			for ch in [1,2,3,4,5]:
+			for ch in [1, 2, 3, 4, 5]:
 				cgs = []
 				for cg in cand_genes:
-					if cg.chromosome==ch:
+					if cg.chromosome == ch:
 						cgs.append(cg)
 				chr_cand_genes.append(cgs)
-			
+
 		num_scores = len(self.scores)
 		result = self.simple_clone()
-		
-		result.filter_percentile(percentile/100.0)
-		if percentile<100 and len(result.scores)==len(self.scores):
+
+		result.filter_percentile(percentile / 100.0)
+		if percentile < 100 and len(result.scores) == len(self.scores):
 			raise Exception()
-		
+
 		if not max_score:
 			max_score = max(result.scores)
-		if not min_score:		
-			if type=="pvals":
+		if not min_score:
+			if type == "pvals":
 				min_score = 0
 			else:
 				min_score = min(result.scores)
-		
+
 		scoreRange = max_score - min_score
 		offset = 0
 		chromosomeSplits = result.get_chromosome_splits()
 		ticksList1 = []
 		ticksList2 = []
 		textPos = []
-		plt.figure(figsize=(12,2.8))
-		plt.axes([0.045,0.15,0.95,0.71])
-		starPoints = [[],[],[]]
-		for i in range(0,len(result.chromosome_ends)):
+		plt.figure(figsize=(12, 2.8))
+		plt.axes([0.045, 0.15, 0.95, 0.71])
+		starPoints = [[], [], []]
+		for i in range(0, len(result.chromosome_ends)):
 			index1 = chromosomeSplits[i][0]
-			index2 = chromosomeSplits[i+1][0]
+			index2 = chromosomeSplits[i + 1][0]
 			scoreList = result.scores[index1:index2]
 			posList = result.positions[index1:index2]
-			
+
 			if cand_genes:
 				for cg in chr_cand_genes[i]:
-					plt.axvspan(offset+cg.startPos,offset+cg.endPos, facecolor='k', alpha=0.5)
-			      	
-			
+					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='k', alpha=0.5)
+
+
 			newPosList = []
 			for pos in posList:
-				newPosList.append(offset+pos)
-			
-			for s_i, (score,pos) in enumerate(zip(scoreList,newPosList)):
-				if score>max_score:
+				newPosList.append(offset + pos)
+
+			for s_i, (score, pos) in enumerate(zip(scoreList, newPosList)):
+				if score > max_score:
 					starPoints[0].append(pos)
 					starPoints[1].append(max_score)
 					starPoints[2].append(score)
 					score = max_score
 				scoreList[s_i] = score
-	
-			plt.plot(newPosList,scoreList,".",markersize=5,alpha=0.7)
+
+			plt.plot(newPosList, scoreList, ".", markersize=5, alpha=0.7)
 			oldOffset = offset
-			textPos.append(offset+result.chromosome_ends[i]/2-2000000)
+			textPos.append(offset + result.chromosome_ends[i] / 2 - 2000000)
 			offset += result.chromosome_ends[i]
-			for j in range(oldOffset,offset,5000000):
+			for j in range(oldOffset, offset, 5000000):
 				ticksList1.append(j)
-			for j in range(0,result.chromosome_ends[i],5000000):
-				if j%10000000 == 0 and j < result.chromosome_ends[i]-2500000 :
-					ticksList2.append(j/1000000)
+			for j in range(0, result.chromosome_ends[i], 5000000):
+				if j % 10000000 == 0 and j < result.chromosome_ends[i] - 2500000 :
+					ticksList2.append(j / 1000000)
 				else:
 					ticksList2.append("")
-			
-			
-			
-		plt.plot(starPoints[0],starPoints[1],".",color="#ee9922",markersize=6)
-		if len(starPoints[0])>0:
+
+
+
+		plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=6)
+		if len(starPoints[0]) > 0:
 			i = 0
 			while i < len(starPoints[0]):
 				max_point = i
 				cur_pos = starPoints[0][i]
-				while i < len(starPoints[0]) and abs(starPoints[0][i]-cur_pos) < 3000000:
-					if starPoints[2][i]>starPoints[2][max_point]:
+				while i < len(starPoints[0]) and abs(starPoints[0][i] - cur_pos) < 3000000:
+					if starPoints[2][i] > starPoints[2][max_point]:
 						max_point = i
 					i += 1
-				plt.text(starPoints[0][max_point]-1000000,(starPoints[1][max_point]-1)*1.15,str(round(starPoints[2][max_point],2)),rotation=45,size="small")
-				
-			
-				
-			
+				plt.text(starPoints[0][max_point] - 1000000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
+
+
+
+
 		if plot_bonferroni:
 			import math
-			bonferroni_threshold = -math.log10(1.0/(num_scores*20.0))
-			plt.plot([0,sum(result.chromosome_ends)],[bonferroni_threshold,bonferroni_threshold],"k-.")
-	
-		plt.axis([0,sum(result.chromosome_ends),min_score-0.05*scoreRange,max_score+0.05*scoreRange])
-		plt.xticks(ticksList1,ticksList2)
+			bonferroni_threshold = -math.log10(1.0 / (num_scores * 20.0))
+			plt.plot([0, sum(result.chromosome_ends)], [bonferroni_threshold, bonferroni_threshold], "k-.")
+
+		plt.axis([0, sum(result.chromosome_ends), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
+		plt.xticks(ticksList1, ticksList2)
 		if not ylab:
-			if type=="pvals":
-				plt.ylabel('$-log(p-$value$)$',size="large")
-			
+			if type == "pvals":
+				plt.ylabel('$-log(p-$value$)$', size="large")
+
 			else:
 				plt.ylabel('score')
 		else:
 			plt.ylabel(ylab)
-		plt.xlabel("Mb",size="large")
-	
+		plt.xlabel("Mb", size="large")
+
 		if pdf_file:
-			plt.savefig(pdf_file,format="pdf")
+			plt.savefig(pdf_file, format="pdf")
 		if png_file:
-			plt.savefig(png_file,format="png",dpi=300,bbox_inches='tight')		
+			plt.savefig(png_file, format="png", dpi=300, bbox_inches='tight')
 		if not (pdf_file or png_file):
 			plt.show()
-			
+
 		plt.clf()
 		plt.close()
 
 
-	
+
 	def get_chromosome_splits(self):
 		"""
 		Returns list of indices (and prev chromosome), for the when the chromosomes 
@@ -471,41 +472,41 @@ class Result(object):
 		"""
 		oldChrom = 0
 		chromosome_splits = []
-		for i in range(0,len(self.scores)):
+		for i in range(0, len(self.scores)):
 			newChrom = self.chromosomes[i]
 			if oldChrom != newChrom:
 				while oldChrom < newChrom:
 					oldChrom += 1
-					chromosome_splits.append((i,oldChrom))
-		chromosome_splits.append((i,-1))
+					chromosome_splits.append((i, oldChrom))
+		chromosome_splits.append((i, -1))
 		return chromosome_splits
 
-			
+
 	def neg_log_trans(self):
 		"""
 		apply -log(x) to the pvalues (scores)
 		"""
-		import math,warnings
+		import math, warnings
 		for i, score in enumerate(self.scores):
 			if score != 0.0:
-				self.scores[i] = -math.log(score,10)
+				self.scores[i] = -math.log(score, 10)
 			else:
 				warnings.warn("P-value is 0, log transformation is invalid.  Score is arbitrary set to 50.")
-				self.scores[i] = 50  				
-		
+				self.scores[i] = 50
 
 
-	def filter_percentile(self,percentile):
+
+	def filter_percentile(self, percentile):
 		new_scores = []
 		for score in self.scores:
 			new_scores.append(score)
-		new_scores.sort() 
-		score_cutoff = new_scores[int(len(new_scores)*percentile)]
-		self.filter_attr("scores",score_cutoff)
+		new_scores.sort()
+		score_cutoff = new_scores[int(len(new_scores) * percentile)]
+		self.filter_attr("scores", score_cutoff)
 
 
 
-	def filter_common_top_scores(self,result,top_fraction=0.1):
+	def filter_common_top_scores(self, result, top_fraction=0.1):
 		import bisect
 		self._rank_scores_()
 		result._rank_scores_()
@@ -513,49 +514,49 @@ class Result(object):
 		keep_indices_2 = set()
 		chr_pos_list_1 = self.get_chr_pos_list()
 		chr_pos_list_2 = result.get_chr_pos_list()
-		for i in self.orders[:int(top_fraction*len(self.orders))]:
-			j = bisect.bisect(chr_pos_list_2,chr_pos_list_1[i])-1
-			if chr_pos_list_2[j]==chr_pos_list_1[i]:
-				keep_indices_1.add(i)			
+		for i in self.orders[:int(top_fraction * len(self.orders))]:
+			j = bisect.bisect(chr_pos_list_2, chr_pos_list_1[i]) - 1
+			if chr_pos_list_2[j] == chr_pos_list_1[i]:
+				keep_indices_1.add(i)
 
-		for i in result.orders[:int(top_fraction*len(result.orders))]:
-			j = bisect.bisect(chr_pos_list_1,chr_pos_list_2[i])-1
-			if chr_pos_list_1[j]==chr_pos_list_2[i]:
+		for i in result.orders[:int(top_fraction * len(result.orders))]:
+			j = bisect.bisect(chr_pos_list_1, chr_pos_list_2[i]) - 1
+			if chr_pos_list_1[j] == chr_pos_list_2[i]:
 				keep_indices_2.add(i)
-		
+
 		keep_indices_list_1 = list(keep_indices_1)
 		for i in keep_indices_2:
-			keep_indices_1.add(bisect.bisect(chr_pos_list_1,chr_pos_list_2[i])-1)
+			keep_indices_1.add(bisect.bisect(chr_pos_list_1, chr_pos_list_2[i]) - 1)
 
 		for i in keep_indices_list_1:
-			keep_indices_2.add(bisect.bisect(chr_pos_list_2,chr_pos_list_1[i])-1)
-		
-		print len(keep_indices_1),len(keep_indices_2)
+			keep_indices_2.add(bisect.bisect(chr_pos_list_2, chr_pos_list_1[i]) - 1)
+
+		print len(keep_indices_1), len(keep_indices_2)
 		self.filter_indices(list(keep_indices_1))
 		result.filter_indices(list(keep_indices_2))
-		return keep_indices_1,keep_indices_2
-		
-		
-	def filter_indices(self,indices_to_keep):
+		return keep_indices_1, keep_indices_2
+
+
+	def filter_indices(self, indices_to_keep):
 		indices_to_keep.sort()
 		new_snp_results = {}
 		for info in self.snp_results:
-			new_snp_results[info]=[]
+			new_snp_results[info] = []
 		count = len(self.scores)
 		for i in indices_to_keep:
 			for info in self.snp_results:
 				if self.snp_results[info]:
 					new_snp_results[info].append(self.snp_results[info][i])
-		
+
 		self.snp_results = new_snp_results
 		self.scores = self.snp_results['scores']
 		self.positions = self.snp_results['positions']
 		self.chromosomes = self.snp_results['chromosomes']
 		self.mafs = self.snp_results['mafs']
 		self.marfs = self.snp_results['marfs']
-		self.snps=self.snp_results['snps']
-		print "%i scores were removed."%(count-len(self.scores))
-		
+		self.snps = self.snp_results['snps']
+		print "%i scores were removed." % (count - len(self.scores))
+
 
 	def filter_attr(self, attr_name, attr_threshold):
 		"""
@@ -564,31 +565,31 @@ class Result(object):
 		attr are e.g. 
 		'mafs', 'marfs', 'scores', etc.	
 		"""
-		print "Filtering for attribute '%s' with threshold: %g"%(attr_name,attr_threshold)
+		print "Filtering for attribute '%s' with threshold: %g" % (attr_name, attr_threshold)
 		attr = getattr(self, attr_name)
 		print len(attr)
 		new_snp_results = {}
 		for info in self.snp_results:
-			new_snp_results[info]=[]
+			new_snp_results[info] = []
 		count = len(self.scores)
-		for i in range(0,len(self.scores)):
-			if attr[i]>= attr_threshold:
+		for i in range(0, len(self.scores)):
+			if attr[i] >= attr_threshold:
 				for info in self.snp_results:
-					if len(self.snp_results[info])>0:
+					if len(self.snp_results[info]) > 0:
 						new_snp_results[info].append(self.snp_results[info][i])
-		
+
 		self.snp_results = new_snp_results
 		self.scores = self.snp_results['scores']
 		self.positions = self.snp_results['positions']
 		self.chromosomes = self.snp_results['chromosomes']
 		self.mafs = self.snp_results['mafs']
 		self.marfs = self.snp_results['marfs']
-		self.snps=self.snp_results['snps']
-		print "%i scores were removed."%(count-len(self.scores))
+		self.snps = self.snp_results['snps']
+		print "%i scores were removed." % (count - len(self.scores))
 		return len(self.scores)
 
 
-	
+
 	def filter_non_segregating_snps(self, ecotype1, ecotype2, accessions=None):
 		"""
 		Filter out all SNPs which are not segregating in the two accessions.
@@ -606,29 +607,29 @@ class Result(object):
 			ecotypes = accessions
 		else:
 			ecotypes = self.accessions
-		
+
 		e_i1 = ecotypes.index(ecotype1)
 		e_i2 = ecotypes.index(ecotype2)
 
 		for i in range(len(self.snps)):
 			snp = self.snps[i]
-			if snp[e_i1]!=snp[e_i2]:
+			if snp[e_i1] != snp[e_i2]:
 				newScores.append(self.scores[i])
 				newPositions.append(self.positions[i])
 				newChromosomes.append(self.chromosomes[i])
 				newMafs.append(self.mafs[i])
-				newMarfs.append(self.marfs[i])		
-				new_snps.append(snp)			
-			
+				newMarfs.append(self.marfs[i])
+				new_snps.append(snp)
+
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
 		self.mafs = newMafs
 		self.marfs = newMarfs
 		self.snps = new_snps
-		
 
-			
+
+
 #	def filter_score_cutoff(self, score_cutoff):
 #
 #		newScores = []
@@ -654,30 +655,30 @@ class Result(object):
 #		self.mafs = newMafs
 #		self.marfs = newMarfs
 #		self.snps = new_snps
-		
-		
 
-	def get_top_snps_result(self,n):
+
+
+	def get_top_snps_result(self, n):
 		"""
 		returns top n SNPs
 		"""
 		import copy
 		result = copy.deepcopy(self) #Cloning
-		result.filter_top_snps(n) 
-		return result		
-	
-	def get_top_snps(self,n):
+		result.filter_top_snps(n)
+		return result
+
+	def get_top_snps(self, n):
 		"""
 		returns top n SNPs
 		"""
 		self._rank_scores_() #Making sure the ranks are updated
 		chr_pos_list = []
 		for i in self.orders[:n]:
-			chr_pos_list.append((self.chromosomes[i],self.positions[i]))
-		return chr_pos_list		
+			chr_pos_list.append((self.chromosomes[i], self.positions[i]))
+		return chr_pos_list
 
-	
-	def get_top_genes(self,n,window_size=5000,conn=None):
+
+	def get_top_genes(self, n, window_size=5000, conn=None):
 		"""
 		Returns a set of (chromosome, start_pos, end_pos), for genes found. 
 		"""
@@ -685,59 +686,59 @@ class Result(object):
 		genes = set()
 		snp_ix = []
 		i = 0
-		while len(genes)<n:
+		while len(genes) < n:
 			snp_i = self.orders[i]
 			p = self.positions[snp_i]
 			c = self.chromosomes[snp_i]
-			c_genes = get_gene_list(p-window_size, p+window_size, c,include_intron_exons=False,conn=conn)
+			c_genes = get_gene_list(p - window_size, p + window_size, c, include_intron_exons=False, conn=conn)
 			for g in c_genes:
-				genes.add((g.chromosome,g.startPos,g.endPos,g.tairID))
+				genes.add((g.chromosome, g.startPos, g.endPos, g.tairID))
 			#print len(genes)
 			i += 1
-		print 'found %d genes'%len(genes)
+		print 'found %d genes' % len(genes)
 		return genes
-	
+
 
 	def get_chr_pos_score_list(self):
-		return zip(self.chromosomes,self.positions,self.scores)
+		return zip(self.chromosomes, self.positions, self.scores)
 
 
 	def get_chr_pos_list(self):
-		return zip(self.chromosomes,self.positions)
+		return zip(self.chromosomes, self.positions)
 
-	
-	def get_top_regions(self,n,distance_threshold=25000):
+
+	def get_top_regions(self, n, distance_threshold=25000):
 		"""
 		Returns a list of regions, defined by (chromosome,start_pos,end_pos).	
 		"""
-		self._rank_scores_() 
+		self._rank_scores_()
 		chromosome_ends = self.get_chromosome_ends()
-			
+
 		i = 0 #how many SNPs are needed
 		region_count = 0
-		regions = [[],[],[],[],[]]  #a list of (chromosome,start,stop)
-		while sum(map(len,regions)) < n:
+		regions = [[], [], [], [], []]  #a list of (chromosome,start,stop)
+		while sum(map(len, regions)) < n:
 			snp_i = self.orders[i]
 			snp_pos = self.positions[snp_i]
 			chromosome = self.chromosomes[snp_i]
-			new_snp_reg = (chromosome,max(snp_pos-distance_threshold,0),min(snp_pos+distance_threshold,chromosome_ends[chromosome-1]))
-			covered=False
-			for reg_i,reg in enumerate(regions[chromosome-1]):
-				if (new_snp_reg[1]<reg[2] and new_snp_reg[2]>reg[2]) or (new_snp_reg[1]<reg[1] and new_snp_reg[2]>reg[1]): #then merge					
-					regions[chromosome-1].pop(reg_i) #Removing the region which we're merging with.
-					new_snp_reg = (reg[0],min(reg[1],new_snp_reg[1]),max(reg[2],new_snp_reg[2]))
-				elif (new_snp_reg[1]>=reg[1] and new_snp_reg[2]<=reg[2]):
-					covered=True  #It's already covered
+			new_snp_reg = (chromosome, max(snp_pos - distance_threshold, 0), min(snp_pos + distance_threshold, chromosome_ends[chromosome - 1]))
+			covered = False
+			for reg_i, reg in enumerate(regions[chromosome - 1]):
+				if (new_snp_reg[1] < reg[2] and new_snp_reg[2] > reg[2]) or (new_snp_reg[1] < reg[1] and new_snp_reg[2] > reg[1]): #then merge					
+					regions[chromosome - 1].pop(reg_i) #Removing the region which we're merging with.
+					new_snp_reg = (reg[0], min(reg[1], new_snp_reg[1]), max(reg[2], new_snp_reg[2]))
+				elif (new_snp_reg[1] >= reg[1] and new_snp_reg[2] <= reg[2]):
+					covered = True  #It's already covered
 					break
 			if not covered:
-				regions[chromosome-1].append(new_snp_reg)
-			i += 1 
-		print "It took %i SNPS to find %i regions."%(i,n)
-		regions_list = regions[0]+regions[1]+regions[2]+regions[3]+regions[4]
-		return regions_list 
-	
-	
-	def get_region_result(self,chromosome,start_pos,end_pos,buffer=0):
+				regions[chromosome - 1].append(new_snp_reg)
+			i += 1
+		print "It took %i SNPS to find %i regions." % (i, n)
+		regions_list = regions[0] + regions[1] + regions[2] + regions[3] + regions[4]
+		return regions_list
+
+
+	def get_region_result(self, chromosome, start_pos, end_pos, buffer=0):
 		"""
 		returns a result object with only the SNPs, etc. within the given boundary. 
 		"""
@@ -748,16 +749,16 @@ class Result(object):
 		marfs = []
 		chromosomes = []
 		i = 0
-		start_pos -=buffer
+		start_pos -= buffer
 		end_pos += buffer
-		while i<len(self.chromosomes) and self.chromosomes[i]!=chromosome: 
+		while i < len(self.chromosomes) and self.chromosomes[i] != chromosome:
 			i += 1
-		while i<len(self.chromosomes) and self.positions[i]<start_pos:
+		while i < len(self.chromosomes) and self.positions[i] < start_pos:
 			i += 1
 		if i == len(self.chromosomes):
 			raise Exception("region results never found!")
-		
-		while i<len(self.chromosomes) and self.positions[i]<=end_pos and self.chromosomes[i]==chromosome:
+
+		while i < len(self.chromosomes) and self.positions[i] <= end_pos and self.chromosomes[i] == chromosome:
 			chromosomes.append(chromosome)
 			positions.append(self.positions[i])
 			scores.append(self.scores[i])
@@ -765,24 +766,24 @@ class Result(object):
 				snps.append(self.snps[i])
 			mafs.append(self.mafs[i])
 			marfs.append(self.marfs[i])
-			i += 1	
-		
-		return Result(result_type=self.result_type,phen_id=self.phen_id,
-			      scores=scores,chromosomes=chromosomes,positions=positions,
-			      snps=snps,accessions=self.accessions,marfs=marfs,mafs=mafs)
-		
-		
-		
-	def get_top_region_results(self,n,distance_threshold=25000,buffer=25000):
+			i += 1
+
+		return Result(result_type=self.result_type, phen_id=self.phen_id,
+			      scores=scores, chromosomes=chromosomes, positions=positions,
+			      snps=snps, accessions=self.accessions, marfs=marfs, mafs=mafs)
+
+
+
+	def get_top_region_results(self, n, distance_threshold=25000, buffer=25000):
 		reg_results = []
 		i = 0
 		for reg in self.get_top_regions(n, distance_threshold):
-			reg_results.append(self.get_region_result(*reg,buffer=buffer))
+			reg_results.append(self.get_region_result(*reg, buffer=buffer))
 		print "Regions were retrieved."
 		return reg_results
-	
 
-	def filter_top_snps(self,n):
+
+	def filter_top_snps(self, n):
 		self._rank_scores_() #Making sure the ranks are updated
 		newScores = []
 		newPositions = []
@@ -792,7 +793,7 @@ class Result(object):
 		new_snps = []
 		l = self.orders[0:n]
 		l.sort()
-	
+
 		for i in l:
 			newScores.append(self.scores[i])
 			newPositions.append(self.positions[i])
@@ -817,15 +818,15 @@ class Result(object):
 			i = 0
 			ch_i = 0
 			curr_chr = self.chromosomes[i]
-			chromosome_ends = [] 
-			while ch_i<5:
-				while i<len(self.chromosomes) and self.chromosomes[i]==curr_chr:
+			chromosome_ends = []
+			while ch_i < 5:
+				while i < len(self.chromosomes) and self.chromosomes[i] == curr_chr:
 					i += 1
-				chromosome_ends.append(self.positions[i-1])
+				chromosome_ends.append(self.positions[i - 1])
 			self.chromosome_ends = chromosome_ends
 		return self.chromosome_ends
-		
-					
+
+
 
 	def clone(self):
 		import copy
@@ -836,12 +837,12 @@ class Result(object):
 	def simple_clone(self):
 		result = Result(scores=self.scores[:], positions=self.positions[:], chromosomes=self.chromosomes[:],
 				marfs=self.marfs[:], mafs=self.mafs[:], accessions=self.accessions[:])
-		result.chromosome_ends=self.chromosome_ends[:]
+		result.chromosome_ends = self.chromosome_ends[:]
 		return result
-		
-	
-	
-	
+
+
+
+
 #	def insert_into_db(self,result_id,host='gmi-ara-devel-be'):
 #		"""
 #		Insert pvalues into DB.. (TEST) 
@@ -872,64 +873,64 @@ class Result(object):
 #		conn.commit()
 #		cursor.close ()
 #		conn.close ()
-			
-			
-			
+
+
+
 	def na_mafs(self, min_maf=10):
 		"""
 		NA scores/pvalues which have maf<minMaf.		
 		"""
-		for i in range(0,len(self.scores)):
-			if self.mafs[i]< min_maf:
-				self.scores[i]= "NA"
+		for i in range(0, len(self.scores)):
+			if self.mafs[i] < min_maf:
+				self.scores[i] = "NA"
 
 
 	def get_max_snp(self):
 		max_val = max(self.scores)
 		mi = self.scores.index(max_val)
-		return (self.snps[mi],self.scores[mi],self.chromosomes[mi],self.positions[mi])
-		
-			
-	
-	def write_to_file_old(self,filename,with_extra_info=False):
-		header = ['chromosomes','positions','scores','marfs','mafs']
+		return (self.snps[mi], self.scores[mi], self.chromosomes[mi], self.positions[mi])
+
+
+
+	def write_to_file_old(self, filename, with_extra_info=False):
+		header = ['chromosomes', 'positions', 'scores', 'marfs', 'mafs']
 		if with_extra_info:
 			for info in self.snp_results:
 				if not info in header:
 					header.append(info)
-		f = open(filename,"w")
-		
+		f = open(filename, "w")
+
 		f.write("Chromosome,Position,Score,MARF,MAF \n")
-		
-		for (ch,pos,score,marf,maf) in zip(self.chromosomes,self.positions,self.scores,self.marfs,self.mafs):
-			l = map(str,[ch,pos,score,marf,maf])
-			f.write(",".join(l)+"\n")
+
+		for (ch, pos, score, marf, maf) in zip(self.chromosomes, self.positions, self.scores, self.marfs, self.mafs):
+			l = map(str, [ch, pos, score, marf, maf])
+			f.write(",".join(l) + "\n")
 		f.close()
 
 
-	def write_to_file(self,filename,additional_columns=None):
-		columns = ['chromosomes','positions','scores','marfs','mafs']
+	def write_to_file(self, filename, additional_columns=None):
+		columns = ['chromosomes', 'positions', 'scores', 'marfs', 'mafs']
 		if additional_columns:
 			for info in additional_columns:
 				if info in self.snp_results:
 					columns.append(info)
 		try:
-			f = open(filename,"w")
-		
-			f.write(','.join(columns)+"\n")
-			
+			f = open(filename, "w")
+
+			f.write(','.join(columns) + "\n")
+
 			for i in range(len(self.snp_results[columns[0]])):
 				l = []
 				for c in columns:
-					l.append(self.snp_results[c][i])				
-				l = map(str,l)
-				f.write(",".join(l)+"\n")
+					l.append(self.snp_results[c][i])
+				l = map(str, l)
+				f.write(",".join(l) + "\n")
 			f.close()
 		except Exception, err_str:
-			print 'Failed writing the resultfile:',err_str
+			print 'Failed writing the resultfile:', err_str
 			print 'Make sure the given path is correct, and you have write rights.'
-		
-		
+
+
 #
 #class Result_old(object):
 #	"""
@@ -2031,48 +2032,48 @@ class Result(object):
 #		self.ml = newML
 #		self.vg = newVG
 #		self.ve = newVE
-			
+
 
 class SNPResult(Result):
 	"""
 	Contains information on the result.
 	"""
 
-	def _loadSnpsData_(self,snpsds):
+	def _loadSnpsData_(self, snpsds):
 		"""
 		Loads the SNP data.
-		"""		
+		"""
 		self.snps = []
-		self.accessions=snpsds[0].accessions
+		self.accessions = snpsds[0].accessions
 		i = 0 #result index
 		chr = -1 # chromosome (index)
-		while i<len(self.scores):
-			if chr != self.chromosomes[i]-1:
-				chr = self.chromosomes[i]-1
+		while i < len(self.scores):
+			if chr != self.chromosomes[i] - 1:
+				chr = self.chromosomes[i] - 1
 				j = 0 #snpsdata index
 			pos = self.positions[i]
 			#print i,chr, j,len(snpsds[chr].positions)
-			while j<len(snpsds[chr].positions) and pos > snpsds[chr].positions[j]:
+			while j < len(snpsds[chr].positions) and pos > snpsds[chr].positions[j]:
 				j += 1
-			if j<len(snpsds[chr].positions) and pos == snpsds[chr].positions[j]:
+			if j < len(snpsds[chr].positions) and pos == snpsds[chr].positions[j]:
 				self.snps.append(snpsds[chr].snps[j])
 			i += 1
-		
+
 		if pos > snpsds[chr].positions[j]:
-			while j<len(snpsds[chr].positions) and pos > snpsds[chr].positions[j]:
+			while j < len(snpsds[chr].positions) and pos > snpsds[chr].positions[j]:
 				j += 1
-			if j<len(snpsds[chr].positions) and pos == snpsds[chr].positions[j]:
+			if j < len(snpsds[chr].positions) and pos == snpsds[chr].positions[j]:
 				self.snps.append(snpsds[chr].snps[j])
 
-		if i!= len( self.snps):
-			print "Problems with loading SNPs",i,len( self.snps)
-			
-		print "Loaded",len(self.snps)," SNPs and",len(self.accessions),"accessions."
+		if i != len(self.snps):
+			print "Problems with loading SNPs", i, len(self.snps)
+
+		print "Loaded", len(self.snps), " SNPs and", len(self.accessions), "accessions."
 
 
 
-	def filterNicePeaks(self,scoreThreshold,singletonScoreThreshold,window=[20000,20000], method=1):
-		currScoreWeight=0.2
+	def filterNicePeaks(self, scoreThreshold, singletonScoreThreshold, window=[20000, 20000], method=1):
+		currScoreWeight = 0.2
 		currChrom = -1
 		newScores = []
 		newSnps = []
@@ -2083,33 +2084,33 @@ class SNPResult(Result):
 		singletonCount = 0
 		lastSecondaryEnd = 0
 		if method == 1:
-			for i in range(0,len(self.positions)):
+			for i in range(0, len(self.positions)):
 				if currChrom != self.chromosomes[i]: #Restart
 					currChrom = self.chromosomes[i]
 					startIndex = i #windowIndices 
 					stopIndex = i #windowIndices 
-					curScoreSum = currScoreWeight*self.scores[i]				
-					oldScore=0
+					curScoreSum = currScoreWeight * self.scores[i]
+					oldScore = 0
 					numSNPs = 1
 				currPos = self.positions[i]
 
-				while currPos - self.positions[startIndex]>window[0]:
+				while currPos - self.positions[startIndex] > window[0]:
 					curScoreSum -= self.scores[startIndex]
 					startIndex += 1
 					numSNPs -= 1
-				
-				while stopIndex+1 < len(self.positions) and self.positions[stopIndex+1]-currPos<window[1]:
+
+				while stopIndex + 1 < len(self.positions) and self.positions[stopIndex + 1] - currPos < window[1]:
 					stopIndex += 1
 					curScoreSum += self.scores[stopIndex]
 					numSNPs += 1
 
-				curScoreSum -= oldScore				
-				oldScore = currScoreWeight*numSNPs*self.scores[i]
+				curScoreSum -= oldScore
+				oldScore = currScoreWeight * numSNPs * self.scores[i]
 				curScoreSum += oldScore
 
-				if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold) or  (numSNPs > 5 and curScoreSum/float(numSNPs) > scoreThreshold):
+				if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold) or  (numSNPs > 5 and curScoreSum / float(numSNPs) > scoreThreshold):
 					if (numSNPs < 5 and self.scores[i] > singletonScoreThreshold):
-						singletonCount +=1 
+						singletonCount += 1
 					newScores.append(self.scores[i])
 					newPositions.append(self.positions[i])
 					newChromosomes.append(self.chromosomes[i])
@@ -2117,9 +2118,9 @@ class SNPResult(Result):
 					newMarfs.append(self.marfs[i])
 					newSnps.append(self.snps[i])
 
-		elif method==2:
-			for i in range(0,len(self.scores)):
-				if self.scores[i]>=singletonScoreThreshold:
+		elif method == 2:
+			for i in range(0, len(self.scores)):
+				if self.scores[i] >= singletonScoreThreshold:
 					newScores.append(self.scores[i])
 					newPositions.append(self.positions[i])
 					newChromosomes.append(self.chromosomes[i])
@@ -2129,23 +2130,23 @@ class SNPResult(Result):
 
 		# The following code locates the regions before and after the "nice" SNPs.
 		j = 0
-		for i in range(0,len(self.positions)):
+		for i in range(0, len(self.positions)):
 			pos = self.positions[i]
 			chr = self.chromosomes[i]
-			if j < len(newPositions) and pos == newPositions[j] and chr==newChromosomes[j]:
-				k = 0				
-				while  i+k > lastSecondaryEnd and pos-self.positions[i+k-1]<window[0] and self.chromosomes[i+k-1]==chr:
+			if j < len(newPositions) and pos == newPositions[j] and chr == newChromosomes[j]:
+				k = 0
+				while  i + k > lastSecondaryEnd and pos - self.positions[i + k - 1] < window[0] and self.chromosomes[i + k - 1] == chr:
 					k -= 1
-				while i+k < len(self.positions)-1 and self.positions[i+k]-pos < window[1] and self.chromosomes[i+k]==chr:
-					if i+k > lastSecondaryEnd:
-						self.secondaryScores.append(self.scores[i+k])
-						self.secondaryPositions.append(self.positions[i+k])
-						self.secondaryChromosomes.append(self.chromosomes[i+k])						
-					k+= 1 
-				lastSecondaryEnd = i+k-1
-				j += 1 
-				
-		
+				while i + k < len(self.positions) - 1 and self.positions[i + k] - pos < window[1] and self.chromosomes[i + k] == chr:
+					if i + k > lastSecondaryEnd:
+						self.secondaryScores.append(self.scores[i + k])
+						self.secondaryPositions.append(self.positions[i + k])
+						self.secondaryChromosomes.append(self.chromosomes[i + k])
+					k += 1
+				lastSecondaryEnd = i + k - 1
+				j += 1
+
+
 		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
@@ -2153,7 +2154,7 @@ class SNPResult(Result):
 		self.mafs = newMafs
 		self.marfs = newMarfs
 
-		print singletonCount,"singletons were added"
+		print singletonCount, "singletons were added"
 
 
 
@@ -2166,9 +2167,9 @@ class SNPResult(Result):
 		newChromosomes = []
 		newMafs = []
 		newMarfs = []
-		newSnps=[]
-		for i in range(0,len(self.scores)):
-			if self.mafs[i]>= minMaf:
+		newSnps = []
+		for i in range(0, len(self.scores)):
+			if self.mafs[i] >= minMaf:
 				newScores.append(self.scores[i])
 				newPositions.append(self.positions[i])
 				newChromosomes.append(self.chromosomes[i])
@@ -2182,15 +2183,15 @@ class SNPResult(Result):
 		del self.mafs
 		del self.marfs
 
-		self.snps=newSnps
+		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
 		self.mafs = newMafs
 		self.marfs = newMarfs
 
-	
-		
+
+
 	def filterMARF(self, minMarf=0.1):
 		"""
 		Filter out scores/pvalues which have maf<minMaf.		
@@ -2200,9 +2201,9 @@ class SNPResult(Result):
 		newChromosomes = []
 		newMafs = []
 		newMarfs = []
-		newSnps=[]
-		for i in range(0,len(self.scores)):
-			if self.marfs[i]>=minMarf:
+		newSnps = []
+		for i in range(0, len(self.scores)):
+			if self.marfs[i] >= minMarf:
 				newScores.append(self.scores[i])
 				newPositions.append(self.positions[i])
 				newChromosomes.append(self.chromosomes[i])
@@ -2216,7 +2217,7 @@ class SNPResult(Result):
 		del self.mafs
 		del self.marfs
 
-		self.snps=newSnps
+		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
@@ -2230,9 +2231,9 @@ class SNPResult(Result):
 		newChromosomes = []
 		newMafs = []
 		newMarfs = []
-		newSnps=[]
-		for i in range(0,len(self.scores)):
-			if self.scores[i]>scoreCutoff:
+		newSnps = []
+		for i in range(0, len(self.scores)):
+			if self.scores[i] > scoreCutoff:
 				newScores.append(self.scores[i])
 				newPositions.append(self.positions[i])
 				newChromosomes.append(self.chromosomes[i])
@@ -2246,7 +2247,7 @@ class SNPResult(Result):
 		del self.mafs
 		del self.marfs
 
-		self.snps=newSnps
+		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
@@ -2254,27 +2255,27 @@ class SNPResult(Result):
 		self.marfs = newMarfs
 
 
-	def getRegionSNPs(self,window=[25000,25000],snpsDataFile=None):
+	def getRegionSNPs(self, window=[25000, 25000], snpsDataFile=None):
 		if self.snps:
 			regionSNPs = []
 			self.getRegions(window=window)
-			for (snpIndex,startPos,endPos,chr,size,maxScore,maxPos,snpRank,regionRank) in self.regions:
-				snp = SNP(self.positions[snpIndex],self.chromosomes[snpIndex],alleles=self.snps[snpIndex],accessions=self.accessions,score=maxScore)
+			for (snpIndex, startPos, endPos, chr, size, maxScore, maxPos, snpRank, regionRank) in self.regions:
+				snp = SNP(self.positions[snpIndex], self.chromosomes[snpIndex], alleles=self.snps[snpIndex], accessions=self.accessions, score=maxScore)
 				regionSNPs.append(snp)
 			return regionSNPs
-			
-	
-	def filterTopSNPs(self,n):
+
+
+	def filterTopSNPs(self, n):
 		self._rankScores_() #Making sure the ranks are updated
 		newScores = []
 		newPositions = []
 		newChromosomes = []
 		newMafs = []
 		newMarfs = []
-		newSnps=[]
+		newSnps = []
 		l = self.orders[0:n]
 		l.sort()
-	
+
 		for i in l:
 			newScores.append(self.scores[i])
 			newPositions.append(self.positions[i])
@@ -2289,7 +2290,7 @@ class SNPResult(Result):
 		del self.mafs
 		del self.marfs
 
-		self.snps=newSnps
+		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
@@ -2298,15 +2299,15 @@ class SNPResult(Result):
 
 
 	def _sortByChrPos_(self):
-		res_ls = zip(self.chromosomes,self.positions,self.scores,self.mafs,self.marfs,self.snps)
+		res_ls = zip(self.chromosomes, self.positions, self.scores, self.mafs, self.marfs, self.snps)
 		res_ls.sort()
 		newScores = []
 		newPositions = []
 		newChromosomes = []
 		newMafs = []
 		newMarfs = []
-		newSnps=[]
-		for (chr,pos,score,maf,marf,snp) in res_ls:
+		newSnps = []
+		for (chr, pos, score, maf, marf, snp) in res_ls:
 			newScores.append(score)
 			newPositions.append(pos)
 			newChromosomes.append(chr)
@@ -2321,7 +2322,7 @@ class SNPResult(Result):
 		del self.mafs
 		del self.marfs
 
-		self.snps=newSnps
+		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
@@ -2329,8 +2330,8 @@ class SNPResult(Result):
 		self.marfs = newMarfs
 
 
-	def filterTopRegions(self,n,window=[25000,25000],minScore=None):
-		self._rankScores_() 
+	def filterTopRegions(self, n, window=[25000, 25000], minScore=None):
+		self._rankScores_()
 		oldScores = self.scores
 		oldPositions = self.positions
 		oldChromosomes = self.chromosomes
@@ -2338,47 +2339,47 @@ class SNPResult(Result):
 		oldMarfs = self.marfs
 		oldSnps = self.snps
 		oldGlobalRanks = self.globalRanks
-		self.snps=[]
+		self.snps = []
 		self.scores = []
 		self.positions = []
 		self.chromosomes = []
 		self.mafs = []
 		self.marfs = []
 		self.globalRanks = []
-		
-		regionCount = 0 
-		i = 0 
-		
+
+		regionCount = 0
+		i = 0
+
 		res_ls = []
 		if minScore:
 			while regionCount < n:
-				res_ls.append((oldChromosomes[self.orders[i]],oldPositions[self.orders[i]]))
+				res_ls.append((oldChromosomes[self.orders[i]], oldPositions[self.orders[i]]))
 				res_ls.sort()
-				if oldScores[self.orders[i]]<minScore:
+				if oldScores[self.orders[i]] < minScore:
 					break
 				self.scores.append(oldScores[self.orders[i]])
 				self.positions.append(oldPositions[self.orders[i]])
 				self.chromosomes.append(oldChromosomes[self.orders[i]])
 				self.mafs.append(oldMafs[self.orders[i]])
 				self.marfs.append(oldMarfs[self.orders[i]])
-				self.snps.append(oldSnps[self.orders[i]])		   
+				self.snps.append(oldSnps[self.orders[i]])
 				self.globalRanks.append(oldGlobalRanks[self.orders[i]])
-				regionCount = self._countRegions_(res_ls,window=window)
-				i += 1 
+				regionCount = self._countRegions_(res_ls, window=window)
+				i += 1
 		else:
 			while regionCount < n:
-				res_ls.append((oldChromosomes[self.orders[i]],oldPositions[self.orders[i]]))
+				res_ls.append((oldChromosomes[self.orders[i]], oldPositions[self.orders[i]]))
 				res_ls.sort()
 				self.scores.append(oldScores[self.orders[i]])
 				self.positions.append(oldPositions[self.orders[i]])
 				self.chromosomes.append(oldChromosomes[self.orders[i]])
 				self.mafs.append(oldMafs[self.orders[i]])
 				self.marfs.append(oldMarfs[self.orders[i]])
-				self.snps.append(oldSnps[self.orders[i]])		   
+				self.snps.append(oldSnps[self.orders[i]])
 				self.globalRanks.append(oldGlobalRanks[self.orders[i]])
-				regionCount = self._countRegions_(res_ls,window=window)
-				i += 1 
-			
+				regionCount = self._countRegions_(res_ls, window=window)
+				i += 1
+
 		del oldScores
 		del oldPositions
 		del oldChromosomes
@@ -2396,9 +2397,9 @@ class SNPResult(Result):
 #		raise  NotImplementedError
 #		for i, snp in enumerate(self.snps):
 #			SNP(position,chromosome,accessions=None,alleles=None,snpsds=None,score=None,rank=None,regionRank=None)
-			
 
-	def mergeWith(self,snpResult):
+
+	def mergeWith(self, snpResult):
 		#pdb.set_trace()
 
 		newScores = []
@@ -2406,11 +2407,11 @@ class SNPResult(Result):
 		newChromosomes = []
 		newMafs = []
 		newMarfs = []
-		newSnps=[]	   
-		
-		if len(snpResult.scores)==0:
-			return 
-		elif len(self.scores)==0:
+		newSnps = []
+
+		if len(snpResult.scores) == 0:
+			return
+		elif len(self.scores) == 0:
 			newPositions = snpResult.positions
 			newChromosomes = snpResult.chromosomes
 			newScores = snpResult.scores
@@ -2420,25 +2421,25 @@ class SNPResult(Result):
 		else:
 
 			i1 = 0
-		
-			pos1 = self.positions[i1] 
+
+			pos1 = self.positions[i1]
 			chr1 = self.chromosomes[i1]
 
-			for i2 in range(0,len(snpResult.positions)):
+			for i2 in range(0, len(snpResult.positions)):
 				pos2 = snpResult.positions[i2]
 				chr2 = snpResult.chromosomes[i2]
-				while i1 <len(self.positions)-1 and (chr1,pos1)<(chr2,pos2):
+				while i1 < len(self.positions) - 1 and (chr1, pos1) < (chr2, pos2):
 					newPositions.append(self.positions[i1])
 					newChromosomes.append(self.chromosomes[i1])
 					newScores.append(self.scores[i1])
 					newMafs.append(self.mafs[i1])
 					newMarfs.append(self.marfs[i1])
-					newSnps.append(self.snps[i1])	
+					newSnps.append(self.snps[i1])
 					i1 += 1
 					pos1 = self.positions[i1]
 					chr1 = self.chromosomes[i1]
 
-				if i1 <len(self.positions)-1 and (chr1,pos1)==(chr2,pos2):
+				if i1 < len(self.positions) - 1 and (chr1, pos1) == (chr2, pos2):
 					i1 += 1
 					pos1 = self.positions[i1]
 					chr1 = self.chromosomes[i1]
@@ -2459,23 +2460,23 @@ class SNPResult(Result):
 		del self.marfs
 		del snpResult
 
-		self.snps=newSnps
+		self.snps = newSnps
 		self.scores = newScores
 		self.positions = newPositions
 		self.chromosomes = newChromosomes
 		self.mafs = newMafs
 		self.marfs = newMarfs
 
-			
-		
+
+
 
 class RegionsTable(object):
 	"""
 	A table or regions X methods/phenotypes.
 	"""
-	def __init__(self,result_ls,window=[25000,25000]):
+	def __init__(self, result_ls, window=[25000, 25000]):
 		merged_result = result_ls[0].clone()
-		for i in range(1,len(result_ls)):
+		for i in range(1, len(result_ls)):
 			result = result_ls[i]
 			merged_result.mergeWith(result)
 		merged_result.getRegions(window=window)
@@ -2486,24 +2487,24 @@ class RegionsTable(object):
 		#print "The union of the results: Number of sign. SNPs: "+str(len(merged_result.scores))+", number of sign. regions: "+str(len(merged_result.regions))+", ave. region size: "+str(totalRegSize/float(len(merged_result.regions)))+".\n"
 
 		self.regions = []
-		for (snpIndex,startPos,endPos,chr,size,maxScore,maxPos,snpRank,regionRank) in merged_result.regions:
-			self.regions.append((chr,startPos,endPos,size))
+		for (snpIndex, startPos, endPos, chr, size, maxScore, maxPos, snpRank, regionRank) in merged_result.regions:
+			self.regions.append((chr, startPos, endPos, size))
 		del merged_result
 
 		self.region_by_methods_table = [] # list[region_index][method/phenotype_index][snp_index]
-		for (chr,startPos,endPos,size) in self.regions:  #For all regions
+		for (chr, startPos, endPos, size) in self.regions:  #For all regions
 			methods_snps_ls = []
-			for m_i in range(0,len(result_ls)):      #for all results
+			for m_i in range(0, len(result_ls)):      #for all results
 				result = result_ls[m_i]
-				snps_ls = []				
-				
+				snps_ls = []
+
 				if result.snps:
 					##Finding all SNPs in region of interest
 					regionRank = None
 					snpRank = None
 					result.getRegions(window=window)
-					for (si,startPos2,endPos2,chr2,size2,mScore,mPos,sRank,rRank) in result.regions:
-						if chr2==chr and startPos<=startPos2 and endPos2<=endPos:
+					for (si, startPos2, endPos2, chr2, size2, mScore, mPos, sRank, rRank) in result.regions:
+						if chr2 == chr and startPos <= startPos2 and endPos2 <= endPos:
 							#print startPos,startPos2,endPos2,endPos
 							regionRank = rRank
 							snpRank = sRank
@@ -2511,14 +2512,14 @@ class RegionsTable(object):
 						#pdb.set_trace()
 
 				##Finding all SNPs in region of interest
-				for i in range(0,len(result.positions)):
-					if result.chromosomes[i]==chr and startPos<result.positions[i]<endPos:
+				for i in range(0, len(result.positions)):
+					if result.chromosomes[i] == chr and startPos < result.positions[i] < endPos:
 						if result.snps:
 							#print result.snps[i]
-							snp = SNP(result.positions[i],chr,alleles=result.snps[i],score=result.scores[i],rank=snpRank,regionRank=regionRank)
+							snp = SNP(result.positions[i], chr, alleles=result.snps[i], score=result.scores[i], rank=snpRank, regionRank=regionRank)
 						else:
-							snp = (chr,result.positions[i],result.scores[i],i)  #(chr,pos,score,index)
-						snps_ls.append(snp)  
+							snp = (chr, result.positions[i], result.scores[i], i)  #(chr,pos,score,index)
+						snps_ls.append(snp)
 				methods_snps_ls.append(snps_ls)
 			self.region_by_methods_table.append(methods_snps_ls)
 
@@ -2536,50 +2537,50 @@ class SNP(object):
 	It's used only when analysing a SNP.
 	"""
 
-	def __init__(self,position,chromosome,accessions=None,alleles=None,snpsds=None,score=None,rank=None,regionRank=None):
+	def __init__(self, position, chromosome, accessions=None, alleles=None, snpsds=None, score=None, rank=None, regionRank=None):
 		self.position = position
 		self.chromosome = chromosome
 
 		self.alleles = None
-		self.accessions=None
-		self.score=None
-		self.rank=None
-		self.regionRank=None
+		self.accessions = None
+		self.score = None
+		self.rank = None
+		self.regionRank = None
 
 		if not alleles and snpsds:
 			self._getAllele_(snpsds)
 		else:
 			self.alleles = alleles
 		if accessions:
-			self.accessions=accessions
+			self.accessions = accessions
 		if score:
-			self.score=score
+			self.score = score
 		if rank:
-			self.rank=rank
+			self.rank = rank
 		if regionRank:
-			self.regionRank=regionRank
+			self.regionRank = regionRank
 
-	def _getAllele_(self,snpsds):
-		chr = self.chromosome - 1		
+	def _getAllele_(self, snpsds):
+		chr = self.chromosome - 1
 		snpsd = snpsds[chr]
-		self.snpsdIndex =-1
+		self.snpsdIndex = -1
 		self.alleles = None
-		for i in range(0,len(snpsd.positions)):
-			if snpsd.position==snpsd.positions[i]:
+		for i in range(0, len(snpsd.positions)):
+			if snpsd.position == snpsd.positions[i]:
 				self.alleles = snpsd.snps[i]
 				self.snpsdIndex = i
 				break
 		if not self.alleles:
 			print "The corresponding allele was not found in the data."
 
-	
-		
- 
+
+
+
 class Gene(object):
 	"""
 	A class which encompasses basic information about a gene.
 	"""
-	def __init__(self,chromosome=None,startPos=None,endPos=None,name="",description=None, dbRef="", tairID= ""):
+	def __init__(self, chromosome=None, startPos=None, endPos=None, name="", description=None, dbRef="", tairID=""):
 		self.chromosome = chromosome
 		self.startPos = startPos
 		self.endPos = endPos
@@ -2597,9 +2598,9 @@ class Gene(object):
 
 	def __str__(self):
 		if not self.description:
-			return "Chromosome="+str(self.chromosome)+", position=("+str(self.startPos)+","+str(self.endPos)+"), tair ID="+self.tairID+", short descriptions="+str(self.shortDescriptions)+", function descriptions="+str(self.functionDescriptions)+"."
+			return "Chromosome=" + str(self.chromosome) + ", position=(" + str(self.startPos) + "," + str(self.endPos) + "), tair ID=" + self.tairID + ", short descriptions=" + str(self.shortDescriptions) + ", function descriptions=" + str(self.functionDescriptions) + "."
 		else:
-			return "Chromosome="+str(self.chromosome)+", position=("+str(self.startPos)+","+str(self.endPos)+"), tdbRef="+self.dbRef+", name="+str(self.name)+", description="+str(self.description)+"."
+			return "Chromosome=" + str(self.chromosome) + ", position=(" + str(self.startPos) + "," + str(self.endPos) + "), tdbRef=" + self.dbRef + ", name=" + str(self.name) + ", description=" + str(self.description) + "."
 
 
 	def _update_introns_(self):
@@ -2607,18 +2608,18 @@ class Gene(object):
 		updates the introns, given the exons.  It uses the Region object..
 		"""
 		introns = []
-		for i in range(len(self.exons)-1):
+		for i in range(len(self.exons) - 1):
 			e1 = self.exons[i]
-			e2 = self.exons[i+1]
-			intron = Region(self.chromosome,e1.endPos,e2.startPos)
+			e2 = self.exons[i + 1]
+			intron = Region(self.chromosome, e1.endPos, e2.startPos)
 			introns.append(intron)
 		self.introns = introns
 
 
-def getCandidateGeneList(cgl_id,host="papaya.usc.edu",user="bvilhjal",passwd="bjazz32",db="stock_250k"):
+def getCandidateGeneList(cgl_id, host="papaya.usc.edu", user="bvilhjal", passwd="bjazz32", db="stock_250k"):
 	import MySQLdb
 	#Load cand. gene list.	
-	print "Connecting to db, host="+host
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -2627,25 +2628,25 @@ def getCandidateGeneList(cgl_id,host="papaya.usc.edu",user="bvilhjal",passwd="bj
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = db)
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db=db)
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
 	cursor = conn.cursor ()
 	#Retrieve the filenames
-	print "Fetching data"  
+	print "Fetching data"
 
 	#select c.locustag, b.start, b.stop, a.comment from genome.gene_commentary a, genome.entrezgene_mapping b, genome.gene c where b.start > 25000 and b.stop < 75000 and b.chromosome=1 and b.gene_id = c.gene_id and c.gene_id = a.gene_id and a.gene_commentary_type_id = 8
 	#select distinct t8_fd.tair_id, t8.chromosome, t8.start, t8.end, t8_fd.type, t8_fd.short_description from T8_annotation_TH.t8_063008 t8, T8_annotation_TH.t8_func_desc t8_fd, stock_250k.candidate_gene_list cgl where t8.pub_locus+'.1' = t8_fd.tair_id and cgl.list_type_id=129  and cgl.original_name=t8.pub_locus and t8.chromosome =1 order by t8.chromosome, t8.start
 	#select distinct gm.chromosome, gm.start, gm.stop, g.locustag from genome.entrezgene_mapping gm, genome.gene g, stock_250k.candidate_gene_list cgl where cgl.list_type_id=129 and gm.gene_id = g.gene_id and cgl.gene_id=g.gene_id order by gm.chromosome, gm.start, gm.stop
 
-	numRows = int(cursor.execute("select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g, stock_250k.candidate_gene_list cgl where cgl.list_type_id="+str(cgl_id)+" and gm.gene_id = g.gene_id and cgl.gene_id=g.gene_id order by gm.chromosome, gm.start, gm.stop"))
+	numRows = int(cursor.execute("select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g, stock_250k.candidate_gene_list cgl where cgl.list_type_id=" + str(cgl_id) + " and gm.gene_id = g.gene_id and cgl.gene_id=g.gene_id order by gm.chromosome, gm.start, gm.stop"))
 	candGenes = []
 	while(1):
 		row = cursor.fetchone()
 		if not row:
 			break;
-		gene = Gene(int(row[0]),int(row[1]),int(row[2]),name=row[4],description=row[5],dbRef=row[6])
+		gene = Gene(int(row[0]), int(row[1]), int(row[2]), name=row[4], description=row[5], dbRef=row[6])
 		candGenes.append(gene)
 	cursor.close ()
 	conn.close ()
@@ -2653,11 +2654,11 @@ def getCandidateGeneList(cgl_id,host="papaya.usc.edu",user="bvilhjal",passwd="bj
 	return candGenes
 
 
-def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be",include_intron_exons=True,\
-		verbose=False,conn=None):
+def get_gene_list(start_pos=None, end_pos=None, chr=None, host="gmi-ara-devel-be", include_intron_exons=True, \
+		verbose=False, conn=None):
 	import dbutils
 	if not conn:
-		new_conn = dbutils.connect_to_db(host,'genome')
+		new_conn = dbutils.connect_to_db(host, 'genome')
 		cursor = new_conn.cursor()
 	else:
 		cursor = conn.cursor()
@@ -2672,20 +2673,20 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be"
 	if chr and start_pos and end_pos:
 		sql_statement = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, \
 		g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g where \
-		gm.gene_id = g.gene_id and gm.chromosome="+str(chr)+" and gm.stop>"+str(start_pos)+" and \
-		gm.start<"+str(end_pos)+" order by gm.chromosome, gm.start, gm.stop"
+		gm.gene_id = g.gene_id and gm.chromosome=" + str(chr) + " and gm.stop>" + str(start_pos) + " and \
+		gm.start<" + str(end_pos) + " order by gm.chromosome, gm.start, gm.stop"
 		numRows = int(cursor.execute(sql_statement))
-	else:	
+	else:
 		sql_statement = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, \
 			g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g \
 			where gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
 		numRows = int(cursor.execute(sql_statement))
-	if numRows==0:
+	if numRows == 0:
 		pass
 		#print sql_statment
 		#print cursor.fetchone()
 	        #import pdb;pdb.set_trace()
-	
+
 	genes = []
 	while(1):
 		row = cursor.fetchone()
@@ -2693,17 +2694,17 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be"
 			break;
 		try:
 			#chr, start, stop, gene_symbol, description, dbref,  
-			gene = Gene(int(row[0]),int(row[1]),int(row[2]),name=row[4],description=row[5],dbRef=row[6],tairID=row[3])
-			gene.tairID=row[6][5:]
+			gene = Gene(int(row[0]), int(row[1]), int(row[2]), name=row[4], description=row[5], dbRef=row[6], tairID=row[3])
+			gene.tairID = row[6][5:]
 			genes.append(gene)
 		except Exception, err_str:
 			#pass
-			print err_str,':'
+			print err_str, ':'
 			print row
 
 	if include_intron_exons:
 		for g in genes:
-			sql_stat = "select distinct gs.start, gs.stop, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g, genome.gene_segment gs, genome.gene_commentary gc where g.dbxrefs='"+str(g.dbRef)+"' and gm.gene_id = g.gene_id and gs.gene_commentary_id=gc.id and gc.gene_id=gm.gene_id order by gs.start, gs.stop"
+			sql_stat = "select distinct gs.start, gs.stop, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g, genome.gene_segment gs, genome.gene_commentary gc where g.dbxrefs='" + str(g.dbRef) + "' and gm.gene_id = g.gene_id and gs.gene_commentary_id=gc.id and gc.gene_id=gm.gene_id order by gs.start, gs.stop"
 			numRows = int(cursor.execute(sql_stat))
 			segments = []
 			while(1):
@@ -2711,15 +2712,15 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be"
 				if not row:
 					break;
 				try:
-					segments.append(Region(g.chromosome,row[0],row[1]))
+					segments.append(Region(g.chromosome, row[0], row[1]))
 				except Exception, err_str:
-					print err_str,':'
+					print err_str, ':'
 					print row
 			exons = []
 			i = 1
 			#print "len(segments):",len(segments)
 			while i < len(segments):
-				curr_exon = segments[i-1]
+				curr_exon = segments[i - 1]
 				while i < len(segments) and curr_exon.overlapping(segments[i]):
 					curr_exon.merge(segments[i])
 					i += 1
@@ -2749,59 +2750,59 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None,host="gmi-ara-devel-be"
 #"""
 
 
-def load_cand_genes_file(file_name,format=1):
+def load_cand_genes_file(file_name, format=1):
 	"""
 	Loads a candidate gene list from a csv file...
 	"""
-	f = open(file_name,"r")
+	f = open(file_name, "r")
 	print(f.readline())
 	reader = csv.reader(f)
 	tair_ids = []
-	gene_names = [] 
-	if format==1:
+	gene_names = []
+	if format == 1:
 		for row in reader:
 		      tair_ids.append(row[0].upper())
-		      gene_names.append(row[1])		 
+		      gene_names.append(row[1])
 	f.close()
-	return get_genes_w_tair_id(tair_ids),tair_ids
-	
+	return get_genes_w_tair_id(tair_ids), tair_ids
+
 
 
 
 def get_genes_w_tair_id(tair_ids):
 	conn = dbutils.connect_to_papaya("genome")
-	cursor  = conn.cursor()
+	cursor = conn.cursor()
 	genes = []
 	for tair_id in tair_ids:
-		sql_statment = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g where g.dbxrefs='TAIR:"+tair_id.upper()+"' and gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
+		sql_statment = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g where g.dbxrefs='TAIR:" + tair_id.upper() + "' and gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
 		numRows = int(cursor.execute(sql_statment))
-		if numRows>1:
-			print "Found 2 copies:",sql_statment
+		if numRows > 1:
+			print "Found 2 copies:", sql_statment
 		while(1):
 			row = cursor.fetchone()
 			if not row:
 				break;
 			try:
 				#chr, start, stop, gene_symbol, description, dbref,  
-				gene = Gene(int(row[0]),int(row[1]),int(row[2]),name=row[4],description=row[5],dbRef=row[6],tairID=row[3])
-				gene.tairID=row[6][5:]
+				gene = Gene(int(row[0]), int(row[1]), int(row[2]), name=row[4], description=row[5], dbRef=row[6], tairID=row[3])
+				gene.tairID = row[6][5:]
 				genes.append(gene)
 			except Exception, err_str:
 				pass
-				print err_str,':'
+				print err_str, ':'
 				print row
-	
+
 	cursor.close()
 	conn.close()
 	return genes
 
 
-def getResultsFilename(host,user,passwd,callMethodID,phenotypeMethodID,analysisMethodID):
+def getResultsFilename(host, user, passwd, callMethodID, phenotypeMethodID, analysisMethodID):
 	"""
 	Retrieve the filename with the results.
 	"""
 	import MySQLdb
-	print "Connecting to db, host="+host
+	print "Connecting to db, host=" + host
 	if not user:
 		import sys
 		sys.stdout.write("Username: ")
@@ -2810,7 +2811,7 @@ def getResultsFilename(host,user,passwd,callMethodID,phenotypeMethodID,analysisM
 		import getpass
 		passwd = getpass.getpass()
 	try:
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "stock_250k")
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="stock_250k")
 	except MySQLdb.Error, e:
 		print "Error %d: %s" % (e.args[0], e.args[1])
 		sys.exit (1)
@@ -2818,7 +2819,7 @@ def getResultsFilename(host,user,passwd,callMethodID,phenotypeMethodID,analysisM
 
 	#Retrieve the filenames
 	print "Fetching data"
-	numRows = int(cursor.execute("select rm.filename from stock_250k.results_method rm where rm.call_method_id="+str(callMethodID)+" and rm.phenotype_method_id="+str(phenotypeMethodID)+" and analysis_method_id="+str(analysisMethodID)+" "))
+	numRows = int(cursor.execute("select rm.filename from stock_250k.results_method rm where rm.call_method_id=" + str(callMethodID) + " and rm.phenotype_method_id=" + str(phenotypeMethodID) + " and analysis_method_id=" + str(analysisMethodID) + " "))
 	filenames = []
 	while(1):
 		row = cursor.fetchone()
@@ -2830,54 +2831,54 @@ def getResultsFilename(host,user,passwd,callMethodID,phenotypeMethodID,analysisM
 	return filenames
 
 
-	
+
 
 def _getStandardResultTypes_():
-	res_path="/Network/Data/250k/tmp-bvilhjal/"	
+	res_path = "/Network/Data/250k/tmp-bvilhjal/"
 	resultTypes = []
-	resultTypes.append(ResultType("KW",".pvals","newDataset",res_path+"kw_results/"))
-	resultTypes.append(ResultType("Emma",".pvals","newDataset",res_path+"emma_results/",mafCutoff=15))
-	resultTypes.append(ResultType("Marg",".score","newDataset",res_path+"marg_results/"))
-	resultTypes.append(ResultType("RF",".imp","newDataset",res_path+"rf_results/",mafCutoff=15))
+	resultTypes.append(ResultType("KW", ".pvals", "newDataset", res_path + "kw_results/"))
+	resultTypes.append(ResultType("Emma", ".pvals", "newDataset", res_path + "emma_results/", mafCutoff=15))
+	resultTypes.append(ResultType("Marg", ".score", "newDataset", res_path + "marg_results/"))
+	resultTypes.append(ResultType("RF", ".imp", "newDataset", res_path + "rf_results/", mafCutoff=15))
 	return resultTypes
 
 def _getStandardResultTypes2_():
-	res_path="/Network/Data/250k/tmp-bvilhjal/"	
+	res_path = "/Network/Data/250k/tmp-bvilhjal/"
 	resultTypes = []
-	resultTypes.append(ResultType("KW",".pvals","raw",res_path+"kw_results/"))
-	resultTypes.append(ResultType("Emma",".pvals","newDataset",res_path+"emma_results/",mafCutoff=15))
-	resultTypes.append(ResultType("Marg",".score","newDataset",res_path+"marg_results/"))
-	resultTypes.append(ResultType("RF",".imp","newDataset",res_path+"rf_results/",mafCutoff=15))
+	resultTypes.append(ResultType("KW", ".pvals", "raw", res_path + "kw_results/"))
+	resultTypes.append(ResultType("Emma", ".pvals", "newDataset", res_path + "emma_results/", mafCutoff=15))
+	resultTypes.append(ResultType("Marg", ".score", "newDataset", res_path + "marg_results/"))
+	resultTypes.append(ResultType("RF", ".imp", "newDataset", res_path + "rf_results/", mafCutoff=15))
 	return resultTypes
 
 def _getStandardResultTypes3_():
-	res_path="/Network/Data/250k/tmp-bvilhjal/"	
+	res_path = "/Network/Data/250k/tmp-bvilhjal/"
 	resultTypes = []
-	resultTypes.append(ResultType("KW",".pvals","raw",res_path+"kw_results/"))
-	resultTypes.append(ResultType("Emma",".pvals","newDataset",res_path+"emma_results/",mafCutoff=15))
+	resultTypes.append(ResultType("KW", ".pvals", "raw", res_path + "kw_results/"))
+	resultTypes.append(ResultType("Emma", ".pvals", "newDataset", res_path + "emma_results/", mafCutoff=15))
 	return resultTypes
 
 def _getStandardResultTypes4_():
-	res_path="/Users/bjarnivilhjalmsson/Projects/Data/gwas_results/"	
+	res_path = "/Users/bjarnivilhjalmsson/Projects/Data/gwas_results/"
 	resultTypes = []
-	resultTypes.append(ResultType("KW",".pvals","raw",res_path+"kw_results/"))
-	resultTypes.append(ResultType("Emma",".pvals","trans",res_path+"emma_results/",mafCutoff=0.1))
+	resultTypes.append(ResultType("KW", ".pvals", "raw", res_path + "kw_results/"))
+	resultTypes.append(ResultType("Emma", ".pvals", "trans", res_path + "emma_results/", mafCutoff=0.1))
 	return resultTypes
 
 
 def _getStandardBinaryResultTypes_():
-	res_path="/Network/Data/250k/tmp-bvilhjal/"	
+	res_path = "/Network/Data/250k/tmp-bvilhjal/"
 	resultTypes = []
-	resultTypes.append(ResultType("KW",".pvals","newDataset",res_path+"kw_results/"))
-	resultTypes.append(ResultType("Marg",".score","newDataset",res_path+"marg_results/"))
-	resultTypes.append(ResultType("RF",".imp","newDataset",res_path+"rf_results/",mafCutoff=15))
+	resultTypes.append(ResultType("KW", ".pvals", "newDataset", res_path + "kw_results/"))
+	resultTypes.append(ResultType("Marg", ".score", "newDataset", res_path + "marg_results/"))
+	resultTypes.append(ResultType("RF", ".imp", "newDataset", res_path + "rf_results/", mafCutoff=15))
 	return resultTypes
 
 def _getStandardSecondRunResultTypes_():
-	res_path="/Network/Data/250k/tmp-bvilhjal/"	
+	res_path = "/Network/Data/250k/tmp-bvilhjal/"
 	resultTypes = []
-	resultTypes.append(ResultType("KW",".pvals","raw",res_path+"kw_results/"))
-	resultTypes.append(ResultType("KW",".pvals","raw",res_path+"kw_results/"))
+	resultTypes.append(ResultType("KW", ".pvals", "raw", res_path + "kw_results/"))
+	resultTypes.append(ResultType("KW", ".pvals", "raw", res_path + "kw_results/"))
 #	resultTypes.append(ResultType("Emma",".pvals","logTransform",res_path+"emma_results/",mafCutoff=20))
 #	resultTypes.append(ResultType("Emma",".pvals","logTransform",res_path+"emma_results/",mafCutoff=20))
 #	resultTypes.append(ResultType("Emma",".pvals","raw",res_path+"emma_results/",mafCutoff=15))
@@ -2885,7 +2886,7 @@ def _getStandardSecondRunResultTypes_():
 	return resultTypes
 
 
-def load_result_from_db(pid,aid,cmid=54,host='gmi-ara-devel-be',conn=None):
+def load_result_from_db(pid, aid, cmid=54, host='gmi-ara-devel-be', conn=None):
 	"""
 	Imports a result object from the filesystem/DB.
 	"""
@@ -2893,98 +2894,98 @@ def load_result_from_db(pid,aid,cmid=54,host='gmi-ara-devel-be',conn=None):
 	if conn:
 		cursor = conn.cursor()
 	else:
-		new_conn = dbutils.connect_to_db(host,'stock_250k')
+		new_conn = dbutils.connect_to_db(host, 'stock_250k')
 		cursor = new_conn.cursor()
 	sql_statement = "SELECT short_name, filename, id FROM stock_250k.results_method \
 			 WHERE call_method_id=%d and phenotype_method_id=%d and analysis_method_id=%d"\
-			 %(cmid,pid,aid)
+			 % (cmid, pid, aid)
 	#print sql_statement
 	numRows = int(cursor.execute(sql_statement))
 	row = cursor.fetchone()
-	r,r_id = None,None
+	r, r_id = None, None
 	if row:
 		fname = row[1]
 		r_id = int(row[2])
-		print "File for %s, found at:%s"%(row[0],fname)
+		print "File for %s, found at:%s" % (row[0], fname)
 		r = Result(fname)
-		
+
 	else:
-		print "Result not found with pid=%d, aid=%d, cmid=%d"%(pid,aid,cmid)
-	
+		print "Result not found with pid=%d, aid=%d, cmid=%d" % (pid, aid, cmid)
+
 	cursor.close ()
 	if not conn:
 		new_conn.close ()
-	
-	return r, r_id
-	
 
-def loadResults(phenotypeIndices,resultTypes=None,phed=None,snpsds=None,filterPercentile=None,filterCutoffs=None,phenotypeFile="/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_111008.tsv",secondRun=False):
-	
+	return r, r_id
+
+
+def loadResults(phenotypeIndices, resultTypes=None, phed=None, snpsds=None, filterPercentile=None, filterCutoffs=None, phenotypeFile="/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_111008.tsv", secondRun=False):
+
 	if not phed:
 		phed = phenotypeData.readPhenotypeFile(phenotypeFile, delimiter='\t')
-		
+
 	if not resultTypes:
 		if secondRun:
 			resultTypes = _getStandardSecondRunResultTypes_()
 		else:
-			resultTypes = _getStandardResultTypes4_() 
-		
+			resultTypes = _getStandardResultTypes4_()
+
 	results_map = {}
 	for i in phenotypeIndices:
-		
+
 		results = []
-		for j in range(0,len(resultTypes)):
+		for j in range(0, len(resultTypes)):
 			resultType = resultTypes[j]
 			phenName = phed.getPhenotypeName(i)
 			if phenName:
-				resultFile=resultType.getFileName(phed,i,secondRun=(secondRun and j%2==1))  #Modify back to get old results 120708
+				resultFile = resultType.getFileName(phed, i, secondRun=(secondRun and j % 2 == 1))  #Modify back to get old results 120708
 				try:
-					print "Loading result file",resultFile
+					print "Loading result file", resultFile
 					if snpsds:
-						result = SNPResult(resultFile,snpsds=snpsds,name=str(resultType)+"_"+phenName, resultType=resultType, phenotypeID=i)
+						result = SNPResult(resultFile, snpsds=snpsds, name=str(resultType) + "_" + phenName, resultType=resultType, phenotypeID=i)
 					else:
-						result = Result(resultFile,name=str(resultType)+"_"+phenName, resultType=resultType, phenotypeID=i)					
+						result = Result(resultFile, name=str(resultType) + "_" + phenName, resultType=resultType, phenotypeID=i)
 					if resultType.logTransform:
 						print "Log transformed the p-values"
 						result.negLogTransform()
-	
+
 					result.filterMARF(minMaf=resultType.mafCutoff)
 					#result.filterMAF(minMaf=resultType.mafCutoff)
 					if filterPercentile:
 						result.filterPercentile(filterPercentile)
 					elif filterCutoffs:
 						result.filterScoreCutoff(filterCutoffs[j])
-						
+
 					results.append(result)
 				except Exception, e:
 					print e.message
-					print "Couldn't load",resultFile
-				
+					print "Couldn't load", resultFile
+
 		results_map[i] = results
 		gc.collect()  #Calling garbage collector, in an attempt to clean up memory..
 	return results_map
 
 
 
-def qq_plots(results, num_dots, max_log_val, file_prefix, method_types = ['kw','emma'], phen_name = None,
+def qq_plots(results, num_dots, max_log_val, file_prefix, method_types=['kw', 'emma'], phen_name=None,
 	      perm_pvalues=None, is_binary=False, **kwargs):
 	"""
 	Plots both log and normal qq plots.
 	"""
 	if file_prefix:
-		log_pdf_file = file_prefix+"_qq_log.pdf"
-		log_png_file = file_prefix+"_qq_log.png"
-		pdf_file = file_prefix+"_qq.pdf"
-		png_file = file_prefix+"_qq.png"
+		log_pdf_file = file_prefix + "_qq_log.pdf"
+		log_png_file = file_prefix + "_qq_log.png"
+		pdf_file = file_prefix + "_qq.pdf"
+		png_file = file_prefix + "_qq.png"
 	else:
 		log_pdf_file = None
 		log_png_file = None
 		pdf_file = None
 		png_file = None
-	qq_plot(results, num_dots, method_types=method_types, phenName=phen_name, pdfFile=pdf_file, pngFile=png_file, 
-	        perm_pvalues=perm_pvalues, isBinary=is_binary,kwargs=kwargs)
-	log_qq_plot(results, num_dots, max_log_val,method_types=method_types, phenName=phen_name, pdfFile=log_pdf_file, 
-		    pngFile=log_png_file, perm_pvalues=perm_pvalues, isBinary=is_binary,kwargs=kwargs)
+	qq_plot(results, num_dots, method_types=method_types, phenName=phen_name, pdfFile=pdf_file, pngFile=png_file,
+	        perm_pvalues=perm_pvalues, isBinary=is_binary, kwargs=kwargs)
+	log_qq_plot(results, num_dots, max_log_val, method_types=method_types, phenName=phen_name, pdfFile=log_pdf_file,
+		    pngFile=log_png_file, perm_pvalues=perm_pvalues, isBinary=is_binary, kwargs=kwargs)
 
 
 def _getQuantiles_(scores, numQuantiles):
@@ -2994,32 +2995,32 @@ def _getQuantiles_(scores, numQuantiles):
 		j = int(len(scores) * i / (numQuantiles + 2))
 		quantiles.append(scores[j])
 	return quantiles
-		
-		
-def _calcMedian_(scores,exp_median=0.5):
-        scores.sort()
-	median = scores[len(scores)/2]
-	return (exp_median-median)
 
-def _estAreaBetweenCurves_(quantiles,expQuantiles):
+
+def _calcMedian_(scores, exp_median=0.5):
+        scores.sort()
+	median = scores[len(scores) / 2]
+	return (exp_median - median)
+
+def _estAreaBetweenCurves_(quantiles, expQuantiles):
 	area = 0
-	for i in range(0,len(quantiles)-1):
-		area += (expQuantiles[i+1]-expQuantiles[i])*(abs(quantiles[i+1]-expQuantiles[i+1]+quantiles[i]-expQuantiles[i]))/2.0
+	for i in range(0, len(quantiles) - 1):
+		area += (expQuantiles[i + 1] - expQuantiles[i]) * (abs(quantiles[i + 1] - expQuantiles[i + 1] + quantiles[i] - expQuantiles[i])) / 2.0
 	return area
-	
-def _calcKS_(scores,exp_scores=None):
+
+def _calcKS_(scores, exp_scores=None):
 	ret = {}
 	ret["D"] = -1
 	try:
 		from rpy import r
 		if exp_scores:
-			res = r.ks_test(scores,exp_scores)
+			res = r.ks_test(scores, exp_scores)
 		else:
-			res = r.ks_test(scores,"punif")
+			res = r.ks_test(scores, "punif")
 		ret = res["statistic"]
 		ret["p.value"] = res["p.value"]
 	except Exception, message:
-		print "Calculating KS failed??",message
+		print "Calculating KS failed??", message
 	return ret
 
 
@@ -3029,7 +3030,7 @@ def _getExpectedPvalueQuantiles_(numQuantiles):
 		quantiles.append(float(i) / (numQuantiles + 2))
 	return quantiles
 
-def qq_plot(results, numQuantiles, method_types=["kw","emma"], phenName = None, pdfFile = None, pngFile = None, 
+def qq_plot(results, numQuantiles, method_types=["kw", "emma"], phenName=None, pdfFile=None, pngFile=None,
 	    perm_pvalues=None, **kwargs):
 	"""
 	QQ-plot for the given results.
@@ -3038,11 +3039,11 @@ def qq_plot(results, numQuantiles, method_types=["kw","emma"], phenName = None, 
 	matplotlib.use('Agg')
 	import matplotlib.pyplot as plt
 
-	plt.figure(figsize=(5,4))
+	plt.figure(figsize=(5, 4))
 	#plt.figure(figsize=(10,8))
 	#plt.figure(figsize=(4,3.5))
-	plt.axes([0.15,0.14,0.82,0.82])
-	plt.plot([0, 1], [0, 1],"k",label="Expected")
+	plt.axes([0.15, 0.14, 0.82, 0.79])
+	plt.plot([0, 1], [0, 1], "k", label="Expected")
 	areas = []
 	medians = []
 	for method_type in method_types:
@@ -3050,85 +3051,85 @@ def qq_plot(results, numQuantiles, method_types=["kw","emma"], phenName = None, 
 		label = method_type
 		newScores = result.scores[:]
 		quantiles = _getQuantiles_(newScores, numQuantiles)
-		if perm_pvalues and method_type in ['kw','ft']: 
+		if perm_pvalues and method_type in ['kw', 'ft']:
 			print "Getting exp. quantiles for permuted p-values"
-			expQuantiles = _getQuantiles_(perm_pvalues,numQuantiles)
-			q_i = numQuantiles/2
-			if numQuantiles%2==0: #even
-				exp_median = (expQuantiles[q_i-1]+expQuantiles[q_i])/2.0
+			expQuantiles = _getQuantiles_(perm_pvalues, numQuantiles)
+			q_i = numQuantiles / 2
+			if numQuantiles % 2 == 0: #even
+				exp_median = (expQuantiles[q_i - 1] + expQuantiles[q_i]) / 2.0
 			else: #odd
 				exp_median = expQuantiles[q_i]
 
 		else:
 			exp_median = 0.5
 			expQuantiles = _getExpectedPvalueQuantiles_(numQuantiles)
-		area = _estAreaBetweenCurves_(quantiles,expQuantiles)
-		median = _calcMedian_(newScores,exp_median)
-		plt.plot(expQuantiles,quantiles, label = label+", A="+str(round(area,3))+", M="+str(round(median,3)))
+		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
+		median = _calcMedian_(newScores, exp_median)
+		plt.plot(expQuantiles, quantiles, label=label + ", A=" + str(round(area, 3)) + ", M=" + str(round(median, 3)))
 		areas.append(area)
 		medians.append(median)
-			
+
 	if phenName:
 		plt.title(phenName)
 	fontProp = matplotlib.font_manager.FontProperties(size=8)
-	plt.legend(loc = 2, numpoints = 4, handlelen = 0.05, markerscale = 1,prop=fontProp,pad=0.018)
-	plt.axis([-0.01,1.01,-0.01,1.01])
+	plt.legend(loc=2, numpoints=4, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
+	plt.axis([-0.01, 1.01, -0.01, 1.01])
 	plt.xlabel("Expected $p$-value")
 	plt.ylabel("Observed $p$-value")
 	if pdfFile:
-		plt.savefig(pdfFile, format = "pdf")
+		plt.savefig(pdfFile, format="pdf")
 	if pngFile:
-		plt.savefig(pngFile, format = "png",dpi=300)
+		plt.savefig(pngFile, format="png", dpi=300)
 	elif not pdfFile:
 		plt.show()
 	plt.clf()
-	return (areas,medians)
+	return (areas, medians)
 
 
 
-	
-def _getLogQuantilesMaxVal_(scores,maxScore=None):
+
+def _getLogQuantilesMaxVal_(scores, maxScore=None):
 	scores.sort()
 	i = 0
-	new_score = -math.log(scores[i],10)
+	new_score = -math.log(scores[i], 10)
 	score = new_score
 	#print score, maxScore
-	while i < len(scores)-1 and new_score > maxScore:
+	while i < len(scores) - 1 and new_score > maxScore:
 		score = new_score
 		i += 1
-		new_score = -math.log(scores[i],10)
+		new_score = -math.log(scores[i], 10)
 
-	maxVal = math.log((len(scores))/float(i+1),10)
+	maxVal = math.log((len(scores)) / float(i + 1), 10)
 	#print maxVal,i, score, maxScore
 	return(maxVal)
 
 def _getLogQuantiles_(scores, numDots, maxVal=None):
 	scores.sort()
 	quantiles = []
-	for i in range(0,numDots):
-		j = max(int(round(math.pow(10,-(float(i)/(numDots-1))*maxVal)*len(scores)))-1,0) #A bug fixed to make sure j was not less than 0
+	for i in range(0, numDots):
+		j = max(int(round(math.pow(10, -(float(i) / (numDots - 1)) * maxVal) * len(scores))) - 1, 0) #A bug fixed to make sure j was not less than 0
 		val = -math.log10(scores[j])
 		quantiles.append(val)
 	return quantiles
 
 
-def _estLogSlope_(ys,xs=None):
+def _estLogSlope_(ys, xs=None):
 	if xs:
-		q1 = _getQuantiles_(xs,1000)
+		q1 = _getQuantiles_(xs, 1000)
 	else:
 		q1 = _getExpectedPvalueQuantiles_(1000)
-	q2 = _getQuantiles_(ys,1000)
+	q2 = _getQuantiles_(ys, 1000)
 	b_sum = 0.0
 	num_valid = 0
-	for (x,y) in zip(q1,q2):
-		if x<1.0:
-			b_sum += math.log(y,10)/math.log(x,10)
+	for (x, y) in zip(q1, q2):
+		if x < 1.0:
+			b_sum += math.log(y, 10) / math.log(x, 10)
 			num_valid += 1
-	return(b_sum/num_valid)
+	return(b_sum / num_valid)
 
 
-def log_qq_plot(results, numDots, maxVal, method_types=['kw','emma'], phenName = None, pdfFile = None, 
-	        pngFile = None, perm_pvalues=None, **kwargs):
+def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], phenName=None, pdfFile=None,
+	        pngFile=None, perm_pvalues=None, **kwargs):
 	"""
 	log-transformed QQ-plot for the given results.
 	"""
@@ -3138,17 +3139,17 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw','emma'], phenName =
 	def _getExpectedLogQuantiles_():
 		quantiles = []
 		for i in range(1, numDots + 1):
-			quantiles.append((float(i)/(numDots+2.0))*maxVal)
+			quantiles.append((float(i) / (numDots + 2.0)) * maxVal)
 		return quantiles
-	
-	plt.figure(figsize=(5,4))
+
+	plt.figure(figsize=(5, 4))
 	#plt.figure(figsize=(10,8))
 	#plt.figure(figsize=(4,3.5))
-	plt.axes([0.15,0.14,0.82,0.82])
+	plt.axes([0.15, 0.14, 0.82, 0.79])
 	maxVal = min(math.log10(len(results[method_types[0]].scores)), maxVal)
-	minVal = (1.0/numDots)*maxVal
-	valRange = maxVal-minVal
-	plt.plot([minVal, maxVal], [minVal, maxVal], "k",label="Expected")
+	minVal = (1.0 / numDots) * maxVal
+	valRange = maxVal - minVal
+	plt.plot([minVal, maxVal], [minVal, maxVal], "k", label="Expected")
 	maxObsVals = []
 	areas = []
 	ds = []
@@ -3156,67 +3157,67 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw','emma'], phenName =
 	for method_type in method_types:
 		result = results[method_type]
 		label = method_type
-		if perm_pvalues and method_type in ['kw','ft']:
-			exp_maxVal = _getLogQuantilesMaxVal_(perm_pvalues[:],maxVal)
-			expQuantiles = _getLogQuantiles_(perm_pvalues[:],numDots,exp_maxVal)
-			ks_res = _calcKS_(result.scores,perm_pvalues)
+		if perm_pvalues and method_type in ['kw', 'ft']:
+			exp_maxVal = _getLogQuantilesMaxVal_(perm_pvalues[:], maxVal)
+			expQuantiles = _getLogQuantiles_(perm_pvalues[:], numDots, exp_maxVal)
+			ks_res = _calcKS_(result.scores, perm_pvalues)
 			quantiles = _getLogQuantiles_(result.scores[:], numDots, exp_maxVal)
-			slope = _estLogSlope_(result.scores[:],perm_pvalues)
+			slope = _estLogSlope_(result.scores[:], perm_pvalues)
 		else:
 			quantiles = _getLogQuantiles_(result.scores[:], numDots, maxVal)
 			expQuantiles = _getExpectedLogQuantiles_()
 			ks_res = _calcKS_(result.scores)
 			slope = _estLogSlope_(result.scores[:])
 
-		area = _estAreaBetweenCurves_(quantiles,expQuantiles)
+		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
 		areas.append(area)
 		slopes.append(slope)
 		ds.append(ks_res["D"])
 		#plt.plot(expQuantiles, quantiles, label = label+", A="+str(round(area,2))+", D="+str(round(ks_res["D"],3))+", S="+str(round(slope,3)))
-		plt.plot(expQuantiles, quantiles, label = label+", D="+str(round(ks_res["D"],3))+", S="+str(round(slope,3)))
+		plt.plot(expQuantiles, quantiles, label=label + ", D=" + str(round(ks_res["D"], 3)) + ", S=" + str(round(slope, 3)))
 		maxObsVals.append(max(quantiles))
-		
+
 	maxObsVal = max(maxObsVals)
-	obsValRange = maxObsVal-minVal
-	plt.axis([minVal-0.025*valRange,maxVal+0.025*valRange,minVal-0.025*obsValRange,maxObsVal+0.025*obsValRange])
+	obsValRange = maxObsVal - minVal
+	plt.axis([minVal - 0.025 * valRange, maxVal + 0.025 * valRange, minVal - 0.025 * obsValRange, maxObsVal + 0.025 * obsValRange])
 	plt.ylabel("Observed $-log_{10}(p$-value$)$")
 	plt.xlabel("Expected $-log_{10}(p$-value$)$")
 	if phenName:
 		plt.title(phenName)
 	fontProp = matplotlib.font_manager.FontProperties(size=8)
-	plt.legend(loc = 2, numpoints = 4, handlelen = 0.05, markerscale = 1,prop=fontProp,pad=0.018)
+	plt.legend(loc=2, numpoints=4, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
 	if pdfFile:
-		plt.savefig(pdfFile, format = "pdf")
+		plt.savefig(pdfFile, format="pdf")
 	if pngFile:
-		plt.savefig(pngFile, format = "png",dpi=300)
+		plt.savefig(pngFile, format="png", dpi=300)
 	elif not pdfFile:
 		plt.show()
 	plt.clf()
-	return (ds,areas,slopes)
+	return (ds, areas, slopes)
 
 
 def _add_results_to_db_():
 	"""
 	TEST
 	"""
-	host='gmi-ara-devel-be'
-	for pid in range(1,2):
+	host = 'gmi-ara-devel-be'
+	for pid in range(1, 2):
 		for aid in range(20):
 			for cmid in range(60):
 				try:
-					r,r_id=load_result_from_db(pid,aid,cmid,host=host)
+					r, r_id = load_result_from_db(pid, aid, cmid, host=host)
 					if not r:
 						raise Exception
 					r.insert_into_db(r_id)
 		                except Exception, err_str:
-		                	print "File not found, pid=%d, aid=%d, cmid=%d, err_str=%s"%(pid,aid,cmid,err_str)
-	                	
-	                
-	
+		                	print "File not found, pid=%d, aid=%d, cmid=%d, err_str=%s" % (pid, aid, cmid, err_str)
 
 
 
-if __name__=="__main__":
+
+
+
+if __name__ == "__main__":
 	#load_cand_genes_file("/Users/bjarnivilhjalmsson/Projects/Ales_Pecinka/UV_cand_genes_021710.csv")
 	#load_result_from_db(513,1)
 	_add_results_to_db_()

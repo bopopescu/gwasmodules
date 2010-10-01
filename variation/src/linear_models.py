@@ -533,6 +533,74 @@ class LinearMixedModel(LinearModel):
 
 
 
+	def emmax_anova_f_test(self, snps):
+		"""
+		EMMAX implementation (in python)
+		Single SNPs
+		
+		With interactions between SNP and possible cofactors.
+		"""
+		K = self.random_effects[1][1]
+		eig_L = self._get_eigen_L_(K)
+		res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
+		print 'pseudo_heritability:', res['pseudo_heritability']
+
+		r = self._emmax_anova_f_test_(snps, res['H_sqrt'])
+		r['pseudo_heritability'] = res['pseudo_heritability']
+		r['max_ll'] = res['max_ll']
+		return r
+
+	def _emmax_anova_f_test_(self, snps, H_sqrt, verbose=True,):
+		"""
+		EMMAX implementation (in python)
+		Single SNPs
+		
+		With interactions between SNP and possible cofactors.
+		"""
+		n = self.n
+		p_0 = len(self.X.T)
+
+		H_sqrt_inv = H_sqrt.I
+		Y = H_sqrt_inv * self.Y	#The transformed outputs.
+		h0_X = H_sqrt_inv * self.X
+		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
+		h0_betas = map(float, list(h0_betas))
+		num_snps = len(snps)
+		rss_list = sp.repeat(h0_rss, num_snps)
+		betas_list = [h0_betas] * num_snps
+		var_perc = sp.zeros(num_snps)
+
+		for i, snp in enumerate(snps):
+			num_groups = len(sp.unique(snp))
+			q = num_groups - 1  # Null model has 1 df.
+			p = p_0 + q
+			n_p = n - p
+			l = []
+			for j in range(num_groups):
+				l.append(sp.int8(snp == j))
+			X = sp.mat(l) * (H_sqrt_inv.T)
+			(betas, rss, p, sigma) = linalg.lstsq(X.T, Y)
+			if not rss:
+				if verbose: print 'No predictability in the marker, moving on...'
+				continue
+			rss_list[i] = rss[0]
+			betas_list[i] = map(float, list(betas))
+			if num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+
+		if num_snps >= 10:
+			sys.stdout.write('\n')
+		rss_ratio = h0_rss / rss_list
+		var_perc = 1 - 1 / rss_ratio
+		f_stats = (rss_ratio - 1) * n_p / float(q)
+		p_vals = stats.f.sf(f_stats, q, n_p)
+
+
+		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 'var_perc':var_perc}
+
+
+
 	def emmax_f_test(self, snps):
 		"""
 		EMMAX implementation (in python)
@@ -1120,6 +1188,28 @@ def emmax(snps, phenotypes, K, cofactors=None, with_interactions=False, int_af_t
 
 
 
+
+def emmax_anova(snps, phenotypes, K):
+        """
+        Run EMMAX
+        """
+        lmm = LinearMixedModel(phenotypes)
+        lmm.add_random_effect(K)
+
+        print "Running EMMAX-ANOVA"
+        s1 = time.time()
+        res = lmm.emmax_anova_f_test(snps)
+        secs = time.time() - s1
+        if secs > 60:
+                mins = int(secs) / 60
+                secs = secs - mins * 60
+                print 'Took %d mins and %f seconds.' % (mins, secs)
+        else:
+                print 'Took %f seconds.' % (secs)
+        return res
+
+
+
 def _get_interactions_(isnp, snps, mac_threshold=15):
 	isnps = []
 	cofactor_indices = []
@@ -1131,6 +1221,7 @@ def _get_interactions_(isnp, snps, mac_threshold=15):
 			isnps.append(isnp & snp)
 			cofactor_indices.append(i)
 	return isnps, cofactor_indices
+
 
 
 def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
@@ -1192,7 +1283,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
                 mahalnobis_rss = emmax_res['rss'][min_pval_i]
                 min_pval_chr_pos = chr_pos_list[min_pval_i]
 		print 'Min p-value:', min_pval
-		print 'Min RSS:', mahalnobis_rss
+		print 'Min Mahalanobis RSS:', mahalnobis_rss
 		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
@@ -1299,7 +1390,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 	mahalnobis_rss = emmax_res['rss'][min_pval_i]
 	min_pval_chr_pos = chr_pos_list[min_pval_i]
 	print 'Min p-value:', min_pval
-	print 'Min RSS:', mahalnobis_rss
+	print 'Min Mahalanobis RSS:', mahalnobis_rss
 	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 		'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
@@ -1698,8 +1789,8 @@ def filter_k_for_accessions(k, k_accessions, accessions):
 
 def load_kinship_from_file(kinship_file, accessions=None):
         assert os.path.isfile(kinship_file), 'File not found.'
-        sys.stdout.write("Loading K.\n")
-        sys.stdout.flush()
+        #sys.stdout.write("Loading K.\n")
+        #sys.stdout.flush()
         f = open(kinship_file, 'r')
         l = cPickle.load(f)
         f.close()
@@ -1866,14 +1957,14 @@ def _test_stepwise_emmax_():
 	import phenotypeData as pd
 	import util
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_raw_070810.tsv"
-	mac_threshold = 15
-	for pid, log_trans in [(264, False), (265, False), (266, False), (267, False)]:#[(5, False), (226, True), (264, False), (1025, False)]:
+	mac_threshold = 16
+	for pid, log_trans in [(5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
 		phed = pd.readPhenotypeFile(filename)
 		if log_trans:
 			phed.logTransform(pid)
 		phen_name = phed.getPhenotypeName(pid)
 		filter_accessions = phed.getNonNAEcotypes(pid)
-		sd = dp.parse_binary_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
+		sd = dp.parse_int_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
 		sd.coordinate_w_phenotype_data(phed, pid)
 	        if mac_threshold:
 	        	sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
