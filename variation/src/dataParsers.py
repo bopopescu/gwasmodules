@@ -1616,7 +1616,7 @@ def parseMSDataFilter(filename, baseScale=1000000, sampleNum=None, fixPos=True, 
 
 
 def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None,
-			use_pickle=True, dtype='int8'):
+			use_pickle=True, dtype='int8', data_format='binary'):
 	"""
 	A sped-up version, to load a int (e.g. binary) file.
 	
@@ -1752,7 +1752,7 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 	snpsd_ls.append(snpsd)
 	chromosomes.append(old_chromosome)
 	sys.stderr.write("Loaded %s SNPs.\n" % i)
-	sd = SNPsDataSet(snpsd_ls, chromosomes)
+	sd = SNPsDataSet(snpsd_ls, chromosomes, data_format=data_format)
 	if use_pickle:
 		print 'Saving a pickled version of genotypes.'
 		f = open(pickle_file, 'wb')
@@ -1778,11 +1778,11 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 		if os.path.isfile(sd_binary_file):
 			sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
 						filter=filter, filter_accessions=filter_accessions,
-						use_pickle=use_pickle, dtype='int8')
+						use_pickle=use_pickle, dtype='int8', data_format=format)
 		else:
 			sd = parse_snp_data(data_file , format=data_format_dict[format], delimiter=delimiter,
 					      missingVal=missingVal, filter=filter, look_for_binary=False,
-					      filter_accessions=filter_accessions)
+					      filter_accessions=filter_accessions, data_format=format)
 			print 'Save a binary snps data file:', sd_binary_file
 			sd.writeToFile(sd_binary_file, binary_format=True)
 			if use_pickle:
@@ -1794,15 +1794,15 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 	elif format == 'int':
 		sd = parse_numerical_snp_data(data_file, delimiter=delimiter, missing_val=missingVal,
 					filter=filter, filter_accessions=filter_accessions,
-					use_pickle=use_pickle, dtype='int8')
+					use_pickle=use_pickle, dtype='int8', data_format=format)
 	elif format == 'float':
 		sd = parse_numerical_snp_data(data_file, delimiter=delimiter, missing_val=missingVal,
 					filter=filter, filter_accessions=filter_accessions,
-					use_pickle=use_pickle, dtype='float32')
+					use_pickle=use_pickle, dtype='float32', data_format=format)
 	elif format == 'nucleotides':
 		(snpsds, chromosomes) = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal,
 					format=data_format_dict[format], filter=filter, id=id, returnChromosomes=True)
-		sd = SNPsDataSet(snpsds, chromosomes)
+		sd = SNPsDataSet(snpsds, chromosomes, data_format=format)
 	else:
 		print "Unknown file format!"
 		raise Exception()

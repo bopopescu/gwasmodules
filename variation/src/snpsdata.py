@@ -1906,15 +1906,12 @@ class SNPsData(_SnpsData_):
 			raise Exception('Window size missing')
 
 
-	def get_mafs(self, w_missing=False, binary=False):
+	def get_mafs(self, w_missing=False, binary=True):
 		"""
 		Returns MAFs and MARFs
 		
 		(Uses numpy.bincount)
 		"""
-		def _bin_count_(a):
-			counts = np.zeros(len(np.unique(a)))
-
 
 		mafs = []
 		marfs = []
@@ -2453,7 +2450,7 @@ class SNPsDataSet:
 	chromosomes = None
 	accessions = None
 
-	def __init__(self, snpsds, chromosomes, id=None, is_binary=None, call_method=None):
+	def __init__(self, snpsds, chromosomes, id=None, is_binary=None, call_method=None, data_format=None):
 		self.snpsDataList = snpsds
 		self.chromosomes = chromosomes
 		self.accessions = self.snpsDataList[0].accessions
@@ -2461,7 +2458,8 @@ class SNPsDataSet:
 		self.id = id
 		self.is_binary = is_binary
 		self.missing_val = snpsds[0].missingVal
-		self.call_metho = call_method
+		self.call_method = call_method
+		self.data_format = data_format
 		if not id and snpsds[0].id:
 				self.id = id
 		for i in range(1, len(self.chromosomes)):
@@ -2906,17 +2904,20 @@ class SNPsDataSet:
 
 	def get_mafs(self):
 		"""
-		Returns the mafs and marfs as a dictionary..  (changed from before, so might cause errors).
-		
-		Can only be used when the underlying snpsdata's have the right format.  I.e. is binary 0,1
+		Returns the mafs and marfs as a dictionary.
 		"""
+		if not self.data_format or self.data_format == 'binary':
+			binary = True
+		else:
+			binary = False
+
 		maf_list = []
 		marf_list = []
 		for snpsd in self.snpsDataList:
-			r = snpsd.get_mafs()
+			r = snpsd.get_mafs(binary=binary)
 			maf_list.extend(r["mafs"])
 			marf_list.extend(r["marfs"])
-		print "len(maf_list),len(marf_list)", len(maf_list), len(marf_list)
+		print "Finished calculating MAFs."
 		return {"mafs":maf_list, "marfs":marf_list}
 
 	def getChrPosSNPList(self):

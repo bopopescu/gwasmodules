@@ -613,7 +613,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	#png_file_max30 = file_prefix+"_gwa_plot_max30.png"
 	if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
 		res.neg_log_trans()
-		if mapping_method in ["kw", "ft"] or p_dict['data_format'] != 'binary':
+		if mapping_method in ["kw", "ft"]:# or p_dict['data_format'] != 'binary':
 			#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 			#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
 			res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
