@@ -26,7 +26,7 @@ class PhenotypeInfo(tables.IsDescription):
 	phenotype_scoring = tables.StringCol(256)
 	method_description = tables.StringCol(256)
 	measurement_scale = tables.StringCol(256)
-	
+
 
 
 class PhenotypeValue(tables.IsDescription):
@@ -38,7 +38,7 @@ class PhenotypeValue(tables.IsDescription):
 	mean_value = tables.Float32Col()
 	std_dev = tables.Float32Col()
 	comment = tables.StringCol(256)
-	
+
 
 class ResultRecord(tables.IsDescription):
 	"""
@@ -47,68 +47,68 @@ class ResultRecord(tables.IsDescription):
 	chromosome = tables.Int32Col()
 	position = tables.Int32Col()
 	score = tables.Float32Col() #Perhaps 64 bits?? 
-	maf = tables.Float32Col() 
-	mac = tables.Int32Col() 
+	maf = tables.Float32Col()
+	mac = tables.Int32Col()
 
 class ResultRecordLinearModel(ResultRecord):
 	"""
 	Linear model, mixed models, etc.
 	"""
-	genotype_var_perc = tables.Float32Col() 
-	beta0 = tables.Float32Col() 
-	beta1 = tables.Float32Col() 
-	correlation = tables.Float32Col() 
-	
+	genotype_var_perc = tables.Float32Col()
+	beta0 = tables.Float32Col()
+	beta1 = tables.Float32Col()
+	correlation = tables.Float32Col()
+
 
 class ResultRecordKW(ResultRecord):
 	"""
 	Kruskal Wallis
 	"""
-	statistic = tables.Float32Col() 
+	statistic = tables.Float32Col()
 
 
 class ResultRecordFT(ResultRecord):
 	"""
 	Fisher's exact test
 	"""
-	odds_ratio = tables.Float32Col() 
+	odds_ratio = tables.Float32Col()
 
 
 def init_file(hdf5_filename):
-	print 'Setting up file %s'%hdf5_filename
+	print 'Setting up file %s' % hdf5_filename
 	# Open a file in "w"rite mode
-	h5file = tables.openFile(hdf5_filename, mode = "w", title = "Phenotype_results_file")
+	h5file = tables.openFile(hdf5_filename, mode="w", title="Phenotype_results_file")
 	# Create a new group under "/" (root)
 	group = h5file.createGroup("/", 'phenotypes', 'Basic phenotype folder')
 	h5file.close()
 
 
-def add_new_phenotype_file(hdf5_file_name, phenotype_file, phen_name, growth_conditions='', phenotype_scoring='', 
+def add_new_phenotype_file(hdf5_file_name, phenotype_file, phen_name, growth_conditions='', phenotype_scoring='',
 			method_description='', measurement_scale='', is_binary=False):
 	"""
 	Initializes the phenotype group for this phenotype and inserts it into the file object.
 	"""
 	#Now parsing the phenotype file
 	phend = pd.readPhenotypeFile(phenotype_file)
-	_init_phenotype_(hdf5_file_name,phen_name, growth_conditions=growth_conditions, phenotype_scoring=phenotype_scoring, 
+	_init_phenotype_(hdf5_file_name, phen_name, growth_conditions=growth_conditions, phenotype_scoring=phenotype_scoring,
 			method_description=method_description, measurement_scale=measurement_scale, is_binary=is_binary)
-	add_phenotype_values(hdf5_filename, phen_name, phend.accessions, phend.getPhenVals(1), transformation='raw', 
+	add_phenotype_values(hdf5_filename, phen_name, phend.accessions, phend.getPhenVals(1), transformation='raw',
 			accessions=phend.accessionNames, std_dev_values=None, value_comments=None)
 
 
-def _init_phenotype_(hdf5_file_name, phen_name, growth_conditions='', phenotype_scoring='', 
+def _init_phenotype_(hdf5_file_name, phen_name, growth_conditions='', phenotype_scoring='',
 			method_description='', measurement_scale='', is_binary=False):
 	"""
 	Insert a new phenotype into the DB
 	"""
-	pass
+	group = h5file.createGroup("/", 'phenotypes', 'Basic phenotype folder')
 
 
 
-def add_phenotype_values(hdf5_filename, phen_name, ecotypes, values, transformation='raw', accessions=None, 
+def add_phenotype_values(hdf5_filename, phen_name, ecotypes, values, transformation='raw', accessions=None,
 			std_dev_values=None, value_comments=None):
 	"""
-	Add a new transformation for a particular phenotype.
+	Adds phenotype values.
 	"""
 	pass
 
@@ -121,15 +121,27 @@ def get_phenotype_values(hdf5_filename, phen_name, ecotypes, transformation='raw
 	pass
 
 
+def get_phenotype_names(hdf5_filename):
+	"""
+	Returns the phenotype values
+	"""
+	pass
+
+
+def get_phenotype_transformations(hdf5_filename, phen_name):
+	"""
+	Returns the phenotype values
+	"""
+	pass
+
 
 def add_results(hdf5_filename, phen_name, chromosomes, positions, scores, mafs, macs, analysis_type, transformation='raw', **kwargs):
 	"""
 	Add a result to the hdf5 file.
 	"""
 	pass
-	
-	 
+
+
 #def get_a	
-	
-	
-	
+
+
