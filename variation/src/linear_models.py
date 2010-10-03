@@ -104,12 +104,10 @@ class LinearModel(object):
                 var_perc = sp.zeros(num_snps)
                 q = 1
                 n_p = self.n - self.p
-                missing_indices = []
                 for i, snp in enumerate(snps):
                         (betas, rss, rank, s) = linalg.lstsq(sp.hstack([self.X, sp.matrix(snp).T]), self.Y)
                         if not rss:
                                 print 'No predictability in the marker, moving on...'
-                                missing_indices.append(i)
                                 continue
                         rss_list[i] = rss[0]
                         betas_list[i] = map(float, list(betas))
@@ -118,7 +116,57 @@ class LinearModel(object):
                 f_stats = (rss_ratio - 1) * n_p / float(q)
                 p_vals = stats.f.sf(f_stats, q, n_p)
                 return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
-                        'var_perc':var_perc, 'missing_indices':missing_indices}
+                        'var_perc':var_perc}
+
+
+
+
+	def anova_f_test(self, snps):
+                """
+                A standard ANOVA, using a F-test
+                """
+                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X, self.Y)
+                num_snps = len(snps)
+                rss_list = sp.repeat(h0_rss, num_snps)
+		h0_betas = map(float, list(h0_betas)) + [0.0]
+                betas_list = [h0_betas] * num_snps
+                var_perc = sp.zeros(num_snps)
+		f_stats = sp.zeros(num_snps)
+		dfs = sp.zeros(num_snps)
+		p_vals = sp.ones(num_snps)
+		n = self.n
+		p_0 = len(self.X.T)
+
+                for i, snp in enumerate(snps):
+			groups = sp.unique(snp)
+			q = len(groups) - 1  # Null model has 1 df.
+			p = p_0 + q
+			n_p = n - p
+			x = []
+			for g in groups:
+				x.append(sp.int8(snp == g))
+			(betas, rss, p, sigma) = linalg.lstsq(sp.mat(x).T, self.Y)
+
+  			if not rss:
+				print 'No predictability in the marker, moving on...'
+				continue
+			rss_list[i] = rss[0]
+			betas_list[i] = map(float, list(betas))
+			rss_ratio = h0_rss / rss
+			var_perc[i] = 1 - 1 / rss_ratio
+			f_stat = (rss_ratio - 1) * n_p / float(q)
+			p_vals[i] = stats.f.sf([f_stat], q, n_p)[0]
+			f_stats[i] = f_stat
+			dfs[i] = n_p
+			if num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+
+		if num_snps >= 10:
+			sys.stdout.write('\n')
+
+                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
+                        'var_perc':var_perc, 'dfs':dfs}
 
 
 
@@ -479,60 +527,6 @@ class LinearMixedModel(LinearModel):
 
 
 
-#        def emmax_f_test_2(self, snps):
-#                """
-#                EMMAX implementation (in python)
-#                Single SNPs
-#                
-#                With interactions between SNP and possible cofactors.
-#                """
-#                q = 1  # Single SNP is being tested
-#                p = len(self.X.T) + q
-#                n = self.n
-#                n_p = n - p   
-#                
-#                K = self.random_effects[1][1]
-#                eig_L = self._get_eigen_L_(K)
-#                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-#                delta = res['delta']
-#                print 'pseudo_heritability:', 1.0 / (1 + delta)
-#                H_sqr = res['H_sqrt']
-#                H_sqrt_inv = H_sqr.I
-#                Y = H_sqrt_inv * self.Y        #The transformed outputs.
-#                h0_X = H_sqrt_inv * self.X
-#                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-#                h0_betas = map(float, list(h0_betas)) + [0.0]
-#                num_snps = len(snps)
-#                rss_list = sp.repeat(h0_rss, num_snps)
-#                betas_list = [h0_betas] * num_snps
-#                var_perc = sp.zeros(num_snps)
-#                H = sp.array(H_sqrt_inv.T)
-#		missing_indices = []
-#                for i, snp in enumerate(snps):
-#                	X_1 = dot(snp, H)
-#                        (betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, sp.matrix(X_1).T]), Y)
-#                        if not rss:
-#                                print 'No predictability in the marker, moving on...'
-#                                continue
-#                        rss_list[i] = rss[0]                
-#                        betas_list[i] = map(float, list(betas))
-#                        if (i + 1) % (num_snps / 10) == 0:
-#                        	sys.stdout.write('.')
-#                        	sys.stdout.flush()
-#                sys.stdout.write('\n')
-#                rss_ratio = h0_rss / rss_list
-#                var_perc = 1 - 1 / rss_ratio
-#                f_stats = (rss_ratio - 1) * n_p / float(q)
-#                print len(f_stats)
-#                p_vals = stats.f.sf(f_stats, q, n_p)
-#                print len(p_vals)
-#                pdb.set_trace()
-#                      
-#                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
-#                        'delta':delta, 'pseudo_heritability': 1.0 / (1 + delta), 'var_perc':var_perc}
-
-
-
 	def emmax_anova_f_test(self, snps):
 		"""
 		EMMAX implementation (in python)
@@ -549,6 +543,8 @@ class LinearMixedModel(LinearModel):
 		r['pseudo_heritability'] = res['pseudo_heritability']
 		r['max_ll'] = res['max_ll']
 		return r
+
+
 
 	def _emmax_anova_f_test_(self, snps, H_sqrt, verbose=True,):
 		"""
@@ -569,15 +565,18 @@ class LinearMixedModel(LinearModel):
 		rss_list = sp.repeat(h0_rss, num_snps)
 		betas_list = [h0_betas] * num_snps
 		var_perc = sp.zeros(num_snps)
+		f_stats = sp.zeros(num_snps)
+		dfs = sp.zeros(num_snps)
+		p_vals = sp.ones(num_snps)
 
 		for i, snp in enumerate(snps):
-			num_groups = len(sp.unique(snp))
-			q = num_groups - 1  # Null model has 1 df.
+			groups = sp.unique(snp)
+			q = len(groups) - 1  # Null model has 1 df.
 			p = p_0 + q
 			n_p = n - p
 			l = []
-			for j in range(num_groups):
-				l.append(sp.int8(snp == j))
+			for g in groups:
+				l.append(sp.int8(snp == g))
 			X = sp.mat(l) * (H_sqrt_inv.T)
 			(betas, rss, p, sigma) = linalg.lstsq(X.T, Y)
 			if not rss:
@@ -585,19 +584,26 @@ class LinearMixedModel(LinearModel):
 				continue
 			rss_list[i] = rss[0]
 			betas_list[i] = map(float, list(betas))
+			rss_ratio = h0_rss / rss
+			var_perc[i] = 1 - 1 / rss_ratio
+			f_stat = (rss_ratio - 1) * n_p / float(q)
+			p_vals[i] = stats.f.sf([f_stat], q, n_p)[0]
+			f_stats[i] = f_stat
+			dfs[i] = n_p
 			if num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
 
 		if num_snps >= 10:
 			sys.stdout.write('\n')
-		rss_ratio = h0_rss / rss_list
-		var_perc = 1 - 1 / rss_ratio
-		f_stats = (rss_ratio - 1) * n_p / float(q)
-		p_vals = stats.f.sf(f_stats, q, n_p)
+		#rss_ratio = h0_rss / rss_list
+		#var_perc = 1 - 1 / rss_ratio
+		#f_stats = (rss_ratio - 1) * n_p / float(q)
+		#p_vals = stats.f.sf(f_stats, q, n_p)
 
 
-		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 'var_perc':var_perc}
+		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
+			'var_perc':var_perc, 'dfs':dfs}
 
 
 
@@ -668,70 +674,6 @@ class LinearMixedModel(LinearModel):
 		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 'var_perc':var_perc}
 
 
-
-#        def emmax_f_test_parallel(self, snps, num_proc=2):
-#                """
-#                EMMAX implementation (in python)
-#                Single SNPs
-#                
-#                With interactions between SNP and possible cofactors.
-#                """
-#                assert len(self.random_effects) == 2, "Expedited REMLE only works when we have exactly two random effects."
-#                q = 1  # Single SNP is being tested
-#                p = len(self.X.T) + q
-#                n = self.n
-#                n_p = n - p                                
-#
-#                K = self.random_effects[1][1]
-#                eig_L = self._get_eigen_L_(K)
-#                res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-#                delta = res['delta']
-#                print 'pseudo_heritability:', 1.0 / (1 + delta)
-#                H_sqr = res['H_sqrt']
-#                H_sqrt_inv = H_sqr.I
-#                Y = H_sqrt_inv * self.Y        #The transformed outputs.
-#                h0_X = H_sqrt_inv * self.X
-#                (h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-#
-#                
-#                h0_betas = map(float, list(h0_betas))
-#                num_snps = len(snps)
-#                var_perc = sp.zeros(num_snps)
-#
-#                rss_ratio = mp.Array('d', range(num_snps))
-#                rss_list = mp.Array('d', [h0_rss] * num_snps)
-#                beta1_arr = mp.Array('d', range(num_snps))
-#                beta0_arr = mp.Array('d', range(num_snps))
-#                def _emmax_mp_loop_(self, snps, j):
-#                        for i, snp in enumerate(snps):
-#                                (betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, H_sqrt_inv * (sp.matrix(snp).T)]), Y)
-#                                if not rss:
-#                                        print 'No predictability in the marker, moving on...'
-#                                        continue
-#                                rss_ratio[i + j] = h0_rss / rss             
-#                                rss_list[i + j] = rss[0]                
-#                                betas_list[i + j] = map(float, list(betas))
-#
-#                snp_chunk_size = num_snps / num_proc 
-#                processes = []
-#                for i in range(num_proc - 1):
-#                        snp_chunk = snps[i:i + snp_chunk_size]
-#                        betas_list_ = [h0_betas] * num_snps
-#                        rss_ratio_ = sp.ones(num_snps)
-#                        rss_list_ = sp.repeat(h0_rss, num_snps)
-#                        p = mp.Process(target=_emmax_mp_loop_, args=(snp_chunk, i))
-#                        p.start()
-#                        processes.append(p)
-#                        
-#                var_perc = 1 - 1 / rss_ratio
-#                f_stats = (rss_ratio - 1) * n_p / float(q)
-#                p_vals = stats.f.sf(f_stats, q, n_p)
-#
-#                      
-#                return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
-#                        'delta':delta, 'pseudo_heritability': 1.0 / (1 + delta), 'var_perc':var_perc}
-#                    
-#                        
 
 
         def emmax_two_snps(self, snps):
@@ -1186,6 +1128,26 @@ def emmax(snps, phenotypes, K, cofactors=None, with_interactions=False, int_af_t
                 print 'Took %f seconds.' % (secs)
         return res
 
+
+
+
+def anova(snps, phenotypes):
+        """
+        Run EMMAX
+        """
+        lmm = LinearModel(phenotypes)
+
+        print "Running ANOVA"
+        s1 = time.time()
+        res = lmm.anova_f_test(snps)
+        secs = time.time() - s1
+        if secs > 60:
+                mins = int(secs) / 60
+                secs = secs - mins * 60
+                print 'Took %d mins and %f seconds.' % (mins, secs)
+        else:
+                print 'Took %f seconds.' % (secs)
+        return res
 
 
 

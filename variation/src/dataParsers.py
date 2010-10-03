@@ -1636,6 +1636,8 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 			if filter_accessions and set(filter_accessions) != set(sd.accessions):
 				print 'Filtering accessions.'
 				sd.filter_accessions(filter_accessions)
+			if filter < 1:
+				sd.sample_snps(filter)
 			print 'Loading genotype data took %.2f s...' % (time.time() - t_)
 			return sd
 		else:
@@ -1790,11 +1792,11 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 				cPickle.dump(sd, f, protocol=2)
 				f.close()
 	elif format == 'int':
-		sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
+		sd = parse_numerical_snp_data(data_file, delimiter=delimiter, missing_val=missingVal,
 					filter=filter, filter_accessions=filter_accessions,
 					use_pickle=use_pickle, dtype='int8')
 	elif format == 'float':
-		sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
+		sd = parse_numerical_snp_data(data_file, delimiter=delimiter, missing_val=missingVal,
 					filter=filter, filter_accessions=filter_accessions,
 					use_pickle=use_pickle, dtype='float32')
 	elif format == 'nucleotides':

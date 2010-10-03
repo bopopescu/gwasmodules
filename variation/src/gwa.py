@@ -1,15 +1,15 @@
 #!/usr/bin/env python2.5
 """
-Usage: gwa.py [OPTIONS] [--id=id_text]
+Usage: gwa.py [OPTIONS] 
 
 Option:
 
 	-h					Show this help
-
 	-d ...					Filter SNPs randomly (speed-up for debugging)
 
 	-o ...					ID string, used for output files.
 	-i ...					The phenotype IDs, to be run. 
+
 	-t ...					What data set is used.  Default is 54.
 	-f ...					Load a specific data file, e.g. for heteroplasmy.
 	-r ...					Phenotype file, if left out then phenotypes are retireved from the DB 
@@ -38,7 +38,7 @@ Option:
 	--cand_genes_file=...			A file with a list of candidate genes.  (added to plots)	
 
 	-m ...					MAC threshold which is used for LM, EMMA, EMMAX, etc.  Default is 15.
-	--data_format=...			What type of data should it amil for, binary (default), int, float, etc.
+	--data_format=...			What type of data should it aim for, binary (default), int, float, etc.
 	
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
@@ -196,12 +196,12 @@ def _prepare_transformation_(phed, p_i, transformation_type, remove_outliers):
 	return num_outliers_removed
 
 
-def prepare_data(sd, phed, p_i, transformation_type, remove_outliers):
+def prepare_data(sd, data_format, phed, p_i, transformation_type, remove_outliers):
 	"""
 	Coordinates phenotype and snps data for different mapping methods.
 	"""
 	num_outliers_removed = _prepare_transformation_(phed, p_i, transformation_type, remove_outliers)
-	sd.coordinate_w_phenotype_data(phed, p_i)
+	sd.coordinate_w_phenotype_data(phed, p_i, data_format)
 	return num_outliers_removed
 
 
@@ -364,7 +364,7 @@ def analysis_plots(snps_data_file, phed, p_dict):
 		phen_is_binary = phed.isBinary(p_i)
 		print "Plotting analysis plots for phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
 		for trans_method in p_dict['specific_transformations']:
-			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
 			for mapping_method in p_dict['specific_methods']:
 				file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i),
 							mapping_method, trans_method, p_dict['remove_outliers'])
@@ -379,7 +379,7 @@ def analysis_plots(snps_data_file, phed, p_dict):
 						res = gwaResults.Result(result_file=file_name, name=res_name, snps=snps)
 						pvals = True
 						if mapping_method in ['lm', 'emma', 'emmax']:
-							res.filter_attr("mafs", 15)
+							res.filter_attr("mafs", p_dict['mac_threshold'])
 						results[mapping_method] = res
 
 					else:
@@ -434,7 +434,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	if p_dict['use_existing_results']:
 		if p_dict['region_plots']:
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
 			if p_dict['remove_outliers']:
 				assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
 
@@ -468,8 +468,9 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			if not kinship_file and os.path.isfile(k_file): #Check if corresponding call_method_file is available
 				kinship_file = k_file
 			if kinship_file:   #Kinship file was somehow supplied..
-				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
+							filter=p_dict['debug_filter'])
+				num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
 				print 'Loading supplied kinship'
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
@@ -484,13 +485,13 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				f = open(k_file, 'w')
 				cPickle.dump([k, sd.accessions], f)
 				f.close()
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+				num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
 				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 		else:
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
 
 		snps = sd.getSnps()
 		if p_dict['remove_outliers']:
@@ -544,7 +545,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				#CONNECT TO PYTHON EMMA
 			elif mapping_method in ['emmax_anova']:
 				res = lm.emmax_anova(snps, phen_vals, k)
-			elif mapping_method in ['lm']:
+			elif mapping_method in ['lm_anova']:
 				res = lm.anova(snps, phen_vals)
 			else:
 				print "Mapping method", mapping_method, 'was not found.'
@@ -565,14 +566,6 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			if mapping_method in ['lm_anova', 'emmax_anova']:
 				kwargs['genotype_var_perc'] = res['var_perc']
 				pvals = res['ps']
-				betas = map(list, zip(*res['betas']))
-				kwargs['beta0'] = betas[0]
-				kwargs['beta1'] = betas[1]
-				#kwargs['beta2'] = betas[2]
-				additional_columns.append('genotype_var_perc')
-				additional_columns.append('beta0')
-				additional_columns.append('beta1')
-				#additional_columns.append('beta2')
 				sys.stdout.write("Done!\n")
 				sys.stdout.flush()
 

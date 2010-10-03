@@ -26,7 +26,7 @@ Marker type suggestions:
   
 """
 
-def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True, snp_format='binary'):
+def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True, data_format='binary'):
 	"""
 	1. Remove accessions which are not represented in either of the two datasets
 	2. Order the data in same way.
@@ -71,7 +71,7 @@ def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True, snp_f
 	phed.orderAccessions(accessionMapping)
 
 
-	if snp_format == 'binary':
+	if data_format == 'binary':
 		total_num = 0
 		removed_num = 0
 		for snpsd in snpsds:
@@ -1867,32 +1867,88 @@ class SNPsData(_SnpsData_):
 		return num_removed
 
 
+	def haplotize(self, snp_window=None, base_window=None):
 
-	def get_mafs(self, w_missing=False):
+		def _get_haplotypes_(snps, num_accessions):
+			curr_haplotypes = map(tuple, np.transpose(np.array(snps).tolist()))
+			hap_set = list(set(curr_haplotypes))
+			hap_hash = {}
+			for j, h in enumerate(set(curr_haplotypes)):
+				hap_hash[h] = j
+			new_haplotypes = np.zeros(num_accessions, dtype='int8')
+			for j, h in enumerate(curr_haplotypes):
+				new_haplotypes[j] = hap_hash[h]
+			return new_haplotypes
+
+		if snp_window:
+
+			haplotypes_list = []
+			i = 0
+			num_accessions = len(self.accessions)
+			while i < snp_window:
+				cur_snps = self.snps[:i + snp_window + 1]
+				haplotypes_list.append(_get_haplotypes_(cur_snps, num_accessions))
+				i += 1
+			while i < len(self.snps) - snp_window:
+				cur_snps = self.snps[i - snp_window:i + snp_window + 1]
+				haplotypes_list.append(_get_haplotypes_(cur_snps, num_accessions))
+				i += 1
+				if i % 100 == 0: print i
+			while i < len(self.snps):
+				cur_snps = self.snps[i - snp_window:]
+				haplotypes_list.append(_get_haplotypes_(cur_snps, num_accessions))
+				i += 1
+			self.snps = haplotypes_list
+
+		elif base_window:
+			raise NotImplementedError
+		else:
+			raise Exception('Window size missing')
+
+
+	def get_mafs(self, w_missing=False, binary=False):
 		"""
 		Returns MAFs and MARFs
 		
-		Assumes that this is a binary allele.
+		(Uses numpy.bincount)
 		"""
+		def _bin_count_(a):
+			counts = np.zeros(len(np.unique(a)))
+
+
 		mafs = []
 		marfs = []
 		num_nts = len(self.snps[0])
-		for snp in self.snps:
-			if w_missing and self.missingVal in snp:
-				missing_count = list(snp).count(self.missingVal)
-				num_nts = len(snp) - missing_count
-				nts = set(snp)
-				nts.remove(self.missingVal)
-				c = list(snp).count(nts.pop()) / float(num_nts)
-				if c > 0.5:
-					c = 1.0 - c
-				marfs.append(c)
-				mafs.append(int(c * num_nts))
+		if w_missing:
+			for snp in self.snps:
+				if self.missingVal in snp:
+					missing_count = list(snp).count(self.missingVal)
+					num_nts = len(snp) - missing_count
+					nts = set(snp)
+					nts.remove(self.missingVal)
+					c = list(snp).count(nts.pop()) / float(num_nts)
+					if c > 0.5:
+						c = 1.0 - c
+					marfs.append(c)
+					mafs.append(int(c * num_nts))
+				else:
+					l = np.bincount(snp)
+					maf = min(l)
+					mafs.append(maf)
+					marfs.append(maf / float(num_nts))
+		else:
+			if binary:
+				for snp in self.snps:
+					l = np.bincount(snp)
+					maf = min(l)
+					mafs.append(maf)
+					marfs.append(maf / float(num_nts))
 			else:
-				l = np.bincount(snp)
-				maf = min(l)
-				mafs.append(maf)
-				marfs.append(maf / float(num_nts))
+				for snp in self.snps:
+					l = np.bincount(np.unique(snp, False, True)[1])
+					maf = min(l)
+					mafs.append(maf)
+					marfs.append(maf / float(num_nts))
 
 		return {"mafs":mafs, "marfs":marfs}
 
@@ -2704,12 +2760,12 @@ class SNPsDataSet:
 
 
 
-	def coordinate_w_phenotype_data(self, phend, p_i):
+	def coordinate_w_phenotype_data(self, phend, p_i, data_format):
 
 		"""
 		Deletes accessions which are not common, and sorts the accessions, etc.)
 		"""
-		coordinateSnpsAndPhenotypeData(phend, p_i, self.snpsDataList)
+		coordinateSnpsAndPhenotypeData(phend, p_i, self.snpsDataList, data_format=data_format)
 		self.accessions = self.snpsDataList[0].accessions
 
 
@@ -2739,6 +2795,17 @@ class SNPsDataSet:
 			snpsDataList = snpsd_list
 			self.is_binary = True
 		self.missing_val = self.snpsDataList[0].missingVal
+
+
+	def haplotize(self, snp_window=None, base_window=None):
+		"""
+		Converts the data-format to a haplotype numbering format
+		"""
+		print 'Haplotizing!'
+		assert (snp_window or base_window), 'snp_window or base_window arguments are missing.'
+		for i, sd in enumerate(self.snpsDataList):
+			sd.haplotize(snp_window=snp_window, base_window=base_window)
+			print i
 
 
 
