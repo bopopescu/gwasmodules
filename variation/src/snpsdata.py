@@ -1913,6 +1913,20 @@ class SNPsData(_SnpsData_):
 		(Uses numpy.bincount)
 		"""
 
+#		def _get_maf_(snp):
+#			l = np.bincount(np.unique(snp, False, True)[1])
+#			maf = min(l)
+#			return maf
+
+
+		def _get_maf_(snp):
+			l = np.bincount(snp)
+			maf = max(l)
+			for m in l[1:]:
+				if m != 0 and m < maf:
+					maf = m
+			return maf
+
 		mafs = []
 		marfs = []
 		num_nts = len(self.snps[0])
@@ -1942,8 +1956,7 @@ class SNPsData(_SnpsData_):
 					marfs.append(maf / float(num_nts))
 			else:
 				for snp in self.snps:
-					l = np.bincount(np.unique(snp, False, True)[1])
-					maf = min(l)
+					maf = _get_maf_(snp)
 					mafs.append(maf)
 					marfs.append(maf / float(num_nts))
 
