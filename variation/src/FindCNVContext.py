@@ -2,8 +2,9 @@
 """
 
 Examples:
-	FindCNVContext.py -u yh -c
-
+	# Find contexts for cnv method 20 in table CNV
+	FindCNVContext.py -z banyan -u yh -g genome -m 20
+	
 Description:
 	program to find the context (nearby genes) of a CNV. It fills results into db table cnv_context.
 	
@@ -37,7 +38,7 @@ class FindCNVContext(object):
 	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
 							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
 							('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
-							('genome_dbname', 1, ): ['genome_tair', 'g', 1, 'genome database name', ],\
+							('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('cnv_method_id', 1, int): [None, 'm', 1, 'construct contexts for CNVs from this cnv_method_id'],\
@@ -58,6 +59,8 @@ class FindCNVContext(object):
 	@classmethod
 	def createGenomeRBDict(cls, genome_db, tax_id=3702, max_distance=20000, debug=False):
 		"""
+		2010-10-3
+			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
 		2010-9-23
 			becomes a classmethod
 		2010-8-17
@@ -74,16 +77,18 @@ class FindCNVContext(object):
 				chromosome = row.chromosome
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, \
 							span_ls=[max(1, row.start - max_distance), row.stop + max_distance], \
-							min_reciprocal_overlap=1, strand=row.strand, gene_id=row.gene_id,\
-							gene_start=row.start, gene_stop=row.stop)	#2010-8-17 any overlap is tolerated.
-			genomeRBDict[segmentKey] = []
+							min_reciprocal_overlap=1,)	#2010-8-17 any overlap short of identity is tolerated.
+			if segmentKey not in genomeRBDict:
+				genomeRBDict[segmentKey] = []
+			oneGeneData = PassingData(strand = row.strand, gene_id = row.gene_id, gene_start = row.start, \
+										gene_stop = row.stop, geneCommentaryRBDictLs=[])
 			counter += 1
 			for gene_commentary in row.gene_commentaries:
 				if not gene_commentary.gene_commentary_id:
 					# ignore gene_commentary that are derived from other gene_commentaries. 
 					# they'll be handled within the parental gene_commentary.
-					geneRBDict = RBDict()
-					geneRBDict.gene_commentary_id = gene_commentary.id
+					geneCommentaryRBDict = RBDict()
+					geneCommentaryRBDict.gene_commentary_id = gene_commentary.id
 					#gene_commentary.construct_annotated_box()
 					box_ls = gene_commentary.constructAnnotatedBox()
 					#box_ls=gene_commentary.box_ls
@@ -113,15 +118,16 @@ class FindCNVContext(object):
 							numberPorter.exon_number += 1
 							numberVariableName = 'exon_number'
 						genePartKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, span_ls=[start, stop], \
-														min_reciprocal_overlap=1, label=box_type, cds_number=None,\
-														intron_number=None, utr_number=None,\
-														exon_number=None, gene_segment_id=gene_segment_id)
+											min_reciprocal_overlap=1, label=box_type, cds_number=None,\
+											intron_number=None, utr_number=None, exon_number=None, \
+											gene_segment_id=gene_segment_id)
 									#2010-8-17 any overlap is tolerated.
 						if numberVariableName is not None:	#set the specific number
 							setattr(genePartKey, numberVariableName, getattr(numberPorter, numberVariableName, None))
-						geneRBDict[genePartKey] = None
+						geneCommentaryRBDict[genePartKey] = None
 						real_counter += 1
-					genomeRBDict[segmentKey].append(geneRBDict)
+					oneGeneData.geneCommentaryRBDictLs.append(geneCommentaryRBDict)
+			genomeRBDict[segmentKey].append(oneGeneData)
 			if counter%1000==0:
 				sys.stderr.write("%s%s\t%s"%('\x08'*100, counter, real_counter))
 				if debug:
@@ -133,6 +139,8 @@ class FindCNVContext(object):
 	def findCNVcontext(self, db_250k, genomeRBDict, cnv_method_id=None, compareIns=None, max_distance=50000, debug=0,
 					param_obj=None):
 		"""
+		2010-10-3
+			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
 		2010-8-18
 		"""
 		sys.stderr.write("Finding CNV context ... \n")
@@ -148,78 +156,79 @@ class FindCNVContext(object):
 			genomeRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
 			for node in node_ls:
 				geneSegKey = node.key
-				geneRBDictLs = node.value
-				# geneSegKey.span_ls expands 20kb upstream or downstream of the gene.
-				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-														[geneSegKey.gene_start, geneSegKey.gene_stop])[:5]
-				if overlap_length>0:	#use fraction of length as coordinates.
-					gene_length = geneSegKey.gene_stop - geneSegKey.gene_start + 1
-					try:
-						if geneSegKey.strand == '+1':
-							term5_disp_pos = abs(overlap_start_pos - geneSegKey.gene_start)/float(gene_length)
-							term3_disp_pos = abs(overlap_stop_pos - geneSegKey.gene_start + 1)/float(gene_length)
+				for oneGeneData in node.value:
+					# geneSegKey.span_ls expands 20kb upstream or downstream of the gene.
+					overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
+															[oneGeneData.gene_start, oneGeneData.gene_stop])[:5]
+					if overlap_length>0:	#use fraction of length as coordinates.
+						gene_length = oneGeneData.gene_stop - oneGeneData.gene_start + 1
+						try:
+							if oneGeneData.strand == '+1':
+								term5_disp_pos = abs(overlap_start_pos - oneGeneData.gene_start)/float(gene_length)
+								term3_disp_pos = abs(overlap_stop_pos - oneGeneData.gene_start + 1)/float(gene_length)
+							else:
+								term5_disp_pos = abs(oneGeneData.gene_stop - overlap_stop_pos)/float(gene_length)
+								term3_disp_pos = abs(oneGeneData.gene_stop - overlap_start_pos + 1)/float(gene_length)
+						except:
+							import pdb
+							pdb.set_trace()
+					else:	#no overlap at all
+						term3_disp_pos = None
+						if oneGeneData.strand == '+1':
+							if row.stop<=oneGeneData.gene_start:	#upstream
+								term5_disp_pos = row.stop - oneGeneData.gene_start
+							elif row.start>=oneGeneData.gene_stop:	# downstream
+								term5_disp_pos = row.start - oneGeneData.gene_stop
 						else:
-							term5_disp_pos = abs(geneSegKey.gene_stop - overlap_stop_pos)/float(gene_length)
-							term3_disp_pos = abs(geneSegKey.gene_stop - overlap_start_pos + 1)/float(gene_length)
-					except:
-						import pdb
-						pdb.set_trace()
-				else:	#no overlap at all
-					term3_disp_pos = None
-					if geneSegKey.strand == '+1':
-						if row.stop<=geneSegKey.gene_start:	#upstream
-							term5_disp_pos = row.stop - geneSegKey.gene_start
-						elif row.start>=geneSegKey.gene_stop:	# downstream
-							term5_disp_pos = row.start - geneSegKey.gene_stop
+							if row.stop<=oneGeneData.gene_start:	#downstream
+								term5_disp_pos = oneGeneData.gene_start - row.stop
+							elif row.start>=oneGeneData.gene_stop:	# upstream
+								term5_disp_pos = oneGeneData.gene_stop - row.start
+					cnv_context = Stock_250kDB.CNVContext.query.filter_by(cnv_id=row.id).filter_by(gene_id=oneGeneData.gene_id).first()
+					
+					if cnv_context:
+						param_obj.no_of_cnv_contexts_already_in_db += 1
 					else:
-						if row.stop<=geneSegKey.gene_start:	#downstream
-							term5_disp_pos = geneSegKey.gene_start - row.stop
-						elif row.start>=geneSegKey.gene_stop:	# upstream
-							term5_disp_pos = geneSegKey.gene_stop - row.start
-				cnv_context = Stock_250kDB.CNVContext.query.filter_by(cnv_id=row.id).filter_by(gene_id=geneSegKey.gene_id).first()
-				
-				if cnv_context:
-					param_obj.no_of_cnv_contexts_already_in_db += 1
-				else:
-					cnv_context = Stock_250kDB.CNVContext(cnv_id=row.id, gene_id = geneSegKey.gene_id, \
-													gene_strand=geneSegKey.strand, term5_disp_pos=term5_disp_pos, \
-													term3_disp_pos=term3_disp_pos,\
-													overlap_length=overlap_length, \
-													overlap_fraction_in_cnv=overlap1, overlap_fraction_in_gene=overlap2)
-					session.add(cnv_context)
-					param_obj.no_of_into_db += 1
-				param_obj.no_of_total_contexts += 1
-				
-				for geneRBDict in geneRBDictLs:
-					gene_box_node_ls = []
-					geneRBDict.findNodes(segmentKey, node_ls=gene_box_node_ls, compareIns=compareIns)
-					for gene_box_node in gene_box_node_ls:
-						gene_box_key = gene_box_node.key
-						overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-												gene_box_key.span_ls)[:5]
-						cnv_annotation = Stock_250kDB.CNVAnnotation.query.filter_by(cnv_id=row.id).filter_by(cnv_context_id=cnv_context.id).\
-							filter_by(gene_commentary_id= geneRBDict.gene_commentary_id).\
-							filter_by(gene_segment_id= gene_box_key.gene_segment_id).first()
-						if cnv_annotation:
-							param_obj.no_of_cnv_annotations_already_in_db += 1
-						else:
-							cnv_annotation = Stock_250kDB.CNVAnnotation(cnv_id=row.id, gene_commentary_id = geneRBDict.gene_commentary_id, \
+						cnv_context = Stock_250kDB.CNVContext(cnv_id=row.id, gene_id = oneGeneData.gene_id, \
+														gene_strand=oneGeneData.strand, term5_disp_pos=term5_disp_pos, \
+														term3_disp_pos=term3_disp_pos,\
+														overlap_length=overlap_length, \
+														overlap_fraction_in_cnv=overlap1, overlap_fraction_in_gene=overlap2)
+						session.add(cnv_context)
+						param_obj.no_of_into_db += 1
+					param_obj.no_of_total_contexts += 1
+					
+					for geneCommentaryRBDict in oneGeneData.geneCommentaryRBDictLs:
+						gene_box_node_ls = []
+						geneCommentaryRBDict.findNodes(segmentKey, node_ls=gene_box_node_ls, compareIns=compareIns)
+						for gene_box_node in gene_box_node_ls:
+							gene_box_key = gene_box_node.key
+							overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
+													gene_box_key.span_ls)[:5]
+							cnv_annotation = Stock_250kDB.CNVAnnotation.query.filter_by(cnv_id=row.id).filter_by(cnv_context_id=cnv_context.id).\
+								filter_by(gene_commentary_id= geneCommentaryRBDict.gene_commentary_id).\
+								filter_by(gene_segment_id= gene_box_key.gene_segment_id).first()
+							if cnv_annotation:
+								param_obj.no_of_cnv_annotations_already_in_db += 1
+							else:
+								cnv_annotation = Stock_250kDB.CNVAnnotation(cnv_id=row.id, \
+												gene_commentary_id = geneCommentaryRBDict.gene_commentary_id, \
 												gene_segment_id=gene_box_key.gene_segment_id, label=gene_box_key.label, \
 												utr_number = gene_box_key.utr_number, cds_number = gene_box_key.cds_number, \
 												intron_number = gene_box_key.intron_number, exon_number = gene_box_key.exon_number,\
 												overlap_length=overlap_length, \
 												overlap_fraction_in_cnv=overlap1, overlap_fraction_in_gene=overlap2)
-							cnv_annotation.cnv_context = cnv_context
-							session.add(cnv_annotation)
-							param_obj.no_of_into_db += 1
-						param_obj.no_of_total_annotations += 1
-				
-				if param_obj.no_of_into_db>2000:
-					session.flush()
-					param_obj.no_of_into_db = 0
-					sys.stderr.write("\t %s/%s CNVContext(s) & %s/%s CNVAnnotation(s) already in db.\n"%(\
-								param_obj.no_of_cnv_contexts_already_in_db, param_obj.no_of_total_contexts, \
-								param_obj.no_of_cnv_annotations_already_in_db, param_obj.no_of_total_annotations))
+								cnv_annotation.cnv_context = cnv_context
+								session.add(cnv_annotation)
+								param_obj.no_of_into_db += 1
+							param_obj.no_of_total_annotations += 1
+					
+					if param_obj.no_of_into_db>2000:
+						session.flush()
+						param_obj.no_of_into_db = 0
+						sys.stderr.write("\t %s/%s CNVContext(s) & %s/%s CNVAnnotation(s) already in db.\n"%(\
+									param_obj.no_of_cnv_contexts_already_in_db, param_obj.no_of_total_contexts, \
+									param_obj.no_of_cnv_annotations_already_in_db, param_obj.no_of_total_annotations))
 		session.flush()
 		session.expunge_all()
 		sys.stderr.write("\t %s/%s CNVContext(s) & %s/%s CNVAnnotation(s) already in db.\n"%(\
