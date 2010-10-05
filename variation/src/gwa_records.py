@@ -322,9 +322,6 @@ def add_results(hdf5_file_name, phen_name, analysis_method, chromosomes, positio
 			result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
 		result.append()
 	table.flush()
-	for analysis_method in h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation)):
-		print analysis_method
-
 	h5file.close()
 
 
@@ -419,6 +416,8 @@ def _test_():
 	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
 		'beta1', 'correlation']:
 		print c, res[c][:10]
+	r = get_phenotype_info(hdf5_file_name_1)
+	print r
 
 
 if __name__ == '__main__':
