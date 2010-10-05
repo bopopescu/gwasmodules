@@ -15,6 +15,8 @@ import tables
 import phenotypeData as pd
 import itertools
 import scipy as sp
+import util
+import linear_models as lm
 
 class PhenotypeInfo(tables.IsDescription):
 	"""
@@ -339,32 +341,65 @@ class GWASRecord():
 
 
 
-#	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0, \
-#				chromosomes=[1, 2, 3, 4, 5]):
-#		"""
-#		Return results..
-#		"""
-#		cd = {'chromosome': []}
-#
-#		h5file = tables.openFile(self.filename, mode="r")
-#		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
-#
-#		for chromosome in chromosomes:
-#			d = {'position': [], 'score': [], 'maf': [], 'mac': []}
-#
-#			if analysis_method == 'kw':
-#				d['statistic'] = []
-#			else:
-#				d['beta0'] = []
-#				d['beta1'] = []
-#				d['correlation'] = []
-#				d['genotype_var_perc'] = []
-#			for x in table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac)):
-#				for k in d:
-#					d[k].append(x[k])
-#			cd['chromosome'] =
-#		h5file.close()
-#		return cd
+	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0, \
+				chromosomes=[1, 2, 3, 4, 5]):
+		"""
+		Return results..
+		"""
+		cd = {}
+
+		h5file = tables.openFile(self.filename, mode="r")
+		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
+
+		for chromosome in chromosomes:
+			d = {'position': [], 'score': [], 'maf': [], 'mac': []}
+
+			if analysis_method == 'kw':
+				d['statistic'] = []
+			else:
+				d['beta0'] = []
+				d['beta1'] = []
+				d['correlation'] = []
+				d['genotype_var_perc'] = []
+			for x in table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac)):
+				for k in d:
+					d[k].append(x[k])
+			cd[chromosome] = d
+		h5file.close()
+		return cd
+
+
+	def get_phenotype_bins(self, phen_name, transformation='raw', bin_number=20):
+		"""
+		Returns the 
+		"""
+		#Get the phenotype
+		phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
+		min_phen_val = min(phen_vals)
+		max_phen_val = max(phen_vals)
+		print min_phen_val, max_phen_val
+		chunk_size = ((max_phen_val - min_phen_val) / bin_number) * (1 + 1e-5 / bin_number)
+		pa = (sp.array(phen_vals) - min_phen_val) / chunk_size
+		print pa
+		bin_counts = sp.bincount(sp.array(pa , dtype='int32'))
+		print len(bin_counts)
+		keys = ['x_axis', 'frequency']
+		bin_list = []
+		for i, bin_count in enumerate(bin_counts):
+			x1 = min_phen_val + i * chunk_size
+			x2 = x1 + chunk_size
+			bin_list.append({'x_axis':'%0.2f-%0.2f' % (x1, x2), 'frequency':bin_count})
+
+		return bin_list
+
+
+	def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw'):
+
+		"""
+		Performs GWAS and updates the datastructure.
+		"""
+		phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
+
 
 
 
@@ -384,260 +419,6 @@ class GWASRecord():
 #		h5file.flush()
 #		h5file.close()
 #
-#
-#def init_file(hdf5_file_name):
-#	print 'Setting up file %s' % hdf5_file_name
-#	# Open a file in "w"rite mode
-#	h5file = tables.openFile(hdf5_file_name, mode="w", title="Phenotype_results_file")
-#	# Create a new group under "/" (root)
-#	g = h5file.createGroup("/", 'phenotypes', 'Basic phenotype folder')
-#	h5file.createTable(g, 'info', PhenotypeInfo, "Phenotyping information")
-#	h5file.flush()
-#	h5file.close()
-#
-#
-#def add_new_phenotype_file(hdf5_file_name, phenotype_file, phen_name, growth_conditions='', phenotype_scoring='',
-#			method_description='', measurement_scale='', is_binary=False):
-#	"""
-#	Initializes the phenotype group for this phenotype and inserts it into the file object.
-#	"""
-#	#Now parsing the phenotype file
-#	h5file = tables.openFile(hdf5_file_name, mode="rw")
-#	print h5file
-#	phend = pd.readPhenotypeFile(phenotype_file)
-#	_init_phenotype_(h5file, phen_name, growth_conditions=growth_conditions, phenotype_scoring=phenotype_scoring,
-#			method_description=method_description, measurement_scale=measurement_scale, is_binary=is_binary)
-#	add_phenotype_values(h5file, phen_name, phend.accessions, phend.getPhenVals(1), transformation='raw',
-#			accessions=phend.accessionNames, std_dev_values=None, value_comments=None)
-#	h5file.flush()
-#	h5file.close()
-#
-#
-#def add_new_phenotype(hdf5_file_name, phen_name, phenotype_values, ecotypes, accession_names=None, growth_conditions='', phenotype_scoring='',
-#			method_description='', measurement_scale='', is_binary=False):
-#	"""
-#	Initializes the phenotype group for this phenotype and inserts it into the file object.
-#	"""
-#	#Now parsing the phenotype file
-#	h5file = tables.openFile(hdf5_file_name, mode="r+")
-#	_init_phenotype_(h5file, phen_name, num_vals=len(phenotype_values), std_dev=sp.std(phenotype_values),
-#			growth_conditions=growth_conditions, phenotype_scoring=phenotype_scoring,
-#			method_description=method_description, measurement_scale=measurement_scale, is_binary=is_binary)
-#
-#	add_phenotype_values(h5file, phen_name, ecotypes, phenotype_values, transformation='raw',
-#			accessions=accession_names, std_dev_values=None, value_comments=None)
-#	h5file.flush()
-#	h5file.close()
-#
-#
-#
-#def _init_phenotype_(h5file, phen_name, num_vals=0.0, std_dev=0.0, growth_conditions='', phenotype_scoring='',
-#			method_description='', measurement_scale='', is_binary=False):
-#	"""
-#	Insert a new phenotype into the DB
-#	"""
-#	group = h5file.createGroup("/phenotypes", phen_name, 'Phenotype folder for ' + phen_name)
-#	table = h5file.getNode('/phenotypes/info')
-#	info = table.row
-#	info['name'] = phen_name
-#	info['num_values'] = num_vals
-#	info['std_dev'] = std_dev
-#	info['growth_conditions'] = growth_conditions
-#	info['phenotype_scoring'] = phenotype_scoring
-#	info['method_description'] = method_description
-#	info['measurement_scale'] = measurement_scale
-#	info['is_binary'] = is_binary
-#	info.append()
-#	table.flush()
-#
-#
-#
-#def add_phenotype_values(h5file, phen_name, ecotypes, values, transformation='raw', transformation_description=None,
-#			accessions=None, std_dev_values=None, value_comments=None):
-#	"""
-#	Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
-#	"""
-#
-#	phen_group = h5file.getNode('/phenotypes/%s' % phen_name)
-#	table = h5file.createTable(phen_group, 'transformation_info', TransformationInfo, "Transformation information")
-#	info = table.row
-#	info['name'] = transformation
-#	if transformation_description: info['description'] = transformation_description
-#	info.append()
-#	table.flush()
-#
-#	trans_group = h5file.createGroup(phen_group, transformation, 'Transformation: ' + transformation)
-#	table = h5file.createTable(trans_group, 'values', PhenotypeValue, "Phenotype values")
-#	value = table.row
-#	for i, (ei, v) in enumerate(itertools.izip(ecotypes, values)):
-#		value['ecotype'] = ei
-#		value['mean_value'] = v
-#		if accessions: value['accession_name'] = accessions[i]
-#		if std_dev_values: value['std_dev'] = std_dev_values[i]
-#		if value_comments: value['comment'] = value_comments[i]
-#		value.append()
-#	table.flush()
-#
-#
-#
-#def get_phenotype_values(hdf5_filename, phen_name, transformation='raw'):
-#	"""
-#	Returns the phenotype values
-#	"""
-#	h5file = tables.openFile(hdf5_filename, mode="r")
-#	table = h5file.getNode('/phenotypes/%s/%s/values' % (phen_name, transformation))
-#	d = {'ecotype' : [], 'mean_value' : [], 'accession_name': [], 'std_dev': [], 'comment':[]}
-#	for x in table.iterrows():
-#		for k in d:
-#			d[k].append(x[k])
-#	h5file.close()
-#	return d
-#
-#
-#
-#def get_phenotype_info(hdf5_filename, phen_name=None):
-#	"""
-#	Returns the phenotype meta data in a dict.
-#	"""
-#	dict_list = []
-#	h5file = tables.openFile(hdf5_filename, mode="r")
-#	table = h5file.getNode('/phenotypes/info')
-#	if not phen_name:
-#		for x in table.iterrows():
-#			d = {'name': '', 'num_values': 0, 'std_dev': 0.0, 'growth_conditions': '',
-#				'phenotype_scoring': '', 'method_description': '', 'measurement_scale': '',
-#				'is_binary': False}
-#			for k in d:
-#				d[k] = x[k]
-#			d['transformation'] = _get_phenotype_transformations_(h5file, x['name'])
-#			#for
-#
-#			dict_list.append(d)
-#	else:
-#		for x in table.where('name=="%s"' % phen_name):
-#			d = {'name': '', 'num_values': 0, 'std_dev': 0.0, 'growth_conditions': '',
-#				'phenotype_scoring': '', 'method_description': '', 'measurement_scale': '',
-#				'is_binary': False}
-#			for k in d:
-#				d[k] = x[k]
-#			d['transformation'] = _get_phenotype_transformations_(h5file, x['name'])
-#			dict_list.append(d)
-#
-#	h5file.close()
-#	return dict_list
-#
-#
-#def _get_phenotype_transformations_(h5file, phen_name):
-#	dict_list = []
-#	table = h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
-#	for x in table.iterrows():
-#		d = {'name': '', 'description': ''}
-#		for k in d:
-#			d[k] = x[k]
-#		d['analysis_method'] = _get_analysis_methods_(h5file, phen_name, x['name'])
-#		dict_list.append(d)
-#	return dict_list
-#
-#
-#
-#def get_phenotype_transformations(hdf5_filename, phen_name):
-#	"""
-#	Returns the phenotype values
-#	"""
-#	h5file = tables.openFile(hdf5_filename, mode="r")
-#	d = _get_phenotype_transformations_(h5file)
-#	h5file.close()
-#	return d
-#
-#
-#
-#def _get_analysis_methods_(h5file, phen_name, transformation):
-#	dict_list = []
-#	try:
-#		table = h5file.getNode('/phenotypes/%s/%s/result_info' % (phen_name, transformation))
-#		for x in table.iterrows():
-#			d = {'name': '', 'comment': ''}
-#			for k in d:
-#				d[k] = x[k]
-#			dict_list.append(d)
-#	except Exception, err_str:
-#		print "No results found:", err_str
-#	return dict_list
-#
-#
-#
-#def get_analysis_methods(hdf5_filename, phen_name, transformation):
-#	"""
-#	Returns the phenotype values
-#	"""
-#	h5file = tables.openFile(hdf5_filename, mode="r")
-#	d = _get_analysis_methods_(h5file)
-#	h5file.close()
-#	return d
-#
-#
-#def add_results(hdf5_file_name, phen_name, analysis_method, chromosomes, positions, scores, mafs, macs,
-#		analysis_comment='', transformation='raw', **kwargs):
-#	"""
-#	Add a result to the hdf5 file.
-#	"""
-#	h5file = tables.openFile(hdf5_file_name, mode="r+")
-#	trans_group = h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation))
-#	table = h5file.createTable(trans_group, 'result_info', ResultInfo, "Result information")
-#	info = table.row
-#	info['name'] = analysis_method
-#	if analysis_comment: info['comment'] = analysis_comment
-#	info.append()
-#	table.flush()
-#
-#	analysis_group = h5file.createGroup(trans_group, analysis_method, 'Analysis method: ' + analysis_method)
-#	if analysis_method in ['emmax', 'lm']:
-#		table = h5file.createTable(analysis_group, 'results', ResultRecordLM, "Regression result")
-#	elif analysis_method is 'kw':
-#		table = h5file.createTable(analysis_group, 'results', ResultRecordKW, "Regression result")
-#	else:
-#		raise Exception('Not implemented for analysis method %s' % analysis_method)
-#	result = table.row
-#
-#
-#	for i, cpsmm in enumerate(itertools.izip(chromosomes, positions, scores, mafs, macs)):
-#		(result['chromosome'], result['position'], result['score'], result['maf'], result['mac']) = cpsmm
-#		if analysis_method == 'kw':
-#			result['statistic'] = kwargs['statistics'][i]
-#		else: #EMMAX or LM
-#			result['beta0'] = kwargs['beta0'][i]
-#			result['beta1'] = kwargs['beta1'][i]
-#			result['correlation'] = kwargs['correlation'][i]
-#			result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
-#		result.append()
-#	table.flush()
-#	h5file.close()
-#
-#
-#
-#
-#def get_results(hdf5_file_name, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0):
-#	"""
-#	Return results..
-#	"""
-#	d = {'chromosome': [], 'position': [], 'score': [], 'maf': [], 'mac': []}
-#	if analysis_method == 'kw':
-#		d['statistic'] = []
-#	else:
-#		d['beta0'] = []
-#		d['beta1'] = []
-#		d['correlation'] = []
-#		d['genotype_var_perc'] = []
-#
-#	h5file = tables.openFile(hdf5_file_name, mode="r")
-#	table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
-#	for x in table.where('(score<=%f) & (mac>=%d)' % (max_pval, min_mac)):
-#		for k in d:
-#			d[k].append(x[k])
-#	h5file.close()
-#	return d
-#
-
 
 
 def _test_():
@@ -678,31 +459,38 @@ def _test_():
 	r = gwa_record.get_phenotype_info(phen_name)
 	print r
 
-	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
-	res = gr.Result(result_file=result_file, name='FT10')
-
-	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
-		'beta1', 'correlations']:
-		print c, res.snp_results[c][:10]
-
-
-	gwa_record.add_results(phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
-			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
-			transformation='raw', genotype_var_perc=res.snp_results['genotype_var_perc'],
-			beta0=res.snp_results['beta0'], beta1=res.snp_results['beta1'],
-			correlation=res.snp_results['correlations'])
-
-
-	print "Result added."
-
-	print "Now fetching a result."
-	res = gwa_record.get_results(phen_name, 'emmax')#, min_mac=15, max_pval=0.01)
-	print "Result loaded"
-	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
-		'beta1', 'correlation']:
-		print c, res[c][:10]
-	r = gwa_record.get_phenotype_info()
-	print r
+#	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
+#	res = gr.Result(result_file=result_file, name='FT10')
+#
+#	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
+#		'beta1', 'correlations']:
+#		print c, res.snp_results[c][:10]
+#
+#
+#	gwa_record.add_results(phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
+#			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
+#			transformation='raw', genotype_var_perc=res.snp_results['genotype_var_perc'],
+#			beta0=res.snp_results['beta0'], beta1=res.snp_results['beta1'],
+#			correlation=res.snp_results['correlations'])
+#
+#
+#	print "Result added."
+#
+#	print "Now fetching a result."
+#	res = gwa_record.get_results(phen_name, 'emmax')#, min_mac=15, max_pval=0.01)
+#	print "Result loaded"
+#	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
+#		'beta1', 'correlation']:
+#		print c, res[c][:10]
+#	r = gwa_record.get_phenotype_info()
+#	print r
+#	res = gwa_record.get_results_by_chromosome(phen_name, 'emmax')
+#	print "Result re-loaded"
+#	for chromosome in res:
+#		for c in ['position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
+#			'beta1', 'correlation']:
+#			print c, res[chromosome][c][:10]
+	print gwa_record.get_phenotype_bins(phen_name)
 
 
 
