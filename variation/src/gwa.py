@@ -588,7 +588,6 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 		else:
 			db_pid = p_i
 
-		print p_dict['call_method_id'], db_pid, p_dict['remove_outliers']
 		import results_2_db as rdb
 		short_name = 'cm%d_pid%d_%s_%s_%s_%d' % (p_dict['call_method_id'], db_pid, phenotype_name,
 							mapping_method, trans_method, p_dict['remove_outliers'])
