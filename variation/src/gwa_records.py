@@ -203,21 +203,28 @@ def get_phenotype_info(hdf5_filename, phen_name=None):
 	"""
 	Returns the phenotype meta data in a dict.
 	"""
-
-	d = {'name': [], 'num_values': [], 'std_dev': [], 'growth_conditions': [], 'phenotype_scoring': [],
-	'method_description': [], 'measurement_scale': [], 'is_binary': []}
+	dict_list = []
 	h5file = tables.openFile(hdf5_filename, mode="r")
 	table = h5file.getNode('/phenotypes/info')
 	if phen_name:
 		for x in table.iterrows():
+			d = {'name': '', 'num_values': 0, 'std_dev': 0.0, 'growth_conditions': '',
+				'phenotype_scoring': '', 'method_description': '', 'measurement_scale': '',
+				'is_binary': False}
 			for k in d:
-				d[k].append(x[k])
+				d[k] = x[k]
+			dict_list.append(d)
 	else:
 		for x in table.where('name==%' % phen_name):
+			d = {'name': '', 'num_values': 0, 'std_dev': 0.0, 'growth_conditions': '',
+				'phenotype_scoring': '', 'method_description': '', 'measurement_scale': '',
+				'is_binary': False}
 			for k in d:
 				d[k].append(x[k])
+			dict_list.append(d)
+
 	h5file.close()
-	return d
+	return dict_list
 
 
 
