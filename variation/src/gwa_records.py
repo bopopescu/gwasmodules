@@ -655,6 +655,7 @@ def _test_():
 	#Creating the first hdf5 file
 	hdf5_file_name_1 = '/Users/bjarni.vilhjalmsson/tmp/test1.hdf5'
 	gwa_record = GWASRecord(hdf5_file_name_1)
+	gwa_record.init_file()
 	gwa_record.add_new_phenotype(phen_name, phen_vals, ecotypes, is_binary=is_binary)
 	print "First file is constructed"
 
