@@ -206,7 +206,7 @@ def get_phenotype_info(hdf5_filename, phen_name=None):
 	dict_list = []
 	h5file = tables.openFile(hdf5_filename, mode="r")
 	table = h5file.getNode('/phenotypes/info')
-	if phen_name:
+	if not phen_name:
 		for x in table.iterrows():
 			d = {'name': '', 'num_values': 0, 'std_dev': 0.0, 'growth_conditions': '',
 				'phenotype_scoring': '', 'method_description': '', 'measurement_scale': '',
@@ -345,8 +345,11 @@ def _test_():
 	r = get_phenotype_info(hdf5_file_name_1, phen_name)
 	print r
 
-	res = gr.Result(result_file=result_file, name=result_name, snps=snps)
+	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
+	res = gr.Result(result_file=result_file, name='FT10')
 
+
+	add_results(hdf5_file_name_1, phen_name, chromosomes, positions, scores, mafs, macs, analysis_method, analysis_comment, transformation)
 	#hdf5_file_name_2 = '/Users/bjarni.vilhjalmsson/tmp/test2.hdf5'
 	#init_file(hdf5_file_name_2)
 	#print "Second file is constructed"
