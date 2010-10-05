@@ -196,12 +196,12 @@ def _prepare_transformation_(phed, p_i, transformation_type, remove_outliers):
 	return num_outliers_removed
 
 
-def prepare_data(sd, data_format, phed, p_i, transformation_type, remove_outliers):
+def prepare_data(sd, phed, p_i, transformation_type, remove_outliers):
 	"""
 	Coordinates phenotype and snps data for different mapping methods.
 	"""
 	num_outliers_removed = _prepare_transformation_(phed, p_i, transformation_type, remove_outliers)
-	sd.coordinate_w_phenotype_data(phed, p_i, data_format)
+	sd.coordinate_w_phenotype_data(phed, p_i)
 	return num_outliers_removed
 
 
@@ -364,7 +364,7 @@ def analysis_plots(snps_data_file, phed, p_dict):
 		phen_is_binary = phed.isBinary(p_i)
 		print "Plotting analysis plots for phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
 		for trans_method in p_dict['specific_transformations']:
-			prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
+			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
 			for mapping_method in p_dict['specific_methods']:
 				file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i),
 							mapping_method, trans_method, p_dict['remove_outliers'])
@@ -434,7 +434,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	if p_dict['use_existing_results']:
 		if p_dict['region_plots']:
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
 			if p_dict['remove_outliers']:
 				assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
 
@@ -470,7 +470,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			if kinship_file:   #Kinship file was somehow supplied..
 				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
 							filter=p_dict['debug_filter'])
-				num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
 				print 'Loading supplied kinship'
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
@@ -485,13 +485,13 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				f = open(k_file, 'w')
 				cPickle.dump([k, sd.accessions], f)
 				f.close()
-				num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
 				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 		else:
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, p_dict['data_format'], phed, p_i, trans_method, p_dict['remove_outliers'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
 
 		snps = sd.getSnps()
 		if p_dict['remove_outliers']:

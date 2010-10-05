@@ -2771,12 +2771,12 @@ class SNPsDataSet:
 
 
 
-	def coordinate_w_phenotype_data(self, phend, p_i, data_format):
+	def coordinate_w_phenotype_data(self, phend, p_i):
 
 		"""
 		Deletes accessions which are not common, and sorts the accessions, etc.)
 		"""
-		coordinateSnpsAndPhenotypeData(phend, p_i, self.snpsDataList, data_format=data_format)
+		coordinateSnpsAndPhenotypeData(phend, p_i, self.snpsDataList, data_format=self.data_format)
 		self.accessions = self.snpsDataList[0].accessions
 
 
