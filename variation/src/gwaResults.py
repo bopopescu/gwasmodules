@@ -236,13 +236,6 @@ class Result(object):
 		start = 0
 		currChrom = -1
 		lastPos = 0
-		extra_columns = []
-		if not (line[0].strip()).isdigit():
-			start = 1
-			print "Header detected"
-			columns = map(str.strip, line)
-			print columns
-			#extra_columns
 		if not withMAF:
 			for i in range(start, len(lines)):
 				line = lines[i].split(delim)
@@ -256,19 +249,31 @@ class Result(object):
 				self.positions.append(lastPos)
 				self.scores.append(float(line[2].strip()))
 		else:
-			for i in range(start, len(lines)):
-				line = lines[i].split(delim)
-				newChrom = int(line[0].strip())
+			extra_columns = []
+			if not (line[0].strip()).isdigit():
+				del lines[0]
+				print "Header detected"
+				columns = map(str.strip, line)
+				print columns
+				extra_columns = columns[5:]
+			self.snp_results = {}
+			for col in extra_columns:
+				self.snp_results[col] = []
+			for line in lines:
+				line_list = map(str.strip, line.split(delim))
+				newChrom = int(line_list[0])
 				if newChrom != currChrom:
 					currChrom = newChrom
 					if lastPos:
 						self.chromosome_ends.append(lastPos)
 				self.chromosomes.append(newChrom)
-				lastPos = int(line[1].strip())
+				lastPos = int(line_list[1])
 				self.positions.append(lastPos)
-				self.scores.append(float(line[2].strip()))
-				self.marfs.append(float(line[3].strip()))
-				self.mafs.append(float(line[4].strip()))
+				self.scores.append(float(line_list[2]))
+				self.marfs.append(float(line_list[3]))
+				self.mafs.append(float(line_list[4]))
+				for i, col in enumerate(extra_columns):
+					self.snp_results[col].append(line_list[5 + i])
 
 			assert len(self.positions) == len(self.mafs) == len(self.scores), \
 			     "length of scores, positions, mafs, isn't equal"

@@ -56,37 +56,43 @@ class ResultInfo(tables.IsDescription):
 	analysis_method = tables.StringCol(256)
 	comment = tables.StringCol(256)
 
-class ResultRecord(tables.IsDescription):
+
+class ResultRecordLM(tables.IsDescription):
 	"""
-	A general result record structure
+	Linear model, mixed models, etc.
 	"""
 	chromosome = tables.Int32Col()
 	position = tables.Int32Col()
 	score = tables.Float32Col() #Perhaps 64 bits?? 
 	maf = tables.Float32Col()
 	mac = tables.Int32Col()
-
-class ResultRecordLM(ResultRecord):
-	"""
-	Linear model, mixed models, etc.
-	"""
 	genotype_var_perc = tables.Float32Col()
 	beta0 = tables.Float32Col()
 	beta1 = tables.Float32Col()
 	correlation = tables.Float32Col()
 
 
-class ResultRecordKW(ResultRecord):
+class ResultRecordKW(tables.IsDescription):
 	"""
 	Kruskal Wallis
 	"""
+	chromosome = tables.Int32Col()
+	position = tables.Int32Col()
+	score = tables.Float32Col() #Perhaps 64 bits?? 
+	maf = tables.Float32Col()
+	mac = tables.Int32Col()
 	statistic = tables.Float32Col()
 
 
-class ResultRecordFT(ResultRecord):
+class ResultRecordFT(tables.IsDescription):
 	"""
 	Fisher's exact test
 	"""
+	chromosome = tables.Int32Col()
+	position = tables.Int32Col()
+	score = tables.Float32Col() #Perhaps 64 bits?? 
+	maf = tables.Float32Col()
+	mac = tables.Int32Col()
 	odds_ratio = tables.Float32Col()
 
 
@@ -198,6 +204,8 @@ def get_phenotype_values(hdf5_filename, phen_name, transformation='raw'):
 	return d
 
 
+#def get_full_info(hdf5_filename):
+
 
 def get_phenotype_info(hdf5_filename, phen_name=None):
 	"""
@@ -213,6 +221,9 @@ def get_phenotype_info(hdf5_filename, phen_name=None):
 				'is_binary': False}
 			for k in d:
 				d[k] = x[k]
+			d['transformation'] = _get_phenotype_transformations_(h5file, x['name'])
+			#for
+
 			dict_list.append(d)
 	else:
 		for x in table.where('name=="%s"' % phen_name):
@@ -221,6 +232,7 @@ def get_phenotype_info(hdf5_filename, phen_name=None):
 				'is_binary': False}
 			for k in d:
 				d[k] = x[k]
+			d['transformation'] = _get_phenotype_transformations_(h5file, x['name'])
 			dict_list.append(d)
 
 	h5file.close()
@@ -228,29 +240,61 @@ def get_phenotype_info(hdf5_filename, phen_name=None):
 
 
 
+def _get_phenotype_transformations_(h5file, phen_name):
+	dict_list = []
+	table = h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
+	for x in table.iterrows():
+		d = {'name': '', 'description': ''}
+		for k in d:
+			d[k] = x[k]
+		d['analysis_method'] = _get_analysis_methods_(h5file, phen_name, x['name'])
+		dict_list.append(d)
+	return dict_list
+
+
 def get_phenotype_transformations(hdf5_filename, phen_name):
 	"""
 	Returns the phenotype values
 	"""
-	d = {'names': [], 'descriptions': []}
 	h5file = tables.openFile(hdf5_filename, mode="r")
-	table = h5file.getNode('/phenotypes/%s' % phen_name)
-	for x in table.iterrows():
-		for k in d:
-			d[k].append(x[k])
+	d = _get_phenotype_transformations_(h5file)
+	h5file.close()
+	return d
+
+
+def _get_analysis_methods_(h5file, phen_name, transformation):
+	dict_list = []
+	try:
+		table = h5file.getNode('/phenotypes/%s/%s/result_info' % (phen_name, transformation))
+		for x in table.iterrows():
+			d = {'analysis_method': '', 'comment': ''}
+			for k in d:
+				d[k] = x[k]
+			dict_list.append(d)
+	except Exception, err_str:
+		print "No results found:", err_str
+	return dict_list
+
+
+def get_analysis_methods(hdf5_filename, phen_name, transformation):
+	"""
+	Returns the phenotype values
+	"""
+	h5file = tables.openFile(hdf5_filename, mode="r")
+	d = _get_analysis_methods_(h5file)
 	h5file.close()
 	return d
 
 
 
-def add_results(hdf5_filename, phen_name, chromosomes, positions, scores, mafs, macs, analysis_method,
+def add_results(hdf5_file_name, phen_name, analysis_method, chromosomes, positions, scores, mafs, macs,
 		analysis_comment='', transformation='raw', **kwargs):
 	"""
 	Add a result to the hdf5 file.
 	"""
 	h5file = tables.openFile(hdf5_file_name, mode="r+")
 	trans_group = h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation))
-	table = h5file.createTable(phen_group, 'result_info', ResultInfo, "Result information")
+	table = h5file.createTable(trans_group, 'result_info', ResultInfo, "Result information")
 	info = table.row
 	info['analysis_method'] = analysis_method
 	if analysis_comment: info['comment'] = analysis_comment
@@ -278,12 +322,15 @@ def add_results(hdf5_filename, phen_name, chromosomes, positions, scores, mafs, 
 			result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
 		result.append()
 	table.flush()
+	for analysis_method in h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation)):
+		print analysis_method
+
 	h5file.close()
 
 
 
 
-def get_results(hdf5_filename, phen_name, analysis_method, transformation='raw'):
+def get_results(hdf5_file_name, phen_name, analysis_method, transformation='raw'):
 	"""
 	Return results..
 	"""
@@ -296,13 +343,15 @@ def get_results(hdf5_filename, phen_name, analysis_method, transformation='raw')
 		d['correlation'] = []
 		d['genotype_var_perc'] = []
 
-	h5file = tables.openFile(hdf5_filename, mode="r")
+	h5file = tables.openFile(hdf5_file_name, mode="r")
 	table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
 	for x in table.iterrows():
 		for k in d:
 			d[k].append(x[k])
 	h5file.close()
 	return d
+
+
 
 
 
@@ -348,13 +397,26 @@ def _test_():
 	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
 	res = gr.Result(result_file=result_file, name='FT10')
 
+	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
+		'beta1', 'correlations']:
+		print c, res.snp_results[c][:10]
 
-	add_results(hdf5_file_name_1, phen_name, res.snp_results['chromosomes'], res.snp_results['positions'],
+
+	add_results(hdf5_file_name_1, phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
 			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
-			analysis_method='emmax', transformation='raw', beta0=res.snp_results['beta0'])
-	#hdf5_file_name_2 = '/Users/bjarni.vilhjalmsson/tmp/test2.hdf5'
-	#init_file(hdf5_file_name_2)
-	#print "Second file is constructed"
+			transformation='raw', genotype_var_perc=res.snp_results['genotype_var_perc'],
+			beta0=res.snp_results['beta0'], beta1=res.snp_results['beta1'],
+			correlation=res.snp_results['correlations'])
+
+	print "Result added."
+
+
+	print "Now fetching a result."
+	res = get_results(hdf5_file_name_1, phen_name, 'emmax')
+	print "Result loaded"
+	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
+		'beta1', 'correlation']:
+		print c, res[c][:10]
 
 
 if __name__ == '__main__':
