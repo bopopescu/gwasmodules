@@ -155,7 +155,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 			AND %s"\
 			% (phenotype_method_id, call_method_id, analysis_method_id, results_method_type_id, \
 				transformation_method_id, remove_outliers, str(transformation_parameters_str))
-	print sql_statement
+	#print sql_statement
 	cursor.execute(sql_statement)
 	row = cursor.fetchone()
 	if row:
@@ -173,11 +173,11 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 			       % (short_name, results_file, method_description, data_description, phenotype_method_id, \
 				call_method_id, results_method_type_id, comment, analysis_method_id, transformation_method_id, \
 				remove_outliers, str(transformation_parameters))
-		print sql_statement
+		#print sql_statement
 		cursor.execute(sql_statement)
 
 		sql_statement = "SELECT id FROM stock_250k.results_method WHERE short_name like '" + short_name + "'"
-		print sql_statement
+		#print sql_statement
 		cursor.execute(sql_statement)
 		row = cursor.fetchone()
 		results_id = int(row[0])
@@ -185,7 +185,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 		#Updating filename
 		db_file = db_result_dir + str(results_id) + "_results.tsv"
 		sql_statement = "UPDATE stock_250k.results_method SET filename='%s' WHERE id=%d" % (db_file, results_id)
-		print sql_statement
+		#print sql_statement
 		cursor.execute(sql_statement)
 
 		print "Committing transaction (making changes permanent)."
