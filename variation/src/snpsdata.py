@@ -2919,10 +2919,13 @@ class SNPsDataSet:
 		"""
 		Returns the mafs and marfs as a dictionary.
 		"""
-		if not self.data_format or self.data_format == 'binary':
+		if not self.data_format:
 			binary = True
 		else:
-			binary = False
+			if  self.data_format == 'binary':
+				binary = True
+			else:
+				binary = False
 
 		maf_list = []
 		marf_list = []

@@ -349,7 +349,9 @@ def _test_():
 	res = gr.Result(result_file=result_file, name='FT10')
 
 
-	add_results(hdf5_file_name_1, phen_name, chromosomes, positions, scores, mafs, macs, analysis_method, analysis_comment, transformation)
+	add_results(hdf5_file_name_1, phen_name, res.snp_results['chromosomes'], res.snp_results['positions'],
+			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
+			analysis_method='emmax', '', transformation='raw', beta0=res.snp_results['beta0'])
 	#hdf5_file_name_2 = '/Users/bjarni.vilhjalmsson/tmp/test2.hdf5'
 	#init_file(hdf5_file_name_2)
 	#print "Second file is constructed"
