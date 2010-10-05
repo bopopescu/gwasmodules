@@ -236,10 +236,13 @@ class Result(object):
 		start = 0
 		currChrom = -1
 		lastPos = 0
+		extra_columns = []
 		if not (line[0].strip()).isdigit():
 			start = 1
-			#print "Header detected"
-			#print line[0].strip()
+			print "Header detected"
+			columns = map(str.strip, line)
+			print columns
+
 		if not withMAF:
 			for i in range(start, len(lines)):
 				line = lines[i].split(delim)
@@ -288,7 +291,7 @@ class Result(object):
 
 	def _rank_scores_(self):
 		"""
-		Generates two data structures: 
+		Generates two data structures:
 		self.orders (SNP indices ordered by rank)
 		self.ranks (ranks of the SNPs)
 		"""
@@ -466,8 +469,8 @@ class Result(object):
 
 	def get_chromosome_splits(self):
 		"""
-		Returns list of indices (and prev chromosome), for the when the chromosomes 
-		change in the scores,positions indices.
+		Returns list of indices (and prev chromosome), for the when the chromosomes
+		change in the scores, positions indices.
 		USE WITH CARE
 		"""
 		oldChrom = 0
@@ -484,7 +487,7 @@ class Result(object):
 
 	def neg_log_trans(self):
 		"""
-		apply -log(x) to the pvalues (scores)
+		apply - log(x) to the pvalues (scores)
 		"""
 		import math, warnings
 		for i, score in enumerate(self.scores):
@@ -560,10 +563,10 @@ class Result(object):
 
 	def filter_attr(self, attr_name, attr_threshold):
 		"""
-		Filter out scores/pvalues etc. which have attr<attr_threshold.	
-		
-		attr are e.g. 
-		'mafs', 'marfs', 'scores', etc.	
+		Filter out scores / pvalues etc. which have attr < attr_threshold.
+
+		attr are e.g.
+		'mafs', 'marfs', 'scores', etc.
 		"""
 		print "Filtering for attribute '%s' with threshold: %g" % (attr_name, attr_threshold)
 		attr = getattr(self, attr_name)
@@ -593,7 +596,7 @@ class Result(object):
 	def filter_non_segregating_snps(self, ecotype1, ecotype2, accessions=None):
 		"""
 		Filter out all SNPs which are not segregating in the two accessions.
-		
+
 		Assumes the accessions map the results objects SNPs. (and that they are defined)
 		"""
 		newScores = []
@@ -680,7 +683,7 @@ class Result(object):
 
 	def get_top_genes(self, n, window_size=5000, conn=None):
 		"""
-		Returns a set of (chromosome, start_pos, end_pos), for genes found. 
+		Returns a set of (chromosome, start_pos, end_pos), for genes found.
 		"""
 		self._rank_scores_() #Making sure the ranks are updated
 		genes = set()
@@ -709,7 +712,7 @@ class Result(object):
 
 	def get_top_regions(self, n, distance_threshold=25000):
 		"""
-		Returns a list of regions, defined by (chromosome,start_pos,end_pos).	
+		Returns a list of regions, defined by (chromosome, start_pos, end_pos).
 		"""
 		self._rank_scores_()
 		chromosome_ends = self.get_chromosome_ends()
@@ -740,7 +743,7 @@ class Result(object):
 
 	def get_region_result(self, chromosome, start_pos, end_pos, buffer=0):
 		"""
-		returns a result object with only the SNPs, etc. within the given boundary. 
+		returns a result object with only the SNPs, etc. within the given boundary.
 		"""
 		positions = []
 		scores = []

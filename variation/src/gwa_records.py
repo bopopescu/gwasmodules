@@ -215,12 +215,12 @@ def get_phenotype_info(hdf5_filename, phen_name=None):
 				d[k] = x[k]
 			dict_list.append(d)
 	else:
-		for x in table.where('name==%' % phen_name):
+		for x in table.where('name=="%s"' % phen_name):
 			d = {'name': '', 'num_values': 0, 'std_dev': 0.0, 'growth_conditions': '',
 				'phenotype_scoring': '', 'method_description': '', 'measurement_scale': '',
 				'is_binary': False}
 			for k in d:
-				d[k].append(x[k])
+				d[k] = x[k]
 			dict_list.append(d)
 
 	h5file.close()
@@ -351,7 +351,7 @@ def _test_():
 
 	add_results(hdf5_file_name_1, phen_name, res.snp_results['chromosomes'], res.snp_results['positions'],
 			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
-			analysis_method='emmax', '', transformation='raw', beta0=res.snp_results['beta0'])
+			analysis_method='emmax', transformation='raw', beta0=res.snp_results['beta0'])
 	#hdf5_file_name_2 = '/Users/bjarni.vilhjalmsson/tmp/test2.hdf5'
 	#init_file(hdf5_file_name_2)
 	#print "Second file is constructed"

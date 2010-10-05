@@ -152,7 +152,7 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 	sql_statement = "SELECT id FROM stock_250k.results_method \
 			WHERE phenotype_method_id=%d AND call_method_id=%d AND analysis_method_id=%d \
 			AND results_method_type_id=%d AND transformation_method_id=%d AND remove_outliers=%d \
-			AND transformation_parameters %s"\
+			AND %s"\
 			% (phenotype_method_id, call_method_id, analysis_method_id, results_method_type_id, \
 				transformation_method_id, remove_outliers, str(transformation_parameters_str))
 	print sql_statement
