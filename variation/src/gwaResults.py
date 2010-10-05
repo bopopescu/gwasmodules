@@ -242,7 +242,7 @@ class Result(object):
 			print "Header detected"
 			columns = map(str.strip, line)
 			print columns
-
+			#extra_columns
 		if not withMAF:
 			for i in range(start, len(lines)):
 				line = lines[i].split(delim)
