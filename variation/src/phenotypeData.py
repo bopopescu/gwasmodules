@@ -846,9 +846,16 @@ class PhenotypeData:
 
 		return disregardedEcotypes
 
-	def filter_accessions_w_missing_data(self):
-		indices_to_keep = [ai for ai, a in enumerate(self.accessions) if not 'NA' in self.phenotypeValues[ai]]
-		self.removeAccessions(indices_to_keep)
+	def filter_accessions_w_missing_data(self, pid=None):
+		if pid:
+			i = self.getPhenIndex(pid)
+			indices_to_keep = [ai for ai, a in enumerate(self.accessions) if 'NA' != self.phenotypeValues[ai][i]]
+			self.removeAccessions(indices_to_keep)
+		else:
+			indices_to_keep = [ai for ai, a in enumerate(self.accessions) if not 'NA' in self.phenotypeValues[ai]]
+			self.removeAccessions(indices_to_keep)
+
+
 
 
 	def getNonNAEcotypes(self, phenotypeID):
