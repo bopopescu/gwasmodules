@@ -101,12 +101,14 @@ class GWASRecord():
 
 	def __init__(self, hdf5_file_name):
 		self.filename = hdf5_file_name
-		h5file = tables.openFile(hdf5_file_name, mode="w", title="Phenotype_results_file")
+
+
+	def init_file(self):
+		h5file = tables.openFile(self.filename, mode="w", title="Phenotype_results_file")
 		g = h5file.createGroup("/", 'phenotypes', 'Basic phenotype folder')
 		h5file.createTable(g, 'info', PhenotypeInfo, "Phenotyping information")
 		h5file.flush()
 		h5file.close()
-
 
 	def add_new_phenotype(self, phen_name, phenotype_values, ecotypes, accession_names=None, growth_conditions='',
 				phenotype_scoring='', method_description='', measurement_scale='', is_binary=False):
@@ -335,6 +337,34 @@ class GWASRecord():
 		h5file.close()
 		return d
 
+
+
+#	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0, \
+#				chromosomes=[1, 2, 3, 4, 5]):
+#		"""
+#		Return results..
+#		"""
+#		cd = {'chromosome': []}
+#
+#		h5file = tables.openFile(self.filename, mode="r")
+#		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
+#
+#		for chromosome in chromosomes:
+#			d = {'position': [], 'score': [], 'maf': [], 'mac': []}
+#
+#			if analysis_method == 'kw':
+#				d['statistic'] = []
+#			else:
+#				d['beta0'] = []
+#				d['beta1'] = []
+#				d['correlation'] = []
+#				d['genotype_var_perc'] = []
+#			for x in table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac)):
+#				for k in d:
+#					d[k].append(x[k])
+#			cd['chromosome'] =
+#		h5file.close()
+#		return cd
 
 
 
