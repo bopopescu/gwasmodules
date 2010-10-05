@@ -330,7 +330,7 @@ def add_results(hdf5_file_name, phen_name, analysis_method, chromosomes, positio
 
 
 
-def get_results(hdf5_file_name, phen_name, analysis_method, transformation='raw'):
+def get_results(hdf5_file_name, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0):
 	"""
 	Return results..
 	"""
@@ -345,11 +345,13 @@ def get_results(hdf5_file_name, phen_name, analysis_method, transformation='raw'
 
 	h5file = tables.openFile(hdf5_file_name, mode="r")
 	table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
-	for x in table.iterrows():
+	for x in table.where('(score<=%f) & (mac>=%d)' % (max_pval, min_mac)):
 		for k in d:
 			d[k].append(x[k])
 	h5file.close()
 	return d
+
+
 
 
 
@@ -412,7 +414,7 @@ def _test_():
 
 
 	print "Now fetching a result."
-	res = get_results(hdf5_file_name_1, phen_name, 'emmax')
+	res = get_results(hdf5_file_name_1, phen_name, 'emmax', min_mac=15, max_pval=0.01)
 	print "Result loaded"
 	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
 		'beta1', 'correlation']:
