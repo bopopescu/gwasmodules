@@ -849,10 +849,12 @@ class PhenotypeData:
 	def filter_accessions_w_missing_data(self, pid=None):
 		if pid:
 			i = self.getPhenIndex(pid)
-			indices_to_keep = [ai for ai, a in enumerate(self.accessions) if 'NA' != self.phenotypeValues[ai][i]]
+			indices_to_keep = [ai for ai, a in enumerate(self.accessions) \
+					if 'NA' != self.phenotypeValues[ai][i]]
 			self.removeAccessions(indices_to_keep)
 		else:
-			indices_to_keep = [ai for ai, a in enumerate(self.accessions) if not 'NA' in self.phenotypeValues[ai]]
+			indices_to_keep = [ai for ai, a in enumerate(self.accessions) \
+					if not 'NA' in self.phenotypeValues[ai]]
 			self.removeAccessions(indices_to_keep)
 
 
@@ -1054,13 +1056,10 @@ _publishablePhenotypes_ = []
 
 
 
-def getPhenotypes(host=None, user='bvilhjal', passwd='*rri_bjarni@usc', onlyBinary=False, onlyQuantitative=False,
-		  onlyCategorical=False, onlyReplicates=False, includeSD=False, rawPhenotypes=False,
-		  onlyPublishable=False):
-	if not host:
-		host = env['default_lookup_db']
+def getPhenotypes(onlyBinary=False, onlyQuantitative=False, onlyCategorical=False, onlyReplicates=False,
+		includeSD=False, rawPhenotypes=False, onlyPublishable=False):
 	import dbutils
-	conn = dbutils.connect_to_gmi_ara_devel_be()
+	conn = dbutils.connect_to_default_lookup()
 	cursor = conn.cursor ()
 
 	#Retrieve the ecotypes
@@ -1921,6 +1920,47 @@ def _insert_bergelsson_phen_into_db_():
 #	phed.writeToFile('/tmp/hypocotyl.tsv',with_accession_names=True)
 
 
+def combine_resistance_nc14():
+	filename = "/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/phen_raw_092910.tsv"
+	phed = readPhenotypeFile(filename)
+
+	print phed.getPhenotypeName(1316)
+	phed.filter_accessions_w_missing_data(1316)
+	eids1 = phed.getNonNAEcotypes(1316)
+	phen_vals1 = phed.getPhenVals(1316)
+
+	phed = readPhenotypeFile(filename)
+	print phed.getPhenotypeName(1328)
+	phed.filter_accessions_w_missing_data(1328)
+	eids2 = phed.getNonNAEcotypes(1328)
+	phen_vals2 = phed.getPhenVals(1328)
+	intersection_eids = set(eids1).intersection(set(eids2))
+	for eid in intersection_eids:
+		i1 = eids1.index(eid)
+		i2 = eids2.index(eid)
+		print phen_vals1[i1], phen_vals2[i2]
+	new_ecotype_ids = []
+	new_phen_vals = []
+	for eid in set(eids1).difference(intersection_eids):
+		i = eids1.index(eid)
+		new_ecotype_ids.append(eid)
+		new_phen_vals.append(phen_vals1[i])
+	for eid in set(eids2).difference(intersection_eids):
+		i = eids2.index(eid)
+		new_ecotype_ids.append(eid)
+		new_phen_vals.append(phen_vals2[i])
+	for eid in intersection_eids:
+		i = eids1.index(eid)
+		new_ecotype_ids.append(eid)
+		new_phen_vals.append(phen_vals1[i])
+	print new_ecotype_ids
+	phen_vals = [[pv] for pv in new_phen_vals]
+	phed = PhenotypeData(new_ecotype_ids, ['Resistance_Nc14_combined_binary'], phen_vals, with_db_ids=False)
+	phed.insert_into_DB([1], method_description='', growth_condition='Field', biology_category_id=2,
+			citations='Jonathan Jones', data_description='Albug laibachii Nc14 combined',
+			data_type='binary')
+
+
 if __name__ == '__main__':
 	#_createRatioPhenotype_(184,183,222,"Trich_avg_JA_div_Trich_avg_C","Ratio: Trich_avg_JA/Trich_avg_C",biology_category_id=7)
 	#pass
@@ -1933,7 +1973,8 @@ if __name__ == '__main__':
 	#_test_phen_map_plot_()
 	#_insert_bergelsson_phen_into_db_()
 	#get_AW_common_dataset()
-	get_hypocotyl_lenghts()
+	#get_hypocotyl_lenghts()
+	combine_resistance_nc14()
 	print "Done!"
 
 

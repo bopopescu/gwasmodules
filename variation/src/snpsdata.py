@@ -3110,8 +3110,8 @@ class SNPsDataSet:
 		#print self.accessions
 		num_accessions = len(self.accessions)
 		acc_indices_to_keep = []
-		for i in range(0, len(self.accessions)):
-			if self.accessions[i] in ecotypes:
+		for i, acc in enumerate(self.accessions):
+			if acc in ecotypes:
 				acc_indices_to_keep.append(i)
 		#pdb.set_trace()
 		self.filter_accessions_indices(acc_indices_to_keep)

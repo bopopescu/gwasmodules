@@ -17,6 +17,7 @@ import itertools
 import scipy as sp
 import util
 import linear_models as lm
+import dataParsers as dp
 
 class PhenotypeInfo(tables.IsDescription):
 	"""
@@ -313,6 +314,10 @@ class GWASRecord():
 				result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
 			result.append()
 		table.flush()
+
+#		table.cols.chromosome.createIndex()
+#		table.cols.score.createIndex()
+#		table.cols.mac.createIndex()
 		h5file.close()
 
 
@@ -342,7 +347,7 @@ class GWASRecord():
 
 
 	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0, \
-				chromosomes=[1, 2, 3, 4, 5]):
+				top_fraction=0.01, chromosomes=[1, 2, 3, 4, 5]):
 		"""
 		Return results..
 		"""
@@ -351,19 +356,28 @@ class GWASRecord():
 		h5file = tables.openFile(self.filename, mode="r")
 		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
 
-		for chromosome in chromosomes:
-			d = {'position': [], 'score': [], 'maf': [], 'mac': []}
 
-			if analysis_method == 'kw':
-				d['statistic'] = []
-			else:
-				d['beta0'] = []
-				d['beta1'] = []
-				d['correlation'] = []
-				d['genotype_var_perc'] = []
+		d_keys = ['score', 'position', 'maf', 'mac']
+		if analysis_method == 'kw':
+			d_keys.append('statistic')
+		else:
+			d_keys.extend(['beta0', 'beta1', 'correlation', 'genotype_var_perc'])
+
+		for chromosome in chromosomes:
+			sort_list = []
 			for x in table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac)):
-				for k in d:
-					d[k].append(x[k])
+				sort_list.append([x[k] for k in d_keys])
+			#print sort_list[:10]
+			sort_list.sort()
+			#print sort_list[:10]
+			sort_list = sort_list[:int(top_fraction * len(sort_list))]
+			for l in sort_list: l[1], l[0] = l[0], l[1]
+			sort_list.sort()
+			l = map(list, zip(*sort_list))
+			d = {}
+			d_keys[0], d_keys[1] = d_keys[1], d_keys[0]
+			for i, k in enumerate(d_keys):
+				d[k] = l[i]
 			cd[chromosome] = d
 		h5file.close()
 		return cd
@@ -377,12 +391,9 @@ class GWASRecord():
 		phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
 		min_phen_val = min(phen_vals)
 		max_phen_val = max(phen_vals)
-		print min_phen_val, max_phen_val
 		chunk_size = ((max_phen_val - min_phen_val) / bin_number) * (1 + 1e-5 / bin_number)
 		pa = (sp.array(phen_vals) - min_phen_val) / chunk_size
-		print pa
 		bin_counts = sp.bincount(sp.array(pa , dtype='int32'))
-		print len(bin_counts)
 		keys = ['x_axis', 'frequency']
 		bin_list = []
 		for i, bin_count in enumerate(bin_counts):
@@ -393,13 +404,49 @@ class GWASRecord():
 		return bin_list
 
 
-	def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw'):
+	def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', \
+			snps_data_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary',
+			kinship_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled'):
 
 		"""
 		Performs GWAS and updates the datastructure.
 		"""
-		phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
+		import bisect
+		import gwa
+		phen_data = self.get_phenotype_values(phen_name, transformation)
+		sd = dp.parse_numerical_snp_data(snps_data_file)
+		sd.filter_accessions(map(str, phen_data['ecotype']))
+		phen_vals = []
+		for ei in sd.accessions:
+			i = bisect.bisect(phen_data['ecotype'], int(ei)) - 1
+			phen_vals.append(phen_data['mean_value'][i])
+		snps = sd.getSnps()
 
+		kwargs = {}
+		if analysis_method == 'emmax':
+			k = lm.load_kinship_from_file(kinship_file, sd.accessions)
+			res = lm.emmax(snps, phen_vals, k)
+		elif analysis_method == 'lm':
+			res = lm.linear_model(snps, phen_vals)
+		elif analysis_method == 'kw':
+			kw_res = util.kruskal_wallis(snps, phen_vals)
+			pvals = kw_res['ps']
+			kwargs['statistics'] = kw_res['ds']
+		else:
+			raise Exception()
+
+		if analysis_method in ['lm', 'emmax']:
+			kwargs['genotype_var_perc'] = res['var_perc']
+			betas = map(list, zip(*res['betas']))
+			kwargs['beta0'] = betas[0]
+			kwargs['beta1'] = betas[1]
+			pvals = res['ps']
+
+		kwargs['correlations'] = gwa.calc_correlations(snps, phen_vals)
+		sd.get_mafs()
+
+		#Now add to hdf5 file
+		print 'Done!'
 
 
 
@@ -459,39 +506,39 @@ def _test_():
 	r = gwa_record.get_phenotype_info(phen_name)
 	print r
 
-#	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
-#	res = gr.Result(result_file=result_file, name='FT10')
-#
-#	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
-#		'beta1', 'correlations']:
-#		print c, res.snp_results[c][:10]
-#
-#
-#	gwa_record.add_results(phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
-#			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
-#			transformation='raw', genotype_var_perc=res.snp_results['genotype_var_perc'],
-#			beta0=res.snp_results['beta0'], beta1=res.snp_results['beta1'],
-#			correlation=res.snp_results['correlations'])
-#
-#
-#	print "Result added."
-#
-#	print "Now fetching a result."
-#	res = gwa_record.get_results(phen_name, 'emmax')#, min_mac=15, max_pval=0.01)
-#	print "Result loaded"
-#	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
-#		'beta1', 'correlation']:
-#		print c, res[c][:10]
-#	r = gwa_record.get_phenotype_info()
-#	print r
-#	res = gwa_record.get_results_by_chromosome(phen_name, 'emmax')
-#	print "Result re-loaded"
-#	for chromosome in res:
-#		for c in ['position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
-#			'beta1', 'correlation']:
-#			print c, res[chromosome][c][:10]
-	print gwa_record.get_phenotype_bins(phen_name)
+	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
+	res = gr.Result(result_file=result_file, name='FT10')
 
+	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
+		'beta1', 'correlations']:
+		print c, res.snp_results[c][:10]
+
+
+	gwa_record.add_results(phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
+			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
+			transformation='raw', genotype_var_perc=res.snp_results['genotype_var_perc'],
+			beta0=res.snp_results['beta0'], beta1=res.snp_results['beta1'],
+			correlation=res.snp_results['correlations'])
+
+
+	print "Result added."
+
+	print "Now fetching a result."
+	res = gwa_record.get_results(phen_name, 'emmax')#, min_mac=15, max_pval=0.01)
+	print "Result loaded"
+	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
+		'beta1', 'correlation']:
+		print c, res[c][:10]
+	r = gwa_record.get_phenotype_info()
+	print r
+	res = gwa_record.get_results_by_chromosome(phen_name, 'emmax')
+	print "Result re-loaded"
+	for chromosome in res:
+		for c in ['position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
+			'beta1', 'correlation']:
+			print c, res[chromosome][c][:10]
+	print gwa_record.get_phenotype_bins(phen_name)
+	gwa_record.perform_gwas(phen_name, analysis_method='emmax')
 
 
 if __name__ == '__main__':

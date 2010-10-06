@@ -1919,8 +1919,8 @@ def _test_stepwise_emmax_():
 	import phenotypeData as pd
 	import util
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_raw_070810.tsv"
-	mac_threshold = 16
-	for pid, log_trans in [(5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
+	mac_threshold = 15
+	for pid, log_trans in [(5, False), (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
 		phed = pd.readPhenotypeFile(filename)
 		if log_trans:
 			phed.logTransform(pid)

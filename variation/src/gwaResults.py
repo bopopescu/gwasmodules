@@ -252,9 +252,9 @@ class Result(object):
 			extra_columns = []
 			if not (line[0].strip()).isdigit():
 				del lines[0]
-				print "Header detected"
+				#print "Header detected"
 				columns = map(str.strip, line)
-				print columns
+				#print columns
 				extra_columns = columns[5:]
 			self.snp_results = {}
 			for col in extra_columns:
