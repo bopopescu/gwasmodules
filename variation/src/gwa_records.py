@@ -377,7 +377,7 @@ class GWASRecord():
 			sort_list.sort()
 			sort_list = sort_list[:int(top_fraction * len(sort_list))]
 			for l in sort_list: l[1], l[0] = l[0], l[1]
-			sort_list.sort()
+			sort_list.sort(reverse=True)
 			transp_list = map(list, zip(*sort_list))
 			d = {}
 			d_keys[0], d_keys[1] = d_keys[1], d_keys[0]
@@ -411,6 +411,20 @@ class GWASRecord():
 		return bin_list
 
 
+
+	def transform_phenotype(self, phen_name, transformation):
+		"""
+		Apply a transformation to a phenotype.
+		"""
+		phen_data = self.get_phenotype_values(phen_name, transformation)
+		if transformation == 'raw':
+			return
+		elif transformation == 'log':
+			sp.s
+
+
+
+
 	def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', \
 			snps_data_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary',
 			kinship_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled'):
@@ -428,6 +442,13 @@ class GWASRecord():
 			i = bisect.bisect(phen_data['ecotype'], int(ei)) - 1
 			phen_vals.append(phen_data['mean_value'][i])
 		snps = sd.getSnps()
+		positions = sd.getPositions()
+		chromosomes = []
+		for s, c in itertools.izip(sd.snpsDataList, sd.chromosomes):
+			chromosomes.extend([c] * len(s.snps))
+		maf_dict = sd.get_mafs()
+		correlations = gwa.calc_correlations(snps, phen_vals)
+
 
 		kwargs = {}
 		if analysis_method == 'emmax':
@@ -437,22 +458,20 @@ class GWASRecord():
 			res = lm.linear_model(snps, phen_vals)
 		elif analysis_method == 'kw':
 			kw_res = util.kruskal_wallis(snps, phen_vals)
-			pvals = kw_res['ps']
-			kwargs['statistics'] = kw_res['ds']
+			scores = map(lambda x:-math.log10(x), kw_res['ps'])
+			self.add_results(phen_name, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
+					maf_dict['mafs'], transformation=transformation, statistics=kw_res['ds'],
+					correlation=correlations)
 		else:
 			raise Exception()
 
 		if analysis_method in ['lm', 'emmax']:
-			kwargs['genotype_var_perc'] = res['var_perc']
 			betas = map(list, zip(*res['betas']))
-			kwargs['beta0'] = betas[0]
-			kwargs['beta1'] = betas[1]
-			pvals = res['ps']
-
-		kwargs['correlations'] = gwa.calc_correlations(snps, phen_vals)
-		sd.get_mafs()
-
-		#Now add to hdf5 file
+			scores = map(lambda x:-math.log10(x), res['ps'])
+			self.add_results(phen_name, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
+					maf_dict['mafs'], transformation=transformation,
+					genotype_var_perc=res['var_perc'], beta0=betas[0], beta1=betas[1],
+					correlation=correlations)
 		print 'Done!'
 
 
@@ -556,7 +575,15 @@ def _test_():
 	print res['chromosome_ends']
 	print res['max_score']
 	print gwa_record.get_phenotype_bins(phen_name)
-	gwa_record.perform_gwas(phen_name, analysis_method='emmax')
+	s1 = time.time()
+	gwa_record.perform_gwas('LD', analysis_method='kw')
+      	secs = time.time() - s1
+        if secs > 60:
+                mins = int(secs) / 60
+                secs = secs - mins * 60
+                print 'Took %d mins and %f seconds.' % (mins, secs)
+        else:
+                print 'Took %f seconds.' % (secs)
 
 
 if __name__ == '__main__':
