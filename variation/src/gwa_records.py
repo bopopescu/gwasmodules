@@ -20,6 +20,7 @@ import linear_models as lm
 import dataParsers as dp
 import math
 import time
+import pdb
 
 chromosome_ends = [30429953, 19701870, 23467451, 18578708, 26992130]
 
@@ -130,7 +131,7 @@ class GWASRecord():
 				method_description=method_description, measurement_scale=measurement_scale,
 				is_binary=is_binary)
 
-		self.add_phenotype_values(phen_name, ecotypes, phenotype_values, transformation='raw',
+		self._add_phenotype_values_(phen_name, ecotypes, phenotype_values, transformation='raw',
 				accessions=accession_names, std_dev_values=None, value_comments=None)
 		self.h5file.flush()
 		self.h5file.close()
@@ -161,6 +162,17 @@ class GWASRecord():
 				accessions=None, std_dev_values=None, value_comments=None):
 		"""
 		Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
+		"""
+		self.h5file = tables.openFile(self.filename, mode="r+")
+		self._add_phenotype_values_(phen_name, ecotypes, values, transformation, transformation_description,
+				accessions, std_dev_values, value_comments)
+		self.h5file.flush()
+		self.h5file.close()
+
+
+	def _add_phenotype_values_(self, phen_name, ecotypes, values, transformation='raw', transformation_description=None,
+				accessions=None, std_dev_values=None, value_comments=None):
+		"""
 		"""
 
 		phen_group = self.h5file.getNode('/phenotypes/%s' % phen_name)
@@ -352,8 +364,8 @@ class GWASRecord():
 
 
 
-	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0, \
-				top_fraction=0.5, chromosomes=[1, 2, 3, 4, 5], log_transform=True):
+	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=15, min_score=0.0, \
+				top_fraction=0.05, chromosomes=[1, 2, 3, 4, 5], log_transform=True):
 		"""
 		Return results..
 		"""
@@ -372,12 +384,13 @@ class GWASRecord():
 
 		for chromosome in chromosomes:
 			sort_list = []
-			for i, x in enumerate(table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac))):
+			for i, x in enumerate(table.where('(chromosome==%d) &(score>=%f) & (mac>=%d)' % (chromosome, min_score, min_mac))):
 				sort_list.append([x[k] for k in d_keys])
-			sort_list.sort()
+			print len(sort_list)
+			sort_list.sort(reverse=False)
 			sort_list = sort_list[:int(top_fraction * len(sort_list))]
 			for l in sort_list: l[1], l[0] = l[0], l[1]
-			sort_list.sort(reverse=True)
+			#sort_list.sort()
 			transp_list = map(list, zip(*sort_list))
 			d = {}
 			d_keys[0], d_keys[1] = d_keys[1], d_keys[0]
@@ -387,6 +400,7 @@ class GWASRecord():
 		cd['chromosome_ends'] = chromosome_ends
 		cd['max_score'] = max_score
 		h5file.close()
+		pdb.set_trace()
 		return cd
 
 
@@ -412,15 +426,22 @@ class GWASRecord():
 
 
 
-	def transform_phenotype(self, phen_name, transformation):
+	def transform_phenotype(self, phen_name, transformation, original_transformation='raw'):
 		"""
 		Apply a transformation to a phenotype.
 		"""
-		phen_data = self.get_phenotype_values(phen_name, transformation)
+		phen_data = self.get_phenotype_values(phen_name, original_transformation)
+		phen_vals = sp.array(phen_data['mean_value'])
 		if transformation == 'raw':
 			return
 		elif transformation == 'log':
-			sp.s
+			new_phen_vals = sp.log(phen_vals - min(phen_vals) + sp.var(phen_vals) * 0.1)
+		elif transformation == 'sqrt':
+			new_phen_vals = sp.sqrt(phen_vals - min(phen_vals) + sp.var(phen_vals) * 0.1)
+		self.add_phenotype_values(phen_name, phen_data['ecotype'], new_phen_vals, transformation)
+
+
+
 
 
 
@@ -542,7 +563,7 @@ def _test_():
 
 
 	gwa_record.add_results(phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
-			res.snp_results['scores'], res.snp_results['marfs'], res.snp_results['mafs'],
+			res.scores, res.snp_results['marfs'], res.snp_results['mafs'],
 			transformation='raw', genotype_var_perc=res.snp_results['genotype_var_perc'],
 			beta0=res.snp_results['beta0'], beta1=res.snp_results['beta1'],
 			correlation=res.snp_results['correlations'])
@@ -584,6 +605,10 @@ def _test_():
                 print 'Took %d mins and %f seconds.' % (mins, secs)
         else:
                 print 'Took %f seconds.' % (secs)
+
+	gwa_record.transform_phenotype('LD', transformation='log')
+	gwa_record.perform_gwas('LD', analysis_method='emmax', transformation='log')
+
 
 
 if __name__ == '__main__':
