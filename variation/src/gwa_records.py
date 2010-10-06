@@ -143,6 +143,7 @@ class GWASRecord():
 		Insert a new phenotype into the DB
 		"""
 		group = self.h5file.createGroup("/phenotypes", phen_name, 'Phenotype folder for ' + phen_name)
+		table = self.h5file.createTable(group, 'transformation_info', TransformationInfo, "Transformation information")
 		table = self.h5file.getNode('/phenotypes/info')
 		info = table.row
 		info['name'] = phen_name
@@ -176,7 +177,7 @@ class GWASRecord():
 		"""
 
 		phen_group = self.h5file.getNode('/phenotypes/%s' % phen_name)
-		table = self.h5file.createTable(phen_group, 'transformation_info', TransformationInfo, "Transformation information")
+		table = self.h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
 		info = table.row
 		info['name'] = transformation
 		if transformation_description: info['description'] = transformation_description
@@ -400,7 +401,6 @@ class GWASRecord():
 		cd['chromosome_ends'] = chromosome_ends
 		cd['max_score'] = max_score
 		h5file.close()
-		pdb.set_trace()
 		return cd
 
 
@@ -547,6 +547,13 @@ def _test_():
 	is_binary = phed.isBinary(pid2)
 	gwa_record.add_new_phenotype(phen_name, phen_vals, ecotypes, is_binary=is_binary)
 
+	print "Now testing it"
+	r = gwa_record.get_phenotype_values(phen_name, 'raw')
+	#print r
+	r = gwa_record.get_phenotype_info(phen_name)
+	print r
+
+	gwa_record.transform_phenotype('FT10', transformation='sqrt')
 	print "Now testing it"
 	r = gwa_record.get_phenotype_values(phen_name, 'raw')
 	#print r
