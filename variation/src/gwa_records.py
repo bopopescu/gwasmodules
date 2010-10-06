@@ -18,6 +18,10 @@ import scipy as sp
 import util
 import linear_models as lm
 import dataParsers as dp
+import math
+import time
+
+chromosome_ends = [30429953, 19701870, 23467451, 18578708, 26992130]
 
 class PhenotypeInfo(tables.IsDescription):
 	"""
@@ -58,6 +62,7 @@ class PhenotypeValue(tables.IsDescription):
 class ResultInfo(tables.IsDescription):
 	name = tables.StringCol(256)
 	comment = tables.StringCol(256)
+	max_score = tables.Float64Col()
 
 
 class ResultRecordLM(tables.IsDescription):
@@ -289,6 +294,7 @@ class GWASRecord():
 		table = h5file.createTable(trans_group, 'result_info', ResultInfo, "Result information")
 		info = table.row
 		info['name'] = analysis_method
+		info['max_score'] = max(scores)
 		if analysis_comment: info['comment'] = analysis_comment
 		info.append()
 		table.flush()
@@ -347,7 +353,7 @@ class GWASRecord():
 
 
 	def get_results_by_chromosome(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0, \
-				top_fraction=0.01, chromosomes=[1, 2, 3, 4, 5]):
+				top_fraction=0.5, chromosomes=[1, 2, 3, 4, 5], log_transform=True):
 		"""
 		Return results..
 		"""
@@ -355,7 +361,8 @@ class GWASRecord():
 
 		h5file = tables.openFile(self.filename, mode="r")
 		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
-
+		info_table = h5file.getNode('/phenotypes/%s/%s/result_info' % (phen_name, transformation))
+		max_score = info_table.where('name=="%s"' % analysis_method)['max_score']
 
 		d_keys = ['score', 'position', 'maf', 'mac']
 		if analysis_method == 'kw':
@@ -365,20 +372,20 @@ class GWASRecord():
 
 		for chromosome in chromosomes:
 			sort_list = []
-			for x in table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac)):
+			for i, x in enumerate(table.where('(chromosome==%d) &(score<=%f) & (mac>=%d)' % (chromosome, max_pval, min_mac))):
 				sort_list.append([x[k] for k in d_keys])
-			#print sort_list[:10]
 			sort_list.sort()
-			#print sort_list[:10]
 			sort_list = sort_list[:int(top_fraction * len(sort_list))]
 			for l in sort_list: l[1], l[0] = l[0], l[1]
 			sort_list.sort()
-			l = map(list, zip(*sort_list))
+			transp_list = map(list, zip(*sort_list))
 			d = {}
 			d_keys[0], d_keys[1] = d_keys[1], d_keys[0]
 			for i, k in enumerate(d_keys):
-				d[k] = l[i]
+				d[k] = transp_list[i]
 			cd[chromosome] = d
+		cd['chromosome_ends'] = chromosome_ends
+		cd['max_score'] = max_score
 		h5file.close()
 		return cd
 
@@ -508,10 +515,11 @@ def _test_():
 
 	result_file = '/Users/bjarnivilhjalmsson/tmp/pi1_pid5_FT10_emmax_none.pvals'
 	res = gr.Result(result_file=result_file, name='FT10')
+	res.neg_log_trans()
 
-	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
-		'beta1', 'correlations']:
-		print c, res.snp_results[c][:10]
+#	for c in ['chromosomes', 'positions', 'scores', 'marfs', 'mafs', 'genotype_var_perc', 'beta0', \
+#		'beta1', 'correlations']:
+#		print c, res.snp_results[c][:10]
 
 
 	gwa_record.add_results(phen_name, 'emmax', res.snp_results['chromosomes'], res.snp_results['positions'],
@@ -526,17 +534,27 @@ def _test_():
 	print "Now fetching a result."
 	res = gwa_record.get_results(phen_name, 'emmax')#, min_mac=15, max_pval=0.01)
 	print "Result loaded"
-	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
-		'beta1', 'correlation']:
-		print c, res[c][:10]
+#	for c in ['chromosome', 'position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
+#		'beta1', 'correlation']:
+#		print c, res[c][:10]
 	r = gwa_record.get_phenotype_info()
 	print r
-	res = gwa_record.get_results_by_chromosome(phen_name, 'emmax')
-	print "Result re-loaded"
-	for chromosome in res:
+	s1 = time.time()
+ 	res = gwa_record.get_results_by_chromosome(phen_name, 'emmax')
+ 	print "Result re-loaded"
+       	secs = time.time() - s1
+        if secs > 60:
+                mins = int(secs) / 60
+                secs = secs - mins * 60
+                print 'Took %d mins and %f seconds.' % (mins, secs)
+        else:
+                print 'Took %f seconds.' % (secs)
+	for chromosome in [1, 2, 3, 4, 5]:
 		for c in ['position', 'score', 'maf', 'mac', 'genotype_var_perc', 'beta0', \
 			'beta1', 'correlation']:
 			print c, res[chromosome][c][:10]
+	print res['chromosome_ends']
+	print res['max_score']
 	print gwa_record.get_phenotype_bins(phen_name)
 	gwa_record.perform_gwas(phen_name, analysis_method='emmax')
 
