@@ -375,7 +375,9 @@ class GWASRecord():
 		h5file = tables.openFile(self.filename, mode="r")
 		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
 		info_table = h5file.getNode('/phenotypes/%s/%s/result_info' % (phen_name, transformation))
-		max_score = info_table.where('name=="%s"' % analysis_method)['max_score']
+		for x in info_table.where('name=="%s"' % analysis_method):
+			max_score = x['max_score']
+		pdb.set_trace()
 
 		d_keys = ['score', 'position', 'maf', 'mac']
 		if analysis_method == 'kw':
