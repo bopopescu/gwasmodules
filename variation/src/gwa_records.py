@@ -385,16 +385,15 @@ class GWASRecord():
 
 		for chromosome in chromosomes:
 			sort_list = []
-			for i, x in enumerate(table.where('(chromosome==%d) &(score>=%f) & (mac>=%d)' % (chromosome, min_score, min_mac))):
-				sort_list.append([x[k] for k in d_keys])
+			test_chromosomes = []
+			for x in table.where('(chromosome==%d) &(score>=%f) & (mac>=%d)' % (chromosome, min_score, min_mac)):
+				sort_list.append(tuple([x[k] for k in d_keys]))
+				test_chromosomes.append(x['chromosome'])
 			print len(sort_list)
-			sort_list.sort(reverse=False)
+			sort_list.sort(reverse=True)
 			sort_list = sort_list[:int(top_fraction * len(sort_list))]
-			for l in sort_list: l[1], l[0] = l[0], l[1]
-			#sort_list.sort()
 			transp_list = map(list, zip(*sort_list))
 			d = {}
-			d_keys[0], d_keys[1] = d_keys[1], d_keys[0]
 			for i, k in enumerate(d_keys):
 				d[k] = transp_list[i]
 			cd[chromosome] = d
