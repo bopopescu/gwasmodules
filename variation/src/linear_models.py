@@ -17,6 +17,10 @@ import time
 from pdb import Pdb
 
 
+anti_decoder = {1:0, 0:1}
+get_anti_snp = sp.vectorize(lambda x: anti_decoder[x])  #Creating a vectorized function for anti-snp
+
+
 class LinearModel(object):
         """
         A simple linear model
@@ -1498,13 +1502,6 @@ def emmax_two_snps(snps, phenotypes, K, cofactors=None):
         return res
 
 
-def emmax_plot_step(p_vals, chr_pos_list, cof_pvals, cof_chr_pos_list):
-	"""
-	Plots the GWA plot, with the cofactor highlighted.
-	"""
-
-
-
 
 
 def emmax_snp_pair_plot(snps, positions, phenotypes, K, fm_scatter_plot_file=None,
@@ -1802,11 +1799,11 @@ def _test_two_snps_emma_():
         import dataParsers as dp
         import phenotypeData as pd
         import util
-        filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_raw_070810.tsv"
+        filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_100510.csv"
         phed = pd.readPhenotypeFile(filename)
         pid = 5
         filter_accessions = phed.getNonNAEcotypes(pid)
-        sd = dp.parse_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv', format=0, filter_accessions=filter_accessions)
+	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
         sd.coordinate_w_phenotype_data(phed, pid)
         phenotypes = phed.getPhenVals(pid)
         snps = sd.getSnps()
@@ -1840,7 +1837,9 @@ def _test_two_snps_emma_():
         import env
         tmp_dir = env.env['tmp_dir']
         import regionPlotter as rp
-        rp.plot_simple_region([lm_scores, emmax_scores], [positions, positions[:]], chromosome, caption='FLC_region, FT 10C', png_file=tmp_dir + 'FLC_loci_FT10.png', tair_file=tmp_dir + 'FLC_loci_FT10_tair.txt')
+        rp.plot_simple_region([lm_scores, emmax_scores], [positions, positions[:]], chromosome,
+			caption='FLC_region, FT 10C', png_file=tmp_dir + 'FLC_loci_FT10.png',
+			tair_file=tmp_dir + 'FLC_loci_FT10_tair.txt')
 
         fm_scat_plot = tmp_dir + 'FLC_loci_FT10_fm_scatter.pdf'
         scat_plot = tmp_dir + 'FLC_loci_FT10_vincent_scatter.pdf'
@@ -1862,7 +1861,7 @@ def _test_cofactor_emma_():
         phed = pd.readPhenotypeFile(filename)
         pid = 5
         filter_accessions = phed.getNonNAEcotypes(pid)
-        sd = dp.parse_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv', format=0, filter_accessions=filter_accessions, filter=1.0)
+	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
         sd.coordinate_w_phenotype_data(phed, pid)
         phenotypes = phed.getPhenVals(pid)
         snps = sd.getSnps()
@@ -1918,15 +1917,15 @@ def _test_stepwise_emmax_():
 	import dataParsers as dp
 	import phenotypeData as pd
 	import util
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_raw_070810.tsv"
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_100510.csv"
 	mac_threshold = 15
-	for pid, log_trans in [(5, False), (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
+	for pid, log_trans in [(1348, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
 		phed = pd.readPhenotypeFile(filename)
 		if log_trans:
 			phed.logTransform(pid)
 		phen_name = phed.getPhenotypeName(pid)
 		filter_accessions = phed.getNonNAEcotypes(pid)
-		sd = dp.parse_int_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
+		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
 		sd.coordinate_w_phenotype_data(phed, pid)
 	        if mac_threshold:
 	        	sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
@@ -1941,4 +1940,4 @@ def _test_stepwise_emmax_():
 
 
 if __name__ == "__main__":
-        _test_stepwise_emmax_()
+        _test_two_snps_emma_()

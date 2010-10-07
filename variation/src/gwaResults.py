@@ -792,6 +792,9 @@ class Result(object):
 
 
 	def filter_top_snps(self, n):
+		"""
+		Filter all but top n SNPs, sorted by score.
+		"""
 		self._rank_scores_() #Making sure the ranks are updated
 		newScores = []
 		newPositions = []
@@ -2662,11 +2665,11 @@ def getCandidateGeneList(cgl_id, host="papaya.usc.edu", user="bvilhjal", passwd=
 	return candGenes
 
 
-def get_gene_list(start_pos=None, end_pos=None, chr=None, host="gmi-ara-devel-be", include_intron_exons=True, \
+def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=True, \
 		verbose=False, conn=None):
 	import dbutils
 	if not conn:
-		new_conn = dbutils.connect_to_db(host, 'genome')
+		new_conn = dbutils.connect_to_default_lookup('genome')
 		cursor = new_conn.cursor()
 	else:
 		cursor = conn.cursor()
@@ -2778,11 +2781,13 @@ def load_cand_genes_file(file_name, format=1):
 
 
 def get_genes_w_tair_id(tair_ids):
-	conn = dbutils.connect_to_papaya("genome")
+	conn = dbutils.connect_to_default_lookup("genome")
 	cursor = conn.cursor()
 	genes = []
+	print tair_ids
 	for tair_id in tair_ids:
 		sql_statment = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g where g.dbxrefs='TAIR:" + tair_id.upper() + "' and gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
+		#print sql_statment
 		numRows = int(cursor.execute(sql_statment))
 		if numRows > 1:
 			print "Found 2 copies:", sql_statment
