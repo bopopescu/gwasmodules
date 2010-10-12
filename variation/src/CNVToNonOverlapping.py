@@ -9,6 +9,7 @@ Description:
 	If two CNVs share much of the overlap (>=min_reciprocal_overlap), they will be split into
 		non-overlapping new CNVs. This algorithm works iteratively until no overlapping CNVs exist in the RBTree.
 	
+	This program works on cnv data from table CNV.
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -156,22 +157,39 @@ class CNVToNonOverlapping(object):
 				rbDict[splitKey] = None
 		
 	
-	def partitionCNVIntoNonOverlapping(self, db_250k, cnv_method_id=None, min_reciprocal_overlap=0.000000001):
+	def partitionCNVIntoNonOverlapping(self, db_250k, cnv_method_id=None, min_reciprocal_overlap=0.000000001, \
+									table_name=None, frequency=None, chromosome=None):
 		"""
+		2010-9-20
+			add argument table_name to accommodate other tables, such as CNVCall
+			add frequency. if table_name=CNVCall, frequency is 1/(no_of_total_arrays)
 		2010-8-2
 		
 		"""
 		sys.stderr.write("Partitioning CNVs from method %s into non-overlapping ones ... \n"%(cnv_method_id))
 		rbDict = RBDict()
-		query = db_250k.metadata.bind.execute("select * from %s where cnv_method_id=%s"%\
-											(Stock_250kDB.CNV.table.name, cnv_method_id))
+		if table_name is None:
+			table_name=Stock_250kDB.CNV.table.name
+		where_sql = "where cnv_method_id=%s "%(cnv_method_id)
+		if chromosome:	#2010-9-28
+			where_sql += " and chromosome =%s"%(chromosome)
+			where_sql += " and stop >=%s"%(12000000)	#2010-09-28 temporary as program pre-maturely stopped slightly after this position
+		query = db_250k.metadata.bind.execute("select * from %s %s"%\
+											(table_name, where_sql))
 		#query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id)
 		counter = 0
 		for row in query:
 			counter += 1
+			if frequency:
+				frequency = frequency
+			elif table_name==Stock_250kDB.CNV.table.name:
+				frequency=getattr(row, 'frequency', 0.1)
+			else:
+				frequency = 0.1
+			
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, span_ls=[row.start, row.stop], \
 									min_reciprocal_overlap=min_reciprocal_overlap, parent_cnv_id_ls = [row.id],\
-									frequency=row.frequency)	#start and stop of key is created based on span_ls
+									frequency = frequency)	#start and stop of key is created based on span_ls
 			if segmentKey not in rbDict:
 				rbDict[segmentKey] = None
 			else:
