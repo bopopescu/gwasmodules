@@ -1271,6 +1271,17 @@ class SNPData(object):
 		return_data.no_of_pairs = total_num
 		return return_data
 	
+	def calGeneralLD(self, col1_id, col2_id):
+		"""
+		2010-9-30
+			like calLD() but doesn't require the alleles are encoded in integer according to nt2number.
+		"""
+		from algorithm import LD
+		snp1_index = self.col_id2col_index[col1_id]
+		snp2_index = self.col_id2col_index[col2_id]
+		return LD.calLD(self.data_matrix[:, snp1_index], self.data_matrix[:, snp2_index])
+		
+	
 	def calRowPairwiseDist(self):
 		"""
 		2009-4-18
