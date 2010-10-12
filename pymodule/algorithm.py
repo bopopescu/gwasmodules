@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 from ProcessOptions import  ProcessOptions
 import copy
+from utils import PassingData
+import numpy
 
 def listSubsets(element_ls, subset_size=None):
 	"""
@@ -212,9 +214,156 @@ def ltsFit(x_ls, y_ls, fractionUsed=0.6, startX=1, stopX=5):
 	from utils import PassingData
 	return PassingData(fit_y_ls=fit_y_ls, chiSquare=chiSquare)
 
+def smoothFullData(fullData, smooth_type_id=3, no_of_overview_points=1500):
+	"""
+	2010-9-25
+		fullData is a list of objects. Each object has attributes, chromosome, start, stop.
+		this function reduces the fullData to the number of data points that is <= no_of_overview_points.
+	"""
+	import numpy
+	if smooth_type_id is not None:
+		smooth_type_id = int(smooth_type_id)
+	if no_of_overview_points is not None:
+		no_of_overview_points = int(no_of_overview_points)
+	if len(fullData)<=no_of_overview_points:
+		overviewData = fullData
+	else:
+		xStart = fullData[0]['start']
+		xStop = fullData[-1]['stop']
+		chromosome = fullData[0]['chromosome']
+		overviewData = []
+		if smooth_type_id==1:	#get the top no_of_overview_points
+			yStart_ls = [data['yStart'] for data in fullData]
+			top_data_index_ls = numpy.argsort(yStart_ls)[-no_of_overview_points:]
+			top_data_index_ls.sort()	#to preserve the original order in fullData
+			for i in top_data_index_ls:
+				overviewData.append(fullData[i])
+		else:
+			windowSize = (xStop-xStart + 1)/(no_of_overview_points-1)	#windows overlap, so that's why 2*
+			windowStart = xStart
+			windowStop = min(windowStart + windowSize, xStop)
+			nextWindowStart = windowStart + int(windowSize/2)
+			data_in_window = []
+			no_of_data_before_nextWindowStart = 0
+			for i in xrange(len(fullData)):
+				data = fullData[i]
+				if (data['start']>=windowStart and data['start']<=windowStop) or ( data['stop'] <=windowStop and data['stop']>=windowStart):
+					data_in_window.append(data)
+					if data['stop']<nextWindowStart:
+						no_of_data_before_nextWindowStart += 1
+				elif data['start']>windowStop:
+					if smooth_type_id==3:
+						value = max([row['yStart'] for row in data_in_window])
+					elif smooth_type_id==4:
+						value = sum([row['yStart']*(max(0, min(row['stop'], windowStop) - max(row['start'], windowStart))+ 1) \
+									for row in data_in_window])/windowSize
+					elif smooth_type_id==2:
+						value = numpy.median([row['yStart'] for row in data_in_window])
+					else:
+						#including smooth_type_id==1
+						value = numpy.median([row['yStart'] for row in data_in_window])
+					overviewData.append(dict(start=windowStart, stop=windowStop, yStart=value, chromosome=chromosome))
+					windowStart = nextWindowStart
+					windowStop = min(windowStart + windowSize, xStop)
+					nextWindowStart = windowStart + int(windowSize/2)
+					data_in_window = []
+					no_of_data_before_nextWindowStart = 0
+					data_in_window.append(data)
+	return overviewData
+
+def testSmoothFullData():
+	fullData = []
+	import random
+	for i in range(5000):
+		fullData.append({'start':i*1000+1, 'stop':(i+1)*1000, 'yStart':random.random()*10, 'chromosome':1 })
+	overviewData = smoothFullData(fullData, smooth_type_id=3, no_of_overview_points=1500)
+
+class LD(object):
+	"""
+	2010-9-30
+		moved from pymodule/SNP.py to calculate LD
+	"""
+	def __init__(self):
+		pass
+	
+	@classmethod
+	def fill_in_snp_allele2index(cls, allele, allele2index):
+		"""
+		2010-9-30
+			
+		2008-09-05
+			used in calLD
+		"""
+		if allele not in allele2index:
+			allele2index[allele] = len(allele2index)
+		return allele2index[allele]
+	
+	@classmethod
+	def calLD(cls, locus1_allele_ls, locus2_allele_ls, locus1_id=None, locus2_id = None):
+		"""
+		2010-9-30
+			copied from pymodule/SNP.py.
+			locus1_allele_ls, locus2_allele_ls should be bi-allelic.
+			If locus1_allele_ls and locus2_allele_ls are of different size, the extra elements are discarded.
+		2008-09-05
+			adapted from variation.src.misc's LD.calculate_LD class
+			only deal with 2-allele loci
+			skip if either is NA, or if both are heterozygous (not phased)
+		"""
+		counter_matrix = numpy.zeros([2,2])	#only 2 alleles
+		snp1_allele2index = {}
+		snp2_allele2index = {}
+		no_of_individuals = min(len(locus1_allele_ls), len(locus2_allele_ls))
+		for k in xrange(no_of_individuals):
+			snp1_allele = locus1_allele_ls[k]
+			snp2_allele = locus2_allele_ls[k]
+			snp1_allele_index = cls.fill_in_snp_allele2index(snp1_allele, snp1_allele2index)
+			snp2_allele_index = cls.fill_in_snp_allele2index(snp2_allele, snp2_allele2index)
+			if snp1_allele_index>1 or snp2_allele_index>1:	#ignore the 3rd allele
+				continue
+			counter_matrix[snp1_allele_index, snp2_allele_index] += 1
+			#counter_matrix[snp1_allele_index, snp2_allele_index] += 1	#this is to mimic the diploid.
+		PA = sum(counter_matrix[0,:])
+		Pa = sum(counter_matrix[1,:])
+		PB = sum(counter_matrix[:,0])
+		Pb = sum(counter_matrix[:,1])
+		total_num = float(PA+Pa)
+		try:
+			PA = PA/total_num
+			Pa = Pa/total_num
+			PB = PB/total_num
+			Pb = Pb/total_num
+			PAB = counter_matrix[0,0]/total_num
+			D = PAB-PA*PB
+			PAPB = PA*PB
+			PAPb = PA*Pb
+			PaPB = Pa*PB
+			PaPb = Pa*Pb
+			Dmin = max(-PAPB, -PaPb)
+			Dmax = min(PAPb, PaPB)
+			if D<0:
+				D_prime = D/Dmin
+			else:
+				D_prime = D/Dmax
+			r2 = D*D/(PA*Pa*PB*Pb)
+		except:	#2008-01-23 exceptions.ZeroDivisionError, Dmin or Dmax could be 0 if one of(-PAPB, -PaPb)  is >0 or <0
+			sys.stderr.write('Unknown except, ignore: %s\n'%repr(sys.exc_info()[0]))
+			return None
+		allele_freq = (min(PA, Pa),min(PB, Pb))
+		return_data = PassingData()
+		return_data.D = D
+		return_data.D_prime = D_prime
+		return_data.r2 = r2
+		return_data.allele_freq = allele_freq
+		return_data.snp_pair_ls = (locus1_id, locus2_id)
+		return_data.no_of_pairs = total_num
+		return return_data
+
 if __name__ == '__main__':
-	#import pdb
-	#pdb.set_trace()
+	import pdb
+	pdb.set_trace()
+	
+	testSmoothFullData()
 	
 	element_ls = [1,6,7]
 	print listSubsets(element_ls, subset_size=1)
