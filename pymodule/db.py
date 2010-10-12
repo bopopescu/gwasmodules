@@ -328,6 +328,8 @@ def db_connect(hostname, dbname, schema=None, password=None, user=None):
 def get_sequence_segment(curs, gi, start, stop, annot_assembly_table='sequence.annot_assembly', \
 	raw_sequence_table='sequence.raw_sequence', chunk_size=10000):
 	"""
+	2010-10-05 if this AnnotAssembly is not associated with any raw sequence (raw_sequence_start_id is None).
+		return ''
 	2009-01-03
 		moved from annot/bin/codense/common.py
 		curs could be elixirdb.metadata.bind other than the raw curs from psycopg
@@ -357,6 +359,10 @@ def get_sequence_segment(curs, gi, start, stop, annot_assembly_table='sequence.a
 		acc_ver, orig_start, orig_stop, raw_sequence_start_id = rows[0]
 	if stop>orig_stop:	#11-14-05 to avoid exceeding the boundary
 		stop = orig_stop
+	
+	if raw_sequence_start_id is None:	# 2010-10-05 this AnnotAssembly is not associated with any raw sequence.
+		return ''
+	
 	no_of_chunks_before = max(0, start/chunk_size-1)	#how many chunks are before this segment (2006-08-28) -1 ensures the edge.
 		#2008-01-03 max(0, ...) to make sure it >=0. old expression becomes negative for genes that are near the tip of a chromosome, within chunk_size.
 	
