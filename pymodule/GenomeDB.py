@@ -506,6 +506,8 @@ class GenomeDatabase(ElixirDB):
 	
 	def get_gene_id2model(self, tax_id=3702):
 		"""
+		2010-10-11
+			bug fix: several genes could have the same segmentKey in geneSpanRBDict.
 		2009-1-3
 			add cds_sequence, mrna_sequence to new_gene_commentary
 		2008-10-01
@@ -515,9 +517,16 @@ class GenomeDatabase(ElixirDB):
 			construct a data structure to hold whole-genome annotation of genes
 		"""
 		sys.stderr.write("Getting gene_id2model and chr_id2gene_id_ls ...\n")
-		from Genome import GeneModel
+		from pymodule.Genome import GeneModel	#2010-9-21 although "from Genome import GeneModel" works,
+			#it causes problem in cPickle.load() because Genome is not directly visible outside.	
 		gene_id2model = {}
 		chr_id2gene_id_ls = {}
+		
+		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey
+		from pymodule.RBTree import RBDict
+		
+		geneSpanRBDict = RBDict()			
+		
 		i = 0
 		block_size = 5000
 		query = EntrezgeneMapping.query.filter_by(tax_id=tax_id).order_by(EntrezgeneMapping.chromosome).order_by(EntrezgeneMapping.start)
@@ -526,6 +535,8 @@ class GenomeDatabase(ElixirDB):
 			for row in rows:
 				chromosome = row.chromosome
 				gene_id = row.gene_id
+				
+				
 				if chromosome not in chr_id2gene_id_ls:
 					chr_id2gene_id_ls[chromosome] = []
 				chr_id2gene_id_ls[chromosome].append(gene_id)
@@ -535,11 +546,24 @@ class GenomeDatabase(ElixirDB):
 													type_of_gene=row.entrezgene_type.type, type_id=row.entrezgene_type_id,\
 													start=row.start, stop=row.stop, strand=row.strand, tax_id=row.tax_id,\
 													description =row.gene.description)	#2010-8-19 add description
+					
+					gene_model = gene_id2model[gene_id]
+					if gene_model.chromosome and gene_model.start and gene_model.stop:
+						segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=gene_model.chromosome, \
+									span_ls=[gene_model.start, gene_model.stop], \
+									min_reciprocal_overlap=1, strand=gene_model.strand, gene_id=gene_model.gene_id,\
+									gene_start=gene_model.start, gene_stop=gene_model.stop)
+						#2010-8-17 any overlap short of being identical is tolerated.
+						if segmentKey not in geneSpanRBDict:
+							geneSpanRBDict[segmentKey] = []
+						geneSpanRBDict[segmentKey].append(gene_id)
+				
 					for gene_commentary in row.gene_commentaries:
 						if not gene_commentary.gene_commentary_id:	#ignore gene_commentary that are derived from other gene_commentaries. they'll be handled within the parental gene_commentary.
-							gene_commentary.construct_annotated_box()
+							#gene_commentary.constructAnnotatedBox()
+							gene_commentary.construct_annotated_box()	#2010-9-21 it sets protein_label and etc. constructAnnotatedBox() doesn't do this.
 							gene_commentary.getCDSsequence()
-							#pass everyting to a database-independent object, easy for pickling
+							#pass everything to a database-independent object, easy for pickling
 							new_gene_commentary = GeneModel(gene_id=gene_id, gene_commentary_id=gene_commentary.id, \
 														start=gene_commentary.start, stop=gene_commentary.stop, \
 														label=gene_commentary.label, comment=gene_commentary.comment, \
@@ -562,7 +586,7 @@ class GenomeDatabase(ElixirDB):
 			rows = query.offset(i).limit(block_size)
 		
 		sys.stderr.write("Done.\n")
-		return gene_id2model, chr_id2gene_id_ls
+		return gene_id2model, chr_id2gene_id_ls, geneSpanRBDict
 	
 if __name__ == '__main__':
 	import sys, os, math
@@ -581,12 +605,17 @@ if __name__ == '__main__':
 	instance = main_class(**po.long_option2value)
 	instance.setup()
 	
+	if instance.debug:
+		import pdb
+		pdb.set_trace()
+	
 	#2008-10-01	get gene model and pickle it into a file
-	gene_id2model, chr_id2gene_id_ls = instance.get_gene_id2model()
+	gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = instance.get_gene_id2model()
 	from pymodule import PassingData
 	gene_annotation = PassingData()
 	gene_annotation.gene_id2model = gene_id2model
 	gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
+	gene_annotation.geneSpanRBDict = geneSpanRBDict
 	import cPickle
 	picklef = open(os.path.expanduser('~/at_gene_model_pickelf'), 'w')
 	cPickle.dump(gene_annotation, picklef, -1)

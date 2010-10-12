@@ -8,6 +8,9 @@ Examples:
 	# 2010-8-13 use betweenness centrality to cut graph
 	~/script/variation/src/CNVMergeAcrossArrays.py -u  yh -a 16 -m 25 -n 0.8 -z banyan.usc.edu -i 0.8 -c -g3
 	
+	# 2010-9-13 merging potential-bi-allelic deletions only
+	CNVMergeAcrossArrays.py -u  yh -a 16 -m 28 -z banyan.usc.edu -i 0.95 -n 0.03 -c -g4
+	
 Description:
 	If two segments from two arrays share much of the overlap (>=min_overlap_ratio), they are regarded as one segment
 		and connected in a graph.
@@ -45,7 +48,8 @@ class CNVMergeAcrossArrays(object):
 						('cnv_type_id', 1, int): [1, 'y', 1, 'CNV type id. table CNVType', ],\
 						('min_overlap_ratio', 1, float): [0.8, 'n', 1, 'overlap ratios (overlap/segment-length) for two segments have to be above this.'],\
 						('minConnectivity', 1, float): [0.8, 'i', 1, 'minimum connectivity for the deletion-graph, only for betweenness-centrality method'],\
-						('graphClusterMethod', 1, int): [1, 'g', 1, 'use which method to cluster graph. 1: connected component 2: max-clique, 3: betweenness-centrality'],\
+						('graphClusterMethod', 1, int): [1, 'g', 1, 'use which method to cluster graph. 1: connected component 2: max-clique, \
+							3: betweenness-centrality, 4: bi-allelic connected components (argument min_overlap_ratio is set low, 0.05, to create edge. implicit 0.85 is used.)'],\
 						('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
@@ -58,7 +62,8 @@ class CNVMergeAcrossArrays(object):
 		self.graphClusterMethod2func = {
 									1: self.clearOutGraphAndSaveByConnectedComponents,\
 									2: self.clearOutGraphAndSaveByClique,\
-									3: self.clearOutGraphAndSaveByBetweennessCentrality}
+									3: self.clearOutGraphAndSaveByBetweennessCentrality,\
+									4: self.clearOutGraphByRetainingBiAllelicConnectedComponents}
 		self.clearOutGraphAndSave = self.graphClusterMethod2func[self.graphClusterMethod]
 		
 	cnv_unique_key2cnv = {}	#2010-8-8 to avoid duplicated CNVs stored into db
@@ -309,14 +314,66 @@ class CNVMergeAcrossArrays(object):
 		#2010-8-11 to clear it up
 		self.cnv_unique_key2cnv = {}
 		self.cnv_array_call_unique_key2cnv = {}
-		
-	def getNonDuplicateArraysWithHighestMedianIntensity(self, db_250k, raw_cnv_method_id=None,):
+	
+	def clearOutGraphByRetainingBiAllelicConnectedComponents(self, G, segment_ls, param_obj=None):
 		"""
+		2010-9-13
+			Two conditions for a CC to be regarded as representing just one allele.
+				1. connectivity is >param_obj.minConnectivity
+				2. edge weight >0.85 for each edge 
+		"""
+		H = nx.connected_component_subgraphs(G)
+		for subG in H:
+			minEdgeWeight = None
+			for e in subG.edges_iter():
+				weight = subG.get_edge_data(e[0], e[1])['weight']
+				if minEdgeWeight is None or weight<minEdgeWeight:
+					minEdgeWeight = weight
+				if minEdgeWeight<0.85:
+					break
+			if minEdgeWeight<0.85:
+				continue
+			
+			n = subG.number_of_nodes()
+			if n<=2:
+				connectivity = 1
+			else:
+				e = subG.number_of_edges()
+				connectivity = 2*e/float(n*(n-1))
+			
+			if connectivity < param_obj.minConnectivity:
+				continue
+			
+			segments = []
+			array_id2data = {}	#different CNVCall s from the same array could be included in one component.
+			
+			
+			for i in subG.nodes():
+				segment = segment_ls[i]
+				probability = segment[-3]
+				array_id = segment[-2]
+				if array_id not in array_id2data:
+					array_id2data[array_id] = PassingData(probability_ls = [])
+				array_id2data[array_id].probability_ls.append(probability)
+				segments.append(segment_ls[i])
+			param_obj.array_id2data = array_id2data
+			self.saveSegmentsIntoCNVAndCNVArrayCall(segments, param_obj=param_obj)
+		#2010-8-11 to clear it up
+		self.cnv_unique_key2cnv = {}
+		self.cnv_array_call_unique_key2cnv = {}
+	
+	@classmethod
+	def getNonDuplicateArraysWithHighestMedianIntensity(cls, db_250k, raw_cnv_method_id=None, table_name=None):
+		"""
+		2010-9-30
+			add argument table_name
 		2010-7-29
 		"""
 		sys.stderr.write("Getting non-duplicate arrays with highest median intensity ...")
+		if table_name is None:
+			table_name = Stock_250kDB.CNVCall.table.name
 		rows = db_250k.metadata.bind.execute("select a.* from view_array a, (select distinct array_id from %s where cnv_method_id=%s) \
-				t where t.array_id=a.array_id"%(Stock_250kDB.CNVCall.table.name, raw_cnv_method_id))
+				t where t.array_id=a.array_id"%(table_name, raw_cnv_method_id))
 		ecotype_id2median_intensity_array_id_ls = {}
 		no_of_arrays = 0
 		for row in rows:
