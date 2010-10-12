@@ -9,6 +9,8 @@ Description:
 	If two CNVs share much of the overlap (>=min_reciprocal_overlap), they will be split into
 		non-overlapping new CNVs. This algorithm works iteratively until no overlapping CNVs exist in the RBTree.
 	
+	This program works on cnv data from table CNVCall.
+	
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
