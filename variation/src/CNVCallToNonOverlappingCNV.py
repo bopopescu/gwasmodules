@@ -5,6 +5,9 @@ Examples:
 	# 2010-8-2
 	CNVCallToNonOverlappingCNV.py -u yh -a 16 -m 29 -z banyan.usc.edu -c -r
 	
+	# 2010-10-11 work on chromosome 2
+	CNVCallToNonOverlappingCNV.py -u yh -a 12 -m 30 -z banyan.usc.edu -c -r -o 2
+	
 Description:
 	If two CNVs share much of the overlap (>=min_reciprocal_overlap), they will be split into
 		non-overlapping new CNVs. This algorithm works iteratively until no overlapping CNVs exist in the RBTree.
@@ -41,7 +44,7 @@ class CNVCallToNonOverlappingCNV(CNVToNonOverlapping):
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 						('raw_cnv_method_id', 1, int): [8, 'a', 1, 'CNV method id of the old CNVs to be split'],\
-						('chromosome', 1, int): [1, 'o', 1, 'which chromosome to work on'],\
+						('chromosome', 1, int): [0, 'o', 1, 'which chromosome to work on. if =0, all chromosomes.'],\
 						('cnv_method_id', 1, int): [10, 'm', 1, 'CNV method id for the non-overlapping CNVs.'],\
 						('cnv_type_id', 1, int): [1, 'y', 1, 'CNV type id. table CNVType', ],\
 						('min_reciprocal_overlap', 1, float): [0.000000001, 'n', 1, 'upper bound of overlap ratios for new CNVs. \
@@ -56,7 +59,8 @@ class CNVCallToNonOverlappingCNV(CNVToNonOverlapping):
 		"""
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 												class_to_have_attr=self)
-	
+		if self.chromosome ==0 or self.chromosome=='0':
+			self.chromosome = None
 	
 	
 	def assignNewCNVArrayCall(self, nonOverlappingCNVRBDict, raw_cnv_method_id=None, \
