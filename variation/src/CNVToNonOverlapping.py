@@ -160,6 +160,8 @@ class CNVToNonOverlapping(object):
 	def partitionCNVIntoNonOverlapping(self, db_250k, cnv_method_id=None, min_reciprocal_overlap=0.000000001, \
 									table_name=None, frequency=None, chromosome=None):
 		"""
+		2010-10-11
+			bugfix. remove a temporary condition restricting chromosome position.
 		2010-9-20
 			add argument table_name to accommodate other tables, such as CNVCall
 			add frequency. if table_name=CNVCall, frequency is 1/(no_of_total_arrays)
@@ -173,7 +175,6 @@ class CNVToNonOverlapping(object):
 		where_sql = "where cnv_method_id=%s "%(cnv_method_id)
 		if chromosome:	#2010-9-28
 			where_sql += " and chromosome =%s"%(chromosome)
-			where_sql += " and stop >=%s"%(12000000)	#2010-09-28 temporary as program pre-maturely stopped slightly after this position
 		query = db_250k.metadata.bind.execute("select * from %s %s"%\
 											(table_name, where_sql))
 		#query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id)
