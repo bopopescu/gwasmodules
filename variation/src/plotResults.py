@@ -528,3 +528,14 @@ def plot_raw_result(p_vals, chromosomes, positions, pdf_file=None, png_file=None
 	plt.clf()
 	plt.close()
 
+
+def plot_two_snps_result(chromosomes, positions, pvals, all_in_one=False):
+	"""
+	Plots 5x5 2D scatter plots
+	
+	Or, all-chromosomes-in-one plot.
+	"""
+	cur_chr = chromosomes[0]
+
+	while i < len(chromosomes), this_chr == cur_chr
+

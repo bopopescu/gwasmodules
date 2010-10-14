@@ -26,6 +26,23 @@ Marker type suggestions:
   
 """
 
+def get_haplotypes(snps, num_accessions, count_haplotypes=False):
+	curr_haplotypes = map(tuple, np.transpose(np.array(snps).tolist()))
+	hap_set = list(set(curr_haplotypes))
+	hap_hash = {}
+	for j, h in enumerate(hap_set):
+		hap_hash[h] = j
+	new_haplotypes = np.zeros(num_accessions, dtype='int8')
+	for j, h in enumerate(curr_haplotypes):
+		new_haplotypes[j] = hap_hash[h]
+	if count_haplotypes:
+		hap_counts = [curr_haplotypes.count(hap) for hap in hap_set]
+		return hap_set, hap_counts, new_haplotypes
+	else:
+		return new_haplotypes
+
+
+
 def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True, data_format='binary'):
 	"""
 	1. Remove accessions which are not represented in either of the two datasets
@@ -1869,17 +1886,6 @@ class SNPsData(_SnpsData_):
 
 	def haplotize(self, snp_window=None, base_window=None):
 
-		def _get_haplotypes_(snps, num_accessions):
-			curr_haplotypes = map(tuple, np.transpose(np.array(snps).tolist()))
-			hap_set = list(set(curr_haplotypes))
-			hap_hash = {}
-			for j, h in enumerate(set(curr_haplotypes)):
-				hap_hash[h] = j
-			new_haplotypes = np.zeros(num_accessions, dtype='int8')
-			for j, h in enumerate(curr_haplotypes):
-				new_haplotypes[j] = hap_hash[h]
-			return new_haplotypes
-
 		if snp_window:
 
 			haplotypes_list = []
@@ -1887,16 +1893,16 @@ class SNPsData(_SnpsData_):
 			num_accessions = len(self.accessions)
 			while i < snp_window:
 				cur_snps = self.snps[:i + snp_window + 1]
-				haplotypes_list.append(_get_haplotypes_(cur_snps, num_accessions))
+				haplotypes_list.append(get_haplotypes(cur_snps, num_accessions))
 				i += 1
 			while i < len(self.snps) - snp_window:
 				cur_snps = self.snps[i - snp_window:i + snp_window + 1]
-				haplotypes_list.append(_get_haplotypes_(cur_snps, num_accessions))
+				haplotypes_list.append(get_haplotypes(cur_snps, num_accessions))
 				i += 1
 				if i % 100 == 0: print i
 			while i < len(self.snps):
 				cur_snps = self.snps[i - snp_window:]
-				haplotypes_list.append(_get_haplotypes_(cur_snps, num_accessions))
+				haplotypes_list.append(get_haplotypes(cur_snps, num_accessions))
 				i += 1
 			self.snps = haplotypes_list
 

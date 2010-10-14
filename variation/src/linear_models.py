@@ -7,6 +7,7 @@ import scipy as sp
 from scipy import linalg
 from scipy import stats
 from scipy import optimize
+import snpsdata
 import warnings
 import pdb
 import cPickle
@@ -705,13 +706,19 @@ class LinearMixedModel(LinearModel):
 		rss_array.shape = (num_snps, num_snps)
 		p_val_array = sp.ones((num_snps, num_snps))
 		var_perc_array = sp.zeros((num_snps, num_snps))
-		#betas_list = [[list(h0_betas)] * num_snps for s in snps]
+		haplotype_counts = [[{} for j in range(i + 1)] for i in range(num_snps)]
 
 		q = 1 #Testing one SNP, given the other
 		p = len(self.X.T) + q
 		n_p = self.n - p
 		#Fill the diagonal with the single SNP emmax
 		for i, snp in enumerate(snps):
+			hap_set, hap_counts, haplotypes = snpsdata.get_haplotypes([snp], self.n,
+										count_haplotypes=True)
+			d = {'num_haps':hap_counts}
+			for hap, hap_c in zip(haplotypes, hap_counts):
+				d[hap] = hap_c
+			haplotype_counts[i][i] = d
 			snp_mat = H_sqrt_inv * sp.matrix(snp).T #Transformed inputs
 			X = sp.hstack([h0_X, snp_mat])
 			(betas, rss, rank, s) = linalg.lstsq(X, Y)
@@ -724,7 +731,6 @@ class LinearMixedModel(LinearModel):
 			f_stat_array[i, i] = f_stat[0]
 			rss_array[i, i] = rss[0]
 			var_perc_array[i, i] = float(1 - rss / h0_rss)
-			#betas_list[i][i] = map(float, list(betas))
 
 		#Fill the upper right part with poorest of two tests.
 		p = len(self.X.T) + q + 1 #Adding one SNP as a cofactor.
@@ -740,6 +746,15 @@ class LinearMixedModel(LinearModel):
 			for j, snp2 in enumerate(snps):
 				if i == j: continue #Skip diagonals..
 
+				#Haplotype counts 
+				if j < i:
+					hap_set, hap_counts, haplotypes = snpsdata.get_haplotypes([snp1, snp2], self.n,
+												count_haplotypes=True)
+					d = {'num_haps':hap_counts}
+					for hap, hap_c in zip(haplotypes, hap_counts):
+						d[hap] = hap_c
+					haplotype_counts[i][j] = d
+
 				if sp.any(snp1 != snp2) and sp.any(anti_snp1 != snp2):
 					snp_mat = H_sqrt_inv * (sp.matrix(snp2).T) #Transformed inputs
 					X = sp.hstack([h0_X1, snp_mat])
@@ -753,10 +768,8 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[i, j] = f_stat[0]
 					rss_array[i, j] = rss[0]
 					var_perc_array[i, j] = float(1 - rss / h0_rss)
-					#betas_list[i][j] = map(float, list(betas))
 				else:
 					rss_array[i, j] = h0_rss[0]
-					#betas_list[i][j] = map(float, list(h0_betas)) + [0.0]
 
 		for i in range(len(snps)):
 			for j in range(len(snps[:i])):
@@ -765,7 +778,6 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[j, i] = f_stat_array[i, j]
 					rss_array[j, i] = rss_array[i, j]
 					var_perc_array[j, i] = var_perc_array[i, j]
-					#betas_list[j][i] = betas_list[i][j]
 
 
 		no_snp_count = 0
@@ -777,16 +789,13 @@ class LinearMixedModel(LinearModel):
 		n_p = self.n - p
 		for i, snp1 in enumerate(snps):
 			for j, snp2 in enumerate(snps[:i]):
-				anti_snp1 = get_anti_snp(snp1)
-				anti_snp2 = get_anti_snp(snp2)
 				pseudo_snp = snp1 * snp2 #Interaction
 				t_X = sp.mat(sp.vstack([sp.ones(self.n), snp1, snp2])).T
 				(t_beta, t_rss, t_rank, t_sigma) = linalg.lstsq(t_X, sp.matrix(pseudo_snp).T)
 				failed = False
 				if t_rss and t_rss[0] > 1e-20 :
-					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T #* sp.matrix(zip(snp1, snp2)) #Transformed inputs
+					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T #Transformed inputs
 					h0_X1 = sp.hstack([h0_X, snp_mat])
-					#(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X1,Y)				
 					snp_mat = H_sqrt_inv * (sp.matrix(pseudo_snp).T) #Transformed inputs
 					X = sp.hstack([h0_X1, snp_mat])
 					(betas, rss, rank, s) = linalg.lstsq(X, Y)
@@ -798,8 +807,6 @@ class LinearMixedModel(LinearModel):
 						f_stat_array[i, j] = f_stat[0]
 						rss_array[i, j] = rss[0]
 						var_perc_array[i, j] = float(1 - rss / h0_rss)
-						#betas_list[i][j] = map(float, list(betas))
-						#print "DIDN'T FAILED"
 
 					else:
 						failed = True
@@ -808,6 +815,8 @@ class LinearMixedModel(LinearModel):
 					failed = True
 
 				if failed:
+					anti_snp1 = get_anti_snp(snp1)
+					anti_snp2 = get_anti_snp(snp2)
 					if sp.all(snp1 == snp2) or sp.all(snp1 == anti_snp2):
 						num_same_snp += 1
 					elif len(sp.unique(pseudo_snp)) == 1:
@@ -819,17 +828,16 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[i, j] = 0
 					rss_array[i, j] = full_rss
 					var_perc_array[i, j] = 0
-					#betas_list[i][j] = map(float, list(h0_betas)) + [0.0]
 
 
 		tot_num = num_snps * (num_snps - 1) / 2.0
 		print 'fail_fraction =%f, no_snp_fraction=%f, identical_pseudo_snp_fraction=%f, num_same_snp=%f'\
-			% ((no_snp_count + identical_snp_count + num_same_snp) / tot_num, no_snp_count / tot_num, identical_snp_count / tot_num, num_same_snp / tot_num)
+			% ((no_snp_count + identical_snp_count + num_same_snp) / tot_num, \
+			no_snp_count / tot_num, identical_snp_count / tot_num, num_same_snp / tot_num)
 
 		res_dict = {'vincent_ps':p_val_array, 'vincent_f_stats':f_stat_array, 'vincent_rss':rss_array, \
-			    'vincent_var_perc':var_perc_array, \
-			    'pseudo_heritability': pseudo_her} #'vincent_betas': betas_list,
-
+			    'vincent_var_perc':var_perc_array, 'pseudo_heritability': pseudo_her, \
+			    'haplotype_counts':haplotype_counts}
 
 		#Filling up the diagonal
 		f_stat_array = sp.zeros((num_snps, num_snps))
@@ -837,14 +845,11 @@ class LinearMixedModel(LinearModel):
 		rss_array.shape = (num_snps, num_snps)
 		p_val_array = sp.ones((num_snps, num_snps))
 		var_perc_array = sp.zeros((num_snps, num_snps))
-		#betas_list = [[0] * num_snps for s in snps]
 		for i in range(num_snps):
 			p_val_array[i, i] = res_dict['vincent_ps'][i, i]
 			f_stat_array[i, i] = res_dict['vincent_f_stats'][i, i]
 			rss_array[i, i] = res_dict['vincent_rss'][i, i]
-			#betas_list[i][i] = res_dict['vincent_betas'][i][i]
 			var_perc_array[i, i] = res_dict['vincent_var_perc'][i, i]
-
 
 		q1 = 2 #Testing significance of two SNPs, compared to none
 		p1 = len(self.X.T) + q1
@@ -858,7 +863,7 @@ class LinearMixedModel(LinearModel):
 				anti_snp2 = get_anti_snp(snp2)
 				pseudo_snp = snp1 * snp2
 				if sp.any(snp1 != snp2) and sp.any(snp1 != anti_snp2):
-					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T#sp.matrix(zip(snp1, snp2)) #Transformed inputs
+					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T #Transformed inputs
 					X = sp.hstack([h0_X, snp_mat])
 					(betas, rss, rank, s) = linalg.lstsq(X, Y)
 					f_stat = ((full_rss - rss) / (q1)) / (rss / n_p1)
@@ -867,7 +872,6 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[j, i] = f_stat[0]
 					rss_array[j, i] = rss[0]
 					var_perc_array[j, i] = float(1 - rss / full_rss)
-					#betas_list[j][i] = map(float, list(betas))
 				else:
 					rss = res_dict['vincent_rss'][j, i]
 					f_stat = ((full_rss - rss) / (q1)) / (rss / n_p1)
@@ -876,13 +880,10 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[j, i] = f_stat[0]
 					rss_array[j, i] = rss
 					var_perc_array[j, i] = float(1 - rss / full_rss)
-					#betas_list[j][i] = res_dict['vincent_betas'][j, i]
 
 				t_X = sp.mat(sp.vstack([sp.ones(self.n), snp1, snp2])).T
 				(t_beta, t_rss, t_rank, t_sigma) = linalg.lstsq(t_X, sp.matrix(pseudo_snp).T)
 				if t_rss and t_rss[0] > 1e-20 :
-#				if  sp.any(snp1 != snp2) and sp.any(snp1 != anti_snp2) and len(sp.unique(pseudo_snp)) > 1 and pseudo_snp != snp1 \
-#					and pseudo_snp != snp2 and pseudo_snp != anti_snp1 and pseudo_snp != anti_snp2:
 					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T  #Transformed inputs
 					X = sp.hstack([h0_X, snp_mat])
 					(betas, rss, rank, s) = linalg.lstsq(X, Y)
@@ -892,7 +893,6 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[i, j] = f_stat[0]
 					rss_array[i, j] = rss[0]
 					var_perc_array[i, j] = float(1 - rss / full_rss)
-					#betas_list[i][j] = map(float, list(betas))
 				else:
 					rss = rss_array[j, i]
 					f_stat = ((full_rss - rss) / (q2)) / (rss / n_p2)
@@ -901,228 +901,13 @@ class LinearMixedModel(LinearModel):
 					f_stat_array[i, j] = f_stat[0]
 					rss_array[i, j] = rss
 					var_perc_array[i, j] = var_perc_array[j, i]
-					#betas_list[i][j] = betas_list[j][i]
 
 		res_dict['ps'] = p_val_array
 		res_dict['f_stats'] = f_stat_array
 		res_dict['rss'] = rss_array
-		#res_dict['betas'] = betas_list
 		res_dict['var_perc'] = var_perc_array
-
-
 		return res_dict
 
-
-
-#	def emmax_two_snps_3(self,snps):
-#		"""
-#		Every pair of SNPs against the null of no SNP.
-#		"""
-#		try:
-#			import psyco
-#			psyco.full()
-#		except ImportError:
-#			pass
-#		assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
-#
-#		K = self.random_effects[1][1]
-#		eig_L = self._get_eigen_L_(K)
-#		q = 2 #Testing two SNPs
-#		p = len(self.X.T)+q
-#		n = self.n
-#		n_p = n-p
-#
-#		res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-#		delta = res['delta']
-#		H_sqr = res['H_sqrt']
-#		H_sqrt_inv = H_sqr.I
-#		Y = H_sqrt_inv*self.Y	#The transformed outputs.
-#		h0_X = H_sqrt_inv*self.X
-#		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-#		
-#	      
-#		#First testing without interactions
-#		f_stats = []
-#		rss_list = []
-#		betas_list = []
-#		p_vals = []
-#		var_perc = []
-#		for i, snp1 in enumerate(snps):
-#			f_l = []
-#			rss_l = []
-#			betas_l = []
-#			p_vals_l = []
-#			var_perc_l = []
-#			for snp2 in snps[:i]:
-#				X = hstack([h0_X,H_sqrt_inv*sp.matrix([[v1,v2] for v1,v2 in zip(snp1,snp2)])]) 
-#				res = _emmax_snp_test_(Y,X,h0_rss,n,p,q)
-#				p_vals_l.append(res['p_val'])	    
-#				f_l.append(res['f_stat'])		
-#				rss_l.append(res['rss'])		
-#				betas_l.append(res['betas'])
-#				var_perc_l.append(res['var_perc'])
-#			f_stats.append(f_l)
-#			rss_list.append(rss_l)
-#			betas_list.append(betas_l)
-#			p_vals.append(p_vals_l)
-#			var_perc.append(var_perc_l)
-#			
-#		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 
-#			'delta':delta, 'pseudo_heritability': 1.0/(1+delta), 'var_perc':var_perc}
-#			
-#	 
-#	def emmax_two_snps_2(self,snps):
-#		"""
-#		Every pair of SNPs, compared to the best model contain one of the SNPs.
-#		"""
-#		try:
-#			import psyco
-#			psyco.full()
-#		except ImportError:
-#			pass
-#		assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
-#
-#		K = self.random_effects[1][1]
-#		eig_L = self._get_eigen_L_(K)
-#		X = self.X
-#		
-#		q = 1 #Testing one SNP, given the other
-#		p = len(X.T)+q+1 
-#		n = self.n
-#		n_p = n-p
-#		
-#		#Then also without interactions, but given the other SNP.
-#		f_stats = []
-#		rss_list = []
-#		betas_list = []
-#		p_vals = []
-#		var_perc = []
-#		pseudo_her_list = []
-#		for i, snp1 in enumerate(snps):			
-#			f_l = []
-#			rss_l = []
-#			betas_l = []
-#			p_vals_l = []
-#			var_perc_l = []
-#
-#			self.X = hstack([X,sp.matrix([[v1] for v1 in snp1])]) #Add the cofactor 
-#			res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-#			delta = res['delta']
-#			pseudo_her_list.append(1.0/(1+delta))
-#			H_sqr = res['H_sqrt']
-#			H_sqrt_inv = H_sqr.I
-#			Y = H_sqrt_inv*self.Y	#The transformed outputs.
-#			h0_X = H_sqrt_inv*self.X
-#			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-#			for j, snp2 in enumerate(snps):			    
-#				if i==j: 
-#					p_vals_l.append(0)	    
-#					f_l.append(0)		
-#					rss_l.append(0)		
-#					betas_l.append(0)
-#					var_perc_l.append(0)
-#				else:
-#					X1 = hstack([h0_X,H_sqrt_inv*sp.matrix([[v2] for v2 in snp2])]) 
-#					res = self._emmax_snp_test_(Y,X1,h0_rss,n,p,q)
-#					p_vals_l.append(res['p_val'])	    
-#					f_l.append(res['f_stat'])		
-#					rss_l.append(res['rss'])		
-#					betas_l.append(res['betas'])
-#					var_perc_l.append(res['var_perc'])
-#			f_stats.append(f_l)
-#			rss_list.append(rss_l)
-#			betas_list.append(betas_l)
-#			p_vals.append(p_vals_l)
-#			var_perc.append(var_perc_l)
-#		
-#		
-#		best_f_stats = []
-#		best_rss_list = []
-#		best_betas_list = []
-#		best_p_vals = []
-#		best_var_perc = []
-#		fixed_choice = []
-#		for i in range(len(snps)):
-#			for j in range(i):
-#				if p_vals[i][j]>p_vals[j][i]:
-#					bi=i
-#					bj=j
-#				else:
-#					bi=j
-#					bj=i
-#					
-#				best_f_stats.append(f_stats[bi][bj])
-#				best_rss_list.append(rss_list[bi][bj])
-#				best_betas_list.append(betas_list[bi][bj])
-#				best_p_vals.append(p_vals[bi][bj])
-#				best_var_perc.append(var_perc[bi][bj])
-#				fixed_choice.append(bi)
-#		
-#		
-#		return {'ps':best_p_vals, 'f_stats':best_f_stats, 'rss':best_rss_list, \
-#				 'betas': best_betas_list, 'pseudo_heritability': pseudo_her_list, \
-#				 'var_perc':best_var_perc, 'fixed_choice':fixed_choice}
-#		
-#
-#
-#	def emmax_two_snp_interaction(self,snps): 
-#		"""
-#		An interaction of a pair of SNPs compared to the model not containing the interaction term.
-#		"""
-#		try:
-#			import psyco
-#			psyco.full()
-#		except ImportError:
-#			pass
-#		assert len(self.random_effects)==2,"Expedited REMLE only works when we have exactly two random effects."
-#
-#		K = self.random_effects[1][1]
-#		eig_L = self._get_eigen_L_(K)
-#		q = 1 #Testing one interaction
-#		p = len(self.X.T)+q+2 #Given 2 SNPs
-#		n = self.n
-#		n_p = n-p
-#
-#		#Then also without interactions, but given the other SNP.
-#		f_stats = []
-#		rss_list = []
-#		betas_list = []
-#		p_vals = []
-#		var_perc = []
-#		pseudo_her_list = []
-#		for i, snp1 in enumerate(snps):			
-#			f_l = []
-#			rss_l = []
-#			betas_l = []
-#			p_vals_l = []
-#			var_perc_l = []
-#			pseudo_her_l
-#			for snp2 in snps[:i]:			    
-#				self.X = hstack([X,sp.matrix([[v1,v2] for v1,v2 in zip(snp1,snp2)])]) #Add the cofactor 
-#				res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-#				delta = res['delta']
-#				pseudo_her_l.append(1.0/(1+delta))
-#				H_sqr = res['H_sqrt']
-#				H_sqrt_inv = H_sqr.I
-#				Y = H_sqrt_inv*self.Y	#The transformed outputs.
-#				h0_X = H_sqrt_inv*self.X
-#				(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X,Y)
-#				X = hstack([h0_X,H_sqrt_inv*sp.matrix([[v1*v2] for v1,v2 in zip(snp1,snp2)])]) 
-#				res = _emmax_snp_test_(Y,X,h0_rss,n,p,q)
-#				p_vals_l.append(res['p_val'])	    
-#				f_l.append(res['f_stat'])		
-#				rss_l.append(res['rss'])		
-#				betas_l.append(res['betas'])
-#				var_perc_l.append(res['var_perc'])
-#			f_stats.append(f_l)
-#			rss_list.append(rss_l)
-#			betas_list.append(betas_l)
-#			p_vals.append(p_vals_l)
-#			var_perc.append(var_perc_l)
-#			pseudo_her_list.append(pseudo_her_l)
-#			
-#		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,\
-#			'pseudo_heritability': pseudo_her_list, 'var_perc':var_perc}
 
 
 
@@ -1845,7 +1630,7 @@ def _test_two_snps_emma_(pid=617):
 
 	chromosome = 5
 	#r = sd.get_region_pos_snp_dict(4,250000,290000)
-	r = sd.get_region_pos_snp_dict(chromosome, 3150000, 3210000)
+	r = sd.get_region_pos_snp_dict(chromosome, 3110000, 3300000)
 	snps = r['snps']
 	positions = r['positions']
 	print 'Found %d SNPs' % len(snps)
@@ -1973,9 +1758,4 @@ if __name__ == "__main__":
 #	_test_two_snps_emma_(629)
 #	_test_two_snps_emma_(631)
 #	_test_two_snps_emma_(633)
-	_test_two_snps_emma_(1)
-	_test_two_snps_emma_(2)
 	_test_two_snps_emma_(3)
-	_test_two_snps_emma_(4)
-	_test_two_snps_emma_(5)
-	_test_two_snps_emma_(6)

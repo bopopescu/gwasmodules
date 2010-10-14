@@ -1782,7 +1782,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 		else:
 			sd = parse_snp_data(data_file , format=data_format_dict[format], delimiter=delimiter,
 					      missingVal=missingVal, filter=filter, look_for_binary=False,
-					      filter_accessions=filter_accessions, data_format=format)
+					      filter_accessions=filter_accessions, format=format)
 			print 'Save a binary snps data file:', sd_binary_file
 			sd.writeToFile(sd_binary_file, binary_format=True)
 			if use_pickle:
