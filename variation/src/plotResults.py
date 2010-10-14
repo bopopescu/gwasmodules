@@ -8,6 +8,17 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import math
 
+def _get_chromosome_splits_(chromosomes, chr_set):
+	"""
+	Assumes chromosome list is sorted.
+	"""
+	import bisect
+	chromosome_splits = [0]
+	for c in chr_set:
+		chromosome_splits.append(bisect.bisect(chromosomes, c))
+	return chromosome_splits
+
+
 def plotFilteredResult(result, pdfFile, minScore=0, maxScore=10, plotBonferroni=False, usePylab=True):
 
 	newScores = []
@@ -529,13 +540,55 @@ def plot_raw_result(p_vals, chromosomes, positions, pdf_file=None, png_file=None
 	plt.close()
 
 
-def plot_two_snps_result(chromosomes, positions, pvals, all_in_one=False):
+def _plot_snp_pair_scatter_(plot_file_name, x_pos_list, y_pos_list, score_array, top_filter=0.05, fig_format='png'):
+	print 'Plotting scatter plot.'
+	plt.figure(figsize=(14, 12))
+	x_min = min(x_pos_list)
+	x_max = max(x_pos_list)
+	x_range = x_max - x_min
+	y_min = min(y_pos_list)
+	y_max = max(y_pos_list)
+	y_range = y_max - y_min
+	plt.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range, y_min - 0.025 * y_range, y_max + 0.025 * y_range])
+
+	sxy_list = []
+	for i, x_pos, in enumerate(x_pos_list):
+		for j, y_pos in enumerate(y_pos_list):
+			sxy_list.append((score_array[i, j], x_pos, y_pos))
+
+	sxy_list.sort()
+	sxy_list = sxy_list[int((1.0 - top_filter) * len(sxy_list)):] #Filtering the top SNPs.
+	l = map(list, zip(*sxy_list))
+	cs = l[0]
+	xs = l[1]
+	ys = l[2]
+
+	plt.plot([x_min, x_max], [y_min, y_max], 'k--')
+	plt.scatter(xs, ys, c=cs, alpha=0.8, linewidths=0)
+	plt.colorbar()
+	plt.savefig(plot_file_name + '.' + fig_format, format=fig_format)
+	plt.clf()
+
+
+
+def plot_snp_pair_result(chromosomes, positions, score_array, file_prefix, all_in_one=False):
 	"""
 	Plots 5x5 2D scatter plots
 	
 	Or, all-chromosomes-in-one plot.
 	"""
-	cur_chr = chromosomes[0]
+	chr_set = set(chromosomes)
+	assert not all_in_one, "all_in_one option isn't implemented yet"
 
-	while i < len(chromosomes), this_chr == cur_chr
+	chromosome_splits = _get_chromosome_splits_(chromosomes, chr_set)
+	for i, chr_1 in enumerate(chr_set):
+		for j, chr_2 in enumerate(chr_set):
+			ci1, ci2 = chromosome_splits[i], chromosome_splits[i + 1]
+			cj1, cj2 = chromosome_splits[j], chromosome_splits[j + 1]
+			plot_file_name = file_prefix + '_chr%d_chr%d' % (chr_1, chr_2)
+			x_pos_list = positions[ci1:ci2]
+			y_pos_list = positions[cj1:cj2]
+			score_array_slice = score_array[ci1:ci2, cj1:cj2]
+			_plot_snp_pair_scatter_(plot_file_name, x_pos_list, y_pos_list, score_array_slice)
+
 
