@@ -213,13 +213,17 @@ class Calls2DB_250k(object):
 	Description:
 		Turn calling algorithm's results into db and associated filesystem directory.
 		
-		Each file in input_dir shall be named like 'array_id'_call.tsv.
-		The file would be ignored if a call with same array_id and same method_id exists in database.
-		
-		The format is 2-column and tab-delimited. example:
-			SNP_ID	'array_id'
-			1_657_C_T	C
-	
+		input_type 1:
+			Each file in input_dir shall be named like 'array_id'_call.tsv.
+			The file would be ignored if a call with same array_id and same method_id exists in database.
+			The format is 2-column and tab-delimited. example:
+				SNP_ID	'array_id'
+				1_657_C_T	C
+		output: Apart from entries inserted into db table call_info, files would be created in the output_dir to store
+			actual calls.
+			Format is 2-column and tab-delimited. First column is id in table snps. example:
+				SNP_DB_ID 'array_id'
+				213444	C
 	"""
 	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
 							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
@@ -304,8 +308,11 @@ class Calls2DB_250k(object):
 		"""
 		pass
 	
-	def submit_call_dir2db(self, curs, input_dir, call_info_table, output_dir, method_id, user):
+	def submit_call_dir2db(self, curs, input_dir, call_info_table, output_dir, method_id, user, chr_pos2db_id=None, db=None):
 		"""
+		2010-10-13
+			add argument chr_pos2db_id and db
+			it replaces the old snp ID (chr_pos_...) with id from table Stock_250kDB.Snps
 		2008-04-11
 			check if output_fname exists already or not. if yes, ignore.
 			use subprocess.Popen to do cp
@@ -332,6 +339,23 @@ class Calls2DB_250k(object):
 					sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
 					continue
 				input_fname = os.path.join(input_dir, filename)
+				reader = csv.reader(open(input_fname), delimiter='')
+				writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+				writer.writerow(['SNP_ID', array_id])
+				for row in reader:
+					chr_pos = row[0].split('_')[:2]
+					chr_pos = tuple(map(int, chr_pos))
+					db_id = chr_pos2db_id.get(chr_pos)
+					if db_id is not None:
+						new_row = [db_id, row[1]]
+						writer.writerow(new_row)
+				del reader, writer
+				call_info = Stock_250kDB.CallInfo(id=new_call_id, filename=output_fname, array_id=array_id,\
+												method_id=method_id, created_by=user)
+				db.session.add(call_info)
+				db.session.flush()
+				
+				"""
 				cp_p = subprocess.Popen(['cp', input_fname, output_fname], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 				cp_p_stdout_out = cp_p.stdout.read()
 				cp_p_stderr_out = cp_p.stderr.read()
@@ -342,9 +366,14 @@ class Calls2DB_250k(object):
 					continue	#error in cp. skip the db insertion.
 				curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
 						(call_info_table, new_call_id, output_fname, array_id, method_id, user))
+				"""
 	
-	def submit_SNPxStrain_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user):
+	def submit_SNPxStrain_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user, chr_pos2db_id=None,\
+								**keywords):
 		"""
+		2010-10-13
+			add argument chr_pos2db_id and **keywords
+			it replaces the old snp ID (chr_pos_...) with id from table Stock_250kDB.Snps
 		2008-05-17
 			submit the calls from a matrix file to db
 		"""
@@ -378,10 +407,15 @@ class Calls2DB_250k(object):
 			chromosome = int(row[0])
 			position = int(row[1])
 			counter += 1
-			snp_id = '%s_%s'%(chromosome, position)
+			chr_pos = (chromosome, position)
 			for i in range(2, len(row)):
 				if i in column_index2writer:
-					column_index2writer[i].writerow([snp_id, row[i]])
+					if chr_pos2db_id:	#2010-10-13
+						db_id = chr_pos2db_id.get(chr_pos)
+					else:
+						db_id = chr_pos
+					if db_id is not None:
+						column_index2writer[i].writerow([db_id, row[i]])
 			if counter%5000==0:
 				sys.stderr.write("%s\t%s"%('\x08'*20, counter))
 		sys.stderr.write("%s\t%s"%('\x08'*20, counter))
@@ -390,8 +424,12 @@ class Calls2DB_250k(object):
 			del writer
 		sys.stderr.write(" %s arrays. Done.\n"%(len(column_index2writer)))
 	
-	def submit_StrainxSNP_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user):
+	def submit_StrainxSNP_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user, chr_pos2db_id=None,
+								**keywords):
 		"""
+		2010-10-13
+			add argument chr_pos2db_id and **keywords
+			it replaces the old snp ID (chr_pos_...) with id from table Stock_250kDB.Snps
 		2008-1-5
 			if the output_fname already exists, exit the program.
 			if db insertion fails, delete the file written out and exit the program.
@@ -419,7 +457,14 @@ class Calls2DB_250k(object):
 				writer.writerow(['SNP_ID', array_id])
 				for i in range(2, len(row)):
 					snp_id = header[i]
-					writer.writerow([snp_id, number2nt[int(row[i])]])	#translate 
+					if chr_pos2db_id:	#2010-10-13
+						snp_id = snp_id.split('_')[:2]
+						chr_pos = tuple(map(int, snp_id))
+						db_id = chr_pos2db_id.get(chr_pos)
+					else:
+						db_id = snp_id
+					if db_id is not None:
+						writer.writerow([db_id, number2nt[int(row[i])]])	#translate 
 				del writer
 				try:
 					curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
@@ -452,10 +497,12 @@ class Calls2DB_250k(object):
 		
 		#database connection and etc
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-				   password=self.passwd, hostname=self.hostname, database=self.dbname)
+									password=self.passwd, hostname=self.hostname, database=self.dbname)
 		db.setup(create_tables=False)
 		session = db.session
 		session.begin()
+		
+		chr_pos2db_id = db.getSNPChrPos2ID()
 		
 		import MySQLdb
 		conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.user, passwd = self.passwd)
@@ -464,15 +511,17 @@ class Calls2DB_250k(object):
 			sys.stderr.write("Warning: method_id=%s not in %s. A new entry to be created.\n"%\
 							(self.method_id, self.call_method_table))
 			cm = Stock_250kDB.CallMethod(short_name=self.call_method_short_name, id=self.method_id)
-			session.save(cm)
+			session.add(cm)
 			session.flush()
-			session.commit()
 			
 			self.method_id = cm.id
 			
 		if self.commit:
-			self.submit_call2db(curs, self.input_dir, self.call_info_table, self.output_dir, self.method_id, self.user)
+			self.submit_call2db(curs, self.input_dir, self.call_info_table, self.output_dir, self.method_id, self.user, \
+							chr_pos2db_id=chr_pos2db_id, db=db)
 			curs.execute("commit")
+			session.flush()
+			session.commit()
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
