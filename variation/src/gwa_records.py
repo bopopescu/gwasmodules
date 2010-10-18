@@ -104,20 +104,35 @@ class ResultRecordFT(tables.IsDescription):
 	mac = tables.Int32Col()
 	odds_ratio = tables.Float32Col()
 
-
+_file_counter = {}
 
 class GWASRecord():
 
 	def __init__(self, hdf5_file_name):
 		self.filename = hdf5_file_name
 
+	def _open(self,mode,*args):
+		h5file = tables.openFile(self.filename, mode,*args)
+		if self.filename not in _file_counter:
+			_file_counter[self.filename] = 1
+		else:
+			_file_counter[self.filename] +=1 
+		return h5file
+	
+	def _close(self,h5file):
+		if self.filename in _file_counter:
+			_file_counter[self.filename] -= 1
+			if _file_counter[self.filename]  == 0:
+				print "closing hdf5 file"
+				h5file.close()
+			
 
 	def init_file(self):
-		h5file = tables.openFile(self.filename, mode="w", title="Phenotype_results_file")
+		h5file = self_open(mode="w", title="Phenotype_results_file")
 		g = h5file.createGroup("/", 'phenotypes', 'Basic phenotype folder')
 		h5file.createTable(g, 'info', PhenotypeInfo, "Phenotyping information")
 		h5file.flush()
-		h5file.close()
+		self._close(h5file)
 
 	def add_new_phenotype(self, phen_name, phenotype_values, ecotypes, accession_names=None, growth_conditions='',
 				phenotype_scoring='', method_description='', measurement_scale='', is_binary=False):
@@ -125,7 +140,7 @@ class GWASRecord():
 		Initializes the phenotype group for this phenotype and inserts it into the file object.
 		"""
 		#Now parsing the phenotype file
-		self.h5file = tables.openFile(self.filename, mode="r+")
+		self.h5file = self._open(mode="r+")
 		self._init_phenotype_(phen_name, num_vals=len(phenotype_values), std_dev=sp.std(phenotype_values),
 				growth_conditions=growth_conditions, phenotype_scoring=phenotype_scoring,
 				method_description=method_description, measurement_scale=measurement_scale,
@@ -134,7 +149,7 @@ class GWASRecord():
 		self._add_phenotype_values_(phen_name, ecotypes, phenotype_values, transformation='raw',
 				accessions=accession_names, std_dev_values=None, value_comments=None)
 		self.h5file.flush()
-		self.h5file.close()
+		self._close(self.h5file)
 
 
 	def _init_phenotype_(self, phen_name, num_vals=0.0, std_dev=0.0, growth_conditions='', phenotype_scoring='',
@@ -164,11 +179,11 @@ class GWASRecord():
 		"""
 		Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
 		"""
-		self.h5file = tables.openFile(self.filename, mode="r+")
+		self.h5file = self._open(mode="r+")
 		self._add_phenotype_values_(phen_name, ecotypes, values, transformation, transformation_description,
 				accessions, std_dev_values, value_comments)
 		self.h5file.flush()
-		self.h5file.close()
+		self._close(self.h5file)
 
 
 	def _add_phenotype_values_(self, phen_name, ecotypes, values, transformation='raw', transformation_description=None,
@@ -203,13 +218,13 @@ class GWASRecord():
 		"""
 		Returns the phenotype values
 		"""
-		h5file = tables.openFile(self.filename, mode="r")
+		h5file = self._open(mode="r")
 		table = h5file.getNode('/phenotypes/%s/%s/values' % (phen_name, transformation))
 		d = {'ecotype' : [], 'mean_value' : [], 'accession_name': [], 'std_dev': [], 'comment':[]}
 		for x in table.iterrows():
 			for k in d:
 				d[k].append(x[k])
-		h5file.close()
+		self._close(h5file)
 		return d
 
 
@@ -219,7 +234,7 @@ class GWASRecord():
 		Returns the phenotype meta data in a dict.
 		"""
 		dict_list = []
-		self.h5file = tables.openFile(self.filename, mode="r")
+		self.h5file = self._open(mode="r")
 		table = self.h5file.getNode('/phenotypes/info')
 		if not phen_name:
 			for x in table.iterrows():
@@ -241,8 +256,7 @@ class GWASRecord():
 					d[k] = x[k]
 				d['transformation'] = self._get_phenotype_transformations_(x['name'])
 				dict_list.append(d)
-
-		self.h5file.close()
+		self._close(self.h5file)
 		return dict_list
 
 
@@ -264,9 +278,9 @@ class GWASRecord():
 		"""
 		Returns the phenotype values
 		"""
-		self.h5file = tables.openFile(self.filename, mode="r")
+		self.h5file = self._open(mode="r")
 		d = self._get_phenotype_transformations_(phen_name)
-		self.h5file.close()
+		self._close(self.h5file)
 		return d
 
 
@@ -290,9 +304,9 @@ class GWASRecord():
 		"""
 		Returns the phenotype values
 		"""
-		self.h5file = tables.openFile(self.filename, mode="r")
+		self.h5file = self._open(mode="r")
 		d = _get_analysis_methods_(phen_name, transformation)
-		self.h5file.close()
+		self._close(self.h5file)
 		return d
 
 
@@ -302,7 +316,7 @@ class GWASRecord():
 		"""
 		Add a result to the hdf5 file.
 		"""
-		h5file = tables.openFile(self.filename, mode="r+")
+		h5file = self._open(mode="r+")
 		trans_group = h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation))
 		table = h5file.createTable(trans_group, 'result_info', ResultInfo, "Result information")
 		info = table.row
@@ -337,7 +351,7 @@ class GWASRecord():
 #		table.cols.chromosome.createIndex()
 #		table.cols.score.createIndex()
 #		table.cols.mac.createIndex()
-		h5file.close()
+		self._close(h5file)
 
 
 
@@ -355,12 +369,12 @@ class GWASRecord():
 			d['correlation'] = []
 			d['genotype_var_perc'] = []
 
-		h5file = tables.openFile(self.filename, mode="r")
+		h5file = self.open(mode="r")
 		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
 		for x in table.where('(score<=%f) & (mac>=%d)' % (max_pval, min_mac)):
 			for k in d:
 				d[k].append(x[k])
-		h5file.close()
+		self._close(h5file)
 		return d
 
 
@@ -371,8 +385,7 @@ class GWASRecord():
 		Return results..
 		"""
 		cd = {}
-
-		h5file = tables.openFile(self.filename, mode="r")
+		h5file = self._open(mode="r")
 		table = h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
 		info_table = h5file.getNode('/phenotypes/%s/%s/result_info' % (phen_name, transformation))
 		for x in info_table.where('name=="%s"' % analysis_method):
@@ -383,7 +396,7 @@ class GWASRecord():
 			d_keys.append('statistic')
 		else:
 			d_keys.extend(['beta0', 'beta1', 'correlation', 'genotype_var_perc'])
-
+		
 		for chromosome in chromosomes:
 			sort_list = []
 			test_chromosomes = []
@@ -399,8 +412,9 @@ class GWASRecord():
 				d[k] = transp_list[i]
 			cd[chromosome] = d
 		cd['chromosome_ends'] = chromosome_ends
+		print '/phenotypes/%s/%s/result_info' % (phen_name, transformation)
 		cd['max_score'] = max_score
-		h5file.close()
+		self._close(h5file)
 		return cd
 
 
