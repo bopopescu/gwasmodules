@@ -471,9 +471,10 @@ create or replace view view_qc as select e.id as ecotype_id, e.nativename, \
 
 create or replace view view_call as select c.id as call_info_id, c.filename, 
 	c.method_id as call_method_id, a.id as array_id, a.median_intensity, a.original_filename,
-	a.maternal_ecotype_id as ecotype_id, e.latitude, e.longitude, e.nativename, e.stockparent, s.name as site, ad.region, co.abbr as country \
-	from call_info c, array_info a, stock.ecotype e, stock.site s, stock.address ad, stock.country co where \
-	a.id=c.array_id and e.id=a.maternal_ecotype_id and e.siteid=s.id and s.addressid=ad.id and ad.countryid=co.id \
+	a.maternal_ecotype_id as ecotype_id, e.latitude, e.longitude, e.nativename, e.stockparent, p.firstname, p.surname, \
+	s.name as site, ad.region, co.abbr as country \
+	from call_info c, array_info a, stock.ecotype e, stock.site s, stock.address ad, stock.country co , stock.person p where \
+	a.id=c.array_id and e.id=a.maternal_ecotype_id and e.siteid=s.id and s.addressid=ad.id and ad.countryid=co.id and e.collectorid=p.id \
 	order by nativename;
 
 -- 2008-05-27 view the arrays
@@ -482,7 +483,8 @@ create or replace view view_array as select a.id as array_id, a.median_intensity
 	a.original_filename as array_filename,  a.maternal_ecotype_id,
 	e1.nativename as maternal_nativename, e1.stockparent as maternal_stockparent,
 	a.paternal_ecotype_id, e2.nativename as paternal_nativename,
-	e2.stockparent as paternal_stockparent, a.date_created as array_created from array_info a, stock.ecotype e1,
+	e2.stockparent as paternal_stockparent, a.experimenter, a.date_created as array_created 
+	from array_info a, stock.ecotype e1,
 	stock.ecotype e2 where e1.id=a.maternal_ecotype_id and e2.id=a.paternal_ecotype_id
 	order by maternal_nativename, paternal_nativename;
 
