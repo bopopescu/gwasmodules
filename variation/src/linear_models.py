@@ -121,8 +121,167 @@ class LinearModel(object):
 		f_stats = (rss_ratio - 1) * n_p / float(q)
 		p_vals = stats.f.sf(f_stats, q, n_p)
 		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
-			'var_perc':var_perc}
+			'var_perc':var_perc, 'h0_rss':h0_rss}
 
+
+	def two_snps_ftest(self, snps, verbose=True):
+		"""
+		Every pair of SNPs, Vincent's results.
+		"""
+		import util
+		num_snps = len(snps)
+
+		ftest_res = self.fast_f_test(snps)
+		full_rss = ftest_res['h0_rss']
+		h0_X = self.X
+		Y = self.Y	#The transformed outputs.
+
+		#Contructing result containers		
+		p3_f_stat_array = sp.zeros((num_snps, num_snps))
+		p3_p_val_array = sp.ones((num_snps, num_snps))
+		p4_f_stat_array = sp.zeros((num_snps, num_snps))
+		p4_p_val_array = sp.ones((num_snps, num_snps))
+		f_stat_array = sp.zeros((num_snps, num_snps))
+		p_val_array = sp.ones((num_snps, num_snps))
+		rss_array = sp.repeat(full_rss, num_snps * num_snps)
+		rss_array.shape = (num_snps, num_snps)
+		var_perc_array = sp.zeros((num_snps, num_snps))
+		haplotype_counts = [[{} for j in range(i + 1)] for i in range(num_snps)]
+
+		#Fill the diagonals with the single SNP emmax
+		for i, snp in enumerate(snps):
+			hap_set, hap_counts, haplotypes = snpsdata.get_haplotypes([snp], self.n,
+										count_haplotypes=True)
+			d = {'num_haps':hap_counts}
+			for hap, hap_c in zip(hap_set, hap_counts):
+				d[hap] = hap_c
+			haplotype_counts[i][i] = d
+			p_val_array[i, i] = ftest_res['ps'][i]
+			p3_p_val_array[i, i] = p_val_array[i, i]
+			p4_p_val_array[i, i] = p_val_array[i, i]
+			f_stat_array[i, i] = ftest_res['f_stats'][i]
+			p3_f_stat_array[i, i] = f_stat_array[i, i]
+			p4_f_stat_array[i, i] = f_stat_array[i, i]
+			rss_array[i, i] = ftest_res['rss'][i]
+			var_perc_array[i, i] = ftest_res['var_perc'][i]
+
+
+		identical_snp_count = 0
+		no_interaction_count = 0
+		for i, snp1 in enumerate(snps):
+			snp1 = snps[i]
+			for j in range(i):
+				snp2 = snps[j]
+				if i == j: continue #Skip diagonals..
+
+				#Haplotype counts 
+				hap_set, hap_counts, haplotypes = snpsdata.get_haplotypes([snp1, snp2], self.n,
+											count_haplotypes=True)
+				groups = set(haplotypes)
+				d = {'num_haps':len(hap_counts)}
+				for hap, hap_c in zip(hap_set, hap_counts):
+					d[hap] = hap_c
+				haplotype_counts[i][j] = d
+
+				#Fill the upper right part with more powerful of two tests.
+
+				if ftest_res['ps'][i] < ftest_res['ps'][j]:
+					rss_array[j, i] = ftest_res['rss'][i]
+					max_i = i
+				else:
+					rss_array[j, i] = ftest_res['rss'][j]
+					max_i = j
+
+				if d['num_haps'] == 2:
+					identical_snp_count += 1
+					continue
+				elif d['num_haps'] == 3:
+					n_p = self.n - 3
+					no_interaction_count += 1
+					#Do ANOVA
+					l = []
+					for g in groups:
+						l.append(sp.int8(haplotypes == g))
+					X = sp.mat(l)
+					(betas, rss, p, sigma) = linalg.lstsq(X.T, Y)
+					rss_array[i, j] = rss[0]
+					var_perc_array[i, j] = 1 - rss / full_rss
+					f_stat = (rss_array[j, i] / rss - 1) * n_p #FINISH
+					p_val = stats.f.sf([f_stat], 1, n_p)[0]
+					p3_f_stat_array[j, i] = f_stat
+					p3_f_stat_array[i, j] = f_stat
+					p3_p_val_array[j, i] = p_val
+					p3_p_val_array[i, j] = p_val
+
+					f_stat = ((full_rss - rss) / 2) / (rss / n_p)
+					f_stat_array[j, i] = f_stat
+					p_val_array[j, i] = stats.f.sf([f_stat], 2, n_p)[0]
+
+
+				elif d['num_haps'] == 4: #With interaction
+					n_p = self.n - 3
+					#Do additive model
+					snp_mat = sp.mat([snp1, snp2]).T #Transformed inputs
+					X = sp.hstack([h0_X, snp_mat])
+					(betas, rss, rank, s) = linalg.lstsq(X, Y)
+					f_stat = (rss_array[j, i] / rss - 1) * n_p #Compared to only one SNP
+					p_val = stats.f.sf([f_stat], 1, n_p)[0]
+					rss_array[i, j] = rss
+					p3_f_stat_array[j, i] = f_stat
+					p3_p_val_array[j, i] = p_val
+
+#					v_f_stat_array[j, i] = f_stat
+#					v_p_val_array[j, i] = stats.f.sf([f_stat], 1, n_p)[0]
+
+					f_stat = ((full_rss - rss) / 2) / (rss / n_p) #Compared to only the intercept
+					f_stat_array[j, i] = f_stat
+					p_val_array[j, i] = stats.f.sf([f_stat], 2, n_p)[0]
+
+					#Generate the interaction, and test it.
+					i_snp = snp1 & snp2
+					snp_mat = sp.mat([i_snp]).T
+					X = sp.hstack([h0_X, sp.mat([snps[max_i]]).T, snp_mat])
+					(betas, rss, rank, s) = linalg.lstsq(X, Y)
+					f_stat = (rss_array[j, i] / rss - 1) * n_p #Compared to only one SNP
+					p_val = stats.f.sf([f_stat], 1, n_p)[0]
+					p3_f_stat_array[i, j] = f_stat
+					p3_p_val_array[i, j] = p_val
+
+
+					#full model p-value
+					n_p = self.n - 4
+					l = []
+					for g in groups:
+						l.append(sp.int8(haplotypes == g))
+					X = sp.mat(l)
+					(betas, rss, p, sigma) = linalg.lstsq(X.T, Y)
+
+					f_stat = ((rss_array[j, i] - rss) / 2) / (rss / n_p) #Compared to only one SNP
+					p_val = stats.f.sf([f_stat], 2, n_p)[0]
+					p4_f_stat_array[j, i] = f_stat
+					p4_p_val_array[j, i] = p_val
+
+					f_stat = (rss_array[i, j] / rss - 1) * n_p #Compared to two SNPs
+					p4_f_stat_array[i, j] = f_stat
+					p4_p_val_array[i, j] = stats.f.sf([f_stat], 1, n_p)[0]
+
+					f_stat = ((full_rss - rss) / 3) / (rss / n_p) #Compared to only intercept
+					f_stat_array[i, j] = f_stat
+					p_val_array[i, j] = stats.f.sf([f_stat], 3, n_p)[0]
+					rss_array[j, i] = rss
+
+			if num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+
+		print no_interaction_count, identical_snp_count
+
+		#FINISH res dict!!!
+		res_dict = {'p3_ps':p3_p_val_array, 'p3_f_stats':p3_f_stat_array, 'p4_ps':p4_p_val_array,
+			'p4_f_stats':p4_f_stat_array, 'rss':rss_array, 'var_perc':var_perc_array,
+			'haplotype_counts':haplotype_counts,
+			'f_stats':f_stat_array, 'ps':p_val_array}
+		return res_dict
 
 
 
@@ -780,7 +939,6 @@ class LinearMixedModel(LinearModel):
 					rss_array[i, j] = rss[0]
 					var_perc_array[i, j] = 1 - rss / full_rss
 					f_stat = (rss_array[j, i] / rss - 1) * n_p #FINISH
-					rss_array[i, j] = rss
 					p_val = stats.f.sf([f_stat], 1, n_p)[0]
 					p3_f_stat_array[j, i] = f_stat
 					p3_f_stat_array[i, j] = f_stat
@@ -849,6 +1007,7 @@ class LinearMixedModel(LinearModel):
 				sys.stdout.write('.')
 				sys.stdout.flush()
 
+		print no_interaction_count, identical_snp_count
 
 		#FINISH res dict!!!
 		res_dict = {'p3_ps':p3_p_val_array, 'p3_f_stats':p3_f_stat_array, 'p4_ps':p4_p_val_array,
@@ -1483,6 +1642,26 @@ def emmax_two_snps(snps, phenotypes, K, cofactors=None):
 	else:
 		print 'Took %f seconds.' % (secs)
 	print 'pseudo_heritability:', res['pseudo_heritability']
+	return res
+
+
+
+def linear_model_two_snps(snps, phenotypes, cofactors=None):
+	lm = LinearModel(phenotypes)
+	if cofactors:
+		for cofactor in cofactors:
+			lm.add_factor(cofactor)
+
+	print "Running standard regression on pairs of SNPs"
+	s1 = time.time()
+	res = lm.two_snps_ftest(snps)
+	secs = time.time() - s1
+	if secs > 60:
+		mins = int(secs) / 60
+		secs = secs - mins * 60
+		print 'Took %d mins and %f seconds.' % (mins, secs)
+	else:
+		print 'Took %f seconds.' % (secs)
 	return res
 
 
