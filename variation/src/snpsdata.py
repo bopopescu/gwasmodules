@@ -2491,6 +2491,8 @@ class SNPsDataSet:
 
 
 
+
+
 	def add_to_db(self, short_name, method_description='', data_description='', comment='', **kwargs):
 		"""
 		Other possible keyword args are parent_id, accession_set_id ,imputed ,unique_ecotype 
@@ -2786,16 +2788,28 @@ class SNPsDataSet:
 		self.accessions = self.snpsDataList[0].accessions
 
 
-	def calc_kinship_matrix(self, debug_filter=1):
-		import numpy as np
-		try:
-			r.source("emma.R")
-		except Exception, err_str:
-			print "EMMA doesn't seem to be installed correctly:%s", err_str
-			return None
+	def get_ibs_kinship_matrix(self, debug_filter=1):
+		import scipy as sp
+		print 'Starting kinship calculation'
 		snps = self.getSnps(debug_filter)
-		a = np.array(snps)
-		return r.emma_kinship(a)
+		snps_array = sp.array(snps)
+		snps_array = snps_array.T
+		num_lines = len(self.accessions)
+		num_snps = float(len(snps))
+		k_mat = sp.ones((num_lines, num_lines))
+		num_comp = num_lines * (num_lines - 1) / 2
+		comp_i = 0
+		for i in range(num_lines):
+			for j in range(i):
+				comp_i += 1
+				k_mat[i, j] = sp.sum(snps_array[i] == snps_array[j]) / num_snps
+				k_mat[j, i] = k_mat[i, j]
+				if num_comp >= 10 and (comp_i + 1) % (num_comp / 10) == 0: #Print dots
+					sys.stdout.write('.')
+					sys.stdout.flush()
+		return k_mat
+
+
 
 
 	def convert_2_binary(self):

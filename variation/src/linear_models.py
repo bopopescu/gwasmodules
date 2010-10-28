@@ -334,6 +334,58 @@ class LinearModel(object):
 
 
 
+	def anova_f_test_w_missing(self, snps):
+		"""
+		A standard ANOVA, using a F-test
+		
+		Handles SNPs w. missing data...
+		"""
+		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X, self.Y)
+		num_snps = len(snps)
+		rss_list = sp.repeat(h0_rss, num_snps)
+		h0_betas = map(float, list(h0_betas)) + [0.0]
+		betas_list = [h0_betas] * num_snps
+		var_perc = sp.zeros(num_snps)
+		f_stats = sp.zeros(num_snps)
+		dfs = sp.zeros(num_snps)
+		p_vals = sp.ones(num_snps)
+		n = self.n
+		p_0 = len(self.X.T)
+
+		for i, snp in enumerate(snps):
+			groups = sp.unique(snp)
+			q = len(groups) - 1  # Null model has 1 df.
+			p = p_0 + q
+			n_p = n - p
+			x = []
+			for g in groups:
+				x.append(sp.int8(snp == g))
+			(betas, rss, p, sigma) = linalg.lstsq(sp.mat(x).T, self.Y)
+
+  			if not rss:
+				print 'No predictability in the marker, moving on...'
+				continue
+			rss_list[i] = rss[0]
+			betas_list[i] = map(float, list(betas))
+			rss_ratio = h0_rss / rss
+			var_perc[i] = 1 - 1 / rss_ratio
+			f_stat = (rss_ratio - 1) * n_p / float(q)
+			p_vals[i] = stats.f.sf([f_stat], q, n_p)[0]
+			f_stats[i] = f_stat
+			dfs[i] = n_p
+			if num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+
+		if num_snps >= 10:
+			sys.stdout.write('\n')
+
+		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
+			'var_perc':var_perc, 'dfs':dfs}
+
+
+
+
 
 	def test_explanatory_variable(self, x):
 		"""
