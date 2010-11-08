@@ -186,6 +186,33 @@ class GWASRecord():
 		self._close(self.h5file)
 
 
+	def delete_transformation(self,phen_name,transformation='raw'):
+		"""
+		Deletes transformation from an existing phenotype.
+		"""
+		self.h5file = self._open(mode="r+")
+		try:
+			try:
+				self._delete_transformation_(phen_name,  transformation)
+			except Exception, err:
+				raise err
+		finally:
+			self.h5file.flush()
+			self._close(self.h5file)
+
+	def _delete_transformation_(self,phen_name,transformation='raw'):
+		table = self.h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
+		trans_index = -1 
+		for x in table.iterrows():
+			if x['name'] == transformation:
+				trans_index = x.nrow
+		if trans_index == -1:
+			raise Exception('Transformation not found')
+		self.h5file.removeNode('/phenotypes/%s' % phen_name,transformation,True)
+		table.removeRows(trans_index)
+		table.flush()
+		
+
 	def _add_phenotype_values_(self, phen_name, ecotypes, values, transformation='raw', transformation_description=None,
 				accessions=None, std_dev_values=None, value_comments=None):
 		"""
@@ -268,6 +295,7 @@ class GWASRecord():
 			d = {'name': '', 'description': ''}
 			for k in d:
 				d[k] = x[k]
+			d['phenotype'] = phen_name
 			d['analysis_method'] = self._get_analysis_methods_(phen_name, x['name'])
 			dict_list.append(d)
 		return dict_list
@@ -293,6 +321,8 @@ class GWASRecord():
 				d = {'name': '', 'comment': ''}
 				for k in d:
 					d[k] = x[k]
+				d['phenotype'] = phen_name
+				d['transformation'] = transformation
 				dict_list.append(d)
 		except Exception, err_str:
 			print "No results found:", err_str
@@ -317,41 +347,44 @@ class GWASRecord():
 		Add a result to the hdf5 file.
 		"""
 		h5file = self._open(mode="r+")
-		trans_group = h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation))
-		table = h5file.createTable(trans_group, 'result_info', ResultInfo, "Result information")
-		info = table.row
-		info['name'] = analysis_method
-		info['max_score'] = max(scores)
-		if analysis_comment: info['comment'] = analysis_comment
-		info.append()
-		table.flush()
-
-		analysis_group = h5file.createGroup(trans_group, analysis_method, 'Analysis method: ' + analysis_method)
-		if analysis_method in ['emmax', 'lm']:
-			table = h5file.createTable(analysis_group, 'results', ResultRecordLM, "Regression result")
-		elif analysis_method is 'kw':
-			table = h5file.createTable(analysis_group, 'results', ResultRecordKW, "Regression result")
-		else:
-			raise Exception('Not implemented for analysis method %s' % analysis_method)
-		result = table.row
-
-
-		for i, cpsmm in enumerate(itertools.izip(chromosomes, positions, scores, mafs, macs)):
-			(result['chromosome'], result['position'], result['score'], result['maf'], result['mac']) = cpsmm
-			if analysis_method == 'kw':
-				result['statistic'] = kwargs['statistics'][i]
-			else: #EMMAX or LM
-				result['beta0'] = kwargs['beta0'][i]
-				result['beta1'] = kwargs['beta1'][i]
-				result['correlation'] = kwargs['correlation'][i]
-				result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
-			result.append()
-		table.flush()
-
+		try:
+			trans_group = h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation))
+			table = h5file.createTable(trans_group, 'result_info', ResultInfo, "Result information")
+			info = table.row
+			info['name'] = analysis_method
+			info['max_score'] = max(scores)
+			if analysis_comment: info['comment'] = analysis_comment
+			info.append()
+			table.flush()
+	
+			analysis_group = h5file.createGroup(trans_group, analysis_method, 'Analysis method: ' + analysis_method)
+			if analysis_method in ['emmax', 'lm']:
+				table = h5file.createTable(analysis_group, 'results', ResultRecordLM, "Regression result")
+			elif analysis_method == 'kw':
+				table = h5file.createTable(analysis_group, 'results', ResultRecordKW, "Regression result")
+			else:
+				raise Exception('Not implemented for analysis method %s' % analysis_method)
+			result = table.row
+	
+	
+			for i, cpsmm in enumerate(itertools.izip(chromosomes, positions, scores, mafs, macs)):
+				(result['chromosome'], result['position'], result['score'], result['maf'], result['mac']) = cpsmm
+				if analysis_method == 'kw':
+					result['statistic'] = kwargs['statistics'][i]
+				else: #EMMAX or LM
+					result['beta0'] = kwargs['beta0'][i]
+					result['beta1'] = kwargs['beta1'][i]
+					result['correlation'] = kwargs['correlation'][i]
+					result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
+				result.append()
+		except Exception, err:
+			raise err
+		finally:
+			table.flush()
 #		table.cols.chromosome.createIndex()
 #		table.cols.score.createIndex()
 #		table.cols.mac.createIndex()
-		self._close(h5file)
+			self._close(h5file)
 
 
 
@@ -418,12 +451,16 @@ class GWASRecord():
 		return cd
 
 
-	def get_phenotype_bins(self, phen_name, transformation='raw', bin_number=20):
+	def get_phenotype_bins(self,phen_name,transformation='raw',bin_number=20):
+		phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
+		return self._get_phenotype_bins(phen_vals,bin_number)
+
+	def _get_phenotype_bins(self, phen_vals, bin_number=20):
 		"""
 		Returns the 
 		"""
 		#Get the phenotype
-		phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
+		
 		min_phen_val = min(phen_vals)
 		max_phen_val = max(phen_vals)
 		chunk_size = ((max_phen_val - min_phen_val) / bin_number) * (1 + 1e-5 / bin_number)
@@ -439,8 +476,11 @@ class GWASRecord():
 		return bin_list
 
 
+	def preview_transform_phenotype(self,phen_name,transformation,original_transformation='raw'):
+		new_phen_vals = self.transform_phenotype(phen_name, transformation, original_transformation)
+		return self._get_phenotype_bins(new_phen_vals)
 
-	def transform_phenotype(self, phen_name, transformation, original_transformation='raw'):
+	def transform_phenotype(self, phen_name, transformation, original_transformation='raw',store=False):
 		"""
 		Apply a transformation to a phenotype.
 		"""
@@ -452,11 +492,16 @@ class GWASRecord():
 			new_phen_vals = sp.log(phen_vals - min(phen_vals) + sp.var(phen_vals) * 0.1)
 		elif transformation == 'sqrt':
 			new_phen_vals = sp.sqrt(phen_vals - min(phen_vals) + sp.var(phen_vals) * 0.1)
-		self.add_phenotype_values(phen_name, phen_data['ecotype'], new_phen_vals, transformation)
+		if store:
+			self.add_phenotype_values(phen_name, phen_data['ecotype'], new_phen_vals, transformation)
+		return new_phen_vals
 
-
-
-
+	def exists_transformation(self,phen_name,transformation):
+		transformations = self.get_phenotype_transformations(phen_name)
+		for trans in transformations:
+			if trans['name'] == transformation:
+				return True
+		return False
 
 
 
@@ -469,6 +514,8 @@ class GWASRecord():
 		"""
 		import bisect
 		import gwa
+		if analysis_method not in ['lm', 'emmax','kw']:
+			raise Exception('analysis method %s not supported' % analysis_method)
 		phen_data = self.get_phenotype_values(phen_name, transformation)
 		sd = dp.parse_numerical_snp_data(snps_data_file)
 		sd.filter_accessions(map(str, phen_data['ecotype']))
@@ -498,7 +545,7 @@ class GWASRecord():
 					maf_dict['mafs'], transformation=transformation, statistics=kw_res['ds'],
 					correlation=correlations)
 		else:
-			raise Exception()
+			raise Exception('analysis method %s not supported' % analysis_method)
 
 		if analysis_method in ['lm', 'emmax']:
 			betas = map(list, zip(*res['betas']))
@@ -508,6 +555,7 @@ class GWASRecord():
 					genotype_var_perc=res['var_perc'], beta0=betas[0], beta1=betas[1],
 					correlation=correlations)
 		print 'Done!'
+
 
 
 
