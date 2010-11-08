@@ -1768,8 +1768,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 		id=None, useDecoder=True, look_for_binary=True, filter_accessions=None,
 		use_pickle=True):
 	"""
-	format=1: the function return a RawSnpsData object list
-	format=0: the function return a SnpsData object list
+	Load snps data..
 	"""
 	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
 	import cPickle
@@ -1779,10 +1778,11 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 			sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
 						filter=filter, filter_accessions=filter_accessions,
 						use_pickle=use_pickle, dtype='int8', data_format=format)
-		else:
-			sd = parse_snp_data(data_file , format=data_format_dict[format], delimiter=delimiter,
+		else: #Try nucleotide format
+			sd = parse_snp_data(data_file , format='nucleotides', delimiter=delimiter,
 					      missingVal=missingVal, filter=filter, look_for_binary=False,
 					      filter_accessions=filter_accessions)
+			sd.convert_2_binary()
 			print 'Save a binary snps data file:', sd_binary_file
 			sd.writeToFile(sd_binary_file, binary_format=True)
 			if use_pickle:

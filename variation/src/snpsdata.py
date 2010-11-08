@@ -2823,7 +2823,7 @@ class SNPsDataSet:
 			snpsd_list = []
 			for snpsd in self.snpsDataList:
 				snpsd_list.append(snpsd.getSnpsData())
-			snpsDataList = snpsd_list
+			self.snpsDataList = snpsd_list
 			self.is_binary = True
 		self.missing_val = self.snpsDataList[0].missingVal
 

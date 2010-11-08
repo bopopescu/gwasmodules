@@ -475,14 +475,10 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			else:
 				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
 				print "No kinship file was found.  Generating kinship file:", k_file
-				snps = sd.getSnps()
 				k_accessions = sd.accessions[:]
-				if p_dict['debug_filter']:
-					import random
-					snps = random.sample(snps, int(p_dict['debug_filter'] * len(snps)))
-				k = lm.calc_kinship(snps)
+				k = sd.get_ibs_kinship_matrix(p_dict['debug_filter'])
 				f = open(k_file, 'w')
-				cPickle.dump([k, sd.accessions], f)
+				cPickle.dump([k, k_accessions], f)
 				f.close()
 				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
 				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)

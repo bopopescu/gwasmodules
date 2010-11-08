@@ -1456,7 +1456,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 			pdf_file_name = file_prefix + '_step' + str(step_i - 1) + '.pdf'
 			png_file_name = file_prefix + '_step' + str(step_i - 1) + '.png'
 			pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-					pdf_file=pdf_file_name, png_file=png_file_name)
+					 png_file=png_file_name)
 
 
 		#Adding the new SNP as a cofactor
@@ -1544,6 +1544,9 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 			(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 			bic, extended_bic, modified_bic)
 		print 'Cofactors:', cofactors_str
+		if reml_res['pseudo_heritability'] < 0.01:
+			print 'Breaking early, since pseudoheritability is close to 0.'
+			break
 
 	emmax_res = lmm._emmax_f_test_(snps, H_sqrt)
 	min_pval_i = sp.argmin(emmax_res['ps'])
@@ -1562,7 +1565,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
 		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
 		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-				pdf_file=pdf_file_name, png_file=png_file_name)
+				png_file=png_file_name)
 
 
 	secs = time.time() - s1
@@ -1647,9 +1650,9 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		genetic_variance = p_her_array + (1 - rss_array)
 		variance_explained = (1 - rss_array)
 		pylab.figure(figsize=(10, 6))
-		pylab.fill_between([0, num_steps], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.fill_between([0, step_i], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
 		pylab.ylabel('Percentage of variance')
 		pylab.xlabel('Step number')
 		pylab.legend(loc=1, ncol=3, shadow=True)
@@ -1975,36 +1978,37 @@ def load_kinship_from_file(kinship_file, accessions=None):
 
 
 
-def calc_kinship_old(snps):
-	"""
-	Requires EMMA to be installed.
-	
-	Uses rpy2 
-	"""
-	import rpy2.robjects as robjects
-	import rpy2.robjects.numpy2ri
-	import env
-	r_source = robjects.r('source')
-	a = sp.array(snps)
-	r_source(env.env['script_dir'] + "emma_fast.R")
-	r_emma_kinship = robjects.r['emma.kinship']
-	return sp.array(r_emma_kinship(a))
-	#from rpy import r 
-	#r.source(script_dir+"emma_fast.R")
-	#return r.emma_kinship(a)
+#def calc_kinship_old(snps):
+#	"""
+#	Requires EMMA to be installed.
+#	
+#	Uses rpy2 
+#	"""
+#	import rpy2.robjects as robjects
+#	import rpy2.robjects.numpy2ri
+#	import env
+#	r_source = robjects.r('source')
+#	a = sp.array(snps)
+#	r_source(env.env['script_dir'] + "emma_fast.R")
+#	r_emma_kinship = robjects.r['emma.kinship']
+#	return sp.array(r_emma_kinship(a))
+#	#from rpy import r 
+#	#r.source(script_dir+"emma_fast.R")
+#	#return r.emma_kinship(a)
+#
+#
+#def calc_kinship(snps):
+#	"""
+#	Requires EMMA to be installed.
+#	
+#	Uses the old rpy
+#	"""
+#	import env
+#	a = sp.array(snps)
+#	from rpy import r
+#	r.source(env.env['script_dir'] + "emma_fast.R")
+#	return r.emma_kinship(a)
 
-
-def calc_kinship(snps):
-	"""
-	Requires EMMA to be installed.
-	
-	Uses the old rpy
-	"""
-	import env
-	a = sp.array(snps)
-	from rpy import r
-	r.source(env.env['script_dir'] + "emma_fast.R")
-	return r.emma_kinship(a)
 
 
 
@@ -2135,26 +2139,26 @@ def _test_stepwise_emmax_():
 	import phenotypeData as pd
 	import util
 	#filename = "/Users/bjarnivilhjalmsson/Projects/FLC_analysis/FLC_expression_101011.txt"
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_100510.csv"
-	mac_threshold = 10
-	for pid, log_trans in [(38, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
-		phed = pd.readPhenotypeFile(filename, with_db_ids=False)
-		#phed = pd.readPhenotypeFile(filename)
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_100810.csv"
+	mac_threshold = 15
+	for pid, log_trans in [ (43, True), (44, True)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
+		#phed = pd.readPhenotypeFile(filename, with_db_ids=False)
+		phed = pd.readPhenotypeFile(filename)
 		if log_trans:
 			phed.logTransform(pid)
 		phen_name = phed.getPhenotypeName(pid)
 		filter_accessions = phed.getNonNAEcotypes(pid)
-		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
+		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary')
 		sd.coordinate_w_phenotype_data(phed, pid)
 		if mac_threshold:
 			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
 		phenotypes = phed.getPhenVals(pid)
-		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled',
+		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
 					phed.accessions)
 
 		info_list = emmax_step_wise(phenotypes, K, sd=sd, \
 					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_' \
-					+ str(pid) + '_' + phen_name, num_steps=8, allow_interactions=True,
+					+ str(pid) + '_' + phen_name, num_steps=18, allow_interactions=True,
 					interaction_pval_thres=0.001)
 
 
