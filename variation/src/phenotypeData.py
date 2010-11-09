@@ -261,6 +261,21 @@ class PhenotypeData:
 					vals.append(float(phenVals[p_i]))
 		return vals
 
+	def get_vals_accs(self, pid):
+		"""
+		Returns the values and accessions for a particular phenotype. 
+		(It doesn't return missing values)
+		"""
+		p_i = self.getPhenIndex(phenId)
+		vals = []
+		accs = []
+		for phenVals, acc in zip(self.phenotypeValues, self.accessions):
+			if phenVals[p_i] != 'NA':
+				vals.append(float(phenVals[p_i]))
+				accs.append(acc)
+		return (vals, accs)
+
+
 #	def getAccessionsWithValues(self, phenId):
 #		import warnings
 #		warnings.warn("Use getNonNAEcotypes instead of getAccessionsWithValues!")

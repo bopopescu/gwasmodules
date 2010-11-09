@@ -179,11 +179,13 @@ class GWASRecord():
 		Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
 		"""
 		phen_file_name
-		self.h5file = self._open(mode="r+")
-		self._add_phenotype_values_(phen_name, ecotypes, values, transformation, transformation_description,
-				accessions, std_dev_values, value_comments)
-		self.h5file.flush()
-		self._close(self.h5file)
+		phed = pd.readPhenotypeFile(phen_file_name, with_db_ids=False)
+		phed.filter_accessions_w_missing_data()
+		for pid in phed.phenIds:
+			(phen_vals, ecotypes) = phed.get_vals_accs(pid)
+			self.add_phenotype_values(phed.getPhenotypeName(pid), ecotypes, phen_vals,
+						transformation=transformation,
+						transformation_description=transformation_description)
 
 
 	def add_phenotype_values(self, phen_name, ecotypes, values, transformation='raw', transformation_description=None,
