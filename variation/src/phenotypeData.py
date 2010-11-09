@@ -266,7 +266,7 @@ class PhenotypeData:
 		Returns the values and accessions for a particular phenotype. 
 		(It doesn't return missing values)
 		"""
-		p_i = self.getPhenIndex(phenId)
+		p_i = self.getPhenIndex(pid)
 		vals = []
 		accs = []
 		for phenVals, acc in zip(self.phenotypeValues, self.accessions):
@@ -1031,13 +1031,19 @@ class PhenotypeData:
 		f.close()
 
 
-def readPhenotypeFile(filename, delimiter=None, missing_value_decoder=None, accessionDecoder=None, with_db_ids=True):
+def readPhenotypeFile(filename=None, file_object=None, delimiter=None, missing_value_decoder=None, accessionDecoder=None, with_db_ids=True):
 	"""
 	Reads a phenotype file and returns a phenotype object.
 	"""
 	if not missing_value_decoder:
 		missing_value_decoder = {'NA':'NA'}
-	f = open(filename, "r")
+	if filename:
+		f = open(filename, "r")
+	elif file_object:
+		f = file_object
+	else:
+		raise Exception('Error')
+		
 	lines = f.readlines()
 	f.close()
 	shift = 1

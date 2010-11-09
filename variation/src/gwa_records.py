@@ -174,12 +174,12 @@ class GWASRecord():
 
 
 
-	def add_phenotype_file(self, phen_file_name, transformation='raw', transformation_description=None):
+	def add_phenotype_file(self, phen_file_name=None, file_object=None, transformation='raw', transformation_description=None):
 		"""
 		Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
 		"""
 		phen_file_name
-		phed = pd.readPhenotypeFile(phen_file_name, with_db_ids=False)
+		phed = pd.readPhenotypeFile(phen_file_name,file_object, with_db_ids=False)
 		phed.filter_na_ecotypes()
 		for pid in phed.phenIds:
 			(phen_vals, ecotypes) = phed.get_vals_accs(pid)
