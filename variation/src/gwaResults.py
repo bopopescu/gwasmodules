@@ -289,9 +289,13 @@ class Result(object):
 			self.positions.extend(snpsd.positions)
 			self.snps.extend(snpsd.snps)
 			self.chromosome_ends.append(snpsd.positions[-1])
-		maf_d = snps_data.get_mafs()
-		self.mafs = maf_d['mafs']
-		self.marfs = maf_d['marfs']
+		if snps_data.data_format == 'float':
+			self.mafs = [1] * len(self.snps)
+			self.marfs = [1] * len(self.snps)
+		else:
+			maf_d = snps_data.get_mafs()
+			self.mafs = maf_d['mafs']
+			self.marfs = maf_d['marfs']
 
 
 	def _rank_scores_(self):

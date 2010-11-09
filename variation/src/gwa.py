@@ -577,6 +577,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 		res.write_to_file(result_file, additional_columns)
 
 	#add results to DB..
+
 	if p_dict['add_to_db']:
 		if p_dict['no_phenotype_ids']:
 			db_pid = phed.get_db_pid(p_i)
@@ -593,61 +594,62 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 
 
-	#Load candidate genes from a file, if it is given
-	cand_genes = None
-	if p_dict['cand_genes_file']:
-		cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
-	else:
+	if p_dict['data_format'] != 'float':
+		#Load candidate genes from a file, if it is given
 		cand_genes = None
-		tair_ids = None
-
-
-	print "Generating a GW plot."
-	sys.stdout.flush()
-	png_file = file_prefix + "_gwa_plot.png"
-	#png_file_max30 = file_prefix+"_gwa_plot_max30.png"
-	if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
-		res.neg_log_trans()
-		if mapping_method in ["kw", "ft"]:# or p_dict['data_format'] != 'binary':
-			#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-			#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
-			res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-				       plot_bonferroni=True, cand_genes=cand_genes)
+		if p_dict['cand_genes_file']:
+			cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
 		else:
-			if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
+			cand_genes = None
+			tair_ids = None
+
+
+		print "Generating a GW plot."
+		sys.stdout.flush()
+		png_file = file_prefix + "_gwa_plot.png"
+		#png_file_max30 = file_prefix+"_gwa_plot_max30.png"
+		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
+			res.neg_log_trans()
+			if mapping_method in ["kw", "ft"]:# or p_dict['data_format'] != 'binary':
 				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
+				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
 				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
 					       plot_bonferroni=True, cand_genes=cand_genes)
-	else:
-		pass
+			else:
+				if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
+					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
+					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
+					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
+						       plot_bonferroni=True, cand_genes=cand_genes)
+		else:
+			pass
 
-	print "plotting histogram"
-	hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method, p_dict['remove_outliers'])
-	hist_png_file = hist_file_prefix + "_hist.png"
-	phed.plot_histogram(p_i, pngFile=hist_png_file)
+		print "plotting histogram"
+		hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method, p_dict['remove_outliers'])
+		hist_png_file = hist_file_prefix + "_hist.png"
+		phed.plot_histogram(p_i, pngFile=hist_png_file)
 
 
 
-	if p_dict['region_plots']:
-		import regionPlotter as rp
-		regions_results = res.get_top_region_results(p_dict['region_plots'])
-		plotter = rp.RegionPlotter()
-		print "Starting region plots..."
-		for reg_res in regions_results:
-			chromosome = reg_res.chromosomes[0]
-			caption = phenotype_name + "_c" + str(chromosome) + "_" + mapping_method
-			png_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + ".png"
-			tair_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_tair_info.txt"
-			plotter.plot_small_result([reg_res], png_file=png_file, highlight_gene_ids=tair_ids,
-						  caption=caption, tair_file=tair_file)
+		if p_dict['region_plots']:
+			import regionPlotter as rp
+			regions_results = res.get_top_region_results(p_dict['region_plots'])
+			plotter = rp.RegionPlotter()
+			print "Starting region plots..."
+			for reg_res in regions_results:
+				chromosome = reg_res.chromosomes[0]
+				caption = phenotype_name + "_c" + str(chromosome) + "_" + mapping_method
+				png_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + ".png"
+				tair_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_tair_info.txt"
+				plotter.plot_small_result([reg_res], png_file=png_file, highlight_gene_ids=tair_ids,
+							  caption=caption, tair_file=tair_file)
 
-			#Plot Box-plot
-			png_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_box_plot.png"
-			(marker, score, chromosome, pos) = reg_res.get_max_snp()
-			marker_accessions = sd.accessions
-			phed.plot_marker_box_plot(p_i, marker=marker, marker_accessions=marker_accessions, png_file=png_file,
-					     title="c" + str(chromosome) + "_p" + str(pos), marker_score=score, marker_missing_val=sd.missing_val)
+				#Plot Box-plot
+				png_file = file_prefix + "_reg_plot_c" + str(chromosome) + "_s" + str(reg_res.positions[0]) + "_e" + str(reg_res.positions[-1]) + "_box_plot.png"
+				(marker, score, chromosome, pos) = reg_res.get_max_snp()
+				marker_accessions = sd.accessions
+				phed.plot_marker_box_plot(p_i, marker=marker, marker_accessions=marker_accessions, png_file=png_file,
+						     title="c" + str(chromosome) + "_p" + str(pos), marker_score=score, marker_missing_val=sd.missing_val)
 
 
 
