@@ -548,12 +548,14 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 			if mapping_method in ['lm', 'emmax']:
 				kwargs['genotype_var_perc'] = res['var_perc']
+				additional_columns.append('genotype_var_perc')
+
 				betas = map(list, zip(*res['betas']))
 				kwargs['beta0'] = betas[0]
-				kwargs['beta1'] = betas[1]
-				additional_columns.append('genotype_var_perc')
 				additional_columns.append('beta0')
-				additional_columns.append('beta1')
+				if len(betas) > 1:
+					kwargs['beta1'] = betas[1]
+					additional_columns.append('beta1')
 				pvals = res['ps']
 				sys.stdout.write("Done!\n")
 				sys.stdout.flush()
