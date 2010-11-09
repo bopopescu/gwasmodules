@@ -889,9 +889,9 @@ class PhenotypeData:
 		"""
 		Removes accessions with missing data in all traits.
 		"""
-		acc_set = set()
+		e_set = set()
 		for pid in self.phenIds:
-			e_set = acc_set.union(set(self.getNonNAEcotypes(pid)))
+			e_set = e_set.union(set(self.getNonNAEcotypes(pid)))
 		self.filterAccessions(list(e_set))
 
 
@@ -1994,10 +1994,10 @@ def combine_resistance_nc14():
 
 
 def _get_fri_flc_():
-	file_name = '/Users/bjarni.vilhjalmsson/FRI_FLC.phen_csv'
+	file_name = '/Users/bjarni.vilhjalmsson/test.phen_csv'
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_100810.csv"
 	phed = readPhenotypeFile(filename)
-	phed.removePhenotypes([0, 1, 2, 3, 31, 32, 33, 34, 35, 36, 37, 42, 43])
+	phed.removePhenotypes([0, 4, 5, 43])
 	phed.filter_na_ecotypes()
 	phed.writeToFile(file_name)
 

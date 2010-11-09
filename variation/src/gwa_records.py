@@ -180,7 +180,7 @@ class GWASRecord():
 		"""
 		phen_file_name
 		phed = pd.readPhenotypeFile(phen_file_name, with_db_ids=False)
-		phed.filter_accessions_w_missing_data()
+		phed.filter_na_ecotypes()
 		for pid in phed.phenIds:
 			(phen_vals, ecotypes) = phed.get_vals_accs(pid)
 			self.add_phenotype_values(phed.getPhenotypeName(pid), ecotypes, phen_vals,
