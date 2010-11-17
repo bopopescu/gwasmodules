@@ -155,13 +155,65 @@ class GeneList(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('gene_id', 'list_type_id'))
 
+class GenomeWideResultMethod(Entity):
+	"""
+	2010-10-10
+	"""
+	short_name = Field(String(256), unique=True)
+	description = Field(String(8192))
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='genome_wide_result_method', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+
+class GenomeMarker(Entity):
+	"""
+	2010-10-10
+	"""
+	chromosome = Field(Integer)
+	start = Field(Integer)
+	stop = Field(Integer)
+	description = Field(String(512), deferred=True)
+	object = Field(LargeBinary(1000000), deferred=True)	#a python dictionary to store other attributes
+	created_by = Field(String(128), deferred=True)
+	updated_by = Field(String(128), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
+	using_options(tablename='genome_marker', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('chromosome', 'start', 'stop'))
+	
+
+class GenomeWideResult(Entity):
+	"""
+	2010-10-10
+		a general table to store all kinds of genomic data
+	"""
+	method = ManyToOne('GenomeWideResultMethod', colname='method_id', ondelete='CASCADE', onupdate='CASCADE')
+	marker = ManyToOne('GenomeMarker', colname='marker_id', ondelete='CASCADE', onupdate='CASCADE')
+	value = Field(Float)
+	rank = Field(Integer)
+	object = Field(LargeBinary(13217728), deferred=True)	#a python dictionary to store other attributes
+	created_by = Field(String(128), deferred=True)
+	updated_by = Field(String(128), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
+	using_options(tablename='genome_wide_result', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('method_id', 'marker_id'))
+	
 
 class Snps(Entity):
 	"""
+	2010-10-19
+		add column include_after_qc, Field(Integer):
+			indicating whether this SNP is still included in final dataset after QC.
 	2010-6-17
 		add argument tair8_chromosome, tair8_position
 	"""
-	name = Field(String(200), unique=True, nullable = False)
+	name = Field(String(200), unique=True, nullable = False, deferred=True)
 	chromosome = Field(Integer)
 	position = Field(Integer)
 	end_position = Field(Integer)
@@ -169,10 +221,11 @@ class Snps(Entity):
 	allele2 = Field(String(2))
 	tair8_chromosome = Field(Integer)
 	tair8_position = Field(Integer)
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	include_after_qc = Field(Integer, default=0)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='snps', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
@@ -181,12 +234,12 @@ class SnpsContext(Entity):
 	disp_pos = Field(Integer)
 	gene_id = Field(Integer)
 	gene_strand = Field(String(1))
-	left_or_right = Field(String(200))
-	disp_pos_comment = Field(String(2000))
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	left_or_right = Field(String(200), deferred=True)
+	disp_pos_comment = Field(String(2000), deferred=True)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='snps_context', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('snps_id', 'gene_id'))
@@ -361,6 +414,8 @@ class AccessionSet2Ecotype(Entity):
 
 class ResultsMethod(Entity):
 	"""
+	2010-9-21
+		add remove_outliers, pseudo_heritability, transformation_parameters
 	2010-1-22
 		add unique constraint
 	"""
@@ -380,6 +435,9 @@ class ResultsMethod(Entity):
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
+	remove_outliers = Field(Integer, default=0)
+	pseudo_heritability = Field(Float)
+	transformation_parameters = Field(String(11))
 	using_options(tablename='results_method', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
@@ -554,8 +612,8 @@ class SnpsQC(Entity):
 	snp = ManyToOne('Snps', colname='snps_id', ondelete='CASCADE', onupdate='CASCADE')
 	min_probability = Field(Float)
 	max_call_info_mismatch_rate = Field(Float)
-	snps_name = Field(String(200))
-	tg_snps_name = Field(String(200))
+	snps_name = Field(String(200), deferred=True)
+	tg_snps_name = Field(String(200), deferred=True)
 	NA_rate = Field(Float)
 	no_of_NAs = Field(Integer)
 	no_of_totals = Field(Integer)
@@ -568,10 +626,10 @@ class SnpsQC(Entity):
 	qc_method = ManyToOne("%s.QCMethod"%__name__, colname='qc_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	call_method = ManyToOne("CallMethod", colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	readme = ManyToOne("%s.README"%__name__, colname='readme_id', ondelete='CASCADE', onupdate='CASCADE')
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='snps_qc', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
@@ -635,10 +693,10 @@ class ArrayInfo(Entity):
 	method_name = Field(String(250))
 	readme = ManyToOne("%s.README"%__name__, colname='readme_id', ondelete='CASCADE', onupdate='CASCADE')
 	array_quartile_ls = OneToMany("%s.ArrayQuartile"%__name__)
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='array_info', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
@@ -754,22 +812,22 @@ class Probes(Entity, TableClass):
 			CNV.markCNVProbeTAIR9CopyNumber(db_250k, tair9_blast_result_fname)
 	"""
 	snp = ManyToOne('Snps', colname='snps_id', ondelete='CASCADE', onupdate='CASCADE')
-	seq = Field(String(25))
+	seq = Field(String(25), deferred=True)
 	chromosome = Field(Integer)
 	position = Field(Integer)
 	allele = Field(String(1))
 	strand = Field(String(20))
 	xpos = Field(Integer)
 	ypos = Field(Integer)
-	direction = Field(String(20))
-	gene = Field(String(50))
-	RNA = Field(String(50))
-	tu = Field(String(50))
-	flank = Field(String(50))
+	direction = Field(String(20), deferred=True)
+	gene = Field(String(50), deferred=True)
+	RNA = Field(String(50), deferred=True)
+	tu = Field(String(50), deferred=True)
+	flank = Field(String(50), deferred=True)
 	expressedClones = Field(Float)
 	totalClones = Field(Integer)
-	multiTranscript = Field(String(50))
-	LerDel = Field(String(50))
+	multiTranscript = Field(String(50), deferred=True)
+	LerDel = Field(String(50), deferred=True)
 	LerCopy = Field(Integer)
 	LerSNPdelL = Field(Integer)
 	LerSNPdelR = Field(Integer)
@@ -784,10 +842,10 @@ class Probes(Entity, TableClass):
 	cda = Field(Boolean)
 	tair8_chromosome = Field(Integer)
 	tair8_position = Field(Integer)
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='probes', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
@@ -1400,15 +1458,15 @@ class CNV(Entity):
 	score_std = Field(Float)
 	frequency = Field(Float)
 	fractionNotCoveredByLyrata = Field(Float)
-	comment = Field(String(8124))
+	comment = Field(String(8124), deferred=True)
 	cnv_type =  ManyToOne('%s.CNVType'%__name__, colname='cnv_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	cnv_method = ManyToOne('%s.CNVMethod'%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	cnv_call_ls = ManyToMany("CNVCall", tablename='cnv2cnv_call', ondelete='CASCADE', onupdate='CASCADE')	#2010-7-31
 	cnv_array_call_ls = OneToMany("CNVArrayCall")
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='cnv', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('chromosome', 'start', 'stop', 'cnv_type_id', 'cnv_method_id'))
@@ -1423,11 +1481,11 @@ class CNVArrayCall(Entity):
 	cnv_method = ManyToOne('%s.CNVMethod'%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	score = Field(Float)
 	fractionDeletedInPECoverageData = Field(Float)	#2010-8-1
-	comment = Field(String(8124))
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
+	comment = Field(String(8124), deferred=True)
+	created_by = Field(String(200), deferred=True)
+	updated_by = Field(String(200), deferred=True)
+	date_created = Field(DateTime, default=datetime.now, deferred=True)
+	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='cnv_array_call', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('array_id', 'cnv_id', 'cnv_method_id'))
@@ -2241,8 +2299,12 @@ class Stock_250kDB(ElixirDB):
 		return gwr
 	
 	@classmethod
-	def getOneSequenceRefPosInGWA(cls, sequence_fragment_id=None, min_size=None, min_no_of_probes=None, version=1):
+	def getOneSequenceRefPosInGWA(cls, sequence_fragment_id=None, min_size=None, min_no_of_probes=None, \
+								chr=None, start=None, stop=None, version=1):
 		"""
+		2010-11-15
+			add argument chr, start, stop to restrict the segments to that space
+			report the version argument as well
 		2010-6-18
 			change default of min_size to None
 		2010-6-14
@@ -2252,11 +2314,12 @@ class Stock_250kDB(ElixirDB):
 				fragment positions are treated as y-axis values.
 				called by GenomeBrowser.py
 		"""
-		sys.stderr.write("Getting positions of sequences from sequence fragment %s on ref genome, min_size %s, min_no_of_probes %s ..."%\
-						(sequence_fragment_id, min_size, min_no_of_probes))
+		sys.stderr.write("Getting positions of sequences from sequence fragment %s on ref genome, min_size %s, \
+						min_no_of_probes %s version %s ..."%\
+						(sequence_fragment_id, min_size, min_no_of_probes, version))
 		TableClass = SequenceFragmentRefPos
 		query = TableClass.query.filter(TableClass.sequence_fragment.has(id=sequence_fragment_id)).filter_by(version=version)
-		
+		query = cls.limitQueryByChrPosition(query, TableClass, chr, start, stop)
 		if min_size is not None:
 			query = query.filter((TableClass.stop-TableClass.start+1)>=min_size)
 		if min_no_of_probes is not None:
@@ -2306,6 +2369,8 @@ class Stock_250kDB(ElixirDB):
 	def getSequenceRefPosInMultiGWA(self, accession_id=None, min_size=None, min_no_of_probes=None,\
 							chr=None, start=None, stop=None, version=1):
 		"""
+		2010-11-15
+			bugfix: pass argument version to getOneSequenceRefPosInGWA()
 		2010-6-14
 			add version
 		2010-4-28
@@ -2343,7 +2408,8 @@ class Stock_250kDB(ElixirDB):
 		genome_wide_result_ls = []
 		for row in rows:
 			gwr = self.getOneSequenceRefPosInGWA(row.sequence_fragment_id, min_size=min_size, \
-												min_no_of_probes=min_no_of_probes)
+										min_no_of_probes=min_no_of_probes, chr=chr, start=start, stop=stop, \
+										version=version)
 			genome_wide_result_ls.append(gwr)
 		return genome_wide_result_ls
 	
@@ -2744,8 +2810,10 @@ class Stock_250kDB(ElixirDB):
 		from pymodule import PassingData
 		return PassingData(list_id_ls=list_id_ls, list_id2index=list_id2index, list_label_ls=list_label_ls)
 	
-	def getCNVMethodOrTypeInfoDataInCNVCallOrQC(self, TableClass=CNVMethod, CNVTableClass=CNVCall):
+	def getCNVMethodOrTypeInfoDataInCNVCallOrQC(self, TableClass=CNVMethod, CNVTableClass=CNVCall, extra_condition=None):
 		"""
+		2010-10-19
+			add argument extra_condition
 		2010-7-23
 			set TableClass = CNVType to get type info.
 			set CNVTableClass=CNVQCCall to get info for the QC table
@@ -2756,9 +2824,45 @@ class Stock_250kDB(ElixirDB):
 			field_name = 'cnv_method_id'
 		else:
 			field_name = 'cnv_method_id'
-		sql_string = "select distinct m.* from %s m, %s c where m.id=c.%s"%\
-					(TableClass.table.name, CNVTableClass.table.name, field_name)
+		where_sql_ls = [ "m.id=s.%s"%(field_name)]
+		if extra_condition is not None:
+			where_sql_ls.append(extra_condition)
+		sql_string = "select distinct m.* from %s m, %s s where %s order by m.id"%\
+					(TableClass.table.name, CNVTableClass.table.name, " and ".join(where_sql_ls))
 		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
+	
+	def getSNPChrPos2ID(self, keyType=1):
+		"""
+		2010-10-13
+			return a dictionary which translates (chr, pos) to snps.id or vice versa.
+			used in Calls2DB_250k.py
+			
+			keyType
+				1: (chr,pos) is key. id is value
+				2: id is key, (chr, pos) is value.
+		"""
+		dict_to_return = {}
+		rows = self.metadata.bind.execute("select id, chromosome, position from %s where chromosome is not null and position is not null"\
+										%Snps.table.name)
+		for row in rows:
+			if keyType==1:
+				key = (row.chromosome, row.position)
+				value = row.id
+			else:
+				key = row.id
+				value = (row.chromosome, row.position)
+			dict_to_return[key] = value
+		return dict_to_return
+	
+	def getSNPID2ChrPos(self,):
+		"""
+		2010-10-13
+			return a dictionary which translates snps.id to (chr, pos).
+			used in DB_250k2data.py
+			
+		"""
+		return self.getSNPChrPos2ID(keyType=2)
+		
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
