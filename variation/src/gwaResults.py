@@ -13,7 +13,6 @@ import pdb, gc
 import dbutils
 import csv
 import math
-from numarray.image.combine import threshhold
 
 #A dictionary for loaded results.. to avoid reloading. 
 #Use carefully to avoid memory leaks!
