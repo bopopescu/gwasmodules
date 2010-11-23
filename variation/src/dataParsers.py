@@ -1773,6 +1773,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
 	import cPickle
 	if format == 'binary' and look_for_binary:
+		print 'Looking for binary SNPs'
 		sd_binary_file = data_file + '.binary'
 		if os.path.isfile(sd_binary_file):
 			sd = parse_numerical_snp_data(sd_binary_file, delimiter=delimiter, missing_val=missingVal,
@@ -1800,6 +1801,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 					filter=filter, filter_accessions=filter_accessions,
 					use_pickle=use_pickle, dtype='float32', data_format=format)
 	elif format == 'nucleotides':
+		print 'Looking for nucleotide SNPs'
 		(snpsds, chromosomes) = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal,
 					format=data_format_dict[format], filter=filter, id=id, returnChromosomes=True)
 		sd = SNPsDataSet(snpsds, chromosomes, data_format=format)

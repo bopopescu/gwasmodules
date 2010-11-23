@@ -104,6 +104,20 @@ class ResultRecordFT(tables.IsDescription):
 	mac = tables.Int32Col()
 	odds_ratio = tables.Float32Col()
 
+class ResultRecordLMStep(tables.IsDescription):
+	"""
+	Linear model, mixed models, etc. for stepwise analysis.
+	"""
+	chromosome = tables.Int32Col()
+	position = tables.Int32Col()
+	score = tables.Float64Col()
+	maf = tables.Float32Col()
+	mac = tables.Int32Col()
+	genotype_var_perc = tables.Float32Col()
+	beta0 = tables.Float32Col()
+	beta1 = tables.Float32Col()
+	correlation = tables.Float32Col()
+
 _file_counter = {}
 
 class GWASRecord():
@@ -179,7 +193,7 @@ class GWASRecord():
 		Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
 		"""
 		phen_file_name
-		phed = pd.readPhenotypeFile(phen_file_name,file_object, with_db_ids=False)
+		phed = pd.readPhenotypeFile(phen_file_name, file_object, with_db_ids=False)
 		phed.filter_na_ecotypes()
 		for pid in phed.phenIds:
 			(phen_vals, ecotypes) = phed.get_vals_accs(pid)
@@ -570,6 +584,11 @@ class GWASRecord():
 					correlation=correlations)
 		print 'Done!'
 
+
+	def conditional_analysis(self):
+		"""
+		Conditions on the selected SNP, for either EMMAX, or LM.
+		"""
 
 
 

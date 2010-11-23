@@ -1,5 +1,9 @@
 import pdb
 from env import *
+import math
+import scipy as sp
+import itertools as it
+from distutils.tests.setuptools_build_ext import if_dl
 
 # Phenotype categories: (category,order)
 #phenotypeCategories = {
@@ -39,9 +43,415 @@ from env import *
 #Log 02/25/09 - Chlor_16,Chlor_22 were removed from cat. 2: 168,169, { 168: (2,26), 169: (2,27),} 
 #new_name_dict = {11:"Emoy2", 32:"Emoy2", }
 
+
+class phenotype_data:
+	"""
+	A class that encapsulates phenotype values and provides basic functionality for these.
+	
+	This is an update of an older class.
+	"""
+
+	def __init__(self, phen_dict=None, phenotype_names=[], phen_ids=None):
+		if phen_dict:
+			self.phen_dict = phen_dict
+			self.phen_ids = phen_dict.keys()
+		else:
+			if phen_ids:
+				self.phen_ids = phen_ids
+			else:
+				self.phen_ids = range(len(phenotype_names))
+			self.phen_dict = {}
+			for i, pid in enumerate(self.phen_ids):
+				self.phen_dict[pid] = {'name':phenotype_names[i], 'ecotypes':[], 'values':[]}
+
+
+	def log_transform(self, pid, method='standard'):
+		a = sp.array(self.phen_dict[pid]['values'])
+		if method == 'standard':
+			vals = sp.log((a - min(a)) + 0.1 * sp.std(a))
+		else:
+			vals = sp.log(a)
+		self.phen_dict[pid]['values'] = vals.tolist()
+
+	def sqrt_transform(self, pid, method='standard'):
+		a = sp.array(self.phen_dict[pid]['values'])
+		if method == 'standard':
+			vals = sp.sqrt((a - min(a)) + 0.1 * sp.std(a))
+		else:
+			vals = sp.sqrt(a)
+		self.phen_dict[pid]['values'] = vals.tolist()
+
+
+	def na_outliers(self, pids, iqr_threshold):
+		raise NotImplementedError
+
+
+	def filter_phenotypes(self, pids_to_keep):
+		"""
+		Removes phenotypes.
+		"""
+		self.phen_ids = pids_to_keep
+		d = {}
+		for pid in pids_to_keep:
+			d[pid] = self.phen_dict[pid]
+		self.phen_dict = d
+
+
+	def filter_ecotypes(self, indices_to_keep, pids=None):
+		"""
+		Removes the ecotypes from all data.
+		"""
+		if not pids:
+			pids = self.phen_ids
+		for pid in pids:
+			el = []
+			vl = []
+			d = self.phen_dict[pid]
+			for i in indices_to_keep:
+				el.append(d['ecotypes'][i])
+				vl.append(d['values'][i])
+			self.phen_dict[pid]['ecotypes'] = el
+			self.phen_dict[pid]['values'] = vl
+
+
+	def order_ecotypes(self, ets_map, pids=None):
+		if not pids:
+			pids = self.phen_ids
+		for pid in pids:
+			d = self.phen_dict[pid]
+			ets = []
+			vals = []
+			for i in ets_map:
+				ets.append(d['ecotypes'][i])
+				vals.append(d['values'][i])
+
+	def get_name(self, pid):
+		return self.phen_dict[pid]['name']
+
+	def get_values(self, pid):
+		return self.phen_dict[pid]['values']
+
+	def get_ecotypes(self, pid):
+		return self.phen_dict[pid]['ecotypes']
+
+	def get_incidence_matrix(self, pid):
+		ets = sp.array(map(int, self.phen_dict[pid]['ecotypes']))
+		unique_ets = []
+		i = 0
+		while i < len(ets):
+			et = ets[i]
+			unique_ets.append(et)
+			while i < len(ets) and ets[i] == et:
+				i += 1
+#		unique_ets = sp.mat(sp.unique(ets))
+		Z = sp.int16(sp.mat(ets).T == sp.mat(unique_ets))
+		#print Z
+		return Z
+
+
+	def _get_ecotype_value_dict_(self, pid):
+		ecotypes = self.get_ecotypes(pid)
+		values = self.get_values(pid)
+		d = {}
+		for et in set(ecotypes):
+			d[et] = {'values':[], 'rep_num':0}
+
+		for et, val in it.izip(ecotypes, values):
+			d[et]['values'].append(val)
+			d[et]['rep_num'] += 1
+		return d
+
+	def get_avg_values(self, pid):
+		"""
+		Returns the average values, along with the ecotypes, and rep_number
+		"""
+		d = self._get_ecotype_value_dict_(pid)
+		ecotypes = d.keys()
+		avg_vals = []
+		rep_nums = []
+		for et in d:
+			avg_vals.append(sp.mean(d[et]['values']))
+			rep_nums.append(d[et]['rep_num'])
+		return {'name':self.get_name(pid) + '_avg', 'ecotypes':ecotypes, 'values':avg_vals, 'rep_nums': rep_nums}
+
+
+
+
+	def get_db_pid(self, pid, conn=None):
+		"""
+		Retrieves the DB pid, using the phenotype name.
+		"""
+		phen_name = self.get_name(pid)
+		import dbutils
+		if not conn:
+			conn = dbutils.connect_to_default_lookup()
+		cursor = conn.cursor()
+		sql_statement = "SELECT id FROM stock_250k.phenotype_method WHERE short_name='%s'" % (phen_name)
+		print sql_statement
+		numRows = int(cursor.execute(sql_statement))
+		row = cursor.fetchone()
+		if row:
+			db_pid = int(row[0])
+		else:
+			print "No id found in DB for phenotype:%s" % (phen_name)
+			db_pid = None
+		cursor.close()
+		if not conn:
+			conn.close()
+		return db_pid
+
+
+	def convert_to_averages(self, pids=None):
+		"""
+		Replaces phenotypes with replicates with their averages.
+		"""
+		if not pids:
+			pids = self.phen_dict.keys()
+		for pid in pids:
+			phen_name = self.get_name(pid)
+			self.phen_dict[pid] = self.get_avg_values(pid)
+			self.phen_dict[pid]['name'] = phen_name
+
+
+
+	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None):
+		import pylab as plt
+		plt.figure(figsize=(5, 4))
+		plt.axes([0.14, 0.13, 0.81, 0.83])
+		if x_label:
+			plt.xlabel(x_label)
+		phen_vals = self.get_values(pid)
+
+		minVal = min(phen_vals)
+		maxVal = max(phen_vals)
+		x_range = maxVal - minVal
+		histRes = plt.hist(phen_vals, bins=round(8 + 2 * sp.log(len(phen_vals))), alpha=0.8)
+		y_max = max(histRes[0])
+		plt.axis([minVal - 0.035 * x_range, maxVal + 0.035 * x_range, -0.035 * y_max, 1.18 * y_max])
+		num_phen_vals = len(phen_vals)
+		shapiro_pval = sp.stats.shapiro(phen_vals)[1]
+		plt.text(maxVal - 0.7 * x_range, 1.1 * y_max, "Number of values: " + str(num_phen_vals), size="x-small")
+		plt.text(maxVal - 0.85 * x_range, 1.02 * y_max, "Shapiro-Wilk normality $p$-value: %0.6f" % shapiro_pval , size="x-small")
+		print max(histRes[0])
+		plt.ylabel("Frequency")
+		if title:
+			plt.title(title)
+		if pdf_file:
+			plt.savefig(pdf_file, format="pdf")
+		if png_file:
+			plt.savefig(png_file, format="png", dpi=300)
+		elif not pdf_file or png_file:
+			plt.show()
+		plt.clf()
+
+
+	def write_to_file(self, file_name, delim=','):
+		"""
+		Writes the object to a file.. (in the new format)
+		"""
+		f = open(file_name, 'w')
+		header = ['phenotype_id', 'phenotype_name', 'ecotype_id', 'value', 'replicate_id', ]
+		f.write(delim.join(header) + '\n')
+		for pid in self.phen_dict:
+			d = self.phen_dict[pid]
+			phen_name = d['name']
+			ets_vals = zip(d['ecotypes'], d['values'])
+			ets_vals.sort()
+			last_et = -1
+			for (et, val) in ets_vals:
+				if et != last_et:
+					repl_id = 1
+				else:
+					repl_id += 1
+				l = map(str, [pid, phen_name, et, val, repl_id])
+				f.write(delim.join(l) + '\n')
+				last_et = et
+		f.close()
+
+
+	def is_binary(self, pid):
+		return len(sp.unique(self.phen_dict[pid]['values'])) == 2
+
+
+	def plot_accession_map(self, pid, ecotypes=None, pdf_file=None, png_file=None):
+		"""
+		Plot accessions on a map.
+		
+		'color_by' is by default set to be the phenotype values.
+		"""
+		if not ecotypes:
+			ecotypes = self.phen_dict[pid]['ecotypes']
+		eid = get_ecotype_id_info_dict()
+		lats = []
+		lons = []
+		for e in ecotypes:
+			r = eid[int(e)]
+			try:
+				latitude = float(r[2])
+				longitude = float(r[3])
+
+			except Exception, err_str:
+				print "Latitude and Longitude, not found?:", err_str
+				print 'Placing them in the Atlantic.'
+				latitude = 40
+				longitude = -20
+			lats.append(latitude)
+			lons.append(longitude)
+
+		from mpl_toolkits.basemap import Basemap
+		import numpy as np
+		import matplotlib.pyplot as plt
+		from pylab import cm
+		if map_type == "global2":
+			plt.figure(figsize=(14, 12))
+			m = Basemap(width=21.e6, height=21.e6, projection='gnom', lat_0=76, lon_0=15)
+			m.drawparallels(np.arange(20, 90, 20))
+			m.drawmeridians(np.arange(-180, 180, 30))
+		elif map_type == 'global':
+
+			plt.figure(figsize=(16, 4))
+			plt.axes([0.02, 0.02, 0.96, 0.96])
+			m = Basemap(projection='cyl', llcrnrlat=10, urcrnrlat=80,
+				    llcrnrlon= -130, urcrnrlon=150, lat_ts=20, resolution='c')
+			m.drawparallels(np.arange(20, 90, 20))
+			m.drawmeridians(np.arange(-180, 180, 30))
+		else:
+			raise Exception("map_type is invalid")
+
+		#m.drawmapboundary(fill_color='aqua')
+		m.drawcoastlines(zorder=0)
+		m.fillcontinents(zorder=1)
+		#m.fillcontinents(color='coral',lake_color='aqua')
+
+		xs = []
+		ys = []
+		for lon, lat in zip(lons, lats):
+			x, y = m(*np.meshgrid([lon], [lat]))
+			xs.append(x)
+			ys.append(y)
+
+		if not color_by:
+			color_vals = self.getPhenVals(p_i)
+		else:
+			color_vals = color_by
+		if len(color_vals) != len(accessions):
+			raise Exception("accessions and color_by_vals values don't match ! ")
+		if not cmap:
+			num_colors = len(set(color_vals))
+			if num_colors <= 10:
+				cmap = cm.get_cmap('jet', num_colors)
+			else:
+				cmap = cm.get_cmap('jet')
+		lws = [0] * len(xs)
+		plt.scatter(xs, ys, s=10, linewidths=lws, c=color_vals, cmap=cmap, alpha=0.7, zorder=2)
+		plt.colorbar()
+		if title:
+			plt.title(title)
+		if pdf_file:
+			plt.savefig(pdf_file, format="pdf")
+		if png_file:
+			plt.savefig(png_file, format="png")
+		if not pdf_file and not png_file:
+			plt.show()
+
+
+	def plot_marker_box_plot(self, pid, marker=None, marker_accessions=None, md=None, m_i=None,
+				 pdf_file=None, png_file=None, title=None, marker_score=None, marker_missing_val='NA'):
+		"""
+		Plots a box plot for the given binary marker and phenotype. 
+		"""
+		raise NotImplementedError
+		marker = list(marker)
+		import pylab
+		if md and m_i:
+			r = self.get_marker_and_phen_vals(phen_i, md, m_i)
+			marker = r['marker']
+			phen_vals = r['phen_vals']
+			missing_val = md.missingVal
+		elif marker and marker_accessions:
+#			new_marker = []
+#			new_phen_vals = []
+			phen_vals = self.getPhenVals(phen_i, noNAs=False)
+			if len(marker_accessions) != len(phen_vals):
+				raise Exception
+#			for nt,a in zip(marker,marker_accessions):
+#				if a in self.accessions:
+#					a_i = self.accessions.index(a)
+#					phen_val = phen_vals[a_i]
+#					if phen_val!='NA' and nt!='NA':
+#						new_marker.append(nt)
+#						new_phen_vals.append(phen_val)
+#			phen_vals = new_phen_vals
+#			marker = new_marker		
+			missing_val = marker_missing_val
+
+		nt_counts = [(marker.count(nt), nt) for nt in set(marker) if nt != missing_val]
+		nt_counts.sort()
+		if len(nt_counts) > 2:
+			import warnings
+			warnings.warn("More than 2 alleles, box-plot might be wrong?")
+
+		allele_phen_vals = []
+		for c, nt in nt_counts:
+			allele_phen_vals.append([v for i, v in enumerate(phen_vals) if marker[i] == nt])
+			pylab.figure()
+		pylab.boxplot(allele_phen_vals)
+		minVal = min(phen_vals)
+		maxVal = max(phen_vals)
+		rangeVal = maxVal - minVal
+		pylab.axis([0.2, 2.8, minVal - rangeVal * 0.3, maxVal + rangeVal * 0.3])
+		pylab.text(0.4, minVal - 0.15 * rangeVal, "# of obs.: ", color='k')
+		pylab.text(0.95, minVal - 0.15 * rangeVal, str(len(allele_phen_vals[0])), color='k')
+		if len(allele_phen_vals) > 1:
+			pylab.text(1.95, minVal - 0.15 * rangeVal, str(len(allele_phen_vals[1])), color='k')
+		if marker_score:
+			pylab.text(0.9, maxVal + 0.15 * rangeVal, "-log(p-value)/score: " + str(marker_score), color='k')
+		if title:
+			pylab.title(title)
+		elif md and m_i:
+			pylab.title(self.getPhenotypeName(phen_i) + ": chromosome " + str(md.chromosome) + ", position " + str(md.positions[m_i]))
+		if pdf_file:
+			pylab.savefig(pdf_file, format="pdf")
+		if png_file:
+			pylab.savefig(png_file, format="png")
+		if not pdf_file and not png_file:
+			pylab.show()
+
+
+
+
+def parse_phenotype_file(file_name, delim=','):
+	"""
+	Parses a phenotype file of the new format, and returns a new phenotype_data object.
+	"""
+	phen_dict = {}
+	last_pid = -1
+	with open(file_name) as f:
+		header = f.next()
+		if len(header.split(delim)) != 5:
+			raise Exception('Problems with delimiter', delim)
+		for line in f:
+			l = line.split(delim)
+			pid = int(l[0])
+			if pid != last_pid:
+				if last_pid != -1:
+					phen_dict[last_pid] = d
+				phen_name = l[1]
+				d = {'name':phen_name, 'ecotypes':[], 'values':[]}
+			d['ecotypes'].append(l[2])
+			d['values'].append(float(l[3]))
+			last_pid = pid
+	return phenotype_data(phen_dict=phen_dict, phen_ids=phen_dict.keys())
+
+
+
+
+
+
+
 class PhenotypeData:
 	"""
-	A class that knows how to read simple tsv or csv phenotypefiles and facilitates their interactions with SnpsData objects.	
+	A class that knows how to read simple tsv or csv phenotypefiles and facilitates their interactions with SnpsData objects.
 	"""
 
 	def __init__(self, accessions, phenotypeNames, phenotypeValues, accessionNames=None,
@@ -181,7 +591,7 @@ class PhenotypeData:
 
 	def getPC(self, pc_num=1):
 		"""
-		Returns principal component values of of the phenotypes 
+		Returns principal component values of of the phenotypes
 		"""
 		index_map = self._getIndexMapping_()
 		print index_map
@@ -263,7 +673,7 @@ class PhenotypeData:
 
 	def get_vals_accs(self, pid):
 		"""
-		Returns the values and accessions for a particular phenotype. 
+		Returns the values and accessions for a particular phenotype.
 		(It doesn't return missing values)
 		"""
 		p_i = self.getPhenIndex(pid)
@@ -340,6 +750,7 @@ class PhenotypeData:
 
 		self.removePhenotypes(indicesToKeep)
 
+
 	def removePhenotypes(self, indicesToKeep):
 		"""
 		Removes phenotypes from the data.
@@ -388,7 +799,7 @@ class PhenotypeData:
 				for j, acc2 in enumerate(self.accessions):
 					if acc == acc2:
 						merge_indices.append(j)
-				print "merging: " + ','.join([self.accessions[mi] for mi in merge_indices])
+				print "merging: " + ', '.join([self.accessions[mi] for mi in merge_indices])
 
 			else:
 				merge_indices = [self.accessions.index(acc)]
@@ -574,11 +985,6 @@ class PhenotypeData:
 			pylab.show()
 
 
-	def plot_accession_histogram(self, phen_i, marker=None, marker_accessions=None, pdf_file=None, png_file=None,
-				     title=None, marker_score=None, marker_missing_val='NA'):
-		"""
-		Assumes markers accessions and phenotype accessions are synchronized. (Is that safe?)
-		"""
 
 	def plot_accession_map(self, p_i, pdf_file=None, png_file=None, color_by=None, map_type="global",
 			       title=None, accessions=None, cmap=None):
@@ -643,7 +1049,7 @@ class PhenotypeData:
 		else:
 			color_vals = color_by
 		if len(color_vals) != len(accessions):
-			raise Exception("accessions and color_by_vals values don't match!")
+			raise Exception("accessions and color_by_vals values don't match ! ")
 		if not cmap:
 			num_colors = len(set(color_vals))
 			if num_colors <= 10:
@@ -678,12 +1084,30 @@ class PhenotypeData:
 		return True
 
 
-	def standard_transform(self, p_i):
+	#def standard_transform(self, p_i):
+	def log_transform(self, p_i):
 		"""
 		Adds a constant before applying log-transformation.
 		"""
 		self.addSDscaledConstant(p_i)
 		self.logTransform(p_i)
+
+
+	def sqrt_transform(self, p_i):
+		"""
+		Adds a constant before applying log-transformation.
+		"""
+		self.addSDscaledConstant(p_i)
+		pi = self.getPhenIndex(p_i)
+
+		if not self.isBinary(p_i) and not self._lessOrEqualZero_(pi):
+			for i in range(len(self.accessions)):
+				if self.phenotypeValues[i][pi] != 'NA':
+					self.phenotypeValues[i][pi] = str(math.sqrt(float(self.phenotypeValues[i][pi])))
+		else:
+			print "Can't sqrt - transform, since phenotype is binary OR values are out of sqrt range ! "
+			return False
+		return True
 
 
 	def transformToRanks(self, pIndex):
@@ -900,7 +1324,7 @@ class PhenotypeData:
 			   citations='', data_description='', transformation_description=None,
 			   method_id=None, data_type=None, comment=''):
 		"""
-		Inserts phenotypes into DB, but assumes that values are averages.		
+		Inserts phenotypes into DB, but assumes that values are averages.
 		(Assumes no transformation)
 		"""
 
@@ -1087,6 +1511,151 @@ _publishablePhenotypes_ = []
 
 
 
+def get_all_phenotypes_from_db(file_name=None):
+	"""
+	Fetches all raw phenotype data from the DB, including replicates.
+	
+	Checks whether averages are consistent with replicates.
+	"""
+	import dbutils
+	conn = dbutils.connect_to_default_lookup()
+	cursor = conn.cursor ()
+
+	#Get the phenotypic values
+	sql_statement = "\
+	SELECT DISTINCT pa.method_id, pa.ecotype_id, pa.value, pm.short_name\
+	FROM stock_250k.phenotype_avg pa, stock_250k.phenotype_method pm \
+	WHERE pa.method_id=pm.id ORDER BY pa.method_id, pa.ecotype_id"
+	print sql_statement
+	numRows = int(cursor.execute(sql_statement))
+
+	phen_dict = {}
+	num_values = 0
+	while(1):
+		row = cursor.fetchone()
+		if not row:
+			break;
+		pid = int(row[0])
+		phen_name = row[3]
+		if pid not in phen_dict:
+			phen_dict[pid] = {'name':phen_name, 'ecotypes':[], 'values':[]}
+
+		if row[2] != None:
+			phen_dict[pid]['values'].append(float(row[2]))
+			phen_dict[pid]['ecotypes'].append(int(row[1]))
+			num_values += 1
+
+	print 'Values for %d phenotypes were fetched from DB.' % len(phen_dict)
+	print "%d values in total." % num_values
+
+	avg_phend = phenotype_data(phen_dict)
+
+	#Now fetch the replicates
+#	sql_statement = "\
+#	SELECT DISTINCT p.method_id, p.ecotype_id, p.value, p.replicate, pm.short_name\
+#	FROM stock_250k.phenotype p, stock_250k.phenotype_method pm \
+#	WHERE p.method_id=pm.id ORDER BY p.method_id, p.ecotype_id"
+	sql_statement = "\
+	SELECT DISTINCT p.method_id, ei.tg_ecotypeid, p.value, p.replicate, pm.short_name\
+	FROM stock_250k.phenotype p, stock_250k.phenotype_method pm, stock.ecotypeid2tg_ecotypeid ei \
+	WHERE ei.ecotypeid=p.ecotype_id and p.method_id=pm.id ORDER BY p.method_id, ei.tg_ecotypeid"
+	print sql_statement
+	numRows = int(cursor.execute(sql_statement))
+	repl_phen_dict = {}
+	num_values = 0
+	while(1):
+		row = cursor.fetchone()
+		if not row:
+			break;
+		pid = int(row[0])
+		phen_name = row[4]
+		if pid not in repl_phen_dict:
+			repl_phen_dict[pid] = {'name':phen_name, 'ecotypes':[], 'values':[], 'replicate':[]}
+
+		if row[2] != None:
+			repl_phen_dict[pid]['values'].append(float(row[2]))
+			repl_phen_dict[pid]['ecotypes'].append(int(row[1]))
+			repl_phen_dict[pid]['replicate'].append(int(row[3]))
+			num_values += 1
+
+	print 'Values for %d phenotypes were fetched from DB.' % len(repl_phen_dict)
+	print "%d values in total." % num_values
+
+	cursor.close ()
+	conn.close ()
+	cm72_dict = get_250K_accession_to_ecotype_dict(dict_key='ecotype_id')
+	#print cm72_dict
+	repl_phend = phenotype_data(repl_phen_dict)
+	no_problem_pids = []
+	for pid in phen_dict:
+		if pid in repl_phen_dict:
+			d1 = avg_phend.get_avg_values(pid)
+			d2 = repl_phend.get_avg_values(pid)
+			ets1 = d1['ecotypes']
+			ets2 = d2['ecotypes']
+			vls1 = d1['values']
+			vls2 = d2['values']
+			l1 = zip(ets1, vls1)
+			l2 = zip(ets2, vls2)
+			l1.sort()
+			l2.sort()
+			et_set1 = set(ets1)
+			et_set2 = set(ets2)
+			phen_name = phen_dict[pid]['name']
+			print phen_name, ', pid:', pid, ', et_set1==et_set2 :', et_set1 == et_set2
+			common_ets = et_set1.intersection(et_set2)
+			num_diffs = 0
+			for et in common_ets:
+				t = (sp.var(d1['values']) + sp.var(d2['values'])) / 100.0
+				i1 = d1['ecotypes'].index(et)
+				i2 = d2['ecotypes'].index(et)
+				if (d1['values'][i1] - d2['values'][i2]) > t:
+					print d1['values'][i1], d2['values'][i2]
+					num_diffs += 1
+			if not et_set1 == et_set2:
+				print len(et_set1), len(et_set2)
+				s = et_set1.symmetric_difference(et_set2)
+				#print 'et_set1.difference(et_set2):', et_set1.difference(et_set2)
+				#print 'et_set2.difference(et_set1):', et_set2.difference(et_set1)
+				if len(s) < 8 and num_diffs == 0:
+					print 'No major problems'
+					no_problem_pids.append(pid)
+					continue
+#				for ei in s:
+#					if str(ei) in cm72_dict:
+#						print cm72_dict[str(ei)]
+#					else:
+#						print ei, 'is not in 250K data!'
+			elif num_diffs == 0:
+				print 'No problems?'
+				no_problem_pids.append(pid)
+	print no_problem_pids
+
+	merged_phen_dict = {}
+	for pid in phen_dict:
+		if pid in no_problem_pids:
+			d = {'name':phen_dict[pid]['name'], 'values': repl_phen_dict[pid]['values'],
+				'ecotypes': repl_phen_dict[pid]['ecotypes']}
+
+			et_set1 = set(phen_dict[pid]['ecotypes'])
+			et_set2 = set(repl_phen_dict[pid]['ecotypes'])
+			for et in et_set1 - et_set2:
+				vi = phen_dict[pid]['ecotypes'].index(et)
+				val = phen_dict[pid]['values'][vi]
+				d['ecotypes'].append(et)
+				d['values'].append(val)
+			merged_phen_dict[pid] = d
+		else:
+			merged_phen_dict[pid] = phen_dict[pid]
+
+
+	phend = phenotype_data(phen_dict=merged_phen_dict)
+	if file_name:
+		phend.write_to_file(file_name)
+	return phend
+
+
+
 def getPhenotypes(onlyBinary=False, onlyQuantitative=False, onlyCategorical=False, onlyReplicates=False,
 		includeSD=False, rawPhenotypes=False, onlyPublishable=False):
 	import dbutils
@@ -1258,40 +1827,40 @@ def _getFirst96Ecotypes_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bj
 	return ecotypes
 
 def _getFirst192Ecotypes_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc"):
-	""" 
+	"""
 	Result of a union of all the "192" accessions for the phenotypes to be used for the GWA 2009 paper.
 	"""
 	return map(int, ['100000', '5837', '6008', '6009', '6016', '6024', '6039', '6040', '6042', '6043', '6046', '6064', '6074', '6088', '6243', '6709', '6830', '6897', '6898', '6899', '6900', '6901', '6903', '6904', '6905', '6906', '6907', '6908', '6909', '6910', '6911', '6913', '6914', '6915', '6916', '6917', '6918', '6919', '6920', '6921', '6922', '6923', '6924', '6926', '6927', '6928', '6929', '6930', '6931', '6932', '6933', '6936', '6937', '6938', '6939', '6940', '6942', '6943', '6944', '6945', '6946', '6951', '6956', '6957', '6958', '6959', '6960', '6961', '6962', '6963', '6964', '6965', '6966', '6967', '6968', '6969', '6970', '6971', '6972', '6973', '6974', '6975', '6976', '6977', '6978', '6979', '6980', '6981', '6982', '6983', '6984', '6985', '6988', '7000', '7014', '7033', '7062', '7064', '7081', '7094', '7123', '7147', '7163', '7231', '7255', '7275', '7282', '7296', '7306', '7323', '7327', '7329', '7346', '7418', '7424', '7438', '7460', '7461', '7477', '7514', '7515', '7516', '7517', '7518', '7519', '7520', '7521', '7522', '7523', '7524', '7525', '7526', '8213', '8214', '8215', '8222', '8230', '8231', '8233', '8234', '8235', '8236', '8237', '8239', '8240', '8241', '8242', '8243', '8244', '8245', '8246', '8247', '8249', '8254', '8256', '8257', '8258', '8259', '8264', '8265', '8266', '8270', '8271', '8274', '8275', '8283', '8284', '8285', '8290', '8296', '8297', '8300', '8304', '8306', '8307', '8310', '8311', '8312', '8313', '8314', '8323', '8325', '8326', '8329', '8334', '8335', '8337', '8343', '8351', '8353', '8354', '8356', '8357', '8365', '8366', '8369', '8374', '8376', '8378', '8387', '8388', '8389', '8395', '8411', '8412', '8419', '8420', '8422', '8423', '8424', '8426', '8428', '8430', '9057', '9058'])
 
  	#accessions = set(['100000', '5837', '6008', '6009', '6016', '6024', '6039', '6040', '6042', '6043', '6046', '6064', '6074', '6088', '6243', '6709', '6830', '6897', '6898', '6899', '6900', '6901', '6903', '6904', '6905', '6906', '6907', '6908', '6909', '6910', '6911', '6913', '6914', '6915', '6916', '6917', '6918', '6919', '6920', '6921', '6922', '6923', '6924', '6926', '6927', '6928', '6929', '6930', '6931', '6932', '6933', '6936', '6937', '6938', '6939', '6940', '6942', '6943', '6944', '6945', '6946', '6951', '6956', '6957', '6958', '6959', '6960', '6961', '6962', '6963', '6964', '6965', '6966', '6967', '6968', '6969', '6970', '6971', '6972', '6973', '6974', '6975', '6976', '6977', '6978', '6979', '6980', '6981', '6982', '6983', '6984', '6985', '6988', '7000', '7014', '7033', '7062', '7064', '7081', '7094', '7123', '7147', '7163', '7231', '7255', '7275', '7282', '7296', '7306', '7323', '7327', '7329', '7346', '7418', '7424', '7438', '7460', '7461', '7477', '7514', '7515', '7516', '7517', '7518', '7519', '7520', '7521', '7522', '7523', '7524', '7525', '7526', '8213', '8214', '8215', '8222', '8230', '8231', '8233', '8234', '8235', '8236', '8237', '8239', '8240', '8241', '8242', '8243', '8244', '8245', '8246', '8247', '8249', '8254', '8256', '8257', '8258', '8259', '8264', '8265', '8266', '8270', '8271', '8274', '8275', '8283', '8284', '8285', '8290', '8296', '8297', '8300', '8304', '8306', '8307', '8310', '8311', '8312', '8313', '8314', '8323', '8325', '8326', '8329', '8334', '8335', '8337', '8343', '8351', '8353', '8354', '8356', '8357', '8365', '8366', '8369', '8374', '8376', '8378', '8387', '8388', '8389', '8395', '8411', '8412', '8419', '8420', '8422', '8423', '8424', '8426', '8428', '8430', '9057', '9058'])
 	"""
-	import MySQLdb																					    
-	print "Connecting to db, host="+host																		      
-	if not user:																					      
-		import sys																					
-		sys.stdout.write("Username: ")																		    
-		user = sys.stdin.readline().rstrip()																	      
-	if not passwd:																					    
-		import getpass																				    
-		passwd = getpass.getpass()																			
-	try:																						      
-		conn = MySQLdb.connect (host = host, user = user, passwd = passwd, db = "at")												     
-	except MySQLdb.Error, e:																				  
-		print "Error %d: %s" % (e.args[0], e.args[1])																     
-		sys.exit (1)																				      
-	cursor = conn.cursor ()																				   
-	print "Fetching data"																				     
-	ecotypes = []																					     
-	numRows = int(cursor.execute("select distinct e2te.tg_ecotypeid, c2010.accession_id, e2te.nativename, e2te.stockparent from at.complete_2010_strains_in_stock c2010, stock.ecotypeid2tg_ecotypeid e2te, at.ecotype_192_vs_accession_192 ea192 where e2te.ecotypeid=c2010.ecotypeid and e2te.stockparent = c2010.stockparent and ea192.accession_id =c2010.accession_id order by c2010.accession_id"))																						      
+	import MySQLdb
+	print "Connecting to db, host=" + host
+	if not user:
+		import sys
+		sys.stdout.write("Username: ")
+		user = sys.stdin.readline().rstrip()
+	if not passwd:
+		import getpass
+		passwd = getpass.getpass()
+	try:
+		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
+	except MySQLdb.Error, e:
+		print "Error %d: %s" % (e.args[0], e.args[1])
+		sys.exit (1)
+	cursor = conn.cursor ()
+	print "Fetching data"
+	ecotypes = []
+	numRows = int(cursor.execute("select distinct e2te.tg_ecotypeid, c2010.accession_id, e2te.nativename, e2te.stockparent from at.complete_2010_strains_in_stock c2010, stock.ecotypeid2tg_ecotypeid e2te, at.ecotype_192_vs_accession_192 ea192 where e2te.ecotypeid=c2010.ecotypeid and e2te.stockparent = c2010.stockparent and ea192.accession_id =c2010.accession_id order by c2010.accession_id"))
 	#numRows = int(cursor.execute("select distinct e2te.tg_ecotypeid, ai2ei.accession_id, e2te.nativename, e2te.stockparent from at.accession2tg_ecotypeid ai2ei, stock.ecotypeid2tg_ecotypeid e2te where e2te.tg_ecotypeid = ai2ei.ecotype_id order by ai2ei.accession_id"))														   
-	i = 0																						     
-	while(1):																						 
-		row = cursor.fetchone()																			   
-		if not row:																				       
-			break;																				    
-		ecotypes.append(row[0])																		      
-	cursor.close ()																					   
-	conn.close ()																					     
+	i = 0
+	while(1):
+		row = cursor.fetchone()
+		if not row:
+			break;
+		ecotypes.append(row[0])
+	cursor.close ()
+	conn.close ()
 	accessions = set(ecotypes)
 	"""
 
@@ -1375,7 +1944,7 @@ def _getFirst192Ecotypes_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_b
 
 def get_ecotype_id_info_dict(defaultValue=None):
 	"""
-	Returns a dict containing tuples of (nativename,stockparent,latitude,longitude,country)
+	Returns a dict containing tuples of (nativename, stockparent, latitude, longitude, country)
 	"""
 	import dbutils
 	conn = dbutils.connect_to_default_lookup(db='stock')
@@ -1387,7 +1956,7 @@ def get_ecotype_id_info_dict(defaultValue=None):
 	sql_statment = """
 select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
 from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock.site s, stock.address a, stock.country c
-where e.id=ei.tg_ecotypeid and e.siteid=s.id and s.addressid=a.id and a.countryid=c.id
+where e.id = ei.tg_ecotypeid and e.siteid = s.id and s.addressid = a.id and a.countryid = c.id
 """
 #	sql_statment= """
 #select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
@@ -1506,6 +2075,24 @@ where e.id=ei.tg_ecotypeid and e.siteid=s.id and s.addressid=a.id and a.countryi
 #
 #
 #
+
+def get_250K_accession_to_ecotype_dict(call_method=72, dict_key='nativename'):
+	"""
+	"""
+	delim = '\t'
+	fn = env['data_dir'] + 'call_method_72_ecotype_info.tsv'
+	f = open(fn)
+	header = f.next().split(delim)
+	i = header.index(dict_key)
+	info_table = []
+	ret_dict = {}
+	for line in f:
+		l = line.split(delim)
+		info_table.append(l)
+		ret_dict[l[i].strip().lower()] = l
+	return ret_dict
+
+
 
 def get_accession_to_ecotype_id_dict(accessions, stockParents=None, defaultValue=None, only_250K_accessions=False, lower_cases=True):
 	import warnings
@@ -1999,6 +2586,36 @@ def combine_resistance_nc14():
 
 
 
+def combine_telomere_lengths():
+	fn1 = env['phen_dir'] + 'telomere_lengths_192.csv'
+	fn2 = env['phen_dir'] + 'telomere_lengths_swedish.csv'
+	phed1 = readPhenotypeFile(fn1)
+	phed2 = readPhenotypeFile(fn2)
+	accs = list(set(phed1.accessions).union(set(phed2.accessions)))
+	i_accs = list(set(phed1.accessions).intersection(set(phed2.accessions)))
+	print 'i_accs:', i_accs
+	pvs1 = phed1.getPhenVals(1)
+	pvs2 = phed2.getPhenVals(1)
+	pvs = []
+	for acc in accs:
+		if acc in i_accs:
+			i1 = phed1.accessions.index(acc)
+			i2 = phed2.accessions.index(acc)
+			print acc, ':', pvs1[i1], pvs2[i2]
+			pvs.append([(pvs1[i1] + pvs2[i2]) / 2.0])
+		else:
+			if acc in phed1.accessions:
+				i = phed1.accessions.index(acc)
+				pvs.append([pvs1[i]])
+			elif acc in phed2.accessions:
+				i = phed2.accessions.index(acc)
+				pvs.append([pvs2[i]])
+	print zip(accs, pvs)
+	phed = PhenotypeData(accs, ['telomere_length'], pvs)
+	phed.writeToFile(env['phen_dir'] + 'telomere_lengths_all.csv', delimiter=',')
+
+
+
 def _get_fri_flc_():
 	file_name = '/Users/bjarni.vilhjalmsson/test.phen_csv'
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_100810.csv"
@@ -2021,6 +2638,10 @@ if __name__ == '__main__':
 	#_insert_bergelsson_phen_into_db_()
 	#get_AW_common_dataset()
 	#get_hypocotyl_lenghts()
-	_get_fri_flc_()
+	#combine_telomere_lengths()
+	get_all_phenotypes_from_db('/tmp/phen_raw_112210.csv')
+	phed = parse_phenotype_file('/tmp/phen_raw_112210.csv')
+	phed.convert_to_averages()
+	phed.write_to_file('/tmp/phen_avg_112210.csv')
 	print "Done!"
 

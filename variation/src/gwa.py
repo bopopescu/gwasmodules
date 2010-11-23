@@ -38,6 +38,8 @@ Option:
 
 	-m ...					MAC threshold which is used for LM, EMMA, EMMAX, etc.  Default is 15.
 	--data_format=...			What type of data should it aim for, binary (default), int, float, etc.
+	--emmax_perm=...			Number of permutations, used for estimating a significant threshold.
+	--with_replicates			Run EMMAX with replicates (if any, otherwise it uses the mean)
 	
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
@@ -82,10 +84,11 @@ import multiprocessing as mp
 import time
 import cPickle
 
+import scipy as sp
 import linear_models as lm
 from numpy import *
 from env import *
-
+import copy
 import pdb
 
 
@@ -93,6 +96,7 @@ transformation_method_dict = {
 			'none':1,
 			'log_trans':2,
 			'box_cox':3,
+			'sqrt_trans':0,
 			}
 
 
@@ -126,7 +130,7 @@ def parse_parameters():
 		sys.exit(2)
 
 	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'proc_per_node=',
-			'only_add_2_db', 'data_format=']
+			'only_add_2_db', 'data_format=', 'emmax_perm=', 'with_replicates']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -137,12 +141,12 @@ def parse_parameters():
 
 
 	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
-		'call_method_id':54, 'walltime_req':'12:00:00', 'proc_per_node':8,
+		'call_method_id':72, 'walltime_req':'12:00:00', 'proc_per_node':8,
 		'specific_methods':['kw', 'ft', 'lm', 'emma', 'emmax'], 'specific_transformations':['none'],
 		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
 		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
 		'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15, 'data_file':None,
-		'data_format':'binary'}
+		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False}
 
 
 	for opt, arg in opts:
@@ -173,6 +177,8 @@ def parse_parameters():
 		elif opt in ("--proc_per_node"): p_dict['proc_per_node'] = int(arg)
 		elif opt in ("--only_add_2_db"): p_dict['only_add_2_db'] = True
 		elif opt in ("--data_format"): p_dict['data_format'] = arg
+		elif opt in ("--emmax_perm"): p_dict['emmax_perm'] = int(arg)
+		elif opt in ("--with_replicates"): p_dict['with_replicates'] = True
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -187,19 +193,27 @@ def _prepare_transformation_(phed, p_i, transformation_type, remove_outliers):
 	num_outliers_removed = 0
 	if "log_trans" == transformation_type:
 		print 'log transforming phenotypes..'
-		phed.standard_transform(p_i)
+		phed.log_transform(p_i)
+
+	if "sqrt_trans" == transformation_type:
+		print 'sqrt transforming phenotypes..'
+		phed.sqrt_transform(p_i)
 
 	if remove_outliers:
 		print 'removing outliers above IQR fence of', remove_outliers, '..'
-		num_outliers_removed = phed.naOutliers(p_i, iqrThreshold=remove_outliers)
+		#num_outliers_removed = phed.naOutliers(p_i, iqrThreshold=remove_outliers)
+		num_outliers_removed = phed.na_outliers(p_i, iqr_threshold=remove_outliers)
 	return num_outliers_removed
 
 
-def prepare_data(sd, phed, p_i, transformation_type, remove_outliers):
+def prepare_data(sd, phed, p_i, transformation_type, remove_outliers, with_replicates=False):
 	"""
 	Coordinates phenotype and snps data for different mapping methods.
 	"""
 	num_outliers_removed = _prepare_transformation_(phed, p_i, transformation_type, remove_outliers)
+	if not with_replicates:
+		print 'Converting replicates of phenotypes to averages'
+		phed.convert_to_averages([p_i])
 	sd.coordinate_w_phenotype_data(phed, p_i)
 	return num_outliers_removed
 
@@ -223,7 +237,8 @@ def get_perm_pvals(snps, phen_vals, mapping_method='kw', num_perm=100, snps_filt
 
 
 
-def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method=None, remove_outliers=None):
+def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method=None, remove_outliers=None,
+		with_replicates=False):
 	prefix = env['results_dir'] + id + "_pid" + str(p_i) + "_" + phenotype_name
 	if mapping_method:
 		prefix += "_" + mapping_method
@@ -231,6 +246,8 @@ def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method
 		prefix += "_" + trans_method
 	if remove_outliers:
 		prefix += '_no' + str(remove_outliers)
+	if with_replicates:
+		prefix += '_with_replicates'
 	return prefix
 
 
@@ -240,10 +257,10 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 	If no mapping_method, then analysis run is set up.
 	"""
 
-	if not p_i in phed.phenIds:
+	if not p_i in phed.phen_dict:
 		print "Phenotype ID not found:%i" % p_i
 		return
-	if phed.isBinary(p_i):
+	if phed.is_binary(p_i):
 		if trans_method != 'none':
 			return
 		elif mapping_method in ["kw"]:
@@ -256,7 +273,7 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 		elif p_dict['analysis_plots']:
 			specific_methods = ["kw", 'lm', "emma", 'emmax']
 
-	phenotype_name = phed.getPhenotypeName(p_i)
+	phenotype_name = phed.get_name(p_i)
 	#Cluster specific parameters
 	print "Setting up a gwa run for phenotype:%s, pid=%d, using method:%s, with transformation as:%s"\
 		% (phenotype_name, p_i, mapping_method, trans_method)
@@ -265,7 +282,7 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 	#Add results to DB (a hack for papaya, to add results from main node to DB).
 	if p_dict['only_add_2_db']:
 		file_name_prefix = _get_file_prefix_(p_dict['parallel'], p_i, phenotype_name, mapping_method, \
-						trans_method, p_dict['remove_outliers'])
+						trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 		pval_file = file_name_prefix + ".pvals"
 		score_file = file_name_prefix + ".scores"
 		sys.stdout.write("Looking for files %s or %s." % (pval_file, score_file))
@@ -347,7 +364,7 @@ def analysis_plots(snps_data_file, phed, p_dict):
 		print "Plotting accession phenotype map"
 		for p_i in p_dict['pids']:
 			sys.stdout.flush()
-			file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i))
+			file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i))
 			accession_map_pdf_file = file_prefix + "_acc_phen_map.pdf"
 			phed.plot_accession_map(p_i, pdf_file=accession_map_pdf_file)
 	except Exception, err_str:
@@ -359,16 +376,17 @@ def analysis_plots(snps_data_file, phed, p_dict):
 	methods_found = []
 	#Iterate over all possible combination of results
 	for p_i in p_dict['pids']:
-		phenotype_name = phed.getPhenotypeName(p_i)
-		phen_is_binary = phed.isBinary(p_i)
+		phenotype_name = phed.get_name(p_i)
+		phen_is_binary = phed.is_binary(p_i)
 		print "Plotting analysis plots for phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
 		for trans_method in p_dict['specific_transformations']:
-			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 			for mapping_method in p_dict['specific_methods']:
-				file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i),
-							mapping_method, trans_method, p_dict['remove_outliers'])
+				file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i),
+							mapping_method, trans_method, p_dict['remove_outliers'],
+							p_dict['with_replicates'])
 				snps = sd.getSnps()
-				phen_vals = phed.getPhenVals(p_i)
+				phen_vals = phed.get_values(p_i)
 				res_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
 				try:
 					file_name = file_prefix + ".pvals"
@@ -415,17 +433,18 @@ def analysis_plots(snps_data_file, phed, p_dict):
                         #Plotting the QQ plots.
 			num_dots = 1000
 			max_log_val = 5
-			qq_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i))
+			qq_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i))
 			gwaResults.qq_plots(results, num_dots, max_log_val, qq_file_prefix, method_types=results.keys(),
 					    phen_name=phenotype_name, perm_pvalues=perm_pvals, is_binary=phen_is_binary)
 
 
 
 def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dict):
-	phenotype_name = phed.getPhenotypeName(p_i)
-	phen_is_binary = phed.isBinary(p_i)
-	file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.getPhenotypeName(p_i),
-				mapping_method, trans_method, p_dict['remove_outliers'])
+	phed = copy.deepcopy(phed)
+	phenotype_name = phed.get_name(p_i)
+	phen_is_binary = phed.is_binary(p_i)
+	file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i),
+				mapping_method, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 	result_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
 
 	res = None
@@ -433,7 +452,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	if p_dict['use_existing_results']:
 		if p_dict['region_plots']:
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 			if p_dict['remove_outliers']:
 				assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
 
@@ -469,7 +488,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			if kinship_file:   #Kinship file was somehow supplied..
 				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
 							filter=p_dict['debug_filter'])
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 				print 'Loading supplied kinship'
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
@@ -480,18 +499,18 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				f = open(k_file, 'w')
 				cPickle.dump([k, k_accessions], f)
 				f.close()
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 		else:
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 
 		snps = sd.getSnps()
 		if p_dict['remove_outliers']:
 			assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
-		phen_vals = phed.getPhenVals(p_i)
+		phen_vals = phed.get_values(p_i)
 
 		sys.stdout.write("Finished loading and handling data!\n")
 
@@ -518,21 +537,30 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 		else:  #Parametric tests below:		
 
 			if mapping_method in ['emma']:
-				sys.stdout.write("Starting EMMA (fast)\n")
-				sys.stdout.flush()
-				res = run_emma_parallel(snps, phen_vals, k, num_proc=proc_per_node)
-				#res = runEmma(snps,phen_vals,k)
-				kwargs['genotype_var_perc'] = [val[0] for val in res['genotype_var_perc']]
-				kwargs['beta0'] = [val[0] for val in res['beta0_est']]
-				kwargs['beta1'] = [val[0] for val in res['beta1_est']]
-				additional_columns.append('genotype_var_perc')
-				additional_columns.append('beta0')
-				additional_columns.append('beta1')
-				pvals = [pval[0] for pval in res['ps']]
-				sys.stdout.write("Done!\n")
-				sys.stdout.flush()
+				res = lm.emma(snps, phen_vals, k)
 			elif mapping_method in ['emmax']:
-				res = lm.emmax(snps, phen_vals, k)
+				if p_dict['emmax_perm']:
+					perm_sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+					num_outliers = prepare_data(perm_sd, phed, p_i, 'none', 0, p_dict['with_replicates'])
+					perm_sd.filter_mac_snps(p_dict['mac_threshold'])
+					t_snps = perm_sd.getSnps()
+					t_phen_vals = phed.get_values(p_i)
+					res = lm.emmax_perm_test(t_snps, t_phen_vals, k, p_dict['emmax_perm'])
+					p_dict['emmax_perm'] = res['threshold_05'][0]
+					import pylab
+					hist_res = pylab.hist(-sp.log10(res['min_ps']))
+					threshold = -sp.log10(p_dict['emmax_perm'])
+					b_threshold = -sp.log10(1.0 / (len(t_snps) * 20.0))
+					pylab.vlines(threshold, 0, max(hist_res[0]), color='g')
+					pylab.vlines(b_threshold, 0, max(hist_res[0]), color='r')
+					pylab.savefig(env['tmp_dir'] + 'test.png', format='png')
+				if p_dict['with_replicates']:
+					#Get values, with ecotypes, construct Z and do GWAM
+					phen_vals = phed.get_values(p_i)
+					Z = phed.get_incidence_matrix(p_i)
+					res = lm.emmax(snps, phen_vals, k, Z=Z)
+				else:
+					res = lm.emmax(snps, phen_vals, k)
 			elif mapping_method in ['lm']:
 				res = lm.linear_model(snps, phen_vals)
 			elif mapping_method in ['py_emma']:
@@ -546,7 +574,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				print "Mapping method", mapping_method, 'was not found.'
 				sys.exit(2)
 
-			if mapping_method in ['lm', 'emmax']:
+			if mapping_method in ['lm', 'emma', 'emmax']:
 				kwargs['genotype_var_perc'] = res['var_perc']
 				additional_columns.append('genotype_var_perc')
 
@@ -567,8 +595,9 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				sys.stdout.flush()
 
 
-		kwargs['correlations'] = calc_correlations(snps, phen_vals)
-		additional_columns.append('correlations')
+
+		#kwargs['correlations'] = calc_correlations(snps, phen_vals)
+		#additional_columns.append('correlations')
 
 		res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
 
@@ -616,20 +645,21 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
 				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-					       plot_bonferroni=True, cand_genes=cand_genes)
+					       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
 			else:
 				if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
 					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
 					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-						       plot_bonferroni=True, cand_genes=cand_genes)
+						       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
 		else:
 			pass
 
 		print "plotting histogram"
-		hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method, p_dict['remove_outliers'])
+		hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method,
+						p_dict['remove_outliers'], p_dict['with_replicates'])
 		hist_png_file = hist_file_prefix + "_hist.png"
-		phed.plot_histogram(p_i, pngFile=hist_png_file)
+		phed.plot_histogram(p_i, png_file=hist_png_file)
 
 
 
@@ -666,18 +696,17 @@ def _run_():
 	#Load phenotype file
 	if p_dict['phen_file']:
 		print 'Loading phenotypes from file.'
-		phed = phenotypeData.readPhenotypeFile(p_dict['phen_file'],
-						with_db_ids=(not p_dict['no_phenotype_ids']))  #load phenotype file
+		phed = phenotypeData.parse_phenotype_file(p_dict['phen_file'])#, with_db_ids=(not p_dict['no_phenotype_ids']))  #load phenotype file
 	else:
 		print 'Retrieving the phenotypes from the DB.'
-		phed = phenotypeData.getPhenotypes()
+		phed = phenotypeData.get_all_phenotypes_from_db()
 
 	#If on the cluster, then set up runs..
 	if p_dict['parallel']:
 		if len(p_dict['pids']) == 0:  #phenotype index arguement is missing, hence all phenotypes are run/analyzed.
 			if not p_dict['phen_file']:
 				raise Exception('Phenotype file or phenotype ID is missing.')
-			p_dict['pids'] = phed.phenIds
+			p_dict['pids'] = phed.phen_dict.keys()
 		else:
 			raise Exception('Too many arguments..')
 
@@ -706,9 +735,9 @@ def _run_():
 	else:
 		#If not analysis plots... then GWAS
 		for p_i in p_dict['pids']:
-			if p_i in phed.phenIds:
+			if p_i in phed.phen_dict:
 				print '-' * 120, '\n'
-				phenotype_name = phed.getPhenotypeName(p_i)
+				phenotype_name = phed.get_name(p_i)
 				print "Performing GWAS for phenotype: %s, phenotype_id: %s" % (phenotype_name, p_i)
 				for trans_method in p_dict['specific_transformations']:
 					print 'Phenotype transformation:', trans_method
@@ -721,122 +750,121 @@ def _run_():
 
 
 
-def _run_emma_mp_(in_que, out_que, confirm_que, num_splits=10):
-	from rpy import r
-	args = in_que.get(block=True)
-	#r_source(script_dir+"emma_fast.R")
-	#r_emma_REML_t = robjects.r['emma.REML.t']
-	r.source(env['script_dir'] + "emma_fast.R")
-	phenArray = array([args[2]])
-	snps = args[1]
-	print "Found data nr. %i, starting run.  pid=%d" % (args[0], os.getpid())
-	sys.stdout.flush()
-	confirm_que.put([args[0], "start confirmation!"], block=False)
-	results = []
-	for i in range(num_splits):
-		snp_slice = snps[(len(snps) * i) / num_splits:(len(snps) * (i + 1)) / num_splits]
-		snpsArray = array(snp_slice)
-	        results.append(r.emma_REML_t(phenArray, snpsArray, args[3], [args[4]]))
-		#results.append(r_emma_REML_t(phenArray,snpsArray,args[3],[args[4]]))
-		if args[0] == 0:
-			print "About %d.0%% is done now." % (100 * (i + 1.0) / num_splits)
-			sys.stdout.flush()
-	new_res = {}
-	for k in results[0]:
-		new_res[k] = []
-	for nr in results:
-		for k in nr:
-			new_res[k].extend(list(nr[k]))
-	out_que.put([args[0], new_res])
+#def _run_emma_mp_(in_que, out_que, confirm_que, num_splits=10):
+#	from rpy import r
+#	args = in_que.get(block=True)
+#	#r_source(script_dir+"emma_fast.R")
+#	#r_emma_REML_t = robjects.r['emma.REML.t']
+#	r.source(env['script_dir'] + "emma_fast.R")
+#	phenArray = array([args[2]])
+#	snps = args[1]
+#	print "Found data nr. %i, starting run.  pid=%d" % (args[0], os.getpid())
+#	sys.stdout.flush()
+#	confirm_que.put([args[0], "start confirmation!"], block=False)
+#	results = []
+#	for i in range(num_splits):
+#		snp_slice = snps[(len(snps) * i) / num_splits:(len(snps) * (i + 1)) / num_splits]
+#		snpsArray = array(snp_slice)
+#	        results.append(r.emma_REML_t(phenArray, snpsArray, args[3], [args[4]]))
+#		#results.append(r_emma_REML_t(phenArray,snpsArray,args[3],[args[4]]))
+#		if args[0] == 0:
+#			print "About %d.0%% is done now." % (100 * (i + 1.0) / num_splits)
+#			sys.stdout.flush()
+#	new_res = {}
+#	for k in results[0]:
+#		new_res[k] = []
+#	for nr in results:
+#		for k in nr:
+#			new_res[k].extend(list(nr[k]))
+#	out_que.put([args[0], new_res])
+#
+	#def run_emma_parallel(snps, phen_vals, k, num_proc=8):
+	#	"""
+	#	Run EMMA on multiple processors, using multiprocessing
+	#	"""
+	#	processes = []
+	#	in_que = mp.Queue()
+	#	out_que = mp.Queue()
+	#	confirm_que = mp.Queue()
+	#	import scipy
+	#	phen_var = scipy.var(phen_vals)
+	#
+	#	#Populating the in_que
+	#	for i in range(num_proc):
+	#		snp_slice = snps[(len(snps) * i) / num_proc:(len(snps) * (i + 1)) / num_proc]
+	#		print len(snp_slice)
+	#		in_que.put([i, snp_slice, phen_vals, k, phen_var], block=False)
+	#		p = mp.Process(target=_run_emma_mp_, args=(in_que, out_que, confirm_que))
+	#		p.start()
+	#		done = False
+	#		fail_count = 0
+	#		while not done:
+	#			try:
+	#				confirm = confirm_que.get(block=True, timeout=90)
+	#				done = True
+	#			except:
+	#				p.terminate()
+	#				fail_count += 1
+	#				if fail_count > 10:
+	#					print "Giving up!!"
+	#					for p in processes:
+	#						p.terminate()
+	#					raise Exception("Failed to start all processes.")
+	#				else:
+	#					print "Trying again with a new process!"
+	#					in_que.put([i, snp_slice, phen_vals, k, phen_var], block=False)
+	#					p = mp.Process(target=_run_emma_mp_, args=(in_que, out_que, confirm_que))
+	#					p.start()
+	#
+	#
+	#		print "ID=%i, Recieved %s" % (confirm[0], confirm[1])
+	#		sys.stdout.flush()
+	#		processes.append(p)
+	#
+	#	for p in processes:
+	#		print p, p.is_alive()
+	#
+	#	results = []
+	#	for i in range(num_proc):
+	#		#import pdb;pdb.set_trace()
+	#		if i > 0:
+	#			try:
+	#				res = out_que.get(block=True, timeout=10000) #waits about 3 hours, if needed. 
+	#				results.append(res)
+	#			except Exception, err_str:
+	#				print "The parent process didn't receive the results, after waiting over almost 3 hours."
+	#
+	#		else:
+	#			res = out_que.get()
+	#			results.append(res)
+	#
+	#	for p in processes:
+	#		p.terminate()
+	#
+	#	results.sort()
+	#	new_res = {}
+	#	for k in results[0][1]:
+	#		new_res[k] = []
+	#	for nr in results:
+	#		for k in nr[1]:
+	#			new_res[k].extend(list(nr[1][k]))
+	#
+	#	#import pdb;pdb.set_trace()
+	#	return new_res
+	#	#print "len(q):",len(q)
 
 
-def run_emma_parallel(snps, phen_vals, k, num_proc=8):
-	"""
-	Run EMMA on multiple processors, using multiprocessing
-	"""
-	processes = []
-	in_que = mp.Queue()
-	out_que = mp.Queue()
-	confirm_que = mp.Queue()
-	import scipy
-	phen_var = scipy.var(phen_vals)
 
-	#Populating the in_que
-	for i in range(num_proc):
-		snp_slice = snps[(len(snps) * i) / num_proc:(len(snps) * (i + 1)) / num_proc]
-		print len(snp_slice)
-		in_que.put([i, snp_slice, phen_vals, k, phen_var], block=False)
-		p = mp.Process(target=_run_emma_mp_, args=(in_que, out_que, confirm_que))
-		p.start()
-		done = False
-		fail_count = 0
-		while not done:
-			try:
-				confirm = confirm_que.get(block=True, timeout=90)
-				done = True
-			except:
-				p.terminate()
-				fail_count += 1
-				if fail_count > 10:
-					print "Giving up!!"
-					for p in processes:
-						p.terminate()
-					raise Exception("Failed to start all processes.")
-				else:
-					print "Trying again with a new process!"
-					in_que.put([i, snp_slice, phen_vals, k, phen_var], block=False)
-					p = mp.Process(target=_run_emma_mp_, args=(in_que, out_que, confirm_que))
-					p.start()
-
-
-		print "ID=%i, Recieved %s" % (confirm[0], confirm[1])
-		sys.stdout.flush()
-		processes.append(p)
-
-	for p in processes:
-		print p, p.is_alive()
-
-	results = []
-	for i in range(num_proc):
-		#import pdb;pdb.set_trace()
-		if i > 0:
-			try:
-				res = out_que.get(block=True, timeout=10000) #waits about 3 hours, if needed. 
-				results.append(res)
-			except Exception, err_str:
-				print "The parent process didn't receive the results, after waiting over almost 3 hours."
-
-		else:
-			res = out_que.get()
-			results.append(res)
-
-	for p in processes:
-		p.terminate()
-
-	results.sort()
-	new_res = {}
-	for k in results[0][1]:
-		new_res[k] = []
-	for nr in results:
-		for k in nr[1]:
-			new_res[k].extend(list(nr[1][k]))
-
-	#import pdb;pdb.set_trace()
-	return new_res
-	#print "len(q):",len(q)
-
-
-
-def runEmma(snps, phenValues, k):
-	from rpy import r
-	#Assume that the accessions are ordered.
-	r.source("emma.R")
-	#r_emma_REML_t = robjects.r['emma.REML.t']
-
-	phenArray = array([phenValues])
-	snpsArray = array(snps)
-	res = r.emma_REML_t(phenArray, snpsArray, k)
-	return res
+#def runEmma(snps, phenValues, k):
+#	from rpy import r
+#	#Assume that the accessions are ordered.
+#	r.source("emma.R")
+#	#r_emma_REML_t = robjects.r['emma.REML.t']
+#
+#	phenArray = array([phenValues])
+#	snpsArray = array(snps)
+#	res = r.emma_REML_t(phenArray, snpsArray, k)
+#	return res
 
 
 def run_fet(snps, phenotypeValues, verbose=False):

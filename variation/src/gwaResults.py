@@ -13,6 +13,7 @@ import pdb, gc
 import dbutils
 import csv
 import math
+from numarray.image.combine import threshhold
 
 #A dictionary for loaded results.. to avoid reloading. 
 #Use carefully to avoid memory leaks!
@@ -351,7 +352,7 @@ class Result(object):
 
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
 		       percentile=98, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
-		       plot_bonferroni=False, cand_genes=None):
+		       plot_bonferroni=False, cand_genes=None, threshold=0):
 
 		import matplotlib
 		matplotlib.use('Agg')
@@ -448,9 +449,12 @@ class Result(object):
 
 
 		if plot_bonferroni:
-			import math
-			bonferroni_threshold = -math.log10(1.0 / (num_scores * 20.0))
-			plt.plot([0, sum(result.chromosome_ends)], [bonferroni_threshold, bonferroni_threshold], "k-.")
+			if threshold :
+				threshold = -math.log10(threshold)
+				plt.plot([0, sum(result.chromosome_ends)], [threshold, threshold], "y-.")
+			#Bonferroni threshold
+			b_threshold = -math.log10(1.0 / (num_scores * 20.0))
+			plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], "k-.")
 
 		plt.axis([0, sum(result.chromosome_ends), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 		plt.xticks(ticksList1, ticksList2)

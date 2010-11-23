@@ -8,10 +8,9 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 
 import sys, warnings
 import pdb
-import numpy as np
 import env
 from itertools import *
-
+import scipy as sp
 
 IUPAC_alphabet = ['A', 'C', 'G', 'T', '-', 'Y', 'R', 'W', 'S', 'K', 'M', 'D', 'H', 'V', 'B', 'X', 'N']
 
@@ -27,12 +26,12 @@ Marker type suggestions:
 """
 
 def get_haplotypes(snps, num_accessions, count_haplotypes=False):
-	curr_haplotypes = map(tuple, np.transpose(np.array(snps).tolist()))
+	curr_haplotypes = map(tuple, sp.transpose(sp.array(snps).tolist()))
 	hap_set = list(set(curr_haplotypes))
 	hap_hash = {}
 	for j, h in enumerate(hap_set):
 		hap_hash[h] = j
-	new_haplotypes = np.zeros(num_accessions, dtype='int8')
+	new_haplotypes = sp.zeros(num_accessions, dtype='int8')
 	for j, h in enumerate(curr_haplotypes):
 		new_haplotypes[j] = hap_hash[h]
 	if count_haplotypes:
@@ -43,58 +42,58 @@ def get_haplotypes(snps, num_accessions, count_haplotypes=False):
 
 
 
-def coordinateSnpsAndPhenotypeData(phed, p_i, snpsds, onlyBinarySNPs=True, data_format='binary'):
-	"""
-	1. Remove accessions which are not represented in either of the two datasets
-	2. Order the data in same way.
-	3. Remove monomorphic SNPs
-	"""
-	print "Coordinating SNP and Phenotype data."
-	numAcc = len(snpsds[0].accessions)
-	phenotype = phed.getPhenIndex(p_i)
-	accIndicesToKeep = []
-	phenAccIndicesToKeep = []
-	#Checking which accessions to keep and which to remove .
-	for i in range(0, len(snpsds[0].accessions)):
-		acc1 = snpsds[0].accessions[i]
-		for j in range(0, len(phed.accessions)):
-			acc2 = phed.accessions[j]
-			if acc1 == acc2 and phed.phenotypeValues[j][phenotype] != 'NA':
-				accIndicesToKeep.append(i)
-				phenAccIndicesToKeep.append(j)
-				break
-
-
-	#Filter accessions which do not have the phenotype value (from the genotype data).
-	for snpsd in snpsds:
-		sys.stdout.write(".")
-		sys.stdout.flush()
-		snpsd.removeAccessionIndices(accIndicesToKeep)
-	print ""
-	print numAcc - len(accIndicesToKeep), "accessions removed from genotype data, leaving", \
-		len(accIndicesToKeep), "accessions in all."
-
-
-	print "Filtering phenotype data."
-	phed.removeAccessions(phenAccIndicesToKeep) #Removing accessions that don't have genotypes or phenotype values
-
-	#Ordering accessions according to the order of accessions in the genotype file
-	accessionMapping = []
-	i = 0
-	for acc in snpsds[0].accessions:
-		if acc in phed.accessions:
-			accessionMapping.append((phed.accessions.index(acc), i))
-			i += 1
-	phed.orderAccessions(accessionMapping)
-
-
-	if data_format == 'binary':
-		total_num = 0
-		removed_num = 0
-		for snpsd in snpsds:
-			total_num += len(snpsd.snps)
-			removed_num += snpsd.onlyBinarySnps()
-		print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
+#def coordinateSnpsAndPhenotypeData(phed, p_i, sd, onlyBinarySNPs=True, data_format='binary'):
+#	"""
+#	1. Remove accessions which are not represented in either of the two datasets
+#	2. Order the data in same way.
+#	3. Remove monomorphic SNPs
+#	"""
+#	import bisect
+#	print "Coordinating SNP and Phenotype data."
+#	ets = phed.phen_dict[p_i]['ecotypes']
+#	#Checking which accessions to keep and which to remove.
+#	common_ets = list(set(sd.accessions).union(set(ets)))
+#	common_ets.sort()
+#
+#	sd_indices_to_keep = []
+#	for i, acc in enumerate(sd.accessions):
+#		b_i = bisect.bisect_left(common_ets, acc)
+#		if b_i < len(common_ets) and common_ets[b_i] == acc:
+#			sd_indices_to_keep.append(i)
+#	pd_indices_to_keep = []
+#	for i, acc in enumerate(ets):
+#		b_i = bisect.bisect_left(common_ets, acc)
+#		if b_i < len(common_ets) and common_ets[b_i] == acc:
+#			pd_indices_to_keep.append(i)
+#
+#
+#	#Filter accessions which do not have the phenotype value (from the genotype data).
+#	self.filter_accessions_indices()
+#	print ""
+#	print numAcc - len(accIndicesToKeep), "accessions removed from genotype data, leaving", \
+#		len(accIndicesToKeep), "accessions in all."
+#
+#
+#	print "Filtering phenotype data."
+#	phed.removeAccessions(phenAccIndicesToKeep) #Removing accessions that don't have genotypes or phenotype values
+#
+#	#Ordering accessions according to the order of accessions in the genotype file
+#	accessionMapping = []
+#	i = 0
+#	for acc in snpsds[0].accessions:
+#		if acc in phed.accessions:
+#			accessionMapping.append((phed.accessions.index(acc), i))
+#			i += 1
+#	phed.orderAccessions(accessionMapping)
+#
+#
+#	if data_format == 'binary':
+#		total_num = 0
+#		removed_num = 0
+#		for snpsd in snpsds:
+#			total_num += len(snpsd.snps)
+#			removed_num += snpsd.onlyBinarySnps()
+#		print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
 
 
 class _SnpsData_(object):
@@ -1082,42 +1081,6 @@ class _SnpsData_(object):
 
 
 
-	def kinship_matrix(self):
-		"""
-		Percentage of identity kinship matrix.
-		
-		NA's are ignored!
-		"""
-		import numpy
-		import sys
-		a = numpy.zeros(shape=(len(self.accessions), len(self.accessions)))
-		for i in range(0, len(self.accessions)):
-			for j in range(0, i):
-				diff_count = 0
-				total = 0
-				for snp in self.snps:
-					if snp[i] != self.missingVal and snp[j] != self.missingVal:
-						total += 1
-						if snp[i] != snp[j]:
-							diff_count += 1
-					elif snp[i] != self.missingVal or snp[j] != self.missingVal:
-						total += 1
-				if total != 0:
-					a[i, j] = diff_count / float(total)
-				else:
-					print "total = 0!!"
-					a[i, j] = 0.5
-				a[j, i] = a[i, j]
-
-#			print i
-
-#		for i in range(0,len(self.accessions)):
-#			for j in range(0,i):
-#				sys.stdout.write(str(a[i,j])+",")
-#			sys.stdout.write(str(a[i,i])+"\n")
-
-		return a
-
 	def accessionsMissingCounts(self):
 		"""
 		Returns a list of accessions and their missing value rates.
@@ -1548,7 +1511,7 @@ class RawSnpsData(_SnpsData_):
 			if only_non_binary:
 				if k == 2:
 					positions.append(self.positions[i])
-					new_snp = np.zeros(num_lines, dtype='int8')
+					new_snp = sp.zeros(num_lines, dtype='int8')
 					for j, nt in enumerate(snp):
 						new_snp[j] = decoder[nt]
 					snps.append(new_snp)
@@ -1853,7 +1816,7 @@ class SNPsData(_SnpsData_):
 		for i in range(len(self.snps)):
 			self.snps[i] = self.snps[i][indicesToKeep]
 #			snp = self.snps[i]
-#			newSnp = np.empty(num_accessions,dtype='int8')
+#			newSnp = sp.empty(num_accessions,dtype='int8')
 #			for j,k in enumerate(indicesToKeep):
 #				newSnp[j] = snp[k]
 #			self.snps[i] = newSnp
@@ -1872,8 +1835,8 @@ class SNPsData(_SnpsData_):
 		"""
 		new_positions = []
 		new_snps = []
-		for i, (snp, pos) in enumerate(zip(self.snps, self.positions)):
-			if 0 in snp and 1 in snp:
+		for i, (snp, pos) in enumerate(izip(self.snps, self.positions)):
+			if len(sp.unique(snp)) == 2:
 				new_snps.append(snp)
 				new_positions.append(pos)
 		num_removed = len(self.positions) - len(new_positions)
@@ -1920,13 +1883,13 @@ class SNPsData(_SnpsData_):
 		"""
 
 #		def _get_maf_(snp):
-#			l = np.bincount(np.unique(snp, False, True)[1])
+#			l = sp.bincount(sp.unique(snp, False, True)[1])
 #			maf = min(l)
 #			return maf
 
 
 		def _get_maf_(snp):
-			l = np.bincount(snp)
+			l = sp.bincount(snp)
 			maf = max(l)
 			for m in l[1:]:
 				if m != 0 and m < maf:
@@ -1949,14 +1912,14 @@ class SNPsData(_SnpsData_):
 					marfs.append(c)
 					mafs.append(int(c * num_nts))
 				else:
-					l = np.bincount(snp)
+					l = sp.bincount(snp)
 					maf = min(l)
 					mafs.append(maf)
 					marfs.append(maf / float(num_nts))
 		else:
 			if binary:
 				for snp in self.snps:
-					l = np.bincount(snp)
+					l = sp.bincount(snp)
 					maf = min(l)
 					mafs.append(maf)
 					marfs.append(maf / float(num_nts))
@@ -1991,7 +1954,7 @@ class SNPsData(_SnpsData_):
 					new_positions.append(pos)
 		else:
 			for snp, pos in izip(self.snps, self.positions):
-				if min(np.bincount(snp)) >= min_mac:
+				if min(sp.bincount(snp)) >= min_mac:
 					new_snps.append(snp)
 					new_positions.append(pos)
 
@@ -2098,8 +2061,7 @@ class SnpsData(_SnpsData_):
 		"""
 		Calculate the r2 matrix for all of these SNPs.
 		"""
-		import numpy as np
-		r2s = np.ones((len(self.snps), len(self.snps)))
+		r2s = sp.ones((len(self.snps), len(self.snps)))
 		freqs_list = self.calc_all_freqs(w_missing=w_missing)
 		for i in range(len(self.snps)):
 			for j in range(i):
@@ -2779,17 +2741,62 @@ class SNPsDataSet:
 
 
 
-	def coordinate_w_phenotype_data(self, phend, p_i):
+	def coordinate_w_phenotype_data(self, phend, pid):
 
 		"""
-		Deletes accessions which are not common, and sorts the accessions, etc.)
+		Deletes accessions which are not common, and sorts the accessions, removes monomorphic SNPs, etc.
 		"""
-		coordinateSnpsAndPhenotypeData(phend, p_i, self.snpsDataList, data_format=self.data_format)
-		self.accessions = self.snpsDataList[0].accessions
+		#import bisect
+		print "Coordinating SNP and Phenotype data."
+		ets = phend.phen_dict[pid]['ecotypes']
+		#Checking which accessions to keep and which to remove.
+		#common_ets = list(set(self.accessions).union(set(ets)))
+		#common_ets.sort()
+
+		sd_indices_to_keep = set()#[]
+		pd_indices_to_keep = []
+
+		for i, acc in enumerate(self.accessions):
+			for j, et in enumerate(ets):
+				if acc == et:
+					sd_indices_to_keep.add(i)
+					pd_indices_to_keep.append(j)
+		sd_indices_to_keep = list(sd_indices_to_keep)
+		sd_indices_to_keep.sort()
+
+
+
+		#Filter accessions which do not have phenotype values (from the genotype data).
+		print "Filtering genotype data"
+		self.filter_accessions_indices(sd_indices_to_keep)
+
+		print "Filtering phenotype data."
+		phend.filter_ecotypes(pd_indices_to_keep, pids=[pid]) #Removing accessions that don't have genotypes or phenotype values
+		ets = phend.phen_dict[pid]['ecotypes']
+		print "Leaving %d values." % len(ets)
+		#Ordering accessions according to the order of accessions in the genotype file
+
+		if ets != self.accessions:
+			l = zip(ets, range(len(ets)))
+			l.sort()
+			l = map(list, zip(*l))
+			ets_map = l[1]
+			phend.order_ecotypes(ets_map, pids=[pid])
+
+
+		if self.data_format == 'binary':
+			print 'Filtering non-binary SNPs'
+			total_num = 0
+			removed_num = 0
+			for snpsd in self.snpsDataList:
+				total_num += len(snpsd.snps)
+				removed_num += snpsd.onlyBinarySnps()
+			print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
+
+
 
 
 	def get_ibs_kinship_matrix(self, debug_filter=1):
-		import scipy as sp
 		print 'Starting kinship calculation'
 		snps = self.getSnps(debug_filter)
 		snps_array = sp.array(snps)
@@ -2816,7 +2823,7 @@ class SNPsDataSet:
 		"""
 		Converts the underlying raw data format to a binary one, i.e. A,C,G,T,NA,etc. are converted to 0,1,-1
 		"""
-		if self.is_binary:
+		if self.data_format == 'binary':
 			import warnings
 			warnings.warn("Data appears to be already in binary format!")
 		else:
@@ -2824,7 +2831,7 @@ class SNPsDataSet:
 			for snpsd in self.snpsDataList:
 				snpsd_list.append(snpsd.getSnpsData())
 			self.snpsDataList = snpsd_list
-			self.is_binary = True
+			self.data_format = 'binary'
 		self.missing_val = self.snpsDataList[0].missingVal
 
 
@@ -2999,7 +3006,6 @@ class SNPsDataSet:
 		"""
 		import random
 		import rpy, util
-		import numpy as np
 
 		if not self.is_binary:
 			print "Converting the snps data to binary format."
@@ -3016,7 +3022,7 @@ class SNPsDataSet:
 			for j in range(len(genotype)):
 				genotype[j] = genotype[j] / sd
 
-		genotypes = np.transpose(np.array(genotypes))
+		genotypes = sp.transpose(sp.array(genotypes))
 		#print genotypes
 		pc = rpy.r.princomp(genotypes)
 		pc_sorted = zip(list(pc["scores"][pc_num - 1]), self.accessions)

@@ -3,6 +3,7 @@ Contains helper functions for parsing various phenotype files.
 """
 import csv
 import phenotypeData as pd
+from env import *
 
 def load_phentoype_file(filename):
 	"""
@@ -374,6 +375,113 @@ def load_phentoype_file_bergelsson():
 
 
 
+def load_phentoype_file_duszynska():
+	fn1 = env['phen_dir'] + 'seed_size_2n.csv'
+	fn2 = env['phen_dir'] + 'seed_size_3n_2x4.csv'
+	fn3 = env['phen_dir'] + 'seed_size_3n_4x2.csv'
+	fn4 = env['phen_dir'] + 'seed_size_spss.csv'
+	fns = [fn1, fn2, fn3, fn4]
+	phen_names = ['seed_size_2n', 'seed_size_3n_2x4', 'seed_size_3n_4x2', 'seed_size_spss']
+	phen_list = []
+	accs_list = []
+	et_list = []
+	for fn in fns:
+		f = open(fn, "r")
+		accession_names = []
+		phen_vals = {}
+		print f.next()
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc_name = l[0].lower()
+			if not acc_name in accession_names:
+				 accession_names.append(acc_name)
+				 phen_vals[acc_name] = []
+			phen_vals[acc_name].append(float(l[1]))
+		f.close()
+		print accession_names
+		acc_dict = pd.get_250K_accession_to_ecotype_dict()
+		ecotypes = []
+	        new_phen_vals = []
+		for acc in accession_names:
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ecotype = acc_dict[acc][4]
+				ecotypes.append(ecotype)
+				new_phen_vals.append(sum(phen_vals[acc]) / float(len(phen_vals[acc])))
+		accs_list.append(accession_names)
+		et_list.append(ecotypes)
+		phen_list.append(new_phen_vals)
+
+	et_set = set([])
+	for ets in et_list:
+		et_set = et_set.union(set(ets))
+	ecotypes = list(et_set)
+	phenotypes = []
+	for et in ecotypes:
+		pl = []
+		for el, pvs in zip(et_list, phen_list):
+			if et in el:
+				i = el.index(et)
+				pl.append(pvs[i])
+			else:
+				pl.append('NA')
+		phenotypes.append(pl)
+
+
+	print len(ecotypes)
+	phed = pd.PhenotypeData(ecotypes, phen_names, phenotypes)
+	phed.writeToFile(env['phen_dir'] + 'seed_size_means.csv', delimiter=',')
+
+
+
+
+
+
+def load_phentoype_file_riha():
+	filename = env['phen_dir'] + 'telomere_lengths_192_raw.csv'
+	f = open(filename, "r")
+	phen_name = 'telomere_length'
+	accession_names = []
+	accession_ids = []
+	parent_ids = []
+	phen_vals = []
+	print f.next()
+	for line in f:
+		l = map(str.strip, line.split(','))
+		parent_ids.append(l[0])
+		accession_names.append(l[1].lower())
+		accession_ids.append(l[2])
+		phen_vals.append(float(l[3]))
+
+	f.close()
+	print accession_names
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+	print acc_dict
+	ecotypes = []
+        uncertain_list = []
+        new_phen_vals = []
+	for acc, par_id, acc_id, phen_val in zip(accession_names, parent_ids, accession_ids, phen_vals):
+		if not acc in acc_dict:
+			print "(%s, %s, %s) is missing in dictionary" % (acc, par_id, acc_id)
+		else:
+			ecotype = acc_dict[acc][4]
+			ecotypes.append(ecotype)
+			new_phen_vals.append([phen_val])
+
+	print len(set(accession_names)), len(set(ecotypes))
+
+
+
+	phed = pd.PhenotypeData(ecotypes, [phen_name], new_phen_vals)
+	phed.writeToFile(env['phen_dir'] + 'telomere_lengths_192.csv', delimiter=',')
+
+
+
+
+
+
+
 def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, method_descriptions=None, data_descriptions=None, host="papaya.usc.edu", user="bvilhjal", passwd="bjazz32"):
 	"""
 	Insert phenotypes into the DB
@@ -437,7 +545,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_nc_resistance_2()
+	load_phentoype_file_duszynska()
 	print "Done!"
 
 
