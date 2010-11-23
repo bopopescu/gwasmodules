@@ -3,7 +3,6 @@ from env import *
 import math
 import scipy as sp
 import itertools as it
-from distutils.tests.setuptools_build_ext import if_dl
 
 # Phenotype categories: (category,order)
 #phenotypeCategories = {
