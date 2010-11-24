@@ -2769,11 +2769,11 @@ class SNPsDataSet:
 		#Filter accessions which do not have phenotype values (from the genotype data).
 		print "Filtering genotype data"
 		self.filter_accessions_indices(sd_indices_to_keep)
-
+		num_values = len(phend.phen_dict[pid]['ecotypes'])
 		print "Filtering phenotype data."
 		phend.filter_ecotypes(pd_indices_to_keep, pids=[pid]) #Removing accessions that don't have genotypes or phenotype values
 		ets = phend.phen_dict[pid]['ecotypes']
-		print "Leaving %d values." % len(ets)
+		print "Out of %d, leaving %d values." % (num_values, len(ets))
 		#Ordering accessions according to the order of accessions in the genotype file
 
 		if ets != self.accessions:

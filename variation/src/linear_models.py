@@ -1094,7 +1094,7 @@ class LinearMixedModel(LinearModel):
 					t_snps.append(sp.array(Xs[j]).flatten())
 				if method == 'qr':
 					gammas = Xs[j] * Q
-					gammas = sp.repeat(gammas,)
+					gammas = sp.sum(Q * sp.mat(sp.diag(gammas)), axis=0)
 				else:
 					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, overwrite_a=True)
 				if not rss:
