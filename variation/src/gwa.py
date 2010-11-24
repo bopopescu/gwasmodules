@@ -80,7 +80,6 @@ import snpsdata
 import gwaResults
 import util
 import warnings
-import multiprocessing as mp
 import time
 import cPickle
 
@@ -360,20 +359,20 @@ def analysis_plots(snps_data_file, phed, p_dict):
 	#Genotype and phenotype data is only used for permutations.
 	sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
 
-	try:
-		print "Plotting accession phenotype map"
-		for p_i in p_dict['pids']:
-			sys.stdout.flush()
-			file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i))
-			accession_map_pdf_file = file_prefix + "_acc_phen_map.pdf"
-			phed.plot_accession_map(p_i, pdf_file=accession_map_pdf_file)
-	except Exception, err_str:
-		print 'Skipping accession - phenotype map... basemap package is probably not installed:', err_str
+	#try:
+	print "Plotting accession phenotype map"
+	for p_i in p_dict['pids']:
+		sys.stdout.flush()
+		file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i))
+		accession_map_pdf_file = file_prefix + "_acc_phen_map.pdf"
+		phed.plot_accession_map(p_i, pdf_file=accession_map_pdf_file)
+	#except Exception, err_str:
+	#	print 'Skipping accession - phenotype map... basemap package is probably not installed:', err_str
 
 	#Load gwas results
 	results = {}
 	perm_pvals = None
-	methods_found = []
+	method_types = []
 	#Iterate over all possible combination of results
 	for p_i in p_dict['pids']:
 		phenotype_name = phed.get_name(p_i)
@@ -383,47 +382,51 @@ def analysis_plots(snps_data_file, phed, p_dict):
 			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 			for mapping_method in p_dict['specific_methods']:
 				file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i),
-							mapping_method, trans_method, p_dict['remove_outliers'],
-							p_dict['with_replicates'])
-				snps = sd.getSnps()
-				phen_vals = phed.get_values(p_i)
-				res_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
-				try:
-					file_name = file_prefix + ".pvals"
-					sys.stdout.write("Looking for file %s." % (file_name))
-					if os.path.isfile(file_name):
-						sys.stdout.write("..... found!\n")
-						res = gwaResults.Result(result_file=file_name, name=res_name, snps=snps)
-						pvals = True
-						if mapping_method in ['lm', 'emma', 'emmax']:
-							res.filter_attr("mafs", p_dict['mac_threshold'])
-						results[mapping_method] = res
-
-					else:
-						sys.stdout.write("..... not found.\n")
-						sys.stdout.flush()
-						file_name = file_prefix + ".scores"
+							mapping_method, trans_method, p_dict['remove_outliers'])
+				for with_reps in ['', '_with_replicates']:
+					file_prefix = file_prefix + with_reps
+					mapping_label = mapping_method + '_' + trans_method + with_reps
+					snps = sd.getSnps()
+					phen_vals = phed.get_values(p_i)
+					res_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
+					try:
+						file_name = file_prefix + ".pvals"
 						sys.stdout.write("Looking for file %s." % (file_name))
 						if os.path.isfile(file_name):
 							sys.stdout.write("..... found!\n")
-							res = gwaResults.Result(result_file=file_name, name=res_name,
-									snps=snps)
-							pvals = False
-							results[mapping_method] = res
+							res = gwaResults.Result(result_file=file_name, name=res_name, snps=snps)
+							pvals = True
+							if mapping_method in ['lm', 'emma', 'emmax']:
+								res.filter_attr("mafs", p_dict['mac_threshold'])
+							results[mapping_label] = res
+							method_types.append(mapping_method)
+
 						else:
 							sys.stdout.write("..... not found.\n")
-					sys.stdout.flush()
-
-
-					#Permutation tests for KW and FT..
-					if mapping_method in ['kw', 'ft']:
-						print "Retrieving permutations for %s" % (mapping_method)
+							sys.stdout.flush()
+							file_name = file_prefix + ".scores"
+							sys.stdout.write("Looking for file %s." % (file_name))
+							if os.path.isfile(file_name):
+								sys.stdout.write("..... found!\n")
+								res = gwaResults.Result(result_file=file_name, name=res_name,
+										snps=snps)
+								pvals = False
+								results[mapping_label] = res
+								method_types.append(mapping_method)
+							else:
+								sys.stdout.write("..... not found.\n")
 						sys.stdout.flush()
-						perm_pvals = get_perm_pvals(snps, phen_vals, mapping_method)
-				except Exception, err_str:
-					print err_str
-					print "Failed loading file %s" % (file_name)
-					sys.stdout.flush()
+
+
+						#Permutation tests for KW and FT..
+						if mapping_method in ['kw', 'ft']:
+							print "Retrieving permutations for %s" % (mapping_method)
+							sys.stdout.flush()
+							perm_pvals = get_perm_pvals(snps, phen_vals, mapping_method)
+					except Exception, err_str:
+						print err_str
+						print "Failed loading file %s" % (file_name)
+						sys.stdout.flush()
 		if len(results.keys()) > 0:
 			print "Drawing QQ plots for methods: %s" % (str(results.keys()))
 			for k in results:
@@ -432,10 +435,11 @@ def analysis_plots(snps_data_file, phed, p_dict):
 
                         #Plotting the QQ plots.
 			num_dots = 1000
-			max_log_val = 5
+			max_log_val = 6
 			qq_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i))
-			gwaResults.qq_plots(results, num_dots, max_log_val, qq_file_prefix, method_types=results.keys(),
-					    phen_name=phenotype_name, perm_pvalues=perm_pvals, is_binary=phen_is_binary)
+			gwaResults.qq_plots(results, num_dots, max_log_val, qq_file_prefix, method_types=method_types,
+					mapping_labels=results.keys(), phen_name=phenotype_name, perm_pvalues=perm_pvals,
+					is_binary=phen_is_binary)
 
 
 
@@ -696,7 +700,7 @@ def _run_():
 	#Load phenotype file
 	if p_dict['phen_file']:
 		print 'Loading phenotypes from file.'
-		phed = phenotypeData.parse_phenotype_file(p_dict['phen_file'])#, with_db_ids=(not p_dict['no_phenotype_ids']))  #load phenotype file
+		phed = phenotypeData.parse_phenotype_file(p_dict['phen_file'], with_db_ids=(not p_dict['no_phenotype_ids']))  #load phenotype file
 	else:
 		print 'Retrieving the phenotypes from the DB.'
 		phed = phenotypeData.get_all_phenotypes_from_db()

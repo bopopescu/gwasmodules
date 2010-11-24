@@ -3,6 +3,7 @@ from env import *
 import math
 import scipy as sp
 import itertools as it
+import sys
 
 # Phenotype categories: (category,order)
 #phenotypeCategories = {
@@ -272,22 +273,29 @@ class phenotype_data:
 		return len(sp.unique(self.phen_dict[pid]['values'])) == 2
 
 
-	def plot_accession_map(self, pid, ecotypes=None, pdf_file=None, png_file=None):
+	def plot_accession_map(self, pid, ecotypes=None, pdf_file=None, png_file=None, map_type='global',
+			color_by=None, cmap=None, title=''):
 		"""
 		Plot accessions on a map.
 		
 		'color_by' is by default set to be the phenotype values.
 		"""
+		import matplotlib
+		matplotlib.rcParams['backend'] = 'GTKAgg'
 		if not ecotypes:
 			ecotypes = self.phen_dict[pid]['ecotypes']
+		#eid = get_250K_accession_to_ecotype_dict(dict_key='ecotype_id')
 		eid = get_ecotype_id_info_dict()
 		lats = []
 		lons = []
 		for e in ecotypes:
-			r = eid[int(e)]
 			try:
+				r = eid[int(e)]
 				latitude = float(r[2])
 				longitude = float(r[3])
+#				r = eid[str(e)]
+#				latitude = float(r[5])
+#				longitude = float(r[6])
 
 			except Exception, err_str:
 				print "Latitude and Longitude, not found?:", err_str
@@ -330,10 +338,10 @@ class phenotype_data:
 			ys.append(y)
 
 		if not color_by:
-			color_vals = self.getPhenVals(p_i)
+			color_vals = self.get_values(pid)
 		else:
 			color_vals = color_by
-		if len(color_vals) != len(accessions):
+		if len(color_vals) != len(self.get_ecotypes(pid)):
 			raise Exception("accessions and color_by_vals values don't match ! ")
 		if not cmap:
 			num_colors = len(set(color_vals))
@@ -419,27 +427,78 @@ class phenotype_data:
 
 
 
-def parse_phenotype_file(file_name, delim=','):
+def parse_phenotype_file(file_name, delim=',', file_format='guess', with_db_ids=True):
 	"""
-	Parses a phenotype file of the new format, and returns a new phenotype_data object.
+	Parses a phenotype file, and returns a new phenotype_data object.
+	
+	File format types:
+	
+		new - Everything in a long sequence.
+		old - Well, old phenotype file_format.
+		guess - Guesses the file_format
 	"""
 	phen_dict = {}
-	last_pid = -1
 	with open(file_name) as f:
 		header = f.next()
-		if len(header.split(delim)) != 5:
-			raise Exception('Problems with delimiter', delim)
-		for line in f:
-			l = line.split(delim)
-			pid = int(l[0])
-			if pid != last_pid:
-				if last_pid != -1:
-					phen_dict[last_pid] = d
-				phen_name = l[1]
-				d = {'name':phen_name, 'ecotypes':[], 'values':[]}
-			d['ecotypes'].append(l[2])
-			d['values'].append(float(l[3]))
-			last_pid = pid
+		if len(header.split(delim)) < 2:
+			test_delims = [',', '\t']
+			for n_delim in test_delims:
+				if len(header.split(n_delim)) > 2:
+					delim = n_delim
+					break
+			else:
+				raise Exception('Problems with delimiters', delim, test_delims)
+		if file_format == 'guess':
+			header = map(str.strip, header.split(delim))
+			if len(header) != 5:
+				print 'Guessing old format.'
+				#print len(header), header
+				file_format = 'old'
+			elif 'phenotype_id' in header:
+				print 'Guessing new format.'
+				file_format = 'new'
+			else:
+				v = raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:')
+				if v == 1:
+					file_format = 'old'
+				elif v == 2:
+					file_format = 'new'
+				else:
+					sys.exit()
+
+		if file_format == 'old':
+			if with_db_ids:
+				pids = [int(l.split('_')[0]) for l in header[1:]]
+			else:
+				pids = range(1, len(header))
+			for i, pid in enumerate(pids):
+				phen_dict[pid] = {'ecotypes':[], 'values':[], 'name':header[i + 1]}
+			for line in f:
+				l = map(str.strip, line.split(delim))
+				ecotype = l[0]
+				del l[0]
+				for i, v in enumerate(l):
+					pid = pids[i]
+					if v != 'NA':
+						phen_dict[pid]['ecotypes'].append(ecotype)
+						phen_dict[pid]['values'].append(float(v))
+
+		elif file_format == 'new':
+			last_pid = -1
+			for line in f:
+				l = line.split(delim)
+				pid = int(l[0])
+				if pid != last_pid:
+					if last_pid != -1:
+						phen_dict[last_pid] = d
+					phen_name = l[1]
+					d = {'name':phen_name, 'ecotypes':[], 'values':[]}
+				d['ecotypes'].append(l[2])
+				d['values'].append(float(l[3]))
+				last_pid = pid
+
+	#print phen_dict
+
 	return phenotype_data(phen_dict=phen_dict, phen_ids=phen_dict.keys())
 
 
@@ -703,7 +762,6 @@ class PhenotypeData:
 
 		#print "Connecting to db, host="+host
 		if not user:
-			import sys
 			sys.stdout.write("Username: ")
 			user = sys.stdin.readline().rstrip()
 		if not passwd:
@@ -1800,7 +1858,6 @@ def _getFirst96Ecotypes_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bj
 	import MySQLdb
 	print "Connecting to db, host=" + host
 	if not user:
-		import sys
 		sys.stdout.write("Username: ")
 		user = sys.stdin.readline().rstrip()
 	if not passwd:
@@ -1953,10 +2010,15 @@ def get_ecotype_id_info_dict(defaultValue=None):
 	ecotypeDict = {}
 
 	sql_statment = """
-select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
-from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock.site s, stock.address a, stock.country c
-where e.id = ei.tg_ecotypeid and e.siteid = s.id and s.addressid = a.id and a.countryid = c.id
+SELECT DISTINCT e.id, e.nativename, e.stockparent, e.latitude, e.longitude, c.abbr
+FROM stock.ecotype e, stock.site s, stock.address a, stock.country c
+WHERE e.siteid = s.id AND s.addressid = a.id AND a.countryid = c.id
 """
+#	sql_statment = """
+#select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
+#from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock.site s, stock.address a, stock.country c
+#where e.id = ei.tg_ecotypeid and e.siteid = s.id and s.addressid = a.id and a.countryid = c.id
+#"""
 #	sql_statment= """
 #select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
 #from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai, stock.site s, stock.address a, stock.country c
@@ -2082,6 +2144,7 @@ def get_250K_accession_to_ecotype_dict(call_method=72, dict_key='nativename'):
 	fn = env['data_dir'] + 'call_method_72_ecotype_info.tsv'
 	f = open(fn)
 	header = f.next().split(delim)
+	#print header
 	i = header.index(dict_key)
 	info_table = []
 	ret_dict = {}
@@ -2196,7 +2259,6 @@ def _simpleInsertPhenotypesIntoDb_(host="papaya.usc.edu", user="bvilhjal", passw
 	import MySQLdb
 	print "Connecting to db, host=" + host
 	if not user:
-		import sys
 		sys.stdout.write("Username: ")
 		user = sys.stdin.readline().rstrip()
 	if not passwd:

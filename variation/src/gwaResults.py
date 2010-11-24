@@ -2987,25 +2987,25 @@ def loadResults(phenotypeIndices, resultTypes=None, phed=None, snpsds=None, filt
 
 
 
-def qq_plots(results, num_dots, max_log_val, file_prefix, method_types=['kw', 'emma'], phen_name=None,
-	      perm_pvalues=None, is_binary=False, **kwargs):
+def qq_plots(results, num_dots, max_log_val, file_prefix, method_types=['kw', 'emma'], mapping_labels=None,
+	 	phen_name=None, perm_pvalues=None, is_binary=False, **kwargs):
 	"""
 	Plots both log and normal qq plots.
 	"""
+	log_pdf_file = None
+	log_png_file = None
+	pdf_file = None
+	png_file = None
 	if file_prefix:
 		log_pdf_file = file_prefix + "_qq_log.pdf"
 		log_png_file = file_prefix + "_qq_log.png"
 		pdf_file = file_prefix + "_qq.pdf"
 		png_file = file_prefix + "_qq.png"
-	else:
-		log_pdf_file = None
-		log_png_file = None
-		pdf_file = None
-		png_file = None
-	qq_plot(results, num_dots, method_types=method_types, phenName=phen_name, pdfFile=pdf_file, pngFile=png_file,
-	        perm_pvalues=perm_pvalues, isBinary=is_binary, kwargs=kwargs)
-	log_qq_plot(results, num_dots, max_log_val, method_types=method_types, phenName=phen_name, pdfFile=log_pdf_file,
-		    pngFile=log_png_file, perm_pvalues=perm_pvalues, isBinary=is_binary, kwargs=kwargs)
+	qq_plot(results, num_dots, method_types=method_types, mapping_labels=mapping_labels, phenName=phen_name,
+		pdfFile=pdf_file, pngFile=png_file, perm_pvalues=perm_pvalues, isBinary=is_binary, kwargs=kwargs)
+	log_qq_plot(results, num_dots, max_log_val, method_types=method_types, mapping_labels=mapping_labels,
+		phenName=phen_name, pdfFile=log_pdf_file, pngFile=log_png_file, perm_pvalues=perm_pvalues,
+		isBinary=is_binary, kwargs=kwargs)
 
 
 def _getQuantiles_(scores, numQuantiles):
@@ -3050,14 +3050,16 @@ def _getExpectedPvalueQuantiles_(numQuantiles):
 		quantiles.append(float(i) / (numQuantiles + 2))
 	return quantiles
 
-def qq_plot(results, numQuantiles, method_types=["kw", "emma"], phenName=None, pdfFile=None, pngFile=None,
+def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=None, phenName=None, pdfFile=None, pngFile=None,
 	    perm_pvalues=None, **kwargs):
 	"""
 	QQ-plot for the given results.
 	"""
 	import matplotlib
-	matplotlib.use('Agg')
 	import matplotlib.pyplot as plt
+
+	if not mapping_labels:
+		mapping_labels = method_types
 
 	plt.figure(figsize=(5, 4))
 	#plt.figure(figsize=(10,8))
@@ -3066,9 +3068,8 @@ def qq_plot(results, numQuantiles, method_types=["kw", "emma"], phenName=None, p
 	plt.plot([0, 1], [0, 1], "k", label="Expected")
 	areas = []
 	medians = []
-	for method_type in method_types:
-		result = results[method_type]
-		label = method_type
+	for method_type, label in zip(method_types, mapping_labels):
+		result = results[label]
 		newScores = result.scores[:]
 		quantiles = _getQuantiles_(newScores, numQuantiles)
 		if perm_pvalues and method_type in ['kw', 'ft']:
@@ -3148,13 +3149,12 @@ def _estLogSlope_(ys, xs=None):
 	return(b_sum / num_valid)
 
 
-def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], phenName=None, pdfFile=None,
+def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_labels=None, phenName=None, pdfFile=None,
 	        pngFile=None, perm_pvalues=None, **kwargs):
 	"""
 	log-transformed QQ-plot for the given results.
 	"""
 	import matplotlib
-	matplotlib.use('Agg')
 	import matplotlib.pyplot as plt
 	def _getExpectedLogQuantiles_():
 		quantiles = []
@@ -3162,11 +3162,11 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], phenName=
 			quantiles.append((float(i) / (numDots + 2.0)) * maxVal)
 		return quantiles
 
+	if not mapping_labels:
+		mapping_labels = method_types
 	plt.figure(figsize=(5, 4))
-	#plt.figure(figsize=(10,8))
-	#plt.figure(figsize=(4,3.5))
 	plt.axes([0.15, 0.14, 0.82, 0.79])
-	maxVal = min(math.log10(len(results[method_types[0]].scores)), maxVal)
+	maxVal = min(math.log10(len(results[mapping_labels[0]].scores)), maxVal)
 	minVal = (1.0 / numDots) * maxVal
 	valRange = maxVal - minVal
 	plt.plot([minVal, maxVal], [minVal, maxVal], "k", label="Expected")
@@ -3174,9 +3174,8 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], phenName=
 	areas = []
 	ds = []
 	slopes = []
-	for method_type in method_types:
-		result = results[method_type]
-		label = method_type
+	for method_type, label in zip(method_types, mapping_labels):
+		result = results[label]
 		if perm_pvalues and method_type in ['kw', 'ft']:
 			exp_maxVal = _getLogQuantilesMaxVal_(perm_pvalues[:], maxVal)
 			expQuantiles = _getLogQuantiles_(perm_pvalues[:], numDots, exp_maxVal)

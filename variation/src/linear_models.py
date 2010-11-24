@@ -445,10 +445,6 @@ class LinearMixedModel(LinearModel):
 			raise Exception('Currently, only Normal random effects are allowed.')
 		self.random_effects.append((effect_type, cov_matrix))
 
-#	def least_square_estimate(self): 
-#		raise Exception("LSE not applicable for mixed models")
-
-
 	def _get_eigen_L_(self, K):
 		evals, evecs = linalg.eigh(K)
 		return {'values':evals, 'vectors':sp.mat(evecs).T}
@@ -469,28 +465,35 @@ class LinearMixedModel(LinearModel):
 	def _rell_(self, delta, eig_vals, sq_etas):
 		num_eig_vals = len(eig_vals)
 		c_1 = 0.5 * num_eig_vals * (sp.log(num_eig_vals / (2.0 * sp.pi)) - 1)
-		sum_1 = 0
-		sum_2 = 0
-		for j in range(num_eig_vals):
-			v_1 = eig_vals[j] + delta
-			v_2 = sq_etas[j] / v_1
-			sum_1 += v_2
-			sum_2 += sp.log(v_1)
-		return c_1 - 0.5 * (num_eig_vals * sp.log(sum_1) + sum_2)  #log-likelihoods (eq. 7 from paper)
+		v = eig_vals + delta
+		res = c_1 - 0.5 * (num_eig_vals * sp.log(sp.sum(sq_etas.flatten() / v)) + sp.sum(sp.log(v)))
+		return res  #log-likelihoods (eq. 7 from paper)
 
 
 	def _redll_(self, delta, eig_vals, sq_etas):
 		num_eig_vals = len(eig_vals)
-		sum_1 = 0
-		sum_2 = 0
-		sum_3 = 0
-		for j in range(num_eig_vals):
-			v_1 = eig_vals[j] + delta
-			v_2 = sq_etas[j] / v_1
-			sum_1 += v_2
-			sum_2 += v_2 / v_1
-			sum_3 += 1.0 / v_1
-		return num_eig_vals * sum_2 / sum_1 - sum_3  #diffrentiated log-likelihoods (*2) (eq. 9 from paper)
+		v1 = eig_vals + delta
+		v2 = sq_etas.flatten() / v1
+		res = (num_eig_vals * sp.sum(v2 / v1) / sp.sum(v2) - sp.sum(1.0 / v1))
+		return res  #diffrentiated log-likelihoods (*2) (eq. 9 from paper)
+
+
+	def _ll_(self, delta, eig_vals, eig_vals_L, sq_etas):
+		n = self.n
+		c_1 = 0.5 * n * (sp.log(n / (2.0 * sp.pi)) - 1)
+		v1 = eig_vals + delta
+		v2 = eig_vals_L + delta
+		res = c_1 - 0.5 * (n * sp.log(sp.sum(sq_etas.flatten() / v1)) + sp.sum(sp.log(v2)))
+		return res  #log-likelihoods (eq. 6 from paper)
+
+
+	def _dll_(self, delta, eig_vals, eig_vals_L, sq_etas):
+		num_eig_vals = len(eig_vals)
+		v1 = eig_vals + delta
+		v2 = sq_etas.flatten() / v1
+		v3 = eig_vals_L + delta
+		res = (self.n * sp.sum(v2 / v1) / sp.sum(v2) - sp.sum(1.0 / v3))
+		return res  #diffrentiated log-likelihoods (*2) (eq. 8 from paper)
 
 
 	def get_REML(self, ngrids=50, llim= -5, ulim=10, esp=1e-6):
@@ -505,6 +508,18 @@ class LinearMixedModel(LinearModel):
 		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML')
 
 
+	def get_ML(self, ngrids=50, llim= -5, ulim=10, esp=1e-6):
+		"""
+		Get REML estimates for the effect sizes, as well as the random effect contributions.
+		
+		This is EMMA
+		"""
+		K = self.random_effects[1][1]
+		eig_L = self._get_eigen_L_(K)
+		#Get the variance estimates..
+		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='ML')
+
+
 	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -5, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML'):
 		"""
@@ -513,6 +528,7 @@ class LinearMixedModel(LinearModel):
 		
 		Methods available are 'REML', and 'ML'		
 		"""
+		print 'Retrieving %s variance estimates' % method
 		if not eig_L:
 			raise Exception
 		if len(xs):
@@ -536,12 +552,26 @@ class LinearMixedModel(LinearModel):
 
   		lambdas = sp.reshape(sp.repeat(eig_vals, m), (p, m)) + \
   			sp.reshape(sp.repeat(deltas, p), (m, p)).T
-  		s1 = sp.sum(sq_etas / lambdas, axis=0)
-  		s2 = sp.sum(sp.log(lambdas), axis=0)
-  		lls = 0.5 * (p * (sp.log((p) / (2.0 * sp.pi)) - 1 - sp.log(s1)) - s2)
- 		s3 = sp.sum(sq_etas / (lambdas * lambdas), axis=0)
- 		s4 = sp.sum(1 / lambdas, axis=0)
-  		dlls = 0.5 * (p * s3 / s1 - s4)
+	  	s1 = sp.sum(sq_etas / lambdas, axis=0)
+  		if method == 'REML':
+	  		s2 = sp.sum(sp.log(lambdas), axis=0)
+	  		lls = 0.5 * (p * (sp.log((p) / (2.0 * sp.pi)) - 1 - sp.log(s1)) - s2)
+	 		s3 = sp.sum(sq_etas / (lambdas * lambdas), axis=0)
+	 		s4 = sp.sum(1 / lambdas, axis=0)
+	  		dlls = 0.5 * (p * s3 / s1 - s4)
+  		elif method == 'ML':
+  			#Xis < -matrix(eig.L$values, n, m) + matrix(delta, n, m, byrow=TRUE)
+  			eig_vals_L = sp.array(eig_L['values'])
+  			xis = sp.reshape(sp.repeat(eig_vals_L, m), (n, m)) + \
+  				sp.reshape(sp.repeat(deltas, n), (m, n)).T
+  			#LL <- 0.5*(n*(log(n/(2*pi))-1-log(colSums(Etasq/Lambdas)))-colSums(log(Xis)))	
+  			#dLL <- 0.5*delta*(n*colSums(Etasq/(Lambdas*Lambdas))/colSums(Etasq/Lambdas)-colSums(1/Xis))	
+
+	  		s2 = sp.sum(sp.log(xis), axis=0)
+	  		lls = 0.5 * (n * (sp.log((n) / (2.0 * sp.pi)) - 1 - sp.log(s1)) - s2)
+	 		s3 = sp.sum(sq_etas / (lambdas * lambdas), axis=0)
+	 		s4 = sp.sum(1 / xis, axis=0)
+	  		dlls = 0.5 * (n * s3 / s1 - s4)
 
 		max_ll_i = sp.argmax(lls)
 		max_ll = lls[max_ll_i]
@@ -559,13 +589,24 @@ class LinearMixedModel(LinearModel):
 			opt_ll, opt_i = max(zero_intervals)
 			opt_delta = 0.5 * (deltas[opt_i - 1] + deltas[opt_i])
 			#Newton-Raphson
-			new_opt_delta = optimize.newton(self._redll_, opt_delta, args=(eig_vals, sq_etas), tol=esp, maxiter=50)[0]
-			if deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
-				opt_delta = new_opt_delta
-				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
-			else:
-				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
-				raise Exception('Local maximum outside of suggested area??')
+			if method == 'REML':
+				new_opt_delta = optimize.newton(self._redll_, opt_delta, args=(eig_vals, sq_etas),
+								tol=esp, maxiter=50)
+				if deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
+					opt_delta = new_opt_delta
+					opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
+				else:
+					opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
+					raise Exception('Local maximum outside of suggested area??')
+			elif method == 'ML':
+				new_opt_delta = optimize.newton(self._dll_, opt_delta, args=(eig_vals, eig_vals_L, sq_etas),
+								tol=esp, maxiter=50)
+				if deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
+					opt_delta = new_opt_delta
+					opt_ll = self._ll_(opt_delta, eig_vals, eig_vals_L, sq_etas)
+				else:
+					opt_ll = self._ll_(opt_delta, eig_vals, eig_vals_L, sq_etas)
+					raise Exception('Local maximum outside of suggested area??')
 			if opt_ll < max_ll:
 				opt_delta = deltas[max_ll_i]
 		else:
@@ -1011,12 +1052,15 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None):
+	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None, method='normal'):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
 		
-		With interactions between SNP and possible cofactors.
+		Methods:
+			normal - Normal regression
+			qr - Uses QR decomposition to speed up regression with many co-factors.
+			
 		"""
 		q = 1  # Single SNP is being tested
 		p = len(self.X.T) + q
@@ -1027,7 +1071,8 @@ class LinearMixedModel(LinearModel):
 		h0_X = H_sqrt_inv * self.X
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
 		h0_betas = map(float, list(h0_betas))
-		Y = Y - h0_X * h0_betas
+		#Y = Y - h0_X * h0_betas
+		(Q, R) = linalg.qr(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
 		num_snps = len(snps)
 		rss_list = sp.repeat(h0_rss, num_snps)
 		betas_list = [h0_betas] * num_snps
@@ -1043,11 +1088,15 @@ class LinearMixedModel(LinearModel):
 				Xs = snps_chunk * (H_sqrt_inv_Z.T)
 			else:
 				Xs = snps_chunk * (H_sqrt_inv.T)
-			Xs = Xs - sp.mat(sp.mean(Xs, axis=1))
+			#Xs = Xs - Xs * Q #- sp.mat(sp.mean(Xs, axis=1))
 			for j in range(len(Xs)):
 				if return_transformed_snps:
 					t_snps.append(sp.array(Xs[j]).flatten())
-				(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+				if method == 'qr':
+					gammas = Xs[j] * Q
+					gammas = sp.repeat(gammas,)
+				else:
+					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, overwrite_a=True)
 				if not rss:
 					if verbose: print 'No predictability in the marker, moving on...'
 					continue
