@@ -1052,7 +1052,7 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None, method='normal'):
+	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1062,6 +1062,10 @@ class LinearMixedModel(LinearModel):
 			qr - Uses QR decomposition to speed up regression with many co-factors.
 			
 		"""
+#		if len(self.X.T) < 0:
+#			method = 'normal'
+#		else:
+		method = 'qr'
 		q = 1  # Single SNP is being tested
 		p = len(self.X.T) + q
 		n = self.n
@@ -1070,9 +1074,16 @@ class LinearMixedModel(LinearModel):
 		Y = H_sqrt_inv * self.Y	#The transformed outputs.
 		h0_X = H_sqrt_inv * self.X
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
+		if Z != None:
+			H_sqrt_inv = H_sqrt_inv * Z
+
+		Y = Y - h0_X * h0_betas
+		(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+		Q = sp.mat(Q)
+		Q2 = Q * Q.T
+		M = H_sqrt_inv.T * (sp.eye(n) - Q2)
+
 		h0_betas = map(float, list(h0_betas))
-		#Y = Y - h0_X * h0_betas
-		(Q, R) = linalg.qr(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
 		num_snps = len(snps)
 		rss_list = sp.repeat(h0_rss, num_snps)
 		betas_list = [h0_betas] * num_snps
@@ -1080,28 +1091,21 @@ class LinearMixedModel(LinearModel):
 		if return_transformed_snps:
 			t_snps = []
 		chunk_size = len(Y)
-		if Z != None:
-			H_sqrt_inv_Z = H_sqrt_inv * Z
 		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size])
-			if Z != None:
-				Xs = snps_chunk * (H_sqrt_inv_Z.T)
-			else:
-				Xs = snps_chunk * (H_sqrt_inv.T)
-			#Xs = Xs - Xs * Q #- sp.mat(sp.mean(Xs, axis=1))
+			Xs = snps_chunk * M
+#			Xs = snps_chunk * (H_sqrt_inv.T)
 			for j in range(len(Xs)):
 				if return_transformed_snps:
 					t_snps.append(sp.array(Xs[j]).flatten())
-				if method == 'qr':
-					gammas = Xs[j] * Q
-					gammas = sp.sum(Q * sp.mat(sp.diag(gammas)), axis=0)
-				else:
-					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, overwrite_a=True)
+				(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+#				(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, \
+#									overwrite_a=True)
 				if not rss:
 					if verbose: print 'No predictability in the marker, moving on...'
 					continue
+				#betas_list[i + j] = map(float, list(betas))
 				rss_list[i + j] = rss[0]
-				betas_list[i + j] = map(float, list(betas))
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					sys.stdout.write('.')
@@ -1114,8 +1118,10 @@ class LinearMixedModel(LinearModel):
 		f_stats = (rss_ratio - 1) * n_p / float(q)
 		p_vals = stats.f.sf(f_stats, q, n_p)
 
-		res_d = {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list, 'var_perc':var_perc,
+		res_d = {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'var_perc':var_perc,
 			'h0_rss':h0_rss, 'h0_betas':h0_betas}
+		#if method == 'normal':
+		#	res_d['betas'] = betas_list
 		if return_transformed_snps:
 			res_d['t_snps'] = t_snps
 		return res_d
@@ -1704,7 +1710,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 
 
 	reml_res = lmm.get_REML()
-	H_sqrt = reml_res['H_sqrt']
+	H_sqrt_inv = reml_res['H_sqrt_inv']
 	ll = reml_res['max_ll']
 	rss = float(reml_res['rss'])
 	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
@@ -1720,7 +1726,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 	print 'Cofactors:', cofactors_str
 
 	for step_i in range(1, num_steps + 1):
-		emmax_res = lmm._emmax_f_test_(snps, H_sqrt)
+		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
 		min_pval_i = sp.argmin(emmax_res['ps'])
 		min_pval = emmax_res['ps'][min_pval_i]
 		mahalnobis_rss = emmax_res['rss'][min_pval_i]
@@ -1747,7 +1753,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		cofactor_snps.append(snps[min_pval_i])
 		lmm.add_factor(snps[min_pval_i])
 		reml_res = lmm.get_REML()
-		H_sqrt = reml_res['H_sqrt']
+		H_sqrt_inv = reml_res['H_sqrt_inv']
 		ll = reml_res['max_ll']
 		rss = float(reml_res['rss'])
 		reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
@@ -1764,7 +1770,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		if allow_interactions and len(cofactor_snps) > 1:
 			isnps, cofactor_indices = _get_interactions_(cofactor_snps[-1], cofactor_snps[:-1])
 			if isnps:
-				emmax_res = lmm._emmax_f_test_(isnps, H_sqrt)
+				emmax_res = lmm._emmax_f_test_(isnps, H_sqrt_inv)
 				min_pval_i = sp.argmin(emmax_res['ps'])
 				print emmax_res['ps'][min_pval_i], emmax_res['rss'][min_pval_i]
 				if emmax_res['ps'][min_pval_i] < interaction_pval_thres and emmax_res['rss'][min_pval_i] < rss:
@@ -1778,7 +1784,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 						step_info['interactions'] = interactions
 						action += 'i'
 						reml_res = lmm.get_REML()
-						H_sqrt = reml_res['H_sqrt']
+						H_sqrt_inv = reml_res['H_sqrt_inv']
 						ll = reml_res['max_ll']
 						rss = float(reml_res['rss'])
 						reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
@@ -1830,7 +1836,7 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 			print 'Breaking early, since pseudoheritability is close to 0.'
 			break
 
-	emmax_res = lmm._emmax_f_test_(snps, H_sqrt)
+	emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
 	min_pval_i = sp.argmin(emmax_res['ps'])
 	min_pval = emmax_res['ps'][min_pval_i]
 	mahalnobis_rss = emmax_res['rss'][min_pval_i]
@@ -2142,21 +2148,20 @@ def _test_stepwise_emmax_():
 	mac_threshold = 15
 	for pid, log_trans in [ (44, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
 		#phed = pd.readPhenotypeFile(filename, with_db_ids=False)
-		phed = pd.readPhenotypeFile(filename)
+		phed = pd.parse_phenotype_file(filename)
 		if log_trans:
-			phed.logTransform(pid)
-		phen_name = phed.getPhenotypeName(pid)
-		filter_accessions = phed.getNonNAEcotypes(pid)
+			phed.log_transform(pid)
+		phen_name = phed.get_name(pid)
 		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary')
 		sd.coordinate_w_phenotype_data(phed, pid)
 		if mac_threshold:
 			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
-		phenotypes = phed.getPhenVals(pid)
+		phenotypes = phed.get_values(pid)
 		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-					phed.accessions)
+					phed.get_ecotypes(pid))
 
 		info_list = emmax_step_wise(phenotypes, K, sd=sd, \
-					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_' \
+					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_new_' \
 					+ str(pid) + '_' + phen_name, num_steps=18, allow_interactions=True,
 					interaction_pval_thres=0.001)
 
