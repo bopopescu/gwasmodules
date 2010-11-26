@@ -2689,10 +2689,10 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 	#select distinct t8_fd.tair_id, t8.chromosome, t8.start, t8.end, t8_fd.type, t8_fd.short_description from T8_annotation_TH.t8_063008 t8, T8_annotation_TH.t8_func_desc t8_fd, stock_250k.candidate_gene_list cgl where t8.pub_locus+'.1' = t8_fd.tair_id and cgl.list_type_id=129  and cgl.original_name=t8.pub_locus and t8.chromosome =1 order by t8.chromosome, t8.start
 	#select distinct gm.chromosome, gm.start, gm.stop, g.locustag from genome.entrezgene_mapping gm, genome.gene g, stock_250k.candidate_gene_list cgl where cgl.list_type_id=129 and gm.gene_id = g.gene_id and cgl.gene_id=g.gene_id order by gm.chromosome, gm.start, gm.stop
 	if chr and start_pos and end_pos:
-		sql_statement = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, \
-		g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g where \
-		gm.gene_id = g.gene_id and gm.chromosome=" + str(chr) + " and gm.stop>" + str(start_pos) + " and \
-		gm.start<" + str(end_pos) + " order by gm.chromosome, gm.start, gm.stop"
+		sql_statement = "SELECT DISTINCT gm.chromosome, gm.start, gm.stop, g.locustag, \
+		g.gene_symbol, g.description, g.dbxrefs FROM genome.entrezgene_mapping gm, genome.gene g WHERE \
+		gm.gene_id = g.gene_id AND gm.chromosome=" + str(chr) + " AND gm.stop>" + str(start_pos) + " AND \
+		gm.start<" + str(end_pos) + " ORDER BY gm.chromosome, gm.start, gm.stop"
 		numRows = int(cursor.execute(sql_statement))
 	else:
 		sql_statement = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, \

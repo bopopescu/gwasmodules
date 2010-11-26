@@ -660,10 +660,16 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			pass
 
 		print "plotting histogram"
+		p_her = None
+		if k != None:
+			p_her = phed.get_pseudo_heritability(p_i, k)
+		#title = phenotype_name
+		#if p_her:
+		#	title += ': p_her=%0.4f' % p_her
 		hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method,
 						p_dict['remove_outliers'], p_dict['with_replicates'])
 		hist_png_file = hist_file_prefix + "_hist.png"
-		phed.plot_histogram(p_i, png_file=hist_png_file)
+		phed.plot_histogram(p_i, png_file=hist_png_file, p_her=p_her)
 
 
 

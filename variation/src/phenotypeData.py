@@ -65,6 +65,34 @@ class phenotype_data:
 				self.phen_dict[pid] = {'name':phenotype_names[i], 'ecotypes':[], 'values':[]}
 
 
+	def get_pseudo_heritability(self, pid, K, method='repl'):
+		"""
+		Returns the REML estimate of the heritability.
+		
+		methods: 'avg' (averages), 'repl' (replicates)
+		"""
+		import linear_models as lm
+		if method == 'avg':
+			phen_vals = self.get_avg_values(pid)
+			lmm = lm.LinearMixedModel(phen_vals)
+			lmm.add_random_effect(K)
+		elif method == 'repl':
+			phen_vals = self.get_values(pid)
+			lmm = lm.LinearMixedModel(phen_vals)
+			Z = self.get_incidence_matrix(pid)
+			lmm.add_random_effect(Z * K * Z.T)
+		else:
+			raise Exception('Unknown method')
+		return lmm.get_REML()['pseudo_heritability']
+
+
+	def get_broad_sense_heritability(self):
+		"""
+		Estimates the heritability from replicates.
+		"""
+		raise NotImplementedError
+
+
 	def log_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
 		if method == 'standard':
@@ -131,6 +159,10 @@ class phenotype_data:
 	def get_values(self, pid):
 		return self.phen_dict[pid]['values']
 
+	def get_avg_values(self, pid):
+		d = self.get_avg_value_dict(pid)
+		return d['values']
+
 	def get_ecotypes(self, pid):
 		return self.phen_dict[pid]['ecotypes']
 
@@ -161,7 +193,7 @@ class phenotype_data:
 			d[et]['rep_num'] += 1
 		return d
 
-	def get_avg_values(self, pid):
+	def get_avg_value_dict(self, pid):
 		"""
 		Returns the average values, along with the ecotypes, and rep_number
 		"""
@@ -173,6 +205,8 @@ class phenotype_data:
 			avg_vals.append(sp.mean(d[et]['values']))
 			rep_nums.append(d[et]['rep_num'])
 		return {'name':self.get_name(pid) + '_avg', 'ecotypes':ecotypes, 'values':avg_vals, 'rep_nums': rep_nums}
+
+
 
 
 
@@ -209,12 +243,12 @@ class phenotype_data:
 			pids = self.phen_dict.keys()
 		for pid in pids:
 			phen_name = self.get_name(pid)
-			self.phen_dict[pid] = self.get_avg_values(pid)
+			self.phen_dict[pid] = self.get_avg_value_dict(pid)
 			self.phen_dict[pid]['name'] = phen_name
 
 
 
-	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None):
+	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None, p_her=None):
 		import pylab as plt
 		plt.figure(figsize=(5, 4))
 		plt.axes([0.14, 0.13, 0.81, 0.83])
@@ -230,7 +264,12 @@ class phenotype_data:
 		plt.axis([minVal - 0.035 * x_range, maxVal + 0.035 * x_range, -0.035 * y_max, 1.18 * y_max])
 		num_phen_vals = len(phen_vals)
 		shapiro_pval = sp.stats.shapiro(phen_vals)[1]
-		plt.text(maxVal - 0.7 * x_range, 1.1 * y_max, "Number of values: " + str(num_phen_vals), size="x-small")
+		if p_her:
+			st = "Number of values: %d,  Pseudo-heritability: %0.4f" % (num_phen_vals, p_her)
+			plt.text(maxVal - 0.9 * x_range, 1.1 * y_max, st, size="x-small")
+		else:
+			st = "Number of values: " + str(num_phen_vals)
+			plt.text(maxVal - 0.7 * x_range, 1.1 * y_max, st, size="x-small")
 		plt.text(maxVal - 0.85 * x_range, 1.02 * y_max, "Shapiro-Wilk normality $p$-value: %0.6f" % shapiro_pval , size="x-small")
 		print max(histRes[0])
 		plt.ylabel("Frequency")
@@ -496,6 +535,7 @@ def parse_phenotype_file(file_name, delim=',', file_format='guess', with_db_ids=
 				d['ecotypes'].append(l[2])
 				d['values'].append(float(l[3]))
 				last_pid = pid
+			phen_dict[last_pid] = d
 
 	#print phen_dict
 
@@ -1646,8 +1686,8 @@ def get_all_phenotypes_from_db(file_name=None):
 	no_problem_pids = []
 	for pid in phen_dict:
 		if pid in repl_phen_dict:
-			d1 = avg_phend.get_avg_values(pid)
-			d2 = repl_phend.get_avg_values(pid)
+			d1 = avg_phend.get_avg_value_dict(pid)
+			d2 = repl_phend.get_avg_value_dict(pid)
 			ets1 = d1['ecotypes']
 			ets2 = d2['ecotypes']
 			vls1 = d1['values']
@@ -2649,31 +2689,37 @@ def combine_resistance_nc14():
 
 def combine_telomere_lengths():
 	fn1 = env['phen_dir'] + 'telomere_lengths_192.csv'
-	fn2 = env['phen_dir'] + 'telomere_lengths_swedish.csv'
-	phed1 = readPhenotypeFile(fn1)
-	phed2 = readPhenotypeFile(fn2)
-	accs = list(set(phed1.accessions).union(set(phed2.accessions)))
-	i_accs = list(set(phed1.accessions).intersection(set(phed2.accessions)))
-	print 'i_accs:', i_accs
-	pvs1 = phed1.getPhenVals(1)
-	pvs2 = phed2.getPhenVals(1)
-	pvs = []
-	for acc in accs:
-		if acc in i_accs:
-			i1 = phed1.accessions.index(acc)
-			i2 = phed2.accessions.index(acc)
-			print acc, ':', pvs1[i1], pvs2[i2]
-			pvs.append([(pvs1[i1] + pvs2[i2]) / 2.0])
-		else:
-			if acc in phed1.accessions:
-				i = phed1.accessions.index(acc)
-				pvs.append([pvs1[i]])
-			elif acc in phed2.accessions:
-				i = phed2.accessions.index(acc)
-				pvs.append([pvs2[i]])
-	print zip(accs, pvs)
-	phed = PhenotypeData(accs, ['telomere_length'], pvs)
-	phed.writeToFile(env['phen_dir'] + 'telomere_lengths_all.csv', delimiter=',')
+	fn2 = env['phen_dir'] + 'telomere_lengths_swedish_raw.csv'
+	phed1 = parse_phenotype_file(fn1)
+	phed2 = parse_phenotype_file(fn2, with_db_ids=False)
+	phed1.phen_dict[1]['ecotypes'].extend(phed2.phen_dict[1]['ecotypes'])
+	phed1.phen_dict[1]['values'].extend(phed2.phen_dict[1]['values'])
+	phed1.phen_dict[1]['name'] = 'telomere_length'
+#	accs = list(set(phed1.accessions).union(set(phed2.accessions)))
+#	i_accs = list(set(phed1.accessions).intersection(set(phed2.accessions)))
+#	print 'i_accs:', i_accs
+#	pvs1 = phed1.getPhenVals(1)
+#	pvs2 = phed2.getPhenVals(1)
+#	pvs = []
+#	for acc in accs:
+#		if acc in i_accs:
+#			i1 = phed1.accessions.index(acc)
+#			i2 = phed2.accessions.index(acc)
+#			print acc, ':', pvs1[i1], pvs2[i2]
+#			pvs.append([(pvs1[i1] + pvs2[i2]) / 2.0])
+#		else:
+#			if acc in phed1.accessions:
+#				i = phed1.accessions.index(acc)
+#				pvs.append([pvs1[i]])
+#			elif acc in phed2.accessions:
+#				i = phed2.accessions.index(acc)
+#				pvs.append([pvs2[i]])
+#	print zip(accs, pvs)
+#	phed = PhenotypeData(accs, ['telomere_length'], pvs)
+	phed1.write_to_file(env['phen_dir'] + 'telomere_lengths_all.csv')
+	print len(phed1.phen_dict[1]['ecotypes'])
+	phed1.convert_to_averages()
+	print len(phed1.phen_dict[1]['ecotypes'])
 
 
 
@@ -2699,10 +2745,10 @@ if __name__ == '__main__':
 	#_insert_bergelsson_phen_into_db_()
 	#get_AW_common_dataset()
 	#get_hypocotyl_lenghts()
-	#combine_telomere_lengths()
-	get_all_phenotypes_from_db('/tmp/phen_raw_112210.csv')
-	phed = parse_phenotype_file('/tmp/phen_raw_112210.csv')
-	phed.convert_to_averages()
-	phed.write_to_file('/tmp/phen_avg_112210.csv')
+	combine_telomere_lengths()
+	#get_all_phenotypes_from_db('/tmp/phen_raw_112210.csv')
+	#phed = parse_phenotype_file('/tmp/phen_raw_112210.csv')
+	#phed.convert_to_averages()
+	#phed.write_to_file('/tmp/phen_avg_112210.csv')
 	print "Done!"
 

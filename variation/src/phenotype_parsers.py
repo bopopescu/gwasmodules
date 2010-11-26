@@ -182,6 +182,44 @@ def load_phentoype_file_wilczek():
 
 
 
+def load_phentoype_file_dilkes():
+	filename = env['phen_dir'] + 'dilkes_metabolites.csv'
+	f = open(filename, "r")
+	print f.next()
+	header = f.next()
+	phen_names = map(str.strip, header.split(',')[2:])
+	print phen_names
+	pids = range(len(phen_names))
+	accessions = []
+	phen_dict = {}
+	for pid, name in zip(pids, phen_names):
+		phen_dict[pid] = {'name':name, 'ecotypes':[], 'values':[]}
+	for line in f:
+		l = map(str.strip, line.split(','))
+		accessions.append(l[1].lower())
+		for i in pids:
+			phen_dict[i]['values'].append(float(l[2 + i]))
+
+	f.close()
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+#	acc_dict['buckhorn'] = [0, 0, 0, 0, 7033]
+	acc_dict['sakhdara'] = [0, 0, 0, 0, 6962]
+	ecotypes = []
+	for acc in accessions:
+		if not acc in acc_dict:
+			print "%s is missing in dictionary" % acc
+		else:
+			ecotype = acc_dict[acc][4]
+			ecotypes.append(ecotype)
+
+	for pid, name in zip(pids, phen_names):
+		phen_dict[pid]['ecotypes'] = ecotypes
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'b_dilkes_metabolites.csv')
+
+
+
 
 def load_phentoype_file_nc_resistance():
 	filename = "/Users/bjarnivilhjalmsson/Summary_results_330Arabidopsis_accessions.csv"
@@ -382,7 +420,7 @@ def load_phentoype_file_duszynska():
 	fn4 = env['phen_dir'] + 'seed_size_spss.csv'
 	fns = [fn1, fn2, fn3, fn4]
 	phen_names = ['seed_size_2n', 'seed_size_3n_2x4', 'seed_size_3n_4x2', 'seed_size_spss']
-	phen_list = []
+	phen_dict = {}
 	accs_list = []
 	et_list = []
 	for fn in fns:
@@ -436,8 +474,6 @@ def load_phentoype_file_duszynska():
 
 
 
-
-
 def load_phentoype_file_riha():
 	filename = env['phen_dir'] + 'telomere_lengths_192_raw.csv'
 	f = open(filename, "r")
@@ -450,14 +486,21 @@ def load_phentoype_file_riha():
 	for line in f:
 		l = map(str.strip, line.split(','))
 		parent_ids.append(l[0])
-		accession_names.append(l[1].lower())
-		accession_ids.append(l[2])
-		phen_vals.append(float(l[3]))
+		acc_l = l[1].split()
+		acc_name = acc_l[0]
+		if len(acc_l) > 1:
+			acc_id = acc_l[1]
+		else:
+			acc_id = ''
+		accession_names.append(acc_name.lower())
+		accession_ids.append(acc_id)
+		phen_vals.append(float(l[2]))
 
 	f.close()
 	print accession_names
 	acc_dict = pd.get_250K_accession_to_ecotype_dict()
-	print acc_dict
+	acc_dict['buckhorn'] = [0, 0, 0, 0, 7033]
+	acc_dict['shahdara'] = [0, 0, 0, 0, 6962]
 	ecotypes = []
         uncertain_list = []
         new_phen_vals = []
@@ -467,16 +510,13 @@ def load_phentoype_file_riha():
 		else:
 			ecotype = acc_dict[acc][4]
 			ecotypes.append(ecotype)
-			new_phen_vals.append([phen_val])
+			new_phen_vals.append(phen_val)
 
 	print len(set(accession_names)), len(set(ecotypes))
+	phen_dict = {1:{'name':phen_name, 'ecotypes':ecotypes, 'values':new_phen_vals}}
 
-
-
-	phed = pd.PhenotypeData(ecotypes, [phen_name], new_phen_vals)
-	phed.writeToFile(env['phen_dir'] + 'telomere_lengths_192.csv', delimiter=',')
-
-
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'telomere_lengths_192.csv')
 
 
 
@@ -545,7 +585,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_duszynska()
+	load_phentoype_file_dilkes()
 	print "Done!"
 
 
