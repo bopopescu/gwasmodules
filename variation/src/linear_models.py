@@ -4,6 +4,7 @@ Contains functions to perform various linear regression schemes, such as simple,
 #import numpy as np
 #from scipy import *
 import scipy as sp
+sp.alterdot()
 from scipy import linalg
 from scipy import stats
 from scipy import optimize
@@ -1120,10 +1121,10 @@ class LinearMixedModel(LinearModel):
 					if not rss:
 						if verbose: print 'No predictability in the marker, moving on...'
 						continue
-						betas_list[i + j] = map(float, list(betas))
+					betas_list[i + j] = map(float, list(betas))
 				else:
 					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
-					rss_list[i + j] = rss[0]
+				rss_list[i + j] = rss[0]
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					sys.stdout.write('.')
