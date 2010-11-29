@@ -1713,7 +1713,7 @@ def get_all_phenotypes_from_db(file_name=None):
 	SELECT DISTINCT pa.method_id, pa.ecotype_id, pa.value, pm.short_name\
 	FROM stock_250k.phenotype_avg pa, stock_250k.phenotype_method pm \
 	WHERE pa.method_id=pm.id ORDER BY pa.method_id, pa.ecotype_id"
-	print sql_statement
+	#print sql_statement
 	numRows = int(cursor.execute(sql_statement))
 
 	phen_dict = {}
@@ -1729,11 +1729,11 @@ def get_all_phenotypes_from_db(file_name=None):
 
 		if row[2] != None:
 			phen_dict[pid]['values'].append(float(row[2]))
-			phen_dict[pid]['ecotypes'].append(int(row[1]))
+			phen_dict[pid]['ecotypes'].append(str(row[1]))
 			num_values += 1
 
-	print 'Values for %d phenotypes were fetched from DB.' % len(phen_dict)
-	print "%d values in total." % num_values
+	#print 'Values for %d phenotypes were fetched from DB.' % len(phen_dict)
+	#print "%d values in total." % num_values
 
 	avg_phend = phenotype_data(phen_dict)
 
@@ -1746,7 +1746,7 @@ def get_all_phenotypes_from_db(file_name=None):
 	SELECT DISTINCT p.method_id, ei.tg_ecotypeid, p.value, p.replicate, pm.short_name\
 	FROM stock_250k.phenotype p, stock_250k.phenotype_method pm, stock.ecotypeid2tg_ecotypeid ei \
 	WHERE ei.ecotypeid=p.ecotype_id and p.method_id=pm.id ORDER BY p.method_id, ei.tg_ecotypeid"
-	print sql_statement
+	#print sql_statement
 	numRows = int(cursor.execute(sql_statement))
 	repl_phen_dict = {}
 	num_values = 0
@@ -1761,12 +1761,12 @@ def get_all_phenotypes_from_db(file_name=None):
 
 		if row[2] != None:
 			repl_phen_dict[pid]['values'].append(float(row[2]))
-			repl_phen_dict[pid]['ecotypes'].append(int(row[1]))
+			repl_phen_dict[pid]['ecotypes'].append(str(row[1]))
 			repl_phen_dict[pid]['replicate'].append(int(row[3]))
 			num_values += 1
 
-	print 'Values for %d phenotypes were fetched from DB.' % len(repl_phen_dict)
-	print "%d values in total." % num_values
+	#print 'Values for %d phenotypes were fetched from DB.' % len(repl_phen_dict)
+	#print "%d values in total." % num_values
 
 	cursor.close ()
 	conn.close ()
@@ -1789,7 +1789,7 @@ def get_all_phenotypes_from_db(file_name=None):
 			et_set1 = set(ets1)
 			et_set2 = set(ets2)
 			phen_name = phen_dict[pid]['name']
-			print phen_name, ', pid:', pid, ', et_set1==et_set2 :', et_set1 == et_set2
+			#print phen_name, ', pid:', pid, ', et_set1==et_set2 :', et_set1 == et_set2
 			common_ets = et_set1.intersection(et_set2)
 			num_diffs = 0
 			for et in common_ets:
@@ -1800,12 +1800,12 @@ def get_all_phenotypes_from_db(file_name=None):
 					print d1['values'][i1], d2['values'][i2]
 					num_diffs += 1
 			if not et_set1 == et_set2:
-				print len(et_set1), len(et_set2)
+				#print len(et_set1), len(et_set2)
 				s = et_set1.symmetric_difference(et_set2)
 				#print 'et_set1.difference(et_set2):', et_set1.difference(et_set2)
 				#print 'et_set2.difference(et_set1):', et_set2.difference(et_set1)
 				if len(s) < 8 and num_diffs == 0:
-					print 'No major problems'
+					#print 'No major problems'
 					no_problem_pids.append(pid)
 					continue
 #				for ei in s:
@@ -1814,9 +1814,9 @@ def get_all_phenotypes_from_db(file_name=None):
 #					else:
 #						print ei, 'is not in 250K data!'
 			elif num_diffs == 0:
-				print 'No problems?'
+				#print 'No problems?'
 				no_problem_pids.append(pid)
-	print no_problem_pids
+	#print no_problem_pids
 
 	merged_phen_dict = {}
 	for pid in phen_dict:
