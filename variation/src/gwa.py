@@ -41,6 +41,7 @@ Option:
 	--emmax_perm=...			Number of permutations, used for estimating a significant threshold.
 	--with_replicates			Run EMMAX with replicates (if any, otherwise it uses the mean)
 	--with_betas				Output betas (effect sizes), this is a tad slower
+	--num_steps=...				Max number of steps, for EMMAX stepwise
 	
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
@@ -106,6 +107,7 @@ analysis_methods_dict = {"kw":1,
 			 'lm':16,
 			 "emmax":32,
 			 'emmax_anova':None,
+			 'emmax_step':None,
 			 'lm_anova':None,
 			 }
 
@@ -130,7 +132,7 @@ def parse_parameters():
 		sys.exit(2)
 
 	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'proc_per_node=',
-			'only_add_2_db', 'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas']
+			'only_add_2_db', 'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -146,7 +148,8 @@ def parse_parameters():
 		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
 		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
 		'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15, 'data_file':None,
-		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False, 'with_betas':False}
+		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False, 'with_betas':False,
+		'num_steps':50}
 
 
 	for opt, arg in opts:
@@ -180,6 +183,7 @@ def parse_parameters():
 		elif opt in ("--emmax_perm"): p_dict['emmax_perm'] = int(arg)
 		elif opt in ("--with_replicates"): p_dict['with_replicates'] = True
 		elif opt in ("--with_betas"): p_dict['with_betas'] = True
+		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -484,7 +488,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 	if not res: #If results weren't found in a file... then do GWA.
 		#Do we need to calculate the K-matrix?
-		if mapping_method in ['emma', 'emmax', 'emmax_anova']:
+		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:
 			#Load genotype file (in binary format)
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
@@ -568,11 +572,15 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 					res = lm.emmax(snps, phen_vals, k, Z=Z, with_betas=p_dict['with_betas'])
 				else:
 					res = lm.emmax(snps, phen_vals, k, with_betas=p_dict['with_betas'])
+
+			elif mapping_method in ['emmax_step']:
+				sd.filter_mac_snps(p_dict['mac_threshold'])
+				res = lm.emmax_step_wise(phen_vals, k, sd=sd, num_steps=p_dict['num_steps'],
+							file_prefix=file_prefix)
+				print 'Step-wise EMMAX finished!'
+				sys.exit()
 			elif mapping_method in ['lm']:
 				res = lm.linear_model(snps, phen_vals)
-			elif mapping_method in ['py_emma']:
-				pass
-				#CONNECT TO PYTHON EMMA
 			elif mapping_method in ['emmax_anova']:
 				res = lm.emmax_anova(snps, phen_vals, k)
 			elif mapping_method in ['lm_anova']:
