@@ -1082,6 +1082,8 @@ class LinearMixedModel(LinearModel):
 		p = len(self.X.T) + q
 		n = self.n
 		n_p = n - p
+		num_snps = len(snps)
+
 		h0_X = H_sqrt_inv * self.X
 		Y = H_sqrt_inv * self.Y	#The transformed outputs.
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
@@ -1099,7 +1101,6 @@ class LinearMixedModel(LinearModel):
 		else:
 			betas_list = [h0_betas] * num_snps
 
-		num_snps = len(snps)
 		rss_list = sp.repeat(h0_rss, num_snps)
 		if return_transformed_snps:
 			t_snps = []

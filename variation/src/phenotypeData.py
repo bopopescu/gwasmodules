@@ -1797,7 +1797,7 @@ def get_all_phenotypes_from_db(file_name=None):
 				i1 = d1['ecotypes'].index(et)
 				i2 = d2['ecotypes'].index(et)
 				if (d1['values'][i1] - d2['values'][i2]) > t:
-					print d1['values'][i1], d2['values'][i2]
+					#print d1['values'][i1], d2['values'][i2]
 					num_diffs += 1
 			if not et_set1 == et_set2:
 				#print len(et_set1), len(et_set2)
