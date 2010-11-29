@@ -1068,7 +1068,7 @@ class LinearMixedModel(LinearModel):
 
 
 	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None,
-			with_betas=with_betas):
+			with_betas=False):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
