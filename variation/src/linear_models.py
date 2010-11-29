@@ -1045,7 +1045,7 @@ class LinearMixedModel(LinearModel):
 		return res_d
 
 
-	def emmax_f_test(self, snps, Z=None, method='REML'):
+	def emmax_f_test(self, snps, Z=None, with_betas=False, method='REML'):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1059,7 +1059,7 @@ class LinearMixedModel(LinearModel):
 		#print 'Took % .6f secs.' % (time.time() - s)
 		print 'pseudo_heritability:', res['pseudo_heritability']
 
-		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], Z=Z)
+		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], Z=Z, with_betas=with_betas)
 		r['pseudo_heritability'] = res['pseudo_heritability']
 		r['max_ll'] = res['max_ll']
 		return r
@@ -1067,7 +1067,8 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None):
+	def _emmax_f_test_(self, snps, H_sqrt_inv, verbose=True, return_transformed_snps=False, Z=None,
+			with_betas=with_betas):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1081,42 +1082,47 @@ class LinearMixedModel(LinearModel):
 		p = len(self.X.T) + q
 		n = self.n
 		n_p = n - p
-
-		Y = H_sqrt_inv * self.Y	#The transformed outputs.
 		h0_X = H_sqrt_inv * self.X
+		Y = H_sqrt_inv * self.Y	#The transformed outputs.
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
+		Y = Y - h0_X * h0_betas
+		h0_betas = map(float, list(h0_betas))
+
 		if Z != None:
 			H_sqrt_inv = H_sqrt_inv * Z
 
-		Y = Y - h0_X * h0_betas
-		(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
-		Q = sp.mat(Q)
-		Q2 = Q * Q.T
-		M = H_sqrt_inv.T * (sp.eye(n) - Q2)
+		if not with_betas:
+			(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+			Q = sp.mat(Q)
+			Q2 = Q * Q.T
+			M = H_sqrt_inv.T * (sp.eye(n) - Q2)
+		else:
+			betas_list = [h0_betas] * num_snps
 
-		h0_betas = map(float, list(h0_betas))
 		num_snps = len(snps)
 		rss_list = sp.repeat(h0_rss, num_snps)
-		betas_list = [h0_betas] * num_snps
-		var_perc = sp.zeros(num_snps)
 		if return_transformed_snps:
 			t_snps = []
 		chunk_size = len(Y)
 		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size])
-			Xs = snps_chunk * M
-#			Xs = snps_chunk * (H_sqrt_inv.T)
+			if with_betas:
+				Xs = snps_chunk * (H_sqrt_inv.T)
+			else:
+				Xs = snps_chunk * M
 			for j in range(len(Xs)):
 				if return_transformed_snps:
 					t_snps.append(sp.array(Xs[j]).flatten())
-				(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
-#				(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, \
-#									overwrite_a=True)
-				if not rss:
-					if verbose: print 'No predictability in the marker, moving on...'
-					continue
-				#betas_list[i + j] = map(float, list(betas))
-				rss_list[i + j] = rss[0]
+				if with_betas:
+					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, \
+									overwrite_a=True)
+					if not rss:
+						if verbose: print 'No predictability in the marker, moving on...'
+						continue
+						betas_list[i + j] = map(float, list(betas))
+				else:
+					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+					rss_list[i + j] = rss[0]
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					sys.stdout.write('.')
@@ -1131,11 +1137,12 @@ class LinearMixedModel(LinearModel):
 
 		res_d = {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'var_perc':var_perc,
 			'h0_rss':h0_rss, 'h0_betas':h0_betas}
-		#if method == 'normal':
-		#	res_d['betas'] = betas_list
+		if with_betas:
+			res_d['betas'] = betas_list
 		if return_transformed_snps:
 			res_d['t_snps'] = t_snps
 		return res_d
+
 
 
 	def emmax_two_snps(self, snps, verbose=True):
@@ -1575,7 +1582,7 @@ def emma(snps, phenotypes, K, cofactors=None):
 
 
 
-def emmax(snps, phenotypes, K, cofactors=None, Z=None):
+def emmax(snps, phenotypes, K, cofactors=None, Z=None, with_betas=False):
 	"""
 	Run EMMAX
 	"""
@@ -1593,7 +1600,7 @@ def emmax(snps, phenotypes, K, cofactors=None, Z=None):
 
 	print "Running EMMAX"
 	s1 = time.time()
-	res = lmm.emmax_f_test(snps, Z)
+	res = lmm.emmax_f_test(snps, Z=Z, with_betas=with_betas)
 	secs = time.time() - s1
 	if secs > 60:
 		mins = int(secs) / 60
@@ -2173,7 +2180,7 @@ def _test_stepwise_emmax_():
 	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/b_dilkes_metabolites.csv"
 	mac_threshold = 15
-	for pid, trans in [(4, 'log_trans')]:#[ (5, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
+	for pid, trans in [(2, 'log_trans')]:#[ (5, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
 		phed = pd.parse_phenotype_file(filename)
 		phed.convert_to_averages()
 		if trans == 'sqrt_trans':

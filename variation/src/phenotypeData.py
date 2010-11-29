@@ -312,6 +312,96 @@ class phenotype_data:
 		return len(sp.unique(self.phen_dict[pid]['values'])) == 2
 
 
+	def insert_into_db(self, pids=None, phenotype_scoring='',
+			   method_description='', growth_condition='', biology_category_id='',
+			   citations='', data_description='', transformation_description=None,
+			   method_id=None, data_type=None, comment=''):
+		"""
+		Inserts phenotypes into avg DB, but assumes that values are averages.
+		(Assumes no transformation)
+		"""
+
+		if not pids:
+			pids = self.phen_dict.keys()
+		import dbutils
+		conn = dbutils.connect_to_default_insert("stock_250k")
+		cursor = conn.cursor()
+		for fpid, pid in enumerate(pids):
+			try:
+				phen_name = self.get_name(pid)
+				cur_method_id = self.get_db_pid(pid, conn=conn)
+				phen_vals = self.get_values(pid)
+				ecotypes = self.get_ecotypes(pid)
+				no_of_accessions = len(ecotypes)
+				print cur_method_id
+				if cur_method_id:
+					print phen_name, 'is already in DB.'
+					print 'Updating values only.'
+
+					sql_statement = "UPDATE stock_250k.phenotype_method SET no_of_accessions=%d, biology_category_id=%d WHERE short_name='%s'" % (no_of_accessions, biology_category_id, phen_name)
+					print sql_statement
+					cursor.execute(sql_statement)
+				else:
+					if not data_type:
+						if self.is_binary(pid):
+							data_type = 'binary'
+						else:
+							data_type = 'quantitative'
+					print "Inserting phenotype %s into DB." % phen_name
+					if method_id:
+						sql_statement = "INSERT INTO stock_250k.phenotype_method  (id, short_name, only_first_96, no_of_accessions," + \
+						     " biology_category_id,phenotype_scoring, method_description, growth_condition, data_description, comment," + \
+						     " data_type, transformation_description) VALUES (" + str(method_id) + ", '" + phen_name + "', false, " + \
+						     str(no_of_accessions) + ", " + str(biology_category_id) + ", '" + phenotype_scoring + "', '" + method_description + \
+						     "', '" + growth_condition + "', '" + data_description + "', '" + comment + "', '" + data_type + "', '" + \
+						     str(transformation_description) + "')"
+					else:
+						sql_statement = "INSERT INTO stock_250k.phenotype_method  (short_name, only_first_96, no_of_accessions," + \
+						     " biology_category_id,phenotype_scoring, method_description, growth_condition, data_description," + \
+						     " comment, data_type, transformation_description) VALUES ('" + phen_name + "', false, " + \
+						     str(no_of_accessions) + ", " + str(biology_category_id) + ", '" + phenotype_scoring + "', '" + method_description + \
+						     "', '" + growth_condition + "', '" + data_description + "', '" + comment + "', '" + data_type + "', '" + \
+						     str(transformation_description) + "')"
+
+					print sql_statement
+					numRows = int(cursor.execute(sql_statement))
+					row = cursor.fetchone()
+					if row:
+						print row
+					cur_method_id = self.get_db_pid(pid, conn=conn)
+
+				print "Inserting values for phenotype method_id = %d" % cur_method_id
+				for e_i, val in zip(ecotypes, phen_vals):
+					sql_statement = "INSERT INTO stock_250k.phenotype_avg  (ecotype_id, value, ready_for_publication, " + \
+							"method_id, transformed_value) VALUES ( " + str(e_i) + ", " + str(val) + ", 0, " + \
+							str(cur_method_id) + ", " + str(val) + " )"
+					try:
+						print sql_statement
+						numRows = int(cursor.execute(sql_statement))
+						row = cursor.fetchone()
+						if row:
+							print row
+					except Exception, err_str:
+						print 'Failed at inserting data:', err_str
+						print 'Trying to update.'
+						sql_statement = "UPDATE stock_250k.phenotype_avg SET value=%d, transformed_value=%d \
+								 WHERE ecotype_id=%d and method_id=%d" % (val, val, int(e_i), cur_method_id)
+						print sql_statement
+						numRows = int(cursor.execute(sql_statement))
+						row = cursor.fetchone()
+						if row:
+							print row
+
+				print "Committing"
+				conn.commit()
+			except Exception, err_str:
+				print 'Failed at inserting phentoype nr.', fpid + 1, ':', err_str
+
+		cursor.close ()
+		conn.close ()
+
+
+
 	def plot_accession_map(self, pid, ecotypes=None, pdf_file=None, png_file=None, map_type='global',
 			color_by=None, cmap=None, title=''):
 		"""
@@ -2398,6 +2488,30 @@ def _insert_wilzcek_phen_into_db_():
 			     data_type=data_type, comment=comment)
 
 
+def _insert_dilkes_phen_into_db_():
+	"""
+	Insert Brian Dilkes' phenotypes into the  DB. 
+	"""
+	#phen_file = env.home_dir+"/Projects/Data/phenotypes/phen_wilzcek_042710.tsv"
+	phen_file = env['phen_dir'] + 'b_dilkes_metabolites.csv'
+	phend = parse_phenotype_file(phen_file)
+	method_description = "Metabolites from Brian Dilkes"
+	growth_condition = ""
+	biology_category_id = 4
+	citations = ""
+	data_description = ""
+	transformation_description = "None"
+	phenotype_scoring = ''
+	#transformation_description = "Log(SD/10+x-minVal)"
+	method_id = None
+	data_type = ""
+	comment = "Data from Brian Dilkes"
+	phend.insert_into_db(phenotype_scoring=phenotype_scoring, method_description=method_description,
+			     growth_condition=growth_condition, biology_category_id=biology_category_id,
+			     citations=citations, data_description=data_description,
+			     transformation_description=transformation_description, method_id=method_id,
+			     data_type=data_type, comment=comment)
+
 
 def _insert_peijin_phen_into_db_():
 	"""
@@ -2745,7 +2859,7 @@ if __name__ == '__main__':
 	#_insert_bergelsson_phen_into_db_()
 	#get_AW_common_dataset()
 	#get_hypocotyl_lenghts()
-	combine_telomere_lengths()
+	_insert_dilkes_phen_into_db_()
 	#get_all_phenotypes_from_db('/tmp/phen_raw_112210.csv')
 	#phed = parse_phenotype_file('/tmp/phen_raw_112210.csv')
 	#phed.convert_to_averages()

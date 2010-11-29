@@ -40,6 +40,7 @@ Option:
 	--data_format=...			What type of data should it aim for, binary (default), int, float, etc.
 	--emmax_perm=...			Number of permutations, used for estimating a significant threshold.
 	--with_replicates			Run EMMAX with replicates (if any, otherwise it uses the mean)
+	--with_betas				Output betas (effect sizes), this is a tad slower
 	
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
@@ -129,7 +130,7 @@ def parse_parameters():
 		sys.exit(2)
 
 	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'proc_per_node=',
-			'only_add_2_db', 'data_format=', 'emmax_perm=', 'with_replicates']
+			'only_add_2_db', 'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -145,7 +146,7 @@ def parse_parameters():
 		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
 		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
 		'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15, 'data_file':None,
-		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False}
+		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False, 'with_betas':False}
 
 
 	for opt, arg in opts:
@@ -178,6 +179,7 @@ def parse_parameters():
 		elif opt in ("--data_format"): p_dict['data_format'] = arg
 		elif opt in ("--emmax_perm"): p_dict['emmax_perm'] = int(arg)
 		elif opt in ("--with_replicates"): p_dict['with_replicates'] = True
+		elif opt in ("--with_betas"): p_dict['with_betas'] = True
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -476,6 +478,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				pvals = False
 		if res:
 			print "Found existing results.. (%s)" % (result_file)
+
 		sys.stdout.flush()
 
 
@@ -562,9 +565,9 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 					#Get values, with ecotypes, construct Z and do GWAM
 					phen_vals = phed.get_values(p_i)
 					Z = phed.get_incidence_matrix(p_i)
-					res = lm.emmax(snps, phen_vals, k, Z=Z)
+					res = lm.emmax(snps, phen_vals, k, Z=Z, with_betas=p_dict['with_betas'])
 				else:
-					res = lm.emmax(snps, phen_vals, k)
+					res = lm.emmax(snps, phen_vals, k, with_betas=p_dict['with_betas'])
 			elif mapping_method in ['lm']:
 				res = lm.linear_model(snps, phen_vals)
 			elif mapping_method in ['py_emma']:
@@ -620,8 +623,10 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			db_pid = p_i
 
 		import results_2_db as rdb
-		short_name = 'cm%d_pid%d_%s_%s_%s_%d' % (p_dict['call_method_id'], db_pid, phenotype_name,
-							mapping_method, trans_method, p_dict['remove_outliers'])
+
+		short_name = 'cm%d_pid%d_%s_%s_%s_%d_%s' % (p_dict['call_method_id'], db_pid, phenotype_name,
+							mapping_method, trans_method, p_dict['remove_outliers'],
+							str(p_dict['with_replicates']))
 		tm_id = transformation_method_dict[trans_method]
 		rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid,
 					analysis_methods_dict[mapping_method],

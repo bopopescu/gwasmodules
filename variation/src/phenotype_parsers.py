@@ -421,55 +421,30 @@ def load_phentoype_file_duszynska():
 	fns = [fn1, fn2, fn3, fn4]
 	phen_names = ['seed_size_2n', 'seed_size_3n_2x4', 'seed_size_3n_4x2', 'seed_size_spss']
 	phen_dict = {}
+	for i, pn in enumerate(phen_names):
+		phen_dict[i + 1] = {'name':pn }
 	accs_list = []
-	et_list = []
-	for fn in fns:
+	for i, fn in enumerate(fns):
 		f = open(fn, "r")
-		accession_names = []
-		phen_vals = {}
+		acc_dict = pd.get_250K_accession_to_ecotype_dict()
+		ecotypes = []
+		values = []
 		print f.next()
 		for line in f:
 			l = map(str.strip, line.split(','))
-			acc_name = l[0].lower()
-			if not acc_name in accession_names:
-				 accession_names.append(acc_name)
-				 phen_vals[acc_name] = []
-			phen_vals[acc_name].append(float(l[1]))
-		f.close()
-		print accession_names
-		acc_dict = pd.get_250K_accession_to_ecotype_dict()
-		ecotypes = []
-	        new_phen_vals = []
-		for acc in accession_names:
+			acc = l[0].lower()
 			if not acc in acc_dict:
 				print "(%s) is missing in dictionary" % (acc)
 			else:
-				ecotype = acc_dict[acc][4]
-				ecotypes.append(ecotype)
-				new_phen_vals.append(sum(phen_vals[acc]) / float(len(phen_vals[acc])))
-		accs_list.append(accession_names)
-		et_list.append(ecotypes)
-		phen_list.append(new_phen_vals)
-
-	et_set = set([])
-	for ets in et_list:
-		et_set = et_set.union(set(ets))
-	ecotypes = list(et_set)
-	phenotypes = []
-	for et in ecotypes:
-		pl = []
-		for el, pvs in zip(et_list, phen_list):
-			if et in el:
-				i = el.index(et)
-				pl.append(pvs[i])
-			else:
-				pl.append('NA')
-		phenotypes.append(pl)
+				ecotypes.append(acc_dict[acc][4])
+				values.append(float(l[1]))
+		f.close()
+		phen_dict[i + 1]['ecotypes'] = ecotypes
+		phen_dict[i + 1]['values'] = values
 
 
-	print len(ecotypes)
-	phed = pd.PhenotypeData(ecotypes, phen_names, phenotypes)
-	phed.writeToFile(env['phen_dir'] + 'seed_size_means.csv', delimiter=',')
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'seed_size.csv')
 
 
 
@@ -585,7 +560,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_dilkes()
+	load_phentoype_file_duszynska()
 	print "Done!"
 
 

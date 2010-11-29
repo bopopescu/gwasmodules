@@ -138,7 +138,6 @@ def add_results_to_db(results_file, short_name, call_method_id, phenotype_method
 
         #Connect to DB
         import dbutils
-        #conn = dbutils.connect_to_papaya()
 	conn = dbutils.connect_to_default_insert()
 	cursor = conn.cursor()
 	db_result_dir = "/Network/Data/250k/db/results/type_1/"
