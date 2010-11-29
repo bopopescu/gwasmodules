@@ -602,10 +602,10 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				sys.stdout.flush()
 
 
-
-		#kwargs['correlations'] = calc_correlations(snps, phen_vals)
-		#additional_columns.append('correlations')
-
+		print 'Calculating SNP-phenotype correlations.'
+		kwargs['correlations'] = calc_correlations(snps, phen_vals)
+		additional_columns.append('correlations')
+		print 'Writing result to file.'
 		res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
 
 		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
@@ -617,6 +617,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	#add results to DB..
 
 	if p_dict['add_to_db']:
+		print 'Adding results to DB.'
 		if p_dict['no_phenotype_ids']:
 			db_pid = phed.get_db_pid(p_i)
 		else:

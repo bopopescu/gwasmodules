@@ -582,7 +582,6 @@ class Result(object):
 		"""
 		print "Filtering for attribute '%s' with threshold: %g" % (attr_name, attr_threshold)
 		attr = getattr(self, attr_name)
-		print len(attr)
 		new_snp_results = {}
 		for info in self.snp_results:
 			new_snp_results[info] = []
@@ -600,7 +599,7 @@ class Result(object):
 		self.mafs = self.snp_results['mafs']
 		self.marfs = self.snp_results['marfs']
 		self.snps = self.snp_results['snps']
-		print "%i scores were removed." % (count - len(self.scores))
+		print "%i scores were removed out of %i." % (count - len(self.scores), count)
 		return len(self.scores)
 
 
