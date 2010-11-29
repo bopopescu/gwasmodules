@@ -578,7 +578,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				res = lm.emmax_step_wise(phen_vals, k, sd=sd, num_steps=p_dict['num_steps'],
 							file_prefix=file_prefix)
 				print 'Step-wise EMMAX finished!'
-				sys.exit()
+				return
 			elif mapping_method in ['lm']:
 				res = lm.linear_model(snps, phen_vals)
 			elif mapping_method in ['emmax_anova']:
@@ -587,7 +587,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				res = lm.anova(snps, phen_vals)
 			else:
 				print "Mapping method", mapping_method, 'was not found.'
-				sys.exit(2)
+				return
 
 			if mapping_method in ['lm', 'emma', 'emmax']:
 				kwargs['genotype_var_perc'] = res['var_perc']
