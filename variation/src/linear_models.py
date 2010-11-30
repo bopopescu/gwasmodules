@@ -1896,6 +1896,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			del cofactors[i_to_remove]
 			lmm.set_factors(cofactor_snps)
 
+
 			#Re-estimating the REML and ML.
 			reml_res = lmm.get_REML()
 			ml_res = lmm.get_ML()
@@ -1904,6 +1905,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
 			num_par -= 1
 			action = '-'
+
+			#Update the p-values
+			for i, snp in enumerate(cofactor_snps):
+				t_cofactors = cofactor_snps[:]
+				del t_cofactors[i]
+				lmm.set_factors(t_cofactors)
+				res = lmm._emmax_f_test_([snp], H_sqrt_inv)
+				cofactors[i][2] = res['ps'][0]
 
 			#Calculate the BICs
 			(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n)
@@ -1977,7 +1986,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			if si['min_pval_chr_pos']:
 				st += ',%d_%d,' % si['min_pval_chr_pos']
 			else:
-				st += ',,'
+				st += ','
 			st += _to_string_(si['cofactors'])
 			st += '\n'
 			f.write(st)
