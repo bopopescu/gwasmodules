@@ -1935,7 +1935,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	for c in criterias:
 		print 'GWAs for optimal %s criteria:' % c
 		i_opt = sp.array(criterias[c]).argmin()
-		print '    %d step was the optimal step was.' % i_opt
+		print "    %d'th step was the optimal step was." % i_opt
 		cofactor_snps = step_info_list[i_opt]['cofactor_snps']
 		cofactors = step_info_list[i_opt]['cofactors']
 		print cofactors
@@ -1986,7 +1986,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			if si['min_pval_chr_pos']:
 				st += ',%d_%d,' % si['min_pval_chr_pos']
 			else:
-				st += ','
+				st += ',,'
 			st += _to_string_(si['cofactors'])
 			st += '\n'
 			f.write(st)
