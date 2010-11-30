@@ -1870,6 +1870,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 	step_info_list.append(step_info)
 
+	#Now plotting!
+	print "Generating plots"
+	if file_prefix:
+		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
+		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
+		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
+				png_file=png_file_name)
+
 	#Now backward stepwise.
 	if forward_backwards:
 		print 'Starting backwards..'
@@ -1880,7 +1888,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 				t_cofactors = cofactor_snps[:]
 				del t_cofactors[i]
 				lmm.set_factors(t_cofactors)
-				f_stats[i] = lmm._emmax_f_test_([snp], H_sqrt_inv)['f_stats'][0]
+				res = lmm._emmax_f_test_([snp], H_sqrt_inv)
+				cofactors[i][2] = res['ps'][0]
+				f_stats[i] = res['f_stats'][0]
 			i_to_remove = f_stats.argmin()
 			del cofactor_snps[i_to_remove]
 			del cofactors[i_to_remove]
@@ -1912,12 +1922,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			step_info_list.append(step_info)
 			print cofactors
 
+
 	for c in criterias:
 		print 'GWAs for optimal %s criteria:' % c
-		i_opt = sp.array(criterias[c]).argmax()
+		i_opt = sp.array(criterias[c]).argmin()
 		print '    %d step was the optimal step was.' % i_opt
-		cofactor_snps = step_info_list[i]['cofactor_snps']
-		cofactors = step_info_list[i]['cofactors']
+		cofactor_snps = step_info_list[i_opt]['cofactor_snps']
+		cofactors = step_info_list[i_opt]['cofactors']
+		print cofactors
 		lmm.set_factors(cofactor_snps)
 		reml_res = lmm.get_REML()
 		H_sqrt_inv = reml_res['H_sqrt_inv']
@@ -1936,14 +1948,6 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 					 png_file=png_file_name)
 
 
-
-	#Now plotting!
-	print "Generating plots"
-	if file_prefix:
-		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
-		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
-		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-				png_file=png_file_name)
 
 
 	secs = time.time() - s1
