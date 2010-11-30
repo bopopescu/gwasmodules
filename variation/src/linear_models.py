@@ -1976,6 +1976,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
 			if si['min_pval_chr_pos']:
 				st += ',%d_%d,' % si['min_pval_chr_pos']
+			else:
+				st += ',,'
 			st += _to_string_(si['cofactors'])
 			st += '\n'
 			f.write(st)
