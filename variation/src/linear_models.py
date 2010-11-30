@@ -1712,18 +1712,30 @@ def _calc_bic_(ll, num_snps, num_par, n):
 
 
 
-def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
-		chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
-		interaction_pval_thres=0.01, allow_backward_steps=False):
+def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
+		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
+		interaction_pval_thres=0.01, forward_backwards=True):
 	"""
 	Run EMMAX stepwise.. forward, with one possible backward at each step.
 	"""
 	import plotResults as pr
 
+	def _to_string_(cofactors):
+		st = ''
+		if len(cofactors) > 0:
+			for tup in cofactors[:-1]:
+				st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
+			st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
+		return st
+
 	if sd:
-	 	snps = sd.getSnps()
-	 	positions = sd.getPositions()
-	 	chromosomes = sd.get_chr_list()
+	 	all_snps = sd.getSnps()
+	 	all_positions = sd.getPositions()
+	 	all_chromosomes = sd.get_chr_list()
+
+	snps = all_snps[:]
+	positions = all_positions[:]
+	chromosomes = all_chromosomes[:]
 	chr_pos_list = zip(chromosomes, positions)
        	lmm = LinearMixedModel(phenotypes)
 	lmm.add_random_effect(K)
@@ -1732,7 +1744,6 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 	s1 = time.time()
  	step_info_list = []
 	cofactors = []  #A list of the loci found, together with their statistics.
-	cofactors_str = ''
 	cofactor_snps = []
 	interactions = []
  	step_i = 0
@@ -1744,12 +1755,15 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 	ll = ml_res['max_ll']
 	rss = float(reml_res['rss'])
 	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
+	criterias = {'ebics':[], 'mbics':[]}
 	(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
+	criterias['ebics'].append(extended_bic)
+	criterias['mbics'].append(modified_bic)
 	action = 'None'
 	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 		 bic, extended_bic, modified_bic)
-	print 'Cofactors:', cofactors_str
+	print 'Cofactors:', _to_string_(cofactors)
 
 	for step_i in range(1, num_steps + 1):
 		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
@@ -1762,8 +1776,8 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-			'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'cofactors_str':cofactors_str,
-			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
+			'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
+			'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 		step_info_list.append(step_info)
 
 		if file_prefix:
@@ -1786,7 +1800,6 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		action = '+'
 
 		cofactors.append([min_pval_chr_pos[0], min_pval_chr_pos[1], min_pval])
-		cofactors_str += '%d_%d,' % (min_pval_chr_pos)
 
 
 		#Re-estimate the p-value of the cofactors... with the smallest in the list.
@@ -1832,12 +1845,13 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 
 
 		(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
+		criterias['ebics'].append(extended_bic)
+		criterias['mbics'].append(modified_bic)
 
-		print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, \
-			bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+		print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 			(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 			bic, extended_bic, modified_bic)
-		print 'Cofactors:', cofactors_str
+		print 'Cofactors:', _to_string_(cofactors)
 		if reml_res['pseudo_heritability'] < 0.01:
 			print 'Breaking early, since pseudoheritability is close to 0.'
 			break
@@ -1852,38 +1866,79 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 		'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-		'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'cofactors_str':cofactors_str,
-		'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
+		'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
+		'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 	step_info_list.append(step_info)
 
-	#Now backward stepwise regression.
-	print 'Starting backwards..'
-#		lmm.add_factor(snps[min_pval_i])
-#		cofactor_snps.append(snps[min_pval_i])
-#		reml_res = lmm.get_REML()
-#		ml_res = lmm.get_ML()
-#		H_sqrt_inv = reml_res['H_sqrt_inv']
-#		ll = ml_res['max_ll']
-#		rss = float(reml_res['rss'])
-#		reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-#		num_par += 1
-#		action = '+'
-#
-#		cofactors.append([min_pval_chr_pos[0], min_pval_chr_pos[1], min_pval])
-#		cofactors_str += '%d_%d,' % (min_pval_chr_pos)
-#
-#
-#		#Re-estimate the p-value of the cofactors... with the smallest in the list.
-#		for i, snp in enumerate(cofactor_snps):
-#			t_cofactors = cofactor_snps[:]
-#			del t_cofactors[i]
-#			lmm.set_factors(t_cofactors)
-#			cofactors[i][2] = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
-#		lmm.set_factors(cofactor_snps)
+	#Now backward stepwise.
+	if forward_backwards:
+		print 'Starting backwards..'
+		while len(cofactor_snps) > 0:
+			step_i += 1
+			f_stats = sp.zeros(len(cofactor_snps))
+			for i, snp in enumerate(cofactor_snps):
+				t_cofactors = cofactor_snps[:]
+				del t_cofactors[i]
+				lmm.set_factors(t_cofactors)
+				f_stats[i] = lmm._emmax_f_test_([snp], H_sqrt_inv)['f_stats'][0]
+			i_to_remove = f_stats.argmin()
+			del cofactor_snps[i_to_remove]
+			del cofactors[i_to_remove]
+			lmm.set_factors(cofactor_snps)
+
+			#Re-estimating the REML and ML.
+			reml_res = lmm.get_REML()
+			ml_res = lmm.get_ML()
+			ll = ml_res['max_ll']
+			rss = float(reml_res['rss'])
+			reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
+			num_par -= 1
+			action = '-'
+
+			#Calculate the BICs
+			(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n)
+			criterias['ebics'].append(extended_bic)
+			criterias['mbics'].append(modified_bic)
+			print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+				(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss,
+				reml_mahalanobis_rss, bic, extended_bic, modified_bic)
+			print 'Cofactors:', _to_string_(cofactors)
+
+			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
+				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
+				'e_bic':extended_bic, 'm_bic':modified_bic, 'cofactors':cofactors[:],
+				'cofactor_snps':cofactor_snps[:], 'mahalanobis_rss':None, 'min_pval':None,
+				'min_pval_chr_pos':None}
+			step_info_list.append(step_info)
+			print cofactors
+
+	for c in criterias:
+		print 'GWAs for optimal %s criteria:' % c
+		i_opt = sp.array(criterias[c]).argmax()
+		print '    %d step was the optimal step was.' % i_opt
+		cofactor_snps = step_info_list[i]['cofactor_snps']
+		cofactors = step_info_list[i]['cofactors']
+		lmm.set_factors(cofactor_snps)
+		reml_res = lmm.get_REML()
+		H_sqrt_inv = reml_res['H_sqrt_inv']
+		emmax_res = lmm._emmax_f_test_(all_snps, H_sqrt_inv)
+		min_pval_i = emmax_res['ps'].argmin()
+		min_pval = emmax_res['ps'][min_pval_i]
+		mahalnobis_rss = emmax_res['rss'][min_pval_i]
+		min_pval_chr_pos = chr_pos_list[min_pval_i]
+		print 'Min p-value:', min_pval
+		print 'Min Mahalanobis RSS:', mahalnobis_rss
+
+		if file_prefix:
+			pdf_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.pdf'
+			png_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.png'
+			pr.plot_raw_result(emmax_res['ps'], all_chromosomes, all_positions, highlight_markers=cofactors,
+					 png_file=png_file_name)
 
 
 
 	#Now plotting!
+	print "Generating plots"
 	if file_prefix:
 		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
 		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
@@ -1915,18 +1970,22 @@ def emmax_step_wise(phenotypes, K, sd=None, snps=None, positions=None,
 		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
 		for i, si in enumerate(step_info_list):
 			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-			st += ',%d_%d,' % si['min_pval_chr_pos']
-			st += si['cofactors_str'] + '\n'
+			if si['min_pval_chr_pos']:
+				st += ',%d_%d,' % si['min_pval_chr_pos']
+			_to_string_(si['cofactors'])
+			st += '\n'
 			f.write(st)
 			p_her_list.append(float(si['pseudo_heritability']))
 			rss_list.append(float(si['rss']))
 			reml_mahalanobis_rss_list.append(float(si['reml_mahalanobis_rss']))
-			mahalanobis_rss_list.append(float(si['mahalanobis_rss']))
+			if si['mahalanobis_rss']:
+				mahalanobis_rss_list.append(float(si['mahalanobis_rss']))
 			ll_list.append(si['ll'])
 			bic_list.append(si['bic'])
 			e_bic_list.append(si['e_bic'])
 			m_bic_list.append(si['m_bic'])
-			min_pval_list.append(float(si['min_pval']))
+			if si['min_pval']:
+				min_pval_list.append(float(si['min_pval']))
 		f.close()
 		import pylab
 		pylab.figure(figsize=(6, 4))
