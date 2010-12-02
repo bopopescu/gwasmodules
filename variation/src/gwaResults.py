@@ -13,7 +13,12 @@ import pdb, gc
 import dbutils
 import csv
 import math
-
+import itertools as it
+import scipy as sp
+import scipy.stats as st
+import random
+import sys
+import env
 #A dictionary for loaded results.. to avoid reloading. 
 #Use carefully to avoid memory leaks!
 loaded_results = {}
@@ -152,7 +157,7 @@ class Result(object):
 	"""
 	def __init__(self, result_file=None, scores=None, snps_data=None, accessions=None, name=None,
 		     result_type=None, phen_id=None, positions=None, chromosomes=None, marfs=None,
-		     mafs=None, snps=None, recall_snps=False, **snp_results_info):
+		     mafs=None, snps=None, **snp_results_info):
 		"""
 		032610: A new init function to clean up the previous mess...  
 
@@ -161,9 +166,6 @@ class Result(object):
 		snps_data is assumed to match the results, (in term of positions, etc)
 		
 		accessions (when used) should fit the results!
-		
-		recall_snps: if this is flagged, then the result object stores all the SNPs, 
-			otherwise SNP data is just uesd for MAF calculations. 
 		"""
 
 		#Contain various information for every snp and position
@@ -345,6 +347,223 @@ class Result(object):
 		self.mafs = newMafs
 		self.marfs = newMarfs
 		self.snps = new_snps
+
+
+
+	def candidate_gene_enrichments(self, cgl=None, cgl_file=None, pval_thresholds=[0.01], gene_radius=20000,
+				method='chi_square', num_perm=100):
+		"""
+		Performs CGR analysis on this results object.
+		
+		cgl is a list of genes.
+		cgl_file is a file with a list of genes.
+		
+		method: 
+			chi_square - statistics
+			multinomial - statistics
+			gene_perm - permute genes.
+			snps_perm - permute SNPs
+		"""
+		import pylab
+		import bisect
+#		import matplotlib
+#		matplotlib.rcParams['backend'] = 'GTKAgg'
+
+		chrom_ends = self.get_chromosome_ends()
+		print 'chrom_ends', chrom_ends
+
+		def _calc_enrichment_(all_genes, cg_indices, regions):
+			"""
+			Calculate the enrichment (efficiently iterating over all genes.)
+			"""
+			num_genes = len(all_genes)
+			num_cand_genes = len(cg_indices)
+			g_iter = enumerate(all_genes)
+			g_i, g = g_iter.next()
+			g_end_chr_pos = sp.array([g.chromosome, g.endPos])
+			g_start_chr_pos = sp.array([g.chromosome, g.startPos])
+			r_iter = enumerate(regions)
+			r_i, r = r_iter.next()
+			r_start_chr_pos = r[0]
+			r_end_chr_pos = r[1]
+			num_close_genes = 0
+			num_close_cand_genes = 0
+			cg_iter = enumerate(cg_indices)
+			cg_ii, cg_i = cg_iter.next()
+			while g_i < num_genes - 1 and r_i < len(regions) - 1:
+				#count until overlap
+				#if g_i % 100 == 0: print g_i
+				while g_i < num_genes - 1 and tuple(g_end_chr_pos) < tuple(r_start_chr_pos):
+					g_i, g = g_iter.next()
+					g_end_chr_pos = sp.array([g.chromosome, g.endPos])
+					g_start_chr_pos = sp.array([g.chromosome, g.startPos])
+
+				while r_i < len(regions) - 1 and  tuple(r_end_chr_pos) < tuple(g_start_chr_pos):
+					r_i, r = r_iter.next()
+					r_start_chr_pos = r[0]
+					r_end_chr_pos = r[1]
+
+				while g_i < num_genes - 1 and tuple(g_end_chr_pos) >= tuple(r_start_chr_pos) \
+						and tuple(r_end_chr_pos) >= tuple(g_start_chr_pos):
+					#there is an overlap
+					num_close_genes += 1
+					while cg_ii < num_cand_genes - 1 and cg_i < g_i:
+						cg_ii, cg_i = cg_iter.next()
+					if g_i == cg_i:
+						num_close_cand_genes += 1
+					g_i, g = g_iter.next()
+					g_end_chr_pos = sp.array([g.chromosome, g.endPos])
+					g_start_chr_pos = sp.array([g.chromosome, g.startPos])
+				#print g_i, r_i
+				#print num_close_genes, num_close_cand_genes
+				#pdb.set_trace()
+
+			#r1 = (num_close_cand_genes / float(num_close_genes))
+			#r2 = (num_cand_genes / float(num_genes))
+			return (num_close_cand_genes, num_close_genes)
+
+		#Parse cgl file
+		if cgl_file:
+			cgl, cg_tair_ids = load_cand_genes_file(cgl_file)
+
+		#Load genes from DB.
+		print 'Fetching all genes'
+		all_genes = get_gene_list(include_intron_exons=False, verbose=False)
+		print 'Fetched %d genes.' % len(all_genes)
+		num_genes = len(all_genes)
+
+		#Pre-process cgl.
+		cand_gene_indices = []
+		for i, g in enumerate(all_genes):
+			for cg in cgl:
+				if g.dbRef == cg.dbRef:
+					#print g.dbRef, cg.dbRef
+					cand_gene_indices.append(i)
+					break
+		num_cand_genes = len(cand_gene_indices)
+		#print num_cand_genes, cand_gene_indices
+
+
+		pval_thresholds.sort()
+		last_thres = 1.0
+		for pval_threshold in reversed(pval_thresholds):
+			print 'Using p-value threshold %f' % pval_threshold
+			thres = pval_threshold / last_thres
+			print 'Using corrected threshold %f' % thres
+			last_thres = pval_threshold
+
+			#Filter pvalue file
+			self.filter_percentile(1 - thres)
+
+			#pre-process pvalues
+			regions = []
+			num_scores = len(self.snp_results['scores'])
+			iter = enumerate(it.izip(self.snp_results['chromosomes'], self.snp_results['positions']))
+			th = sp.array([0, gene_radius])
+			(pos_i, t) = iter.next()
+			chr_pos = sp.array(t)
+			while pos_i < num_scores - 1:
+				start_chr_pos = chr_pos
+				end_chr_pos = start_chr_pos
+				while pos_i < num_scores - 1 and sp.all((chr_pos - end_chr_pos) <= th):
+					end_chr_pos = chr_pos
+					(pos_i, t) = iter.next()
+					chr_pos = sp.array(t)
+				if tuple(end_chr_pos) < tuple(start_chr_pos):
+					pdb.set_trace()
+				if pos_i == num_scores - 1: #Last one..
+					if sp.all((chr_pos - end_chr_pos) <= th):
+						regions.append([start_chr_pos - th, chr_pos + th])
+					else:
+						regions.append([start_chr_pos - th, end_chr_pos + th])
+						regions.append([chr_pos - th, chr_pos + th])
+
+				else:
+					regions.append([start_chr_pos - th, end_chr_pos + th])
+			start_chr_pos = chr_pos
+			end_chr_pos = start_chr_pos
+			regions.append([start_chr_pos - th, end_chr_pos + th])
+			print 'Found %d regions' % len(regions)
+
+
+			#Calculate observed gene enrichments. 
+			obs_enrichments = _calc_enrichment_(all_genes, cand_gene_indices, regions)
+			r1 = obs_enrichments[0] / float(obs_enrichments[1])
+			r2 = (num_cand_genes / float(num_genes))
+			obs_stat = sp.log(r1 / r2)
+			print 'Observed statistics %f' % obs_stat
+
+			if method == 'chi_square' or 'gene_perm':
+				num_close_cand_genes = obs_enrichments[0]
+				num_close_genes = obs_enrichments[1]
+				num_exp_ccg = (num_close_genes) * num_cand_genes / float(num_genes)
+				num_exp_cg = (num_close_genes) * (1 - num_cand_genes / float(num_genes))
+				num_exp_dcg = (float(num_genes) - num_close_genes) * (num_cand_genes / float(num_genes))
+				num_exp_dg = (float(num_genes) - num_close_genes) * (1 - num_cand_genes / float(num_genes))
+				num_obs_ccg = num_close_cand_genes
+				num_obs_cg = num_close_genes - num_close_cand_genes
+				num_obs_dcg = num_cand_genes - num_close_cand_genes
+				num_obs_dg = num_genes - num_close_genes
+				f_obs = sp.array([num_obs_ccg, num_obs_cg, num_obs_dcg, num_obs_dg])
+				f_exp = sp.array([num_exp_ccg, num_exp_cg, num_exp_dcg, num_exp_dg])
+				chi_stat, p_val = st.chisquare(f_obs, f_exp, 2)
+				print chi_stat, p_val
+
+
+			if method == 'multinomial':
+				pass
+			if method == 'gene_perm':
+				perm_stats = []
+				for perm_i in range(num_perm):
+					perm_cand_gene_indices = random.sample(range(num_genes), num_cand_genes)
+					perm_cand_gene_indices.sort()
+					perm_enrichments = _calc_enrichment_(all_genes, perm_cand_gene_indices, regions)
+					r1 = perm_enrichments[0] / float(perm_enrichments[1])
+					perm_stats.append(sp.log(r1 / r2))
+					sys.stdout.write('.')
+					sys.stdout.flush()
+				sys.stdout.write('\n')
+				sys.stdout.flush()
+				perm_stats.sort()
+				p_val = 1.0 - bisect.bisect_left(perm_stats, obs_stat) / float(len(perm_stats))
+				print 'Permutation p-value estimate: %f' % p_val
+
+				h_res = pylab.hist(perm_stats)
+				pylab.vlines(obs_stat, 0, max(h_res[0]), colors='r')
+				pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+
+			if method == 'snps_perm':
+
+				def _get_perm_regions_(region_dict):
+					for chrom in region_dict:
+						regions = region_dict[chrom]
+						while True:
+							shift = int(random.random()*chrom_ends[chrom - 1])
+							for region in regions:
+								pass
+
+
+
+				perm_stats = []
+				for perm_i in range(num_perm):
+					perm_cand_gene_indices = random.sample(range(num_genes), num_cand_genes)
+					perm_cand_gene_indices.sort()
+					perm_enrichments = _calc_enrichment_(all_genes, perm_cand_gene_indices, regions)
+					r1 = perm_enrichments[0] / float(perm_enrichments[1])
+					perm_stats.append(sp.log(r1 / r2))
+					sys.stdout.write('.')
+					sys.stdout.flush()
+				sys.stdout.write('\n')
+				sys.stdout.flush()
+				print perm_stats
+				perm_stats.sort()
+				bisect.bisect(perm_stats, obs_stat)
+				h_res = pylab.hist(perm_stats)
+				pylab.vlines(obs_stat, 0, max(h_res), colors='r')
+				pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+
+
+
 
 
 
@@ -586,7 +805,7 @@ class Result(object):
 		for info in self.snp_results:
 			new_snp_results[info] = []
 		count = len(self.scores)
-		for i in range(0, len(self.scores)):
+		for i in range(len(self.scores)):
 			if attr[i] >= attr_threshold:
 				for info in self.snp_results:
 					if len(self.snp_results[info]) > 0:
@@ -2716,8 +2935,9 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 			genes.append(gene)
 		except Exception, err_str:
 			#pass
-			print err_str, ':'
-			print row
+			if verbose:
+				print err_str, ':'
+				print row
 
 	if include_intron_exons:
 		for g in genes:
@@ -2772,7 +2992,7 @@ def load_cand_genes_file(file_name, format=1):
 	Loads a candidate gene list from a csv file...
 	"""
 	f = open(file_name, "r")
-	print(f.readline())
+	#print(f.readline())
 	reader = csv.reader(f)
 	tair_ids = []
 	gene_names = []
@@ -2790,7 +3010,8 @@ def get_genes_w_tair_id(tair_ids):
 	conn = dbutils.connect_to_default_lookup("genome")
 	cursor = conn.cursor()
 	genes = []
-	print tair_ids
+	#print tair_ids
+	tair_ids.sort()
 	for tair_id in tair_ids:
 		sql_statment = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g where g.dbxrefs='TAIR:" + tair_id.upper() + "' and gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
 		#print sql_statment
