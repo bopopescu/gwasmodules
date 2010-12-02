@@ -1079,16 +1079,17 @@ class LinearMixedModel(LinearModel):
 			qr - Uses QR decomposition to speed up regression with many co-factors.
 			
 		"""
+		dtype = 'single'
 		q = 1  # Single SNP is being tested
 		p = len(self.X.T) + q
 		n = self.n
 		n_p = n - p
 		num_snps = len(snps)
 
-		h0_X = H_sqrt_inv * self.X
+		h0_X = sp.mat(H_sqrt_inv * self.X, dtype=dtype)
 		Y = H_sqrt_inv * self.Y	#The transformed outputs.
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-		Y = Y - h0_X * h0_betas
+		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
 		h0_betas = map(float, list(h0_betas))
 
 		if Z != None:
@@ -1098,7 +1099,7 @@ class LinearMixedModel(LinearModel):
 			(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
 			Q = sp.mat(Q)
 			Q2 = Q * Q.T
-			M = H_sqrt_inv.T * (sp.eye(n) - Q2)
+			M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
 		else:
 			betas_list = [h0_betas] * num_snps
 
@@ -1111,7 +1112,7 @@ class LinearMixedModel(LinearModel):
 			if with_betas:
 				Xs = snps_chunk * (H_sqrt_inv.T)
 			else:
-				Xs = snps_chunk * M
+				Xs = sp.mat(snps_chunk, dtype=dtype) * M
 			for j in range(len(Xs)):
 				if return_transformed_snps:
 					t_snps.append(sp.array(Xs[j]).flatten())
@@ -1776,7 +1777,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-			'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
+			'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
 			'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 		step_info_list.append(step_info)
 
@@ -1866,7 +1867,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 		'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
 		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-		'cofactors':cofactors[:], 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
+		'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
 		'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 	step_info_list.append(step_info)
 
@@ -1925,7 +1926,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
-				'e_bic':extended_bic, 'm_bic':modified_bic, 'cofactors':cofactors[:],
+				'e_bic':extended_bic, 'm_bic':modified_bic, 'cofactors':map(tuple, cofactors[:]),
 				'cofactor_snps':cofactor_snps[:], 'mahalanobis_rss':None, 'min_pval':None,
 				'min_pval_chr_pos':None}
 			step_info_list.append(step_info)
