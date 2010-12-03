@@ -537,14 +537,15 @@ class LinearMixedModel(LinearModel):
 
 
 	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -5, ulim=10, esp=1e-6,
-				return_pvalue=False, return_f_stat=False, method='REML'):
+				return_pvalue=False, return_f_stat=False, method='REML', verbose=False):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
 		Using the EMMA algorithm.
 		
 		Methods available are 'REML', and 'ML'		
 		"""
-		print 'Retrieving %s variance estimates' % method
+		if verbose:
+			print 'Retrieving %s variance estimates' % method
 		if not eig_L:
 			raise Exception
 		if len(xs):
@@ -2252,7 +2253,6 @@ def load_kinship_from_file(kinship_file, accessions=None):
 def _test_stepwise_emmax_():
 	import dataParsers as dp
 	import phenotypeData as pd
-	import util
 	#filename = "/Users/bjarnivilhjalmsson/Projects/FLC_analysis/FLC_expression_101011.txt"
 	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/b_dilkes_metabolites.csv"
@@ -2277,6 +2277,14 @@ def _test_stepwise_emmax_():
 					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_dilkes' \
 					+ str(pid) + '_' + phen_name, num_steps=60, allow_interactions=True,
 					interaction_pval_thres=0.001)
+
+
+
+def _test_joint_analysis_():
+	import dataParsers as dp
+	import phenotypeData as pd
+
+
 
 
 if __name__ == "__main__":

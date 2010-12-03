@@ -758,13 +758,25 @@ def plot_gene_pvalue_count(cgl_id=145, window_size=20000):
 
 def _test_cand_gene_enrichment_():
 	#load result
-	res_file = env.env['tmp_dir'] + 'ss_pid1_seed_size_2n_emmax_none_with_replicates.pvals'
-	#res_file = env.env['tmp_dir'] + 'ss_pid2_seed_size_3n_2x4_emmax_none_with_replicates.pvals'
-	#res_file = env.env['tmp_dir'] + 'ss_pid3_seed_size_3n_4x2_emmax_none_with_replicates.pvals'
-	r = gr.Result(res_file)
-	r.neg_log_trans()
-	r.candidate_gene_enrichments(cgl_file=env.env['phen_dir'] + 'seeds_cgl.csv', method='gene_perm',
-				pval_thresholds=[ 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005], num_perm=100)
+	res_files = []
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid1_seed_size_2n_emmax_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid2_seed_size_3n_2x4_emmax_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid3_seed_size_3n_4x2_emmax_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid4_seed_size_spss_emmax_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid1_seed_size_2n_kw_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid2_seed_size_3n_2x4_kw_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid3_seed_size_3n_4x2_kw_none.pvals')
+	res_files.append(env.env['tmp_dir'] + 'seeds_pid2_seed_size_spss_kw_none.pvals')
+	for res_file in res_files:
+
+		r = gr.Result(res_file)
+		r.neg_log_trans()
+		res = r.candidate_gene_enrichments(cgl_file=env.env['phen_dir'] + 'seeds_cgl.csv', methods=['gene_perm', 'snps_perm'],
+					pval_thresholds=[ 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001],
+					num_perm=200,
+					file_prefix=env.env['tmp_dir'] + 'enrichments_seed_size_2n')
+	import pylab
+	pylab.plot
 
 
 if __name__ == '__main__':

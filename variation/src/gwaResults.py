@@ -351,7 +351,7 @@ class Result(object):
 
 
 	def candidate_gene_enrichments(self, cgl=None, cgl_file=None, pval_thresholds=[0.01], gene_radius=20000,
-				method='chi_square', num_perm=100):
+				methods=['chi_square'], num_perm=100, file_prefix=None):
 		"""
 		Performs CGR analysis on this results object.
 		
@@ -366,8 +366,9 @@ class Result(object):
 		"""
 		import pylab
 		import bisect
-#		import matplotlib
-#		matplotlib.rcParams['backend'] = 'GTKAgg'
+
+		if not 'chi_square' in methods:
+			methods.append('chi_square')
 
 		chrom_ends = self.get_chromosome_ends()
 		print 'chrom_ends', chrom_ends
@@ -444,12 +445,17 @@ class Result(object):
 		#print num_cand_genes, cand_gene_indices
 
 
+		method_res_dict = {}
+		for m in methods:
+			method_res_dict[m] = {'statistics':[], 'pvals':[]}
+
 		pval_thresholds.sort()
 		last_thres = 1.0
+		log_enrichments = []
 		for pval_threshold in reversed(pval_thresholds):
-			print 'Using p-value threshold %f' % pval_threshold
+			print 'Using p - value threshold % f' % pval_threshold
 			thres = pval_threshold / last_thres
-			print 'Using corrected threshold %f' % thres
+			print 'Using corrected threshold % f' % thres
 			last_thres = pval_threshold
 
 			#Filter pvalue file
@@ -483,7 +489,7 @@ class Result(object):
 			start_chr_pos = chr_pos
 			end_chr_pos = start_chr_pos
 			regions.append([start_chr_pos - th, end_chr_pos + th])
-			print 'Found %d regions' % len(regions)
+			print 'Found % d regions' % len(regions)
 
 
 			#Calculate observed gene enrichments. 
@@ -491,79 +497,134 @@ class Result(object):
 			r1 = obs_enrichments[0] / float(obs_enrichments[1])
 			r2 = (num_cand_genes / float(num_genes))
 			obs_stat = sp.log(r1 / r2)
-			print 'Observed statistics %f' % obs_stat
+			print 'Observed statistics % f' % obs_stat
+			log_enrichments.append(obs_stat)
 
-			if method == 'chi_square' or 'gene_perm':
-				num_close_cand_genes = obs_enrichments[0]
-				num_close_genes = obs_enrichments[1]
-				num_exp_ccg = (num_close_genes) * num_cand_genes / float(num_genes)
-				num_exp_cg = (num_close_genes) * (1 - num_cand_genes / float(num_genes))
-				num_exp_dcg = (float(num_genes) - num_close_genes) * (num_cand_genes / float(num_genes))
-				num_exp_dg = (float(num_genes) - num_close_genes) * (1 - num_cand_genes / float(num_genes))
-				num_obs_ccg = num_close_cand_genes
-				num_obs_cg = num_close_genes - num_close_cand_genes
-				num_obs_dcg = num_cand_genes - num_close_cand_genes
-				num_obs_dg = num_genes - num_close_genes
-				f_obs = sp.array([num_obs_ccg, num_obs_cg, num_obs_dcg, num_obs_dg])
-				f_exp = sp.array([num_exp_ccg, num_exp_cg, num_exp_dcg, num_exp_dg])
-				chi_stat, p_val = st.chisquare(f_obs, f_exp, 2)
-				print chi_stat, p_val
+			num_close_cand_genes = obs_enrichments[0]
+			num_close_genes = obs_enrichments[1]
+			num_exp_ccg = (num_close_genes) * num_cand_genes / float(num_genes)
+			num_exp_cg = (num_close_genes) * (1 - num_cand_genes / float(num_genes))
+			num_exp_dcg = (float(num_genes) - num_close_genes) * (num_cand_genes / float(num_genes))
+			num_exp_dg = (float(num_genes) - num_close_genes) * (1 - num_cand_genes / float(num_genes))
+			num_obs_ccg = num_close_cand_genes
+			num_obs_cg = num_close_genes - num_close_cand_genes
+			num_obs_dcg = num_cand_genes - num_close_cand_genes
+			num_obs_dg = num_genes - num_close_genes
+			f_obs = sp.array([num_obs_ccg, num_obs_cg, num_obs_dcg, num_obs_dg])
+			f_exp = sp.array([num_exp_ccg, num_exp_cg, num_exp_dcg, num_exp_dg])
+			chi_sq_stat, chi_sq_pval = st.chisquare(f_obs, f_exp, 2)
+			print chi_sq_pval
 
+			for method in methods:
+				if method == 'chi_square':
+					method_res_dict[method]['statistics'].append(chi_sq_stat)
+					method_res_dict[method]['pvals'].append(chi_sq_pval)
 
-			if method == 'multinomial':
-				pass
-			if method == 'gene_perm':
-				perm_stats = []
-				for perm_i in range(num_perm):
-					perm_cand_gene_indices = random.sample(range(num_genes), num_cand_genes)
-					perm_cand_gene_indices.sort()
-					perm_enrichments = _calc_enrichment_(all_genes, perm_cand_gene_indices, regions)
-					r1 = perm_enrichments[0] / float(perm_enrichments[1])
-					perm_stats.append(sp.log(r1 / r2))
-					sys.stdout.write('.')
+				if method == 'multinomial':
+					pass
+				if method == 'gene_perm':
+					print "Doing gene permutations"
+					perm_stats = []
+					for perm_i in range(num_perm):
+						perm_cand_gene_indices = random.sample(range(num_genes), num_cand_genes)
+						perm_cand_gene_indices.sort()
+						perm_enrichments = _calc_enrichment_(all_genes, perm_cand_gene_indices, regions)
+						r1 = perm_enrichments[0] / float(perm_enrichments[1])
+						perm_stats.append(sp.log(r1 / r2))
+						sys.stdout.write('.')
+						sys.stdout.flush()
+					sys.stdout.write('\n')
 					sys.stdout.flush()
-				sys.stdout.write('\n')
-				sys.stdout.flush()
-				perm_stats.sort()
-				p_val = 1.0 - bisect.bisect_left(perm_stats, obs_stat) / float(len(perm_stats))
-				print 'Permutation p-value estimate: %f' % p_val
+					perm_stats.sort()
+					p_val = 1.0 - bisect.bisect_left(perm_stats, obs_stat) / float(len(perm_stats))
+					print 'Permutation p-value estimate: % f' % p_val
 
-				h_res = pylab.hist(perm_stats)
-				pylab.vlines(obs_stat, 0, max(h_res[0]), colors='r')
-				pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+					method_res_dict[method]['statistics'].append(perm_stats)
+					method_res_dict[method]['pvals'].append(p_val)
 
-			if method == 'snps_perm':
+				if method == 'snps_perm':
+					print "Doing SNPs permutations"
+					def _get_perm_regions_(region_dict):
+						new_regions = []
+						for chrom in region_dict:
+							chrom_end = chrom_ends[chrom - 1]
+							regions = region_dict[chrom]
+							while True:
+								shift = int(random.random()*chrom_end)
+								for region in regions:
+									if (region[0][1] + shift) < chrom_end \
+											and (region[1][1] + shift) > chrom_end:
+										break #for loop
+								else:
+									break #while loop
+							start_pos_list = []
+							for i, region in enumerate(regions):
+								start_pos = (region[0][1] + shift) % chrom_end
+								region[0][1] = start_pos
+								region[1][1] = (region[1][1] + shift) % chrom_end
+								start_pos_list.append((start_pos, i))
+							start_pos_list.sort()
+							for sp, i in start_pos_list:
+								new_regions.append(regions[i])
+						return new_regions
 
-				def _get_perm_regions_(region_dict):
-					for chrom in region_dict:
-						regions = region_dict[chrom]
-						while True:
-							shift = int(random.random()*chrom_ends[chrom - 1])
-							for region in regions:
-								pass
 
+					region_dict = {1:[], 2:[], 3:[], 4:[], 5:[]}
+					for region in regions:
+						region_dict[region[0][0]].append(region)
 
-
-				perm_stats = []
-				for perm_i in range(num_perm):
-					perm_cand_gene_indices = random.sample(range(num_genes), num_cand_genes)
-					perm_cand_gene_indices.sort()
-					perm_enrichments = _calc_enrichment_(all_genes, perm_cand_gene_indices, regions)
-					r1 = perm_enrichments[0] / float(perm_enrichments[1])
-					perm_stats.append(sp.log(r1 / r2))
-					sys.stdout.write('.')
+					perm_stats = []
+					for perm_i in range(num_perm):
+						perm_regions = _get_perm_regions_(region_dict)
+						perm_enrichments = _calc_enrichment_(all_genes, cand_gene_indices, perm_regions)
+						r1 = perm_enrichments[0] / float(perm_enrichments[1])
+						perm_stats.append(sp.log(r1 / r2))
+						sys.stdout.write('.')
+						sys.stdout.flush()
+					sys.stdout.write('\n')
 					sys.stdout.flush()
-				sys.stdout.write('\n')
-				sys.stdout.flush()
-				print perm_stats
-				perm_stats.sort()
-				bisect.bisect(perm_stats, obs_stat)
-				h_res = pylab.hist(perm_stats)
-				pylab.vlines(obs_stat, 0, max(h_res), colors='r')
-				pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+					perm_stats.sort()
+					p_val = 1.0 - bisect.bisect_left(perm_stats, obs_stat) / float(len(perm_stats))
+					print 'Permutation p-value estimate: % f' % p_val
+
+					method_res_dict[method]['statistics'].append(perm_stats)
+					method_res_dict[method]['pvals'].append(p_val)
+
+#					h_res = pylab.hist(perm_stats)
+#					pylab.vlines(obs_stat, 0, max(h_res[0]), colors='r')
+#					pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
 
 
 
+		#Now the plotting of the results.
+		method_name_dict = {'chi_square':'Chi-square test', 'gene_perm':'Canditate gene permutations',
+					'snps_perm':'SNP positions permutation (chromosome rotation)' }
+
+
+		pval_thresholds.reverse()
+		pos_list = range(len(pval_thresholds))
+		for m in methods:
+			pylab.figure()
+			pvals = []
+			for p in method_res_dict[m]['pvals']:
+				if p != 0:
+					pvals.append(p)
+				else:
+					pvals.append(0.5 / num_perm)
+			neg_log_pvals = map(lambda x:-math.log10(x), pvals)
+			pylab.barh(pos_list, neg_log_pvals, align='center', color='g', alpha=0.6)
+			pylab.ylim((-1, len(pval_thresholds)))
+			pylab.yticks(pos_list, map(str, pval_thresholds))
+			pylab.xlabel('Enrichment -log(p-value)')
+			pylab.ylabel('p-value percentile threshold')
+			ymin, ymax = pylab.ylim()
+			xmin, xmax = pylab.xlim()
+			pylab.axvline(-math.log10(0.05), ymin=ymin, ymax=ymax, color='r')
+			pylab.xlim((0, max(-math.log10(0.05), max(neg_log_pvals)) * 1.05))
+			pylab.title(method_name_dict[m])
+			pylab.savefig(file_prefix + '_' + m + '.pdf', format='pdf')
+
+		return {'enr_stats':log_enrichments, 'method_res_dict':method_res_dict}
 
 
 
@@ -572,12 +633,12 @@ class Result(object):
 		       percentile=98, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
 		       plot_bonferroni=False, cand_genes=None, threshold=0):
 
-		import matplotlib
-		matplotlib.use('Agg')
-		import matplotlib.pyplot as plt
 		"""
 		Plots a 'Manhattan' style GWAs plot.
 		"""
+		import matplotlib
+		matplotlib.use('Agg')
+		import matplotlib.pyplot as plt
 
 		"Plotting a Manhattan-style plot with %i markers." % len(self.scores)
 		if cand_genes:
@@ -678,7 +739,7 @@ class Result(object):
 		plt.xticks(ticksList1, ticksList2)
 		if not ylab:
 			if type == "pvals":
-				plt.ylabel('$-log(p-$value$)$', size="large")
+				plt.ylabel('$ - log(p - $value$)$', size="large")
 
 			else:
 				plt.ylabel('score')
@@ -799,7 +860,7 @@ class Result(object):
 		attr are e.g.
 		'mafs', 'marfs', 'scores', etc.
 		"""
-		print "Filtering for attribute '%s' with threshold: %g" % (attr_name, attr_threshold)
+		print "Filtering for attribute ' % s' with threshold: %g" % (attr_name, attr_threshold)
 		attr = getattr(self, attr_name)
 		new_snp_results = {}
 		for info in self.snp_results:
@@ -928,7 +989,7 @@ class Result(object):
 				genes.add((g.chromosome, g.startPos, g.endPos, g.tairID))
 			#print len(genes)
 			i += 1
-		print 'found %d genes' % len(genes)
+		print 'found % d genes' % len(genes)
 		return genes
 
 

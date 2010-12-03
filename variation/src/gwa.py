@@ -42,7 +42,7 @@ Option:
 	--with_replicates			Run EMMAX with replicates (if any, otherwise it uses the mean)
 	--with_betas				Output betas (effect sizes), this is a tad slower
 	--num_steps=...				Max number of steps, for EMMAX stepwise
-	
+		
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
 	-p ...					Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
@@ -456,6 +456,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i),
 				mapping_method, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 	result_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
+	k = None
 
 	res = None
 	#Check whether result already exists.
@@ -675,7 +676,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 		print "plotting histogram"
 		p_her = None
-		if k != None:
+		if k is not None:
 			p_her = phed.get_pseudo_heritability(p_i, k)
 		#title = phenotype_name
 		#if p_her:
