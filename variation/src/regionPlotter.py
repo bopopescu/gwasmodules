@@ -316,6 +316,8 @@ class RegionPlotter():
 			print "Drawing TAIR genes"
 			drawGenes(tair_genes, gene_position_cycle=num_rows, rangeVal=y_range * 1.5)
 		pylab.axis(plot_range)
+		pylab.xlabel('Position')
+		pylab.ylabel('-log(p-value)')
 		if pdf_file:
 			pylab.savefig(pdf_file, format="pdf")
 		if png_file:

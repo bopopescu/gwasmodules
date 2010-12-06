@@ -690,7 +690,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 		if p_dict['region_plots']:
 			import regionPlotter as rp
-			regions_results = res.get_top_region_results(p_dict['region_plots'])
+			regions_results = res.get_top_region_results(p_dict['region_plots'], distance_threshold=60000, buffer=60000)
 			plotter = rp.RegionPlotter()
 			print "Starting region plots..."
 			for reg_res in regions_results:

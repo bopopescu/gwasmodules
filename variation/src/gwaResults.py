@@ -453,7 +453,7 @@ class Result(object):
 		last_thres = 1.0
 		log_enrichments = []
 		for pval_threshold in reversed(pval_thresholds):
-			print 'Using p - value threshold % f' % pval_threshold
+			print 'Using p-value threshold % f' % pval_threshold
 			thres = pval_threshold / last_thres
 			print 'Using corrected threshold % f' % thres
 			last_thres = pval_threshold
@@ -513,6 +513,10 @@ class Result(object):
 			f_obs = sp.array([num_obs_ccg, num_obs_cg, num_obs_dcg, num_obs_dg])
 			f_exp = sp.array([num_exp_ccg, num_exp_cg, num_exp_dcg, num_exp_dg])
 			chi_sq_stat, chi_sq_pval = st.chisquare(f_obs, f_exp, 2)
+			if obs_stat > 0:
+				chi_sq_pval = chi_sq_pval / 2
+			else:
+				chi_sq_pval = 1 - chi_sq_pval / 2
 			print chi_sq_pval
 
 			for method in methods:
@@ -597,7 +601,7 @@ class Result(object):
 
 
 		#Now the plotting of the results.
-		method_name_dict = {'chi_square':'Chi-square test', 'gene_perm':'Canditate gene permutations',
+		method_name_dict = {'chi_square':'Chi-square test', 'gene_perm':'Candidate gene permutations',
 					'snps_perm':'SNP positions permutation (chromosome rotation)' }
 
 
@@ -623,6 +627,15 @@ class Result(object):
 			pylab.xlim((0, max(-math.log10(0.05), max(neg_log_pvals)) * 1.05))
 			pylab.title(method_name_dict[m])
 			pylab.savefig(file_prefix + '_' + m + '.pdf', format='pdf')
+
+
+		pylab.figure()
+		pylab.barh(pos_list, log_enrichments, align='center', color='g', alpha=0.6)
+		pylab.ylim((-1, len(pval_thresholds)))
+		pylab.yticks(pos_list, map(str, pval_thresholds))
+		pylab.xlabel('Enrichment (log[ratio])')
+		pylab.ylabel('p-value percentile threshold')
+		pylab.savefig(file_prefix + '_enrichment_ratio.pdf', format='pdf')
 
 		return {'enr_stats':log_enrichments, 'method_res_dict':method_res_dict}
 

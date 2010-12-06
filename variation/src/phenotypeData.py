@@ -259,9 +259,9 @@ class phenotype_data:
 		minVal = min(phen_vals)
 		maxVal = max(phen_vals)
 		x_range = maxVal - minVal
-		histRes = plt.hist(phen_vals, bins=round(8 + 2 * sp.log(len(phen_vals))), alpha=0.8)
+		histRes = plt.hist(phen_vals, bins=round(8 + 2 * sp.log(len(phen_vals))), alpha=0.7)
 		y_max = max(histRes[0])
-		plt.axis([minVal - 0.035 * x_range, maxVal + 0.035 * x_range, -0.035 * y_max, 1.18 * y_max])
+		plt.axis([minVal - 0.035 * x_range, maxVal + 0.035 * x_range, -0.035 * y_max, 1.19 * y_max])
 		num_phen_vals = len(phen_vals)
 		shapiro_pval = sp.stats.shapiro(phen_vals)[1]
 		if p_her:
@@ -599,7 +599,7 @@ def parse_phenotype_file(file_name, delim=',', file_format='guess', with_db_ids=
 				print 'Guessing new format.'
 				file_format = 'new'
 			else:
-				v = raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:')
+				v = int(raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:'))
 				if v == 1:
 					file_format = 'old'
 				elif v == 2:
