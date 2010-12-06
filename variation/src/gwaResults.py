@@ -351,7 +351,7 @@ class Result(object):
 
 
 	def candidate_gene_enrichments(self, cgl=None, cgl_file=None, pval_thresholds=[0.01], gene_radius=20000,
-				methods=['chi_square'], num_perm=100, file_prefix=None):
+				methods=['chi_square'], num_perm=100, file_prefix=None, obs_genes_file=None):
 		"""
 		Performs CGR analysis on this results object.
 		
@@ -391,6 +391,7 @@ class Result(object):
 			num_close_cand_genes = 0
 			cg_iter = enumerate(cg_indices)
 			cg_ii, cg_i = cg_iter.next()
+			obs_cg_indices = []
 			while g_i < num_genes - 1 and r_i < len(regions) - 1:
 				#count until overlap
 				#if g_i % 100 == 0: print g_i
@@ -412,6 +413,7 @@ class Result(object):
 						cg_ii, cg_i = cg_iter.next()
 					if g_i == cg_i:
 						num_close_cand_genes += 1
+						obs_cg_indices.append(g_i)
 					g_i, g = g_iter.next()
 					g_end_chr_pos = sp.array([g.chromosome, g.endPos])
 					g_start_chr_pos = sp.array([g.chromosome, g.startPos])
@@ -421,7 +423,7 @@ class Result(object):
 
 			#r1 = (num_close_cand_genes / float(num_close_genes))
 			#r2 = (num_cand_genes / float(num_genes))
-			return (num_close_cand_genes, num_close_genes)
+			return (num_close_cand_genes, num_close_genes, obs_cg_indices)
 
 		#Parse cgl file
 		if cgl_file:
@@ -448,6 +450,9 @@ class Result(object):
 		method_res_dict = {}
 		for m in methods:
 			method_res_dict[m] = {'statistics':[], 'pvals':[]}
+
+		if obs_genes_file:
+			obs_gene_str = ''
 
 		pval_thresholds.sort()
 		last_thres = 1.0
@@ -517,7 +522,17 @@ class Result(object):
 				chi_sq_pval = chi_sq_pval / 2
 			else:
 				chi_sq_pval = 1 - chi_sq_pval / 2
-			print chi_sq_pval
+			print 'Cand. gene enrichment p-value from Chi-square test:', chi_sq_pval
+
+			#What cand. genes overlap with regions?
+			obs_cg_indices = obs_enrichments[2]
+			if obs_cg_indices:
+				obs_gene_str += str(pval_threshold) + ','
+				tair_ids = [all_genes[cgi].tairID for cgi in obs_cg_indices]
+				obs_gene_str += ','.join(tair_ids)
+				obs_gene_str += '\n'
+
+
 
 			for method in methods:
 				if method == 'chi_square':
@@ -599,6 +614,9 @@ class Result(object):
 #					pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
 
 
+		if obs_genes_file:
+			with open(obs_genes_file, 'w') as f:
+				f.write(obs_gene_str)
 
 		#Now the plotting of the results.
 		method_name_dict = {'chi_square':'Chi-square test', 'gene_perm':'Candidate gene permutations',
@@ -3073,7 +3091,8 @@ def load_cand_genes_file(file_name, format=1):
 	if format == 1:
 		for row in reader:
 		      tair_ids.append(row[0].upper())
-		      gene_names.append(row[1])
+		      if len(row) > 1:
+		      	gene_names.append(row[1])
 	f.close()
 	return get_genes_w_tair_id(tair_ids), tair_ids
 

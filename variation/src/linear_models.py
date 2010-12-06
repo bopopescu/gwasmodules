@@ -113,31 +113,97 @@ class LinearModel(object):
 		p_value = 1 - stats.f.cdf(f_stat, q, self.n - self.p)
 		return p_value, f_stat
 
-	def fast_f_test(self, snps):
+#	def fast_f_test(self, snps):
+#		"""
+#		A standard linear model, using a F-test
+#		"""
+#		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X, self.Y)
+#		num_snps = len(snps)
+#		rss_list = sp.repeat(h0_rss, num_snps)
+#		h0_betas = map(float, list(h0_betas)) + [0.0]
+#		betas_list = [h0_betas] * num_snps
+#		var_perc = sp.zeros(num_snps)
+#		q = 1
+#		n_p = self.n - self.p
+#		for i, snp in enumerate(snps):
+#			(betas, rss, rank, s) = linalg.lstsq(sp.hstack([self.X, sp.matrix(snp).T]), self.Y)
+#			if not rss:
+#				print 'No predictability in the marker, moving on...'
+#				continue
+#			rss_list[i] = rss[0]
+#			betas_list[i] = map(float, list(betas))
+#		rss_ratio = h0_rss / rss_list
+#		var_perc = 1 - 1 / rss_ratio
+#		f_stats = (rss_ratio - 1) * n_p / float(q)
+#		p_vals = stats.f.sf(f_stats, q, n_p)
+#		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
+#			'var_perc':var_perc, 'h0_rss':h0_rss}
+
+
+	def fast_f_test(self, snps, verbose=True, Z=None,
+			with_betas=False):
 		"""
-		A standard linear model, using a F-test
+		LM implementation 
+		Single SNPs
+					
 		"""
-		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X, self.Y)
+		dtype = 'single'
+		q = 1  # Single SNP is being tested
+		p = len(self.X.T) + q
+		n = self.n
+		n_p = n - p
 		num_snps = len(snps)
+
+		h0_X = sp.mat(self.X, dtype=dtype)
+		Y = self.Y	#The transformed outputs.
+		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
+		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
+		h0_betas = map(float, list(h0_betas))
+
+		if not with_betas:
+			(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+			Q = sp.mat(Q)
+			Q2 = Q * Q.T
+			M = sp.mat((sp.eye(n) - Q2), dtype=dtype)
+		else:
+			betas_list = [h0_betas] * num_snps
+
 		rss_list = sp.repeat(h0_rss, num_snps)
-		h0_betas = map(float, list(h0_betas)) + [0.0]
-		betas_list = [h0_betas] * num_snps
-		var_perc = sp.zeros(num_snps)
-		q = 1
-		n_p = self.n - self.p
-		for i, snp in enumerate(snps):
-			(betas, rss, rank, s) = linalg.lstsq(sp.hstack([self.X, sp.matrix(snp).T]), self.Y)
-			if not rss:
-				print 'No predictability in the marker, moving on...'
-				continue
-			rss_list[i] = rss[0]
-			betas_list[i] = map(float, list(betas))
+		chunk_size = len(Y)
+		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
+			snps_chunk = sp.matrix(snps[i:i + chunk_size])
+			if with_betas:
+				Xs = snps_chunk
+			else:
+				Xs = sp.mat(snps_chunk, dtype=dtype) * M
+			for j in range(len(Xs)):
+				if with_betas:
+					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, \
+									overwrite_a=True)
+					if not rss:
+						if verbose: print 'No predictability in the marker, moving on...'
+						continue
+					betas_list[i + j] = map(float, list(betas))
+				else:
+					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+				rss_list[i + j] = rss[0]
+
+				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
+					sys.stdout.write('.')
+					sys.stdout.flush()
+
+		if verbose and num_snps >= 10:
+			sys.stdout.write('\n')
 		rss_ratio = h0_rss / rss_list
 		var_perc = 1 - 1 / rss_ratio
 		f_stats = (rss_ratio - 1) * n_p / float(q)
 		p_vals = stats.f.sf(f_stats, q, n_p)
-		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
-			'var_perc':var_perc, 'h0_rss':h0_rss}
+
+		res_d = {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'var_perc':var_perc,
+			'h0_rss':h0_rss, 'h0_betas':h0_betas}
+		if with_betas:
+			res_d['betas'] = betas_list
+		return res_d
 
 
 	def two_snps_ftest(self, snps, verbose=True):
@@ -2257,7 +2323,7 @@ def _test_stepwise_emmax_():
 	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/b_dilkes_metabolites.csv"
 	mac_threshold = 15
-	for pid, trans in [(2, 'log_trans')]:#[ (5, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
+	for pid, trans in [(0, 'log_trans')]:#[ (5, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
 		phed = pd.parse_phenotype_file(filename)
 		phed.convert_to_averages()
 		if trans == 'sqrt_trans':
@@ -2283,6 +2349,22 @@ def _test_stepwise_emmax_():
 def _test_joint_analysis_():
 	import dataParsers as dp
 	import phenotypeData as pd
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
+	phed = pd.parse_phenotype_file(filename)
+	pids = []
+
+	#1. Get pseudoheritabilities for all phenotypes
+
+	#2. Get correlations between traits.. (if correlation method is used).
+
+	#3. Figure out all ecotypes which are in 250K and for which we have phenotypic values.
+
+	#4. Create a new phenotype, and SNP indicator vector.
+
+	#5. Run analysis..
+
+
+
 
 
 

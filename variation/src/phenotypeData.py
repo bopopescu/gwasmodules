@@ -2449,8 +2449,8 @@ def insert_phenotypes_into_db(phen_file, method_description='', comment='', tran
 #			with_colorbar=False, map_type='europe')
 
 if __name__ == '__main__':
-#	insert_phenotypes_into_db(env['phen_dir'] + 'seed_size.csv', method_description='Seed size',
-#			comment='Data from Dorota Duszynska')
-	_castric_plot_()
+	insert_phenotypes_into_db(env['phen_dir'] + 'b_dilkes_metabolites.csv', method_description='Metabolites, mass spec?',
+			comment='Data from Brian Dilkes')
+	#_castric_plot_()
 	print "Done!"
 

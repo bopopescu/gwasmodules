@@ -593,7 +593,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			if mapping_method in ['lm', 'emma', 'emmax']:
 				kwargs['genotype_var_perc'] = res['var_perc']
 				additional_columns.append('genotype_var_perc')
-				if p_dict['with_betas'] or mapping_method != 'emmax':
+				if p_dict['with_betas'] or mapping_method not in ['emmax', 'lm']:
 					betas = map(list, zip(*res['betas']))
 					kwargs['beta0'] = betas[0]
 					additional_columns.append('beta0')
