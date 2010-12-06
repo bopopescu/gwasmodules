@@ -517,7 +517,7 @@ class Result(object):
 			num_obs_dg = num_genes - num_close_genes
 			f_obs = sp.array([num_obs_ccg, num_obs_cg, num_obs_dcg, num_obs_dg])
 			f_exp = sp.array([num_exp_ccg, num_exp_cg, num_exp_dcg, num_exp_dg])
-			chi_sq_stat, chi_sq_pval = st.chisquare(f_obs, f_exp, 2)
+			chi_sq_stat, chi_sq_pval = st.chisquare(f_obs, f_exp)#, 2)
 			if obs_stat > 0:
 				chi_sq_pval = chi_sq_pval / 2
 			else:
