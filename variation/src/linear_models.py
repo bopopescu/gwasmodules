@@ -2079,38 +2079,47 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		#pylab.axes([0.05, 0.05, 0.92, 0.95])
 		pylab.plot(range(len(p_her_list)), p_her_list, 'o-')
 		pylab.ylabel('Pseudo-heritability')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_p_her.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(rss_list)), rss_list, 'o-')
 		pylab.ylabel('RSS')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_rss.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-')
 		pylab.ylabel('REML Mahalanobis RSS')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-')
 		pylab.ylabel('Mahalanobis RSS')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(ll_list)), ll_list, 'o-')
 		pylab.ylabel('Log likelihood')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_ll.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-')
 		pylab.ylabel('Min. p-value')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_pval.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(bic_list)), bic_list, 'o-')
 		pylab.ylabel('BIC')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_bic.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-')
 		pylab.ylabel('Extended BIC')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_ebic.pdf', format='pdf')
 		pylab.clf()
 		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-')
 		pylab.ylabel('Modified BIC')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_mbic.pdf', format='pdf')
 		pylab.clf()
 		max_rss = max(rss_list)
@@ -2118,7 +2127,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		p_her_array = rss_array * sp.array(p_her_list)
 		genetic_variance = p_her_array + (1 - rss_array)
 		variance_explained = (1 - rss_array)
-		pylab.figure(figsize=(10, 6))
+		pylab.figure(figsize=(12, 6))
+		pylab.axes([0.05, 0.08, 0.94, 0.90])
 		pylab.fill_between([0, step_i], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
 		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
 		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
@@ -2126,9 +2136,23 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		pylab.xlabel('Step number')
 		pylab.axvline(x=num_steps, c='k', linestyle=':')
 		pylab.legend(loc=1, ncol=3, shadow=True)
-
+		pylab.axis([0, step_i, 0, 1])
 		pylab.savefig(file_prefix + '_stats_variances.png', format='png')
 		pylab.savefig(file_prefix + '_stats_variances.pdf', format='pdf')
+
+		pylab.figure(figsize=(10, 6))
+		pylab.axes([0.06, 0.08, 0.92, 0.90])
+		step_i = step_i / 2
+		pylab.fill_between([0, step_i ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance[:step_i + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained[:step_i + 1], color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.ylabel('Percentage of variance')
+		pylab.xlabel('Step number')
+		pylab.axvline(x=num_steps, c='k', linestyle=':')
+		pylab.legend(loc=1, ncol=3, shadow=True)
+		pylab.axis([0, step_i, 0, 1])
+		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
+		pylab.savefig(file_prefix + '_stats_variances_forward.pdf', format='pdf')
 
 	return step_info_list
 
@@ -2338,7 +2362,7 @@ def _test_stepwise_emmax_():
 		elif trans == 'log_trans':
 			phed.log_transform(pid)
 		phen_name = phed.get_name(pid)
-		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=1)
+		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=0.02)
 		sd.coordinate_w_phenotype_data(phed, pid)
 		if mac_threshold:
 			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
@@ -2348,7 +2372,7 @@ def _test_stepwise_emmax_():
 
 		info_list = emmax_step_wise(phenotypes, K, sd=sd, \
 					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_dilkes' \
-					+ str(pid) + '_' + phen_name, num_steps=60, allow_interactions=True,
+					+ str(pid) + '_' + phen_name, num_steps=10, allow_interactions=True,
 					interaction_pval_thres=0.001)
 
 
