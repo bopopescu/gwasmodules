@@ -5,6 +5,7 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
 import time, sys, random
 import os
+import dbutils
 
 from snpsdata import *
 
@@ -127,7 +128,6 @@ def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=Non
 
 def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="stock_250k", withArrayIds=False,
 			methodId=1, user=None, passwd=None, callProb=False, newBatch=False):
-	import MySQLdb
 	"""
 	Retrieve 2010 data from DB.  Returns a list of RawSnpsData objects. 
 	
@@ -139,19 +139,7 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="st
 	rt = time.time()
 	decoder = RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']!!
 
-	print "Connecting to db, host=" + host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db=db)
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
+	conn = dbutils.connect_to_default_lookup()
 	cursor = conn.cursor ()
 	#Retrieve the filenames
 	print "Fetching data"
