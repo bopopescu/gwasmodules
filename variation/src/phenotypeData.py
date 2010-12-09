@@ -86,11 +86,13 @@ class phenotype_data:
 		return lmm.get_REML()['pseudo_heritability']
 
 
-	def get_broad_sense_heritability(self, pids):
+	def get_broad_sense_heritability(self, pids=None):
 		"""
 		Estimates the heritability from replicates.
 		"""
 		import linear_models as lm
+		if not pids:
+			pids = sorted(self.phen_dict.keys())
 		bs_herits = []
 		bs_avg_herits = []
 		bs_pids = []
@@ -627,7 +629,7 @@ class phenotype_data:
 
 
 
-def parse_phenotype_file(file_name, delim=',', file_format='guess', with_db_ids=True):
+def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_format='guess', with_db_ids=True):
 	"""
 	Parses a phenotype file, and returns a new phenotype_data object.
 	
@@ -638,67 +640,73 @@ def parse_phenotype_file(file_name, delim=',', file_format='guess', with_db_ids=
 		guess - Guesses the file_format
 	"""
 	phen_dict = {}
-	with open(file_name) as f:
-		header = f.next()
-		if len(header.split(delim)) < 2:
-			test_delims = [',', '\t']
-			for n_delim in test_delims:
-				if len(header.split(n_delim)) > 2:
-					delim = n_delim
-					break
-			else:
-				raise Exception('Problems with delimiters', delim, test_delims)
-		if file_format == 'guess':
-			header = map(str.strip, header.split(delim))
-			if len(header) != 5:
-				print 'Guessing old format.'
-				#print len(header), header
+	if file_object:
+		f = file_object
+	else:
+		f = open(file_name)
+	header = f.next()
+	if len(header.split(delim)) < 2:
+		test_delims = [',', '\t']
+		for n_delim in test_delims:
+			if len(header.split(n_delim)) > 2:
+				delim = n_delim
+				break
+		else:
+			raise Exception('Problems with delimiters', delim, test_delims)
+	if file_format == 'guess':
+		header = map(str.strip, header.split(delim))
+		if len(header) != 5:
+			print 'Guessing old format.'
+			#print len(header), header
+			file_format = 'old'
+		elif 'phenotype_id' in header:
+			print 'Guessing new format.'
+			file_format = 'new'
+		else:
+			v = int(raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:'))
+			if v == 1:
 				file_format = 'old'
-			elif 'phenotype_id' in header:
-				print 'Guessing new format.'
+			elif v == 2:
 				file_format = 'new'
 			else:
-				v = int(raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:'))
-				if v == 1:
-					file_format = 'old'
-				elif v == 2:
-					file_format = 'new'
-				else:
-					sys.exit()
+				sys.exit()
 
-		if file_format == 'old':
-			if with_db_ids:
-				pids = [int(l.split('_')[0]) for l in header[1:]]
-			else:
-				pids = range(1, len(header))
-			for i, pid in enumerate(pids):
-				phen_dict[pid] = {'ecotypes':[], 'values':[], 'name':header[i + 1]}
-			for line in f:
-				l = map(str.strip, line.split(delim))
-				ecotype = l[0]
-				del l[0]
-				for i, v in enumerate(l):
-					pid = pids[i]
-					if v != 'NA':
-						phen_dict[pid]['ecotypes'].append(ecotype)
-						phen_dict[pid]['values'].append(float(v))
+	if file_format == 'old':
+		if with_db_ids:
+			pids = [int(l.split('_')[0]) for l in header[1:]]
+		else:
+			pids = range(1, len(header))
+		for i, pid in enumerate(pids):
+			phen_dict[pid] = {'ecotypes':[], 'values':[], 'name':header[i + 1]}
+		for line in f:
+			l = map(str.strip, line.split(delim))
+			ecotype = l[0]
+			del l[0]
+			for i, v in enumerate(l):
+				pid = pids[i]
+				if v != 'NA':
+					phen_dict[pid]['ecotypes'].append(ecotype)
+					phen_dict[pid]['values'].append(float(v))
 
-		elif file_format == 'new':
-			last_pid = -1
-			for line in f:
-				l = line.split(delim)
-				pid = int(l[0])
-				if pid != last_pid:
-					if last_pid != -1:
-						phen_dict[last_pid] = d
-					phen_name = l[1]
-					d = {'name':phen_name, 'ecotypes':[], 'values':[]}
-				d['ecotypes'].append(l[2])
-				d['values'].append(float(l[3]))
-				last_pid = pid
-			phen_dict[last_pid] = d
+	elif file_format == 'new':
+		last_pid = -1
+		for line in f:
+			l = line.split(delim)
+			pid = int(l[0])
+			if pid != last_pid:
+				if last_pid != -1:
+					phen_dict[last_pid] = d
+				phen_name = l[1]
+				d = {'name':phen_name, 'ecotypes':[], 'values':[]}
+			d['ecotypes'].append(l[2])
+			d['values'].append(float(l[3]))
+			last_pid = pid
+		phen_dict[last_pid] = d
 
 	#print phen_dict
+	if not file_object:
+		f.close()
+
 
 	return phenotype_data(phen_dict=phen_dict, phen_ids=phen_dict.keys())
 
@@ -2511,8 +2519,8 @@ def insert_phenotypes_into_db(phen_file, method_description='', comment='', tran
 #			with_colorbar=False, map_type='europe')
 
 def _test_bs_herits_():
-	pd = parse_phenotype_file(env['phen_dir'] + 'phen_raw_112210.csv')
-	pd.get_broad_sense_heritability([1, 2, 3, 4, 5, 6, 7, 264, 265])
+	pd = parse_phenotype_file(env['phen_dir'] + 'telomere_lengths_all.csv')
+	pd.get_broad_sense_heritability()
 
 
 if __name__ == '__main__':

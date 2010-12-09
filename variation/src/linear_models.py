@@ -1848,11 +1848,15 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 		step_info_list.append(step_info)
 
+		#Plot gwas results per step 
 		if file_prefix:
 			pdf_file_name = file_prefix + '_step' + str(step_i - 1) + '.pdf'
 			png_file_name = file_prefix + '_step' + str(step_i - 1) + '.png'
+			#Manhattan plot
 			pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
 					 png_file=png_file_name)
+			#QQ plot
+
 
 
 		#Adding the new SNP as a cofactor
@@ -2354,7 +2358,24 @@ def _test_joint_analysis_():
 	import phenotypeData as pd
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
 	phed = pd.parse_phenotype_file(filename)
+	phed.convert_to_averages()
+
+	mac_threshold = 15
 	pids = []
+
+	join_phen_vals = []
+	joint_ecotypes = []
+	for pid in pids:
+		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=1)
+		sd.coordinate_w_phenotype_data(phed, pid)
+		if mac_threshold:
+			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
+		snps = sd.getSnps()
+		phenotypes = phed.get_values(pid)
+		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
+					phed.get_ecotypes(pid))
+		emma(snps, phenotypes, K)
+
 
 
 	#1. Get pseudoheritabilities for all phenotypes

@@ -788,12 +788,14 @@ class Result(object):
 
 
 		if plot_bonferroni:
-			if threshold :
-				threshold = -math.log10(threshold)
-				plt.plot([0, sum(result.chromosome_ends)], [threshold, threshold], "y-.")
-			#Bonferroni threshold
 			b_threshold = -math.log10(1.0 / (num_scores * 20.0))
-			plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], "k-.")
+			if threshold :
+				plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], ":")
+				threshold = -math.log10(threshold)
+				plt.plot([0, sum(result.chromosome_ends)], [threshold, threshold], color='#6495ed', linestyle='-.')
+			#Bonferroni threshold
+			else:
+				plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
 
 		plt.axis([0, sum(result.chromosome_ends), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 		plt.xticks(ticksList1, ticksList2)
