@@ -125,7 +125,8 @@ def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=Non
 
 
 
-def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="stock_250k", withArrayIds=False, methodId=1, user=None, passwd=None, callProb=False, newBatch=False):
+def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="stock_250k", withArrayIds=False,
+			methodId=1, user=None, passwd=None, callProb=False, newBatch=False):
 	import MySQLdb
 	"""
 	Retrieve 2010 data from DB.  Returns a list of RawSnpsData objects. 

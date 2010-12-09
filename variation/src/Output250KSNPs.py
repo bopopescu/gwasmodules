@@ -25,13 +25,14 @@ Description:
 """
 
 import sys, getopt, traceback
+import env
 
 def _run_():
 	if len(sys.argv) == 1:
 		print __doc__
 		sys.exit(2)
-	
-	long_options_list = ["newBatch","hostname=", "user=", "passwd=", "method=", "delim=", "missingval=", "withArrayId=", "callProbFile=", "help"]
+
+	long_options_list = ["newBatch", "hostname=", "user=", "passwd=", "method=", "delim=", "missingval=", "withArrayId=", "callProbFile=", "help"]
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "z:u:p:o:t:d:m:a:h", long_options_list)
 
@@ -40,13 +41,13 @@ def _run_():
 		print sys.exc_info()
 		print __doc__
 		sys.exit(2)
-	
-	
-	hostname = 'papaya.usc.edu'
-	user = None
-	passwd = None
+
+
+	hostname = env.env['default_lookup_db']#'papaya.usc.edu'
+	user = env.env['db_user']
+	passwd = env.env['db_user']
 	output_fname = None
-	method = 1 
+	method = 1
 	delim = ","
 	missingVal = "NA"
 	help = 0
@@ -66,22 +67,22 @@ def _run_():
 			passwd = arg
 		elif opt in ("-o",):
 			output_fname = arg
-		elif opt in ("-t","--method"):
+		elif opt in ("-t", "--method"):
 			method = int(arg)
-		elif opt in ("-d","--delim"):
+		elif opt in ("-d", "--delim"):
 			delim = arg
-		elif opt in ("-m","--missingval"):
-			missingVal = arg	
-		elif opt in ("-a","--withArrayId"):
+		elif opt in ("-m", "--missingval"):
+			missingVal = arg
+		elif opt in ("-a", "--withArrayId"):
 			withArrayId = bool(arg)
 		elif opt in ("--callProbFile"):
-			callProbFile =arg
+			callProbFile = arg
 		elif opt in ("--newBatch"):
 			newBatch = True
-	
+
 	if not output_fname:
 		output_fname
-		if help==0:
+		if help == 0:
 			print "Output file missing!!\n"
 			print __doc__
 		sys.exit(2)
@@ -90,11 +91,12 @@ def _run_():
 	import dataParsers
 	import snpsdata
 	if callProbFile:
-		snpsds = dataParsers.get250KDataFromDb(host=hostname,chromosomes=[1,2,3,4,5], methodId=method, user=user, passwd=passwd, withArrayIds=withArrayId, callProb=True, newBatch=newBatch)
-		snpsdata.writeRawSnpsDatasToFile(output_fname,snpsds,chromosomes=[1,2,3,4,5], deliminator=delim, missingVal = missingVal, withArrayIds=withArrayId, callProbFile=callProbFile)
+		snpsds = dataParsers.get250KDataFromDb(host=hostname, chromosomes=[1, 2, 3, 4, 5], methodId=method,
+						user=user, passwd=passwd, withArrayIds=withArrayId, callProb=True, newBatch=newBatch)
+		snpsdata.writeRawSnpsDatasToFile(output_fname, snpsds, chromosomes=[1, 2, 3, 4, 5], deliminator=delim, missingVal=missingVal, withArrayIds=withArrayId, callProbFile=callProbFile)
 	else:
-		snpsds = dataParsers.get250KDataFromDb(host=hostname,chromosomes=[1,2,3,4,5], methodId=method, user=user, passwd=passwd, withArrayIds=withArrayId, newBatch=newBatch)
-		snpsdata.writeRawSnpsDatasToFile(output_fname,snpsds,chromosomes=[1,2,3,4,5], deliminator=delim, missingVal = missingVal, withArrayIds=withArrayId)
+		snpsds = dataParsers.get250KDataFromDb(host=hostname, chromosomes=[1, 2, 3, 4, 5], methodId=method, user=user, passwd=passwd, withArrayIds=withArrayId, newBatch=newBatch)
+		snpsdata.writeRawSnpsDatasToFile(output_fname, snpsds, chromosomes=[1, 2, 3, 4, 5], deliminator=delim, missingVal=missingVal, withArrayIds=withArrayId)
 
 
 if __name__ == '__main__':
