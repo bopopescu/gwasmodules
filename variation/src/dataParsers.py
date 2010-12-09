@@ -177,6 +177,7 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="st
 
 	line = lines[1].split()
 
+	print dataFiles
 	linesList = []
 	for i in range(0, len(accessions)): #Checking files
 		f = open(dataFiles[i], "r")
