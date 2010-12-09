@@ -673,13 +673,15 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
 				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-					       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
+					       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'],
+					       local_region=p_dict['local_gwas'])
 			else:
 				if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
 					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
 					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-						       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
+						       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'],
+						       local_region=p_dict['local_gwas'])
 		else:
 			pass
 

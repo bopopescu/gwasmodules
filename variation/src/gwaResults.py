@@ -691,7 +691,7 @@ class Result(object):
 
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
 		       percentile=98, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
-		       plot_bonferroni=False, cand_genes=None, threshold=0):
+		       plot_bonferroni=False, cand_genes=None, threshold=0, local_region=None):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
