@@ -655,11 +655,11 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 			raise Exception('Problems with delimiters', delim, test_delims)
 	if file_format == 'guess':
 		header = map(str.strip, header.split(delim))
-		if len(header) != 5:
-			print 'Guessing old format.'
-			#print len(header), header
-			file_format = 'old'
-		elif 'phenotype_id' in header:
+#		if len(header) != 5:
+#			print 'Guessing old format.'
+#			#print len(header), header
+#			file_format = 'old'
+		if 'phenotype_id' in header:
 			print 'Guessing new format.'
 			file_format = 'new'
 		else:
