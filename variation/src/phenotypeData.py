@@ -88,7 +88,7 @@ class phenotype_data:
 
 	def get_broad_sense_heritability(self, pids=None):
 		"""
-		Estimates the heritability from replicates.
+		Estimates the broad sense heritability from replicates.
 		"""
 		import linear_models as lm
 		if not pids:
