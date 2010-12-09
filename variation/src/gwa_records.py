@@ -431,8 +431,10 @@ class GWASRecord():
 				if analysis_method == 'kw':
 					result['statistic'] = kwargs['statistics'][i]
 				else: #EMMAX or LM
-					result['beta0'] = kwargs['beta0'][i]
-					result['beta1'] = kwargs['beta1'][i]
+					if kwargs['beta0'] != None: 
+						result['beta0'] = kwargs['beta0'][i]
+					if kwargs['beta1'] != None:
+						result['beta1'] = kwargs['beta1'][i]
 					result['correlation'] = kwargs['correlation'][i]
 					result['genotype_var_perc'] = kwargs['genotype_var_perc'][i]
 				result.append()
@@ -619,7 +621,10 @@ class GWASRecord():
 			raise Exception('analysis method %s not supported' % analysis_method)
 
 		if analysis_method in ['lm', 'emmax']:
-			betas = map(list, zip(*res['betas']))
+			if 'betas' in res:
+				betas = map(list, zip(*res['betas']))
+			else:
+				betas = [None,None]
 			scores = map(lambda x:-math.log10(x), res['ps'])
 			self.add_results(phen_name, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
 					maf_dict['mafs'], transformation=transformation,
