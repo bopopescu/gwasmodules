@@ -2611,7 +2611,6 @@ class SNPsDataSet:
 		
 		Note that there is no decoder dictionary option here..
 		"""
-		import itertools as it
 
 		print "Writing data to file:", filename
 		numSnps = 0
@@ -2638,10 +2637,10 @@ class SNPsDataSet:
 			f = open(filename, "w")
 		f.write(outStr)
 		if decoder:
-			for chromosome, snpsd in it.izip(self.chromosomes, self.snpsDataList):
+			for chromosome, snpsd in izip(self.chromosomes, self.snpsDataList):
 				sys.stdout.write(".")
 				sys.stdout.flush()
-				for pos, snp in it.izip(snpsd.positions, snpsd.snps):
+				for pos, snp in izip(snpsd.positions, snpsd.snps):
 					outStr = str(chromosome) + delimiter + str(pos)
 					for nt in snp:
 						outStr += delimiter + str(decoder[snp])
@@ -2655,10 +2654,10 @@ class SNPsDataSet:
 #					outStr +="\n"
 #					f.write(outStr)
 		else:
-			for chromosome, snpsd in it.izip(self.chromosomes, self.snpsDataList):
+			for chromosome, snpsd in izip(self.chromosomes, self.snpsDataList):
 				sys.stdout.write(".")
 				sys.stdout.flush()
-				for pos, snp in it.izip(snpsd.positions, snpsd.snps):
+				for pos, snp in izip(snpsd.positions, snpsd.snps):
 					outStr = str(chromosome) + delimiter + str(pos)
 					for nt in snp: outStr += delimiter + str(nt)
 					outStr += "\n"
@@ -2869,6 +2868,34 @@ class SNPsDataSet:
 				snplist += snpsd.snps
 		return snplist
 
+
+#	def get_snps(self, random_fraction=None, region=None):
+#		snplist = []
+#		if random_fraction:
+#			import random
+#			for snpsd in self.snpsDataList:
+#				for snp in snpsd.snps:
+#					if random.random() < random_fraction:
+#						snplist.append(snp)
+#		elif region:
+#			chrom, start_pos, end_pos = region
+#			snpsd = self.snpsDataList[chrom - 1]
+#			ps_gen = izip(snpsd.positions, snpsd.snps)
+#			p, s = ps_ge.next()
+#			while p < start_pos:
+#				p, s = ps_ge.next()
+#			#Now found
+#			while p < end_pos:
+#				snplist.append(s)
+#				pos_list = []
+#				p, s = ps_ge.next()
+#
+#		else:
+#			for snpsd in self.snpsDataList:
+#				snplist += snpsd.snps
+#		return snplist
+
+
 	def get_snp_at(self, chromosome, position):
 		"""
 		Returns the SNP at the given position, if it exits.
@@ -2892,6 +2919,7 @@ class SNPsDataSet:
 			for pos in snpsd.positions:
 				poslist.append(pos)
 		return poslist
+
 
 	def get_top_correlated_snp(self, snp, r2_threshold=0.5):
 		sample_snp_chr_pos_marf = []

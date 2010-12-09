@@ -522,13 +522,15 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
 			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 
-		snps = sd.getSnps()
 		if p_dict['remove_outliers']:
 			assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
 		phen_vals = phed.get_values(p_i)
 
 		if p_dict['local_gwas']: #Filter SNPs, etc..
-			pass
+			snpsd = sd.get_region_snpsd(*p_dict['local_gwas'])
+			snps = snpsd.snps
+		else:
+			snps = sd.getSnps()
 
 
 		sys.stdout.write("Finished loading and handling data!\n")

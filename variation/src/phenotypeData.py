@@ -663,13 +663,14 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 			print 'Guessing new format.'
 			file_format = 'new'
 		else:
-			v = int(raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:'))
-			if v == 1:
-				file_format = 'old'
-			elif v == 2:
-				file_format = 'new'
-			else:
-				sys.exit()
+			file_format = 'old'
+#			v = int(raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:'))
+#			if v == 1:
+#				file_format = 'old'
+#			elif v == 2:
+#				file_format = 'new'
+#			else:
+#				sys.exit()
 
 	if file_format == 'old':
 		if with_db_ids:
