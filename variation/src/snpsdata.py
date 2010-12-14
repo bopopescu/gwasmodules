@@ -2965,8 +2965,8 @@ class SNPsDataSet:
 
 	def get_chr_list(self):
 		chr_list = []
-		for i, snpsd in enumerate(self.snpsDataList):
-			chr_list.extend([i + 1] * len(snpsd.positions))
+		for c, snpsd in izip(self.chromosomes, self.snpsDataList):
+			chr_list.extend([c] * len(snpsd.positions))
 		return chr_list
 
 
@@ -3212,7 +3212,7 @@ class SNPsDataSet:
 		"""
 		Modifies original object, beware!
 		"""
-
+		print chr, start_pos, end_pos
 		snpsd = self.snpsDataList[chr - 1]
 		if start_pos != None:
 			new_snps = []

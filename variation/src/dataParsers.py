@@ -1801,6 +1801,16 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 
 
 
+#def _parse_
+def parse_full_snp_data(data_file_prefix, chromosome, data_format='nucleotides'):
+	"""
+	Handles large dataset (e.g. full SNPs data) in a managable way... even for a 4GB memory mac.
+	"""
+	if data_format == 'nucleotides':
+		pass
+	elif data_format == 'int': #E.g. binary data.
+		pass
+
 
 def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",",
 			missingVal='NA', format=1, filter=1, id=None):

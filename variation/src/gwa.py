@@ -43,7 +43,7 @@ Option:
 	--with_betas				Output betas (effect sizes), this is a tad slower
 	--num_steps=...				Max number of steps, for EMMAX stepwise
 
-	--local_gwas=(chrom,start,stop)		Run local GWAs only..		
+	--local_gwas=chrom,start,stop		Run local GWAs only..		
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
 	-p ...					Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
@@ -186,7 +186,7 @@ def parse_parameters():
 		elif opt in ("--with_replicates"): p_dict['with_replicates'] = True
 		elif opt in ("--with_betas"): p_dict['with_betas'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
-		elif opt in ("--local_gwas"): p_dict['local_gwas'] = eval(arg)
+		elif opt in ("--local_gwas"): p_dict['local_gwas'] = map(int, arg.split(','))
 		else:
 			print "Unkown option:", opt
 			print __doc__
@@ -503,37 +503,54 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 			if kinship_file:   #Kinship file was somehow supplied..
 				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
 							filter=p_dict['debug_filter'])
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
+							p_dict['with_replicates'])
 				print 'Loading supplied kinship'
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
-				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
+							filter=p_dict['debug_filter'])
 				print "No kinship file was found.  Generating kinship file:", k_file
 				k_accessions = sd.accessions[:]
 				k = sd.get_ibs_kinship_matrix(p_dict['debug_filter'])
 				f = open(k_file, 'w')
 				cPickle.dump([k, k_accessions], f)
 				f.close()
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
+				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
+							p_dict['with_replicates'])
 				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 		else:
-			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
+			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
+						filter=p_dict['debug_filter'])
+			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
+						p_dict['with_replicates'])
 
 		if p_dict['remove_outliers']:
 			assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
 		phen_vals = phed.get_values(p_i)
 
 		if p_dict['local_gwas']: #Filter SNPs, etc..
-			snpsd = sd.get_region_snpsd(*p_dict['local_gwas'])
-			snps = snpsd.snps
-		else:
-			snps = sd.getSnps()
+			sd = snpsdata.SNPsDataSet([sd.get_region_snpsd(*p_dict['local_gwas'])],
+						[p_dict['local_gwas'][0]])
+		snps = sd.getSnps()
 
 
 		sys.stdout.write("Finished loading and handling data!\n")
+
+		print "Plotting a histogram"
+		p_her = None
+		if k is not None:
+			p_her = phed.get_pseudo_heritability(p_i, k)
+		#title = phenotype_name
+		#if p_her:
+		#	title += ': p_her=%0.4f' % p_her
+		hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method,
+						p_dict['remove_outliers'], p_dict['with_replicates'])
+		hist_png_file = hist_file_prefix + "_hist.png"
+		phed.plot_histogram(p_i, png_file=hist_png_file, p_her=p_her)
+
 
 		print "Applying %s to data." % (mapping_method)
 		sys.stdout.flush()
@@ -585,8 +602,12 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 			elif mapping_method in ['emmax_step']:
 				sd.filter_mac_snps(p_dict['mac_threshold'])
+				local = False
+				if p_dict['local_gwas']:
+					local = True
+					file_prefix += '_' + '_'.join(map(str, p_dict['local_gwas']))
 				res = lm.emmax_step_wise(phen_vals, k, sd=sd, num_steps=p_dict['num_steps'],
-							file_prefix=file_prefix)
+							file_prefix=file_prefix, local=local)
 				print 'Step-wise EMMAX finished!'
 				return
 			elif mapping_method in ['lm']:
@@ -625,7 +646,6 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 		additional_columns.append('correlations')
 		print 'Writing result to file.'
 		res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
-
 		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
 		 	result_file = file_prefix + ".pvals"
 		else:
@@ -665,37 +685,29 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 		print "Generating a GW plot."
 		sys.stdout.flush()
-		png_file = file_prefix + "_gwa_plot.png"
+		if p_dict['local_gwas']:
+			png_file = file_prefix + "_gwa_plot_" + '_'.join(map(str, p_dict['local_gwas'])) + "_.png"
+		else:
+			png_file = file_prefix + "_gwa_plot.png"
 		#png_file_max30 = file_prefix+"_gwa_plot_max30.png"
 		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
 			res.neg_log_trans()
 			if mapping_method in ["kw", "ft"]:# or p_dict['data_format'] != 'binary':
 				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
-				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-					       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'],
-					       local_region=p_dict['local_gwas'])
+				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",
+						ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
+						cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
 			else:
 				if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
 					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
-					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals", ylab="$-$log$_{10}(p)$",
-						       plot_bonferroni=True, cand_genes=cand_genes, threshold=p_dict['emmax_perm'],
-						       local_region=p_dict['local_gwas'])
+					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",
+							ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
+							cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
 		else:
 			pass
 
-		print "plotting histogram"
-		p_her = None
-		if k is not None:
-			p_her = phed.get_pseudo_heritability(p_i, k)
-		#title = phenotype_name
-		#if p_her:
-		#	title += ': p_her=%0.4f' % p_her
-		hist_file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phenotype_name, trans_method,
-						p_dict['remove_outliers'], p_dict['with_replicates'])
-		hist_png_file = hist_file_prefix + "_hist.png"
-		phed.plot_histogram(p_i, png_file=hist_png_file, p_her=p_her)
 
 
 

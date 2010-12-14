@@ -324,8 +324,10 @@ class Result(object):
 	def _sort_by_chr_pos_(self):
 		if self.snps:
 			res_ls = zip(self.chromosomes, self.positions, self.scores, self.mafs, self.marfs, self.snps)
-		else:
+		elif self.mafs:
 			res_ls = zip(self.chromosomes, self.positions, self.scores, self.mafs, self.marfs)
+		else:
+			res_ls = zip(self.chromosomes, self.positions, self.scores)
 		res_ls.sort()
 		newScores = []
 		newPositions = []
@@ -334,11 +336,12 @@ class Result(object):
 		newMarfs = []
 		new_snps = []
 		for res in res_ls:
-			newScores.append(res[0])
+			newScores.append(res[2])
 			newPositions.append(res[1])
-			newChromosomes.append(res[2])
-			newMafs.append(res[3])
-			newMarfs.append(res[4])
+			newChromosomes.append(res[0])
+			if self.mafs:
+				newMafs.append(res[3])
+				newMarfs.append(res[4])
 			if self.snps:
 				new_snps.append(res[5])
 
@@ -352,8 +355,8 @@ class Result(object):
 
 
 	def candidate_gene_enrichments(self, cgl=None, cgl_file=None, pval_thresholds=[0.01], gene_radius=20000,
-				methods=['chi_square'], num_perm=100, file_prefix=None, obs_genes_file=None,
-				early_stop_threshold=15):
+				methods=['chi_square'], num_perm=500, file_prefix=None,
+				obs_genes_file=None, early_stop_threshold=25, all_genes=None, cand_gene_indices=None):
 		"""
 		Performs CGR analysis on this results object.
 		
@@ -367,65 +370,13 @@ class Result(object):
 			snps_perm - permute SNPs
 		"""
 		import pylab
-		import bisect
+		import analyze_gene_enrichment as genr
 
 		if not 'chi_square' in methods:
 			methods.append('chi_square')
 
 		chrom_ends = self.get_chromosome_ends()
 		print 'chrom_ends', chrom_ends
-
-		def _calc_enrichment_(all_genes, cg_indices, regions):
-			"""
-			Calculate the enrichment (efficiently iterating over all genes.)
-			"""
-			num_genes = len(all_genes)
-			num_cand_genes = len(cg_indices)
-			g_iter = enumerate(all_genes)
-			g_i, g = g_iter.next()
-			g_end_chr_pos = sp.array([g.chromosome, g.endPos])
-			g_start_chr_pos = sp.array([g.chromosome, g.startPos])
-			r_iter = enumerate(regions)
-			r_i, r = r_iter.next()
-			r_start_chr_pos = r[0]
-			r_end_chr_pos = r[1]
-			num_close_genes = 0
-			num_close_cand_genes = 0
-			cg_iter = enumerate(cg_indices)
-			cg_ii, cg_i = cg_iter.next()
-			obs_cg_indices = []
-			while g_i < num_genes - 1 and r_i < len(regions) - 1:
-				#count until overlap
-				#if g_i % 100 == 0: print g_i
-				while g_i < num_genes - 1 and tuple(g_end_chr_pos) < tuple(r_start_chr_pos):
-					g_i, g = g_iter.next()
-					g_end_chr_pos = sp.array([g.chromosome, g.endPos])
-					g_start_chr_pos = sp.array([g.chromosome, g.startPos])
-
-				while r_i < len(regions) - 1 and  tuple(r_end_chr_pos) < tuple(g_start_chr_pos):
-					r_i, r = r_iter.next()
-					r_start_chr_pos = r[0]
-					r_end_chr_pos = r[1]
-
-				while g_i < num_genes - 1 and tuple(g_end_chr_pos) >= tuple(r_start_chr_pos) \
-						and tuple(r_end_chr_pos) >= tuple(g_start_chr_pos):
-					#there is an overlap
-					num_close_genes += 1
-					while cg_ii < num_cand_genes - 1 and cg_i < g_i:
-						cg_ii, cg_i = cg_iter.next()
-					if g_i == cg_i:
-						num_close_cand_genes += 1
-						obs_cg_indices.append(g_i)
-					g_i, g = g_iter.next()
-					g_end_chr_pos = sp.array([g.chromosome, g.endPos])
-					g_start_chr_pos = sp.array([g.chromosome, g.startPos])
-				#print g_i, r_i
-				#print num_close_genes, num_close_cand_genes
-				#pdb.set_trace()
-
-			#r1 = (num_close_cand_genes / float(num_close_genes))
-			#r2 = (num_cand_genes / float(num_genes))
-			return (num_close_cand_genes, num_close_genes, obs_cg_indices)
 
 		#Parse cgl file
 		if cgl_file:
@@ -434,22 +385,24 @@ class Result(object):
 			print str(cg)
 
 
-		#Load genes from DB.
-		print 'Fetching all genes'
-		all_genes = get_gene_list(include_intron_exons=False, verbose=False)
-		print 'Fetched %d genes.' % len(all_genes)
-		num_genes = len(all_genes)
+		if not all_genes:
+			#Load genes from DB.
+			print 'Fetching all genes'
+			all_genes = get_gene_list(include_intron_exons=False, verbose=False)
+			print 'Fetched %d genes.' % len(all_genes)
+			num_genes = len(all_genes)
 
-		#Pre-process cgl.
-		cand_gene_indices = []
-		for i, g in enumerate(all_genes):
-			for cg in cgl:
-				if g.dbRef == cg.dbRef:
-					#print g.dbRef, cg.dbRef
-					cand_gene_indices.append(i)
-					break
-		num_cand_genes = len(cand_gene_indices)
-		#print num_cand_genes, cand_gene_indices
+		if not cand_gene_indices:
+			#Pre-process cgl.
+			cand_gene_indices = []
+			for i, g in enumerate(all_genes):
+				for cg in cgl:
+					if g.dbRef == cg.dbRef:
+						#print g.dbRef, cg.dbRef
+						cand_gene_indices.append(i)
+						break
+			num_cand_genes = len(cand_gene_indices)
+			#print num_cand_genes, cand_gene_indices
 
 
 		method_res_dict = {}
@@ -472,62 +425,15 @@ class Result(object):
 			self.filter_percentile(1 - thres)
 
 			#pre-process pvalues
-			regions = []
-			num_scores = len(self.snp_results['scores'])
-			iter = enumerate(it.izip(self.snp_results['chromosomes'], self.snp_results['positions']))
-			th = sp.array([0, gene_radius])
-			(pos_i, t) = iter.next()
-			chr_pos = sp.array(t)
-			while pos_i < num_scores - 1:
-				start_chr_pos = chr_pos
-				end_chr_pos = start_chr_pos
-				while pos_i < num_scores - 1 and sp.all((chr_pos - end_chr_pos) <= th):
-					end_chr_pos = chr_pos
-					(pos_i, t) = iter.next()
-					chr_pos = sp.array(t)
-				if tuple(end_chr_pos) < tuple(start_chr_pos):
-					pdb.set_trace()
-				if pos_i == num_scores - 1: #Last one..
-					if sp.all((chr_pos - end_chr_pos) <= th):
-						regions.append([start_chr_pos - th, chr_pos + th])
-					else:
-						regions.append([start_chr_pos - th, end_chr_pos + th])
-						regions.append([chr_pos - th, chr_pos + th])
+			regions = self.get_regions(gene_radius=gene_radius)
 
-				else:
-					regions.append([start_chr_pos - th, end_chr_pos + th])
-			start_chr_pos = chr_pos
-			end_chr_pos = start_chr_pos
-			regions.append([start_chr_pos - th, end_chr_pos + th])
-			print 'Found % d regions' % len(regions)
-
-
-			#Calculate observed gene enrichments. 
-			obs_enrichments = _calc_enrichment_(all_genes, cand_gene_indices, regions)
+			#Calculate observed candidate gene enrichment. 
+			obs_enrichments = genr.calc_enrichment(all_genes, cand_gene_indices, regions)
 			r1 = obs_enrichments[0] / float(obs_enrichments[1])
 			r2 = (num_cand_genes / float(num_genes))
 			obs_stat = sp.log(r1 / r2)
 			print 'Observed statistics % f' % obs_stat
 			log_enrichments.append(obs_stat)
-
-			num_close_cand_genes = obs_enrichments[0]
-			num_close_genes = obs_enrichments[1]
-			num_exp_ccg = (num_close_genes) * num_cand_genes / float(num_genes)
-			num_exp_cg = (num_close_genes) * (1 - num_cand_genes / float(num_genes))
-			num_exp_dcg = (float(num_genes) - num_close_genes) * (num_cand_genes / float(num_genes))
-			num_exp_dg = (float(num_genes) - num_close_genes) * (1 - num_cand_genes / float(num_genes))
-			num_obs_ccg = num_close_cand_genes
-			num_obs_cg = num_close_genes - num_close_cand_genes
-			num_obs_dcg = num_cand_genes - num_close_cand_genes
-			num_obs_dg = num_genes - num_close_genes
-			f_obs = sp.array([num_obs_ccg, num_obs_cg, num_obs_dcg, num_obs_dg])
-			f_exp = sp.array([num_exp_ccg, num_exp_cg, num_exp_dcg, num_exp_dg])
-			chi_sq_stat, chi_sq_pval = st.chisquare(f_obs, f_exp, 2)
-			if obs_stat > 0:
-				chi_sq_pval = chi_sq_pval / 2
-			else:
-				chi_sq_pval = 1 - chi_sq_pval / 2
-			print 'Cand. gene enrichment p-value from Chi-square test:', chi_sq_pval
 
 			#What cand. genes overlap with regions?
 			obs_cg_indices = obs_enrichments[2]
@@ -541,106 +447,33 @@ class Result(object):
 
 			for method in methods:
 				if method == 'chi_square':
+					chi_sq_pval, chi_sq_stat = genr.get_chi_square_pval(obs_enrichments[0],
+											obs_enrichments[1],
+											num_cand_genes, num_genes)
 					method_res_dict[method]['statistics'].append(chi_sq_stat)
 					method_res_dict[method]['pvals'].append(chi_sq_pval)
 
 				if method == 'multinomial':
 					pass
 				if method == 'gene_perm':
-					print "Doing gene permutations"
-					if obs_stat != float('-inf'):
-						perm_stats = []
-						sign_count = 0
-						for perm_i in range(num_perm):
-							perm_cand_gene_indices = random.sample(range(num_genes), num_cand_genes)
-							perm_cand_gene_indices.sort()
-							perm_enrichments = _calc_enrichment_(all_genes, perm_cand_gene_indices, regions)
-							r1 = perm_enrichments[0] / float(perm_enrichments[1])
-							if r1 == 0.0:
-								perm_stat = float('-inf')
-							else:
-								perm_stat = sp.log(r1 / r2)
-							perm_stats.append(perm_stat)
-							if perm_stat >= obs_stat:
-								sign_count += 1
-								if sign_count == early_stop_threshold:
-									break
-							sys.stdout.write('.')
-							sys.stdout.flush()
-						sys.stdout.write('\n')
-						sys.stdout.flush()
-						perm_stats.sort()
-						p_val = sign_count / float(perm_i + 1)
-					else:
-						p_val = 1.0
-					print 'Permutation p-value estimate: % f' % p_val
-
+					p_val, perm_stats = genr.get_gene_perm_pval(obs_stat, regions, all_genes,
+									cand_gene_indices, num_perm=num_perm,
+									early_stop_threshold=early_stop_threshold)
 					method_res_dict[method]['statistics'].append(perm_stats)
 					method_res_dict[method]['pvals'].append(p_val)
 
 				if method == 'snps_perm':
-					print "Doing SNPs permutations"
-					def _get_perm_regions_(region_dict):
-						new_regions = []
-						for chrom in region_dict:
-							chrom_end = chrom_ends[chrom - 1]
-							regions = region_dict[chrom]
-							while True:
-								shift = int(random.random()*chrom_end)
-								for region in regions:
-									if (region[0][1] + shift) < chrom_end \
-											and (region[1][1] + shift) > chrom_end:
-										break #for loop
-								else:
-									break #while loop
-							start_pos_list = []
-							for i, region in enumerate(regions):
-								start_pos = (region[0][1] + shift) % chrom_end
-								region[0][1] = start_pos
-								region[1][1] = (region[1][1] + shift) % chrom_end
-								start_pos_list.append((start_pos, i))
-							start_pos_list.sort()
-							for sp, i in start_pos_list:
-								new_regions.append(regions[i])
-						return new_regions
-
-
-					region_dict = {1:[], 2:[], 3:[], 4:[], 5:[]}
-					for region in regions:
-						region_dict[region[0][0]].append(region)
-
-					if obs_stat != float('-inf'):
-						perm_stats = []
-						sign_count = 0
-						for perm_i in range(num_perm):
-							perm_regions = _get_perm_regions_(region_dict)
-							perm_enrichments = _calc_enrichment_(all_genes, cand_gene_indices, perm_regions)
-							r1 = perm_enrichments[0] / float(perm_enrichments[1])
-							if r1 == 0.0:
-								perm_stat = float('-inf')
-							else:
-								perm_stat = sp.log(r1 / r2)
-							perm_stats.append(perm_stat)
-							if perm_stat >= obs_stat:
-								sign_count += 1
-								if sign_count == early_stop_threshold:
-									break
-							sys.stdout.write('.')
-							sys.stdout.flush()
-						sys.stdout.write('\n')
-						sys.stdout.flush()
-						perm_stats.sort()
-						p_val = sign_count / float(perm_i + 1)
-					else:
-						p_val = 1.0
-					print 'Permutation p-value estimate: % f' % p_val
+					p_val, perm_stats = genr.get_snps_perm_pval(obs_stat, regions, all_genes,
+									cand_gene_indices, chrom_ends,
+									num_perm=num_perm,
+									early_stop_threshold=early_stop_threshold)
 
 					method_res_dict[method]['statistics'].append(perm_stats)
 					method_res_dict[method]['pvals'].append(p_val)
 
-#					h_res = pylab.hist(perm_stats)
-#					pylab.vlines(obs_stat, 0, max(h_res[0]), colors='r')
-#					pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+#						h_res = pylab.hist(perm_stats)
+#						pylab.vlines(obs_stat, 0, max(h_res[0]), colors='r')
+#						pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
 
 
 		if obs_genes_file:
@@ -689,15 +522,106 @@ class Result(object):
 
 
 
+	def _plot_small_manhattan_(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
+				type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False,
+				cand_genes=None, threshold=0, highlight_markers=None):
+		import matplotlib
+		#matplotlib.use('Agg')
+		import matplotlib.pyplot as plt
+
+		scoreRange = max_score - min_score
+		plt.figure(figsize=(6, 3.5))
+		plt.axes([0.045, 0.12, 0.95, 0.7])
+		starPoints = [[], [], []]
+
+		if cand_genes:
+			for cg in cand_genes:
+				plt.axvspan(cg.startPos, cg.endPos, facecolor='k', alpha=0.5)
+
+		chrom = self.snp_results['chromosomes'][0]
+		positions = map(lambda x: x / 1000.0, self.snp_results['positions'])
+		scores = self.snp_results['scores']
+		for s_i, (score, pos) in enumerate(it.izip(scores, positions)):
+			if score > max_score:
+				starPoints[0].append(pos)
+				starPoints[1].append(max_score)
+				starPoints[2].append(score)
+				score = max_score
+			scores[s_i] = score
+
+		plt.plot(positions, scores, ".", markersize=5, alpha=0.7)
+
+
+		if highlight_markers:
+			ys = []
+			xs = []
+			for c, p, score in highlight_markers:
+				xs.append(p / 1000.0)
+				if score > max_score:
+					plt.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
+					ys.append(max_score)
+				else:
+					ys.append(score)
+			plt.plot(xs, ys, ".", color="#ff9944", markersize=9, alpha=0.8)
+
+		if len(starPoints[0]) > 0:
+			plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=6)
+			i = 0
+			while i < len(starPoints[0]):
+				max_point = i
+				cur_pos = starPoints[0][i]
+				while i < len(starPoints[0]) and abs(starPoints[0][i] - cur_pos) < 1000000:
+					if starPoints[2][i] > starPoints[2][max_point]:
+						max_point = i
+					i += 1
+				plt.text(starPoints[0][max_point] - 200000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
+
+
+
+
+		if plot_bonferroni:
+			b_threshold = -math.log10(1.0 / (len(scores) * 20.0))
+			if threshold :
+				plt.plot([0, max(positions)], [b_threshold, b_threshold], ":")
+				threshold = -math.log10(threshold)
+				plt.plot([0, max(positions)], [threshold, threshold], color='#6495ed', linestyle='-.')
+			#Bonferroni threshold
+			else:
+				plt.plot([0, max(positions)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
+
+		plt.axis([min(positions), max(positions), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
+		if not ylab:
+			if type == "pvals":
+				plt.ylabel('$ - log(p - $value$)$', size="large")
+
+			else:
+				plt.ylabel('score')
+		else:
+			plt.ylabel(ylab)
+		plt.xlabel("kilobases", size="large")
+		plt.title('Chromsome %d' % chrom)
+
+		if pdf_file:
+			plt.savefig(pdf_file, format="pdf")
+		if png_file:
+			plt.savefig(png_file, format="png", dpi=300, bbox_inches='tight')
+		if not (pdf_file or png_file):
+			plt.show()
+
+		plt.clf()
+		plt.close()
+
+
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
 		       percentile=98, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
-		       plot_bonferroni=False, cand_genes=None, threshold=0, local_region=None):
+		       plot_bonferroni=False, cand_genes=None, threshold=0, highlight_markers=None):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
 		"""
+
 		import matplotlib
-		matplotlib.use('Agg')
+		#matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
 
 		"Plotting a Manhattan-style plot with %i markers." % len(self.scores)
@@ -712,30 +636,55 @@ class Result(object):
 				chr_cand_genes.append(cgs)
 
 		num_scores = len(self.scores)
+		chromosome_ends = self.get_chromosome_ends()
 		result = self.simple_clone()
 
-		result.filter_percentile(percentile / 100.0)
-		if percentile < 100 and len(result.scores) == len(self.scores):
-			raise Exception()
+		chrom_set = set(result.snp_results['chromosomes'])
+		if len(chrom_set) == 1:
+			percentile = 0.0
+		if percentile != 0.0:
+			result.filter_percentile(percentile / 100.0)
+
+		if highlight_markers:
+			new_h_markers = []
+			for c, p, pval in highlight_markers:
+				new_h_markers.append((c, p, -math.log10(pval)))
+			highlight_markers = new_h_markers
 
 		if not max_score:
 			max_score = max(result.scores)
+			if highlight_markers:
+				h_scores = [s for c, p, s in highlight_markers]
+				max_score = max(max_score, max(h_scores))
 		if not min_score:
 			if type == "pvals":
 				min_score = 0
 			else:
 				min_score = min(result.scores)
 
+
+		if len(chrom_set) == 1:
+			if cand_genes:
+				cand_genes = chr_cand_genes[chrom_set.pop()]
+			return result._plot_small_manhattan_(pdf_file=pdf_file, png_file=png_file, min_score=min_score,
+						max_score=max_score, ylab=ylab, plot_bonferroni=plot_bonferroni,
+						cand_genes=cand_genes, threshold=threshold,
+						highlight_markers=highlight_markers)
+
+
 		scoreRange = max_score - min_score
 		offset = 0
 		chromosomeSplits = result.get_chromosome_splits()
+
 		ticksList1 = []
 		ticksList2 = []
 		textPos = []
 		plt.figure(figsize=(12, 2.8))
 		plt.axes([0.045, 0.15, 0.95, 0.71])
 		starPoints = [[], [], []]
-		for i in range(0, len(result.chromosome_ends)):
+		chr_offsets = []
+		for i, chromosome_end in enumerate(chromosome_ends):
+			chr_offsets.append(offset)
 			index1 = chromosomeSplits[i][0]
 			index2 = chromosomeSplits[i + 1][0]
 			scoreList = result.scores[index1:index2]
@@ -745,12 +694,9 @@ class Result(object):
 				for cg in chr_cand_genes[i]:
 					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='k', alpha=0.5)
 
+			newPosList = [offset + pos for pos in posList]
 
-			newPosList = []
-			for pos in posList:
-				newPosList.append(offset + pos)
-
-			for s_i, (score, pos) in enumerate(zip(scoreList, newPosList)):
+			for s_i, (score, pos) in enumerate(it.izip(scoreList, newPosList)):
 				if score > max_score:
 					starPoints[0].append(pos)
 					starPoints[1].append(max_score)
@@ -760,12 +706,12 @@ class Result(object):
 
 			plt.plot(newPosList, scoreList, ".", markersize=5, alpha=0.7)
 			oldOffset = offset
-			textPos.append(offset + result.chromosome_ends[i] / 2 - 2000000)
-			offset += result.chromosome_ends[i]
+			textPos.append(offset + chromosome_end / 2 - 2000000)
+			offset += chromosome_end
 			for j in range(oldOffset, offset, 5000000):
 				ticksList1.append(j)
-			for j in range(0, result.chromosome_ends[i], 5000000):
-				if j % 10000000 == 0 and j < result.chromosome_ends[i] - 2500000 :
+			for j in range(chromosome_end, 5000000):
+				if j % 10000000 == 0 and j < chromosome_end - 2500000 :
 					ticksList2.append(j / 1000000)
 				else:
 					ticksList2.append("")
@@ -785,6 +731,18 @@ class Result(object):
 				plt.text(starPoints[0][max_point] - 1000000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
 
 
+		if highlight_markers:
+			ys = []
+			xs = []
+			for c, p, score in highlight_markers:
+				x = chr_offsets[c - 1] + p
+				xs.append(x)
+				if score > max_score:
+					plt.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
+					ys.append(max_score)
+				else:
+					ys.append(score)
+			plt.plot(xs, ys, ".", color="#ff9944", markersize=9, alpha=0.8)
 
 
 		if plot_bonferroni:
@@ -938,9 +896,11 @@ class Result(object):
 		self.scores = self.snp_results['scores']
 		self.positions = self.snp_results['positions']
 		self.chromosomes = self.snp_results['chromosomes']
-		self.mafs = self.snp_results['mafs']
-		self.marfs = self.snp_results['marfs']
-		self.snps = self.snp_results['snps']
+		if self.mafs:
+			self.mafs = self.snp_results['mafs']
+			self.marfs = self.snp_results['marfs']
+		if self.snps:
+			self.snps = self.snp_results['snps']
 		print "%i scores were removed out of %i." % (count - len(self.scores), count)
 		return len(self.scores)
 
@@ -1094,6 +1054,41 @@ class Result(object):
 		return regions_list
 
 
+	def get_regions(self, gene_radius=20000):
+		"""
+		Returns a list of [[chr,start],[chr,end]] elements, 
+		"""
+		regions = []
+		num_scores = len(self.snp_results['scores'])
+		iter = enumerate(it.izip(self.snp_results['chromosomes'], self.snp_results['positions']))
+		th = sp.array([0, gene_radius])
+		(pos_i, t) = iter.next()
+		chr_pos = sp.array(t)
+		while pos_i < num_scores - 1:
+			start_chr_pos = chr_pos
+			end_chr_pos = start_chr_pos
+			while pos_i < num_scores - 1 and sp.all((chr_pos - end_chr_pos) <= th):
+				end_chr_pos = chr_pos
+				(pos_i, t) = iter.next()
+				chr_pos = sp.array(t)
+			if tuple(end_chr_pos) < tuple(start_chr_pos):
+				pdb.set_trace()
+			if pos_i == num_scores - 1: #Last one..
+				if sp.all((chr_pos - end_chr_pos) <= th):
+					regions.append([start_chr_pos - th, chr_pos + th])
+				else:
+					regions.append([start_chr_pos - th, end_chr_pos + th])
+					regions.append([chr_pos - th, chr_pos + th])
+
+			else:
+				regions.append([start_chr_pos - th, end_chr_pos + th])
+		start_chr_pos = chr_pos
+		end_chr_pos = start_chr_pos
+		regions.append([start_chr_pos - th, end_chr_pos + th])
+		print 'Found % d regions' % len(regions)
+		return regions
+
+
 	def get_region_result(self, chromosome, start_pos, end_pos, buffer=0):
 		"""
 		returns a result object with only the SNPs, etc. within the given boundary.
@@ -1175,14 +1170,14 @@ class Result(object):
 		if not self.chromosome_ends:
 			self._sort_by_chr_pos_()
 			i = 0
-			ch_i = 0
-			curr_chr = self.chromosomes[i]
 			chromosome_ends = []
-			while ch_i < 5:
+			while i < len(self.chromosomes):
+				curr_chr = self.chromosomes[i]
 				while i < len(self.chromosomes) and self.chromosomes[i] == curr_chr:
 					i += 1
 				chromosome_ends.append(self.positions[i - 1])
 			self.chromosome_ends = chromosome_ends
+		print self.chromosome_ends
 		return self.chromosome_ends
 
 
