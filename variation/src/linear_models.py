@@ -578,7 +578,7 @@ class LinearMixedModel(LinearModel):
 		return res  #diffrentiated log-likelihoods (*2) (eq. 8 from paper)
 
 
-	def get_REML(self, ngrids=50, llim= -5, ulim=10, esp=1e-6):
+	def get_REML(self, ngrids=100, llim= -10, ulim=10, esp=1e-6):
 		"""
 		Get REML estimates for the effect sizes, as well as the random effect contributions.
 		
@@ -590,7 +590,7 @@ class LinearMixedModel(LinearModel):
 		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML')
 
 
-	def get_ML(self, ngrids=50, llim= -5, ulim=10, esp=1e-6):
+	def get_ML(self, ngrids=100, llim= -10, ulim=10, esp=1e-6):
 		"""
 		Get REML estimates for the effect sizes, as well as the random effect contributions.
 		
@@ -602,7 +602,7 @@ class LinearMixedModel(LinearModel):
 		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='ML')
 
 
-	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -5, ulim=10, esp=1e-6,
+	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
@@ -724,7 +724,7 @@ class LinearMixedModel(LinearModel):
 			p_val = stats.f.sf(f_stat, (xs.shape[1]), p)
 			res_dict['p_val'] = float(p_val)
 
-		return res_dict
+		return res_dict, lls, dlls, sp.log(deltas)
 
 
 
@@ -2428,8 +2428,39 @@ def _test_joint_analysis_():
 
 
 
+def _check_emma_bug_():
+	"""
+	It seems fixed?
+	"""
+	import dataParsers as dp
+	import phenotypeData as pd
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
+	phed = pd.parse_phenotype_file(filename)
+	phed.convert_to_averages()
+	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=1)
+	sd.coordinate_w_phenotype_data(phed, 5)
+	phenotypes = phed.get_values(5)
+	ets = phed.get_ecotypes(5)
+	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
+				ets)
+	lmm = LinearMixedModel(phenotypes)
+	lmm.add_random_effect(K)
+	print 'Getting REML'
+	res, lls, dlls, deltas = lmm.get_REML()
+	import pylab
+	pylab.plot(deltas, dlls)
+	pylab.ylabel('dlls')
+	pylab.xlabel('log(delta)')
+	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/dlls.png', format='png')
+	pylab.clf()
+	pylab.plot(deltas, lls)
+	pylab.ylabel('lls')
+	pylab.xlabel('log(delta)')
+	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/lls.png', format='png')
+
+
 
 
 
 if __name__ == "__main__":
-	_test_stepwise_emmax_()
+	_check_emma_bug_()
