@@ -1,8 +1,6 @@
 """
 Contains functions to perform various linear regression schemes, such as simple, and mixed models.
 """
-#import numpy as np
-#from scipy import *
 import scipy as sp
 sp.alterdot()
 from scipy import linalg
@@ -14,7 +12,6 @@ import pdb
 import cPickle
 import os
 import sys
-#import multiprocessing as mp
 import time
 from pdb import Pdb
 
@@ -724,7 +721,15 @@ class LinearMixedModel(LinearModel):
 			p_val = stats.f.sf(f_stat, (xs.shape[1]), p)
 			res_dict['p_val'] = float(p_val)
 
-		return res_dict, lls, dlls, sp.log(deltas)
+		return res_dict #, lls, dlls, sp.log(deltas)
+
+
+
+	def get_variance_esitimates(self, llim= -10, ulim=10, esp=1e-6, ll_method='REML', opt_method='newton_krylov'):
+		"""
+		A general mixed model estimation of the variance matrices.
+		"""
+		pass
 
 
 
