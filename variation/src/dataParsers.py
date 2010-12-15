@@ -1997,11 +1997,12 @@ def _bug_test_():
 	sd = parse_numerical_snp_data('/home/GMI/bjarni.vilhjalmsson/Projects/data/250K_t72.csv.binary', use_pickle=True)
 	accs1 = set(sd_1001.accessions)
 	accs2 = set(sd.accessions)
-	print accs2 - accs1
 	print len(accs1)
 	print len(accs2)
 	print len(accs2 - accs1)
 	print accs2 - accs1
+	print len(accs1 - accs2)
+	print accs1 - accs2
 
 if __name__ == "__main__":
 
