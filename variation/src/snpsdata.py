@@ -2420,7 +2420,6 @@ class SnpsData(_SnpsData_):
 
 
 
-
 class SNPsDataSet:
 	"""
 	A class that encompasses multiple _SnpsData_ chromosomes objects (chromosomes), and can deal with them as a whole.
@@ -2658,9 +2657,8 @@ class SNPsDataSet:
 				sys.stdout.write(".")
 				sys.stdout.flush()
 				for pos, snp in izip(snpsd.positions, snpsd.snps):
-					outStr = str(chromosome) + delimiter + str(pos)
-					for nt in snp: outStr += delimiter + str(nt)
-					outStr += "\n"
+					outStr = '%d%s%d%s%s\n' % (chromosome, delimiter, pos, delimiter,
+								delimiter.join(map(str, snp.tolist())))
 					f.write(outStr)
 #			for i in range(0,len(self.chromosomes)):
 #				sys.stdout.write(".")

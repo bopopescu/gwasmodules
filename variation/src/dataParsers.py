@@ -6,12 +6,11 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 import time, sys, random
 import os
 import dbutils
-
+import cPickle
+import pdb
 from snpsdata import *
 
 # this should be fixed
-homedir = "/Users/bjarni/"
-resultsdir = ""
 
 
 #Standard missing value is NA
@@ -53,42 +52,41 @@ nt_decoder = {'A':'A',
 #accessionName2EcotypeId = {'NFA-8': '8346', 'Ei2': '8289', 'Pu27': '8362', 'Ms-0': '8340', 'Mt-0': '8341', 'Ull25': '8397', 'HR-10': '8308', 'Nfa10': '8345', 'Fei0': '8294', 'Ws0': '8405', 'Omo2_3': '8350', 'Est1B': '8291', 'Lp26': '8333', 'Var26': '8402', 'Zdr-1': '8409', 'Lp22': '8332', 'Ms_0': '8340', 'Tsu-1': '8394', 'Knox-18': '8318', 'HR5': '8309', 'Spr1-6': '8383', 'Knox-10': '8317', 'Spr1-2': '8382', 'Nok-3': '8347', 'Ra0': '8364', 'LP26': '8333', 'Bay0B': '8260', 'LP22': '8332', 'Mt0': '8341', 'Eden-2': '8287', 'Uod-1': '8398', 'LY1': '8279', 'FeiOB': '8294', 'LY3': '8324', 'Mrk0': '8339', 'C24B': '8273', 'C24A': '8273', 'Pro-0': '8360', 'Ra-0': '8364', 'Kin-0': '8316', 'Ts1A': '8392', 'Ts1B': '8394', 'Gu-0': '8301', 'LOV5A': '6046', 'Knox10': '8317', 'Mz-0': '8342', 'Ts5': '8393', 'Knox18': '8318', 'Sq_1': '8384', 'Ler1': '8324', 'Lz0': '8336', 'Ts1': '8392', 'Wa_1': '8403', 'Spr16': '8383', 'Fei-0': '8294', 'Nok_3': '8347', 'Bur-0': '8272', 'Spr1_6': '8383', 'Bur0': '8272', 'Gy0': '8302', 'Rrs10B': '8372', 'HR10': '8308', 'Tsu1': '8394', 'Ws_2': '8406', 'Ull2-3': '8396', 'Omo2-3': '8350', 'Omo2-1': '8349', 'Rmx-A180': '8371', 'Kondara': '8319', 'NFA10': '8345', 'Bil7': '8263', 'Tamm-2': '8390', 'Bil5': '8262', 'Kin0': '8316', 'CS22491': '8429', 'Nd1': '8344', 'Ga0': '8295', 'Cibc5': '8277', 'Ren11': '8368', 'Zdr-6': '8410', 'Bor4': '8268', 'Ren-11': '8368', 'Bor1': '5837', 'Var21': '8401', 'Est1': '8291', 'Lov_1': '6043', 'CIBC-17': '8276', 'Pu2-23': '8361', 'An-1': '8253', 'Zdr_1': '8409', 'Kas1': '8315', 'LL0': '8328', 'Ren-1': '8367', 'Ler-1': '8324', 'RRS10': '8372', 'Var2_6': '8402', 'Sq-8': '8385', 'Zdr6': '8410', 'EST1A': '8291', 'Rrs7B': '8373', 'Got-7': '8299', 'BroA': '8269', 'Uod_1': '8398', 'Tamm_27': '8391', 'Kz1': '8320', 'Wt5': '8407', 'Zdr1': '8409', 'Tamm-27': '8391', 'Kz9': '8322', 'RmxA02': '8370', 'Got7A': '8299', 'Ts_5': '8393', 'Eden2': '8287', 'Eden1': '6009', 'Pna10': '8358', 'Pu2-7': '8362', 'Tamm27': '8391', 'Mr-0': '8338', 'Ei-2': '8289', 'Mrk-0': '8339', 'Uod1': '8398', 'Pu2_7': '8362', 'CIBC17': '8276', 'Uod7': '8399', 'Lz-0': '8336', 'Gu0': '8301', 'Kz_9': '8322', 'Bil-7': '8263', 'Bil-5': '8262', 'Lp2-2': '8332', 'Fab-2': '8292', 'Fab-4': '8293', 'Se0': '8379', 'Sq-1': '8384', 'Oy-0': '8352', 'LL-0': '8328', 'Col0': '8279', 'Lov1': '6043', 'ShaA': '8248', 'Lov5': '6046', 'An1': '8253', 'Var2-1': '8401', 'Var2-6': '8402', 'CIBC5': '8277', 'Pna_17': '8359', 'Fab4': '8293', 'Got22': '8298', 'Wa-1': '8403', 'Fab2': '8292', 'Lov-5': '6046', 'Edi0': '8288', 'Lov-1': '6043', 'CS2249': '8429', 'RRS7': '8373', 'Ms0': '8340', 'Col-0': '8279', 'Gy-0': '8302', 'BUR0A': '8272', 'El2': '8289', 'Nok3': '8347', 'Wa1': '8403', 'Nd-1': '8344', 'Got-22': '8298', 'Br-0': '8269', 'HR-5': '8309', 'Cibc17': '8276', 'Ull2-5': '8397', 'Se0_2': '8379', 'Est-1': '8291', 'Tamm2B': '8390', 'Se-0': '8379', 'Pu223': '8361', 'Ct-1': '8280', 'Got7': '8299', 'Tamm2': '8390', 'Shahdara': '8248', 'Kas-2': '8315', 'Ct1': '8280', 'Cvi-0': '8281', 'Spr12': '8382', 'Omo21': '8349', 'Bor4B': '8268', 'Omo23': '8350', 'Mr0': '8338', 'Uod-7': '8399', 'Kno10': '8317', 'RmxA180': '8371', 'Bor-4': '8268', 'Bor-1': '5837', 'Kno18': '8318', 'Pna-10': '8358', 'Spr1_2': '8382', 'CviOA': '8281', 'Pna-17': '8359', 'C24': '8273', 'Ts-5': '8393', 'Nafa8B': '8346', 'Pna_10': '8358', 'Pna17': '8359', 'Bay-0': '8260', 'Br0': '8269', 'Ren1': '8367', 'NFA8': '8346', 'RRS-10': '8372', 'Eden-1': '6009', 'Yo-0': '8408', 'Ag0': '8251', 'Ren_11': '8368', 'Ts-1': '8392', 'Kz-1': '8320', 'RRS-7': '8373', 'Wt-5': '8407', 'Ws-2': '8406', 'Cvi0': '8281', 'Kz-9': '8322', 'Edi-0': '8288', 'Wei0': '8404', 'Wei-0': '8404', 'Oy0': '8352', 'Bay0': '8260', 'CIBC-5': '8277', 'Lov5B': '6046', 'Ws-0': '8405', 'Pro0': '8360', 'Van-0': '8400', 'Rmx-A02': '8370', 'Yo0': '8408', 'Van0': '8400', 'Ler1A': '8324', 'Sq8': '8385', 'Mz0': '8342', 'Lp2-6': '8333', 'Ull23': '8396', 'Ws2': '8406', 'Sq1': '8384', 'Ga-0': '8295', 'Tsu1B': '8394', 'BurOB': '8272', 'Kas2': '8315', 'NFA-10': '8345', 'Ag-0': '8251', 'VanOA': '8400', 'Sorbo': '8381'}
 
 
-def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=None, defaultValue=None):
-	class _ecotypeDict_(dict):
-		def __missing__(self, key):
-			return (defaultValue, defaultValue)
-
-	import MySQLdb
-	print "Connecting to db, host=" + host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Fetching data"
-	numRows = int(cursor.execute("select distinct ei.tg_ecotypeid, e2a.accession_id, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, at.complete_2010_strains_in_stock2tg_ecotypeid e2a where e2a.tg_ecotypeid=ei.tg_ecotypeid"))
-
-	ecotDict = _ecotypeDict_()
-	while(1):
-		row = cursor.fetchone()
-		if not row:
-			break;
-		ecotypeID = str(int(row[0]))
-		ecotDict[ecotypeID] = (str(int(row[1])), str(row[2]))
-	cursor.close ()
-	conn.close ()
-	return ecotDict
-
-
+#def getEcotypeToAccessionDictionary(host="papaya.usc.edu", user=None, passwd=None, defaultValue=None):
+#	class _ecotypeDict_(dict):
+#		def __missing__(self, key):
+#			return (defaultValue, defaultValue)
+#
+#	import MySQLdb
+#	print "Connecting to db, host=" + host
+#	if not user:
+#		import sys
+#		sys.stdout.write("Username: ")
+#		user = sys.stdin.readline().rstrip()
+#	if not passwd:
+#		import getpass
+#		passwd = getpass.getpass()
+#	try:
+#		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
+#	except MySQLdb.Error, e:
+#		print "Error %d: %s" % (e.args[0], e.args[1])
+#		sys.exit (1)
+#	cursor = conn.cursor ()
+#	#Retrieve the filenames
+#	print "Fetching data"
+#	numRows = int(cursor.execute("select distinct ei.tg_ecotypeid, e2a.accession_id, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, at.complete_2010_strains_in_stock2tg_ecotypeid e2a where e2a.tg_ecotypeid=ei.tg_ecotypeid"))
+#
+#	ecotDict = _ecotypeDict_()
+#	while(1):
+#		row = cursor.fetchone()
+#		if not row:
+#			break;
+#		ecotypeID = str(int(row[0]))
+#		ecotDict[ecotypeID] = (str(int(row[1])), str(row[2]))
+#	cursor.close ()
+#	conn.close ()
+#	return ecotDict
+#
 #def getEcotypeToNameDictionary(host="papaya.usc.edu", user=None, passwd=None, defaultValue=None):
 #	class _ecotypeDict_(dict):
 #		def __missing__(self, key):
@@ -832,7 +830,6 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 
 
 
-
 def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", missingVal='NA', withArrayIds=False):
 	"""
 	Parses raw CSV SNPs data files into a RawSnpsData.
@@ -1227,381 +1224,381 @@ def parse2010Data(datafile=None):
 #	return(chromasomes)
 
 
-def parseMSFile(filename):
-	"""
-	Parses a Hudson's ms file.
-
-	Returns a list of snpsdata.
-	"""
-	import random
-	f = open(filename, 'r')
-	lines = f.readlines()
-	f.close()
-	i = 0
-	data = []
-	while i	 < len(lines):
-		line = lines[i]
-		if line.startswith("//"):
-			num = 0
-			positions = []
-			snps = []
-			i = i + 1
-			while i < len(lines) and not lines[i].startswith("//"):
-				line = lines[i]
-				if line.startswith("segsites:"):
-					num = int(line[9:].rstrip())
-				if line.startswith("positions:"):
-					l1 = line[10:].rstrip().split()
-					l2 = [0.0] * len(l1)
-					for j in range(0, len(l1)):
-						l2[j] = float(l1[j])
-						snps.append([])		#Initializing the snps.
-					positions = l2
-				if line[0].isdigit():
-					line = line.rstrip()
-					snps[0].append(int(line[0]))
-					for j in range(1, len(positions)):
-						snps[j].append(int(line[j]))
-
-				i = i + 1
-			newSnps = []
-			newPositions = []
-			if len(positions) > 0:
-				newSnps.append(snps[0])
-				newPositions.append(positions[0])
-			k = 0
-			for j in range(1, len(positions)):
-				newSnps.append(snps[j])
-				newPositions.append(positions[j])
-
-			newSnpsd = SnpsData(newSnps, newPositions)
-			#print newSnpsd.snps
-			data.append(newSnpsd)
-		else:
-			i = i + 1
-	#print len(data[0].snps)
-	return data
-
-
-
-def parseMSFileBasescale(filename, baseScale=100000):
-	"""
-	Parses a Hudson's ms file.
-
-	Returns a list of snpsdata.
-	"""
-	import random
-	f = open(filename, 'r')
-	lines = f.readlines()
-	f.close()
-	i = 0
-	data = []
-	invBaseScale = 1 / float(baseScale)
-	while i	 < len(lines):
-		line = lines[i]
-		if line.startswith("//"):
-			num = 0
-			positions = []
-			snps = []
-			i = i + 1
-			while i < len(lines) and not lines[i].startswith("//"):
-				line = lines[i]
-				if line.startswith("segsites:"):
-					num = int(line[9:].rstrip())
-				if line.startswith("positions:"):
-					l1 = line[10:].rstrip().split()
-					l2 = [0.0] * len(l1)
-					for j in range(0, len(l1)):
-						l2[j] = float(l1[j])
-						snps.append([])		#Initializing the snps.
-					positions = l2
-				if line[0].isdigit():
-					line = line.rstrip()
-					snps[0].append(int(line[0]))
-					for j in range(1, len(positions)):
-						snps[j].append(int(line[j]))
-
-				i = i + 1
-			newSnps = []
-			newPositions = []
-			if len(positions) > 0:
-				newSnps.append(snps[0])
-				newPositions.append(positions[0])
-			k = 0
-			for j in range(1, len(positions)):
-				if (positions[j] - positions[j - 1]) >= invBaseScale:
-					newSnps.append(snps[j])
-					newPositions.append(positions[j])
-				else:
-					if baseScale > 10000 and k <= j:  #The precision of ms is 1/10000 (sometimes we have many more snps)
-						k = j + 1
-						while(k < len(positions) and (positions[k] - positions[j - 1]) < invBaseScale):
-							k = k + 1
-						last = 0.0
-						for h in range(0, k - j): # Order statistic 
-							last = random.betavariate(1, k - j - h) * (1 - last) + last
-							positions[j + h] = positions[j + h] + last / 10000
-						if (positions[j] - positions[j - 1]) >= invBaseScale:
-							newSnps.append(snps[j])
-							newPositions.append(positions[j])
-
-			newSnpsd = SnpsData(newSnps, newPositions, baseScale)
-			#print newSnpsd.snps
-			data.append(newSnpsd)
-		else:
-			i = i + 1
-	#print len(data[0].snps)
-	return data
-
-
-def parseMSFileFilter(filename, baseScale=1000000, fixPos=True, filterProb=1.0):
-	f = open(filename, 'r')
-	lines = 	f.readlines()
-	f.close()
-	i = 0
-	data = []
-	invBaseScale = 1 / float(baseScale)
-	while i	 < len(lines):
-		line = lines[i]
-		if line.startswith("//"):
-			num = 0
-			positions = []
-			snps = []
-			i = i + 1
-			while i	 < len(lines) and not lines[i].startswith("//"):
-				line = lines[i]
-				if line.startswith("segsites:"):
-					num = int(line[9:].rstrip())
-				if line.startswith("positions:"):
-					l1 = line[10:].rstrip().split()
-					l2 = [0.0] * len(l1)
-					for j in range(0, len(l1)):
-						l2[j] = float(l1[j])
-						snps.append([])		#Initializing the snps.
-					positions = l2
-				if line[0].isdigit():
-					line = line.rstrip()
-					snps[0].append(int(line[0]))
-					for j in range(1, len(positions)):
-						snps[j].append(int(line[j]))
-
-				i = i + 1
-			newSnps = []
-			newPositions = []
-			l = 0
-			pos = -1
-			for j in range(0, len(positions)):
-				if random.random() <= filterProb:
-					npos = positions[j]
-					if (npos - pos) >= invBaseScale:
-						newSnps.append(snps[j])
-						newPositions.append(npos)
-					else:
-						if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
-							l = j + 1
-							while(l < len(positions) and (positions[l] - pos) < invBaseScale):
-								l = l + 1
-							last = 0.0
-							for h in range(0, l - j): # Order statistic 
-								last = random.betavariate(1, l - j - h) * (1 - last) + last
-								positions[j + h] = positions[j + h] + last / 10000
-
-							if (npos - pos) >= invBaseScale:
-								newSnps.append(snps[j])
-								newPositions.append(npos)
-					pos = positions[j]
-			data.append(SnpsData(newSnps, newPositions, baseScale))
-		else:
-			i = i + 1
-	return data
-
-
-
-def parseMSData(filename, baseScale=1000000, sampleNum=None, fixPos=True):
-	""" 
-	Parses randomly chosen ms outputs from previously calculated files.  Depends on the datafiles!
-	"""
-	f = open(filename, 'r')
-	lines = 	f.readlines()
-	totSampleNum = int(lines[0].split()[2])
-	f.close()
-	i = 0
-	klist = []
-	if sampleNum:
-		k = 0
-		while k < sampleNum:
-			val = int(random.random()*totSampleNum + 1)
-			if not val in klist:
-				klist.append(val)
-				k = k + 1
-	else:
-		klist = range(0, totSampleNum)
-	k = -1
-	data = []
-	invBaseScale = 1 / float(baseScale)
-	while i < len(lines):
-		line = lines[i]
-		if line.startswith("//"):
-			k = k + 1
-			i = i + 1
-			if k in klist:
-				num = 0
-				positions = []
-				snps = []
-				while i	 < len(lines) and not lines[i].startswith("//"):
-					line = lines[i]
-					if line.startswith("segsites:"):
-						num = int(line[9:].rstrip())
-					if line.startswith("positions:"):
-						l1 = line[10:].rstrip().split()
-						l2 = [0.0] * len(l1)
-						for j in range(0, len(l1)):
-							l2[j] = float(l1[j])
-							snps.append([])		#Initializing the snps.
-						positions = l2
-					if line[0].isdigit():
-						line = line.rstrip()
-						snps[0].append(int(line[0]))
-						for j in xrange(1, len(positions)):
-							snps[j].append(int(line[j]))
-
-					i = i + 1
-				newSnps = []
-				newPositions = []
-				if len(positions) > 0:
-					newSnps.append(snps[0])
-					newPositions.append(positions[0])
-					pos = positions[0]
-				l = 0
-				for j in range(1, len(positions)):
-					npos = positions[j]
-					if (npos - pos) >= invBaseScale:
-						newSnps.append(snps[j])
-						newPositions.append(npos)
-					else:
-						if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
-							l = j + 1
-							while(l < len(positions) and (positions[l] - pos) < invBaseScale):
-								l = l + 1
-							last = 0.0
-							for h in range(0, l - j): # Order statistic 
-								last = random.betavariate(1, l - j - h) * (1 - last) + last
-								positions[j + h] = positions[j + h] + last / 10000
-
-							if (npos - pos) >= invBaseScale:
-								newSnps.append(snps[j])
-								newPositions.append(npos)
-					pos = positions[j]
-				data.append(SnpsData(newSnps, newPositions, baseScale))
-		else:
-			i = i + 1
-	return data
-
-
-def parseMSDataFilter(filename, baseScale=1000000, sampleNum=None, fixPos=True, filterProb=1.0):
-	""" 
-	Parses randomly chosen ms outputs from previously calculated files.  Depends on the datafiles!
-	"""
-	#print filename
-	f = open(filename, 'r')
-	lines = 	f.readlines()
-	totSampleNum = int(lines[0].split()[2])
-	f.close()
-	i = 0
-	klist = []
-	if sampleNum:
-		k = 0
-		while k < sampleNum:
-			val = int(random.random()*totSampleNum + 1)
-			if not val in klist:
-				klist.append(val)
-				k = k + 1
-	else:
-		klist = range(0, totSampleNum)
-	k = -1
-	data = []
-	invBaseScale = 1 / float(baseScale)
-	while i	 < len(lines):
-		line = lines[i]
-		if line.startswith("//"):  #New data
-			k = k + 1
-			i = i + 1
-			if k in klist:
-				num = 0
-				positions = []
-				snps = []
-				while i	 < len(lines) and not lines[i].startswith("//"):
-					line = lines[i]
-					if line.startswith("segsites:"):
-						num = int(line[9:].rstrip())
-					if line.startswith("positions:"):
-						l1 = line[10:].rstrip().split()
-						l2 = [0.0] * len(l1)
-						for j in range(0, len(l1)):
-							l2[j] = float(l1[j])
-							snps.append([])		#Initializing the snps.
-						positions = l2
-					if line[0].isdigit():
-						if len(positions) == len(line.rstrip()):  #Hack added to fix ms generated errors in files!
-							line = line.rstrip()
-								#snps[0].append(int(line[0]))
-							for j in xrange(0, len(line)):
-								snps[j].append(int(line[j]))
-						else:
-							print "line nr.", i
-							print "positions:", positions
-							print "line:", line.rstrip()
-							print "old line:", line
-							raise Exception()
-					i = i + 1
-				newSnps = []
-				newPositions = []
-				l = 0
-				pos = -1
-				debug1 = positions[:]
-				debug2 = snps[:]
-				r = 0
-				for j in range(0, len(positions)):
-					if random.random() <= filterProb:
-						r = r + 1
-						npos = positions[j]
-						if (npos - pos) >= invBaseScale:
-							newSnps.append(snps[j])
-							newPositions.append(npos)
-						else:
-							if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
-								l = j + 1
-								while(l < len(positions) and (positions[l] - pos) < invBaseScale):
-									l = l + 1
-								last = 0.0
-								for h in range(0, l - j): # Order statistic 
-									last = random.betavariate(1, l - j - h) * (1 - last) + last
-									positions[j + h] = positions[j + h] + last / 10000
-
-								if (npos - pos) >= invBaseScale:
-									newSnps.append(snps[j])
-									newPositions.append(npos)
-						pos = positions[j]
-				if r == 0 :
-					print "No luck"
-					print len(positions)
-				if len(newSnps) == 0 or len(newSnps[0]) == 0:
-					print "data is empty!!!"
-					print "It succeded ", r, "number of times."
-					print debug1
-					print newPositions
-					print newSnps
-					print debug2
-				snpsd = SnpsData(newSnps, newPositions, baseScale)
-				if len(snpsd.snps) == 0 or len(snpsd.snps[0]) == 0:
-					print snpsd.positions
-					print snpsd.snps
-				data.append(snpsd)
-		else:
-			i = i + 1
-	if data[0] == []:
-		print
-	return data
+#def parseMSFile(filename):
+#	"""
+#	Parses a Hudson's ms file.
+#
+#	Returns a list of snpsdata.
+#	"""
+#	import random
+#	f = open(filename, 'r')
+#	lines = f.readlines()
+#	f.close()
+#	i = 0
+#	data = []
+#	while i	 < len(lines):
+#		line = lines[i]
+#		if line.startswith("//"):
+#			num = 0
+#			positions = []
+#			snps = []
+#			i = i + 1
+#			while i < len(lines) and not lines[i].startswith("//"):
+#				line = lines[i]
+#				if line.startswith("segsites:"):
+#					num = int(line[9:].rstrip())
+#				if line.startswith("positions:"):
+#					l1 = line[10:].rstrip().split()
+#					l2 = [0.0] * len(l1)
+#					for j in range(0, len(l1)):
+#						l2[j] = float(l1[j])
+#						snps.append([])		#Initializing the snps.
+#					positions = l2
+#				if line[0].isdigit():
+#					line = line.rstrip()
+#					snps[0].append(int(line[0]))
+#					for j in range(1, len(positions)):
+#						snps[j].append(int(line[j]))
+#
+#				i = i + 1
+#			newSnps = []
+#			newPositions = []
+#			if len(positions) > 0:
+#				newSnps.append(snps[0])
+#				newPositions.append(positions[0])
+#			k = 0
+#			for j in range(1, len(positions)):
+#				newSnps.append(snps[j])
+#				newPositions.append(positions[j])
+#
+#			newSnpsd = SnpsData(newSnps, newPositions)
+#			#print newSnpsd.snps
+#			data.append(newSnpsd)
+#		else:
+#			i = i + 1
+#	#print len(data[0].snps)
+#	return data
+#
+#
+#
+#def parseMSFileBasescale(filename, baseScale=100000):
+#	"""
+#	Parses a Hudson's ms file.
+#
+#	Returns a list of snpsdata.
+#	"""
+#	import random
+#	f = open(filename, 'r')
+#	lines = f.readlines()
+#	f.close()
+#	i = 0
+#	data = []
+#	invBaseScale = 1 / float(baseScale)
+#	while i	 < len(lines):
+#		line = lines[i]
+#		if line.startswith("//"):
+#			num = 0
+#			positions = []
+#			snps = []
+#			i = i + 1
+#			while i < len(lines) and not lines[i].startswith("//"):
+#				line = lines[i]
+#				if line.startswith("segsites:"):
+#					num = int(line[9:].rstrip())
+#				if line.startswith("positions:"):
+#					l1 = line[10:].rstrip().split()
+#					l2 = [0.0] * len(l1)
+#					for j in range(0, len(l1)):
+#						l2[j] = float(l1[j])
+#						snps.append([])		#Initializing the snps.
+#					positions = l2
+#				if line[0].isdigit():
+#					line = line.rstrip()
+#					snps[0].append(int(line[0]))
+#					for j in range(1, len(positions)):
+#						snps[j].append(int(line[j]))
+#
+#				i = i + 1
+#			newSnps = []
+#			newPositions = []
+#			if len(positions) > 0:
+#				newSnps.append(snps[0])
+#				newPositions.append(positions[0])
+#			k = 0
+#			for j in range(1, len(positions)):
+#				if (positions[j] - positions[j - 1]) >= invBaseScale:
+#					newSnps.append(snps[j])
+#					newPositions.append(positions[j])
+#				else:
+#					if baseScale > 10000 and k <= j:  #The precision of ms is 1/10000 (sometimes we have many more snps)
+#						k = j + 1
+#						while(k < len(positions) and (positions[k] - positions[j - 1]) < invBaseScale):
+#							k = k + 1
+#						last = 0.0
+#						for h in range(0, k - j): # Order statistic 
+#							last = random.betavariate(1, k - j - h) * (1 - last) + last
+#							positions[j + h] = positions[j + h] + last / 10000
+#						if (positions[j] - positions[j - 1]) >= invBaseScale:
+#							newSnps.append(snps[j])
+#							newPositions.append(positions[j])
+#
+#			newSnpsd = SnpsData(newSnps, newPositions, baseScale)
+#			#print newSnpsd.snps
+#			data.append(newSnpsd)
+#		else:
+#			i = i + 1
+#	#print len(data[0].snps)
+#	return data
+#
+#
+#def parseMSFileFilter(filename, baseScale=1000000, fixPos=True, filterProb=1.0):
+#	f = open(filename, 'r')
+#	lines = 	f.readlines()
+#	f.close()
+#	i = 0
+#	data = []
+#	invBaseScale = 1 / float(baseScale)
+#	while i	 < len(lines):
+#		line = lines[i]
+#		if line.startswith("//"):
+#			num = 0
+#			positions = []
+#			snps = []
+#			i = i + 1
+#			while i	 < len(lines) and not lines[i].startswith("//"):
+#				line = lines[i]
+#				if line.startswith("segsites:"):
+#					num = int(line[9:].rstrip())
+#				if line.startswith("positions:"):
+#					l1 = line[10:].rstrip().split()
+#					l2 = [0.0] * len(l1)
+#					for j in range(0, len(l1)):
+#						l2[j] = float(l1[j])
+#						snps.append([])		#Initializing the snps.
+#					positions = l2
+#				if line[0].isdigit():
+#					line = line.rstrip()
+#					snps[0].append(int(line[0]))
+#					for j in range(1, len(positions)):
+#						snps[j].append(int(line[j]))
+#
+#				i = i + 1
+#			newSnps = []
+#			newPositions = []
+#			l = 0
+#			pos = -1
+#			for j in range(0, len(positions)):
+#				if random.random() <= filterProb:
+#					npos = positions[j]
+#					if (npos - pos) >= invBaseScale:
+#						newSnps.append(snps[j])
+#						newPositions.append(npos)
+#					else:
+#						if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
+#							l = j + 1
+#							while(l < len(positions) and (positions[l] - pos) < invBaseScale):
+#								l = l + 1
+#							last = 0.0
+#							for h in range(0, l - j): # Order statistic 
+#								last = random.betavariate(1, l - j - h) * (1 - last) + last
+#								positions[j + h] = positions[j + h] + last / 10000
+#
+#							if (npos - pos) >= invBaseScale:
+#								newSnps.append(snps[j])
+#								newPositions.append(npos)
+#					pos = positions[j]
+#			data.append(SnpsData(newSnps, newPositions, baseScale))
+#		else:
+#			i = i + 1
+#	return data
+#
+#
+#
+#def parseMSData(filename, baseScale=1000000, sampleNum=None, fixPos=True):
+#	""" 
+#	Parses randomly chosen ms outputs from previously calculated files.  Depends on the datafiles!
+#	"""
+#	f = open(filename, 'r')
+#	lines = 	f.readlines()
+#	totSampleNum = int(lines[0].split()[2])
+#	f.close()
+#	i = 0
+#	klist = []
+#	if sampleNum:
+#		k = 0
+#		while k < sampleNum:
+#			val = int(random.random()*totSampleNum + 1)
+#			if not val in klist:
+#				klist.append(val)
+#				k = k + 1
+#	else:
+#		klist = range(0, totSampleNum)
+#	k = -1
+#	data = []
+#	invBaseScale = 1 / float(baseScale)
+#	while i < len(lines):
+#		line = lines[i]
+#		if line.startswith("//"):
+#			k = k + 1
+#			i = i + 1
+#			if k in klist:
+#				num = 0
+#				positions = []
+#				snps = []
+#				while i	 < len(lines) and not lines[i].startswith("//"):
+#					line = lines[i]
+#					if line.startswith("segsites:"):
+#						num = int(line[9:].rstrip())
+#					if line.startswith("positions:"):
+#						l1 = line[10:].rstrip().split()
+#						l2 = [0.0] * len(l1)
+#						for j in range(0, len(l1)):
+#							l2[j] = float(l1[j])
+#							snps.append([])		#Initializing the snps.
+#						positions = l2
+#					if line[0].isdigit():
+#						line = line.rstrip()
+#						snps[0].append(int(line[0]))
+#						for j in xrange(1, len(positions)):
+#							snps[j].append(int(line[j]))
+#
+#					i = i + 1
+#				newSnps = []
+#				newPositions = []
+#				if len(positions) > 0:
+#					newSnps.append(snps[0])
+#					newPositions.append(positions[0])
+#					pos = positions[0]
+#				l = 0
+#				for j in range(1, len(positions)):
+#					npos = positions[j]
+#					if (npos - pos) >= invBaseScale:
+#						newSnps.append(snps[j])
+#						newPositions.append(npos)
+#					else:
+#						if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
+#							l = j + 1
+#							while(l < len(positions) and (positions[l] - pos) < invBaseScale):
+#								l = l + 1
+#							last = 0.0
+#							for h in range(0, l - j): # Order statistic 
+#								last = random.betavariate(1, l - j - h) * (1 - last) + last
+#								positions[j + h] = positions[j + h] + last / 10000
+#
+#							if (npos - pos) >= invBaseScale:
+#								newSnps.append(snps[j])
+#								newPositions.append(npos)
+#					pos = positions[j]
+#				data.append(SnpsData(newSnps, newPositions, baseScale))
+#		else:
+#			i = i + 1
+#	return data
+#
+#
+#def parseMSDataFilter(filename, baseScale=1000000, sampleNum=None, fixPos=True, filterProb=1.0):
+#	""" 
+#	Parses randomly chosen ms outputs from previously calculated files.  Depends on the datafiles!
+#	"""
+#	#print filename
+#	f = open(filename, 'r')
+#	lines = 	f.readlines()
+#	totSampleNum = int(lines[0].split()[2])
+#	f.close()
+#	i = 0
+#	klist = []
+#	if sampleNum:
+#		k = 0
+#		while k < sampleNum:
+#			val = int(random.random()*totSampleNum + 1)
+#			if not val in klist:
+#				klist.append(val)
+#				k = k + 1
+#	else:
+#		klist = range(0, totSampleNum)
+#	k = -1
+#	data = []
+#	invBaseScale = 1 / float(baseScale)
+#	while i	 < len(lines):
+#		line = lines[i]
+#		if line.startswith("//"):  #New data
+#			k = k + 1
+#			i = i + 1
+#			if k in klist:
+#				num = 0
+#				positions = []
+#				snps = []
+#				while i	 < len(lines) and not lines[i].startswith("//"):
+#					line = lines[i]
+#					if line.startswith("segsites:"):
+#						num = int(line[9:].rstrip())
+#					if line.startswith("positions:"):
+#						l1 = line[10:].rstrip().split()
+#						l2 = [0.0] * len(l1)
+#						for j in range(0, len(l1)):
+#							l2[j] = float(l1[j])
+#							snps.append([])		#Initializing the snps.
+#						positions = l2
+#					if line[0].isdigit():
+#						if len(positions) == len(line.rstrip()):  #Hack added to fix ms generated errors in files!
+#							line = line.rstrip()
+#								#snps[0].append(int(line[0]))
+#							for j in xrange(0, len(line)):
+#								snps[j].append(int(line[j]))
+#						else:
+#							print "line nr.", i
+#							print "positions:", positions
+#							print "line:", line.rstrip()
+#							print "old line:", line
+#							raise Exception()
+#					i = i + 1
+#				newSnps = []
+#				newPositions = []
+#				l = 0
+#				pos = -1
+#				debug1 = positions[:]
+#				debug2 = snps[:]
+#				r = 0
+#				for j in range(0, len(positions)):
+#					if random.random() <= filterProb:
+#						r = r + 1
+#						npos = positions[j]
+#						if (npos - pos) >= invBaseScale:
+#							newSnps.append(snps[j])
+#							newPositions.append(npos)
+#						else:
+#							if fixPos and baseScale > 10000 and l <= j :  #The precision of ms
+#								l = j + 1
+#								while(l < len(positions) and (positions[l] - pos) < invBaseScale):
+#									l = l + 1
+#								last = 0.0
+#								for h in range(0, l - j): # Order statistic 
+#									last = random.betavariate(1, l - j - h) * (1 - last) + last
+#									positions[j + h] = positions[j + h] + last / 10000
+#
+#								if (npos - pos) >= invBaseScale:
+#									newSnps.append(snps[j])
+#									newPositions.append(npos)
+#						pos = positions[j]
+#				if r == 0 :
+#					print "No luck"
+#					print len(positions)
+#				if len(newSnps) == 0 or len(newSnps[0]) == 0:
+#					print "data is empty!!!"
+#					print "It succeded ", r, "number of times."
+#					print debug1
+#					print newPositions
+#					print newSnps
+#					print debug2
+#				snpsd = SnpsData(newSnps, newPositions, baseScale)
+#				if len(snpsd.snps) == 0 or len(snpsd.snps[0]) == 0:
+#					print snpsd.positions
+#					print snpsd.snps
+#				data.append(snpsd)
+#		else:
+#			i = i + 1
+#	if data[0] == []:
+#		print
+#	return data
 
 
 def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=1, filter_accessions=None,
@@ -1613,7 +1610,6 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 	"""
 	import numpy as np
 	import random
-	import cPickle
 	import time
 	pickle_file = data_file + '.pickled'
 	if use_pickle:
@@ -1760,7 +1756,6 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 	Load snps data..
 	"""
 	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
-	import cPickle
 	if format == 'binary' and look_for_binary:
 		print 'Looking for binary SNPs'
 		sd_binary_file = data_file + '.binary'
@@ -1800,16 +1795,6 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
  	return sd
 
 
-
-#def _parse_
-def parse_full_snp_data(data_file_prefix, chromosome, data_format='nucleotides'):
-	"""
-	Handles large dataset (e.g. full SNPs data) in a managable way... even for a 4GB memory mac.
-	"""
-	if data_format == 'nucleotides':
-		pass
-	elif data_format == 'int': #E.g. binary data.
-		pass
 
 
 def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",",
@@ -1853,47 +1838,158 @@ def parse_chr_pos_list(datafile, delimiter=",", min_marf=0.0):
 
 #--------------------------------------------------------------------------------#
 
-def _testDBParser_():
+#def _testDBParser_():
+#
+#	snpsDatas250 = parse250DataRaw()
+#
+#
+#	#snpsDatasPerlgen = get2010DataFromDb()
+#	snpsDatasPerlgen = getPerlgenDataFromDb()
+#	print len(snpsDatasPerlgen)
+#	for snpsd in snpsDatasPerlgen:
+#		print len(snpsd.positions)
+#
+#
+#	snpsDatas250[0].compareWith(snpsDatasPerlgen[0])
+#
+#	merged250nPerlgen = []
+#	for i in range(0, len(snpsDatas250)):
+#		merged250nPerlgen.append(snpsDatasPerlgen[i].mergeData(snpsDatas250[i]))
+#
+#	writeRawSnpsDatasToFile("Perlgen_250.out", merged250nPerlgen)
+#
+#	snpsDatas2010 = get2010DataFromDb()
+#	print len(snpsDatas2010)
+#	for snpsd in snpsDatas2010:
+#		print len(snpsd.positions)
+#
+#
+#	snpsDatas2010[0].compareWith(snpsDatasPerlgen[0])
+#
+#	merged250n2010nPerlgen = []
+#	for i in range(0, len(merged250nPerlgen)):
+#		merged250n2010nPerlgen.append(snpsDatas2010[i].mergeData(merged250nPerlgen[i]))
+#
+#	writeRawSnpsDatasToFile("2010_Perlgen_250.out", merged250n2010nPerlgen)
+#
+#
+#	"""  
+#	snpErrorRate = []
+#	for chr in [0,1,2,3,4]:
+#		snpErrorRate +=snpsds2[chr].compareWith(snpsds1[chr])
+#	print "Average Genome Wide Snp Error:",sum(snpErrorRate)/float(len(snpErrorRate))
+#	"""
 
-	snpsDatas250 = parse250DataRaw()
 
-
-	#snpsDatasPerlgen = get2010DataFromDb()
-	snpsDatasPerlgen = getPerlgenDataFromDb()
-	print len(snpsDatasPerlgen)
-	for snpsd in snpsDatasPerlgen:
-		print len(snpsd.positions)
-
-
-	snpsDatas250[0].compareWith(snpsDatasPerlgen[0])
-
-	merged250nPerlgen = []
-	for i in range(0, len(snpsDatas250)):
-		merged250nPerlgen.append(snpsDatasPerlgen[i].mergeData(snpsDatas250[i]))
-
-	writeRawSnpsDatasToFile("Perlgen_250.out", merged250nPerlgen)
-
-	snpsDatas2010 = get2010DataFromDb()
-	print len(snpsDatas2010)
-	for snpsd in snpsDatas2010:
-		print len(snpsd.positions)
-
-
-	snpsDatas2010[0].compareWith(snpsDatasPerlgen[0])
-
-	merged250n2010nPerlgen = []
-	for i in range(0, len(merged250nPerlgen)):
-		merged250n2010nPerlgen.append(snpsDatas2010[i].mergeData(merged250nPerlgen[i]))
-
-	writeRawSnpsDatasToFile("2010_Perlgen_250.out", merged250n2010nPerlgen)
-
-
-	"""  
-	snpErrorRate = []
-	for chr in [0,1,2,3,4]:
-		snpErrorRate +=snpsds2[chr].compareWith(snpsds1[chr])
-	print "Average Genome Wide Snp Error:",sum(snpErrorRate)/float(len(snpErrorRate))
+def parse_full_snp_data(data_file_prefix, chromosome, data_format='nucleotides'):
 	"""
+	Handles large dataset (e.g. full SNPs data) in a managable way... even for a 4GB memory mac.
+	"""
+	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
+	data_file = data_file_prefix + '_Chr%i.csv' % chromosome
+	if data_format == 'nucleotides':
+		print 'Looking for nucleotide SNPs'
+		(snpsds, chromosomes) = parseCSVData(data_file, deliminator=',', missingVal='N',
+					format=data_format_dict[data_format], filter=filter, id=id, returnChromosomes=True)
+		sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
+	elif data_format == 'int': #E.g. binary data.
+		pass
+	return sd
+
+
+
+def parse_1001genomes_data(file_name, convert_to_binary=True, remove_non_binary=True, mac_filter=5, delimiter=',',
+		reference_ecotype='6909'):
+	"""
+	Parse SNPs...
+	"""
+	if convert_to_binary:
+	 	if not remove_non_binary:
+			 raise Exception("Can't convert SNPs to binary values when non-binary values are in the data.  Set remove_non_binary option!")
+
+	with open(file_name) as f:
+		header = map(str.strip, f.next().split(delimiter))
+		print header[0]
+		if header[0] != 'Chromosome':
+			array_ids = map(int, header[2:])
+			header = map(str.strip, f.next().split(delimiter))
+		ecotypes = header[2:]
+		if convert_to_binary:
+			if '6909' in ecotypes:
+				ref_i = ecotypes.index('6909')
+			else:
+				ref_i = 0
+				print "Couldn't find reference ecotype!"
+
+		snps = []
+		positions = []
+		num_mac_filtered = 0
+		num_non_binary_filtered = 0
+		for i, line in enumerate(f):
+			if i % 10000 == 0:
+				print i, num_non_binary_filtered, num_mac_filtered, num_non_binary_filtered + num_mac_filtered
+			l = map(str.strip, line.split(delimiter))
+			chrom = int(l[0])
+			pos = int(l[1])
+			snp = l[2:]
+			nts = set(snp)
+			if remove_non_binary:
+				if len(nts) != 2:
+					num_non_binary_filtered += 1
+					continue
+
+			if mac_filter > 0:
+				counts = [snp.count(nt) for nt in nts]
+				if min(counts) < mac_filter:
+					num_mac_filtered += 1
+					continue
+
+			if convert_to_binary:
+				allele_0 = snp[ref_i]
+				f = lambda x: 0 if x == allele_0 else 1
+				snp = sp.array(map(f, snp), dtype='int8')
+
+			snps.append(snp)
+			positions.append(pos)
+	if num_mac_filtered:
+		print '%d SNPs were filtered due to small MACs' % num_mac_filtered
+	if num_non_binary_filtered:
+		print '%d non-binary SNPs were filtered.' % num_non_binary_filtered
+	return ecotypes, snps, positions
+
+
+
+
+
+def _test_full_seq_parser_():
+	file_prefix = '/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/Imputed_2_Chr'
+	chromosomes = [4, 1, 2, 3, 5]
+	for mac in [0, 15]:
+		for chrom in chromosomes:
+			snpsd_list = []
+			file_name = file_prefix + '%d_mac%d.binary.csv' % (chrom, mac)
+			sd = parse_numerical_snp_data(file_name, use_pickle=True)
+
+
+def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5]):
+	"""
+	Parses the binary SNPs
+	"""
+	import env
+	data_1001_dir = env.env['data_1001_dir']
+
+	t = time.time()
+	snpsds = []
+	for chrom in chromosomes:
+		print 'Loading pickled chromosome %d.' % chrom
+		file_name = data_1001_dir + 'Imputed_2_Chr%d_mac%d.binary.csv.pickled' % (chrom, mac)
+		with open(file_name) as f:
+			sd = cPickle.load(f)
+		snpsds.append(sd.snpsDataList[0])
+	t = time.time() - t
+	print 'It took %d minutes and %0.2f seconds to load the data' % (t / 60, t % 60)
+	return SNPsDataSet(snpsds, chromosomes)
+
 
 if __name__ == "__main__":
 
@@ -1903,24 +1999,25 @@ if __name__ == "__main__":
 #		print len(snpsds[i].snps)
 #	sd = parse_snp_data('/Users/bjarni.vilhjalmsson/Projects/Data/250k/250K_t54.csv',look_for_binary=False)
 #	sd = parse_binary_snp_data('/Users/bjarni.vilhjalmsson/Projects/Data/250k/250K_t54.csv.binary')
-	import cPickle
-	import time
-	import random
+#	import time
+#	import random
 #	t_ = time.time()
 #	f = open('/tmp/test.pickled','wb')
 #	cPickle.dump(sd, f, protocol=2)
 #	print 'Took %.2f s...'%(time.time()-t_)
 #	f.close()
 
-	f = open('/tmp/test.pickled', 'rb')
-	t_ = time.time()
-	sd = cPickle.load(f)
-	f_accessions = random.sample(sd.accessions, 900)
-	sd.filter_accessions(f_accessions)
-	print 'Took %.2f s...' % (time.time() - t_)
-	f.close()
+#	f = open('/tmp/test.pickled', 'rb')
+#	t_ = time.time()
+#	sd = cPickle.load(f)
+#	f_accessions = random.sample(sd.accessions, 900)
+#	sd.filter_accessions(f_accessions)
+#	print 'Took %.2f s...' % (time.time() - t_)
+#	f.close()
 
 	#get250KDataFromDb(user="bvilhjal", passwd="bamboo123")
 
 	#pass
 	#_testDBParser_()
+	load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
+	pdb.set_trace()

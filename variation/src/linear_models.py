@@ -2403,69 +2403,74 @@ def _test_joint_analysis_():
 	phed.convert_to_averages()
 
 	mac_threshold = 15
-	pids = []
+	pids = [1, 2, 8]
 
 	join_phen_vals = []
 	joint_ecotypes = []
+	p_her_list = []
 	for pid in pids:
-		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=1)
+		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
+						filter=0.1)
 		sd.coordinate_w_phenotype_data(phed, pid)
 		if mac_threshold:
 			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
 		snps = sd.getSnps()
 		phenotypes = phed.get_values(pid)
+		#Create a new phenotype.
+		join_phen_vals.append(phenotypes)
+		ecotypes = phed.get_ecotypes(pid)
+		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
+		joint_ecotypes.append(ecotypes)
 		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-					phed.get_ecotypes(pid))
-		emma(snps, phenotypes, K)
+					ecotypes)
+		#Get pseudoheritabilities for all phenotypes
+		p_her_list.append(emmax(snps, phenotypes, K)['pseudo_heritability'])
 
+	#Get correlations between traits..
+	corr_mat, pids = phed.get_correlations(pids)
+	print p_her_list, corr_mat, pids
 
-
-	#1. Get pseudoheritabilities for all phenotypes
-
-	#2. Get correlations between traits.. (if correlation method is used).
-
-	#3. Figure out all ecotypes which are in 250K and for which we have phenotypic values.
-
+	unique_ecotypes = list(set(joint_ecotypes))
+	ecotype_indicator_vector = []
 	#4. Create a new phenotype, and SNP indicator vector.
 
 	#5. Run analysis..
 
 
 
-
-def _check_emma_bug_():
-	"""
-	It seems fixed?
-	"""
-	import dataParsers as dp
-	import phenotypeData as pd
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
-	phed = pd.parse_phenotype_file(filename)
-	phed.convert_to_averages()
-	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=1)
-	sd.coordinate_w_phenotype_data(phed, 5)
-	phenotypes = phed.get_values(5)
-	ets = phed.get_ecotypes(5)
-	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-				ets)
-	lmm = LinearMixedModel(phenotypes)
-	lmm.add_random_effect(K)
-	print 'Getting REML'
-	res, lls, dlls, deltas = lmm.get_REML()
-	import pylab
-	pylab.plot(deltas, dlls)
-	pylab.ylabel('dlls')
-	pylab.xlabel('log(delta)')
-	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/dlls.png', format='png')
-	pylab.clf()
-	pylab.plot(deltas, lls)
-	pylab.ylabel('lls')
-	pylab.xlabel('log(delta)')
-	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/lls.png', format='png')
-
+#
+#def _check_emma_bug_():
+#	"""
+#	It seems fixed?
+#	"""
+#	import dataParsers as dp
+#	import phenotypeData as pd
+#	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
+#	phed = pd.parse_phenotype_file(filename)
+#	phed.convert_to_averages()
+#	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=1)
+#	sd.coordinate_w_phenotype_data(phed, 5)
+#	phenotypes = phed.get_values(5)
+#	ets = phed.get_ecotypes(5)
+#	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
+#				ets)
+#	lmm = LinearMixedModel(phenotypes)
+#	lmm.add_random_effect(K)
+#	print 'Getting REML'
+#	res, lls, dlls, deltas = lmm.get_REML()
+#	import pylab
+#	pylab.plot(deltas, dlls)
+#	pylab.ylabel('dlls')
+#	pylab.xlabel('log(delta)')
+#	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/dlls.png', format='png')
+#	pylab.clf()
+#	pylab.plot(deltas, lls)
+#	pylab.ylabel('lls')
+#	pylab.xlabel('log(delta)')
+#	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/lls.png', format='png')
 
 
 
 
 if __name__ == "__main__":
-	_check_emma_bug_()
+	_test_joint_analysis_()

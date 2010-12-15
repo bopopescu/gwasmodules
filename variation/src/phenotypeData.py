@@ -351,11 +351,11 @@ class phenotype_data:
 		num_traits = len(pids)
 		corr_mat = sp.ones((num_traits, num_traits))
 		for i, pid1 in enumerate(pids):
-			pd = self.get_avg_value_dict(pid)
+			pd = self.get_avg_value_dict(pid1)
 			ets1 = pd['ecotypes']
 			pvs1 = pd['values']
 			for j, pid2 in enumerate(pids[:i]):
-				pd = self.get_avg_value_dict(pid)
+				pd = self.get_avg_value_dict(pid2)
 				ets2 = pd['ecotypes']
 				pvs2 = pd['values']
 				common_ets = set(ets1).intersection(set(ets2))
