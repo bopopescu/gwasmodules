@@ -4,8 +4,12 @@ Examples:
 	#setup database in postgresql
 	GenomeDB.py -u crocea -k genome
 	
+	# 2010-12-15 setup genome schema in vervetdb.
+	GenomeDB.py -u yh -k genome -d vervetdb -v postgresql
+	
 	#setup database in mysql
 	GenomeDB.py -v mysql -u yh -z papaya -d genome -k ""
+	
 	
 Description:
 	2008-07-09
@@ -97,12 +101,15 @@ class EntrezgeneType(Entity):
 	using_options(tablename='entrezgene_type')
 	using_table_options(mysql_engine='InnoDB')
 
-class EntrezgeneMapping(Entity):
 	"""
+class EntrezgeneMapping(Entity):
+	2010-12-13
+		merged into Gene
 	2008-07-27
 		table to store position info of genes
 	"""
-	gene = ManyToOne('Gene', colname='gene_id', primary_key=True, ondelete='CASCADE', onupdate='CASCADE')
+	"""
+	gene = ManyToOne('Gene', colname='gene_id', ondelete='CASCADE', onupdate='CASCADE')
 	tax_id = Field(Integer)
 	genomic_accession = Field(String(32))
 	genomic_version = Field(Integer)
@@ -120,6 +127,7 @@ class EntrezgeneMapping(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='entrezgene_mapping')
 	using_table_options(mysql_engine='InnoDB')
+	"""
 
 class GeneCommentaryType(Entity):
 	"""
@@ -135,13 +143,15 @@ class GeneCommentaryType(Entity):
 
 class GeneCommentary(Entity):
 	"""
+	2010-12-15
+		gene linked to table Gene
 	2008-07-28
 		store different mRNAs/Peptides from the same gene or mRNA
 	"""
 	accession = Field(String(32))
 	version = Field(Integer)
 	gi = Field(Integer)
-	gene = ManyToOne('EntrezgeneMapping', colname='gene_id', ondelete='CASCADE', onupdate='CASCADE')
+	gene = ManyToOne('Gene', colname='gene_id', ondelete='CASCADE', onupdate='CASCADE')
 	gene_commentary = ManyToOne('GeneCommentary', colname='gene_commentary_id', ondelete='CASCADE', onupdate='CASCADE')
 	gene_commentaries = OneToMany('GeneCommentary')
 	start = Field(Integer)
@@ -340,11 +350,14 @@ class GeneSegment(Entity):
 
 class Gene(Entity):
 	"""
+	2010-12-15
+		move all EntrezgeneMapping-exclusive elements into Gene.
+		EntrezgeneMapping will disappear.
 	2008-07-27
 		table to store meta info of genes
 	"""
 	tax_id = Field(Integer)
-	gene_id = Field(Integer, primary_key=True)
+	ncbi_gene_id = Field(Integer, unique=True)
 	gene_symbol = Field(String(128))
 	locustag = Field(String(128))
 	synonyms = Field(Text)
@@ -361,6 +374,14 @@ class Gene(Entity):
 	nomenclature_status = Field(String(64))
 	other_designations = Field(Text)
 	modification_date = Field(DateTime, default=datetime.now)
+	
+	genomic_accession = Field(String(32))
+	genomic_version = Field(Integer)
+	genomic_annot_assembly = ManyToOne('AnnotAssembly', colname='genomic_gi', ondelete='CASCADE', onupdate='CASCADE')
+	entrezgene_type = ManyToOne('EntrezgeneType', colname='entrezgene_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	comment = Field(Text)
+	gene_commentaries = OneToMany('GeneCommentary')
+	
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
 	date_created = Field(DateTime, default=datetime.now)
@@ -371,6 +392,9 @@ class Gene(Entity):
 
 class Gene2go(Entity):
 	"""
+	2010-12-15
+		add go_qualifier as part of the unique constraint
+		"NOT" means the gene is not associated with specified GO.
 	2008-07-27
 		table to store mapping between gene and GO
 	"""
@@ -388,7 +412,7 @@ class Gene2go(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='gene2go')
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('tax_id', 'gene_id', 'go_id', 'evidence', 'category'))
+	using_table_options(UniqueConstraint('tax_id', 'gene_id', 'go_id', 'evidence', 'category', 'go_qualifier'))
 
 class Gene2Family(Entity):
 	"""
@@ -461,7 +485,7 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 	gene_id2coord = {}
 	offset_index = 0
 	block_size = 5000
-	rows = EntrezgeneMapping.query.filter_by(tax_id=tax_id).offset(offset_index).limit(block_size)
+	rows = Gene.query.filter_by(tax_id=tax_id).offset(offset_index).limit(block_size)
 	while rows.count()!=0:
 		for row in rows:
 			genomic_gi = row.genomic_gi
@@ -483,7 +507,7 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 			chromosome2anchor_gene_tuple_ls[chromosome].append((start, gene_id))
 			gene_id2coord[gene_id] = (start, stop, strand, genomic_gi)
 		
-		rows = EntrezgeneMapping.query.filter_by(tax_id=tax_id).offset(offset_index).limit(block_size)
+		rows = Gene.query.filter_by(tax_id=tax_id).offset(offset_index).limit(block_size)
 	for chromosome in chromosome2anchor_gene_tuple_ls:	#sort the list
 		chromosome2anchor_gene_tuple_ls[chromosome].sort()
 	sys.stderr.write("Done.\n")
@@ -502,6 +526,9 @@ class GenomeDatabase(ElixirDB):
 		"""
 		from ProcessOptions import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		if self.debug:
+			import pdb
+			pdb.set_trace()
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 	
 	def get_gene_id2model(self, tax_id=3702):
@@ -525,27 +552,27 @@ class GenomeDatabase(ElixirDB):
 		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey
 		from pymodule.RBTree import RBDict
 		
-		geneSpanRBDict = RBDict()			
+		geneSpanRBDict = RBDict()
 		
 		i = 0
 		block_size = 5000
-		query = EntrezgeneMapping.query.filter_by(tax_id=tax_id).order_by(EntrezgeneMapping.chromosome).order_by(EntrezgeneMapping.start)
+		query = Gene.query.filter_by(tax_id=tax_id).order_by(Gene.chromosome).order_by(Gene.start)
 		rows = query.offset(i).limit(block_size)
 		while rows.count()!=0:
 			for row in rows:
 				chromosome = row.chromosome
-				gene_id = row.gene_id
-				
+				gene_id = row.id
 				
 				if chromosome not in chr_id2gene_id_ls:
 					chr_id2gene_id_ls[chromosome] = []
 				chr_id2gene_id_ls[chromosome].append(gene_id)
 				if gene_id not in gene_id2model:
-					gene_id2model[gene_id] = GeneModel(gene_id=gene_id, chromosome=chromosome, gene_symbol=row.gene.gene_symbol,\
-													locustag=row.gene.locustag, map_location=row.gene.map_location,\
+					gene_id2model[gene_id] = GeneModel(gene_id=gene_id, ncbi_gene_id=row.ncbi_gene_id, chromosome=chromosome, \
+													gene_symbol=row.gene_symbol,\
+													locustag=row.locustag, map_location=row.map_location,\
 													type_of_gene=row.entrezgene_type.type, type_id=row.entrezgene_type_id,\
 													start=row.start, stop=row.stop, strand=row.strand, tax_id=row.tax_id,\
-													description =row.gene.description)	#2010-8-19 add description
+													description =row.description)	#2010-8-19 add description
 					
 					gene_model = gene_id2model[gene_id]
 					if gene_model.chromosome and gene_model.start and gene_model.stop:
