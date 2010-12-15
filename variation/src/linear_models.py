@@ -2431,7 +2431,13 @@ def _test_joint_analysis_():
 	print p_her_list, corr_mat, pids
 
 	unique_ecotypes = list(set(joint_ecotypes))
-	ecotype_indicator_vector = []
+	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
+					filter=0.1)
+	sd.filter_accessions(unique_ecotypes)
+	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
+				sd.accessions)
+
+	ecotype_maps = []
 	#4. Create a new phenotype, and SNP indicator vector.
 
 	#5. Run analysis..

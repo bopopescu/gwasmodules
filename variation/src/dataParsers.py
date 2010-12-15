@@ -1989,8 +1989,19 @@ def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5], debug_filter=1):
 		snpsds.append(sd.snpsDataList[0])
 	t = time.time() - t
 	print 'It took %d minutes and %0.2f seconds to load the data' % (t / 60, t % 60)
-	return SNPsDataSet(snpsds, chromosomes)
+	return SNPsDataSet(snpsds, chromosomes, data_format='binary')
 
+
+def _bug_test_():
+	sd_1001 = load_1001_full_snps()
+	sd = parse_numerical_snp_data('/home/GMI/bjarni.vilhjalmsson/Projects/data/250K_t72.csv.binary', use_pickle=True)
+	accs1 = set(sd_1001.accessions)
+	accs2 = set(sd.accessions)
+	print accs2 - accs1
+	print len(accs1)
+	print len(accs2)
+	print len(accs2 - accs1)
+	print accs2 - accs1
 
 if __name__ == "__main__":
 
@@ -2020,5 +2031,6 @@ if __name__ == "__main__":
 
 	#pass
 	#_testDBParser_()
-	load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
+	#load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
+	_bug_test_()
 	pdb.set_trace()

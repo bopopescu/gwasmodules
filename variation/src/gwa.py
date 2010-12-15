@@ -505,7 +505,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 		if p_dict['use_imputed_full_data']:
 			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
 		else:
-			get_pseudo_heritability = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
+			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
 						filter=p_dict['debug_filter'])
 		#Do we need to calculate the K-matrix?
 		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:

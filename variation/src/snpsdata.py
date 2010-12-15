@@ -2773,12 +2773,12 @@ class SNPsDataSet:
 		print "Out of %d, leaving %d values." % (num_values, len(ets))
 		#Ordering accessions according to the order of accessions in the genotype file
 
-		if ets != self.accessions:
-			l = zip(ets, range(len(ets)))
-			l.sort()
-			l = map(list, zip(*l))
-			ets_map = l[1]
-			phend.order_ecotypes(ets_map, pids=[pid])
+#		if ets != self.accessions:
+#			l = zip(ets, range(len(ets)))
+#			l.sort()
+#			l = map(list, zip(*l))
+#			ets_map = l[1]
+#			phend.order_ecotypes(ets_map, pids=[pid])
 
 
 		if self.data_format == 'binary':
@@ -3166,6 +3166,7 @@ class SNPsDataSet:
 			if acc in ecotypes:
 				acc_indices_to_keep.append(i)
 		#pdb.set_trace()
+		acc_indices_to_keep.sort()
 		self.filter_accessions_indices(acc_indices_to_keep)
 
 
