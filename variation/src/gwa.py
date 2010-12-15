@@ -370,7 +370,7 @@ def analysis_plots(snps_data_file, phed, p_dict):
 
 	#Genotype and phenotype data is only used for permutations.
 	if p_dict['use_imputed_full_data']:
-		sd = dataParsers.load_1001_full_snps()
+		sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
 	else:
 		sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
 
@@ -472,7 +472,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	if p_dict['use_existing_results']:
 		if p_dict['region_plots']:
 			if p_dict['use_imputed_full_data']:
-				sd = dataParsers.load_1001_full_snps()
+				sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
 			else:
 				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
 								filter=p_dict['debug_filter'])
@@ -503,9 +503,9 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	if not res: #If results weren't found in a file... then do GWA.
 		#Loading data
 		if p_dict['use_imputed_full_data']:
-			sd = dataParsers.load_1001_full_snps()
+			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
 		else:
-			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
+			get_pseudo_heritability = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
 						filter=p_dict['debug_filter'])
 		#Do we need to calculate the K-matrix?
 		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:
@@ -555,7 +555,10 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 		print "Plotting a histogram"
 		p_her = None
 		if k is not None:
-			p_her = phed.get_pseudo_heritability(p_i, k)
+			ph_method = 'avg'
+			if p_dict['with_replicates']:
+				ph_method = 'repl'
+			p_her = phed.get_pseudo_heritability(p_i, k, method=ph_method)
 		#title = phenotype_name
 		#if p_her:
 		#	title += ': p_her=%0.4f' % p_her

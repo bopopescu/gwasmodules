@@ -2793,8 +2793,8 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1):
-		print 'Starting kinship calculation'
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100):
+		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
 		snps_array = sp.array(snps)
 		snps_array = snps_array.T
@@ -2808,7 +2808,7 @@ class SNPsDataSet:
 				comp_i += 1
 				k_mat[i, j] = sp.sum(snps_array[i] == snps_array[j]) / num_snps
 				k_mat[j, i] = k_mat[i, j]
-				if num_comp >= 10 and (comp_i + 1) % (num_comp / 10) == 0: #Print dots
+				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
 					sys.stdout.write('.')
 					sys.stdout.flush()
 		return k_mat

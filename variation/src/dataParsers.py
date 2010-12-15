@@ -1971,7 +1971,7 @@ def _test_full_seq_parser_():
 			sd = parse_numerical_snp_data(file_name, use_pickle=True)
 
 
-def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5]):
+def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5], debug_filter=1):
 	"""
 	Parses the binary SNPs
 	"""
@@ -1985,6 +1985,7 @@ def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5]):
 		file_name = data_1001_dir + 'Imputed_2_Chr%d_mac%d.binary.csv.pickled' % (chrom, mac)
 		with open(file_name) as f:
 			sd = cPickle.load(f)
+		sd.sample_snps(debug_filter)
 		snpsds.append(sd.snpsDataList[0])
 	t = time.time() - t
 	print 'It took %d minutes and %0.2f seconds to load the data' % (t / 60, t % 60)
