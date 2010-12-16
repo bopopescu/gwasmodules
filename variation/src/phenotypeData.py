@@ -70,24 +70,17 @@ class phenotype_data:
 				self.phen_dict[pid] = {'name':phenotype_names[i], 'ecotypes':[], 'values':[]}
 
 
-	def get_pseudo_heritability(self, pid, K, method='repl'):
+	def get_pseudo_heritability(self, pid, K):
 		"""
 		Returns the REML estimate of the heritability.
 		
 		methods: 'avg' (averages), 'repl' (replicates)
 		"""
 		import linear_models as lm
-		if method == 'avg':
-			phen_vals = self.get_avg_values(pid)
-			lmm = lm.LinearMixedModel(phen_vals)
-			lmm.add_random_effect(K)
-		elif method == 'repl':
-			phen_vals = self.get_values(pid)
-			lmm = lm.LinearMixedModel(phen_vals)
-			Z = self.get_incidence_matrix(pid)
-			lmm.add_random_effect(Z * K * Z.T)
-		else:
-			raise Exception('Unknown method')
+		phen_vals = self.get_values(pid)
+		lmm = lm.LinearMixedModel(phen_vals)
+		Z = self.get_incidence_matrix(pid)
+		lmm.add_random_effect(Z * K * Z.T)
 		return lmm.get_REML()['pseudo_heritability']
 
 
@@ -305,7 +298,7 @@ class phenotype_data:
 			st = "Number of values: " + str(num_phen_vals)
 			plt.text(maxVal - 0.7 * x_range, 1.1 * y_max, st, size="x-small")
 		plt.text(maxVal - 0.85 * x_range, 1.02 * y_max, "Shapiro-Wilk normality $p$-value: %0.6f" % shapiro_pval , size="x-small")
-		print max(histRes[0])
+		#print max(histRes[0])
 		plt.ylabel("Frequency")
 		if title:
 			plt.title(title)

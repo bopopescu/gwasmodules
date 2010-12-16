@@ -704,21 +704,23 @@ class Result(object):
 					score = max_score
 				scoreList[s_i] = score
 
-			plt.plot(newPosList, scoreList, ".", markersize=5, alpha=0.7)
+			plt.plot(newPosList, scoreList, ".", markersize=2, alpha=0.7)
 			oldOffset = offset
 			textPos.append(offset + chromosome_end / 2 - 2000000)
 			offset += chromosome_end
-			for j in range(oldOffset, offset, 5000000):
+			for j in range(oldOffset, offset, 2000000):
 				ticksList1.append(j)
-			for j in range(chromosome_end, 5000000):
-				if j % 10000000 == 0 and j < chromosome_end - 2500000 :
+			#pdb.set_trace()
+			for j in range(0, chromosome_end, 2000000):
+				if j % 5000000 == 0 and j < chromosome_end - 2500000 :
 					ticksList2.append(j / 1000000)
 				else:
 					ticksList2.append("")
+			#pdb.set_trace()
 
 
 
-		plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=6)
+		plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=4)
 		if len(starPoints[0]) > 0:
 			i = 0
 			while i < len(starPoints[0]):
@@ -742,7 +744,7 @@ class Result(object):
 					ys.append(max_score)
 				else:
 					ys.append(score)
-			plt.plot(xs, ys, ".", color="#ff9944", markersize=9, alpha=0.8)
+			plt.plot(xs, ys, ".", color="#ff9944", markersize=6, alpha=0.8)
 
 
 		if plot_bonferroni:
@@ -756,16 +758,17 @@ class Result(object):
 				plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
 
 		plt.axis([0, sum(result.chromosome_ends), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
-		plt.xticks(ticksList1, ticksList2)
+		plt.xticks(ticksList1, ticksList2, fontsize='x-small')
+		#pdb.set_trace()
 		if not ylab:
 			if type == "pvals":
-				plt.ylabel('$ - log(p - $value$)$', size="large")
+				plt.ylabel('$ - log(p - $value$)$')
 
 			else:
 				plt.ylabel('score')
 		else:
 			plt.ylabel(ylab)
-		plt.xlabel("Mb", size="large")
+		plt.xlabel("Mb")
 
 		if pdf_file:
 			plt.savefig(pdf_file, format="pdf")
