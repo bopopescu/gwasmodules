@@ -95,6 +95,10 @@ from env import *
 import copy
 import pdb
 
+#For annoying linux computers, which don't have a display..
+import matplotlib
+matplotlib.use("Agg")
+
 
 transformation_method_dict = {
 			'none':1,

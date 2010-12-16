@@ -1977,7 +1977,7 @@ def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5], debug_filter=1):
 	"""
 	import env
 	data_1001_dir = env.env['data_1001_dir']
-
+	print 'Loading full genotype data.'
 	t = time.time()
 	snpsds = []
 	num_snps = 0
@@ -1991,7 +1991,7 @@ def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5], debug_filter=1):
 		snpsds.append(sd.snpsDataList[0])
 	t = time.time() - t
 	print 'Loaded %d SNPs.' % num_snps
-	print 'It took %d minutes and %0.2f seconds to load the data' % (t / 60, t % 60)
+	print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
 	return SNPsDataSet(snpsds, chromosomes, data_format='binary')
 
 

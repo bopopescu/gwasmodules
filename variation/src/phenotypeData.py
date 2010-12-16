@@ -4,6 +4,11 @@ import math
 import scipy as sp
 import itertools as it
 import sys
+#For annoying linux computers, which don't have a display..
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 
 # Phenotype categories: (category,order)
 #phenotypeCategories = {
@@ -279,7 +284,6 @@ class phenotype_data:
 
 
 	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None, p_her=None):
-		import pylab as plt
 		plt.figure(figsize=(5, 4))
 		plt.axes([0.14, 0.13, 0.81, 0.83])
 		if x_label:
@@ -471,7 +475,6 @@ class phenotype_data:
 		
 		'color_by' is by default set to be the phenotype values.
 		"""
-		import matplotlib
 		matplotlib.rcParams['backend'] = 'GTKAgg'
 		if not ecotypes:
 			ecotypes = self.phen_dict[pid]['ecotypes']
@@ -498,7 +501,6 @@ class phenotype_data:
 
 		from mpl_toolkits.basemap import Basemap
 		import numpy as np
-		import matplotlib.pyplot as plt
 		from pylab import cm
 		if map_type == "global2":
 			plt.figure(figsize=(14, 12))
@@ -571,7 +573,6 @@ class phenotype_data:
 		"""
 		raise NotImplementedError
 		marker = list(marker)
-		import pylab
 		if md and m_i:
 			r = self.get_marker_and_phen_vals(phen_i, md, m_i)
 			marker = r['marker']
@@ -849,7 +850,6 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 #		Z = hc.average(dist_mat)
 #		#print "Z:",Z
 #		#hc.leaders(Z)
-#		import pylab
 #		pylab.figure(figsize=(24, 15))
 #		pylab.axes([0.03, 0.08, 0.96, 0.91])
 #		dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=pi_list)
@@ -1159,9 +1159,6 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 #
 #
 #	def plot_histogram(self, p_i, title=None , pdfFile=None, pngFile=None, withLabels=False):
-#		import matplotlib
-#		matplotlib.use('Agg')
-#		import matplotlib.pyplot as plt
 #		plt.figure(figsize=(5, 4))
 #		plt.axes([0.14, 0.13, 0.81, 0.83])
 #		if withLabels:
@@ -1196,7 +1193,6 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 #		Plots a box plot for the given binary marker and phenotype. 
 #		"""
 #		marker = list(marker)
-#		import pylab
 #		if md and m_i:
 #			r = self.get_marker_and_phen_vals(phen_i, md, m_i)
 #			marker = r['marker']
@@ -1281,7 +1277,6 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 #
 #		from mpl_toolkits.basemap import Basemap
 #		import numpy as np
-#		import matplotlib.pyplot as plt
 #		from pylab import cm
 #		if map_type == "global2":
 #			plt.figure(figsize=(14, 12))
