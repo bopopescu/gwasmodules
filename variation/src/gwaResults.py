@@ -690,6 +690,7 @@ class Result(object):
 			scoreList = result.scores[index1:index2]
 			posList = result.positions[index1:index2]
 
+
 			if cand_genes:
 				for cg in chr_cand_genes[i]:
 					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='k', alpha=0.5)
