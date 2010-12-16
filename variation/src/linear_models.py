@@ -14,6 +14,7 @@ import os
 import sys
 import time
 from pdb import Pdb
+import itertools as it
 
 
 anti_decoder = {1:0, 0:1}
@@ -2365,6 +2366,13 @@ def load_kinship_from_file(kinship_file, accessions=None):
 	return filter_k_for_accessions(k, k_accessions, accessions)
 
 
+def save_kinship_in_text_format(filename, k, accessions):
+	with open(filename, 'w') as f:
+		for acc, row in it.izip(accessions, k):
+			f.write('%s,%s\n' % (acc, ','.join(map(str, row.tolist()))))
+
+
+
 def _test_stepwise_emmax_():
 	import dataParsers as dp
 	import phenotypeData as pd
@@ -2478,5 +2486,10 @@ def _test_joint_analysis_():
 
 
 
+
 if __name__ == "__main__":
-	_test_joint_analysis_()
+	kinship_file_name = '/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.pickled'
+	k, k_accessions = cPickle.load(open(kinship_file_name))
+	save_kinship_in_text_format('/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.csv',
+				k, k_accessions)
+	#_test_joint_analysis_()

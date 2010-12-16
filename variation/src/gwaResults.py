@@ -712,7 +712,7 @@ class Result(object):
 				ticksList1.append(j)
 			#pdb.set_trace()
 			for j in range(0, chromosome_end, 2000000):
-				if j % 5000000 == 0 and j < chromosome_end - 2500000 :
+				if j % 4000000 == 0 and j < chromosome_end - 2000000 :
 					ticksList2.append(j / 1000000)
 				else:
 					ticksList2.append("")
