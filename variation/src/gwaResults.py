@@ -550,6 +550,7 @@ class Result(object):
 
 		if cand_genes:
 			for cg in cand_genes:
+				print cg.startPos, cg.endPos
 				plt.axvspan(cg.startPos, cg.endPos, facecolor='k', alpha=0.5)
 
 
