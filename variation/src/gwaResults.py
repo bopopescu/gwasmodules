@@ -534,9 +534,6 @@ class Result(object):
 		plt.axes([0.045, 0.12, 0.95, 0.7])
 		starPoints = [[], [], []]
 
-		if cand_genes:
-			for cg in cand_genes:
-				plt.axvspan(cg.startPos, cg.endPos, facecolor='k', alpha=0.5)
 
 		chrom = self.snp_results['chromosomes'][0]
 		positions = map(lambda x: x / 1000.0, self.snp_results['positions'])
@@ -549,7 +546,11 @@ class Result(object):
 				score = max_score
 			scores[s_i] = score
 
-		plt.plot(positions, scores, ".", markersize=5, alpha=0.7)
+		plt.plot(positions, scores, ".", markersize=3, alpha=0.7)
+
+		if cand_genes:
+			for cg in cand_genes:
+				plt.axvspan(cg.startPos, cg.endPos, facecolor='k', alpha=0.5)
 
 
 		if highlight_markers:
@@ -562,10 +563,10 @@ class Result(object):
 					ys.append(max_score)
 				else:
 					ys.append(score)
-			plt.plot(xs, ys, ".", color="#ff9944", markersize=9, alpha=0.8)
+			plt.plot(xs, ys, ".", color="#ff9944", markersize=6, alpha=0.8)
 
 		if len(starPoints[0]) > 0:
-			plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=6)
+			plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=4)
 			i = 0
 			while i < len(starPoints[0]):
 				max_point = i
