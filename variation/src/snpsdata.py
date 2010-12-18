@@ -3215,8 +3215,9 @@ class SNPsDataSet:
 		"""
 		Modifies original object, beware!
 		"""
+		c_i = self.chromosomes.index(chr)
 		print chr, start_pos, end_pos
-		snpsd = self.snpsDataList[chr - 1]
+		snpsd = self.snpsDataList[c_i]
 		if start_pos != None:
 			new_snps = []
 			new_positions = []
