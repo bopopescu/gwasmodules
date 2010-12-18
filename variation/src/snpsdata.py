@@ -3140,13 +3140,16 @@ class SNPsDataSet:
 		for snpsd in self.snpsDataList:
 			snpsd.snpsFilterMAF([maf, maf_ub])
 
+
 	def filter_mac_snps(self, mac_threshold=15):
 		for snpsd in self.snpsDataList:
 			snpsd.filter_mac(mac_threshold)
 
+
 	def filter_monomorphic_snps(self):
 		for snpsd in self.snpsDataList:
 			snpsd.filterMonoMorphicSnps()
+
 
 	def filter_accessions(self, accessions_to_keep, use_accession_names=False):
 		assert len(accessions_to_keep) != 0, "Can't remove all ecotypes."
@@ -3158,15 +3161,16 @@ class SNPsDataSet:
 				ecotypes.append(str(ad[acc]))
 		else:
 			ecotypes = accessions_to_keep
-		#print ecotypes
-		#print self.accessions
 		num_accessions = len(self.accessions)
 		acc_indices_to_keep = []
-		for i, acc in enumerate(self.accessions):
-			if acc in ecotypes:
+		for et in ecotypes:
+			try:
+				i = self.accessions.index(et)
 				acc_indices_to_keep.append(i)
+			except:
+				continue
 		#pdb.set_trace()
-		acc_indices_to_keep.sort()
+		#acc_indices_to_keep.sort()
 		self.filter_accessions_indices(acc_indices_to_keep)
 
 

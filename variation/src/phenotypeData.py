@@ -138,6 +138,15 @@ class phenotype_data:
 		self.phen_dict[pid]['values'] = vals.tolist()
 
 
+	def normalize_values(self, pid):
+		"""
+		"""
+		a = sp.array(self.phen_dict[pid]['values'])
+		v = sp.var(self.get_avg_values(pid), ddof=1)
+		vals = a / sp.sqrt(v)
+		self.phen_dict[pid]['values'] = vals.tolist()
+
+
 	def na_outliers(self, pids, iqr_threshold):
 		raise NotImplementedError
 
@@ -201,10 +210,10 @@ class phenotype_data:
 		while i < len(ets):
 			et = ets[i]
 			unique_ets.append(et)
-			while i < len(ets) and ets[i] == et:
+			while i < len(ets) and ets[i] == et: #The ecotypes are assumed to be sorted
 				i += 1
 #		unique_ets = sp.mat(sp.unique(ets))
-		Z = sp.int16(sp.mat(ets).T == sp.mat(unique_ets))
+		Z = sp.int8(sp.mat(ets).T == sp.mat(unique_ets))
 		#print Z
 		return Z
 
@@ -657,6 +666,7 @@ def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_forma
 			print 'Guessing new format.'
 			file_format = 'new'
 		else:
+			print 'Guessing old format.'
 			file_format = 'old'
 #			v = int(raw_input('File format is ambiguous:\n (1) - old format\n (2) - new format\n (3) - exit\n:'))
 #			if v == 1:

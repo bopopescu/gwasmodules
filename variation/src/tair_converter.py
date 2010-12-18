@@ -7,7 +7,7 @@ class tair8_to_tair9_map():
 	"""
 	def __init__(self):
 		#Read conversion manual.
-		file_name = env.home_dir + 'Projects/Data/tair/TAIR9_assembly_updates_relative_to_TAIR8_TAIR9_assemblies.csv'
+		file_name = env.env['data_dir'] + 'tair/TAIR9_assembly_updates_relative_to_TAIR8_TAIR9_assemblies.csv'
 		self.offsets = {}
 		self.offset_positions = {}
 		for chrom in [1, 2, 3, 4, 5]:

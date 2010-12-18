@@ -3426,6 +3426,8 @@ def _getExpectedPvalueQuantiles_(numQuantiles):
 		quantiles.append(float(i) / (numQuantiles + 2))
 	return quantiles
 
+
+
 def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=None, phenName=None, pdfFile=None, pngFile=None,
 	    perm_pvalues=None, **kwargs):
 	"""

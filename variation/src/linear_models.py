@@ -694,8 +694,11 @@ class LinearMixedModel(LinearModel):
 			opt_delta = deltas[max_ll_i]
 			opt_ll = max_ll
 
+		#l <- sq_etas/(eig.R$values+maxdelta)
+		#maxva <- sum(l)/(n-q) 	#vg   		 
+		#maxve <- maxva*maxdelta	#ve
 
-		l = sp.reshape(sq_etas, (len(sq_etas))) / (eig_vals + opt_delta)
+		l = sq_etas / (eig_vals + opt_delta)
 		opt_vg = sp.sum(l) / p  #vg   
 		opt_ve = opt_vg * opt_delta  #ve
 
@@ -1135,6 +1138,8 @@ class LinearMixedModel(LinearModel):
 
 		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], Z=Z, with_betas=with_betas)
 		r['pseudo_heritability'] = res['pseudo_heritability']
+		r['ve'] = res['ve']
+		r['vg'] = res['vg']
 		r['max_ll'] = res['max_ll']
 		return r
 
@@ -1181,11 +1186,11 @@ class LinearMixedModel(LinearModel):
 			t_snps = []
 		chunk_size = len(Y)
 		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
-			snps_chunk = sp.matrix(snps[i:i + chunk_size])
+			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			if with_betas:
 				Xs = snps_chunk * (H_sqrt_inv.T)
 			else:
-				Xs = sp.mat(snps_chunk, dtype=dtype) * M
+				Xs = snps_chunk * M
 			for j in range(len(Xs)):
 				if return_transformed_snps:
 					t_snps.append(sp.array(Xs[j]).flatten())
@@ -1198,7 +1203,10 @@ class LinearMixedModel(LinearModel):
 					betas_list[i + j] = map(float, list(betas))
 				else:
 					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
-				rss_list[i + j] = rss[0]
+				if rss:
+					rss_list[i + j] = rss[0]
+				else:
+					h0_rss
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					sys.stdout.write('.')
@@ -2338,21 +2346,25 @@ def emmax_snp_pair_plot(snps, positions, phenotypes, K, fm_scatter_plot_file=Non
 
 
 
-def _filter_k_(k, indices_to_keep):
-	new_k = sp.zeros((len(indices_to_keep), len(indices_to_keep)))
-	for i in range(len(indices_to_keep)):
-		for j in range(len(indices_to_keep)):
-			new_k[i, j] = k[indices_to_keep[i], indices_to_keep[j]]
-	k = new_k
-	return k
+#def _filter_k_(k, indices_to_keep):
+#	new_k = sp.zeros((len(indices_to_keep), len(indices_to_keep)))
+#	for i in range(len(indices_to_keep)):
+#		for j in range(len(indices_to_keep)):
+#			new_k[i, j] = k[indices_to_keep[i], indices_to_keep[j]]
+#	k = new_k
+#	return k
+
 
 
 def filter_k_for_accessions(k, k_accessions, accessions):
 	indices_to_keep = []
-	for i, acc in enumerate(k_accessions):
-		if acc in accessions:
+	for acc in accessions:
+		try:
+			i = k_accessions.index(acc)
 			indices_to_keep.append(i)
-	return _filter_k_(k, indices_to_keep)
+		except:
+			continue
+	return k[indices_to_keep, :][:, indices_to_keep]
 
 def load_kinship_from_file(kinship_file, accessions=None):
 	assert os.path.isfile(kinship_file), 'File not found.'
@@ -2406,49 +2418,130 @@ def _test_stepwise_emmax_():
 def _test_joint_analysis_():
 	import dataParsers as dp
 	import phenotypeData as pd
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
+	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
 	phed = pd.parse_phenotype_file(filename)
 	phed.convert_to_averages()
 
 	mac_threshold = 15
-	pids = [1, 2, 8]
+	#pids = [187, 188, 189, 190]
+	#pids = [5, 6, 7]
+	pids = [1, 2, 3, 4]
 
-	join_phen_vals = []
+	joint_phen_vals = []
 	joint_ecotypes = []
-	p_her_list = []
+	gen_var_list = []
+	err_var_list = []
+	k_list = []
 	for pid in pids:
+		print phed.get_name(pid)
 		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
-						filter=0.1)
+						filter=0.01)
 		sd.coordinate_w_phenotype_data(phed, pid)
-		if mac_threshold:
-			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
-		snps = sd.getSnps()
+		phed.log_transform(pid)
+		phed.normalize_values(pid)
 		phenotypes = phed.get_values(pid)
 		#Create a new phenotype.
-		join_phen_vals.append(phenotypes)
+		joint_phen_vals.extend(phenotypes)
 		ecotypes = phed.get_ecotypes(pid)
 		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
-		joint_ecotypes.append(ecotypes)
+		joint_ecotypes.extend(ecotypes)
 		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
 					ecotypes)
 		#Get pseudoheritabilities for all phenotypes
-		p_her_list.append(emmax(snps, phenotypes, K)['pseudo_heritability'])
+		lmm = LinearMixedModel(phenotypes)
+		lmm.add_random_effect(K)
+		res = lmm.get_REML()
+		print 'Pseudo-heritatbility:', res['pseudo_heritability']
+		err_var_list.append(res['ve'])
+		gen_var_list.append(sp.sqrt(res['vg']))
 
 	#Get correlations between traits..
 	corr_mat, pids = phed.get_correlations(pids)
-	print p_her_list, corr_mat, pids
+	corr_mat = corr_mat * corr_mat
+	print gen_var_list, err_var_list, corr_mat, pids
 
 	unique_ecotypes = list(set(joint_ecotypes))
 	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
-					filter=0.1)
+					filter=1)
 	sd.filter_accessions(unique_ecotypes)
+	if mac_threshold:
+		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
+	#unique_ecotypes = sd.accessions
 	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-				sd.accessions)
+				unique_ecotypes)
 
-	ecotype_maps = []
-	#4. Create a new phenotype, and SNP indicator vector.
+	#Create ecotype maps
+	ecotype_maps = {}
+	for pid in pids:
+		l = []
+		ets = phed.get_ecotypes(pid)
+		for et in ets:
+			l.append(unique_ecotypes.index(et))
+		ecotype_maps[pid] = l
+
+	#Construct new variance matrix
+	V = sp.zeros((len(joint_ecotypes), len(joint_ecotypes)))
+	m_i = 0
+	for i, pid1 in enumerate(pids):
+		ets_map1 = ecotype_maps[pid1]
+		num_ets1 = len(ets_map1)
+		m_j = 0
+		for j, pid2 in enumerate(pids):
+			ets_map2 = ecotype_maps[pid2]
+			num_ets2 = len(ets_map2)
+			var_sclice = corr_mat[i, j] * gen_var_list[i] * gen_var_list[j] * K[ets_map1, :][:, ets_map2]
+			if pid1 == pid2:
+				var_sclice += err_var_list[i] * sp.eye(num_ets1)
+			V[m_i:m_i + num_ets1, m_j:m_j + num_ets2] = var_sclice
+			m_j += num_ets2
+		m_i += num_ets1
+
+	print'Performing Cholesky decomposition'
+	try:
+		H_sqrt = linalg.cholesky(V)
+	except Exception, err_str:
+		import rpy
+		rpy.r.library('Matrix')
+		rpy.r("""
+		f <- function(v,len){
+			m <- matrix(v,len,len);
+		  	return(as.matrix(nearPD(m)['mat'][[1]]));
+		}
+		""")
+		near_V = rpy.r.f(V, len(V))
+
+		rel_change = (near_V - V) / V
+		avg_rel_change = sp.average(sp.absolute(rel_change))
+		max_rel_change = rel_change.max()
+		print 'Average relative change in matrix: %0.6f' % avg_rel_change
+		print 'Maximum relative change in matrix: %0.6f' % max_rel_change
+		H_sqrt = linalg.cholesky(near_V)
+	H_sqrt_inv = sp.mat(H_sqrt.T).I
+
+	#pdb.set_trace()
 
 	#5. Run analysis..
+	lmm = LinearMixedModel(joint_phen_vals)
+	#Need to fix the SNPs!!!
+	Z = sp.int16(sp.mat(joint_ecotypes).T == sp.mat(unique_ecotypes))
+	snps = sd.getSnps()
+ 	positions = sd.getPositions()
+ 	chromosomes = sd.get_chr_list()
+	#pdb.set_trace()
+	res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
+	#pdb.set_trace()
+	png_file_name = '/Users/bjarni.vilhjalmsson/tmp/test.png'
+	import gwaResults as gr
+	res = gr.Result(scores=res['ps'], positions=positions, chromosomes=chromosomes)
+	gr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
+		pngFile='/Users/bjarni.vilhjalmsson/tmp/qq_plot.png')
+	gr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
+			phenName='joint', pngFile='/Users/bjarni.vilhjalmsson/tmp/log_qq_plot.png')
+	res.neg_log_trans()
+	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+
+
 
 
 
@@ -2488,8 +2581,8 @@ def _test_joint_analysis_():
 
 
 if __name__ == "__main__":
-	kinship_file_name = '/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.pickled'
-	k, k_accessions = cPickle.load(open(kinship_file_name))
-	save_kinship_in_text_format('/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.csv',
-				k, k_accessions)
-	#_test_joint_analysis_()
+#	kinship_file_name = '/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.pickled'
+#	k, k_accessions = cPickle.load(open(kinship_file_name))
+#	save_kinship_in_text_format('/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.csv',
+#				k, k_accessions)
+	_test_joint_analysis_()
