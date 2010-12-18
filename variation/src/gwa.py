@@ -266,6 +266,17 @@ def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method
 	return prefix
 
 
+def _get_genotype_data_(p_dict):
+	if p_dict['use_imputed_full_data']:
+		if p_dict['local_gwas']:
+			chrom = p_dict['local_gwas'][0]
+			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'], chromosomes=[chrom])
+		else:
+			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
+	else:
+		sd = dataParsers.parse_snp_data(p_dict['data_file'] , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+	return sd
+
 
 def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='none'):
 	"""
@@ -369,14 +380,11 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 
 
 
-def analysis_plots(snps_data_file, phed, p_dict):
+def analysis_plots(phed, p_dict):
 	print "\nAnalysing GWAs results jointly... QQ plots etc."
 
 	#Genotype and phenotype data is only used for permutations.
-	if p_dict['use_imputed_full_data']:
-		sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
-	else:
-		sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+	sd = _get_genotype_data_(p_dict)
 
 	#try:
 	print "Plotting accession phenotype map"
@@ -462,7 +470,7 @@ def analysis_plots(snps_data_file, phed, p_dict):
 
 
 
-def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dict):
+def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 	phed = copy.deepcopy(phed)
 	phenotype_name = phed.get_name(p_i)
 	phen_is_binary = phed.is_binary(p_i)
@@ -475,11 +483,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 	#Check whether result already exists.
 	if p_dict['use_existing_results']:
 		if p_dict['region_plots']:
-			if p_dict['use_imputed_full_data']:
-				sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
-			else:
-				sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
-								filter=p_dict['debug_filter'])
+			sd = _get_genotype_data_(p_dict)
 			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 			if p_dict['remove_outliers']:
 				assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
@@ -506,11 +510,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 
 	if not res: #If results weren't found in a file... then do GWA.
 		#Loading data
-		if p_dict['use_imputed_full_data']:
-			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
-		else:
-			sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'],
-						filter=p_dict['debug_filter'])
+		sd = _get_genotype_data_(p_dict)
 		#Do we need to calculate the K-matrix?
 		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:
 			#Load genotype file (in binary format)
@@ -592,10 +592,7 @@ def map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dic
 				res = lm.emma(snps, phen_vals, k)
 			elif mapping_method in ['emmax']:
 				if p_dict['emmax_perm']:
-					if p_dict['use_imputed_full_data']:
-						perm_sd = dataParsers.load_1001_full_snps()
-					else:
-						perm_sd = dataParsers.parse_snp_data(snps_data_file , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+					sd = _get_genotype_data_(p_dict)
 					num_outliers = prepare_data(perm_sd, phed, p_i, 'none', 0, p_dict['with_replicates'])
 					perm_sd.filter_mac_snps(p_dict['mac_threshold'])
 					t_snps = perm_sd.getSnps()
@@ -788,15 +785,12 @@ def _run_():
 
 	#SNPs data file name
 	if not p_dict['data_file']:
-		snps_data_file = '%s250K_t%d.csv' % (env['data_dir'], p_dict['call_method_id'])
-	else:
-		snps_data_file = p_dict['data_file']
-
+		p_dict['data_file'] = '%s250K_t%d.csv' % (env['data_dir'], p_dict['call_method_id'])
 
 
 	#Plot analysis plots...
 	if p_dict['analysis_plots']:
-		analysis_plots(snps_data_file, phed, p_dict)
+		analysis_plots(phed, p_dict)
 	else:
 		#If not analysis plots... then GWAS
 		for p_i in p_dict['pids']:
@@ -810,7 +804,7 @@ def _run_():
 					for mapping_method in p_dict['specific_methods']:
 						#DO ANALYSIS
 						print 'Mapping method:', mapping_method
-						map_phenotype(p_i, phed, snps_data_file, mapping_method, trans_method, p_dict)
+						map_phenotype(p_i, phed, mapping_method, trans_method, p_dict)
 
 
 
