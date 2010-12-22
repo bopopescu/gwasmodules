@@ -484,9 +484,11 @@ class phenotype_data:
 		eid = get_ecotype_id_info_dict()
 		lats = []
 		lons = []
+		acc_names = []
 		for e in ecotypes:
+			r = eid[int(e)]
+			acc_names.append(r[0])
 			try:
-				r = eid[int(e)]
 				latitude = float(r[2])
 				longitude = float(r[3])
 #				r = eid[str(e)]
@@ -498,6 +500,7 @@ class phenotype_data:
 				print 'Placing them in the Atlantic.'
 				latitude = 40
 				longitude = -20
+
 			lats.append(latitude)
 			lons.append(longitude)
 
@@ -566,6 +569,8 @@ class phenotype_data:
 			plt.savefig(png_file, format="png")
 		if not pdf_file and not png_file:
 			plt.show()
+
+		return ecotypes, acc_names, lats, lons
 
 
 	def plot_marker_box_plot(self, pid, marker=None, marker_accessions=None, md=None, m_i=None,
@@ -2192,16 +2197,6 @@ SELECT DISTINCT e.id, e.nativename, e.stockparent, e.latitude, e.longitude, c.ab
 FROM stock.ecotype e, stock.site s, stock.address a, stock.country c
 WHERE e.siteid = s.id AND s.addressid = a.id AND a.countryid = c.id
 """
-#	sql_statment = """
-#select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
-#from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock.site s, stock.address a, stock.country c
-#where e.id = ei.tg_ecotypeid and e.siteid = s.id and s.addressid = a.id and a.countryid = c.id
-#"""
-#	sql_statment= """
-#select distinct ei.tg_ecotypeid, ei.nativename, ei.stockparent, e.latitude, e.longitude, c.abbr
-#from stock.ecotype e, stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai, stock.site s, stock.address a, stock.country c
-#where ai.paternal_ecotype_id=ei.tg_ecotypeid and e.id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and e.siteid=s.id and s.addressid=a.id and a.countryid=c.id
-#"""
 	numRows = int(cursor.execute(sql_statment))
 	i = 0
 	while(1):
@@ -2505,17 +2500,22 @@ def insert_phenotypes_into_db(phen_file, method_description='', comment='', tran
 #	print len(phed1.phen_dict[1]['ecotypes'])
 
 
-#def _castric_plot_():
-#	fn = '/Users/bjarni.vilhjalmsson/Projects/vincent_castric_coordinates.txt'
-#	ecotypes = []
-#	with open(fn) as f:
-#		for l in f:
-#			ecotypes.append(l.split('.')[1].strip())
-#	dummy_phen = [1] * len(ecotypes)
-#	phen_dict = {1:{'name':'test', 'ecotypes':ecotypes, 'values':dummy_phen}}
-#	pd = phenotype_data(phen_dict)
-#	pd.plot_accession_map(1, pdf_file=env['tmp_dir'] + 'castric_plain.pdf', png_file=env['tmp_dir'] + 'castric_plain.png',
-#			with_colorbar=False, map_type='europe')
+def _castric_plot_():
+	fn = '/Users/bjarni.vilhjalmsson/Projects/vincent_castric_coordinates.txt'
+	ecotypes = []
+	with open(fn) as f:
+		for l in f:
+			ecotypes.append(l.split('.')[1].strip())
+	dummy_phen = [1] * len(ecotypes)
+	phen_dict = {1:{'name':'test', 'ecotypes':ecotypes, 'values':dummy_phen}}
+	pd = phenotype_data(phen_dict)
+	ecotypes, acc_names, lats, lons = pd.plot_accession_map(1, pdf_file=env['tmp_dir'] + 'castric_plain.pdf', png_file=env['tmp_dir'] + 'castric_plain.png',
+			with_colorbar=False, map_type='europe')
+	with open(env['tmp_dir'] + 'castric_plain.csv', 'w') as f:
+		f.write('ecotype_id,accession_name,latitude,longitude\n')
+		for t in it.izip(ecotypes, acc_names, lats, lons):
+			f.write('%s,%s,%0.4f,%0.4f\n' % t)
+
 
 def _test_bs_herits_():
 	pd = parse_phenotype_file(env['phen_dir'] + 'telomere_lengths_all.csv')
@@ -2525,7 +2525,7 @@ def _test_bs_herits_():
 if __name__ == '__main__':
 #	insert_phenotypes_into_db(env['phen_dir'] + 'b_dilkes_metabolites.csv', method_description='Metabolites, mass spec?',
 #			comment='Data from Brian Dilkes')
-	#_castric_plot_()
-	_test_bs_herits_()
+	_castric_plot_()
+	#_test_bs_herits_()
 	print "Done!"
 

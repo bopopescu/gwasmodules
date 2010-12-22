@@ -1869,7 +1869,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			png_file_name = file_prefix + '_step' + str(step_i - 1) + '.png'
 			res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors)
+			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+					cand_genes=cand_gene_list)
 #			if local:
 #			else: #Manhattan plot
 #				pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
@@ -1973,7 +1974,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
 		res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 		res.neg_log_trans()
-		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors)
+		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+				cand_genes=cand_gene_list)
 #		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
 #				png_file=png_file_name)
 
@@ -2054,7 +2056,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			png_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.png'
 			res = gr.Result(scores=emmax_res['ps'], positions=all_positions, chromosomes=all_chromosomes)
 			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors)
+			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+					cand_genes=cand_gene_list)
 #			pr.plot_raw_result(emmax_res['ps'], all_chromosomes, all_positions, highlight_markers=cofactors,
 #					 png_file=png_file_name)
 

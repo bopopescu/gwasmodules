@@ -524,19 +524,23 @@ class Result(object):
 
 	def _plot_small_manhattan_(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
 				type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False,
-				cand_genes=None, threshold=0, highlight_markers=None):
+				cand_genes=None, threshold=0, highlight_markers=None, chromosome=None):
 		import matplotlib
 		#matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
 
+		displayed_unit = 1000.0 #kbs
 		scoreRange = max_score - min_score
 		plt.figure(figsize=(6, 3.5))
 		plt.axes([0.045, 0.12, 0.95, 0.7])
 		starPoints = [[], [], []]
-
+		color = 'b'
+		color_map = {1:'b', 2:'g', 3:'r', 4:'c', 5:'m'}
+		if chromosome:
+			color = color_map[chromosome]
 
 		chrom = self.snp_results['chromosomes'][0]
-		positions = map(lambda x: x / 1000.0, self.snp_results['positions'])
+		positions = map(lambda x: x / displayed_unit, self.snp_results['positions'])
 		scores = self.snp_results['scores']
 		for s_i, (score, pos) in enumerate(it.izip(scores, positions)):
 			if score > max_score:
@@ -546,25 +550,24 @@ class Result(object):
 				score = max_score
 			scores[s_i] = score
 
-		plt.plot(positions, scores, ".", markersize=3, alpha=0.7)
+		plt.plot(positions, scores, ".", markersize=3, alpha=0.7, color=color)
 
 		if cand_genes:
 			for cg in cand_genes:
-				print cg.startPos, cg.endPos
-				plt.axvspan(cg.startPos, cg.endPos, facecolor='k', alpha=0.5)
+				plt.axvspan(cg.startPos / displayed_unit, cg.endPos / displayed_unit, facecolor='k', alpha=0.5, linewidth=0)
 
 
 		if highlight_markers:
 			ys = []
 			xs = []
 			for c, p, score in highlight_markers:
-				xs.append(p / 1000.0)
+				xs.append(p / displayed_unit)
 				if score > max_score:
 					plt.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
 					ys.append(max_score)
 				else:
 					ys.append(score)
-			plt.plot(xs, ys, ".", color="#ff9944", markersize=6, alpha=0.8)
+			plt.plot(xs, ys, ".", color="#ff9944", markersize=6, alpha=0.7)
 
 		if len(starPoints[0]) > 0:
 			plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=4)
@@ -594,13 +597,13 @@ class Result(object):
 		plt.axis([min(positions), max(positions), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 		if not ylab:
 			if type == "pvals":
-				plt.ylabel('$ - log(p - $value$)$', size="large")
+				plt.ylabel('$ - log(p - $value$)$')
 
 			else:
 				plt.ylabel('score')
 		else:
 			plt.ylabel(ylab)
-		plt.xlabel("kilobases", size="large")
+		plt.xlabel("kilobases")
 		plt.title('Chromsome %d' % chrom)
 
 		if pdf_file:
@@ -615,7 +618,7 @@ class Result(object):
 
 
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
-		       percentile=98, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
+		       percentile=90, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
 		       plot_bonferroni=False, cand_genes=None, threshold=0, highlight_markers=None):
 
 		"""
@@ -627,21 +630,14 @@ class Result(object):
 		import matplotlib.pyplot as plt
 
 		"Plotting a Manhattan-style plot with %i markers." % len(self.scores)
-		if cand_genes:
-			#processing candidate genes by chromosome
-			chr_cand_genes = []
-			for ch in [1, 2, 3, 4, 5]:
-				cgs = []
-				for cg in cand_genes:
-					if cg.chromosome == ch:
-						cgs.append(cg)
-				chr_cand_genes.append(cgs)
 
 		num_scores = len(self.scores)
 		chromosome_ends = self.get_chromosome_ends()
 		result = self.simple_clone()
 
 		chrom_set = set(result.snp_results['chromosomes'])
+		chromosomes = list(chrom_set)
+		chromosomes.sort()
 		if len(chrom_set) == 1:
 			percentile = 0.0
 		if percentile != 0.0:
@@ -665,13 +661,22 @@ class Result(object):
 				min_score = min(result.scores)
 
 
+		if cand_genes:
+			#processing candidate genes by chromosome
+			chr_cand_genes = {}
+			for chrom in chromosomes:
+				chr_cand_genes[chrom] = []
+			for cg in cand_genes:
+				chr_cand_genes[cg.chromosome].append(cg)
+
 		if len(chrom_set) == 1:
+			chrom = chrom_set.pop()
 			if cand_genes:
-				cand_genes = chr_cand_genes[chrom_set.pop()]
+				cand_genes = chr_cand_genes[chrom]
 			return result._plot_small_manhattan_(pdf_file=pdf_file, png_file=png_file, min_score=min_score,
 						max_score=max_score, ylab=ylab, plot_bonferroni=plot_bonferroni,
 						cand_genes=cand_genes, threshold=threshold,
-						highlight_markers=highlight_markers)
+						highlight_markers=highlight_markers, chromosome=chrom)
 
 
 		scoreRange = max_score - min_score
@@ -691,10 +696,10 @@ class Result(object):
 			index2 = chromosomeSplits[i + 1][0]
 			scoreList = result.scores[index1:index2]
 			posList = result.positions[index1:index2]
-
+			chrom = chromosomes[i]
 
 			if cand_genes:
-				for cg in chr_cand_genes[i]:
+				for cg in chr_cand_genes[chrom]:
 					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='k', alpha=0.5)
 
 			newPosList = [offset + pos for pos in posList]

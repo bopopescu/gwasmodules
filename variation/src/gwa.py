@@ -553,6 +553,13 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 						[p_dict['local_gwas'][0]])
 		snps = sd.getSnps()
 
+		#Loading candidate genes
+		cand_genes = None
+		if p_dict['cand_genes_file']:
+			cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
+		else:
+			cand_genes = None
+			tair_ids = None
 
 		sys.stdout.write("Finished loading and handling data!\n")
 
@@ -621,7 +628,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 					local = True
 					file_prefix += '_' + '_'.join(map(str, p_dict['local_gwas']))
 				res = lm.emmax_step_wise(phen_vals, k, sd=sd, num_steps=p_dict['num_steps'],
-							file_prefix=file_prefix, local=local)
+							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes)
 				print 'Step-wise EMMAX finished!'
 				return
 			elif mapping_method in ['lm']:
@@ -689,13 +696,6 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 
 	if p_dict['data_format'] != 'float':
 		#Load candidate genes from a file, if it is given
-		cand_genes = None
-		if p_dict['cand_genes_file']:
-			cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
-		else:
-			cand_genes = None
-			tair_ids = None
-
 
 		print "Generating a GW plot."
 		sys.stdout.flush()
