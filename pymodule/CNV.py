@@ -905,6 +905,57 @@ def get_chr2start_stop_index(chr_pos_ls):
 	sys.stderr.write("Done.\n")
 	return chr2start_stop_index
 
+def readQuanLongPECoverageIntoGWR(input_fname, additionalTitle=None, windowSize=100, chr=None, start=None, stop=None):
+	"""
+	2010-11-23
+		This function reads 100bp coverage data from files given by Quan and turns it into instance of GenomeWideResult.
+			example file: "variation/data/CNV/QuanLongPE/coverage4Yu/algustrum.8230.Chr1.coverage"
+			format is two-column, tab-delimited. First column is position/100. 2nd column is coverage.:
+				1       0.0
+				2       0.0
+				3       2.84
+		
+		the coverage data is split into different chromosomes. so argument chr is not used here.
+	"""
+	from CNV import CNVSegmentBinarySearchTreeKey
+	from SNP import GenomeWideResult, DataObject
+	import os, sys, re, csv
+	sys.stderr.write("Reading Quan's coverage data from %s ... "%(input_fname))
+	chrPattern = re.compile(r'.*Chr(\d+).coverage')
+	chrPatternSearchResult = chrPattern.search(input_fname)
+	if chrPatternSearchResult:
+		chr = int(chrPatternSearchResult.group(1))
+	else:
+		sys.stderr.write("Can't parse chromosome out of %s. aborted.\n"%input_fname)
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	gwr_name = 'log10(coverage) %s'%os.path.basename(input_fname)
+	if additionalTitle:
+		gwr_name += " "+ additionalTitle
+	
+	coverage_gwr = GenomeWideResult(name=gwr_name)
+	
+	genome_wide_result_id = id(coverage_gwr)
+	
+	for row in reader:
+		position, coverage = row[:2]
+		position = int(position)*windowSize-windowSize/2	#coverage is caculated in 100-base window.
+		if start is not None and position<start:
+			continue
+		if stop is not None and position>stop:
+			continue
+		coverage = float(coverage)
+		if coverage<=0.0:
+			coverage = -3
+		else:
+			coverage = math.log10(coverage)
+		data_obj = DataObject(chromosome=chr, position=position, value=coverage)
+		data_obj.comment = ''
+		data_obj.genome_wide_result_name = gwr_name
+		data_obj.genome_wide_result_id = genome_wide_result_id
+		coverage_gwr.add_one_data_obj(data_obj)
+	sys.stderr.write("Done.\n")
+	return coverage_gwr
+
 # test program if this file is run
 if __name__ == "__main__":
 	import os, sys, math
