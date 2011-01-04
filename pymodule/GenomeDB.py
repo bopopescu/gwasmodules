@@ -51,10 +51,13 @@ class SequenceType(Entity):
 
 class RawSequence(Entity):
 	"""
+	2010-12-17
+		add a foreign key constraint to column annot_assembly_gi
+		so that if the associated entry in AnnotAssembly is deleted, all raw sequences will be deleted as well.
 	2008-07-27
 		to store chunks of sequences of entries from AnnotAssembly
 	"""
-	annot_assembly_gi = Field(Integer)
+	annot_assembly = ManyToOne('AnnotAssembly', colname='annot_assembly_gi', ondelete='CASCADE', onupdate='CASCADE')
 	start = Field(Integer)
 	stop = Field(Integer)
 	sequence = Field(String(10000))	#each fragment is 10kb
@@ -64,6 +67,8 @@ class RawSequence(Entity):
 
 class AnnotAssembly(Entity):
 	"""
+	2010-12-17
+		column raw_sequence_start_id is no longer a foreign key. to avoid circular dependency with RawSequence.
 	2008-07-27
 		table to store meta info of chromosome sequences
 	"""
@@ -77,7 +82,7 @@ class AnnotAssembly(Entity):
 	stop = Field(Integer)
 	orientation = Field(String(1))
 	sequence = Field(String(10000))
-	raw_sequence_start = ManyToOne('RawSequence', colname='raw_sequence_start_id', onupdate='CASCADE')
+	raw_sequence_start_id = Field(Integer)
 	sequence_type = ManyToOne('SequenceType', colname='sequence_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	comment = Field(Text)
 	created_by = Field(String(256))
