@@ -1282,8 +1282,10 @@ class SNPData(object):
 		return LD.calLD(self.data_matrix[:, snp1_index], self.data_matrix[:, snp2_index])
 		
 	
-	def calRowPairwiseDist(self):
+	def calRowPairwiseDist(self, NA_set =Set([0, 'NA', 'N', -2, '|']), ref_row_id=None):
 		"""
+		2010-10-23
+			add argument NA_set and ref_row_id
 		2009-4-18
 			calculate distance between all rows except itself.
 			only calculate half non-redundant pairs.
@@ -1297,6 +1299,9 @@ class SNPData(object):
 			pairwise_dist = []
 			for j in range(i+1, len(self.row_id_ls)):
 				row_id2 = self.row_id_ls[j]
+				if ref_row_id is not None and row_id1!=ref_row_id and row_id2!=ref_row_id:
+					#ignore this pair if neither of them is ref_row_id
+					continue
 				no_of_mismatches = 0
 				no_of_non_NA_pairs = 0
 				for col_index in range(len(self.col_id_ls)):
@@ -1315,6 +1320,35 @@ class SNPData(object):
 			row_id2pairwise_dist[row_id1] = pairwise_dist
 		sys.stderr.write("Done.\n")
 		return row_id2pairwise_dist
+	
+	def calFractionOfLociCarryingDifferentAllelePerRow(self, ref_allele=0, NA_set =Set([0, 'NA', 'N', -2, '|'])):
+		"""
+		2010-10-23
+			for example, after the SNP alleles are converted into bi-allelic, 0 is ancestral, 1 is derived,
+				the fraction returned here would the fraction of derived alleles one row has.
+		"""
+		sys.stderr.write("Calculating fraction of loci with allele !=%s for each row ..."%(ref_allele))
+		row_id2fractionData = {}
+		counter = 0
+		
+		for i in range(len(self.row_id_ls)):
+			row_id1 = self.row_id_ls[i]
+			no_of_mismatches = 0
+			no_of_non_NA_pairs = 0
+			for col_index in xrange(len(self.col_id_ls)):
+				if self.data_matrix[i][col_index] not in NA_set:
+					no_of_non_NA_pairs += 1
+					if self.data_matrix[i][col_index] != ref_allele:
+						no_of_mismatches += 1
+			if no_of_non_NA_pairs>0:
+				mismatch_rate = no_of_mismatches/float(no_of_non_NA_pairs)
+			else:
+				mismatch_rate = -1
+				if self.debug:
+					pass
+			row_id2fractionData[row_id1] = [mismatch_rate, no_of_mismatches, no_of_non_NA_pairs]
+		sys.stderr.write("Done.\n")
+		return row_id2fractionData
 	
 	def convertSNPAllele2Index(self, report=0):
 		"""
@@ -1506,8 +1540,22 @@ from db import TableClass
 class GenomeWideResults(TableClass):
 	genome_wide_result_ls = None
 	genome_wide_result_obj_id2index = None
-	max_value = 0	#the current top value for all genome wide results
-	#gap = 1.0	#gap between two genome wide results
+	max_value = 0.0	#the current top value for all genome wide results. #must be 0.0, not None.
+	#gap = 1.0	#vertical gap (y-axis) between two genome wide results
+	
+	def __init__(self, **keywords):
+		"""
+		2010-11-22
+			added to initialize genome_wide_result_ls and genome_wide_result_obj_id2index properly.
+			argument gap is optional.
+				If not specified, the gap between a newly-added gwr and the previous gwr is
+					1/3*(prev_gwr.max_value-prev_gwr.min_value).
+		"""
+		TableClass.__init__(self, **keywords)
+		self.genome_wide_result_ls = []
+		self.genome_wide_result_obj_id2index = {}
+		self.max_value = 0.0	#must be 0.0, not None.
+	
 	def get_genome_wide_result_by_obj_id(self, obj_id):
 		return self.genome_wide_result_ls[self.genome_wide_result_obj_id2index[obj_id]]
 	
@@ -1530,7 +1578,16 @@ class GenomeWideResults(TableClass):
 		
 		self.genome_wide_result_ls.append(genome_wide_result)
 		self.genome_wide_result_obj_id2index[id(genome_wide_result)] = genome_wide_result_index
-
+	
+	def clear(self):
+		"""
+		2010-11-22
+			clear the 
+		"""
+		self.genome_wide_result_ls = []
+		self.genome_wide_result_obj_id2index = {}
+		self.max_value = None
+		
 class GenomeWideResult(object):
 	"""
 	2009-4-24
@@ -1760,6 +1817,8 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False):
 	"""
+	2010-10-13
+		new structure, pdata.chr_pos_map to map chr,pos to new chr, pos (like TAIR8 to TAIR9 mapping)
 	2010-3-15
 		add this
 			data_obj.genome_wide_result_name = gwr.name
@@ -1817,6 +1876,7 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(input_fname))
 	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
 	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
+	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
 	
 	gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=construct_chr_pos2index, \
 						construct_data_obj_id2index=construct_data_obj_id2index)
@@ -1903,7 +1963,18 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			include_the_data_point = True
 		elif min_value_cutoff is None and max_value_cutoff is None:	# both are not specified.
 			include_the_data_point = True
-		
+		if include_the_data_point and chr_pos_map:	#2010-10-13
+			if stop_pos is not None:
+				key = (chr, start_pos, stop_pos)
+			else:
+				key = (chr, start_pos,)
+			new_chr_start_stop = chr_pos_map.get(key)
+			if new_chr_start_stop is None:
+				include_the_data_point = False	# skip this point
+			else:
+				chr, start_pos = new_chr_start_stop[:2]
+				if len(new_chr_start_stop)>2:
+					stop_pos = new_chr_start_stop[2]
 		if include_the_data_point:
 			if stop_pos is not None:
 				data_obj = DataObject(chromosome=chr, position=start_pos, stop_position=stop_pos, value =score)
