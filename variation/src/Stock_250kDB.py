@@ -1684,6 +1684,8 @@ class SequenceFragment(Entity):
 
 class SequenceFragmentRefPos(Entity):
 	"""
+	2010-12-6
+		change field copy_number to cnv_type
 	2010-6-14
 		change the unqiue constraint
 		add column version to differentiate between different version of SequenceFragmentRefPos data
@@ -1700,7 +1702,7 @@ class SequenceFragmentRefPos(Entity):
 	no_of_probes_covered = Field(Integer)
 	fragment_start = Field(Integer)
 	fragment_stop = Field(Integer)
-	copy_number = Field(Integer)
+	cnv_type = ManyToOne('CNVType', colname='cnv_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	version = Field(Integer)
 	comment = Field(String(8124))
 	created_by = Field(String(200))
