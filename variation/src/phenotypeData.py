@@ -2518,14 +2518,14 @@ def _castric_plot_():
 
 
 def _test_bs_herits_():
-	pd = parse_phenotype_file(env['phen_dir'] + 'telomere_lengths_all.csv')
+	pd = parse_phenotype_file(env['phen_dir'] + 'seed_size.csv')
 	pd.get_broad_sense_heritability()
 
 
 if __name__ == '__main__':
 #	insert_phenotypes_into_db(env['phen_dir'] + 'b_dilkes_metabolites.csv', method_description='Metabolites, mass spec?',
 #			comment='Data from Brian Dilkes')
-	_castric_plot_()
-	#_test_bs_herits_()
+	#_castric_plot_()
+	_test_bs_herits_()
 	print "Done!"
 

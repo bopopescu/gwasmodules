@@ -494,6 +494,36 @@ def load_phentoype_file_riha():
 	phed.write_to_file(env['phen_dir'] + 'telomere_lengths_192.csv')
 
 
+def load_gene_expression_traits():
+	filename = '/Users/bjarni.vilhjalmsson/Projects/Data/rna_seq/gene_expression_table_20110112_10C.tsv'
+	ecotypes = []
+	import scipy as sp
+	with open(filename, "r") as f:
+		for line in f:
+			if line[0] != '#': break
+			l = line.split('\t')
+			ecotypes.append(l[5])
+		gene_ids = line.split('\t')
+		print len(ecotypes), len(set(ecotypes))
+		print ecotypes
+		phen_dict = {}
+		num_const_phen = 0
+		for i, line in enumerate(f): #For each gene
+			l = line.split()
+			phen_name = l[0]
+			phen_vals = map(float, l[1:])
+			if len(phen_vals) != len(ecotypes):
+				raise Exception('Arrg')
+			if len(sp.unique(phen_vals)) > 1:
+				phen_dict[(i + 1)] = {'name':phen_name, 'ecotypes':ecotypes, 'values':phen_vals}
+			else:
+				num_const_phen += 1
+	print 'Number of constant phenotypes:', num_const_phen
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'rna_seq.csv')
+
+
 
 
 
@@ -560,7 +590,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_duszynska()
+	load_gene_expression_traits()
 	print "Done!"
 
 

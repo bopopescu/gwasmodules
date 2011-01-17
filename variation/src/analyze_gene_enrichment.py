@@ -930,40 +930,40 @@ def get_snps_perm_pval(obs_stat, regions, all_genes, cand_gene_indices, chrom_en
 def _test_cand_gene_enrichment_():
 	#load result
 	res_files = []
-	#res_files.append((env.env['tmp_dir'] + 'seeds_pid1_seed_size_2n_emma_none.pvals', 'seed_size_2n EMMAX'))
-	#res_files.append((env.env['tmp_dir'] + 'seeds_pid2_seed_size_3n_2x4_emmax_none.pvals', 'seed_size_3n_2x4 EMMAX'))
-	#res_files.append((env.env['tmp_dir'] + 'seeds_pid3_seed_size_3n_4x2_emmax_none.pvals', 'seed_size_3n_4x2 EMMAX'))
-	#res_files.append((env.env['tmp_dir'] + 'seeds_pid4_seed_size_spss_emmax_none.pvals', 'seed_size_spss EMMAX'))
-	#res_files.append((env.env['tmp_dir'] + 'seeds_pid1_seed_size_2n_kw_none.pvals', 'seed_size_2n KW'))
-#	res_files.append((env.env['tmp_dir'] + 'seeds_pid2_seed_size_3n_2x4_kw_none.pvals', 'seed_size_3n_2x4 KW'))
-#	res_files.append((env.env['tmp_dir'] + 'seeds_pid3_seed_size_3n_4x2_kw_none.pvals', 'seed_size_3n_4x2 KW'))
-#	res_files.append((env.env['tmp_dir'] + 'seeds_pid4_seed_size_spss_kw_none.pvals', 'seed_size_spss KW'))
-	res_files.append((env.env['results_dir'] + 'donald_duck_pid0_25-DHBAG_emmax_log_trans.pvals', '25-DHBAG'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid1_23-DHBAG_emmax_log_trans.pvals', '23-DHBAG'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid2_25-DHBAP_emmax_log_trans.pvals', '25-DHBAP'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid3_23-DHBAP_emmax_log_trans.pvals', '23-DHBAP'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid4_DHBAG_emmax_log_trans.pvals', 'DHBAG'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid5_DHBAP_emmax_none.pvals', 'DHBAP'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid6_total_emmax_log_trans.pvals', 'total'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid7_25-DHBAg_emmax_sqrt_trans.pvals', '25-DHBA_g'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid8_23-DHBAg_emmax_log_trans.pvals', '23-DHBA_g'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid9_Gpct_emmax_none.pvals', 'Gpct'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid10_25pct_emmax_none.pvals', '25pct'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid12_SM_emmax_none.pvals', 'SM'))
-	res_files.append((env.env['results_dir'] + 'dilkes_pid14_unkown1_emmax_log_trans.pvals', 'unknown1'))
+	res_files.append((env.env['tmp_dir'] + 'ss_pid1_seed_size_2n_emmax_none.pvals', 'seed_size_2n EMMAX'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid2_seed_size_3n_2x4_emmax_none.pvals', 'seed_size_3n_2x4 EMMAX'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid3_seed_size_3n_4x2_emmax_none.pvals', 'seed_size_3n_4x2 EMMAX'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid4_seed_size_spss_emmax_none.pvals', 'seed_size_spss EMMAX'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid1_seed_size_2n_kw_none.pvals', 'seed_size_2n KW'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid2_seed_size_3n_2x4_kw_none.pvals', 'seed_size_3n_2x4 KW'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid3_seed_size_3n_4x2_kw_none.pvals', 'seed_size_3n_4x2 KW'))
+#	res_files.append((env.env['tmp_dir'] + 'ss_pid4_seed_size_spss_kw_none.pvals', 'seed_size_spss KW'))
+#	res_files.append((env.env['results_dir'] + 'donald_duck_pid0_25-DHBAG_emmax_log_trans.pvals', '25-DHBAG'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid1_23-DHBAG_emmax_log_trans.pvals', '23-DHBAG'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid2_25-DHBAP_emmax_log_trans.pvals', '25-DHBAP'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid3_23-DHBAP_emmax_log_trans.pvals', '23-DHBAP'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid4_DHBAG_emmax_log_trans.pvals', 'DHBAG'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid5_DHBAP_emmax_none.pvals', 'DHBAP'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid6_total_emmax_log_trans.pvals', 'total'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid7_25-DHBAg_emmax_sqrt_trans.pvals', '25-DHBA_g'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid8_23-DHBAg_emmax_log_trans.pvals', '23-DHBA_g'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid9_Gpct_emmax_none.pvals', 'Gpct'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid10_25pct_emmax_none.pvals', '25pct'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid12_SM_emmax_none.pvals', 'SM'))
+#	res_files.append((env.env['results_dir'] + 'dilkes_pid14_unkown1_emmax_log_trans.pvals', 'unknown1'))
 #	res_files.append((env.env['results_dir'] + 'donald_duck_pid1_telomere_length_emmax_none.pvals', 'telomere_emmax'))
 #	res_files.append((env.env['results_dir'] + 'donald_duck_pid1_telomere_length_emmax_sqrt_trans.pvals', 'telomere_emmax_sqrt_trans'))
 #	res_files.append((env.env['results_dir'] + 'donald_duck_pid1_telomere_length_kw_none.pvals', 'telomere_kw'))
-	#cgl_file = env.env['phen_dir'] + 'seeds_cgl.csv'
+	cgl_file = env.env['phen_dir'] + 'seeds_cgl.csv'
 	#cgl_file = env.env['phen_dir'] + 'teleomere_cgl.csv'
-	cgl_file = env.env['phen_dir'] + 'Dilkes_data_candidate_gene_list.csv'
+	#cgl_file = env.env['phen_dir'] + 'Dilkes_data_candidate_gene_list.csv'
 	for res_file, name in reversed(res_files):
 
 		r = gr.Result(res_file)
 		r.neg_log_trans()
 		r.filter_attr('mafs', 10)
 		res = r.candidate_gene_enrichments(cgl_file=cgl_file, methods=['snps_perm', 'gene_perm'],
-					pval_thresholds=[ 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001],
+					pval_thresholds=[ 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001, 0.00005],
 					num_perm=500, obs_genes_file=env.env['tmp_dir'] + 'enrichments_' + name + '_obs_genes.csv',
 					file_prefix=env.env['tmp_dir'] + 'enrichments_' + name, early_stop_threshold=25)
 

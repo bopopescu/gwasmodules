@@ -662,9 +662,9 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				sys.stdout.flush()
 
 
-		print 'Calculating SNP-phenotype correlations.'
-		kwargs['correlations'] = calc_correlations(snps, phen_vals)
-		additional_columns.append('correlations')
+#		print 'Calculating SNP-phenotype correlations.'
+#		kwargs['correlations'] = calc_correlations(snps, phen_vals)
+#		additional_columns.append('correlations')
 		print 'Writing result to file.'
 		res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
 		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
