@@ -78,7 +78,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import time, csv, cPickle
 import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, GeneModel, read_data, SNPData, SNPInfo
+from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, read_data, SNPData, SNPInfo
+from pymodule.Genome import GeneModel
 import Stock_250kDB
 from sets import Set
 import matplotlib; matplotlib.use("Agg")	#to avoid popup and collapse in X11-disabled environment
@@ -755,7 +756,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				gene_commentaries = [gene_model]	#fake one here
 			else:
 				gene_commentaries = gene_model.gene_commentaries
-			for gene_commentary in gene_model.gene_commentaries:	#multiple commentary
+			for gene_commentary in gene_commentaries:	#multiple commentary
 				gene_desc_ls = cls.returnGeneDescLs(cls.gene_desc_names, gene_model, gene_commentary)
 				param_data.matrix_of_gene_descriptions.append(gene_desc_ls)
 				
@@ -1002,7 +1003,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		"""
 		sys.stderr.write("Drawing region ... \n")
 		phenotype = Stock_250kDB.PhenotypeMethod.get(phenotype_method_id)
-		if not os.path.isdir(output_dir):
+		if not os.path.isdir(output_dir):	#output_dir is a filename
 			output_fname_prefix = output_dir
 		else:
 			#list_type = Stock_250kDB.GeneListType.get(list_type_id)
@@ -1012,6 +1013,11 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 							(this_snp.chromosome, this_snp.position, this_snp.snps_id, call_method_id, phenotype.id, phenotype.short_name)
 			fname_basename = fname_basename.replace('/', '_')
 			output_fname_prefix = os.path.join(output_dir, fname_basename)
+		# 2010-9-17 create the directory if it doesn't exist.
+		output_dir = os.path.split(output_fname_prefix)[0]
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		
 		if snp_region:
 			snps_within_this_region = snp_region
 		elif getattr(this_snp, 'stop', None):
