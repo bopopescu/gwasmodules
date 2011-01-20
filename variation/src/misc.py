@@ -4832,7 +4832,46 @@ for phenotype_method_id in range(1,8):
 	GWA.drawGWANicer(db_250k, gwr, output_fname_prefix, min_value=None, ylim_type=2)
 	"""
 	
-
+	@classmethod
+	def drawGWAPvalueHist(cls, db, genome_wide_result, output_fname_prefix, min_value=2.5, need_svg=False, ylim_type=1):
+		"""
+		2010-10-8
+		"""
+		pvalue_ls = []
+		for data_obj in genome_wide_result.data_obj_ls:
+			pvalue_ls.append(data_obj.value)
+		
+		import pylab
+		pylab.clf()
+		fig = pylab.figure(figsize=(10,8))
+		#ax = pylab.axes()
+		ax = fig.gca()
+		
+		ax.hist(pvalue_ls, 50, alpha=0.8)
+		
+		#separate each chromosome
+		#for chr in chr_ls[:-1]:
+		#	print chr
+		#	ax.axvline(chr_id2cumu_size[chr], linestyle='--', color='k', linewidth=0.8)
+		
+		
+		#ax.set_ylabel("-log(P-value)")
+		#ax.set_xlabel('Chromosomal Position')
+		#ax.set_xlim([0, chr_id2cumu_size[chr_ls[-1]]])
+		
+		
+		pylab.savefig('%s.png'%output_fname_prefix, dpi=300)
+		if need_svg:
+			pylab.savefig('%s.svg'%output_fname_prefix, dpi=300)
+	"""
+		#2010-10-8
+		rm = Stock_250kDB.ResultsMethod.query.filter_by(call_method_id=32).filter_by(phenotype_method_id=5).filter_by(analysis_method_id=1).first()
+		from pymodule import getGenomeWideResultFromFile
+		genome_wide_result = getGenomeWideResultFromFile(rm.filename, min_value_cutoff=None, do_log10_transformation=False)
+		output_fname_prefix = '/tmp/pvalue_hist_call_32_KW_on_LD'
+		GWA.drawGWAPvalueHist(db_250k, genome_wide_result, output_fname_prefix)
+		sys.exit(0)
+	"""
 	def plot_maf_vs_pvalue(maf_vector, input_fname, do_log10_transformation=True):
 		"""
 		2008-06-27 read in pvalues from a file
@@ -6525,6 +6564,57 @@ FileFormatExchange.strip_2010_strain_info('./script/variation/data/2010/2010_str
 	AnalyzeSNPData.fasta2DrawSNPMatrixFormat(input_fname, output_fname)
 	"""
 	
+	@classmethod
+	def outputEachSequenceInFastaFileIntoSingleFile(cls, input_fname, output_dir):
+		"""
+		2010-12-3
+			One fasta file contains >1 sequences. This function writes each sequence to an individual file in output_dir.
+			The sequence title would be the filename in output_dir.
+			
+			SyMAP requires this kind of splitting for it to work on fast files.
+		"""
+		import os,sys
+		sys.stderr.write("Outputting each sequence in %s into single file ...\n"%(input_fname))
+		inf = open(input_fname, 'r')
+		outf = None
+		counter = 0
+		real_counter = 0
+		for line in inf:
+			counter += 1
+			if line[0]=='>':
+				real_counter += 1
+				title = line[1:].strip()
+				if outf is not None:
+					outf.close()
+				output_fname = os.path.join(output_dir, '%s.seq'%title)
+				outf = open(output_fname, 'w')
+			if outf is not None:
+				outf.write(line)
+			if counter%10000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("Done.\n")
+	
+	"""
+		#2010-12-3
+		input_fname = os.path.expanduser("~/script/variation/data/CNV/TAIR9/tair9.fas")
+		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/thaliana/sequence/pseudo/")
+		FileFormatExchange.outputEachSequenceInFastaFileIntoSingleFile(input_fname, output_dir)
+		sys.exit(0)
+		
+		input_fname = os.path.expanduser("~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta")
+		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/lyrata/sequence/pseudo/")
+		FileFormatExchange.outputEachSequenceInFastaFileIntoSingleFile(input_fname, output_dir)
+		sys.exit(0)
+		
+				#2010-12-3
+		input_fname = os.path.expanduser("~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta")
+		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/lyrata/sequence/pseudo/")
+		FileFormatExchange.outputEachSequenceInFastaFileIntoSingleFile(input_fname, output_dir)
+		sys.exit(0)
+		
+		
+	"""
+		
 class Data250k(object):
 	def __init__(self):
 		"""
@@ -6875,11 +6965,19 @@ class Data250k(object):
 				output_fname=output_fname, minCallProbability=0.85)
 		sys.exit(0)
 		
-		#2010-7-2
+		#2010-7-2 add Rhonda Myers' unimputed arrays into call 54
 		imputed_call_method_id=54
 		output_fname = os.path.expanduser('~/script/variation/data/call_%s_with_RhondaUnimputedCalls.tsv'%(imputed_call_method_id))
 		Data250k.addUnimputedArrayCallsToImputedCalls(db_250k, imputed_call_method_id=imputed_call_method_id, \
 				unimputed_array_ids='1516-1602',\
+				output_fname=output_fname, minCallProbability=0.85)
+		sys.exit(0)
+		
+		#2010-10-10 add Martin Koornneef's un-imputed arrays into call 54
+		imputed_call_method_id=54
+		output_fname = os.path.expanduser('~/script/variation/data/call_%s_with_KoornneefUnimputedCalls.tsv'%(imputed_call_method_id))
+		Data250k.addUnimputedArrayCallsToImputedCalls(db_250k, imputed_call_method_id=imputed_call_method_id, \
+				unimputed_array_ids='1603-1619',\
 				output_fname=output_fname, minCallProbability=0.85)
 		sys.exit(0)
 		
@@ -8527,7 +8625,45 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		update snps s, probes p set s.chromosome=p.chromosome, s.position=p.position where s.id=p.snps_id;
 	"""
 		
-		
+	@classmethod
+	def updateSNPIncludeAfterQC(cls, db_250k, call_method_id=72):
+		"""
+		2010-10-19
+			update snps.include_after_qc based on a final snp dataset (call_method_id).
+			
+			call info file from this call method has Snps.id as first column, rather than chr_pos (old format).
+		"""
+		from pymodule import getColName2IndexFromHeader, PassingData, figureOutDelimiter
+		sys.stderr.write("updating snps.include_after_qc based on one random call info from call method %s ... \n"%call_method_id)
+		import Stock_250kDB
+		call_info = Stock_250kDB.CallInfo.query.filter_by(method_id=call_method_id).first()
+		counter = 0
+		real_counter = 0
+		import csv
+		reader = csv.reader(open(call_info.filename), delimiter=figureOutDelimiter(call_info.filename))
+		header = reader.next()
+		for row in reader:
+			snp_id = int(row[0])
+			snp = Stock_250kDB.Snps.get(snp_id)
+			counter += 1
+			if snp:
+				snp.include_after_qc = 1
+				db_250k.session.add(snp)
+				real_counter += 1
+			if counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		db_250k.session.flush()
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("%s SNPs out of %s in the file have include_after_qc set. Done.\n"%(real_counter , counter))
+		db_250k.session.commit()
+	
+	"""
+	#2010-10-19
+	DB250k.updateSNPIncludeAfterQC(db_250k)
+	sys.exit(0)
+	
+	"""
+	
 class CNV(object):
 	class Lyrata(object):
 		"""
@@ -8990,7 +9126,82 @@ class CNV(object):
 		sys.exit(0)
 	"""
 		
+	@classmethod
+	def outputCNVFunctionalCompositionData(cls, db_250k, cnv_method_id=20, cnv_type_id=1):
+		"""
+		2010-10-24
+		"""
+		import Stock_250kDB
+		from variation.src.DrawSNPRegion import DrawSNPRegion
+		def dealWithGeneAnnotation():
+			gene_annotation_picklef = '/Network/Data/250k/tmp-yh/at_gene_model_pickelf'
+			DrawSNPRegion_ins = DrawSNPRegion(db_user=db_250k.username, db_passwd=db_250k.password, hostname=db_250k.hostname, \
+										database=db_250k.database,\
+										input_fname='/tmp/dumb', output_dir='/tmp', debug=0)
+			gene_annotation = DrawSNPRegion_ins.dealWithGeneAnnotation(gene_annotation_picklef, cls_with_db_args=DrawSNPRegion_ins)
+			return gene_annotation
+		gene_annotation = dealWithGeneAnnotation()
 		
+		gene_type_id2gene_set = {}
+		gene_id2type_id = {}
+		for gene_id, model in gene_annotation.gene_id2model.iteritems():
+			type_id = model.type_id
+			if type_id==9 or type_id==11:	#turn TE gene into TE type
+				type_id=11
+			elif type_id==1:
+				type_id=type_id
+			else:
+				type_id = 12
+			if type_id not in gene_type_id2gene_set:
+				gene_type_id2gene_set[type_id] = set()
+			gene_type_id2gene_set[type_id].add(gene_id)
+			gene_id2type_id[gene_id] = type_id
+		
+		sys.stderr.write("Outputting the number of genes in each type ... \n")
+		for gene_type_id, gene_set in gene_type_id2gene_set.iteritems():
+			print gene_type_id, len(gene_set)
+		
+		sys.stderr.write("Getting cnv.id from CNV ...")
+		Table = Stock_250kDB.CNV
+		query = Table.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id)
+		query = query.filter(Table.frequency<0.1)
+		total_cnv_id_set = set()
+		for row in query:
+			total_cnv_id_set.add(row.id)
+		sys.stderr.write("%s total cnvs under this condition Done.\n"%(len(total_cnv_id_set)))
+		
+		sys.stderr.write("Getting stuff from CNVContext ...")
+		Table = Stock_250kDB.CNVContext
+		query = Table.query.filter(Table.cnv.has(cnv_method_id=cnv_method_id)).filter(Table.cnv.has(cnv_type_id=cnv_type_id)).\
+			filter(Table.cnv.has(Stock_250kDB.CNV.frequency<0.1))
+		query = query.filter(Table.overlap_length>50)
+		cnv_in_gene_context_id_set = set()
+		gene_type_id2cnv_id_set = {}
+		gene_type_id2gene_within_cnv_set = {}
+		for row in query:
+			cnv_in_gene_context_id_set.add(row.cnv_id)
+			type_id = gene_id2type_id.get(row.gene_id)
+			if type_id not in gene_type_id2cnv_id_set:
+				gene_type_id2gene_within_cnv_set[type_id] = set()
+				gene_type_id2cnv_id_set[type_id] = set()
+			gene_type_id2cnv_id_set[type_id].add(row.cnv_id)
+			gene_type_id2gene_within_cnv_set[type_id].add(row.gene_id)
+		sys.stderr.write("Done.\n")
+		
+		print "Number of distinct cnv ids in any gene:", len(cnv_in_gene_context_id_set)
+		print "Number of distinct cnv ids in each type of genes."
+		for gene_type_id, cnv_id_set in gene_type_id2cnv_id_set.iteritems():
+			print gene_type_id, len(cnv_id_set)
+		
+		print "Number of genes of each type in all these cnvs"
+		for gene_type_id, gene_within_cnv_set in gene_type_id2gene_within_cnv_set.iteritems():
+			print gene_type_id, len(gene_within_cnv_set)
+		
+	"""
+		#2010-10-24
+		CNV.outputCNVFunctionalCompositionData(db_250k, cnv_method_id=20, cnv_type_id=1)
+		sys.exit(0)
+	"""
 	
 	@classmethod
 	def compareCNVSegmentsAgainstQCHandler(cls, input_fname_ls, ecotype_id2cnv_qc_call_data=None, afterMatchFunction=None, \
@@ -9376,6 +9587,68 @@ class CNV(object):
 		input_dir = os.path.expanduser()
 		CNV.putSebastianCallIntoDB(db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
 							cnv_method_id=22, cnv_type_id=1)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def putCNVSNPLDIntoDB(cls, db_250k, input_fname, method_id=1):
+		"""
+		2010-10-10
+		"""
+		sys.stderr.write("Putting CNV-SNP LD into db ...\n")
+		from pymodule.utils import getColName2IndexFromHeader
+		import csv
+		reader = csv.reader(open(input_fname), delimiter='\t')
+		header = reader.next()
+		col_name2index = getColName2IndexFromHeader(header)
+		cnv_id2max_LD = {}
+		counter = 0
+		real_counter = 0
+		for line in reader:
+			cnv_id = int(line[col_name2index['snp2']])
+			r2_value = float(line[col_name2index['r2']])
+			if cnv_id not in cnv_id2max_LD:
+				cnv_id2max_LD[cnv_id] = r2_value
+				real_counter += 1
+			if r2_value>cnv_id2max_LD[cnv_id]:
+				cnv_id2max_LD[cnv_id] = r2_value
+			counter += 1
+			if counter%10000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		del reader
+		sys.stderr.write("%s CNVs with LD.\n"%(len(cnv_id2max_LD)))
+		
+		
+		import Stock_250kDB
+		method = Stock_250kDB.GenomeWideResultMethod.get(method_id)
+		if method is None:
+			method = Stock_250kDB.GenomeWideResultMethod(id=method_id)
+			db_250k.session.add(method)
+		
+		counter = 0
+		real_counter = 0
+		for cnv_id, max_LD in cnv_id2max_LD.iteritems():
+			cnv = Stock_250kDB.CNV.get(cnv_id)
+			marker = Stock_250kDB.GenomeMarker.query.filter_by(chromosome=cnv.chromosome).filter_by(start=cnv.start).\
+				filter_by(stop=cnv.stop).first()
+			if marker is None:
+				marker = Stock_250kDB.GenomeMarker(chromosome=cnv.chromosome, start=cnv.start, stop=cnv.stop)
+				db_250k.session.add(marker)
+			result = Stock_250kDB.GenomeWideResult(value = max_LD)
+			result.marker = marker
+			result.method = method
+			db_250k.session.add(result)
+			counter += 1
+			if counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+				db_250k.session.flush()
+		sys.stderr.write("Done.\n")
+		db_250k.session.flush()
+	
+	"""
+		# 2010-10-10
+		input_fname = os.path.expanduser("~/cnvMethod20_vs_callMethod32_LD.tsv")
+		CNV.putCNVSNPLDIntoDB(db_250k, input_fname, method_id=1)
 		sys.exit(0)
 	"""
 	
@@ -9850,38 +10123,10 @@ class CNV(object):
 							no_of_non_valid_deletions, no_of_deletions, FDR))
 			if getattr(param_obj, 'array_id2no_of_probes2qc_data', None):
 				no_of_probes2qc_data = param_obj.array_id2no_of_probes2qc_data[array_id]
-				no_of_probes_ls = no_of_probes2qc_data.keys()
-				no_of_probes_ls.sort()
-				no_of_non_valid_deletions_ls = []
-				no_of_deletions_ls = []
-				for no_of_probes in no_of_probes_ls:
-					qc_data = no_of_probes2qc_data[no_of_probes]
-					no_of_valid_deletions = qc_data.no_of_valid_deletions
-					no_of_deletions = qc_data.no_of_deletions
-					no_of_non_valid_deletions = no_of_deletions-no_of_valid_deletions
-					no_of_non_valid_deletions_ls.append(no_of_non_valid_deletions)
-					no_of_deletions_ls.append(no_of_deletions)
-					#false_positive_rate = no_of_non_valid_deletions/float(no_of_deletions)
+				output_fname_prefix = getattr(param_obj, 'output_fname_prefix', None)
+				if output_fname_prefix:
+					output_fname_prefix = '%s_array_%s'%(output_fname_prefix, array_id)
 					
-					#sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(no_of_probes, \
-					#				no_of_non_valid_deletions, no_of_deletions, false_positive_rate))
-				
-				if getattr(param_obj, 'output_fname_prefix', None):
-					sys.stderr.write("Drawing the FDR plot ...")
-					output_fname = '%s_array_%s_FPR.png'%(param_obj.output_fname_prefix, array_id)
-					aggregateReturnData = cls.aggregateEnoughDataPoints(no_of_deletions_ls, \
-									[no_of_non_valid_deletions_ls], [no_of_probes_ls],\
-									min_no_of_data_points=getattr(param_obj, 'min_no_of_data_points', 30))
-					
-					new_no_of_deletions_ls = aggregateReturnData.no_of_data_points_ls
-					new_no_of_non_valid_deletions_ls = aggregateReturnData.lists_to_be_summed[0]
-					new_no_of_probes_ls = aggregateReturnData.lists_to_be_sampled[0]
-					divide_functor = lambda x: x[0]/float(x[1])
-					FPR_ls = map(divide_functor, zip(new_no_of_non_valid_deletions_ls, new_no_of_deletions_ls))
-					import pylab
-					pylab.clf()
-					pylab.plot(new_no_of_probes_ls, FPR_ls, '.')
-					# make a title for the figure
 					array_id2label = getattr(param_obj, 'array_id2label', None)
 					if array_id2label:
 						title = array_id2label.get(array_id)
@@ -9890,12 +10135,10 @@ class CNV(object):
 						title = None
 					if not title:
 						title = 'array %s'%array_id
-					
-					pylab.title(title, size='small')
-					pylab.xlabel(getattr(param_obj, 'xlabel', 'No of Probes'))
-					pylab.ylabel(getattr(param_obj, 'ylabel', 'FDR'))
-					pylab.savefig(output_fname, dpi=300)
-					sys.stderr.write("Done.\n")
+						
+					cls.plotOneFDR(no_of_probes2qc_data, output_fname_prefix, min_no_of_data_points=getattr(param_obj, 'min_no_of_data_points', 30), \
+								fig_title=title, \
+								xlabel=getattr(param_obj, 'xlabel', 'No of Probes'), ylabel = getattr(param_obj, 'ylabel', 'FDR'))
 	
 	@classmethod
 	def outputCNVSegmentObj(cls, cnv_segment_obj, param_obj):
@@ -10479,7 +10722,7 @@ class CNV(object):
 	"""
 		#2010-8-3
 		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
-								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
 								min_reciprocal_overlap=0.0000001, cnv_method_id=18)
 		sys.exit(0)
 	"""
@@ -10766,18 +11009,19 @@ class CNV(object):
 	def updateCNVProbeInfo(cls, db_250k, cnv_method_id=None, cnv_method_id_ls=[]):
 		"""
 		2010-8-2
-			
+			update start_probe_id, stop_probe_id, no_of_probes_covered on entries in table CNV
 		"""
-		sys.stderr.write("Updating start_probe_id, stop_probe_id, no_of_probes_covered of table CNV method %s ...\n"%\
-						repr(cnv_method_id_ls))
-		import Stock_250kDB
-		probeRBDict = cls.getProbeRBDict(db_250k, probeType=2, min_reciprocal_overlap=0.000001)
-		
 		# 2010-8-4
 		if not cnv_method_id_ls:	#empty or None
 			cnv_method_id_ls = []
 		if cnv_method_id is not None:
 			cnv_method_id_ls.append(cnv_method_id)
+		
+		sys.stderr.write("Updating start_probe_id, stop_probe_id, no_of_probes_covered of table CNV method %s ...\n"%\
+						repr(cnv_method_id_ls))
+		import Stock_250kDB
+		probeRBDict = cls.getProbeRBDict(db_250k, probeType=2, min_reciprocal_overlap=0.000001)
+		
 		
 		session = db_250k.session
 		for cnv_method_id in cnv_method_id_ls:
@@ -10799,6 +11043,122 @@ class CNV(object):
 	"""
 		#2010-8-2
 		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[18, 19])
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def traverseCNVQCCall(cls, db_250k, cnv_method_id=8, processClassIns=None, param_obj=None):
+		"""
+		2010-11-24
+			a common function which traverses through entries in table CNVQCCall.
+		"""
+		i = 0
+		block_size = 10000
+		real_counter = 0
+		import Stock_250kDB
+		TableClass = Stock_250kDB.CNVQCCall
+		query = TableClass.query
+		if cnv_method_id is not None:	#2010-7-13
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		
+		rows = query.offset(i).limit(block_size)
+		session = db_250k.session
+		while rows.count()!=0:
+			for row in rows:
+				processClassIns.run(row, param_obj)
+				i += 1
+			if i%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, i, processClassIns.real_counter))
+			rows = query.offset(i).limit(block_size)
+		sys.stderr.write("%s\t%s\t%s Done.\n"%('\x08'*80, i, processClassIns.real_counter))
+	
+	class ProcessCNVQCCallForProbeInfoUpdate(object):
+		"""
+		2010-8-2
+			used by CNV.updateCNVProbeInfo() to be plugged into traverseCNV()
+		"""
+		def __init__(self, **keywords):
+			"""
+			keywords shall include db_250k, probeRBDict, min_reciprocal_overlap
+			"""
+			self.real_counter = 0
+			
+			# 2010-7-29
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+		
+		def run(self, row, param_obj=None):
+			"""
+			row is Stock_250kDB.CNV
+			"""
+			from pymodule.CNV import CNVSegmentBinarySearchTreeKey
+			from pymodule.RBTree import RBDict
+			
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, span_ls=[row.start, row.stop], \
+									min_reciprocal_overlap=self.min_reciprocal_overlap, )
+			probeNodes = []
+			self.probeRBDict.findNodes(segmentKey, probeNodes)
+			no_of_probes_covered = len(probeNodes)
+			
+			row.no_of_probes_covered = no_of_probes_covered
+			"""
+			chr_pos_RBNode_ls = []
+			for i in range(no_of_probes_covered):
+				probeRBNode = probeNodes[i]
+				chr_pos_RBNode_ls.append((probeRBNode.key.chromosome, probeRBNode.key.start, probeRBNode.key.stop, \
+										probeRBNode.key.probe_id))
+			chr_pos_RBNode_ls.sort()
+			
+			if len(chr_pos_RBNode_ls)>0:
+				row.start_probe_id = chr_pos_RBNode_ls[0][-1]
+				row.stop_probe_id = chr_pos_RBNode_ls[-1][-1]
+			"""
+			
+			self.db_250k.session.add(row)
+			self.real_counter += 1
+			if self.real_counter%5000==0:
+				session = self.db_250k.session
+				session.flush()	#this would cause session to become invalid (Instance error ...)
+				#session.expunge_all()
+	
+	@classmethod
+	def updateCNVQCCallProbeInfo(cls, db_250k, cnv_method_id=None, cnv_method_id_ls=[]):
+		"""
+		2010-11-24
+			update no_of_probes_covered on entries in table CNVQCCall
+		"""
+		# 2010-8-4
+		if not cnv_method_id_ls:	#empty or None
+			cnv_method_id_ls = []
+		if cnv_method_id is not None:
+			cnv_method_id_ls.append(cnv_method_id)
+		
+		sys.stderr.write("Updating no_of_probes_covered of entries in CNVQCCall, cnv method %s ...\n"%\
+						repr(cnv_method_id_ls))
+		import Stock_250kDB
+		probeRBDict = cls.getProbeRBDict(db_250k, probeType=2, min_reciprocal_overlap=0.000001)
+		
+		session = db_250k.session
+		session.expire_on_commit = False
+		processClass = cls.ProcessCNVQCCallForProbeInfoUpdate
+		
+		for cnv_method_id in cnv_method_id_ls:
+			processor = processClass(probeRBDict=probeRBDict, db_250k=db_250k, min_reciprocal_overlap=0.000001)
+			
+			cls.traverseCNVQCCall(db_250k, cnv_method_id=cnv_method_id, processClassIns=processor, \
+						param_obj=None)
+			
+			session.flush()
+			try:
+				session.commit()
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+	
+	"""
+		#2010-11-24
+		CNV.updateCNVQCCallProbeInfo(db_250k, cnv_method_id_ls=[9])
 		sys.exit(0)
 	"""
 	
@@ -10943,6 +11303,49 @@ class CNV(object):
 	"""
 	
 	@classmethod
+	def plotOneFDR(cls, x_data2qc_data, output_fname_prefix, min_no_of_data_points=30, fig_title='', xlabel='No of Probes',\
+				ylabel = 'FDR'):
+		"""
+		2010-10-24
+		"""
+		no_of_probes_ls = x_data2qc_data.keys()
+		no_of_probes_ls.sort()
+		no_of_non_valid_deletions_ls = []
+		no_of_deletions_ls = []
+		for no_of_probes in no_of_probes_ls:
+			qc_data = x_data2qc_data[no_of_probes]
+			no_of_valid_deletions = qc_data.no_of_valid_deletions
+			no_of_deletions = qc_data.no_of_deletions
+			no_of_non_valid_deletions = no_of_deletions-no_of_valid_deletions
+			no_of_non_valid_deletions_ls.append(no_of_non_valid_deletions)
+			no_of_deletions_ls.append(no_of_deletions)
+			#false_positive_rate = no_of_non_valid_deletions/float(no_of_deletions)
+			
+			#sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(no_of_probes, \
+			#				no_of_non_valid_deletions, no_of_deletions, false_positive_rate))
+		
+		if output_fname_prefix:
+			sys.stderr.write("Drawing the FDR plot ...")
+			output_fname = '%s_FDR.png'%(output_fname_prefix)
+			aggregateReturnData = cls.aggregateEnoughDataPoints(no_of_deletions_ls, \
+							[no_of_non_valid_deletions_ls], [no_of_probes_ls],\
+							min_no_of_data_points=min_no_of_data_points)
+			
+			new_no_of_deletions_ls = aggregateReturnData.no_of_data_points_ls
+			new_no_of_non_valid_deletions_ls = aggregateReturnData.lists_to_be_summed[0]
+			new_no_of_probes_ls = aggregateReturnData.lists_to_be_sampled[0]
+			divide_functor = lambda x: x[0]/float(x[1])
+			FPR_ls = map(divide_functor, zip(new_no_of_non_valid_deletions_ls, new_no_of_deletions_ls))
+			import pylab
+			pylab.clf()
+			pylab.plot(new_no_of_probes_ls, FPR_ls, '.')
+			# make a title for the figure
+			pylab.title(fig_title, size='small')
+			pylab.xlabel(xlabel)
+			pylab.ylabel(ylabel)
+			pylab.savefig(output_fname, dpi=300)
+		
+	@classmethod
 	def plotCNVArrayCallFDRVsFrequencyNoOfProbes(cls, db_250k, output_dir=None, \
 											ecotype_id=None, ecotype_id_ls=None, qc_data_source_id=13, \
 											minNotCoveredFraction=0.6, \
@@ -10971,10 +11374,11 @@ class CNV(object):
 		if not os.path.isdir(output_dir):
 			os.makedirs(output_dir)
 		from pymodule import PassingData
+		output_fname_prefix = os.path.join(output_dir, 'FDRVsXDataType%s_cnvMethod%s_minNotCoveredFraction%s_minScore%s'%\
+						(xDataType, cnv_method_id,minNotCoveredFraction, minScore))
 		param_obj = PassingData(no_of_valid_deletions=0, no_of_deletions=0, array_id2qc_data={}, \
 				array_id2no_of_probes2qc_data = {}, \
-				output_fname_prefix = os.path.join(output_dir, 'FDRVsXDataType%s_cnvMethod%s_minNotCoveredFraction%s_minScore%s'%\
-						(xDataType, cnv_method_id,minNotCoveredFraction, minScore)),\
+				output_fname_prefix = output_fname_prefix,\
 				minPercUnCoveredByLerContig=minNotCoveredFraction,\
 				min_no_of_data_points=60,\
 				array_id2label={})
@@ -11003,6 +11407,8 @@ class CNV(object):
 		
 		rows = query.offset(i).limit(block_size)
 		session = db_250k.session
+		x_data2qc_data = {}	#2010-10-24 to get FDR for all data combined
+		
 		while rows.count()!=0:
 			for row in rows:
 				array_id = row.array_id
@@ -11039,12 +11445,18 @@ class CNV(object):
 						PassingData(no_of_deletions=0, no_of_valid_deletions=0)
 				param_obj.array_id2no_of_probes2qc_data[array_id][x_data].no_of_deletions += 1
 				
+				if x_data not in x_data2qc_data:
+					x_data2qc_data[x_data] = PassingData(no_of_deletions=0, no_of_valid_deletions=0)
+				x_data2qc_data[x_data].no_of_deletions += 1
+				
 				if row.fractionDeletedInPECoverageData>=minNotCoveredFraction:
 					param_obj.array_id2qc_data[array_id].falseDiscoveryOrNot_ls.append(0)
 					param_obj.no_of_valid_deletions += 1
 					param_obj.array_id2qc_data[array_id].no_of_valid_deletions += 1
 					param_obj.array_id2no_of_probes2qc_data[array_id][x_data].no_of_valid_deletions += 1
 					real_counter += 1
+					
+					x_data2qc_data[x_data].no_of_valid_deletions += 1
 				else:
 					param_obj.array_id2qc_data[array_id].falseDiscoveryOrNot_ls.append(1)
 				i += 1
@@ -11068,7 +11480,12 @@ class CNV(object):
 		for array_id, qc_data in param_obj.array_id2qc_data.iteritems():
 			totalSizeInKB = int(sum(param_obj.array_id2qc_data[array_id].segmentSize_ls)/1000.0)
 			param_obj.array_id2label[array_id] += ' %sKb'%totalSizeInKB
-			
+		
+		#2010-10-24 to get FDR for all data combined
+		cls.plotOneFDR(x_data2qc_data, output_fname_prefix, min_no_of_data_points=3000, fig_title='', xlabel=param_obj.xlabel,\
+				ylabel = param_obj.ylabel)
+		return	#2010-10-24 temporary. ignore the rest
+		
 		cls.outputFalsePositiveRate(param_obj)
 		
 		import numpy
@@ -12518,6 +12935,74 @@ class CNV(object):
 	"""
 	
 	@classmethod
+	def drawCNVSizeHistogram(cls, db_250k, cnv_method_id=8, cnv_type_id=1, \
+								output_dir=None, drawType=1, xlabel='log(deletion length)', ylabel_in_2D='score',\
+								processClass=None, xlim_in_1D=[1.5, 6], fileNamePrefix='CNVSizeHist', **keywords):
+		"""
+		2010-10-23
+			draw histogram of size of cnvs in table CNV
+		"""
+		sys.stderr.write("Drawing CNV size histogram ...")
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		
+		from pymodule import PassingData
+		import math, numpy
+		
+		import Stock_250kDB
+		query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id).filter_by(cnv_type_id=cnv_type_id)
+		cnv_size_ls = []
+		score_ls = []
+		for row in query:
+			cnv_size_ls.append(math.log10(row.stop-row.start+1))
+			score_ls.append(row.score)
+		median_size=  numpy.median(cnv_size_ls)
+		sys.stderr.write("%s CNVs with median size %s.\n"%(len(cnv_size_ls), median_size))
+		
+		from pymodule.utils import addExtraLsToFilenamePrefix
+		
+		import pylab
+		pylab.clf()
+		output_fname = os.path.join(output_dir, '%s_CNVMethod%s_CNVType%s.png'%(fileNamePrefix, \
+									cnv_method_id, cnv_type_id, ))
+		title = ' %s method %s type %s deletions. median %s'%(len(cnv_size_ls), cnv_method_id, cnv_type_id, median_size)
+		
+		pylab.title(title)
+		"""
+		import statistics	# 2010-5-30 package from Michiel De Hoon
+		y, x = statistics.pdf(x_ls)
+		pylab.loglog(x, y, alpha=0.7)
+		pylab.grid(True, alpha=0.6)
+		"""
+		pylab.hist(cnv_size_ls, 20,)
+		if xlim_in_1D:
+			pylab.xlim(xlim_in_1D)
+		
+		pylab.xlabel(xlabel)
+		pylab.ylabel('Count')
+		#
+		pylab.savefig(output_fname, dpi=300)
+		
+		"""
+		C_ls = [1]*len(y_ls)
+		fig_fname = addExtraLsToFilenamePrefix(output_fname, ['2D'])
+		cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+				title=title, \
+				xlabel=xlabel, \
+				ylabel=ylabel_in_2D, \
+				colorBarLabel='log10(count)', reduce_C_function=CNV.logSum)
+		"""
+		sys.stderr.write("Done.\n")
+	"""
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVSegmentSizeHist/')
+		CNV.drawCNVSizeHistogram(db_250k, cnv_method_id=22, cnv_type_id=1, \
+								output_dir=output_dir, drawType=1, xlim_in_1D=None)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
 	def drawCNVQCCallSizeHistogram(cls, db_250k, qc_data_source_id=13, cnv_type_id=1, ecotype_id=None, \
 								output_dir=None, drawType=1, parseNumOfReadsFromComment=False):
 		"""
@@ -13503,9 +13988,9 @@ class CNV(object):
 		"""
 		2010-8-4
 			add argument
-				minFractionNotCoveredByLyrata: to get SFS/sequence frequency spectrum of ancestral deletions/new insertions,
+				minFractionNotCoveredByLyrata: to get SFS/sequence frequency spectrum of derived insertions,
 					usually >0.5
-				maxFractionNotCoveredByLyrata: get SFS of new deletions, usually <0.5
+				maxFractionNotCoveredByLyrata: get SFS of derived deletions, usually <0.5
 		2010-8-1
 		
 		"""
@@ -13524,7 +14009,10 @@ class CNV(object):
 		x_ls = []
 		y_ls = []
 		for row in query:
-			x_ls.append(row.frequency)
+			if minFractionNotCoveredByLyrata is not None:
+				x_ls.append(1-row.frequency)
+			elif maxFractionNotCoveredByLyrata is not None:
+				x_ls.append(row.frequency)
 			y_ls.append(math.log10(row.size_affected))
 		sys.stderr.write("Done.\n")
 		
@@ -13579,6 +14067,127 @@ class CNV(object):
 							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
 		sys.exit(0)
 	"""
+	
+	@classmethod
+	def drawCNVLDHist(cls, db_250k, input_fname, output_dir=None, cnv_method_id=20, fileNamePrefix='CNVLD',\
+							xlabel='LD', ylabel_in_2D='#SNPs per kb', xlim_in_1D=None, logHist=False,
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=None):
+		"""
+		2010-10-12
+		
+		"""
+		sys.stderr.write("Getting data related to CNV LD ...\n")
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		import Stock_250kDB, math
+		
+		from pymodule.utils import getColName2IndexFromHeader
+		from pymodule import PassingData
+		import csv
+		reader = csv.reader(open(input_fname), delimiter='\t')
+		header = reader.next()
+		col_name2index = getColName2IndexFromHeader(header)
+		cnv_id2data = {}
+		counter = 0
+		real_counter = 0
+		for line in reader:
+			cnv_id = int(line[col_name2index['snp2']])
+			r2_value = float(line[col_name2index['r2']])
+			if cnv_id not in cnv_id2data:
+				cnv_id2data[cnv_id] = PassingData(max_LD=r2_value, no_of_snps=0)
+				real_counter += 1
+			if r2_value>cnv_id2data[cnv_id].max_LD:
+				cnv_id2data[cnv_id].max_LD = r2_value
+			cnv_id2data[cnv_id].no_of_snps += 1
+			counter += 1
+			if counter%10000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		del reader
+		sys.stderr.write("\n%s CNVs with LD.\n"%(len(cnv_id2data)))
+		
+		
+		import Stock_250kDB
+		
+		counter = 0
+		real_counter = 0
+		x_ls = []
+		y_ls = []
+		LD_ls = []
+		deletionSizeLs = []
+		for cnv_id, data in cnv_id2data.iteritems():
+			cnv = Stock_250kDB.CNV.get(cnv_id)
+			x_ls.append(cnv.frequency)
+			deletionSize =  cnv.stop-cnv.start+1
+			if deletionSize>0:
+				deletionSizeLs.append(math.log10(deletionSize))
+			else:
+				deletionSizeLs.append(0)
+			regionSize = 40000+deletionSize	#add deletionSize
+			y_ls.append(data.no_of_snps/(regionSize/1000.))
+			LD_ls.append(data.max_LD)
+			counter += 1
+			if counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("Done.\n")
+		
+		sys.stderr.write("Drawing ...")
+		import pylab
+		from pymodule.utils import addExtraLsToFilenamePrefix
+		pylab.clf()
+		output_fname = os.path.join(output_dir, '%s_CNVMethod%s.png'%(fileNamePrefix, \
+									cnv_method_id,))
+		extraFileSuffixLs = []
+		output_fname = addExtraLsToFilenamePrefix(output_fname, extraFileSuffixLs)
+		title = '%s method %s objects.'%(len(x_ls), cnv_method_id)
+		
+		pylab.title(title)
+		"""
+		import statistics	# 2010-5-30 package from Michiel De Hoon
+		y, x = statistics.pdf(x_ls)
+		pylab.loglog(x, y, alpha=0.7)
+		pylab.grid(True, alpha=0.6)
+		"""
+		pylab.hist(x_ls, 30, log=logHist)
+		if xlim_in_1D:
+			pylab.xlim(xlim_in_1D)
+		
+		pylab.xlabel(xlabel)
+		pylab.ylabel('Count')
+		#
+		if logHist:
+			fig_fname = addExtraLsToFilenamePrefix(output_fname, ['logHist'])
+		else:
+			fig_fname = output_fname
+		pylab.savefig(fig_fname, dpi=300)
+		
+		C_ls = LD_ls
+		fig_fname = addExtraLsToFilenamePrefix(output_fname, ['deletionFrequency_vs_snpDensity_2D'])
+		cls.drawHexbin(x_ls, y_ls, C_ls, fig_fname=fig_fname, gridsize=20, \
+				title=title, \
+				xlabel="deletion frequency", \
+				ylabel=ylabel_in_2D, \
+				colorBarLabel='median(LD)')
+		sys.stderr.write("Done.\n")
+		
+		C_ls = LD_ls
+		fig_fname = addExtraLsToFilenamePrefix(output_fname, ['deletionFrequency_vs_deletionSize_2D'])
+		cls.drawHexbin(x_ls, deletionSizeLs, C_ls, fig_fname=fig_fname, gridsize=20, \
+				title=title, \
+				xlabel="deletion frequency", \
+				ylabel="log10(deletion size)", \
+				colorBarLabel='median(LD)')
+		sys.stderr.write("Done.\n")
+	
+	"""
+		#2010-8-1 -z banyan.usc.edu
+		input_fname = os.path.expanduser("~/cnvMethod20_vs_callMethod32_LD.tsv")
+		output_dir = os.path.expanduser('~/doc/compbiophd/figures/')
+		cnv_method_id=20
+		CNV.drawCNVLDHist(db_250k, input_fname, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVLD',\
+							xlabel='LD', ylabel_in_2D='#SNPs per kb', xlim_in_1D=[0,1], logHist=False,)
+		sys.exit(0)
+	"""
+	
 	@classmethod
 	def drawArrayQuartile(cls, db_250k, output_dir, call_method_id=None):
 		"""
@@ -13676,8 +14285,11 @@ class CNV(object):
 		"""
 		
 		@classmethod
-		def putLerContigsIntoDB(cls, db, data_source, accession_name, fasta_input_fname):
+		def putLerContigsIntoDB(cls, db, data_source, accession_name, fasta_input_fname, addSeqIntoDB=True):
 			"""
+			2010-11-12
+				add argument addSeqIntoDB:
+					indicating whether raw sequences shall be added into db
 			2010-1-27
 				put ler contigs sequences and ids into table Stock_250kDB.SequenceFragment
 			"""
@@ -13687,23 +14299,33 @@ class CNV(object):
 			import Stock_250kDB
 			from CNVQCConstruct import CNVQCConstruct
 			data_source_obj = CNVQCConstruct.getDBObj(session, Stock_250kDB.DataSource, data_source)
-			acc_obj = CNVQCConstruct.getCNVQCAccessionObj(session, accession_name, data_source_obj)
+			acc_obj = CNVQCConstruct.getCNVQCAccessionObjFromDB(session, accession_name, data_source_obj)
 			inf = open(fasta_input_fname)
 			from Bio import SeqIO
 			for seq_record in SeqIO.parse(inf, "fasta"):
 				sequence_fragment = Stock_250kDB.SequenceFragment(short_name=seq_record.id, size=len(seq_record.seq),\
-																description=seq_record.description,\
-																sequence=seq_record.seq.tostring())
+																description=seq_record.description)
+				if addSeqIntoDB:
+					sequence_fragment.sequence = seq_record.seq.tostring()
 				sequence_fragment.accession = acc_obj
 				session.add(sequence_fragment)
 			session.flush()
 			sys.stderr.write("Done.\n")
 		
 		"""
+		# 2010-1-27
 		fasta_input_fname = os.path.expanduser('~/script/variation/data/CNV/Cereon_Ath_Ler.fasta')
 		data_source = 'LerContig'
 		accession_name = 'Ler-1'
-		CNV.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname)
+		CNV.LerContig.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname)
+		sys.exit(0)
+		
+		# 2010-11-12
+		fasta_input_fname = os.path.expanduser('~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta')
+		data_source = 'TAIR9LyrataNormalMaxMatch'
+		accession_name = 'Lyrata'
+		CNV.LerContig.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname, addSeqIntoDB=False)
+		sys.exit(0)
 		"""
 		
 		@classmethod
@@ -15593,6 +16215,75 @@ class CNV(object):
 											min_no_of_data_points=min_no_of_data_points, max_no_of_data_points=max_no_of_data_points)
 	sys.exit(0)
 	
+	"""
+	
+	class exportCNVCallTraverseCNVCallProcessor(object):
+		"""
+		2010-9-10
+			used by exportCNVCallData which plugs it into traverseCNVCall()
+		"""
+		def __init__(self, ecotype_id2nativename=None, **keywords):
+			"""
+			2010-7-29
+				add argument **keywords
+				which contains writer
+			"""
+			self.array_id2data = {}
+			self.ecotype_id2nativename = ecotype_id2nativename
+			self.real_counter = 0
+			
+			
+			self.dataType = 1 # 2010-7-29
+			for keyword, value in keywords.iteritems():
+				setattr(self, keyword, value)
+			
+		def run(self, row, param_obj=None):
+			"""
+			This function assumes row comes in 
+			"""
+			array_id = row.array_id
+			ecotype_id = row.ecotype_id
+			nativename = self.ecotype_id2nativename.get(ecotype_id)
+			data_row = [row.ecotype_id, nativename, array_id, row.chromosome, row.start, row.stop, row.stop-row.start+1,\
+					row.no_of_probes_covered, row.amplitude, row.probability]
+			self.writer.writerow(data_row)
+			self.real_counter += 1
+			if self.real_counter%5000==0:
+				sys.stderr.write("%s%s"%('\x08'*80, self.real_counter))
+			
+	
+	@classmethod
+	def exportCNVCallData(cls, db_250k, cnv_method_id=16, output_fname=None, cnv_type_id=None, ecotype_id=None, \
+						**keywords):
+		"""
+		2010-9-10
+			export data from table CNVCall given call method.
+		"""
+		ecotype_id_ls = None
+		
+		from pymodule import PassingData
+		from common import get_ecotypeid2nativename
+		ecotype_id2nativename = get_ecotypeid2nativename(db_250k.metadata.bind)
+		import math, csv
+		writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+		header = ['ecotype_id', 'nativename', 'array_id', 'chr', 'start', 'stop', 'size', 'no_of_probes', 'amplitude', 'probability']
+		writer.writerow(header)
+		
+		processor = cls.exportCNVCallTraverseCNVCallProcessor(ecotype_id2nativename=ecotype_id2nativename, writer = writer, \
+														**keywords)
+		
+		cls.traverseCNVCall(db_250k, cnv_method_id=cnv_method_id, cnv_type_id=cnv_type_id, \
+					ecotype_id=ecotype_id, ecotype_id_ls=ecotype_id_ls,\
+					min_no_of_probes=None, min_segment_size=None, processClassIns=processor, \
+					param_obj=None)
+		del writer
+	
+	"""
+		#2010-9-10
+		cnv_method_id = 16
+		output_fname = '/tmp/cnv_method_%s.tsv'%cnv_method_id
+		CNV.exportCNVCallData(db_250k, cnv_method_id=cnv_method_id, output_fname=output_fname)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -17785,6 +18476,70 @@ class AnalyzeSNPData(object):
 	2007-09-24 increase the #bins of histogram to 40
 	2007-03-21 draw histogram of pairwise accession genetic distance
 	"""
+	
+	@classmethod
+	def turn_row_id2pairwise_dist_into_ecotype_id_pair_dict(cls, row_id2pairwise_dist):
+		"""
+		2010-10-23
+			called by outputPairwiseDistanceFromTwoDatasets()
+		"""
+		ecotype_id_pair2dist = {}
+		for row_id, pairwise_dist in row_id2pairwise_dist.iteritems():
+			row_id = int(row_id)
+			for dist in pairwise_dist:
+				mismatch_rate, row_id2, no_of_mismatches, no_of_non_NA_pairs = dist[:4]
+				row_id2 = int(row_id2)
+				key = (min(row_id, row_id2), max(row_id, row_id2))
+				ecotype_id_pair2dist[key] = [mismatch_rate, no_of_mismatches, no_of_non_NA_pairs]
+		return ecotype_id_pair2dist
+	
+	@classmethod
+	def outputPairwiseDistanceFromTwoDatasets(cls, input_fname1, input_fname2, output_fname, ref_ecotype_id=6909):
+		"""
+		2010-10-23
+			calculate the genetic distance from non-Col ecotypes to Col for each dataset and then output the two in juxtaposation 
+		"""
+		from pymodule import SNPData
+		snpData1 = SNPData(input_fname=input_fname1, turn_into_array=1, ignore_2nd_column=1)
+		snpData2 = SNPData(input_fname=input_fname2, turn_into_array=1, ignore_2nd_column=1)
+		
+		row_id2pairwise_dist1 = snpData1.calRowPairwiseDist(NA_set =set(['NA', 'N', -2, '|']), ref_row_id=str(ref_ecotype_id))
+		ecotype_id_pair2dist1 = cls.turn_row_id2pairwise_dist_into_ecotype_id_pair_dict(row_id2pairwise_dist1)
+		
+		#row_id2pairwise_dist2 = snpData2.calRowPairwiseDist(NA_set =set(['NA', 'N', -2, '|']), ref_row_id=str(ref_ecotype_id))
+		#ecotype_id_pair2dist2 = cls.turn_row_id2pairwise_dist_into_ecotype_id_pair_dict(row_id2pairwise_dist2)
+		# CNV dataset doesn't have ref_ecotype_id 6909
+		row_id2fractionData = snpData2.calFractionOfLociCarryingDifferentAllelePerRow(NA_set =set(['NA', 'N', -2, '|']), ref_allele=0)
+		ecotype_id_pair2dist2 = {}
+		for row_id, fractionData in row_id2fractionData.iteritems():
+			row_id = int(row_id)
+			key = (min(ref_ecotype_id, row_id), max(ref_ecotype_id, row_id))
+			ecotype_id_pair2dist2[key] = fractionData
+		
+		key_overlap = set(ecotype_id_pair2dist1.keys()) & set(ecotype_id_pair2dist2.keys())
+		
+		import csv
+		writer = csv.writer(open(output_fname, 'w'), delimiter ='\t')
+		header =  ['ecotype_id_pair', 'mismatch_rate_1', 'mismatch_rate_2', 'no_of_non_NA_pairs_1', 'no_of_non_NA_pairs_2']
+		writer.writerow(header)
+		for key in key_overlap:
+			dist_1 = ecotype_id_pair2dist1.get(key)
+			dist_2 = ecotype_id_pair2dist2.get(key)
+			key = map(str, key)
+			row = ['-'.join(key), dist_1[0], dist_2[0], dist_1[-1], dist_2[-1]]
+			writer.writerow(row)
+		del writer
+	"""
+		# 2010-10-23 test
+		input_fname1 = '/Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv'
+		input_fname2 = '/Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv'
+		output_fname = '/tmp/pairwiseDistFromTwoDatasets.tsv'
+		AnalyzeSNPData.outputPairwiseDistanceFromTwoDatasets(input_fname1, input_fname2, output_fname)
+		sys.exit(0)
+	"""
+	
+	
+	
 	@classmethod
 	def DrawDistanceHistogram(cls, data_matrix_fname, output_fname, need_savefig=0):
 		from FilterStrainSNPMatrix import FilterStrainSNPMatrix
@@ -18102,6 +18857,51 @@ unImputedFname = '/Network/Data/250k/db/dataset/call_method_35.tsv'
 imputedFname = '/Network/Data/250k/db/dataset/call_method_33.tsv'
 output_fname = '/tmp/call_method_33_imputed_only.tsv'
 row_id2no_of_imputed = AnalyzeSNPData.generateDatasetWithImputedCallsOnly(unImputedFname, imputedFname, output_fname)
+	"""
+	
+	@classmethod
+	def calculateNumberOfDifferingAllelesFromOneEcotypeInCallMethod(cls, db_250k, call_method_id, ecotype_id=6909):
+		"""
+		2010-9-29
+			Paul Dervent's email regarding too many non-reference alleles disappearing
+			 from version 3.02 (call 43) to 3.04 (call 54)
+		"""
+		sys.stderr.write("Calculating number alleles from non-%s ecotypes to %s ... \n"%(ecotype_id, ecotype_id))
+		import Stock_250kDB
+		cm = Stock_250kDB.CallMethod.get(call_method_id)
+		from pymodule import SNPData, TwoSNPData, PassingData
+		snpData1 = SNPData(input_fname=cm.filename, turn_into_array=1)
+		no_of_differing_alleles = 0
+		no_of_cols = len(snpData1.col_id2col_index)
+		base_ecotype_row_index = None
+		for row_id, row_index in snpData1.row_id2row_index.iteritems():
+			row_ecotype_id = int(row_id[0])
+			if row_ecotype_id==ecotype_id:
+				base_ecotype_row_index = row_index
+				break
+		
+		no_of_non_base_accessions = 0
+		for row_id, row_index in snpData1.row_id2row_index.iteritems():
+			row_ecotype_id = int(row_id[0])
+			if row_ecotype_id!= ecotype_id:
+				no_of_non_base_accessions += 1
+				no_of_identities = sum(snpData1.data_matrix[row_index,:]==snpData1.data_matrix[base_ecotype_row_index,:])
+				no_of_differing_alleles += (no_of_cols - no_of_identities)
+		
+		no_of_total_calls = len(snpData1.row_id_ls)*no_of_cols
+		fraction_of_differing = no_of_differing_alleles/float(no_of_total_calls)
+		print "%s (%.4f) alleles from %s rows different from ecotype %s."%(no_of_differing_alleles, fraction_of_differing, \
+											no_of_non_base_accessions, ecotype_id)
+	
+	"""
+		# 2010-9-29
+		AnalyzeSNPData.calculateNumberOfDifferingAllelesFromOneEcotypeInCallMethod(db_250k, 54, ecotype_id=6909)
+		sys.exit(0)
+		
+		# 2010-9-29
+		AnalyzeSNPData.calculateNumberOfDifferingAllelesFromOneEcotypeInCallMethod(db_250k, 43, ecotype_id=6909)
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -18894,10 +19694,99 @@ class Main(object):
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
 						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db_250k.setup(create_tables=False)
+		self.db_250k = db_250k
 		
 		#import MySQLdb
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
+		
+		#2010-11-24
+		CNV.updateCNVQCCallProbeInfo(db_250k, cnv_method_id_ls=[31])
+		sys.exit(0)
+		
+		# 2010-11-12
+		fasta_input_fname = os.path.expanduser('~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta')
+		data_source = 'TAIR9LyrataNormalMaxMatch'
+		accession_name = 'Lyrata'
+		CNV.LerContig.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname, addSeqIntoDB=False)
+		sys.exit(0)
+		
+		#2010-10-24
+		CNV.outputCNVFunctionalCompositionData(db_250k, cnv_method_id=20, cnv_type_id=1)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		minScore = None
+		cnv_method_id = 19
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVSegmentSizeHist/')
+		CNV.drawCNVSizeHistogram(db_250k, cnv_method_id=19, cnv_type_id=1, \
+								output_dir=output_dir, drawType=1, xlim_in_1D=None)
+		sys.exit(0)
+		
+		# 2010-10-23
+		input_fname1 = '/Network/Data/250k/db/dataset/call_method_54.tsv'
+		input_fname2 = os.path.expanduser('~/mnt/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv')
+		output_fname = os.path.expanduser('~/pairwiseDist_call54_vs_cnv20.tsv')
+		AnalyzeSNPData.outputPairwiseDistanceFromTwoDatasets(input_fname1, input_fname2, output_fname)
+		sys.exit(0)
+		
+		#2010-10-23
+		call_method_id=57
+		query = Stock_250kDB.ResultsMethod.query.filter_by(call_method_id=call_method_id)
+		output_dir = os.path.expanduser('~/doc/compbiophd/figures/deletionGWAS/')
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		from pymodule import getGenomeWideResultFromFile, PassingData
+		pdata = PassingData(min_MAF=0.1)
+		for row in query:
+			genome_wide_result = getGenomeWideResultFromFile(row.filename, min_value_cutoff=None, \
+															do_log10_transformation=True, pdata=pdata)
+			output_fname_prefix = os.path.join(output_dir, 'deletionGWASPlot_c%s_p%s_a%s'%(row.call_method_id, \
+																	row.phenotype_method_id, row.analysis_method_id))
+			GWA.drawGWANicer(db_250k, genome_wide_result, output_fname_prefix, min_value=None, ylim_type=2)
+		sys.exit(0)
+		
+		
+		
+		#2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
+		cnv_method_id=20
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
+		sys.exit(0)
+		
+		# 2010-10-10
+		input_fname = os.path.expanduser("~/cnvMethod22_vs_callMethod32_LD.tsv")
+		CNV.putCNVSNPLDIntoDB(db_250k, input_fname, method_id=2)
+		sys.exit(0)
+		
+		
+		#2010-8-3
+		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
+								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=20)
+		sys.exit(0)
+		
+		#2010-8-12
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
+									cnv_method_id=16, cnv_type_id=1, chromosome=1, start=540847, stop=562919)
+		sys.exit(0)
+		
 		
 		#################### 2010-9-6 for PNAS revisions
 		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
@@ -19024,11 +19913,6 @@ class Main(object):
 									cnv_method_id=24, cnv_type_id=1, chromosome=2, start=7063000, stop=7065260)
 		sys.exit(0)
 		
-		#2010-8-12
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
-		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
-									cnv_method_id=16, cnv_type_id=1, chromosome=2, start=7063400, stop=7065260)
-		sys.exit(0)
 		
 		
 		
