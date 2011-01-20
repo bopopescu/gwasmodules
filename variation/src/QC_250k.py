@@ -247,8 +247,11 @@ class QC_250k(TwoSNPData):
 	
 	
 	@classmethod
-	def read_call_matrix(cls, call_info_id2fname, min_probability=-1, snps_name_set=None):
+	def read_call_matrix(cls, call_info_id2fname, min_probability=-1, snps_name_set=None, db_id2chr_pos=None, db_id2index=None):
 		"""
+		2010-10-13
+			add argument db_id2chr_pos & db_id2index to deal with call info files that have snp db id in first column,
+				instead of chr_pos.
 		2008-05-20
 			return PassingData to wrap everything
 		2008-05-19
@@ -265,6 +268,8 @@ class QC_250k(TwoSNPData):
 		"""
 		sys.stderr.write("Creating call matrix ... \n")
 		header = ['', '']	#1st and 2nd is header for 1st two columns.
+		if db_id2index and db_id2chr_pos:
+			header += ['']*len(db_id2index)
 		call_matrix = []
 		call_info_id_ls = []
 		ecotype_id_ls = []
@@ -282,19 +287,37 @@ class QC_250k(TwoSNPData):
 			reader = csv.reader(open(fname), delimiter='\t')
 			reader.next()	#throw away the first line
 			data_row = []
-			
+			if db_id2index and db_id2chr_pos:
+				data_row = [0]*len(db_id2index)
 			for row in reader:
 				SNP_id, call = row[:2]
 				if snps_name_set and SNP_id not in snps_name_set:
 					continue
+				SNP_id_ls = SNP_id.split('_')
+				if len(SNP_id_ls)==1 and db_id2index and db_id2chr_pos:
+					db_id = int(SNP_id_ls[0])
+					column_index = db_id2index.get(db_id)
+					if column_index is None:	#2010-10-13 ignore this as it's no longer included in the snp set.
+						continue
+					chr, pos = db_id2chr_pos.get(db_id)
+				else:
+					column_index = None
+					chr, pos = SNP_id_ls[:2]
+				
 				if counter==0:	#first file
-					SNP_id_ls = SNP_id.split('_')
-					header.append('%s_%s'%(SNP_id_ls[0], SNP_id_ls[1]))
+					chr_pos = '%s_%s'%(chr, pos)
+					if column_index is not None:
+						header[column_index+2] = chr_pos
+					else:
+						header.append(chr_pos)
 				if len(row)==3:
 					probability = float(row[2])
 					if probability < min_probability:
 						call = 'NA'
-				data_row.append(nt2number[call])
+				if column_index is not None:
+					data_row[column_index] = nt2number[call]
+				else:
+					data_row.append(nt2number[call])
 			del reader
 			call_matrix.append(data_row)
 			counter += 1
