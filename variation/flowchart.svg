@@ -135,6 +135,26 @@
          style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
          transform="matrix(-0.8,0,0,-0.8,-10,0)" />
     </marker>
+    <inkscape:perspective
+       id="perspective4593"
+       inkscape:persp3d-origin="0.5 : 0.33333333 : 1"
+       inkscape:vp_z="1 : 0.5 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_x="0 : 0.5 : 1"
+       sodipodi:type="inkscape:persp3d" />
+    <marker
+       inkscape:stockid="Arrow1Lend"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Lend-0"
+       style="overflow:visible">
+      <path
+         id="path4459-1"
+         d="M 0,0 5,-5 -12.5,0 5,5 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.8,0,0,-0.8,-10,0)" />
+    </marker>
   </defs>
   <sodipodi:namedview
      id="base"
@@ -147,10 +167,10 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.66449955"
-     inkscape:cx="1174.6856"
-     inkscape:cy="1476.2405"
+     inkscape:cx="948.99982"
+     inkscape:cy="1349.8296"
      inkscape:document-units="px"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g4663"
      inkscape:window-width="1545"
      inkscape:window-height="1091"
      inkscape:window-x="198"
@@ -2368,6 +2388,22 @@
            y="2756.2742"
            style="font-size:20px"
            id="tspan3590" /></text>
+      <path
+         sodipodi:nodetypes="csc"
+         id="path3234-4"
+         d="m -236.55344,2597.9259 c 3.75872,23.4183 -26.50934,45.8599 -41.6583,18.6178 -15.78047,-28.3775 0.82586,-35.9991 32.95853,-36.6259"
+         style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend)" />
+      <text
+         xml:space="preserve"
+         style="font-size:14px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+         x="102.33265"
+         y="3002.6743"
+         id="text4613"
+         transform="translate(-401.56512,-358.50608)"><tspan
+           sodipodi:role="line"
+           id="tspan4615"
+           x="102.33265"
+           y="3002.6743">CNVMerge.py</tspan></text>
     </g>
     <g
        id="g4762"
@@ -4169,5 +4205,59 @@
        d="m 588.45706,2968.3969 140.48773,48.5173 c 35.51666,16.1055 14.99895,42.6367 -17.52089,28.5082 l -136.97574,-59.5097"
        id="path5799-8-0"
        sodipodi:nodetypes="ccsc" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend-1)"
+       d="m 838.2248,2421.7861 377.7279,39.1272"
+       id="path3668"
+       transform="translate(-401.56512,-48.506077)" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+       x="630.61462"
+       y="2373.2996"
+       id="text4680"><tspan
+         sodipodi:role="line"
+         id="tspan4682"
+         x="630.61462"
+         y="2373.2996">Data250k.addUnimputedArrayCallsToImputedCalls()</tspan><tspan
+         sodipodi:role="line"
+         x="630.61462"
+         y="2388.2996"
+         id="tspan4886">from variation/src/misc.py</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+       x="1273.1385"
+       y="2451.884"
+       id="text4684"
+       transform="translate(-401.56512,-48.506077)"><tspan
+         sodipodi:role="line"
+         id="tspan4686"
+         x="1273.1385"
+         y="2451.884">NPUTE.py</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-end:url(#Arrow1Lend-1)"
+       d="m 841.4756,2413.9121 112.8669,0"
+       id="path4688" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+       x="949.82788"
+       y="2406.3877"
+       id="text4888"><tspan
+         sodipodi:role="line"
+         id="tspan4890"
+         x="949.82788"
+         y="2406.3877">impute unknown arrays</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:14px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+       x="-239.03679"
+       y="2896.9824"
+       id="text4581"><tspan
+         sodipodi:role="line"
+         id="tspan4583"
+         x="-239.03679"
+         y="2896.9824">Table CNVQCCall</tspan></text>
   </g>
 </svg>
