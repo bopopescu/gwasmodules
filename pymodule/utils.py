@@ -360,6 +360,16 @@ def addExtraLsToFilenamePrefix(filename, extra_ls):
 		filename = addExtraToFilenamePrefix(filename, extra)
 	return filename
 
+def returnAnyValueIfNothing(string, data_type=int, defaultValue=0):
+	"""
+	2010-12-15
+		used in Transfac.src.GeneASNXML2gene_mapping.return_datetime() in case nothing is returned.
+	"""
+	if string:
+		return data_type(string)
+	else:
+		return defaultValue
+
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
 	print FigureOutTaxID_ins.returnTaxIDGivenSentence('>gi|172045488|ref|NW_001867254.1| Physcomitrella patens subsp. patens PHYPAscaffold_10696, whole genome shotgun sequence')
