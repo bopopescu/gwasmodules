@@ -3,7 +3,10 @@
 
 Examples:
 	FindSNPContext.py -u yh -c
-
+	
+	# 2010-10-3 find genes within 20kb of any SNP
+	FindSNPContext.py -z banyan -u yh -a 20000 -c -m 20000
+	
 Description:
 	program to find the context (nearby genes) of a snp. It fills results into db table snps_context.
 
