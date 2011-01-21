@@ -190,9 +190,9 @@ def _test_parallel_():
 	run_parallel(sys.argv[1], int(sys.argv[2]), int(sys.argv[2]) + 1)
 
 if __name__ == '__main__':
-	_gene_list_to_file_()
+	#_gene_list_to_file_()
 	#_test_()
-	#run_parallel_rna_seq_gwas()
+	run_parallel_rna_seq_gwas()
 #	print len(sys.argv)
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
