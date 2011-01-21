@@ -354,8 +354,13 @@ class phenotype_data:
 
 
 	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None, p_her=None):
-		plt.figure(figsize=(6, 4.8))
-		plt.axes([0.14, 0.13, 0.80, 0.83])
+
+		if title:
+			plt.figure(figsize=(6, 5.4))
+			plt.axes([0.13, 0.11, 0.85, 0.82])
+		else:
+			plt.figure(figsize=(6, 4.8))
+			plt.axes([0.13, 0.11, 0.85, 0.86])
 		if x_label:
 			plt.xlabel(x_label)
 		phen_vals = self.get_values(pid)

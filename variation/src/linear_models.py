@@ -676,23 +676,32 @@ class LinearMixedModel(LinearModel):
 			opt_delta = 0.5 * (deltas[opt_i - 1] + deltas[opt_i])
 			#Newton-Raphson
 			if method == 'REML':
-				new_opt_delta = optimize.newton(self._redll_, opt_delta, args=(eig_vals, sq_etas),
+				try:
+					new_opt_delta = optimize.newton(self._redll_, opt_delta, args=(eig_vals, sq_etas),
 								tol=esp, maxiter=50)
+				except Exception, err_str:
+					print 'Problems with Newton-Raphson method:', err_str
+					print "Using maximum grid value instead."
+					new_opt_delta = opt_delta
 				if deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
 					opt_delta = new_opt_delta
 					opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 				else:
-					opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 					raise Exception('Local maximum outside of suggested area??')
+				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			elif method == 'ML':
-				new_opt_delta = optimize.newton(self._dll_, opt_delta, args=(eig_vals, eig_vals_L, sq_etas),
+				try:
+					new_opt_delta = optimize.newton(self._dll_, opt_delta, args=(eig_vals, eig_vals_L, sq_etas),
 								tol=esp, maxiter=50)
-				if deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
+				except Exception, err_str:
+					print 'Problems with Newton-Raphson method:', err_str
+					print "Using maximum grid value instead."
+					new_opt_delta = opt_delta
+				if deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp: #Validating the delta
 					opt_delta = new_opt_delta
-					opt_ll = self._ll_(opt_delta, eig_vals, eig_vals_L, sq_etas)
 				else:
-					opt_ll = self._ll_(opt_delta, eig_vals, eig_vals_L, sq_etas)
 					raise Exception('Local maximum outside of suggested area??')
+				opt_ll = self._ll_(opt_delta, eig_vals, eig_vals_L, sq_etas)
 			if opt_ll < max_ll:
 				opt_delta = deltas[max_ll_i]
 		else:

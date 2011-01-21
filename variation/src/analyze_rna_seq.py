@@ -17,7 +17,7 @@ from env import *
 import sys
 import cPickle
 
-def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='gmi'):
+def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
@@ -56,15 +56,17 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='gmi'):
 
 
 
-def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15, filter_threshold=0.02,
-		debug_filter=1.0):
+def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15, filter_threshold=0.1,
+		debug_filter=1.0, use_1001_data=True):
 	if mapping_method not in ['emmax', 'kw']:
 		raise Exception('Mapping method unknown')
-	#phen_file = env['data_dir'] + 'rna_seq.csv'
 	phen_file = env['phen_dir'] + 'rna_seq.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	phed.convert_to_averages()
-	sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+	if use_1001_data:
+		sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+	else:
+		sd = dp.load_250K_snps(debug_filter=debug_filter)
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
 	phed.filter_ecotypes(indices_to_keep, pids=range(start_pid, stop_pid))
 	print len(indices_to_keep)
@@ -81,8 +83,8 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 	print 'In total there are %d SNPs to be mapped.' % len(snps)
 	g_list = _load_genes_list_()
 	for pid in range(start_pid, stop_pid):
-		curr_file_prefix = '%s_%s_mac%d_pid%d' % (file_prefix, mapping_method, mac_threshold, pid)
 		gene_tair_id = phed.get_name(pid)
+		curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
 		if phed.is_constant(pid):
 			print "Skipping expressions for %s since it's constant." % gene_tair_id
 			continue
@@ -94,16 +96,15 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 
 		elif mapping_method == 'emmax':
 			#Identify the right transformation
-			phed.most_normal_transformation(pid)
+			trans_type, shapiro_pval = phed.most_normal_transformation(pid)
 			phen_vals = phed.get_values(pid)
 			#Get pseudo-heritabilities
 			res = lm.get_emma_reml_estimates(phen_vals, K)
 
 			f_prefix = curr_file_prefix + '_hist'
-			print 'plotting histogram:', f_prefix
 			phed.plot_histogram(pid, title='Gene expressions for %s' % gene_tair_id,
-					png_file=f_prefix + '.png', x_label='RNA seq expression levels',
-					p_her=res['pseudo_heritability'])
+					png_file=f_prefix + '.png', p_her=res['pseudo_heritability'],
+					x_label='RNA seq expression levels (%s transformed)' % trans_type)
 			res = lm.emmax(snps, phen_vals, K)
 			pvals = res['ps'].tolist()
 
@@ -113,13 +114,13 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 		res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions,
 				chromosomes=chromosomes)
 
-
 		#filter, top 10%...
-		res.filter_percentile(0.1, reversed=True)
+		res.filter_percentile(filter_threshold, reversed=True)
 		res.write_to_file(curr_file_prefix + '.pvals')
 
 		#Plot GWAs...
 		cgs = g_list[pid - 1]
+		print [cg.tairID for cg in cgs]
 		f_prefix = curr_file_prefix + '_manhattan'
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs)

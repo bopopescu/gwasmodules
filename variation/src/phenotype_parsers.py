@@ -508,6 +508,7 @@ def load_gene_expression_traits():
 		print ecotypes
 		phen_dict = {}
 		num_const_phen = 0
+		phen_i = 1
 		for i, line in enumerate(f): #For each gene
 			l = line.split()
 			phen_name = l[0]
@@ -515,7 +516,8 @@ def load_gene_expression_traits():
 			if len(phen_vals) != len(ecotypes):
 				raise Exception('Arrg')
 			if len(sp.unique(phen_vals)) > 1:
-				phen_dict[(i + 1)] = {'name':phen_name, 'ecotypes':ecotypes, 'values':phen_vals}
+				phen_dict[phen_i] = {'name':phen_name, 'ecotypes':ecotypes, 'values':phen_vals}
+				phen_i += 1
 			else:
 				num_const_phen += 1
 	print 'Number of constant phenotypes:', num_const_phen

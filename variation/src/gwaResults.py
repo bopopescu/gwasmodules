@@ -1826,11 +1826,6 @@ class Result(object):
 			scoreList = result.snp_results['scores'][index1:index2]
 			posList = result.snp_results['positions'][index1:index2]
 			chrom = chromosomes[i]
-
-			if cand_genes:
-				for cg in chr_cand_genes[chrom]:
-					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='k', alpha=0.5)
-
 			newPosList = [offset + pos for pos in posList]
 
 			for s_i, (score, pos) in enumerate(it.izip(scoreList, newPosList)):
@@ -1842,6 +1837,11 @@ class Result(object):
 				scoreList[s_i] = score
 
 			plt.plot(newPosList, scoreList, ".", markersize=2, alpha=0.7)
+
+			if cand_genes:
+				for cg in chr_cand_genes[chrom]:
+					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='#FF9900', alpha=0.6)
+
 			oldOffset = offset
 			textPos.append(offset + chromosome_end / 2 - 2000000)
 			offset += chromosome_end
