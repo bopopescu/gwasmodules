@@ -641,17 +641,22 @@ if __name__ == '__main__':
 		import pdb
 		pdb.set_trace()
 	
-	#2008-10-01	get gene model and pickle it into a file
-	gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = instance.get_gene_id2model()
-	from pymodule import PassingData
-	gene_annotation = PassingData()
-	gene_annotation.gene_id2model = gene_id2model
-	gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
-	gene_annotation.geneSpanRBDict = geneSpanRBDict
 	import cPickle
-	picklef = open(os.path.expanduser('~/at_gene_model_pickelf'), 'w')
-	cPickle.dump(gene_annotation, picklef, -1)
-	picklef.close()
+	#2011-1-20 check if the pickled file already exists or not
+	pickle_fname = '~/at_gene_model_pickelf'
+	if os.path.isfile(os.path.expanduser(pickle_fname)):
+		sys.stderr.write("File %s already exists, no gene model pickle output.\n"%(pickle_fname))
+	else:
+		#2008-10-01	get gene model and pickle it into a file
+		gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = instance.get_gene_id2model()
+		from pymodule import PassingData
+		gene_annotation = PassingData()
+		gene_annotation.gene_id2model = gene_id2model
+		gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
+		gene_annotation.geneSpanRBDict = geneSpanRBDict
+		picklef = open(os.path.expanduser(pickle_fname), 'w')
+		cPickle.dump(gene_annotation, picklef, -1)
+		picklef.close()
 	
 	import sqlalchemy as sql
 	#print dir(Gene)
@@ -671,7 +676,7 @@ if __name__ == '__main__':
 		print rows.count()
 		for row in rows:
 			i += 1
-			print row.gene_id, row.gene_symbol
+			print row.id, row.ncbi_gene_id, row.gene_symbol
 		if i>=5*block_size:
 			break
 		rows = Gene.query.offset(i).limit(block_size)
