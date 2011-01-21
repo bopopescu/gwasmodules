@@ -15,6 +15,7 @@ import gwaResults as gr
 import linear_models as lm
 from env import *
 import sys
+import cPickle
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='gmi'):
 	"""
@@ -139,9 +140,7 @@ def run_parallel_rna_seq_gwas():
 
 
 def _gene_list_to_file_():
-
 	import bisect
-	import cPickle
 	phen_file = env['phen_dir'] + 'rna_seq.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	tair_gene_versions = phed.get_names()
@@ -173,6 +172,7 @@ def _gene_list_to_file_():
 
 
 def _load_genes_list_():
+
 	rna_gene_pickle_file = env['phen_dir'] + 'rna_seq.genes'
 	with open(rna_gene_pickle_file) as f:
 		g_chrom_pos = cPickle.load(f)
