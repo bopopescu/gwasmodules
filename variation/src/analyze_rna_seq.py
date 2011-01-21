@@ -78,7 +78,7 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 	macs = r['mafs']
 	mafs = r['marfs']
 	print 'In total there are %d SNPs to be mapped.' % len(snps)
-	g_chrom_pos_list = _load_gene_chrom_pos_list_()
+	g_list = _load_genes_list_()
 	for pid in range(start_pid, stop_pid):
 		curr_file_prefix = '%s_%s_mac%d_pid%d' % (file_prefix, mapping_method, mac_threshold, pid)
 		gene_tair_id = phed.get_name(pid)
@@ -118,7 +118,7 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 		res.write_to_file(curr_file_prefix + '.pvals')
 
 		#Plot GWAs...
-		cgs = g_chrom_pos_list[pid - 1]
+		cgs = g_list[pid - 1]
 		f_prefix = curr_file_prefix + '_manhattan'
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs)
