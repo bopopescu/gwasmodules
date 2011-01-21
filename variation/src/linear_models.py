@@ -1,11 +1,17 @@
 """
 Contains functions to perform various linear regression schemes, such as simple, and mixed models.
 """
-import scipy as sp
-sp.alterdot()
-from scipy import linalg
-from scipy import stats
-from scipy import optimize
+try:
+	import scipy as sp
+	sp.alterdot()
+	from scipy import linalg
+	from scipy import stats
+	from scipy import optimize
+	#import scipy as sp
+	anti_decoder = {1:0, 0:1}
+	get_anti_snp = sp.vectorize(lambda x: anti_decoder[x])  #Creating a vectorized function for anti-snp
+except Exception, err_str:
+	print 'scipy is missing:', err_str
 import snpsdata
 import warnings
 import pdb
@@ -17,8 +23,6 @@ from pdb import Pdb
 import itertools as it
 
 
-anti_decoder = {1:0, 0:1}
-get_anti_snp = sp.vectorize(lambda x: anti_decoder[x])  #Creating a vectorized function for anti-snp
 
 
 class LinearModel(object):
@@ -504,14 +508,14 @@ class LinearMixedModel(LinearModel):
 	"""
 	A class for linear mixed models
 	"""
-	def __init__(self, Y=None):
+	def __init__(self, Y=None, dtype='single'):
 		"""
 		The fixed effects should be a list of fixed effect lists (SNPs)
 		"""
 		self.n = len(Y)
-		self.y_var = sp.var(Y, ddof=1)
-		self.Y = sp.matrix([[y] for y in Y])
-		self.X = sp.matrix([[1] for y in Y]) #The intercept
+		self.y_var = sp.var(Y, ddof=1, dtype=dtype)
+		self.Y = sp.matrix([[y] for y in Y], dtype=dtype)
+		self.X = sp.matrix([[1] for y in Y], dtype=dtype) #The intercept
 		self.p = 1
 		self.beta_est = None
 		self.cofactors = []
@@ -525,18 +529,18 @@ class LinearMixedModel(LinearModel):
 			raise Exception('Currently, only Normal random effects are allowed.')
 		self.random_effects.append((effect_type, cov_matrix))
 
-	def _get_eigen_L_(self, K):
+	def _get_eigen_L_(self, K, dtype='single'):
 		evals, evecs = linalg.eigh(K)
 		return {'values':evals, 'vectors':sp.mat(evecs).T}
 
 
 
-	def _get_eigen_R_(self, X, hat_matrix=None):
+	def _get_eigen_R_(self, X, hat_matrix=None, dtype='single'):
 		q = X.shape[1]
 		if not hat_matrix:
 			X_squared_inverse = linalg.pinv(X.T * X) #(X.T*X).I
 			hat_matrix = X * X_squared_inverse * X.T
-		S = sp.mat(sp.identity(self.n)) - hat_matrix	#S=I-X(X'X)^{-1}X'
+		S = sp.mat(sp.identity(self.n, dtype=dtype)) - hat_matrix	#S=I-X(X'X)^{-1}X'
 		evals, evecs = linalg.eigh(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S) #eigen of S(K+I)S
 		return {'values':map(lambda x: x - 1, evals[q:]), 'vectors':(sp.mat(evecs).T[q:])}   #Because of S(K+I)S?
 
@@ -601,7 +605,8 @@ class LinearMixedModel(LinearModel):
 
 
 	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -10, ulim=10, esp=1e-6,
-				return_pvalue=False, return_f_stat=False, method='REML', verbose=False):
+				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
+				dtype='single'):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
 		Using the EMMA algorithm.
@@ -623,12 +628,12 @@ class LinearMixedModel(LinearModel):
 		p = n - q
 		m = ngrids + 1
 
-		etas = sp.array(eig_R['vectors'] * self.Y)
+		etas = sp.array(eig_R['vectors'] * self.Y, dtype=dtype)
 		sq_etas = etas * etas
-		log_deltas = (sp.arange(m, dtype='float64') / ngrids) * (ulim - llim) + llim  #a list of deltas to search
+		log_deltas = (sp.arange(m, dtype=dtype) / ngrids) * (ulim - llim) + llim  #a list of deltas to search
 		deltas = sp.exp(log_deltas)
 		assert len(deltas) == m, 'Number of deltas is incorrect.'
-		eig_vals = sp.array(eig_R['values'])
+		eig_vals = sp.array(eig_R['values'], dtype=dtype)
 		assert len(eig_vals) == p, 'Number of eigenvalues is incorrect.'
 
   		lambdas = sp.reshape(sp.repeat(eig_vals, m), (p, m)) + \
@@ -642,7 +647,7 @@ class LinearMixedModel(LinearModel):
 	  		dlls = 0.5 * (p * s3 / s1 - s4)
   		elif method == 'ML':
   			#Xis < -matrix(eig.L$values, n, m) + matrix(delta, n, m, byrow=TRUE)
-  			eig_vals_L = sp.array(eig_L['values'])
+  			eig_vals_L = sp.array(eig_L['values'], dtype=dtype)
   			xis = sp.reshape(sp.repeat(eig_vals_L, m), (n, m)) + \
   				sp.reshape(sp.repeat(deltas, n), (m, n)).T
   			#LL <- 0.5*(n*(log(n/(2*pi))-1-log(colSums(Etasq/Lambdas)))-colSums(log(Xis)))	
@@ -702,7 +707,7 @@ class LinearMixedModel(LinearModel):
 		opt_vg = sp.sum(l) / p  #vg   
 		opt_ve = opt_vg * opt_delta  #ve
 
-		H_sqrt_inv = sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)) * eig_L['vectors']
+		H_sqrt_inv = sp.mat(sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)), dtype=dtype) * eig_L['vectors']
 		X_t = H_sqrt_inv * X
 		Y_t = H_sqrt_inv * self.Y
 		(beta_est, mahalanobis_rss, rank, sigma) = linalg.lstsq(X_t, Y_t)
@@ -1638,6 +1643,7 @@ def get_emma_reml_estimates(y, K):
 	res = lmm.get_REML()
 	res['Y_t'] = res['H_sqrt_inv'] * lmm.Y	#The transformed outputs.
 	res['X_t'] = res['H_sqrt_inv'] * lmm.X
+	res['lmm'] = lmm
 	return res
 
 
@@ -2369,7 +2375,7 @@ def filter_k_for_accessions(k, k_accessions, accessions):
 			continue
 	return k[indices_to_keep, :][:, indices_to_keep]
 
-def load_kinship_from_file(kinship_file, accessions=None):
+def load_kinship_from_file(kinship_file, accessions=None, dtype='single'):
 	assert os.path.isfile(kinship_file), 'File not found.'
 	#sys.stdout.write("Loading K.\n")
 	#sys.stdout.flush()
@@ -2378,7 +2384,7 @@ def load_kinship_from_file(kinship_file, accessions=None):
 	f.close()
 	k = l[0]
 	k_accessions = l[1]
-	return filter_k_for_accessions(k, k_accessions, accessions)
+	return filter_k_for_accessions(sp.mat(k, dtype=dtype), k_accessions, accessions)
 
 
 def save_kinship_in_text_format(filename, k, accessions):

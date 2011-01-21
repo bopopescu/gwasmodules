@@ -10,7 +10,11 @@ import sys, warnings
 import pdb
 import env
 from itertools import *
-import scipy as sp
+try:
+	import scipy as sp
+except Exception, err_str:
+	print 'scipy is missing:', err_str
+
 
 IUPAC_alphabet = ['A', 'C', 'G', 'T', '-', 'Y', 'R', 'W', 'S', 'K', 'M', 'D', 'H', 'V', 'B', 'X', 'N']
 
@@ -456,7 +460,7 @@ class _SnpsData_(object):
 		self.accessions = newAccessions
 		self.arrayIds = None
 
-	def merge_data(self, sd, union_accessions=True, error_threshold=0.2):
+	def merge_data(self, sd, union_accessions=True, allow_multiple_markers=True, error_threshold=0.2):
 		"""
 		Merges data, allowing multiple markers at a position. (E.g. deletions and SNPs.)
 		However it merges markers which overlap to a significant degree.
@@ -2738,7 +2742,7 @@ class SNPsDataSet:
 
 
 
-	def coordinate_w_phenotype_data(self, phend, pid):
+	def coordinate_w_phenotype_data(self, phend, pid, coord_phen=True):
 
 		"""
 		Deletes accessions which are not common, and sorts the accessions, removes monomorphic SNPs, etc.
@@ -2766,11 +2770,12 @@ class SNPsDataSet:
 		#Filter accessions which do not have phenotype values (from the genotype data).
 		print "Filtering genotype data"
 		self.filter_accessions_indices(sd_indices_to_keep)
-		num_values = len(phend.phen_dict[pid]['ecotypes'])
-		print "Filtering phenotype data."
-		phend.filter_ecotypes(pd_indices_to_keep, pids=[pid]) #Removing accessions that don't have genotypes or phenotype values
-		ets = phend.phen_dict[pid]['ecotypes']
-		print "Out of %d, leaving %d values." % (num_values, len(ets))
+		if coord_phen:
+			num_values = len(phend.phen_dict[pid]['ecotypes'])
+			print "Filtering phenotype data."
+			phend.filter_ecotypes(pd_indices_to_keep, pids=[pid]) #Removing accessions that don't have genotypes or phenotype values
+			ets = phend.phen_dict[pid]['ecotypes']
+			print "Out of %d, leaving %d values." % (num_values, len(ets))
 		#Ordering accessions according to the order of accessions in the genotype file
 
 #		if ets != self.accessions:
@@ -2789,18 +2794,18 @@ class SNPsDataSet:
 				total_num += len(snpsd.snps)
 				removed_num += snpsd.onlyBinarySnps()
 			print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
+		return pd_indices_to_keep
 
 
 
-
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
 		snps_array = sp.array(snps)
 		snps_array = snps_array.T
 		num_lines = len(self.accessions)
 		num_snps = float(len(snps))
-		k_mat = sp.ones((num_lines, num_lines))
+		k_mat = sp.ones((num_lines, num_lines), dtype=dtype)
 		num_comp = num_lines * (num_lines - 1) / 2
 		comp_i = 0
 		for i in range(num_lines):
@@ -2865,6 +2870,13 @@ class SNPsDataSet:
 			for snpsd in self.snpsDataList:
 				snplist += snpsd.snps
 		return snplist
+
+
+	def num_snps(self):
+		num_snps = 0
+		for snpsd in self.snpsDataList:
+			num_snps += len(snpsd.snps)
+		return num_snps
 
 
 #	def get_snps(self, random_fraction=None, region=None):

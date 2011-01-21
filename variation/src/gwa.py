@@ -19,7 +19,7 @@ Option:
 	-a ...					Apply specific methods, otherwise all available are applied:
 						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step etc.
 	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
-						log_trans, box_cox_lambda (where lambda is a number)
+						log_trans, box_cox_lambda (where lambda is a number), best (picks a most "normal" transformation).
 	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
 						else the outlier fence is given in IQRs. (An int is required).
 												 
@@ -213,6 +213,11 @@ def _prepare_transformation_(phed, p_i, transformation_type, remove_outliers):
 	if "sqrt_trans" == transformation_type:
 		print 'sqrt transforming phenotypes..'
 		phed.sqrt_transform(p_i)
+
+	if 'best' == transformation_type:
+		print 'Transforming phenotypes..'
+		trans_type, shapiro_pval = phed.most_normal_transformation(p_i)
+		print 'Picked %s transformation.' % trans_type
 
 	if remove_outliers:
 		print 'removing outliers above IQR fence of', remove_outliers, '..'
@@ -424,7 +429,7 @@ def analysis_plots(phed, p_dict):
 							res = gwaResults.Result(result_file=file_name, name=res_name, snps=snps)
 							pvals = True
 							if mapping_method in ['lm', 'emma', 'emmax']:
-								res.filter_attr("mafs", p_dict['mac_threshold'])
+								res.filter_attr("macs", p_dict['mac_threshold'])
 							results[mapping_label] = res
 							method_types.append(mapping_method)
 
@@ -666,7 +671,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 #		kwargs['correlations'] = calc_correlations(snps, phen_vals)
 #		additional_columns.append('correlations')
 		print 'Writing result to file.'
-		res = gwaResults.Result(scores=pvals, snps_data=sd, name=result_name, **kwargs)
+		res = gwaResults.Result(scores=pvals.tolist(), snps_data=sd, name=result_name, **kwargs)
 		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
 		 	result_file = file_prefix + ".pvals"
 		else:
@@ -713,7 +718,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 						ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
 						cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
 			else:
-				if res.filter_attr("mafs", p_dict['mac_threshold']) > 0:
+				if res.filter_attr("macs", p_dict['mac_threshold']) > 0:
 					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
 					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",

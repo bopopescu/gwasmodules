@@ -1,13 +1,18 @@
 import pdb
 from env import *
 import math
-import scipy as sp
 import itertools as it
 import sys
+try:
+	import scipy as sp
+	import matplotlib
+	matplotlib.use("Agg")
+	import matplotlib.pyplot as plt
+except Exception, err_str:
+	print 'scipy/matplotlib is missing:', err_str
+
+
 #For annoying linux computers, which don't have a display..
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 
 # Phenotype categories: (category,order)
@@ -69,6 +74,9 @@ class phenotype_data:
 			for i, pid in enumerate(self.phen_ids):
 				self.phen_dict[pid] = {'name':phenotype_names[i], 'ecotypes':[], 'values':[]}
 
+
+	def num_traits(self):
+		return len(self.phen_dict)
 
 	def get_pseudo_heritability(self, pid, K):
 		"""
@@ -138,9 +146,63 @@ class phenotype_data:
 		self.phen_dict[pid]['values'] = vals.tolist()
 
 
+	def sqr_transform(self, pid, method='standard'):
+		a = sp.array(self.phen_dict[pid]['values'])
+		if method == 'standard':
+			vals = ((a - min(a)) + 0.1 * sp.std(a)) * ((a - min(a)) + 0.1 * sp.std(a))
+		else:
+			vals = a * a
+		self.phen_dict[pid]['values'] = vals.tolist()
+
+	def exp_transform(self, pid, method='standard'):
+		a = sp.array(self.phen_dict[pid]['values'])
+		if method == 'standard':
+			vals = sp.exp((a - min(a)) + 0.1 * sp.std(a))
+		else:
+			vals = sp.exp(a)
+		self.phen_dict[pid]['values'] = vals.tolist()
+
+	def transform(self, pid, trans_type, method='standard'):
+		if trans_type == 'sqrt':
+			self.sqrt_transform(pid, method=method)
+		elif trans_type == 'log':
+			self.log_transform(pid, method=method)
+		elif trans_type == 'sqr':
+			self.sqr_transform(pid, method=method)
+		elif trans_type == 'exp':
+			self.exp_transform(pid, method=method)
+
+	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp']):
+		"""
+		Performs the transformation which results in most normal looking data, according to Shapiro-Wilk's test
+		"""
+		raw_values = self.phen_dict[pid]['values']
+		shapiro_pvals = []
+		for trans_type in trans_types:
+			if trans_type != 'none':
+				self.transform(pid, trans_type=trans_type)
+			phen_vals = self.get_values(pid)
+			#print 'sp.inf in phen_vals:', sp.inf in phen_vals
+			if sp.inf in phen_vals:
+				pval = 0.0
+			else:
+				r = sp.stats.shapiro(phen_vals)
+				if sp.isfinite(r[0]):
+					pval = r[1]
+				else:
+					pval = 0.0
+			shapiro_pvals.append(pval)
+			self.phen_dict[pid]['values'] = raw_values
+		argmin_i = sp.argmax(shapiro_pvals)
+		trans_type = trans_types[argmin_i]
+		shapiro_pval = shapiro_pvals[argmin_i]
+		self.transform(pid, trans_type=trans_type)
+		print "The most normal-looking transformation was %s, with a Shapiro-Wilk's p-value of %0.6f" % \
+			(trans_type, shapiro_pval)
+		return trans_type, shapiro_pval
+
+
 	def normalize_values(self, pid):
-		"""
-		"""
 		a = sp.array(self.phen_dict[pid]['values'])
 		v = sp.var(self.get_avg_values(pid), ddof=1)
 		vals = a / sp.sqrt(v)
@@ -192,6 +254,12 @@ class phenotype_data:
 
 	def get_name(self, pid):
 		return self.phen_dict[pid]['name']
+
+	def get_names(self, pids=None):
+		if not pids:
+			pids = self.phen_dict.keys()
+			pids.sort()
+		return [self.phen_dict[pid]['name'] for pid in pids]
 
 	def get_values(self, pid):
 		return self.phen_dict[pid]['values']
@@ -286,8 +354,8 @@ class phenotype_data:
 
 
 	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None, p_her=None):
-		plt.figure(figsize=(5, 4))
-		plt.axes([0.14, 0.13, 0.81, 0.83])
+		plt.figure(figsize=(6, 4.8))
+		plt.axes([0.14, 0.13, 0.80, 0.83])
 		if x_label:
 			plt.xlabel(x_label)
 		phen_vals = self.get_values(pid)
@@ -378,6 +446,8 @@ class phenotype_data:
 	def is_binary(self, pid):
 		return len(sp.unique(self.phen_dict[pid]['values'])) == 2
 
+	def is_constant(self, pid):
+		return len(sp.unique(self.phen_dict[pid]['values'])) == 1
 
 	def insert_into_db(self, pids=None, phenotype_scoring='',
 			   method_description='', growth_condition='', biology_category_id='',
@@ -477,6 +547,9 @@ class phenotype_data:
 		
 		'color_by' is by default set to be the phenotype values.
 		"""
+		import matplotlib
+		matplotlib.use("Agg")
+		import matplotlib.pyplot as plt
 		matplotlib.rcParams['backend'] = 'GTKAgg'
 		if not ecotypes:
 			ecotypes = self.phen_dict[pid]['ecotypes']

@@ -6,8 +6,8 @@ from env import *
 import dataParsers as dp
 import scipy as sp
 
-def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_threshold=0.2, min_emma_dist=100000,
-		save_threshold=0.2, debug_filter=1):
+def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_threshold=0.15, min_emma_dist=0,
+		save_threshold=0.15, debug_filter=1):
 	"""
 	Returns statistics on LD levels, and plot them.
 	
@@ -18,6 +18,7 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_thre
 	from scipy import linalg
 	import linear_models as lm
 
+	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
 	sd.filter_mac_snps(mac_filter)
@@ -34,31 +35,46 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_thre
 	n = len(sd.accessions)
 	n_p = n - p
 	for (x_c, x_p, x_snp) in x_cps:
+		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
 		#get the EMMA REML
 		res = lm.get_emma_reml_estimates(x_snp, K)
+		print 'Pseudo-heritability:', res['pseudo_heritability']
 		h_sqrt_inv = res['H_sqrt_inv']
 		h0_X = res['X_t']
 		Y = res['Y_t']	#The transformed outputs.
+		std_Y = sp.std(Y)
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-		print i
 		i += 1
 		#j = 0
+		num_emmas = 0
 		for (y_c, y_p, y_snp) in y_cps:
-			if (x_c, x_p) < (y_c, y_p):
-				(r, pearson_pval) = st.pearsonr(x_snp, y_snp)
-				r2 = r * r
-				if r2 > save_threshold:
-					emma_pval = 2
-					if (x_c != y_c or abs(x_p - y_p) > min_emma_dist) and r2 > emma_r2_threshold:
-						#Do EMMAX
-						yt = y_snp * h_sqrt_inv
-						(b, rss, p, s) = linalg.lstsq(sp.hstack([h0_X, sp.matrix(yt).T]), Y)
-						if rss:
-							f_stats = (h0_rss / rss[0] - 1) * n_p / float(q)
-							emma_pval = st.f.sf(f_stats, q, n_p)[0]
-					if emma_pval < 0.01:
-						print [x_c, x_p, y_c, y_p, r2, pearson_pval, emma_pval]
-					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, emma_pval])
+			#if (x_c, x_p) < (y_c, y_p):
+			(r, pearson_pval) = st.pearsonr(x_snp, y_snp) #Done twice, but this is fast..
+			r2 = r * r
+			if r2 > save_threshold:
+				emma_pval = 2
+				f_stat = 0
+				beta = 0
+				emmax_r2 = 0
+				l = [x_c, x_p, y_c, y_p, r2, pearson_pval, f_stat, emma_pval, beta, emmax_r2]
+				if (x_c != y_c or abs(x_p - y_p) > min_emma_dist) and r2 > emma_r2_threshold:
+					num_emmas += 1
+					#Do EMMAX
+					yt = y_snp * h_sqrt_inv
+					(b, rss, p, s) = linalg.lstsq(sp.hstack([h0_X, sp.matrix(yt).T]), Y)
+
+					if rss:
+						f_stat = (h0_rss / rss[0] - 1) * n_p / float(q)
+						emma_pval = st.f.sf(f_stat, q, n_p)[0]
+						beta = b[1, 0]
+						emmax_r = beta * (std_Y / sp.std(yt))
+						emmax_r2 = emmax_r * emmax_r
+				if emma_pval < 0.1:
+					l = [x_c, x_p, y_c, y_p, r2, pearson_pval, f_stat[0], emma_pval, beta, emmax_r2]
+					print l
+					print std_Y, sp.std(yt)
+				result_list.append(l)
+		print '%d EMMAX run' % num_emmas
 	file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".csv"
 	f = open(file_name, 'w')
 	for r in result_list:
@@ -102,7 +118,7 @@ def run_parallel(x_start_i, x_stop_i):
 
 def run_r2_calc():
 	if len(sys.argv) > 2:
-		calc_r2_levels(env['results_dir'] + '250K_r2_min02', int(sys.argv[1]), int(sys.argv[2]))
+		calc_r2_levels(env['results_dir'] + '250K_r2_min015', int(sys.argv[1]), int(sys.argv[2]))
 	else:
 		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
 		num_snps = len(sd.getSnps())
@@ -305,4 +321,5 @@ def load_and_plot_r2_results():
 
 
 if __name__ == "__main__":
-	load_and_plot_r2_results()
+	#load_and_plot_r2_results()
+	run_r2_calc()
