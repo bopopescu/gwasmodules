@@ -175,7 +175,7 @@ def _load_genes_list_():
 
 	rna_gene_pickle_file = env['phen_dir'] + 'rna_seq.genes'
 	with open(rna_gene_pickle_file) as f:
-		g_chrom_pos = cPickle.load(f)
+		genes = cPickle.load(f)
 	return genes
 
 
