@@ -262,8 +262,9 @@ def plot_pval_emmax_correlations():
 	x_pvals = []
 	y_pvals = []
 	for t in d:
-		x_pvals.append(d[t]['x'][3])
-		y_pvals.append(d[t]['y'][3])
+		if 'x' in d[t] and 'y' in d[t]:
+			x_pvals.append(d[t]['x'][3])
+			y_pvals.append(d[t]['y'][3])
 	sp.corrcoef(x_pvals, y_pvals)[0, 1]
 	pylab.plot(x_pvals, y_pvals)
 	pylab.xlabel('p-value')
