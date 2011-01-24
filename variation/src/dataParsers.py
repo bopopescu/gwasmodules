@@ -9,6 +9,7 @@ import dbutils
 import cPickle
 import pdb
 from snpsdata import *
+from env import *
 
 # this should be fixed
 
@@ -1972,7 +1973,6 @@ def _test_full_seq_parser_():
 
 
 def load_250K_snps(call_method_id=72, data_format='binary', debug_filter=1.0):
-	from env import *
 	data_file = '%s250K_t%d.csv' % (env['data_dir'], call_method_id)
 	return parse_snp_data(data_file , format=data_format, filter=debug_filter)
 

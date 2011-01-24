@@ -5,6 +5,14 @@ import sys
 from env import *
 import dataParsers as dp
 import scipy as sp
+import scipy.stats as st
+from scipy import linalg
+import linear_models as lm
+import pylab
+import os
+import cPickle
+import math
+min_float = 5e-324
 
 def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_threshold=0.15, min_emma_dist=0,
 		save_threshold=0.15, debug_filter=1):
@@ -13,10 +21,6 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_thre
 	
 	Calculates emma_
 	"""
-	import scipy as sp
-	import scipy.stats as st
-	from scipy import linalg
-	import linear_models as lm
 
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
@@ -127,21 +131,15 @@ def run_r2_calc():
 			run_parallel(i, i + chunck_size)
 
 
-def load_and_plot_r2_results():
-	import pylab
-	import os
-	import cPickle
-	import math
-	min_float = 5e-324
-	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
-	num_snps = len(sd.getSnps())
-	file_prefix = '/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/250K_r2_min02'
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'emmax_pval']
+def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
+	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	if os.path.isfile(file_prefix + '.pickled'):
 		f = open(file_prefix + '.pickled', 'rb')
 		res_dict = cPickle.load(f)
 		f.close()
 	else:
+		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
+		num_snps = len(sd.getSnps())
 		chunck_size = int(sys.argv[1])
 		res_dict = {}
 		for h in headers:
@@ -160,17 +158,22 @@ def load_and_plot_r2_results():
 					elif h in ['pval', 'emmax_pval']:
 						v = float(st)
 						res_dict[h].append(v if v != 0.0 else min_float)
-					elif h == 'r2':
+					elif h in ['r2', 'beta', 'emmax_r2']:
 						res_dict[h].append(float(st))
+					elif h == 'f_stat':
+						v = float(st)
+						res_dict[h].append(v if v != sp.nan else 0)
 					else:
 						raise Exception()
 		f = open(file_prefix + '.pickled', 'wb')
 		cPickle.dump(res_dict, f, 2)
 		f.close()
+	return res_dict
 
-	max_pval = -math.log10(min_float)
-	max_emmax_pval = -math.log10(min(res_dict['emmax_pval']))
-	#Filter data..
+
+def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)], final_r2_thres=0.2):
+
+	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
 	chromosomes = [1, 2, 3, 4, 5]
 	chr_res_dict = {}
@@ -187,39 +190,89 @@ def load_and_plot_r2_results():
 		y_chr = res_dict['y_chr'][i]
 		x_pos = res_dict['x_pos'][i]
 		y_pos = res_dict['y_pos'][i]
+		r2 = res_dict['r2'][i]
 		x_chr_pos = (x_chr, x_pos)
 		y_chr_pos = (y_chr, y_pos)
-		if x_chr == y_chr and  y_pos - x_pos < 25000:
-			if res_dict['r2'][i] > 0.6:
+		if x_chr == y_chr:
+			for r2_thres, window in r2_thresholds:
+				if y_pos - x_pos < window and r2 > r2_thres:
+					for h in headers:
+						chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+					num_retained += 1
+					chr_pos_set.add((x_chr, x_pos))
+					chr_pos_set.add((y_chr, y_pos))
+					break
+			else:
+				if r2 > final_r2_thres:
+					for h in headers:
+							chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+					num_retained += 1
+					chr_pos_set.add((x_chr, x_pos))
+					chr_pos_set.add((y_chr, y_pos))
+		else:
+			if r2 > final_r2_thres:
 				for h in headers:
-					chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-				num_retained += 1
-				chr_pos_set.add((x_chr, x_pos))
-				chr_pos_set.add((y_chr, y_pos))
-		if x_chr == y_chr and  y_pos - x_pos < 50000:
-			if res_dict['r2'][i] > 0.5:
-				for h in headers:
-					chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-				num_retained += 1
-				chr_pos_set.add((x_chr, x_pos))
-				chr_pos_set.add((y_chr, y_pos))
-		elif x_chr == y_chr and  y_pos - x_pos < 100000:
-			if res_dict['r2'][i] > 0.4:
-				for h in headers:
-					chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+						chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
 				num_retained += 1
 				chr_pos_set.add((x_chr, x_pos))
 				chr_pos_set.add((y_chr, y_pos))
 
-		elif res_dict['r2'][i] > 0.2:
-			for h in headers:
-					chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-			num_retained += 1
-			chr_pos_set.add((x_chr, x_pos))
-			chr_pos_set.add((y_chr, y_pos))
-
-	print num_retained
+	print 'Number of results which were retained:', num_retained
 	print len(chr_pos_set)
+	return chr_res_dict
+
+
+def plot_pval_emmax_correlations():
+	res_dict = _load_r2_results_()
+	#find pairs...
+	d = {}
+	num_res = len(res_dict['x_chr'])
+	for i in range(num_res):
+		x_chr = res_dict['x_chr'][i]
+		y_chr = res_dict['y_chr'][i]
+		x_pos = res_dict['x_pos'][i]
+		y_pos = res_dict['y_pos'][i]
+		#headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
+		r2 = res_dict['r2'][i]
+		pval = res_dict['pval'][i]
+		f_stat = res_dict['f_stat'][i]
+		emmax_pval = res_dict['emmax_pval'][i]
+		beta = res_dict['beta'][i]
+		emmax_r2 = res_dict['emmax_r2'][i]
+		y_t = (y_chr, y_pos)
+		x_t = (x_chr, x_pos)
+		if y_t < x_t:
+			t = (x_chr, x_pos, y_chr, y_pos)
+			flipped = True
+		else:
+			t = (y_chr, y_pos, x_chr, x_pos)
+			flipped = False
+
+		if not t in d:  #Slow as hell!!
+			d[t] = {}
+
+		if flipped:
+			d[t]['x'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
+		else:
+			d[t]['y'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
+
+	x_pvals = []
+	y_pvals = []
+	for t in d:
+		x_pvals.append(d[t]['x'][3])
+		y_pvals.append(d[t]['y'][3])
+	sp.corrcoef(x_pvals, y_pvals)[0, 1]
+	pylab.plot(x_pvals, y_pvals)
+	pylab.xlabel('p-value')
+	pylab.ylabel('p-value')
+	pylab.savefig(env['results_dir'] + 'corr_plot.png')
+
+
+def plot_r2_results():
+	chr_res_dict = load_chr_res_dict()
+	max_pval = -math.log10(min_float)
+	max_emmax_pval = -math.log10(min(res_dict['emmax_pval']))
+	#Filter data..
 	#Now plot data!!
 	alpha = 0.8
 	linewidths = 0
@@ -322,4 +375,5 @@ def load_and_plot_r2_results():
 
 if __name__ == "__main__":
 	#load_and_plot_r2_results()
-	run_r2_calc()
+	#run_r2_calc()
+	plot_pval_emmax_correlations()

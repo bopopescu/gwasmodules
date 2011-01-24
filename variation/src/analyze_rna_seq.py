@@ -16,6 +16,7 @@ import linear_models as lm
 from env import *
 import sys
 import cPickle
+import util
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
@@ -90,9 +91,9 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 			continue
 
 		if mapping_method == 'kw':
-			if "kw" == mapping_method:
-				kw_res = util.kruskal_wallis(snps, phen_vals)
-				pvals = kw_res['ps']
+			phen_vals = phed.get_values(pid)
+			kw_res = util.kruskal_wallis(snps, phen_vals)
+			pvals = kw_res['ps'].tolist()
 
 		elif mapping_method == 'emmax':
 			#Identify the right transformation
@@ -123,7 +124,7 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 		print [cg.tairID for cg in cgs]
 		f_prefix = curr_file_prefix + '_manhattan'
 		res.neg_log_trans()
-		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs)
+		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True)
 
 
 
