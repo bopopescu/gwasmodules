@@ -225,12 +225,16 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 	return chr_res_dict
 
 
-def plot_pval_emmax_correlations():
+def plot_pval_emmax_correlations(filter=0.1):
 	res_dict = _load_r2_results_()
 	#find pairs...
 	d = {}
 	num_res = len(res_dict['x_chr'])
+	print 'Plowing through %i results..' % num_res
 	for i in range(num_res):
+		if sp.rand() > filter: continue
+		if (i + 1) % (num_res / 100) == 0:
+			print  ((i + 1) / (num_res / 100))
 		x_chr = res_dict['x_chr'][i]
 		y_chr = res_dict['y_chr'][i]
 		x_pos = res_dict['x_pos'][i]
