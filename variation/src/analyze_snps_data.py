@@ -148,23 +148,26 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users
 		for i in range(0, num_snps, chunck_size):
 			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
 			print i
-			f = open(file_name)
-			for line in f:
-				l = map(str.strip, line.split(delim))
-				for j, st in enumerate(l):
-					h = headers[j]
-					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
-						res_dict[h].append(int(st))
-					elif h in ['pval', 'emmax_pval']:
-						v = float(st)
-						res_dict[h].append(v if v != 0.0 else min_float)
-					elif h in ['r2', 'beta', 'emmax_r2']:
-						res_dict[h].append(float(st))
-					elif h == 'f_stat':
-						v = float(st)
-						res_dict[h].append(v if v != sp.nan else 0)
-					else:
-						raise Exception()
+			try:
+				f = open(file_name)
+				for line in f:
+					l = map(str.strip, line.split(delim))
+					for j, st in enumerate(l):
+						h = headers[j]
+						if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
+							res_dict[h].append(int(st))
+						elif h in ['pval', 'emmax_pval']:
+							v = float(st)
+							res_dict[h].append(v if v != 0.0 else min_float)
+						elif h in ['r2', 'beta', 'emmax_r2']:
+							res_dict[h].append(float(st))
+						elif h == 'f_stat':
+							v = float(st)
+							res_dict[h].append(v if v != sp.nan else 0)
+						else:
+							raise Exception()
+			except Exception, err_str:
+				print "Problems with file %s: %s" % (file_name, err_str)
 		f = open(file_prefix + '.pickled', 'wb')
 		cPickle.dump(res_dict, f, 2)
 		f.close()
