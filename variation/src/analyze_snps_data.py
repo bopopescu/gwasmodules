@@ -233,7 +233,7 @@ def plot_pval_emmax_correlations(filter=0.02):
 	d = {}
 	num_res = len(res_dict['x_chr'])
 	print 'Plowing through %i results..' % num_res
-	for i in range(num_res):
+	for i in xrange(num_res):
 		if (i + 1) % (num_res / 100) == 0:
 			sys.stdout.write('.')
 			sys.stdout.flush()
@@ -270,13 +270,23 @@ def plot_pval_emmax_correlations(filter=0.02):
 	y_pvals = []
 	for t in d:
 		if 'x' in d[t] and 'y' in d[t]:
-			x_pvals.append(d[t]['x'][3])
-			y_pvals.append(d[t]['y'][3])
+			x_emmax_pval = d[t]['x'][3]
+			y_emmax_pval = d[t]['y'][3]
+			if x_emmax_pval < 1 and y_emmax_pval < 2:
+				x_pvals.append(x_emmax_pval)
+				y_pvals.append(y_emmax_pval)
 	sp.corrcoef(x_pvals, y_pvals)[0, 1]
-	pylab.plot(x_pvals, y_pvals)
+	pylab.plot(x_pvals, y_pvals, '.')
 	pylab.xlabel('p-value')
 	pylab.ylabel('p-value')
-	pylab.savefig(env['results_dir'] + 'corr_plot.png')
+	pylab.savefig(env['results_dir'] + 'pval_corr_plot.png')
+	sp.corrcoef(x_pvals, y_pvals)[0, 1]
+	x_log_pvals = map(lambda x:-sp.log(x), x_pvals)
+	y_log_pvals = map(lambda x:-sp.log(x), y_pvals)
+	pylab.plot(x_log_pvals, y_log_pvals, '.')
+	pylab.xlabel('p-value')
+	pylab.ylabel('p-value')
+	pylab.savefig(env['results_dir'] + 'log_pval_corr_plot.png')
 
 
 def plot_r2_results():
