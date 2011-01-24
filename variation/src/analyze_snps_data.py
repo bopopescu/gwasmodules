@@ -134,9 +134,11 @@ def run_r2_calc():
 def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	if os.path.isfile(file_prefix + '.pickled'):
+		print 'Loading pickled data..'
 		f = open(file_prefix + '.pickled', 'rb')
 		res_dict = cPickle.load(f)
 		f.close()
+		print 'Done'
 	else:
 		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
 		num_snps = len(sd.getSnps())
@@ -225,16 +227,17 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 	return chr_res_dict
 
 
-def plot_pval_emmax_correlations(filter=0.1):
+def plot_pval_emmax_correlations(filter=0.02):
 	res_dict = _load_r2_results_()
 	#find pairs...
 	d = {}
 	num_res = len(res_dict['x_chr'])
 	print 'Plowing through %i results..' % num_res
 	for i in range(num_res):
-		if sp.rand() > filter: continue
 		if (i + 1) % (num_res / 100) == 0:
-			print  ((i + 1) / (num_res / 100))
+			sys.stdout.write('.')
+			sys.stdout.flush()
+		if sp.rand() > filter: continue
 		x_chr = res_dict['x_chr'][i]
 		y_chr = res_dict['y_chr'][i]
 		x_pos = res_dict['x_pos'][i]

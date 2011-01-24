@@ -687,7 +687,6 @@ class LinearMixedModel(LinearModel):
 				print "Using the maximum grid value instead."
 				print 'opt_i:', opt_i
 				print 'Grid optimal delta:', opt_delta
-				print "Newton's optimal delta:", new_opt_delta
 				new_opt_delta = opt_delta
 			#Validating the delta
 			if opt_i > 1 and deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
