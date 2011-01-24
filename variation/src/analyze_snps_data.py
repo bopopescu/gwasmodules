@@ -280,12 +280,16 @@ def plot_pval_emmax_correlations(filter=0.02):
 	pylab.xlabel('p-value')
 	pylab.ylabel('p-value')
 	pylab.savefig(env['results_dir'] + 'pval_corr_plot.png')
-	sp.corrcoef(x_pvals, y_pvals)[0, 1]
+	pval_corr = sp.corrcoef(x_pvals, y_pvals)[0, 1]
+	pylab.title('Pval. corr.: %0.2f' % pval_corr)
 	x_log_pvals = map(lambda x:-sp.log(x), x_pvals)
 	y_log_pvals = map(lambda x:-sp.log(x), y_pvals)
 	pylab.plot(x_log_pvals, y_log_pvals, '.')
+	pylab.clf()
 	pylab.xlabel('p-value')
 	pylab.ylabel('p-value')
+	log_pval_corr = sp.corrcoef(x_pvals, y_pvals)[0, 1]
+	pylab.title('Neg. log. pval. corr.: %0.2f' % log_pval_corr)
 	pylab.savefig(env['results_dir'] + 'log_pval_corr_plot.png')
 
 
