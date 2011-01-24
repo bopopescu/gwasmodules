@@ -227,7 +227,7 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 	return chr_res_dict
 
 
-def plot_pval_emmax_correlations(filter=0.02):
+def plot_pval_emmax_correlations(filter=1.0):
 	res_dict = _load_r2_results_()
 	#find pairs...
 	d = {}
@@ -272,7 +272,7 @@ def plot_pval_emmax_correlations(filter=0.02):
 		if 'x' in d[t] and 'y' in d[t]:
 			x_emmax_pval = d[t]['x'][3]
 			y_emmax_pval = d[t]['y'][3]
-			if x_emmax_pval < 1 and y_emmax_pval < 2:
+			if x_emmax_pval < 1 and y_emmax_pval < 1:
 				x_pvals.append(x_emmax_pval)
 				y_pvals.append(y_emmax_pval)
 	sp.corrcoef(x_pvals, y_pvals)[0, 1]
