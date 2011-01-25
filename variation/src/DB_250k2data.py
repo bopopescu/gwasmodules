@@ -209,7 +209,7 @@ class DB_250k2Data(object):
 			import pdb
 			pdb.set_trace()
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-				   password=self.passwd, hostname=self.hostname, database=self.dbname)
+				password=self.passwd, hostname=self.hostname, database=self.dbname)
 		db.setup(create_tables=False)
 		session = db.session
 		QC_method_id = 0 	#just for QC_250k.get_call_info_id2fname()
