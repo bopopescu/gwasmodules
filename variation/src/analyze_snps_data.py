@@ -281,7 +281,8 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 		x_pvals = []
 		y_pvals = []
-		for t in d:
+		l = d.keys()[:]
+		for t in l:
 			if 'x' in d[t] and 'y' in d[t]:
 				x_emmax_pval = d[t]['x'][3]
 				y_emmax_pval = d[t]['y'][3]
