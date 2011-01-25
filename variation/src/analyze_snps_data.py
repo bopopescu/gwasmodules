@@ -227,54 +227,72 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 	return chr_res_dict
 
 
-def plot_pval_emmax_correlations(filter=1.0):
-	res_dict = _load_r2_results_()
-	#find pairs...
-	d = {}
-	num_res = len(res_dict['x_chr'])
-	print 'Plowing through %i results..' % num_res
-	for i in xrange(num_res):
-		if (i + 1) % (num_res / 100) == 0:
-			sys.stdout.write('.')
-			sys.stdout.flush()
-		if sp.rand() > filter: continue
-		x_chr = res_dict['x_chr'][i]
-		y_chr = res_dict['y_chr'][i]
-		x_pos = res_dict['x_pos'][i]
-		y_pos = res_dict['y_pos'][i]
-		#headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
-		r2 = res_dict['r2'][i]
-		pval = res_dict['pval'][i]
-		f_stat = res_dict['f_stat'][i]
-		emmax_pval = res_dict['emmax_pval'][i]
-		beta = res_dict['beta'][i]
-		emmax_r2 = res_dict['emmax_r2'][i]
-		y_t = (y_chr, y_pos)
-		x_t = (x_chr, x_pos)
-		if y_t < x_t:
-			t = (x_chr, x_pos, y_chr, y_pos)
-			flipped = True
-		else:
-			t = (y_chr, y_pos, x_chr, x_pos)
-			flipped = False
+def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/250K_r2_min015'):
+	pickled_file = file_prefix + '_corr_info.pickled'
+	if os.path.isfile(pickled_file):
+		print 'Loading pickled data..'
+		f = open(pickled_file, 'rb')
+		d = cPickle.load(f)
+		f.close()
+		print 'Done'
+		for t in d:
+			x_pvals.append(d[t]['x'][3])
+			y_pvals.append(d[t]['y'][3])
+	else:
+		res_dict = _load_r2_results_()
+		#find pairs...
+		d = {}
+		num_res = len(res_dict['x_chr'])
+		print 'Plowing through %i results..' % num_res
+		for i in xrange(num_res):
+			if (i + 1) % (num_res / 100) == 0:
+				sys.stdout.write('.')
+				sys.stdout.flush()
+			if sp.rand() > filter: continue
+			x_chr = res_dict['x_chr'][i]
+			y_chr = res_dict['y_chr'][i]
+			x_pos = res_dict['x_pos'][i]
+			y_pos = res_dict['y_pos'][i]
+			#headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
+			r2 = res_dict['r2'][i]
+			pval = res_dict['pval'][i]
+			f_stat = res_dict['f_stat'][i]
+			emmax_pval = res_dict['emmax_pval'][i]
+			beta = res_dict['beta'][i]
+			emmax_r2 = res_dict['emmax_r2'][i]
+			y_t = (y_chr, y_pos)
+			x_t = (x_chr, x_pos)
+			if y_t < x_t:
+				t = (x_chr, x_pos, y_chr, y_pos)
+				flipped = True
+			else:
+				t = (y_chr, y_pos, x_chr, x_pos)
+				flipped = False
 
-		if not t in d:  #Slow as hell!!
-			d[t] = {}
+			if not t in d:  #Slow as hell!!
+				d[t] = {}
 
-		if flipped:
-			d[t]['x'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
-		else:
-			d[t]['y'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
+			if flipped:
+				d[t]['x'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
+			else:
+				d[t]['y'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
 
-	x_pvals = []
-	y_pvals = []
-	for t in d:
-		if 'x' in d[t] and 'y' in d[t]:
-			x_emmax_pval = d[t]['x'][3]
-			y_emmax_pval = d[t]['y'][3]
-			if x_emmax_pval < 1 and y_emmax_pval < 1:
-				x_pvals.append(x_emmax_pval)
-				y_pvals.append(y_emmax_pval)
+		x_pvals = []
+		y_pvals = []
+		for t in d:
+			if 'x' in d[t] and 'y' in d[t]:
+				x_emmax_pval = d[t]['x'][3]
+				y_emmax_pval = d[t]['y'][3]
+				if x_emmax_pval < 1 and y_emmax_pval < 1:
+					x_pvals.append(x_emmax_pval)
+					y_pvals.append(y_emmax_pval)
+				else:
+					del d[t]
+			else:
+				del d[t]
+		f = open(pickled_file, 'wb')
+		cPickle.dump(d, f, 2)
+		f.close()
 	sp.corrcoef(x_pvals, y_pvals)[0, 1]
 	pylab.plot(x_pvals, y_pvals, '.')
 	pylab.xlabel('p-value')
@@ -303,6 +321,8 @@ def plot_pval_emmax_correlations(filter=1.0):
 	pylab.ylabel('p-value')
 	pylab.title('Pval. corr.: %0.2f' % pval_corr)
 	pylab.savefig(env['results_dir'] + 'log_pval_corr_2d_hist.png')
+
+
 
 
 def plot_r2_results():
