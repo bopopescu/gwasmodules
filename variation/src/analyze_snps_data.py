@@ -229,6 +229,8 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 
 def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/250K_r2_min015'):
 	pickled_file = file_prefix + '_corr_info.pickled'
+	x_pvals = []
+	y_pvals = []
 	if os.path.isfile(pickled_file):
 		print 'Loading pickled data..'
 		f = open(pickled_file, 'rb')
@@ -279,8 +281,6 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 			else:
 				d[t]['y'] = [r2, pval, f_stat, emmax_pval, beta, emmax_r2]
 
-		x_pvals = []
-		y_pvals = []
 		l = d.keys()[:]
 		for t in l:
 			if 'x' in d[t] and 'y' in d[t]:
