@@ -2835,6 +2835,8 @@ class Stock_250kDB(ElixirDB):
 	
 	def getSNPChrPos2ID(self, keyType=1):
 		"""
+		2011-1-24
+			add status reporting
 		2010-10-13
 			return a dictionary which translates (chr, pos) to snps.id or vice versa.
 			used in Calls2DB_250k.py
@@ -2843,6 +2845,7 @@ class Stock_250kDB(ElixirDB):
 				1: (chr,pos) is key. id is value
 				2: id is key, (chr, pos) is value.
 		"""
+		sys.stderr.write("Getting a map between Snps.id and (chr,pos), keyType %s ..."%(keyType))
 		dict_to_return = {}
 		rows = self.metadata.bind.execute("select id, chromosome, position from %s where chromosome is not null and position is not null"\
 										%Snps.table.name)
@@ -2854,6 +2857,7 @@ class Stock_250kDB(ElixirDB):
 				key = row.id
 				value = (row.chromosome, row.position)
 			dict_to_return[key] = value
+		sys.stderr.write("Done.\n")
 		return dict_to_return
 	
 	def getSNPID2ChrPos(self,):
