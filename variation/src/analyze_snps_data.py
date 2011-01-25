@@ -304,10 +304,11 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 	pylab.title('Pval. corr.: %0.2f' % pval_corr)
 	pylab.savefig(env['results_dir'] + 'pval_corr_plot.png')
 	pylab.clf()
-	pylab.hexbin(x_pvals, y_pvals, gridsize=200)
+	pylab.hexbin(x_pvals, y_pvals, gridsize=1000)
 	pylab.xlabel('p-value')
 	pylab.ylabel('p-value')
 	pylab.title('Pval. corr.: %0.2f' % pval_corr)
+	pylab.colorbar()
 	pylab.savefig(env['results_dir'] + 'pval_corr_2d_hist.png')
 
 	x_log_pvals = map(lambda x:-sp.log10(x), x_pvals)
@@ -319,10 +320,11 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 	pylab.title('Neg. log. pval. corr.: %0.2f' % log_pval_corr)
 	pylab.savefig(env['results_dir'] + 'log_pval_corr_plot.png')
 	pylab.clf()
-	pylab.hexbin(x_pvals, y_pvals, gridsize=200)
+	pylab.hexbin(x_log_pvals, y_log_pvals, gridsize=1000)
 	pylab.xlabel('p-value')
 	pylab.ylabel('p-value')
 	pylab.title('Pval. corr.: %0.2f' % pval_corr)
+	pylab.colorbar()
 	pylab.savefig(env['results_dir'] + 'log_pval_corr_2d_hist.png')
 
 
