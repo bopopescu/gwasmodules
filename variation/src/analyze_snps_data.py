@@ -12,7 +12,101 @@ import pylab
 import os
 import cPickle
 import math
+import random
 min_float = 5e-324
+
+def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
+	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
+	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
+					filter=debug_filter)
+	sd.filter_mac_snps(mac_filter)
+	K = lm.load_kinship_from_file(env['data_dir'] + 'kinship_matrix_cm72.pickled',
+				sd.accessions)
+	cps_list = sd.getChrPosSNPList()
+	l = range(len(cps_list))
+	y_sample = random.sample(l, num_y)
+	for i in reversed(sorted(y_sample)):
+		del l[i]
+	x_sample = random.sample(l, num_x)
+	print y_sample, x_sample
+	q = 1  # Single SNP is being tested
+	p = 2
+	n = len(sd.accessions)
+	n_p = n - p
+
+	res_d = {}
+	for ys, xs in [(y_sample, x_sample), (x_sample, y_sample)]:
+		for i, yi in enumerate(ys):
+			(y_c, y_p, y_snp) = cps_list[yi]
+			print 'Y_%d: chromosome=%d, position=%d' % (i, y_c, y_p)
+			#get the EMMA REML
+			res = lm.get_emma_reml_estimates(y_snp, K)
+			print 'Pseudo-heritability:', res['pseudo_heritability']
+			h_sqrt_inv = res['H_sqrt_inv']
+			h0_X = res['X_t']
+			Y = res['Y_t']	#The transformed outputs.
+			std_Y = sp.std(Y)
+			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
+			for j, xi in enumerate(xs):
+				(x_c, x_p, x_snp) = cps_list[xi]
+				(r, pearson_pval) = st.pearsonr(x_snp, y_snp) #Done twice, but this is fast..
+				r2 = r * r
+				#Do EMMAX
+				xt = x_snp * h_sqrt_inv
+				(b, rss, p, s) = linalg.lstsq(sp.hstack([h0_X, sp.matrix(xt).T]), Y)
+
+				if rss:
+					f_stat = (h0_rss / rss[0] - 1) * n_p / float(q)
+					emma_pval = st.f.sf(f_stat, q, n_p)[0]
+					beta = b[1, 0]
+					emmax_r = beta * (std_Y / sp.std(xt))
+					emmax_r2 = emmax_r * emmax_r
+					#res_d[(yi, xi)] = emmax_r
+					res_d[(yi, xi)] = [emma_pval, r2]
+
+	xs = []
+	ys = []
+	for yi, xi in res_d:
+		if yi < xi:
+			ys.append(res_d[(yi, xi)][0])
+			xs.append(res_d[(xi, yi)][0])
+	pylab.plot(xs, ys, '.', markersize=2)
+	pylab.savefig(env['results_dir'] + 'emma_pvals.png')
+	pylab.clf()
+
+	xs = -sp.log10(xs)
+	ys = -sp.log10(ys)
+	pylab.plot(xs, ys, '.', markersize=2)
+	pylab.savefig(env['results_dir'] + 'emma_log_pvals.png')
+	pylab.clf()
+
+	xs = []
+	ys = []
+	for yi, xi in res_d:
+		if yi < xi:
+			ys.append(res_d[(yi, xi)][1])
+			xs.append(res_d[(xi, yi)][1])
+	pylab.plot(xs, ys, '.', markersize=2)
+	pylab.savefig(env['results_dir'] + 'r2.png')
+	pylab.clf()
+
+	xs = []
+	ys = []
+	for yi, xi in res_d:
+		if yi < xi:
+			ys.append(res_d[(yi, xi)][0])
+			xs.append(res_d[(xi, yi)][1])
+			xs.append(res_d[(yi, xi)][1])
+			ys.append(res_d[(xi, yi)][0])
+	pylab.plot(xs, ys, '.', markersize=2)
+	pylab.savefig(env['results_dir'] + 'r2_emma_pval.png')
+	pylab.clf()
+
+	ys = -sp.log10(ys)
+	pylab.plot(xs, ys, '.', markersize=2)
+	pylab.savefig(env['results_dir'] + 'r2_emma_pval.png')
+
+
 
 def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_threshold=0.15, min_emma_dist=0,
 		save_threshold=0.15, debug_filter=1):
@@ -32,8 +126,6 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_thre
 	x_cps = cps_list[x_start_i:x_stop_i]
 	y_cps = cps_list
 	result_list = []
-	i = 0
-	j = 0
 	q = 1  # Single SNP is being tested
 	p = 2
 	n = len(sd.accessions)
@@ -48,8 +140,6 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_thre
 		Y = res['Y_t']	#The transformed outputs.
 		std_Y = sp.std(Y)
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-		i += 1
-		#j = 0
 		num_emmas = 0
 		for (y_c, y_p, y_snp) in y_cps:
 			#if (x_c, x_p) < (y_c, y_p):
@@ -438,4 +528,5 @@ def plot_r2_results():
 if __name__ == "__main__":
 	#load_and_plot_r2_results()
 	#run_r2_calc()
-	plot_pval_emmax_correlations()
+	#plot_pval_emmax_correlations()
+	test_correlation()
