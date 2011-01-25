@@ -4282,6 +4282,8 @@ class JBDataGWA(object):
 										planting_value = None, loc_value = None,\
 										logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True)
 		sys.exit(0)
+		
+		
 	"""
 	
 	
@@ -4781,55 +4783,71 @@ for phenotype_method_id in range(1,8):
 	
 	
 	"""
-	input_fname = '/Network/Data/250k/db/results/type_1/3018_results.tsv'	#KW on LD, call method 22
-	from pymodule import getGenomeWideResultFromFile
-	genome_wide_result = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
-	output_fname_prefix = '/tmp/call_22_KW_on_LD'
-	GWA.drawGWANicer(db_250k, genome_wide_result, output_fname_prefix)
-	
-	input_fname = '/Network/Data/250k/db/results/type_1/3025_results.tsv'	#Emma on LD, call method 22
-	from pymodule import getGenomeWideResultFromFile
-	genome_wide_result2 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
-	output_fname_prefix = '/tmp/call_22_Emma_on_LD'
-	GWA.drawGWANicer(db_250k, genome_wide_result2, output_fname_prefix, min_value=1)
-	
-	input_fname = '/Network/Data/250k/db/results/type_1/3024_results.tsv'	#KW on FT_22C, call method 22
-	from pymodule import getGenomeWideResultFromFile
-	genome_wide_result3 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
-	output_fname_prefix = '/tmp/call_22_KW_on_7_FT_22C'
-	GWA.drawGWANicer(db_250k, genome_wide_result3, output_fname_prefix)
-	
-	input_fname = '/Network/Data/250k/db/results/type_1/3031_results.tsv'	#Emma on FT_22C, call method 22
-	from pymodule import getGenomeWideResultFromFile
-	genome_wide_result4 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
-	output_fname_prefix = '/tmp/call_22_Emma_on_7_FT_22C'
-	GWA.drawGWANicer(db_250k, genome_wide_result4, output_fname_prefix, min_value=1)
-	
-	input_fname_ls = ['/Network/Data/250k/db/results/type_1/729_results.tsv',\
-					'/Network/Data/250k/db/results/type_1/3554_results.tsv',\
-					'/Network/Data/250k/db/results/type_1/3881_results.tsv']
-	output_fname_prefix_ls = [os.path.expanduser('~/doc/20090930EckerLabVisit/figures/call_7_KW_on_Germ10'),\
-							os.path.expanduser('~/doc/20090930EckerLabVisit/figures/call_32_KW_on_Germ10'),\
-							os.path.expanduser('~/doc/20090930EckerLabVisit/figures/call_43_KW_on_Germ10')]
-	from pymodule import getGenomeWideResultFromFile
-	for i in range(len(input_fname_ls)):
-		input_fname = input_fname_ls[i]
-		output_fname_prefix = output_fname_prefix_ls[i]
+		input_fname = '/Network/Data/250k/db/results/type_1/3018_results.tsv'	#KW on LD, call method 22
+		from pymodule import getGenomeWideResultFromFile
+		genome_wide_result = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
+		output_fname_prefix = '/tmp/call_22_KW_on_LD'
+		GWA.drawGWANicer(db_250k, genome_wide_result, output_fname_prefix)
+		
+		input_fname = '/Network/Data/250k/db/results/type_1/3025_results.tsv'	#Emma on LD, call method 22
+		from pymodule import getGenomeWideResultFromFile
 		genome_wide_result2 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
+		output_fname_prefix = '/tmp/call_22_Emma_on_LD'
 		GWA.drawGWANicer(db_250k, genome_wide_result2, output_fname_prefix, min_value=1)
-	
-	# 2010-3-10
-	input_fname1 = '/Network/Data/250k/db/results/type_1/4023_results.tsv'	# LM_cofactor_G. orontii conidiophore_32
-	input_fname2 = '/Network/Data/250k/db/results/type_1/4116_results.tsv'	# LM_G. orontii conidiophore_32
-	gwr = GWA.subtractTwoGWAS(input_fname1, input_fname2)
-	output_fname_prefix = '/tmp/LM_cofactor-LM_G. orontii conidiophore_32'
-	GWA.drawGWANicer(db_250k, gwr, output_fname_prefix, min_value=None, ylim_type=2)
-	
-	input_fname1 = '/Network/Data/250k/db/results/type_1/4024_results.tsv'	# EMMA_cofactor_G. orontii conidiophore_32
-	input_fname2 = '/Network/Data/250k/db/results/type_1/3860_results.tsv'	# EmmaTrans_Mildew sensitivity_32
-	gwr = GWA.subtractTwoGWAS(input_fname1, input_fname2)
-	output_fname_prefix = '/tmp/EMMA_cofactor-EMMA_G. orontii conidiophore_32'
-	GWA.drawGWANicer(db_250k, gwr, output_fname_prefix, min_value=None, ylim_type=2)
+		
+		input_fname = '/Network/Data/250k/db/results/type_1/3024_results.tsv'	#KW on FT_22C, call method 22
+		from pymodule import getGenomeWideResultFromFile
+		genome_wide_result3 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
+		output_fname_prefix = '/tmp/call_22_KW_on_7_FT_22C'
+		GWA.drawGWANicer(db_250k, genome_wide_result3, output_fname_prefix)
+		
+		input_fname = '/Network/Data/250k/db/results/type_1/3031_results.tsv'	#Emma on FT_22C, call method 22
+		from pymodule import getGenomeWideResultFromFile
+		genome_wide_result4 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
+		output_fname_prefix = '/tmp/call_22_Emma_on_7_FT_22C'
+		GWA.drawGWANicer(db_250k, genome_wide_result4, output_fname_prefix, min_value=1)
+		
+		input_fname_ls = ['/Network/Data/250k/db/results/type_1/729_results.tsv',\
+						'/Network/Data/250k/db/results/type_1/3554_results.tsv',\
+						'/Network/Data/250k/db/results/type_1/3881_results.tsv']
+		output_fname_prefix_ls = [os.path.expanduser('~/doc/20090930EckerLabVisit/figures/call_7_KW_on_Germ10'),\
+								os.path.expanduser('~/doc/20090930EckerLabVisit/figures/call_32_KW_on_Germ10'),\
+								os.path.expanduser('~/doc/20090930EckerLabVisit/figures/call_43_KW_on_Germ10')]
+		from pymodule import getGenomeWideResultFromFile
+		for i in range(len(input_fname_ls)):
+			input_fname = input_fname_ls[i]
+			output_fname_prefix = output_fname_prefix_ls[i]
+			genome_wide_result2 = getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=True)
+			GWA.drawGWANicer(db_250k, genome_wide_result2, output_fname_prefix, min_value=1)
+		
+		# 2010-3-10
+		input_fname1 = '/Network/Data/250k/db/results/type_1/4023_results.tsv'	# LM_cofactor_G. orontii conidiophore_32
+		input_fname2 = '/Network/Data/250k/db/results/type_1/4116_results.tsv'	# LM_G. orontii conidiophore_32
+		gwr = GWA.subtractTwoGWAS(input_fname1, input_fname2)
+		output_fname_prefix = '/tmp/LM_cofactor-LM_G. orontii conidiophore_32'
+		GWA.drawGWANicer(db_250k, gwr, output_fname_prefix, min_value=None, ylim_type=2)
+		
+		input_fname1 = '/Network/Data/250k/db/results/type_1/4024_results.tsv'	# EMMA_cofactor_G. orontii conidiophore_32
+		input_fname2 = '/Network/Data/250k/db/results/type_1/3860_results.tsv'	# EmmaTrans_Mildew sensitivity_32
+		gwr = GWA.subtractTwoGWAS(input_fname1, input_fname2)
+		output_fname_prefix = '/tmp/EMMA_cofactor-EMMA_G. orontii conidiophore_32'
+		GWA.drawGWANicer(db_250k, gwr, output_fname_prefix, min_value=None, ylim_type=2)
+		
+		#2010-10-23
+		call_method_id=57
+		query = Stock_250kDB.ResultsMethod.query.filter_by(call_method_id=call_method_id)
+		output_dir = os.path.expanduser('~/doc/compbiophd/figures/deletionGWAS/')
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		from pymodule import getGenomeWideResultFromFile, PassingData
+		pdata = PassingData(min_MAF=0.1)
+		for row in query:
+			genome_wide_result = getGenomeWideResultFromFile(row.filename, min_value_cutoff=None, \
+															do_log10_transformation=True, pdata=pdata)
+			output_fname_prefix = os.path.join(output_dir, 'deletionGWASPlot_c%s_p%s_a%s'%(row.call_method_id, \
+																	row.phenotype_method_id, row.analysis_method_id))
+			GWA.drawGWANicer(db_250k, genome_wide_result, output_fname_prefix, min_value=None, ylim_type=2)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -5766,6 +5784,26 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 		
 		
 		run_type = 5
+		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/investigateBjarniEMMAX_DTF16replicates_%s.tsv'%\
+			(run_type))
+		GWA.investigateBjarniEMMAX(genotype_fname_to_generate_kinship, phenotype_genotype_fname, \
+								output_fname, kinship_fname,\
+								snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
+								run_type=run_type)
+		sys.exit(0)
+		
+		#2010-9-6
+		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
+		
+		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
+		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
+		interaction_snp_id_in_base_formula_ls = []
+		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
+								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
+								'5_18620282', '5_25376551', '5_3188328']
+		
+		
+		run_type = 4
 		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/investigateBjarniEMMAX_DTF16replicates_%s.tsv'%\
 			(run_type))
 		GWA.investigateBjarniEMMAX(genotype_fname_to_generate_kinship, phenotype_genotype_fname, \
@@ -8468,6 +8506,62 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	"""	
 	
 	@classmethod
+	def convertOldFormatCallFileIntoNewFormat(cls, db_250k, method_id=3):
+		"""
+		2011-1-24
+			use Stock_250kDB.Snps.id to replace chr_pos... in the call file.
+			i.e.
+				old format: 1_3102_A_G      G       0.985079453549666
+				new format: 2       G       0.985079453549666
+		"""
+		chr_pos2db_id = db_250k.getSNPChrPos2ID()
+		import Stock_250kDB, os, sys, csv
+		sys.stderr.write("Converting old format call files from method %s into new format ... \n"%(method_id))
+		query = Stock_250kDB.CallInfo.query.filter_by(method_id=method_id)
+		counter = 0
+		no_of_files = query.count()
+		for row in query:
+			sys.stderr.write("%d/%d:\t%s "%(counter+1, no_of_files, row.filename))
+			reader = csv.reader(open(row.filename), delimiter='\t')
+			header_row = reader.next()
+			first_data_row = reader.next()
+			SNP_id_ls = first_data_row[0].split('_')
+			if len(SNP_id_ls)>1:	#
+				convertData = True
+			else:
+				convertData = False
+			del reader
+			
+			if convertData:
+				sys.stderr.write("...")
+				# backup the old file first
+				oldFormatFname = '%s.old.tsv'%(os.path.splitext(row.filename)[0])
+				os.rename(row.filename, oldFormatFname)
+				
+				# writing data into the old filename in new format
+				reader = csv.reader(open(oldFormatFname), delimiter='\t')
+				header_row = reader.next()
+				writer = csv.writer(open(row.filename, 'w'), delimiter='\t')
+				writer.writerow(header_row)
+				for row in reader:
+					chr_pos = row[0].split('_')[:2]
+					chr_pos = tuple(map(int, chr_pos))
+					db_id = chr_pos2db_id.get(chr_pos)
+					if db_id is not None:
+						new_row = [db_id] + row[1:]
+						writer.writerow(new_row)
+				del reader, writer
+			counter += 1
+			sys.stderr.write(".\n")
+	
+	"""
+		# 2011-1-24
+		# 
+		DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, method_id=3)
+		sys.exit(0)
+	"""
+	
+	@classmethod
 	def convertRMIntoJson(cls, db_250k, call_method_id_ls_str="", analysis_method_id_ls_str="", \
 						phenotype_method_id_ls_str="", no_of_top_snps = 10000, commit=False):
 		"""
@@ -8743,6 +8837,13 @@ class CNV(object):
 		output_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.normaSegment.tsv')
 		CNV.Lyrata.getLyrataNormalANDDeletionFromQuanFileInTAIR9(input_fname, output_fname=output_fname)
 		sys.exit(0)
+		
+		#2010-8-2
+		input_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.fa')
+		output_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.normaSegment.tsv')
+		CNV.Lyrata.getLyrataNormalANDDeletionFromQuanFileInTAIR9(input_fname, output_fname=output_fname)
+		sys.exit(0)
+		
 		"""
 	class HMMSegmentation(object):
 		"""
@@ -9124,6 +9225,14 @@ class CNV(object):
 		#2010-8-7
 		CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
 		sys.exit(0)
+		
+		#2010-8-7
+		cnv_method_id = 20
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod%s.tsv'%cnv_method_id)
+		CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
+		sys.exit(0)
+		
+		
 	"""
 		
 	@classmethod
@@ -9588,6 +9697,13 @@ class CNV(object):
 		CNV.putSebastianCallIntoDB(db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
 							cnv_method_id=22, cnv_type_id=1)
 		sys.exit(0)
+		
+		#2010-8-3
+		input_dir = os.path.expanduser('~/script/variation/data/CNV/SebastianHMMSummaryCalls/')
+		CNV.putSebastianCallIntoDB(db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
+							cnv_method_id=21, cnv_type_id=1, debug=debug)
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -9649,6 +9765,11 @@ class CNV(object):
 		# 2010-10-10
 		input_fname = os.path.expanduser("~/cnvMethod20_vs_callMethod32_LD.tsv")
 		CNV.putCNVSNPLDIntoDB(db_250k, input_fname, method_id=1)
+		sys.exit(0)
+		
+		# 2010-10-10
+		input_fname = os.path.expanduser("~/cnvMethod22_vs_callMethod32_LD.tsv")
+		CNV.putCNVSNPLDIntoDB(db_250k, input_fname, method_id=2)
 		sys.exit(0)
 	"""
 	
@@ -10703,6 +10824,12 @@ class CNV(object):
 								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
 								min_reciprocal_overlap=0.0000001, cnv_method_id=18, run_type=3)
 		sys.exit(0)
+		
+		#2010-7-31 update CNV.fractionNotCoveredByLyrata for the TAIR9 "-z banyan.usc.edu", cnv_method_id 18
+		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=-1, \
+								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=18, run_type=3)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -10724,6 +10851,18 @@ class CNV(object):
 		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
 								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
 								min_reciprocal_overlap=0.0000001, cnv_method_id=18)
+		sys.exit(0)
+		
+		#2010-8-3
+		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
+								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=20)
+		sys.exit(0)
+		
+		#2010-8-3	qc_data_source_id 16 is too much for mysql to handle, exhaust disk usage in /tmp
+		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
+								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=22)
 		sys.exit(0)
 	"""
 		
@@ -10759,6 +10898,13 @@ class CNV(object):
 		CNV.updateCNVCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
 								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
 								min_reciprocal_overlap=0.0000001, cnv_method_id=7)
+		sys.exit(0)
+		
+		#2010-8-6 for the TAIR9 "-z banyan.usc.edu"
+		for cnv_method_id in [27]:
+			CNV.updateCNVCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id)
 		sys.exit(0)
 		
 	"""
@@ -10804,6 +10950,12 @@ class CNV(object):
 		CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
 								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
 								min_reciprocal_overlap=0.0000001, cnv_method_id=19)
+		sys.exit(0)
+		
+		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
+		CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=22)
 		sys.exit(0)
 		
 	"""
@@ -11044,6 +11196,16 @@ class CNV(object):
 		#2010-8-2
 		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[18, 19])
 		sys.exit(0)
+		
+		#2010-8-1 "-z banyan"
+		#CNV.updateCNVFrequency(db_250k, cnv_method_id=22, run_type=1)
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[22])
+		sys.exit(0)
+		
+		#2010-8-2
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[18, 19])
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -11160,6 +11322,11 @@ class CNV(object):
 		#2010-11-24
 		CNV.updateCNVQCCallProbeInfo(db_250k, cnv_method_id_ls=[9])
 		sys.exit(0)
+		
+		#2010-11-24
+		CNV.updateCNVQCCallProbeInfo(db_250k, cnv_method_id_ls=[31])
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -11300,6 +11467,13 @@ class CNV(object):
 											cnv_method_id=16, useProbeDensity=False, run_type=2, minScore=None)
 		sys.exit(0)
 		
+		# 2010-8-6 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
+		for cnv_method_id in [27]:
+			CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(db_250k, output_dir=output_dir, \
+											ecotype_id=None, minPercUnCoveredByLerContig=0.4, \
+											cnv_method_id=cnv_method_id, useProbeDensity=False, run_type=2, minScore=None)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -11571,6 +11745,58 @@ class CNV(object):
 								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
 		sys.exit(0)
 		
+		# 2010-8-1 -z banyan.usc.edu
+		minScore = None
+		cnv_method_id = 19
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		minScore = None
+		cnv_method_id = 22
+		minNotCoveredFraction = 0.4
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		
+		
+		
+		#2010-8-1 "-z banyan"
+		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[23, 24])
+		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
+		for cnv_method_id in [23, 24]:
+			CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
+								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
+								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id)
+			minScore = None
+			minNotCoveredFraction = 0.4
+			output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+			CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+									ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+									cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
+			CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+									ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
+									cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
+		sys.exit(0)
+		
+		# 2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
+		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
+											ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
+											cnv_method_id=19, xDataType=2)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -12076,6 +12302,24 @@ class CNV(object):
 											replaceAmpWithMedianIntensity=False, colorBarLabel='FractionNotCoveredByPEData', \
 											deletedFraction=2)
 		sys.exit(0)
+		
+		#2010-7-24 banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallLabelVsIntensityByNoOfProbes/')
+		cnv_method_id = 10
+		rows = db_250k.metadata.bind.execute("select distinct array_id from cnv_call where cnv_method_id=%s and \
+			percUnCoveredByLerContig is null order by array_id"%cnv_method_id)
+		array_id_ls = []
+		for row in rows:
+			array_id_ls.append(row.array_id)
+		print "%s arrays"%len(array_id_ls)
+		for array_id in array_id_ls:
+			for gridsize in [40, 60,]:
+				CNV.inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(db_250k, array_id=array_id, output_dir=output_dir, \
+									minPercUnCoveredByLerContig=0.6, gridsize=gridsize, cnv_method_id=cnv_method_id,\
+									deletedFractionType=2, colorBarLabel='FractionNotCoveredByPEData',\
+									replaceNoOfProbesWithProbeDensity=True)
+		sys.exit(0)
+		
 		
 	"""
 	@classmethod
@@ -12629,6 +12873,22 @@ class CNV(object):
 								output_dir=output_dir, drawType=2, fileNamePrefix='CNVCallGapRatioHist', dataType=1)
 		sys.exit(0)
 		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCall_GapRatioHist/')
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, drawType=1)
+		sys.exit(0)
+		
+		
+		# 2010-7-29
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallGapRatioHist/')
+		if not os.path.isdir(output_dir):
+			os.makedirs(output_dir)
+		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=17, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
+								output_dir=output_dir, xlabel='min(gap_ratio1, gap_ratio2)', \
+								ylabel_in_2D='gap_length', fileNamePrefix='CNVCallGapRatioVsGapLenHist', dataType=2)
+		sys.exit(0)
+		
 	"""
 	
 	class ProcessAcrossArrayCNVCallOverlapHistogram(object):
@@ -13000,6 +13260,11 @@ class CNV(object):
 								output_dir=output_dir, drawType=1, xlim_in_1D=None)
 		sys.exit(0)
 		
+		# 2010-7-20
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVSegmentSizeHist/')
+		CNV.drawCNVSizeHistogram(db_250k, cnv_method_id=19, cnv_type_id=1, \
+								output_dir=output_dir, drawType=1, xlim_in_1D=None)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -14066,6 +14331,29 @@ class CNV(object):
 							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=False,\
 							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
 		sys.exit(0)
+		
+		
+		#2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
+		cnv_method_id=20
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
+		sys.exit(0)
+		
+		#2010-8-1 -z banyan.usc.edu
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
+		cnv_method_id=22
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
+		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
+							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
+							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -14326,6 +14614,14 @@ class CNV(object):
 		accession_name = 'Lyrata'
 		CNV.LerContig.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname, addSeqIntoDB=False)
 		sys.exit(0)
+		
+		# 2010-11-12
+		fasta_input_fname = os.path.expanduser('~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta')
+		data_source = 'TAIR9LyrataNormalMaxMatch'
+		accession_name = 'Lyrata'
+		CNV.LerContig.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname, addSeqIntoDB=False)
+		sys.exit(0)
+		
 		"""
 		
 		@classmethod
@@ -18231,6 +18527,19 @@ class CNV(object):
 		CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
 									cnv_method_id=23, cnv_type_id=1, chromosome=1, start=6159423, stop=6160879)
 		sys.exit(0)
+		
+		#2010-8-10
+		for cnv_method_id in [18, 19, 22]:
+			output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+			CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
+									cnv_method_id=cnv_method_id, cnv_type_id=1, chromosome=1, start=6156000, stop=6162000)
+		sys.exit(0)
+		
+		#2010-8-10
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
+									cnv_method_id=24, cnv_type_id=1, chromosome=2, start=7063000, stop=7065260)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -18296,6 +18605,12 @@ class CNV(object):
 		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
 		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
 							cnv_method_id=23, cnv_type_id=1, chromosome=1, start=6159423, stop=6160879)
+		sys.exit(0)
+		
+		#2010-8-12
+		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
+		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
+									cnv_method_id=16, cnv_type_id=1, chromosome=1, start=540847, stop=562919)
 		sys.exit(0)
 	"""
 	
@@ -18536,6 +18851,15 @@ class AnalyzeSNPData(object):
 		output_fname = '/tmp/pairwiseDistFromTwoDatasets.tsv'
 		AnalyzeSNPData.outputPairwiseDistanceFromTwoDatasets(input_fname1, input_fname2, output_fname)
 		sys.exit(0)
+		
+		
+		# 2010-10-23
+		input_fname1 = '/Network/Data/250k/db/dataset/call_method_54.tsv'
+		input_fname2 = os.path.expanduser('~/mnt/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv')
+		output_fname = os.path.expanduser('~/pairwiseDist_call54_vs_cnv20.tsv')
+		AnalyzeSNPData.outputPairwiseDistanceFromTwoDatasets(input_fname1, input_fname2, output_fname)
+		sys.exit(0)
+		
 	"""
 	
 	
@@ -19549,8 +19873,11 @@ class DBGenome(object):
 			session.flush()
 		return family
 	
-	def addTEGenesAndFamilyInfo(self, inputFname, tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT', family_type='TE'):
+	def addTEGenesAndFamilyInfo(self, TAIR_TE_URL='ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR9_genome_release/TAIR9_Transposable_Elements.txt', \
+							tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT', family_type='TE'):
 		"""
+		2011-1-25
+			change the inputFname to TAIR_TE_URL, which would be fetched on the fly.
 		2010-8-19
 			inputFname, TAIR9_Transposable_Elements.txt is downloaded from 
 				ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR9_genome_release/TAIR9_Transposable_Elements.txt
@@ -19560,6 +19887,9 @@ class DBGenome(object):
 			add new symbols into Gene_symbol2id
 		"""
 		sys.stderr.write("Adding TE genes/fragments and family info into db ...")
+		from transfac.src.UpdateGenomeDB import UpdateGenomeDB
+		inputFname, = UpdateGenomeDB.getInputFileList([TAIR_TE_URL], '/tmp/')
+		
 		import csv
 		from pymodule import GenomeDB
 		reader = csv.reader(open(inputFname), delimiter='\t')
@@ -19587,6 +19917,13 @@ class DBGenome(object):
 				sys.stderr.write(" Warning: chromosome %s tax_id=%s not in db yet. all TEs from this chromosome are ignored.\n"%\
 								(chromosome, tax_id))
 				continue
+			entrezgene_type = GenomeDB.EntrezgeneType.query.filter_by(type=type_of_gene).first()	#query the db to see if it exists or not
+			if not entrezgene_type:
+				entrezgene_type = GenomeDB.EntrezgeneType(type=type_of_gene)
+				session.add(entrezgene_type)
+				session.flush()
+				no_of_into_db += 1
+			
 			gene = GenomeDB.Gene.query.filter_by(tax_id=tax_id).filter_by(chromosome=chromosome).\
 				filter_by(strand=strand).filter_by(start=start).filter_by(stop=stop).first()
 			if gene:
@@ -19601,16 +19938,13 @@ class DBGenome(object):
 					chromosome=chromosome,\
 					type_of_gene=type_of_gene, description='TE Family %s Super-Family %s'%(Transposon_Family, Transposon_Super_Family), \
 					strand=strand, start=start, stop=stop)
+				gene.genomic_annot_assembly = annot_assembly
+				gene.entrezgene_type = entrezgene_type
 				session.add(gene)
 				no_of_into_db += 1
 			
-			entrezgene_type = GenomeDB.EntrezgeneType.query.filter_by(type=type_of_gene).first()	#query the db to see if it exists or not
-			if not entrezgene_type:
-				entrezgene_type = GenomeDB.EntrezgeneType(type=type_of_gene)
-				session.add(entrezgene_type)
-				session.flush()
-				no_of_into_db += 1
-			
+			"""
+			# 2011-1-22	EntrezgeneMapping has been merged into Gene.
 			if gene.gene_id:
 				entrezgene_mapping = GenomeDB.EntrezgeneMapping.query.filter_by(gene_id=gene.gene_id).first()
 			else:
@@ -19626,7 +19960,7 @@ class DBGenome(object):
 				no_of_into_db += 1
 			else:
 				no_of_entrezgene_mappings_already_in_db += 1
-			
+			"""
 			super_family = self.getGeneFamily(session, family_name=Transposon_Super_Family, family_type=family_type, \
 									super_family=None)
 			family = self.getGeneFamily(session, family_name=Transposon_Family, family_type=family_type, \
@@ -19655,8 +19989,21 @@ class DBGenome(object):
 		dbname='genome_tair'
 		dbGenome = DBGenome(drivername=self.drivername, db_user=self.db_user,
 						db_passwd=self.db_passwd, hostname=hostname, dbname=dbname, schema=self.schema)
-		inputFname = os.path.expanduser('~/script/variation/data/TAIR9/TAIR9_genome_release/TAIR9_Transposable_Elements.txt')
-		dbGenome.addTEGenesAndFamilyInfo(inputFname, tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT')
+		#inputFname = os.path.expanduser('~/script/variation/data/TAIR9/TAIR9_genome_release/TAIR9_Transposable_Elements.txt')
+		TAIR_TE_URL = 'ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR9_genome_release/TAIR9_Transposable_Elements.txt'
+		TAIR_TE_URL = 'ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR10_genome_release/TAIR9_Transposable_Elements.txt'
+		dbGenome.addTEGenesAndFamilyInfo(TAIR_TE_URL, tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT')
+		sys.exit(0)
+		
+		#2011-1-22
+		hostname='banyan.usc.edu'
+		dbname='genome'
+		dbGenome = DBGenome(drivername=self.drivername, db_user=self.db_user,
+						db_passwd=self.db_passwd, hostname=hostname, dbname=dbname, schema=self.schema)
+		#inputFname = os.path.expanduser('~/script/variation/data/TAIR9/TAIR9_genome_release/TAIR9_Transposable_Elements.txt')
+		TAIR_TE_URL = 'ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR9_genome_release/TAIR9_Transposable_Elements.txt'
+		TAIR_TE_URL = 'ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR10_genome_release/TAIR9_Transposable_Elements.txt'
+		dbGenome.addTEGenesAndFamilyInfo(TAIR_TE_URL, tax_id=3702, type_of_gene ='TRANSPOSABLE_ELEMENT')
 		sys.exit(0)
 		
 	"""
@@ -19699,329 +20046,6 @@ class Main(object):
 		#import MySQLdb
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
-		
-		#2010-11-24
-		CNV.updateCNVQCCallProbeInfo(db_250k, cnv_method_id_ls=[31])
-		sys.exit(0)
-		
-		# 2010-11-12
-		fasta_input_fname = os.path.expanduser('~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta')
-		data_source = 'TAIR9LyrataNormalMaxMatch'
-		accession_name = 'Lyrata'
-		CNV.LerContig.putLerContigsIntoDB(db_250k, data_source, accession_name, fasta_input_fname, addSeqIntoDB=False)
-		sys.exit(0)
-		
-		#2010-10-24
-		CNV.outputCNVFunctionalCompositionData(db_250k, cnv_method_id=20, cnv_type_id=1)
-		sys.exit(0)
-		
-		# 2010-8-1 -z banyan.usc.edu
-		minScore = None
-		cnv_method_id = 19
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
-		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
-								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
-		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
-								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
-		sys.exit(0)
-		
-		# 2010-7-20
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVSegmentSizeHist/')
-		CNV.drawCNVSizeHistogram(db_250k, cnv_method_id=19, cnv_type_id=1, \
-								output_dir=output_dir, drawType=1, xlim_in_1D=None)
-		sys.exit(0)
-		
-		# 2010-10-23
-		input_fname1 = '/Network/Data/250k/db/dataset/call_method_54.tsv'
-		input_fname2 = os.path.expanduser('~/mnt/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv')
-		output_fname = os.path.expanduser('~/pairwiseDist_call54_vs_cnv20.tsv')
-		AnalyzeSNPData.outputPairwiseDistanceFromTwoDatasets(input_fname1, input_fname2, output_fname)
-		sys.exit(0)
-		
-		#2010-10-23
-		call_method_id=57
-		query = Stock_250kDB.ResultsMethod.query.filter_by(call_method_id=call_method_id)
-		output_dir = os.path.expanduser('~/doc/compbiophd/figures/deletionGWAS/')
-		if not os.path.isdir(output_dir):
-			os.makedirs(output_dir)
-		from pymodule import getGenomeWideResultFromFile, PassingData
-		pdata = PassingData(min_MAF=0.1)
-		for row in query:
-			genome_wide_result = getGenomeWideResultFromFile(row.filename, min_value_cutoff=None, \
-															do_log10_transformation=True, pdata=pdata)
-			output_fname_prefix = os.path.join(output_dir, 'deletionGWASPlot_c%s_p%s_a%s'%(row.call_method_id, \
-																	row.phenotype_method_id, row.analysis_method_id))
-			GWA.drawGWANicer(db_250k, genome_wide_result, output_fname_prefix, min_value=None, ylim_type=2)
-		sys.exit(0)
-		
-		
-		
-		#2010-8-1 -z banyan.usc.edu
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
-		cnv_method_id=20
-		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
-							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
-							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
-		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
-							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
-							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
-		sys.exit(0)
-		
-		# 2010-10-10
-		input_fname = os.path.expanduser("~/cnvMethod22_vs_callMethod32_LD.tsv")
-		CNV.putCNVSNPLDIntoDB(db_250k, input_fname, method_id=2)
-		sys.exit(0)
-		
-		
-		#2010-8-3
-		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
-								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
-								min_reciprocal_overlap=0.0000001, cnv_method_id=20)
-		sys.exit(0)
-		
-		#2010-8-12
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
-		CNV.drawCNVCallWithinRegion(db_250k, output_dir=output_dir,\
-									cnv_method_id=16, cnv_type_id=1, chromosome=1, start=540847, stop=562919)
-		sys.exit(0)
-		
-		
-		#################### 2010-9-6 for PNAS revisions
-		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
-		phenotype_genotype_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_tg_ecotypeid.tsv')
-		
-		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
-		vg=None
-		ve=None
-		interaction_snp_id_in_base_formula_ls = []
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
-								'5_18620282', '5_25376551', '5_3188328']
-		
-		special_interaction_snp_id_ls = []	# 2010-3-26 
-		vg=None
-		ve=None
-		
-		
-		#snp_id_to_be_included_ls = []
-		loc_value_ls = ['spain', 'sweden']
-		planting_value_ls = ['spring', 'summer']
-		for planting_value in planting_value_ls:
-			for loc_value in loc_value_ls:
-				for logPhenotype in [True]:
-					#cholesky_inverse_fname = os.path.expanduser('~/mnt/panfs/250k/dataset/call_method_49_core482_kinship_%s_%s_L_inverse_1.tsv'%(loc_value, planting_value))
-					cholesky_inverse_fname = None
-					output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/DaysToFlower16replicates_noSNP2_%s_%s.tsv'%\
-													(loc_value, planting_value))
-					JBDataGWA.checkEpistasisInJBLabData(phenotype_genotype_fname, genotype_fname_to_generate_kinship, \
-												output_fname, vg=vg, ve=ve, \
-												snp_id_to_be_included_ls=snp_id_to_be_included_ls,\
-												includeInteraction=True, kinship_fname=kinship_fname, \
-												cholesky_inverse_fname = cholesky_inverse_fname,\
-												interaction_snp_id_in_base_formula_ls = interaction_snp_id_in_base_formula_ls, \
-												special_interaction_snp_id_ls=special_interaction_snp_id_ls,\
-												planting_value=planting_value, loc_value=loc_value,\
-												logPhenotype=logPhenotype, run_genome_scan=False, drawIntercept=True, run_type=4)
-		
-		sys.exit(0)
-		
-		#2010-9-6
-		phenotype_genotype_fname = os.path.expanduser('~/Downloads/BLUP_381_spSpring.csv')
-		
-		genotype_fname_to_generate_kinship = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_with_FRI_del_chr_order_one_time_impute_yu_format.tsv')
-		kinship_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/call_method_49_core482_kinship.tsv')	
-		interaction_snp_id_in_base_formula_ls = []
-		snp_id_to_be_included_ls=['1_24345319', '1_3978063', '2_8516520', '3_9340928', \
-								'4_1356197',  '4_158958', '4_268809', '4_269962', '4_387727', \
-								'5_18620282', '5_25376551', '5_3188328']
-		
-		
-		run_type = 4
-		output_fname = os.path.expanduser('~/script/variation/data/JBLabSeasonFlowering20100820/investigateBjarniEMMAX_DTF16replicates_%s.tsv'%\
-			(run_type))
-		GWA.investigateBjarniEMMAX(genotype_fname_to_generate_kinship, phenotype_genotype_fname, \
-								output_fname, kinship_fname,\
-								snp_id_to_be_included_ls = snp_id_to_be_included_ls,\
-								run_type=run_type)
-		sys.exit(0)
-		
-		# 2010-8-6 -z banyan.usc.edu
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsNoOfProbes/')
-		for cnv_method_id in [27]:
-			CNV.plotCNVCallFDRVsNoOfProbesBasedOnPercUnCoveredByLerContig(db_250k, output_dir=output_dir, \
-											ecotype_id=None, minPercUnCoveredByLerContig=0.4, \
-											cnv_method_id=cnv_method_id, useProbeDensity=False, run_type=2, minScore=None)
-		sys.exit(0)
-		
-		#2010-8-6 for the TAIR9 "-z banyan.usc.edu"
-		for cnv_method_id in [27]:
-			CNV.updateCNVCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
-								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
-								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id)
-		sys.exit(0)
-		
-		#2010-8-1 -z banyan.usc.edu
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVFrequencyHist/')
-		cnv_method_id=22
-		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
-							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
-							minFractionNotCoveredByLyrata=0.8, maxFractionNotCoveredByLyrata=None)
-		CNV.drawCNVFrequencyHist(db_250k, output_dir, cnv_method_id=cnv_method_id, fileNamePrefix='CNVFrequency',\
-							xlabel='frequency', ylabel_in_2D='log10(size)', xlim_in_1D=[0,1], logHist=True,\
-							minFractionNotCoveredByLyrata=None, maxFractionNotCoveredByLyrata=0.2)
-		sys.exit(0)
-		
-		#2010-8-10
-		for cnv_method_id in [18, 19, 22]:
-			output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
-			CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
-									cnv_method_id=cnv_method_id, cnv_type_id=1, chromosome=1, start=6156000, stop=6162000)
-		sys.exit(0)
-		
-		#2010-7-31 update CNV.fractionNotCoveredByLyrata for the TAIR9 "-z banyan.usc.edu", cnv_method_id 18
-		CNV.updateCNVCallPercUnCoveredByLerContig(db_250k, ecotype_id=-1, \
-								qc_data_source_id=15, qc_cnv_method_id=1, qc_cnv_type_id=None, \
-								min_reciprocal_overlap=0.0000001, cnv_method_id=18, run_type=3)
-		sys.exit(0)
-		
-		
-		
-		#2010-8-1 "-z banyan"
-		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[23, 24])
-		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
-		for cnv_method_id in [23, 24]:
-			CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
-								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
-								min_reciprocal_overlap=0.0000001, cnv_method_id=cnv_method_id)
-			minScore = None
-			minNotCoveredFraction = 0.4
-			output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
-			CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-									ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
-									cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
-			CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-									ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
-									cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
-		sys.exit(0)
-		
-		#2010-8-10
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/MergedAcrossArraysCNV/')
-		CNV.drawMergedAcrossArraysCNVGivenPosition(db_250k, output_dir=output_dir,\
-									cnv_method_id=24, cnv_type_id=1, chromosome=2, start=7063000, stop=7065260)
-		sys.exit(0)
-		
-		
-		
-		
-		
-		#2010-8-7
-		cnv_method_id = 20
-		output_fname = os.path.expanduser('~/script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod%s.tsv'%cnv_method_id)
-		CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
-		sys.exit(0)
-		
-		
-		
-		
-		# 2010-8-1 -z banyan.usc.edu
-		minScore = None
-		cnv_method_id = 22
-		minNotCoveredFraction = 0.4
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
-		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
-								cnv_method_id=cnv_method_id, xDataType=1, draw2D=True, minScore=minScore)
-		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-								ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=minNotCoveredFraction, \
-								cnv_method_id=cnv_method_id, xDataType=2, draw2D=False, minScore=minScore)
-		sys.exit(0)
-		
-		
-		
-		
-		#2010-8-3	qc_data_source_id 16 is too much for mysql to handle, exhaust disk usage in /tmp
-		CNV.updateCNVFractionNotCoveredByLyrata(db_250k, ecotype_id=-1, \
-								qc_data_source_id=16, qc_cnv_method_id=1, qc_cnv_type_id=None, \
-								min_reciprocal_overlap=0.0000001, cnv_method_id=22)
-		sys.exit(0)
-		
-		#2010-8-1 "-z banyan"
-		#CNV.updateCNVFrequency(db_250k, cnv_method_id=22, run_type=1)
-		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[22])
-		sys.exit(0)
-		
-		
-		
-		#2010-8-1 for the TAIR9 "-z banyan.usc.edu"
-		CNV.updateCNVArrayCallFractionDeletedInPECoverageData(db_250k, ecotype_id=None, \
-								qc_data_source_id=13, qc_cnv_method_id=9, qc_cnv_type_id=1, \
-								min_reciprocal_overlap=0.0000001, cnv_method_id=22)
-		sys.exit(0)
-		
-		
-		#2010-8-3
-		input_dir = os.path.expanduser('~/script/variation/data/CNV/SebastianHMMSummaryCalls/')
-		CNV.putSebastianCallIntoDB(db_250k, input_dir, minProbabilityToCallDeletion=0.8,\
-							cnv_method_id=21, cnv_type_id=1, debug=debug)
-		sys.exit(0)
-		
-		#2010-8-2
-		CNV.updateCNVProbeInfo(db_250k, cnv_method_id_ls=[18, 19])
-		sys.exit(0)
-		
-		#2010-8-2
-		input_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.fa')
-		output_fname = os.path.expanduser('~/script/variation/data/lyrata/at_ancestor_t9.normaSegment.tsv')
-		CNV.Lyrata.getLyrataNormalANDDeletionFromQuanFileInTAIR9(input_fname, output_fname=output_fname)
-		sys.exit(0)
-		
-		# 2010-8-1 -z banyan.usc.edu
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/FDRVsFrequency/')
-		CNV.plotCNVArrayCallFDRVsFrequencyNoOfProbes(db_250k, output_dir=output_dir, \
-											ecotype_id=None, qc_data_source_id=13, minNotCoveredFraction=0.4, \
-											cnv_method_id=19, xDataType=2)
-		sys.exit(0)
-		
-		
-		# 2010-7-29
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallGapRatioHist/')
-		if not os.path.isdir(output_dir):
-			os.makedirs(output_dir)
-		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=17, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
-								output_dir=output_dir, xlabel='min(gap_ratio1, gap_ratio2)', \
-								ylabel_in_2D='gap_length', fileNamePrefix='CNVCallGapRatioVsGapLenHist', dataType=2)
-		sys.exit(0)
-		
-		
-		
-		#2010-7-24 banyan.usc.edu
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCallLabelVsIntensityByNoOfProbes/')
-		cnv_method_id = 10
-		rows = db_250k.metadata.bind.execute("select distinct array_id from cnv_call where cnv_method_id=%s and \
-			percUnCoveredByLerContig is null order by array_id"%cnv_method_id)
-		array_id_ls = []
-		for row in rows:
-			array_id_ls.append(row.array_id)
-		print "%s arrays"%len(array_id_ls)
-		for array_id in array_id_ls:
-			for gridsize in [40, 60,]:
-				CNV.inspectCNVCallProbeDensityAndAmplitudeAndNumberOfProbes(db_250k, array_id=array_id, output_dir=output_dir, \
-									minPercUnCoveredByLerContig=0.6, gridsize=gridsize, cnv_method_id=cnv_method_id,\
-									deletedFractionType=2, colorBarLabel='FractionNotCoveredByPEData',\
-									replaceNoOfProbesWithProbeDensity=True)
-		sys.exit(0)
-		
-		
-		
-		
-		# 2010-7-20
-		output_dir = os.path.expanduser('~/script/variation/data/CNV/CNVCall_GapRatioHist/')
-		CNV.drawCNVCallGapHistogram(db_250k, cnv_method_id=8, cnv_type_id=1, ecotype_id=None, qc_data_source_id=13, \
-								output_dir=output_dir, drawType=1)
-		sys.exit(0)
 		
 
 
