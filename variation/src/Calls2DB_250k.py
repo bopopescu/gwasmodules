@@ -310,6 +310,9 @@ class Calls2DB_250k(object):
 	
 	def submit_call_dir2db(self, curs, input_dir, call_info_table, output_dir, method_id, user, chr_pos2db_id=None, db=None):
 		"""
+		2011-1-24
+			bugfix
+				Call files to be added into method 3 have the 3rd column, oligo_probability.
 		2010-10-13
 			add argument chr_pos2db_id and db
 			it replaces the old snp ID (chr_pos_...) with id from table Stock_250kDB.Snps
@@ -339,15 +342,16 @@ class Calls2DB_250k(object):
 					sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
 					continue
 				input_fname = os.path.join(input_dir, filename)
-				reader = csv.reader(open(input_fname), delimiter='')
+				reader = csv.reader(open(input_fname), delimiter='\t')
 				writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-				writer.writerow(['SNP_ID', array_id])
+				header_row = reader.next()
+				writer.writerow(header_row)
 				for row in reader:
 					chr_pos = row[0].split('_')[:2]
 					chr_pos = tuple(map(int, chr_pos))
 					db_id = chr_pos2db_id.get(chr_pos)
 					if db_id is not None:
-						new_row = [db_id, row[1]]
+						new_row = [db_id] + row[1:]
 						writer.writerow(new_row)
 				del reader, writer
 				call_info = Stock_250kDB.CallInfo(id=new_call_id, filename=output_fname, array_id=array_id,\
