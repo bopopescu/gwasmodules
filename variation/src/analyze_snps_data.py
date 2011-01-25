@@ -258,6 +258,8 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 			pval = res_dict['pval'][i]
 			f_stat = res_dict['f_stat'][i]
 			emmax_pval = res_dict['emmax_pval'][i]
+			if emmax_pval > 0.1:
+				continue
 			beta = res_dict['beta'][i]
 			emmax_r2 = res_dict['emmax_r2'][i]
 			y_t = (y_chr, y_pos)
