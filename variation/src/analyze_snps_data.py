@@ -305,7 +305,7 @@ def run_r2_calc():
 #	return res_dict
 
 
-def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
+def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']
 	if os.path.isfile(file_prefix + '.pickled'):
 		print 'Loading pickled data..'
@@ -501,7 +501,6 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 
-
 def plot_r2_results():
 	chr_res_dict = load_chr_res_dict()
 	max_pval = -math.log10(min_float)
@@ -511,8 +510,11 @@ def plot_r2_results():
 	alpha = 0.8
 	linewidths = 0
 	vmin = 0.0
-	for chr2 in chromosomes:
-		for chr1 in chromosomes[:chr2]:
+	f = pylab.figure(figsize=(30, 30))
+
+	for yi, chr2 in enumerate(chromosomes):
+		for xi, chr1 in enumerate(chromosomes[:chr2]):
+
 			x_min = min(chr_res_dict[(chr1, chr2)]['x_pos'])
 			x_max = max(chr_res_dict[(chr1, chr2)]['x_pos'])
 			y_min = min(chr_res_dict[(chr1, chr2)]['y_pos'])
@@ -587,6 +589,93 @@ def plot_r2_results():
 			pylab.ylabel(y_lab)
 			pylab.savefig(emma_pval_file_name, format='png')
 
+
+
+#
+#def plot_r2_results():
+#	chr_res_dict = load_chr_res_dict()
+#	max_pval = -math.log10(min_float)
+#	max_emmax_pval = -math.log10(min(res_dict['emmax_pval']))
+#	#Filter data..
+#	#Now plot data!!
+#	alpha = 0.8
+#	linewidths = 0
+#	vmin = 0.0
+#	for chr2 in chromosomes:
+#		for chr1 in chromosomes[:chr2]:
+#			x_min = min(chr_res_dict[(chr1, chr2)]['x_pos'])
+#			x_max = max(chr_res_dict[(chr1, chr2)]['x_pos'])
+#			y_min = min(chr_res_dict[(chr1, chr2)]['y_pos'])
+#			y_max = max(chr_res_dict[(chr1, chr2)]['y_pos'])
+#			x_range = x_max - x_min
+#			y_range = y_max - y_min
+#			x_lab = 'Chromosome %d' % chr1
+#			y_lab = 'Chromosome %d' % chr2
+#			left = 0.05
+#			bottom = 0.04
+#			width = 0.94
+#			height = 0.94
+#			r2_plot_file_name = file_prefix + 'c_' + str(chr1) + 'x' + str(chr2) + '_r2s.png'
+#			pval_file_name = file_prefix + 'c_' + str(chr1) + 'x' + str(chr2) + '_pvals.png'
+#			emma_pval_file_name = file_prefix + 'c_' + str(chr1) + 'x' + str(chr2) + '_emmax_pvals.png'
+##			print r2_plot_file_name, pval_file_name , emma_pval_file_name
+#			pylab.figure(figsize=(18, 16))
+#			pylab.axes([left, bottom, width, height])
+#
+#			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
+#				chr_res_dict[(chr1, chr2)]['y_pos'])
+#			l_zxy.sort()
+#			l = map(list, zip(*l_zxy))
+#			zs = l[0]
+#			xs = l[1]
+#			ys = l[2]
+##			print len(chr_res_dict[(chr1, chr2)]['x_pos']), len(chr_res_dict[(chr1, chr2)]['y_pos']), \
+##				len(chr_res_dict[(chr1, chr2)]['r2'])
+#			pylab.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
+#			pylab.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range, y_min - 0.025 * y_range,
+#				y_max + 0.025 * y_range])
+#			pylab.colorbar()
+#			pylab.xlabel(x_lab)
+#			pylab.ylabel(y_lab)
+#			pylab.savefig(r2_plot_file_name, format='png')
+#			pylab.clf()
+#			pylab.figure(figsize=(18, 16))
+#			pylab.axes([left, bottom, width, height])
+#			log_pvals = map(lambda x:-math.log10(x), chr_res_dict[(chr1, chr2)]['pval'])
+#			l_zxy = zip(log_pvals, chr_res_dict[(chr1, chr2)]['x_pos'], chr_res_dict[(chr1, chr2)]['y_pos'])
+#			l_zxy.sort()
+#			l = map(list, zip(*l_zxy))
+#			zs = l[0]
+#			xs = l[1]
+#			ys = l[2]
+#			pylab.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=max_pval)
+#			pylab.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range, y_min - 0.025 * y_range,
+#				y_max + 0.025 * y_range])
+#			pylab.colorbar()
+#			pylab.xlabel(x_lab)
+#			pylab.ylabel(y_lab)
+#			pylab.savefig(pval_file_name, format='png')
+#			pylab.clf()
+#			pylab.figure(figsize=(18, 16))
+#			pylab.axes([left, bottom, width, height])
+#			log_pvals = map(lambda x:-math.log10(x), chr_res_dict[(chr1, chr2)]['emmax_pval'])
+#			l_zxy = zip(log_pvals, chr_res_dict[(chr1, chr2)]['x_pos'], chr_res_dict[(chr1, chr2)]['y_pos'])
+#			l_zxy.sort()
+#			i = 0
+#			while l_zxy[i] < 0:
+#				i += 1
+#			l_zxy = l_zxy[i:]
+#			l = map(list, zip(*l_zxy))
+#			zs = l[0]
+#			xs = l[1]
+#			ys = l[2]
+#			pylab.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=max_emmax_pval)
+#			pylab.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range, y_min - 0.025 * y_range,
+#				y_max + 0.025 * y_range])
+#			pylab.colorbar()
+#			pylab.xlabel(x_lab)
+#			pylab.ylabel(y_lab)
+#			pylab.savefig(emma_pval_file_name, format='png')
 #plt.subplot(121)
 #plt.scatter(xyc[:13], xyc[:13], c=xyc[:13], s=35, vmin=0, vmax=20)
 #plt.colorbar()
