@@ -478,10 +478,12 @@ class Gene_symbol2id(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='gene_symbol2id')
 	using_table_options(mysql_engine='InnoDB')
-
+	using_table_options(UniqueConstraint('gene_id', 'gene_symbol', 'symbol_type'))
 
 def getEntrezgeneAnnotatedAnchor(db, tax_id):
 	"""
+	2011-1-25
+		row.gene_id -> row.id
 	2008-08-13
 		similar to annot.bin.codense.common.get_entrezgene_annotated_anchor, but use elixir db interface
 	"""
@@ -495,7 +497,7 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 		for row in rows:
 			genomic_gi = row.genomic_gi
 			chromosome = row.chromosome
-			gene_id = row.gene_id
+			gene_id = row.id
 			strand = row.strand
 			start = row.start
 			stop = row.stop
@@ -512,7 +514,8 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 			chromosome2anchor_gene_tuple_ls[chromosome].append((start, gene_id))
 			gene_id2coord[gene_id] = (start, stop, strand, genomic_gi)
 		
-		rows = Gene.query.filter_by(tax_id=tax_id).offset(offset_index).limit(block_size)
+		rows = Gene.query.filter_by(tax_id=tax_id
+								).offset(offset_index).limit(block_size)
 	for chromosome in chromosome2anchor_gene_tuple_ls:	#sort the list
 		chromosome2anchor_gene_tuple_ls[chromosome].sort()
 	sys.stderr.write("Done.\n")
@@ -619,7 +622,58 @@ class GenomeDatabase(ElixirDB):
 		
 		sys.stderr.write("Done.\n")
 		return gene_id2model, chr_id2gene_id_ls, geneSpanRBDict
+
+def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
+	annot_assembly_table='genome.annot_assembly'):
+	"""
+	2011-1-25
+		moved from annot.bin.common
+		change e.gene_id to e.id
+	2010-8-1 make sure chromosome is not null
 	
+	2008-08-12
+		deal with genes with no strand info
+		only start of the gene gets into chromosome2anchor_gene_tuple_ls. not stop.
+	12-11-05
+	
+	12-17-05
+		for TFBindingSiteParse.py
+	"""
+	sys.stderr.write("Getting entrezgene_annotated_anchor ...")
+	chromosome2anchor_gene_tuple_ls = {}
+	gene_id2coord = {}
+	curs.execute("select e.genomic_gi, a.chromosome, e.id, e.strand, \
+			e.start, e.stop from %s e, %s a where e.genomic_gi = a.gi and e.tax_id=%s and a.chromosome is not null"%\
+			(entrezgene_mapping_table, annot_assembly_table, tax_id))	#2010-8-1 make sure chromosome is not null
+	
+	#curs.execute("fetch 5000 from eaa_crs")
+	rows = curs.fetchall()
+	counter = 0#2010-8-1
+	#while rows:
+	for row in rows:
+		genomic_gi, chromosome, gene_id, strand, start, stop = row
+		gene_id = int(gene_id)
+		if strand=='1' or strand=='+1' or strand=='+':
+			strand = '+'
+		elif strand=='-1' or strand=='-':
+			strand = '-'
+		else:
+			strand = strand
+		
+		if chromosome not in chromosome2anchor_gene_tuple_ls:
+			chromosome2anchor_gene_tuple_ls[chromosome] = []
+		
+		chromosome2anchor_gene_tuple_ls[chromosome].append((start, gene_id))
+		gene_id2coord[gene_id] = (start, stop, strand, genomic_gi)
+		#curs.execute("fetch 5000 from eaa_crs")
+		#rows = curs.fetchall()
+		counter += 1
+	for chromosome in chromosome2anchor_gene_tuple_ls:	#sort the list
+		chromosome2anchor_gene_tuple_ls[chromosome].sort()
+	#curs.execute("close eaa_crs")
+	sys.stderr.write("%s genes (including AS-isoforms). Done.\n"%counter)	#2010-8-1 report counter
+	return chromosome2anchor_gene_tuple_ls, gene_id2coord
+
 if __name__ == '__main__':
 	import sys, os, math
 	bit_number = math.log(sys.maxint)/math.log(2)
