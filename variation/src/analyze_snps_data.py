@@ -15,7 +15,7 @@ import math
 import random
 min_float = 5e-324
 
-def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
+def test_correlation(num_y=30, num_x=30, mac_filter=15, debug_filter=1):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
@@ -38,6 +38,7 @@ def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
 	for ys, xs in [(y_sample, x_sample), (x_sample, y_sample)]:
 		for i, yi in enumerate(ys):
 			(y_c, y_p, y_snp) = cps_list[yi]
+			y_snp = y_snp / sp.std(y_snp)
 			print 'Y_%d: chromosome=%d, position=%d' % (i, y_c, y_p)
 			#get the EMMA REML
 			res = lm.get_emma_reml_estimates(y_snp, K)
@@ -49,6 +50,7 @@ def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
 			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
 			for j, xi in enumerate(xs):
 				(x_c, x_p, x_snp) = cps_list[xi]
+				x_snp = x_snp / sp.std(x_snp)
 				(r, pearson_pval) = st.pearsonr(x_snp, y_snp) #Done twice, but this is fast..
 				r2 = r * r
 				#Do EMMAX
@@ -71,13 +73,13 @@ def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
 			ys.append(res_d[(yi, xi)][0])
 			xs.append(res_d[(xi, yi)][0])
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'emma_pvals.png')
+	pylab.savefig(env['results_dir'] + 'norm_emma_pvals.png')
 	pylab.clf()
 
 	xs = -sp.log10(xs)
 	ys = -sp.log10(ys)
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'emma_log_pvals.png')
+	pylab.savefig(env['results_dir'] + 'norm_emma_log_pvals.png')
 	pylab.clf()
 
 	xs = []
@@ -87,7 +89,7 @@ def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
 			ys.append(res_d[(yi, xi)][1])
 			xs.append(res_d[(xi, yi)][1])
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'r2.png')
+	pylab.savefig(env['results_dir'] + 'norm_r2.png')
 	pylab.clf()
 
 	xs = []
@@ -99,17 +101,52 @@ def test_correlation(num_y=1000, num_x=1000, mac_filter=15, debug_filter=1):
 			xs.append(res_d[(yi, xi)][1])
 			ys.append(res_d[(xi, yi)][0])
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'r2_emma_pval.png')
+	pylab.savefig(env['results_dir'] + 'norm_r2_emma_pval.png')
 	pylab.clf()
 
 	ys = -sp.log10(ys)
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'r2_emma_pval.png')
+	pylab.savefig(env['results_dir'] + 'norm_r2_emma_pval.png')
 
 
 
-def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_threshold=0.15, min_emma_dist=0,
-		save_threshold=0.15, debug_filter=1):
+def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=15, save_threshold=0.1, debug_filter=1):
+	"""
+	Returns statistics on LD levels, and plot them.
+	"""
+
+	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
+	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
+					filter=debug_filter)
+	sd.filter_mac_snps(mac_filter)
+	cps_list = sd.getChrPosSNPList()
+	x_cps = cps_list[x_start_i:x_stop_i]
+	y_cps = cps_list
+	result_list = []
+	q = 1  # Single SNP is being tested
+	p = 2
+	n = len(sd.accessions)
+	n_p = n - p
+	for i, (x_c, x_p, x_snp) in enumerate(x_cps):
+		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
+		for (y_c, y_p, y_snp) in y_cps:
+			if (x_c, x_p) < (y_c, y_p):
+				(r, pearson_pval) = st.pearsonr(x_snp, y_snp) #Done twice, but this is fast..
+				r2 = r * r
+				if r2 > save_threshold:
+					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval])
+	file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".csv"
+	with open(file_name, 'w') as f:
+		for r in result_list:
+			out_string = ','.join(map(str, r))
+			f.write(out_string + '\n')
+	return result_list
+
+
+
+
+def calc_r2_levels_w_mixed_model(file_prefix, x_start_i, x_stop_i, mac_filter=10, emma_r2_threshold=0.15,
+				min_emma_dist=0, save_threshold=0.15, debug_filter=1):
 	"""
 	Returns statistics on LD levels, and plot them.
 	
@@ -211,8 +248,10 @@ def run_parallel(x_start_i, x_stop_i):
 
 
 def run_r2_calc():
+	if len(sys.argv) > 3:
+		calc_r2_levels_w_mixed_model(env['results_dir'] + '250K_r2_min01', int(sys.argv[1]), int(sys.argv[2]))
 	if len(sys.argv) > 2:
-		calc_r2_levels(env['results_dir'] + '250K_r2_min015', int(sys.argv[1]), int(sys.argv[2]))
+		calc_r2_levels(env['results_dir'] + '250K_r2_min01_mac15', int(sys.argv[1]), int(sys.argv[2]))
 	else:
 		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
 		num_snps = len(sd.getSnps())
@@ -527,6 +566,6 @@ def plot_r2_results():
 
 if __name__ == "__main__":
 	#load_and_plot_r2_results()
-	#run_r2_calc()
+	plot_r2_results()
 	#plot_pval_emmax_correlations()
-	test_correlation()
+	#test_correlation()
