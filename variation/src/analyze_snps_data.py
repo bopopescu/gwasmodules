@@ -386,13 +386,13 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 					num_retained += 1
 					chr_pos_set.add((x_chr, x_pos))
 					chr_pos_set.add((y_chr, y_pos))
-		else:
-			if r2 > final_r2_thres:
-				for h in headers:
-						chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-				num_retained += 1
-				chr_pos_set.add((x_chr, x_pos))
-				chr_pos_set.add((y_chr, y_pos))
+#		else:
+#			if r2 > final_r2_thres:
+#				for h in headers:
+#						chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#				num_retained += 1
+#				chr_pos_set.add((x_chr, x_pos))
+#				chr_pos_set.add((y_chr, y_pos))
 
 	print 'Number of results which were retained:', num_retained
 	print len(chr_pos_set)
