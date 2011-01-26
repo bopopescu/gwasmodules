@@ -502,6 +502,8 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
+
+	chromosome_ends = {1:30425061, 2:19694800, 3:23456476, 4:18578714, 5:26974904}
 	chr_res_dict = load_chr_res_dict()
 	max_pval = -math.log10(min_float)
 	#Filter data..
@@ -513,26 +515,25 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	chromosomes = [1, 2, 3, 4, 5]
 	r2_plot_file_name = file_prefix + '_r2s.png'
 	pval_file_name = file_prefix + '_pvals.png'
+
 	for yi, chr2 in enumerate(chromosomes):
 		for xi, chr1 in enumerate(chromosomes[:chr2]):
 
-			x_min = min(chr_res_dict[(chr1, chr2)]['x_pos'])
-			x_max = max(chr_res_dict[(chr1, chr2)]['x_pos'])
-			y_min = min(chr_res_dict[(chr1, chr2)]['y_pos'])
-			y_max = max(chr_res_dict[(chr1, chr2)]['y_pos'])
-			x_range = x_max - x_min
-			y_range = y_max - y_min
 			ax = f.add_axes([xi * 0.2 + 0.01, yi * 0.2 + 0.01, 0.18, 0.18])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			if xi > 0:
 				ax.spines['left'].set_visible(False)
-			else:
-				ax.set_xlabel('Chromosome %d' % chr1)
-			if yi < 4:
-				ax.spines['top'].set_visible(False)
+				ax.yaxis.set_ticks_position('none')
 			else:
 				ax.set_ylabel('Chromosome %d' % chr2)
+				ax.yaxis.set_ticks_position('left')
+			if yi < 4:
+				ax.spines['top'].set_visible(False)
+				ax.xaxis.set_ticks_position('none')
+			else:
+				ax.set_xlabel('Chromosome %d' % chr1)
+				ax.xaxis.set_ticks_position('top')
 
 			r2_plot_file_name = file_prefix + 'c_' + str(chr1) + 'x' + str(chr2) + '_r2s.png'
 #			print r2_plot_file_name, pval_file_name s
@@ -547,8 +548,9 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 #			print len(chr_res_dict[(chr1, chr2)]['x_pos']), len(chr_res_dict[(chr1, chr2)]['y_pos']), \
 #				len(chr_res_dict[(chr1, chr2)]['r2'])
 			ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
-			ax.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range, y_min - 0.025 * y_range,
-				y_max + 0.025 * y_range])
+			x_min = x_min_d[]
+			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
+				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 			#pylab.colorbar()
 	f.savefig(r2_plot_file_name, format='png')
 
