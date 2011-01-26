@@ -511,7 +511,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	alpha = 0.8
 	linewidths = 0
 	vmin = 0.0
-	f = pylab.figure(figsize=(30, 30))
+	f = pylab.figure(figsize=(40, 40))
 	chromosomes = [1, 2, 3, 4, 5]
 	r2_plot_file_name = file_prefix + '_r2s.png'
 	pval_file_name = file_prefix + '_pvals.png'
