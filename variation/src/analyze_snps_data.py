@@ -548,7 +548,6 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 #			print len(chr_res_dict[(chr1, chr2)]['x_pos']), len(chr_res_dict[(chr1, chr2)]['y_pos']), \
 #				len(chr_res_dict[(chr1, chr2)]['r2'])
 			ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
-			x_min = x_min_d[]
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 			#pylab.colorbar()
