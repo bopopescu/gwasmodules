@@ -228,7 +228,7 @@ def run_parallel(x_start_i, x_stop_i):
 
 	shstr = "#!/bin/csh\n"
 	shstr += "#PBS -l walltime=%s \n" % '72:00:00'
-	shstr += "#PBS -l mem=%s \n" % '1200mb'
+	shstr += "#PBS -l mem=%s \n" % '1950mb'
 	shstr += "#PBS -q cmb\n"
 
 	job_id = '%s_%d_%d' % (run_id, x_start_i, x_stop_i)
@@ -260,8 +260,53 @@ def run_r2_calc():
 			run_parallel(i, i + chunck_size)
 
 
-def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
+#def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
+#	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
+#	if os.path.isfile(file_prefix + '.pickled'):
+#		print 'Loading pickled data..'
+#		f = open(file_prefix + '.pickled', 'rb')
+#		res_dict = cPickle.load(f)
+#		f.close()
+#		print 'Done'
+#	else:
+#		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
+#		num_snps = len(sd.getSnps())
+#		chunck_size = int(sys.argv[1])
+#		res_dict = {}
+#		for h in headers:
+#			res_dict[h] = []
+#		delim = ','
+#		for i in range(0, num_snps, chunck_size):
+#			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
+#			print i
+#			try:
+#				f = open(file_name)
+#				for line in f:
+#					l = map(str.strip, line.split(delim))
+#					for j, st in enumerate(l):
+#						h = headers[j]
+#						if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
+#							res_dict[h].append(int(st))
+#						elif h in ['pval', 'emmax_pval']:
+#							v = float(st)
+#							res_dict[h].append(v if v != 0.0 else min_float)
+#						elif h in ['r2', 'beta', 'emmax_r2']:
+#							res_dict[h].append(float(st))
+#						elif h == 'f_stat':
+#							v = float(st)
+#							res_dict[h].append(v if v != sp.nan else 0)
+#						else:
+#							raise Exception()
+#			except Exception, err_str:
+#				print "Problems with file %s: %s" % (file_name, err_str)
+#		f = open(file_prefix + '.pickled', 'wb')
+#		cPickle.dump(res_dict, f, 2)
+#		f.close()
+#	return res_dict
+
+
+def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
+	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']
 	if os.path.isfile(file_prefix + '.pickled'):
 		print 'Loading pickled data..'
 		f = open(file_prefix + '.pickled', 'rb')
@@ -287,16 +332,13 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users
 						h = headers[j]
 						if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
 							res_dict[h].append(int(st))
-						elif h in ['pval', 'emmax_pval']:
+						elif h in ['pval']:
 							v = float(st)
 							res_dict[h].append(v if v != 0.0 else min_float)
-						elif h in ['r2', 'beta', 'emmax_r2']:
+						elif h in ['r2']:
 							res_dict[h].append(float(st))
-						elif h == 'f_stat':
-							v = float(st)
-							res_dict[h].append(v if v != sp.nan else 0)
 						else:
-							raise Exception()
+							raise Exception('Unknown value')
 			except Exception, err_str:
 				print "Problems with file %s: %s" % (file_name, err_str)
 		f = open(file_prefix + '.pickled', 'wb')
@@ -305,8 +347,9 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users
 	return res_dict
 
 
+
 def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)], final_r2_thres=0.2):
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
+	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']#, 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
 	chromosomes = [1, 2, 3, 4, 5]
@@ -327,7 +370,7 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)],
 		r2 = res_dict['r2'][i]
 		x_chr_pos = (x_chr, x_pos)
 		y_chr_pos = (y_chr, y_pos)
-		if x_chr == y_chr:
+		if x_chr <= y_chr:
 			for r2_thres, window in r2_thresholds:
 				if y_pos - x_pos < window and r2 > r2_thres:
 					for h in headers:
