@@ -27,7 +27,8 @@ import Stock_250kDB
 #from Stock_250kDB import Stock_250kDB, Snps, SnpsContext
 from pymodule.db import formReadmeObj
 from transfac.src.TFBindingSiteParse import TFBindingSiteParse
-from annot.bin.codense.common import get_entrezgene_annotated_anchor
+#from annot.bin.codense.common import get_entrezgene_annotated_anchor
+from pymodule.GenomeDB import get_entrezgene_annotated_anchor
 
 class FindSNPContext(object):
 	__doc__ = __doc__
@@ -151,10 +152,8 @@ class FindSNPContext(object):
 									hostname=self.hostname, database=self.dbname)
 		db_250k.setup(create_tables=False)
 		mysql_conn.autocommit(True)
-		entrezgene_mapping_table='genome.entrezgene_mapping'
-		annot_assembly_table='genome.annot_assembly'
 		chromosome2anchor_gene_tuple_ls, gene_id2coord = get_entrezgene_annotated_anchor(mysql_curs, self.tax_id, \
-													entrezgene_mapping_table, annot_assembly_table)
+									entrezgene_mapping_table='genome.gene', annot_assembly_table='genome.annot_assembly')
 		self.find_SNP_context(db_250k, mysql_curs, Stock_250kDB.Snps.table.name, Stock_250kDB.SnpsContext.table.name, \
 							chromosome2anchor_gene_tuple_ls, gene_id2coord,\
 							max_upstream_distance=self.max_upstream_distance,\
