@@ -306,7 +306,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users
 
 
 def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000)], final_r2_thres=0.2):
-
+	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
 	chromosomes = [1, 2, 3, 4, 5]
