@@ -510,7 +510,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	linewidths = 0
 	vmin = 0.0
 	f = pylab.figure(figsize=(30, 30))
-
+	chromosomes = [1, 2, 3, 4, 5]
 	for yi, chr2 in enumerate(chromosomes):
 		for xi, chr1 in enumerate(chromosomes[:chr2]):
 
