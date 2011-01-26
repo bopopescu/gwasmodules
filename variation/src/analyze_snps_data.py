@@ -501,10 +501,9 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 
-def plot_r2_results():
+def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	chr_res_dict = load_chr_res_dict()
 	max_pval = -math.log10(min_float)
-	max_emmax_pval = -math.log10(min(res_dict['emmax_pval']))
 	#Filter data..
 	#Now plot data!!
 	alpha = 0.8
