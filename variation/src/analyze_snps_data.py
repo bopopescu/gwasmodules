@@ -506,10 +506,10 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
 	tot_num_bases = float(sum(chrom_sizes))
-	rel_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), chrom_sizes)
-	rel_cum_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), cum_chrom_sizes)
+	rel_chrom_sizes = map(lambda x: 0.94 * (x / tot_num_bases), chrom_sizes)
+	rel_cum_chrom_sizes = map(lambda x: 0.94 * (x / tot_num_bases), cum_chrom_sizes)
 	for i in range(5):
-		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01 + 0.02 * i
+		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01 + 0.01 * i
 
 	chromosome_ends = {1:30.425061, 2:19.694800, 3:23.456476, 4:18.578714, 5:26.974904}
 	print rel_chrom_sizes, rel_cum_chrom_sizes
