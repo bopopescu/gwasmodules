@@ -348,7 +348,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'):#_mac15'
 
 
 
-def load_chr_res_dict(r2_thresholds=[(0.7, 25000), (0.6, 50000), (0.5, 100000)], final_r2_thres=0.4):
+def load_chr_res_dict(r2_thresholds=[(0.7, 25000), (0.5, 50000), (0.4, 100000)], final_r2_thres=0.3):
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']#, 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -508,6 +508,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	tot_num_bases = float(sum(chrom_sizes))
 	rel_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), chrom_sizes)
 	rel_cum_chrom_sizes = map(lambda x: 0.99 * (x / tot_num_bases), cum_chrom_sizes)
+	print rel_chrom_sizes, rel_cum_chrom_sizes
 	for i in range(5):
 		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01
 	chromosome_ends = {1:30425061, 2:19694800, 3:23456476, 4:18578714, 5:26974904}

@@ -127,6 +127,8 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True)
 
 
+def _load_results_(file_prefix=):
+
 
 def run_parallel_rna_seq_gwas():
 	if len(sys.argv) > 3:
