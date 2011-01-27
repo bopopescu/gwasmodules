@@ -506,8 +506,10 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
 	tot_num_bases = float(sum(chrom_sizes))
-	rel_chrom_sizes = map(lambda x: x / tot_num_bases, chrom_sizes)
-	rel_cum_chrom_sizes = map(lambda x: x / tot_num_bases, cum_chrom_sizes)
+	rel_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), chrom_sizes)
+	rel_cum_chrom_sizes = map(lambda x: 0.99 * (x / tot_num_bases), cum_chrom_sizes)
+	for i in range(5):
+		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01
 	chromosome_ends = {1:30425061, 2:19694800, 3:23456476, 4:18578714, 5:26974904}
 
 	chr_res_dict = load_chr_res_dict()
@@ -532,8 +534,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			y_corr = 0
 			if yi == 0:
 				y_corr = 0.01
-				ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01 + x_corr, rel_cum_chrom_sizes[yi] + 0.01 + y_corr,
-						rel_chrom_sizes[xi] * .9, rel_chrom_sizes[yi] * .9])
+				ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi] + 0.01,
+						rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			if xi > 0:
@@ -541,15 +543,15 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 				#ax.yaxis.set_ticks_position('none')
 				ax.yaxis.set_visible(False)
 			else:
-				ax.set_ylabel('Chromosome %d' % chr2)
 				ax.yaxis.set_ticks_position('left')
+				ax.set_ylabel('Chromosome %d' % chr2)
 			if yi < 5:
 				ax.spines['top'].set_visible(False)
 				#ax.xaxis.set_ticks_position('none')
 				ax.xaxis.set_visible(False)
 			else:
-				ax.set_xlabel('Chromosome %d' % chr1)
 				ax.xaxis.set_ticks_position('top')
+				ax.set_xlabel('Chromosome %d' % chr1)
 
 			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
 				chr_res_dict[(chr1, chr2)]['y_pos'])
