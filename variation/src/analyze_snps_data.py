@@ -534,13 +534,13 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 					rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
+			ax.tick_params(fontsize='x-large')
 			if xi > 0:
 				ax.spines['left'].set_visible(False)
 				ax.yaxis.set_visible(False)
 			else:
 				ax.yaxis.set_ticks_position('left')
 				ax.set_ylabel('Chromosome %d' % chr2, fontsize='x-large')
-				ax.yaxis.set_tick_params(fontsize='x-large')
 			if yi < 4:
 				ax.spines['top'].set_visible(False)
 				ax.xaxis.set_visible(False)
@@ -548,7 +548,6 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 				ax.xaxis.set_ticks_position('top')
 				ax.xaxis.set_label_position('top')
 				ax.xaxis.set_label('Chromosome %d (Mb)' % chr1, fontsize='x-large')
-				ax.xaxis.set_tick_params(fontsize='x-large')
 				#ax.set_xlabel('Chromosome %d' % chr1)
 
 			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
