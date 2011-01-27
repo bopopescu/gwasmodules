@@ -510,7 +510,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	rel_cum_chrom_sizes = map(lambda x: 0.99 * (x / tot_num_bases), cum_chrom_sizes)
 	for i in range(5):
 		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01
-	chromosome_ends = {1:30425061, 2:19694800, 3:23456476, 4:18578714, 5:26974904}
+	chromosome_ends = {1:30.425061, 2:19.694800, 3:23.456476, 4:18.578714, 5:26.974904}
 	print rel_chrom_sizes, rel_cum_chrom_sizes
 
 	chr_res_dict = load_chr_res_dict()
