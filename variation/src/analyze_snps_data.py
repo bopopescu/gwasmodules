@@ -348,7 +348,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'):#_mac15'
 
 
 
-def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.3, 200000)], final_r2_thres=0.2):
+def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.3, 500000)], final_r2_thres=0.2):
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']#, 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -370,16 +370,24 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), 
 		r2 = res_dict['r2'][i]
 		x_chr_pos = (x_chr, x_pos)
 		y_chr_pos = (y_chr, y_pos)
-		if x_chr < y_chr or (x_chr == y_chr and x_pos < y_pos):
-			for r2_thres, window in r2_thresholds:
-				if y_pos - x_pos < window:
-					if r2 > r2_thres:
+		if x_chr <= y_chr:
+			if x_chr == y_chr and x_pos < y_pos:
+				for r2_thres, window in r2_thresholds:
+					if y_pos - x_pos < window:
+						if r2 > r2_thres:
+							for h in headers:
+								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+							num_retained += 1
+							chr_pos_set.add((x_chr, x_pos))
+							chr_pos_set.add((y_chr, y_pos))
+						break
+				else:
+					if r2 > final_r2_thres:
 						for h in headers:
-							chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
 						num_retained += 1
 						chr_pos_set.add((x_chr, x_pos))
 						chr_pos_set.add((y_chr, y_pos))
-					break
 			else:
 				if r2 > final_r2_thres:
 					for h in headers:
@@ -387,13 +395,6 @@ def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), 
 					num_retained += 1
 					chr_pos_set.add((x_chr, x_pos))
 					chr_pos_set.add((y_chr, y_pos))
-#		else:
-#			if r2 > final_r2_thres:
-#				for h in headers:
-#						chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-#				num_retained += 1
-#				chr_pos_set.add((x_chr, x_pos))
-#				chr_pos_set.add((y_chr, y_pos))
 
 	print 'Number of results which were retained:', num_retained
 	print len(chr_pos_set)
@@ -521,7 +522,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	#Now plot data!!
 	alpha = 0.8
 	linewidths = 0
-	vmin = 0
+	vmin = 0.2
 	f = pylab.figure(figsize=(42, 40))
 	chromosomes = [1, 2, 3, 4, 5]
 	r2_plot_file_prefix = file_prefix + '_r2s'
@@ -570,6 +571,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	f.savefig(r2_plot_file_prefix + '.png', format='png')
 
 
+	vmin = 0
 	for yi, chr2 in enumerate(chromosomes):
 		for xi, chr1 in enumerate(chromosomes[:chr2]):
 
