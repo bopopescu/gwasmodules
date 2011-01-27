@@ -539,13 +539,16 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 				ax.yaxis.set_visible(False)
 			else:
 				ax.yaxis.set_ticks_position('left')
-				ax.set_ylabel('Chromosome %d' % chr2)
+				ax.set_ylabel('Chromosome %d' % chr2, fontsize='x-large')
+				ax.yaxis.set_tick_params(fontsize='x-large')
 			if yi < 4:
 				ax.spines['top'].set_visible(False)
 				ax.xaxis.set_visible(False)
 			else:
 				ax.xaxis.set_ticks_position('top')
-				ax.xaxis.set_label('Chromosome %d' % chr1)
+				ax.xaxis.set_label_position('top')
+				ax.xaxis.set_label('Chromosome %d (Mb)' % chr1, fontsize='x-large')
+				ax.xaxis.set_tick_params(fontsize='x-large')
 				#ax.set_xlabel('Chromosome %d' % chr1)
 
 			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
@@ -562,7 +565,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 
 	cax = f.add_axes([0.6, 0.2, 0.015, 0.2])
 	cb = pylab.colorbar(scatter_plot, cax=cax)
-	cb.set_label('Pairwise correlation ($r^2$)')
+	cb.set_label('Pairwise correlation ($r^2$)', fontsize='x-large')
+	cb.set_tick_params(fontsize='x-large')
 	f.savefig(r2_plot_file_prefix + '.png', format='png')
 	#f.savefig(r2_plot_file_prefix + '.pdf', format='pdf')
 
