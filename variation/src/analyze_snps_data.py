@@ -526,8 +526,14 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	for yi, chr2 in enumerate(chromosomes):
 		for xi, chr1 in enumerate(chromosomes[:chr2]):
 
-			ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi] + 0.01,
-					rel_chrom_sizes[xi] * .9, rel_chrom_sizes[yi] * .9])
+			x_corr = 0
+			if xi == 0:
+				x_corr = 0.01
+			y_corr = 0
+			if yi == 0:
+				y_corr = 0.01
+				ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01 + x_corr, rel_cum_chrom_sizes[yi] + 0.01 + y_corr,
+						rel_chrom_sizes[xi] * .9, rel_chrom_sizes[yi] * .9])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			if xi > 0:
@@ -537,7 +543,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			else:
 				ax.set_ylabel('Chromosome %d' % chr2)
 				ax.yaxis.set_ticks_position('left')
-			if yi < 4:
+			if yi < 5:
 				ax.spines['top'].set_visible(False)
 				#ax.xaxis.set_ticks_position('none')
 				ax.xaxis.set_visible(False)
