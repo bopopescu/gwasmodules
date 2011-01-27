@@ -564,7 +564,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.65, 0.3, 0.01, 0.2])
+	cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
 	cb = pylab.colorbar(scatter_plot, cax=cax)
 	cb.set_label('Pairwise correlation ($r^2$)', fontsize='x-large')
 	#cb.set_tick_params(fontsize='x-large')
@@ -607,7 +607,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.65, 0.3, 0.01, 0.2])
+	cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
 	cb = pylab.colorbar(scatter_plot, cax=cax)
 	cb.set_label('Pairwise correlation ($r^2$)', fontsize='x-large')
 	#cb.set_tick_params(fontsize='x-large')
