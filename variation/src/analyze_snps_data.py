@@ -503,7 +503,7 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 
-def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
+def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
