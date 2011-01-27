@@ -547,7 +547,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			else:
 				ax.xaxis.set_ticks_position('top')
 				ax.xaxis.set_label_position('top')
-				ax.xaxis.set_label('Chromosome %d (Mb)' % chr1, fontsize='x-large')
+				ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
 				#ax.set_xlabel('Chromosome %d' % chr1)
 
 			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
