@@ -348,7 +348,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 
 
 
-def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.3, 500000)], final_r2_thres=0.2):
+def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.3, 400000), (0.2, 1000000)], final_r2_thres=0.1):
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']#, 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -523,7 +523,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 	alpha = 0.8
 	linewidths = 0
 	vmin = 0.2
-	f = pylab.figure(figsize=(42, 40))
+	f = pylab.figure(figsize=(50, 46))
 	chromosomes = [1, 2, 3, 4, 5]
 	r2_plot_file_prefix = file_prefix + '_r2s'
 	pval_file_prefix = file_prefix + '_pvals'
