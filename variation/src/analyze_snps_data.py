@@ -348,7 +348,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'):#_mac15'
 
 
 
-def load_chr_res_dict(r2_thresholds=[(0.8, 25000), (0.6, 50000), (0.4, 100000)], final_r2_thres=0.3):
+def load_chr_res_dict(r2_thresholds=[(0.8, 25000), (0.7, 50000), (0.6, 100000)], final_r2_thres=0.5):
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']#, 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -507,9 +507,10 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
 	tot_num_bases = float(sum(chrom_sizes))
 	rel_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), chrom_sizes)
-	rel_cum_chrom_sizes = map(lambda x: 0.99 * (x / tot_num_bases), cum_chrom_sizes)
+	rel_cum_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), cum_chrom_sizes)
 	for i in range(5):
-		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01
+		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01 + 0.02 * i
+
 	chromosome_ends = {1:30425061, 2:19694800, 3:23456476, 4:18578714, 5:26974904}
 	print rel_chrom_sizes, rel_cum_chrom_sizes
 
@@ -535,33 +536,35 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			ax.spines['bottom'].set_visible(False)
 			if xi > 0:
 				ax.spines['left'].set_visible(False)
-				#ax.yaxis.set_ticks_position('none')
 				ax.yaxis.set_visible(False)
 			else:
 				ax.yaxis.set_ticks_position('left')
 				ax.set_ylabel('Chromosome %d' % chr2)
 			if yi < 4:
 				ax.spines['top'].set_visible(False)
-				#ax.xaxis.set_ticks_position('none')
 				ax.xaxis.set_visible(False)
 			else:
 				ax.xaxis.set_ticks_position('top')
-				ax.set_xlabel('Chromosome %d' % chr1)
+				ax.xaxis.set_label('Chromosome %d' % chr1)
+				#ax.set_xlabel('Chromosome %d' % chr1)
 
 			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
 				chr_res_dict[(chr1, chr2)]['y_pos'])
 			l_zxy.sort()
 			l = map(list, zip(*l_zxy))
 			zs = l[0]
-			xs = l[1]
-			ys = l[2]
+			xs = map(lambda x: x / 1000000.0, l[1])
+			ys = map(lambda x: x / 1000000.0, l[2])
 
-			ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
+			scatter_plot = ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
-			#pylab.colorbar()
+
+	cax = f.add_axes([0.6, 0.2, 0.015, 0.2])
+	cb = pylab.colorbar(scatter_plot, cax=cax)
+	cb.set_label('Pairwise correlation ($r^2$)')
 	f.savefig(r2_plot_file_prefix + '.png', format='png')
-	f.savefig(r2_plot_file_prefix + '.pdf', format='pdf')
+	#f.savefig(r2_plot_file_prefix + '.pdf', format='pdf')
 
 
 
