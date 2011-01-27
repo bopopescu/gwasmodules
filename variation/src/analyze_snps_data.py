@@ -522,7 +522,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	alpha = 0.8
 	linewidths = 0
 	vmin = 0
-	f = pylab.figure(figsize=(40, 40))
+	f = pylab.figure(figsize=(42, 40))
 	chromosomes = [1, 2, 3, 4, 5]
 	r2_plot_file_prefix = file_prefix + '_r2s'
 	pval_file_prefix = file_prefix + '_pvals'
@@ -541,7 +541,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 				ax.yaxis.set_visible(False)
 			else:
 				ax.yaxis.set_ticks_position('left')
-				ax.set_ylabel('Chromosome %d' % chr2, fontsize='x-large')
+				ax.set_ylabel('Chromosome %d (Mb)' % chr2, fontsize='x-large')
 			if yi < 4:
 				ax.spines['top'].set_visible(False)
 				ax.xaxis.set_visible(False)
@@ -563,12 +563,53 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.7, 0.3, 0.012, 0.2])
+	cax = f.add_axes([0.65, 0.3, 0.01, 0.2])
 	cb = pylab.colorbar(scatter_plot, cax=cax)
 	cb.set_label('Pairwise correlation ($r^2$)', fontsize='x-large')
 	#cb.set_tick_params(fontsize='x-large')
 	f.savefig(r2_plot_file_prefix + '.png', format='png')
-	#f.savefig(r2_plot_file_prefix + '.pdf', format='pdf')
+
+
+	for yi, chr2 in enumerate(chromosomes):
+		for xi, chr1 in enumerate(chromosomes[:chr2]):
+
+			ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi],
+					rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
+			ax.spines['right'].set_visible(False)
+			ax.spines['bottom'].set_visible(False)
+			#ax.tick_params(fontsize='x-large')
+			if xi > 0:
+				ax.spines['left'].set_visible(False)
+				ax.yaxis.set_visible(False)
+			else:
+				ax.yaxis.set_ticks_position('left')
+				ax.set_ylabel('Chromosome %d (Mb)' % chr2, fontsize='x-large')
+			if yi < 4:
+				ax.spines['top'].set_visible(False)
+				ax.xaxis.set_visible(False)
+			else:
+				ax.xaxis.set_ticks_position('top')
+				ax.xaxis.set_label_position('top')
+				ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
+				#ax.set_xlabel('Chromosome %d' % chr1)
+
+			l_zxy = zip(chr_res_dict[(chr1, chr2)]['pval'], chr_res_dict[(chr1, chr2)]['x_pos'],
+				chr_res_dict[(chr1, chr2)]['y_pos'])
+			l_zxy.sort()
+			l = map(list, zip(*l_zxy))
+			zs = l[0]
+			xs = map(lambda x: x / 1000000.0, l[1])
+			ys = map(lambda x: x / 1000000.0, l[2])
+
+			scatter_plot = ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
+			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
+				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
+
+	cax = f.add_axes([0.65, 0.3, 0.01, 0.2])
+	cb = pylab.colorbar(scatter_plot, cax=cax)
+	cb.set_label('Pairwise correlation ($r^2$)', fontsize='x-large')
+	#cb.set_tick_params(fontsize='x-large')
+	f.savefig(pval_file_prefix + '.png', format='png')
 
 
 
