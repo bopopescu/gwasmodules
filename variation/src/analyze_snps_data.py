@@ -508,10 +508,10 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	tot_num_bases = float(sum(chrom_sizes))
 	rel_chrom_sizes = map(lambda x: 0.89 * (x / tot_num_bases), chrom_sizes)
 	rel_cum_chrom_sizes = map(lambda x: 0.99 * (x / tot_num_bases), cum_chrom_sizes)
-	print rel_chrom_sizes, rel_cum_chrom_sizes
 	for i in range(5):
 		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01
 	chromosome_ends = {1:30425061, 2:19694800, 3:23456476, 4:18578714, 5:26974904}
+	print rel_chrom_sizes, rel_cum_chrom_sizes
 
 	chr_res_dict = load_chr_res_dict()
 	max_pval = -math.log10(min_float)
@@ -529,14 +529,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	for yi, chr2 in enumerate(chromosomes):
 		for xi, chr1 in enumerate(chromosomes[:chr2]):
 
-			x_corr = 0
-			if xi == 0:
-				x_corr = 0.01
-			y_corr = 0
-			if yi == 0:
-				y_corr = 0.01
-				ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi] + 0.01,
-						rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
+			ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi] + 0.01,
+					rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			if xi > 0:
