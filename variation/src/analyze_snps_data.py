@@ -522,8 +522,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 	vmin = 0.0
 	f = pylab.figure(figsize=(40, 40))
 	chromosomes = [1, 2, 3, 4, 5]
-	r2_plot_file_name = file_prefix + '_r2s.png'
-	pval_file_name = file_prefix + '_pvals.png'
+	r2_plot_file_prefix = file_prefix + '_r2s'
+	pval_file_prefix = file_prefix + '_pvals'
 
 
 	for yi, chr2 in enumerate(chromosomes):
@@ -561,7 +561,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 			#pylab.colorbar()
-	f.savefig(r2_plot_file_name, format='png')
+	f.savefig(r2_plot_file_prefix + '.png', format='png')
+	f.savefig(r2_plot_file_prefix + '.pdf', format='pdf')
 
 
 
