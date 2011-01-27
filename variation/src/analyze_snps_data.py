@@ -540,7 +540,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 			else:
 				ax.yaxis.set_ticks_position('left')
 				ax.set_ylabel('Chromosome %d' % chr2)
-			if yi < 5:
+			if yi < 4:
 				ax.spines['top'].set_visible(False)
 				#ax.xaxis.set_ticks_position('none')
 				ax.xaxis.set_visible(False)
