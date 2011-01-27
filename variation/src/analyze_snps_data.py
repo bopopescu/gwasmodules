@@ -305,7 +305,7 @@ def run_r2_calc():
 #	return res_dict
 
 
-def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
+def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']
 	if os.path.isfile(file_prefix + '.pickled'):
 		print 'Loading pickled data..'
