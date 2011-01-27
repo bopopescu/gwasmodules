@@ -534,7 +534,7 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min015'):
 					rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
-			ax.tick_params(fontsize='x-large')
+			#ax.tick_params(fontsize='x-large')
 			if xi > 0:
 				ax.spines['left'].set_visible(False)
 				ax.yaxis.set_visible(False)
