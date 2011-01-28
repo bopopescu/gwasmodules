@@ -389,6 +389,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 	@classmethod
 	def getGeneAnnotation(cls, tax_id=3702, cls_with_db_args=None):
 		"""
+		2011-1-27
+			db.get_gene_id2model() returns 3 objects now. Make sure only the first 2 are needed.
 		2009-1-15
 			add argument cls_with_db_args to get drivername, username, dbname, etc.
 		2008-12-16
@@ -406,7 +408,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				   password=cls_with_db_args.db_passwd, hostname=cls_with_db_args.hostname, database='genome', \
 				   schema=getattr(cls_with_db_args, 'schema', None))
 		db.setup(create_tables=False)
-		gene_id2model, chr_id2gene_id_ls = db.get_gene_id2model(tax_id=tax_id)
+		gene_id2model, chr_id2gene_id_ls, = db.get_gene_id2model(tax_id=tax_id)[:2]
 		gene_annotation = PassingData()
 		gene_annotation.gene_id2model = gene_id2model
 		gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
