@@ -1,11 +1,11 @@
 
 BoostPythonTarget	= GADA.so
-BoostPythonLib  = -lboost_python
+BoostPythonLib  = -lboost_python -L ~/lib64/boost/lib
 # 2010-6-8 "-L ~/lib64/boost/lib" removed from BoostPythonLib. "-lboost_python-mt" changed to "-lboost_python"
 CFLAGS	= -O3
 CXXFLAGS	= -fPIC $(CFLAGS)
 SharedLibFlags	= -shared -fPIC
-IncludeDirs = `python-config --includes`
+IncludeDirs = `python-config --includes` -I ~/lib64/boost/include
 # 2010-6-8 "-I ~/lib64/boost/include/" removed from IncludeDirs
 CXXCOMPILER = g++
 
