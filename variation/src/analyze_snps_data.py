@@ -15,7 +15,7 @@ import math
 import random
 min_float = 5e-324
 
-def test_correlation(sample_num=500, mac_filter=15, debug_filter=1):
+def test_correlation(sample_num=500, mac_filter=15, debug_filter=0.05):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
@@ -31,7 +31,7 @@ def test_correlation(sample_num=500, mac_filter=15, debug_filter=1):
 
 	snps_file = env['data_dir'] + 'snps_trans_kinship_cm72.pickled'
 	if not os.path.isfile(snps_file):
-		snps = self.getSnps(debug_filter)
+		snps = sd.getSnps(debug_filter)
 		snps_mat = sp.mat(snps)
 		snps_mat = snps_mat * H_sqrt_inv
 		with open(snps_file) as f:
