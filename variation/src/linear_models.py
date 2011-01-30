@@ -501,6 +501,28 @@ class LinearModel(object):
 
 
 
+def cholesky(V):
+	try:
+		H_sqrt = sp.mat(linalg.cholesky(V))
+	except Exception, err_str:
+		import rpy2
+		from rpy2 import robjects
+		robjects.r.library('Matrix')
+		robjects.r("""
+		f <- function(v,len){
+			m <- matrix(v,len,len);
+		  	return(as.matrix(nearPD(m)['mat'][[1]]));
+		}
+		""")
+		import rpy2.robjects.numpy2ri
+		near_V = sp.array(robjects.r.f(sp.array(V), len(V)))
+		rel_change = (near_V - V) / V
+		avg_rel_change = sp.average(sp.absolute(rel_change))
+		max_rel_change = rel_change.max()
+		print 'Average absolute relative change in matrix: %0.6f' % avg_rel_change
+		print 'Maximum relative change in matrix: %0.6f' % max_rel_change
+		H_sqrt = sp.mat(linalg.cholesky(near_V))
+	return H_sqrt
 
 
 
@@ -2406,6 +2428,12 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='single'):
 	return filter_k_for_accessions(sp.mat(k, dtype=dtype), k_accessions, accessions)
 
 
+def save_kinship_to_file(kinship_file, kinship_mat, k_accessions):
+	with open(kinship_file, 'wb') as f:
+		cPickle.dump([kinship_mat, k_accessions], f)
+
+
+
 def save_kinship_in_text_format(filename, k, accessions):
 	with open(filename, 'w') as f:
 		for acc, row in it.izip(accessions, k):
@@ -2526,25 +2554,7 @@ def _test_joint_analysis_():
 		m_i += num_ets1
 
 	print'Performing Cholesky decomposition'
-	try:
-		H_sqrt = linalg.cholesky(V)
-	except Exception, err_str:
-		import rpy
-		rpy.r.library('Matrix')
-		rpy.r("""
-		f <- function(v,len){
-			m <- matrix(v,len,len);
-		  	return(as.matrix(nearPD(m)['mat'][[1]]));
-		}
-		""")
-		near_V = rpy.r.f(V, len(V))
-
-		rel_change = (near_V - V) / V
-		avg_rel_change = sp.average(sp.absolute(rel_change))
-		max_rel_change = rel_change.max()
-		print 'Average relative change in matrix: %0.6f' % avg_rel_change
-		print 'Maximum relative change in matrix: %0.6f' % max_rel_change
-		H_sqrt = linalg.cholesky(near_V)
+	H_sqrt = cholesky(V)
 	H_sqrt_inv = sp.mat(H_sqrt.T).I
 
 	#pdb.set_trace()

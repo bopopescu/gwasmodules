@@ -15,98 +15,118 @@ import math
 import random
 min_float = 5e-324
 
-def test_correlation(num_y=30, num_x=30, mac_filter=15, debug_filter=1):
+def test_correlation(sample_num=200, mac_filter=15, debug_filter=1):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
 	sd.filter_mac_snps(mac_filter)
-	K = lm.load_kinship_from_file(env['data_dir'] + 'kinship_matrix_cm72.pickled',
-				sd.accessions)
+	K = sd.get_snp_cov_matrix()
+	lm.save_kinship_to_file(env['data_dir'] + 'snp_corr_kinship_cm72.pickled', K, sd.accessions)
+	H_sqrt = lm.cholesky(K)
+	H_sqrt_inv = (H_sqrt).I
+
 	cps_list = sd.getChrPosSNPList()
 	l = range(len(cps_list))
-	y_sample = random.sample(l, num_y)
+	y_sample = random.sample(l, sample_num)
 	for i in reversed(sorted(y_sample)):
 		del l[i]
-	x_sample = random.sample(l, num_x)
-	print y_sample, x_sample
+	x_sample = random.sample(l, sample_num)
+	#print y_sample, x_sample
 	q = 1  # Single SNP is being tested
 	p = 2
 	n = len(sd.accessions)
 	n_p = n - p
 
 	res_d = {}
-	for ys, xs in [(y_sample, x_sample), (x_sample, y_sample)]:
-		for i, yi in enumerate(ys):
-			(y_c, y_p, y_snp) = cps_list[yi]
-			y_snp = y_snp / sp.std(y_snp)
-			print 'Y_%d: chromosome=%d, position=%d' % (i, y_c, y_p)
-			#get the EMMA REML
-			res = lm.get_emma_reml_estimates(y_snp, K)
-			print 'Pseudo-heritability:', res['pseudo_heritability']
-			h_sqrt_inv = res['H_sqrt_inv']
-			h0_X = res['X_t']
-			Y = res['Y_t']	#The transformed outputs.
-			std_Y = sp.std(Y)
-			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-			for j, xi in enumerate(xs):
-				(x_c, x_p, x_snp) = cps_list[xi]
-				x_snp = x_snp / sp.std(x_snp)
-				(r, pearson_pval) = st.pearsonr(x_snp, y_snp) #Done twice, but this is fast..
-				r2 = r * r
-				#Do EMMAX
-				xt = x_snp * h_sqrt_inv
-				(b, rss, p, s) = linalg.lstsq(sp.hstack([h0_X, sp.matrix(xt).T]), Y)
+	for i, yi in enumerate(y_sample):
+		(y_c, y_p, y_snp) = cps_list[yi]
+		y_snp = (y_snp - sp.mean(y_snp)) / sp.std(y_snp)
+		print 'Y_%d: chromosome=%d, position=%d' % (i, y_c, y_p)
+		y_snp_t = y_snp * H_sqrt_inv 	#The transformed outputs.
+		for j, xi in enumerate(x_sample):
+			(x_c, x_p, x_snp) = cps_list[xi]
+			x_snp = (x_snp - sp.mean(x_snp)) / sp.std(x_snp)
+			x_snp_t = x_snp * H_sqrt_inv
+			(r, pearson_pval) = st.pearsonr(x_snp, y_snp)
+			r2 = r * r
+			(r_t, pearson_pval_t) = st.pearsonr(x_snp_t.T, y_snp_t.T)
+			r2_t = r_t * r_t
+			res_d[(yi, xi)] = [r2_t[0], r2, pearson_pval, pearson_pval_t[0]]
 
-				if rss:
-					f_stat = (h0_rss / rss[0] - 1) * n_p / float(q)
-					emma_pval = st.f.sf(f_stat, q, n_p)[0]
-					beta = b[1, 0]
-					emmax_r = beta * (std_Y / sp.std(xt))
-					emmax_r2 = emmax_r * emmax_r
-					#res_d[(yi, xi)] = emmax_r
-					res_d[(yi, xi)] = [emma_pval, r2]
+	xs = []
+	for yi, xi in res_d:
+		xs.append(res_d[(yi, xi)][0])
+	pylab.hist(xs, bins=20, log=True)
+	pylab.xlabel('Transformed $r^2$')
+	pylab.savefig(env['results_dir'] + 'r2_t_hist.png')
+
+
+	pylab.clf()
+
+#	#xs = -sp.log10(xs)
+#	#ys = -sp.log10(ys)
+#	pylab.plot(xs, ys, '.', markersize=2)
+#	pylab.savefig(env['results_dir'] + 'norm_emma_log_pvals.png')
+#	pylab.clf()
+
+	xs = []
+	for yi, xi in res_d:
+		xs.append(res_d[(yi, xi)][1])
+	pylab.hist(xs, bins=20, log=True)
+	pylab.xlabel('Standard $r^2$')
+	pylab.savefig(env['results_dir'] + 'r2_hist.png')
+	pylab.clf()
+
 
 	xs = []
 	ys = []
 	for yi, xi in res_d:
-		if yi < xi:
-			ys.append(res_d[(yi, xi)][0])
-			xs.append(res_d[(xi, yi)][0])
+		ys.append(res_d[(yi, xi)][0])
+		xs.append(res_d[(yi, xi)][1])
+	x_max = max(xs)
+	y_max = max(ys)
+	lim = min(x_max, y_max)
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'norm_emma_pvals.png')
+	pylab.plot([0, lim], [0, lim], color='g', alpha=0.5)
+	pylab.xlabel('Standard $r^2$')
+	pylab.ylabel('Transformed $r^2$')
+	pylab.savefig(env['results_dir'] + 'r2_r2_t.png')
 	pylab.clf()
 
+	pylab.hexbin(xs, ys)
+	pylab.xlabel('Standard $r^2$')
+	pylab.ylabel('Transformed $r^2$')
+	cb = pylab.colorbar()
+	cb.set_label('Count')
+	pylab.savefig(env['results_dir'] + 'r2_r2_t_3Dhist.png')
+	pylab.clf()
+
+	xs = []
+	ys = []
+	for yi, xi in res_d:
+		ys.append(res_d[(yi, xi)][3])
+		xs.append(res_d[(yi, xi)][2])
 	xs = -sp.log10(xs)
 	ys = -sp.log10(ys)
+	x_max = max(xs)
+	y_max = max(ys)
+	lim = min(x_max, y_max)
 	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'norm_emma_log_pvals.png')
+	pylab.plot([0, lim], [0, lim], color='g', alpha=0.5)
+	pylab.xlabel('Standard $r^2$ -log(p-value)')
+	pylab.ylabel('Transformed $r^2$ -log(p-value)')
+	pylab.savefig(env['results_dir'] + 'pval_pval_t.png')
 	pylab.clf()
 
-	xs = []
-	ys = []
-	for yi, xi in res_d:
-		if yi < xi:
-			ys.append(res_d[(yi, xi)][1])
-			xs.append(res_d[(xi, yi)][1])
-	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'norm_r2.png')
-	pylab.clf()
-
-	xs = []
-	ys = []
-	for yi, xi in res_d:
-		if yi < xi:
-			ys.append(res_d[(yi, xi)][0])
-			xs.append(res_d[(xi, yi)][1])
-			xs.append(res_d[(yi, xi)][1])
-			ys.append(res_d[(xi, yi)][0])
-	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'norm_r2_emma_pval.png')
-	pylab.clf()
-
-	ys = -sp.log10(ys)
-	pylab.plot(xs, ys, '.', markersize=2)
-	pylab.savefig(env['results_dir'] + 'norm_r2_emma_pval.png')
+	pylab.hexbin(xs, ys)
+	pylab.xlabel('Standard $r^2$ -log(p-value)')
+	pylab.ylabel('Transformed $r^2$ -log(p-value)')
+	cb = pylab.colorbar()
+	cb.set_label('Count')
+	pylab.savefig(env['results_dir'] + 'pval_pval_t_3Dhist.png')
+#	ys = -sp.log10(ys)
+#	pylab.plot(xs, ys, '.', markersize=2)
+#	pylab.savefig(env['results_dir'] + 'norm_r2_emma_pval.png')
 
 
 
@@ -722,6 +742,6 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 
 if __name__ == "__main__":
 	#load_and_plot_r2_results()
-	plot_r2_results()
+	#plot_r2_results()
 	#plot_pval_emmax_correlations()
-	#test_correlation()
+	test_correlation()

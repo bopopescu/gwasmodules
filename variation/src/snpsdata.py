@@ -2819,6 +2819,19 @@ class SNPsDataSet:
 		return k_mat
 
 
+	def get_snp_cov_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
+		print 'Starting covariance calculation'
+		snps = self.getSnps(debug_filter)
+		snps_array = sp.array(snps)
+		snps_array = snps_array.T
+		#Normalizing
+		norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+		accession_means = sp.mean(norm_snps_array, 1)
+		x = sp.mat(norm_snps_array.T - accession_means)
+		cov_mat = x.T * x / len(snps)
+		print 'Finished calculating covariance matrix'
+		return cov_mat
+
 
 
 	def convert_2_binary(self):
