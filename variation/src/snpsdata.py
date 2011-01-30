@@ -2821,17 +2821,25 @@ class SNPsDataSet:
 
 	def get_snp_cov_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
 		print 'Starting covariance calculation'
-		snps = self.getSnps(debug_filter)
-		snps_array = sp.array(snps)
-		snps_array = snps_array.T
 		#Normalizing
-		norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+		norm_snps_array = self.get_normalized_snps(debug_filter=debug_filter, dtype=dtype)
 		accession_means = sp.mean(norm_snps_array, 1)
 		x = sp.mat(norm_snps_array.T - accession_means)
 		cov_mat = x.T * x / (len(snps) - 1)
 		print 'Finished calculating covariance matrix'
 		return cov_mat
 
+
+
+	def get_normalized_snps(self, debug_filter=1, dtype='single'):
+		print 'Normalizing SNPs'
+		snps = self.getSnps(debug_filter)
+		snps_array = sp.array(snps)
+		snps_array = snps_array.T
+		#Normalizing
+		norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+		print 'Finished normalizing them'
+		return norm_snps_array
 
 
 

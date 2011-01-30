@@ -13,61 +13,59 @@ import os
 import cPickle
 import math
 import random
+import pdb
 min_float = 5e-324
 
-def test_correlation(sample_num=500, mac_filter=15, debug_filter=0.05):
+def test_correlation(sample_num=100, mac_filter=15, debug_filter=0.05):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
 	sd.filter_mac_snps(mac_filter)
+	snps = sd.getSnps()[:]
 	kinship_matrix_file = env['data_dir'] + 'snp_corr_kinship_cm72.pickled'
 	if not os.path.isfile(kinship_matrix_file):
 		K = sd.get_snp_cov_matrix()
 		lm.save_kinship_to_file(kinship_matrix_file, K, sd.accessions)
-	#else:
-	K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
+	else:
+		K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
 	H_sqrt = lm.cholesky(K)
 	H_sqrt_inv = (H_sqrt).I
 
-	snps_file = env['data_dir'] + 'snps_trans_kinship_cm72.pickled'
-	if not os.path.isfile(snps_file):
-		snps = sd.getSnps(debug_filter)
-		snps_mat = sp.mat(snps)
-		snps_mat = snps_mat * H_sqrt_inv
-		with open(snps_file) as f:
-			cPickle.dump(snps_mat.tolist(), f)
+	t_snps_file = env['data_dir'] + 'snps_trans_kinship_cm72.pickled'
+	if not os.path.isfile(t_snps_file):
+		if os.path.isfile(kinship_matrix_file):
+			n_snps_mat = sd.get_normalized_snps().T
+		t_snps_mat = n_snps_mat * H_sqrt_inv
+		t_snps = t_snps_mat.tolist()
+		with open(t_snps_file, 'wb') as f:
+			cPickle.dump(t_snps, f)
 	else:
-		with open(snps_file) as f:
-			snps_mat = sp.mat(cPickle.load(snps_file))
+		with open(t_snps_file) as f:
+			t_snps = cPickle.load(f)
 
-	cps_list = sd.getChrPosSNPList()
-	l = range(len(cps_list))
+	cp_list = sd.getChrPosList()
+	l = range(len(cp_list))
 	y_sample = random.sample(l, sample_num)
 	for i in reversed(sorted(y_sample)):
 		del l[i]
 	x_sample = random.sample(l, sample_num)
-	#print y_sample, x_sample
-	q = 1  # Single SNP is being tested
-	p = 2
-	n = len(sd.accessions)
-	n_p = n - p
 
 	res_d = {}
-	for i, yi in enumerate(y_sample):
-		(y_c, y_p, y_snp) = cps_list[yi]
-
-		y_snp = (y_snp - sp.mean(y_snp)) / sp.std(y_snp)
-		print 'Y_%d: chromosome=%d, position=%d' % (i, y_c, y_p)
-		y_snp_t = y_snp * H_sqrt_inv 	#The transformed outputs.
-		for j, xi in enumerate(x_sample):
-			(x_c, x_p, x_snp) = cps_list[xi]
-			x_snp = (x_snp - sp.mean(x_snp)) / sp.std(x_snp)
-			x_snp_t = x_snp * H_sqrt_inv
+	for i, xi in enumerate(x_sample):
+		(x_c, x_p) = cp_list[xi]
+		x_snp = snps[xi]
+		x_snp_t = t_snps[xi]
+		print 'SNP %d: chromosome=%d, position=%d' % (i, x_c, x_p)
+		for j, yi in enumerate(y_sample):
+			#pdb.set_trace()
+			(y_c, y_p) = cp_list[yi]
+			y_snp = snps[yi]
+			y_snp_t = t_snps[yi]
 			(r, pearson_pval) = st.pearsonr(x_snp, y_snp)
 			r2 = r * r
-			(r_t, pearson_pval_t) = st.pearsonr(x_snp_t.T, y_snp_t.T)
+			(r_t, pearson_pval_t) = st.pearsonr(x_snp_t, y_snp_t)
 			r2_t = r_t * r_t
-			res_d[(yi, xi)] = [r2_t[0], r2, pearson_pval, pearson_pval_t[0]]
+			res_d[(yi, xi)] = [r2_t, r2, pearson_pval, pearson_pval_t]
 
 	xs = []
 	for yi, xi in res_d:
