@@ -2433,7 +2433,7 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='single'):
 
 def save_kinship_to_file(kinship_file, kinship_mat, k_accessions):
 	with open(kinship_file, 'wb') as f:
-		cPickle.dump([sp.array(kinship_mat), k_accessions], f)
+		cPickle.dump([sp.array(kinship_mat).tolist(), k_accessions], f)
 
 
 
