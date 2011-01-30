@@ -2834,6 +2834,7 @@ class SNPsDataSet:
 
 
 
+
 	def convert_2_binary(self):
 		"""
 		Converts the underlying raw data format to a binary one, i.e. A,C,G,T,NA,etc. are converted to 0,1,-1

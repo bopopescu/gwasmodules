@@ -15,7 +15,7 @@ import math
 import random
 min_float = 5e-324
 
-def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
+def test_correlation(sample_num=500, mac_filter=15, debug_filter=1):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
@@ -28,6 +28,17 @@ def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
 	K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
 	H_sqrt = lm.cholesky(K)
 	H_sqrt_inv = (H_sqrt).I
+
+	snps_file = env['data_dir'] + 'snps_trans_kinship_cm72.pickled'
+	if not os.path.isfile(snps_file):
+		snps = self.getSnps(debug_filter)
+		snps_mat = sp.mat(snps)
+		snps_mat = snps_mat * H_sqrt_inv
+		with open(snps_file) as f:
+			cPickle.dump(snps_mat.tolist(), f)
+	else:
+		with open(snps_file) as f:
+			snps_mat = sp.mat(cPickle.load(snps_file))
 
 	cps_list = sd.getChrPosSNPList()
 	l = range(len(cps_list))
@@ -44,6 +55,7 @@ def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
 	res_d = {}
 	for i, yi in enumerate(y_sample):
 		(y_c, y_p, y_snp) = cps_list[yi]
+
 		y_snp = (y_snp - sp.mean(y_snp)) / sp.std(y_snp)
 		print 'Y_%d: chromosome=%d, position=%d' % (i, y_c, y_p)
 		y_snp_t = y_snp * H_sqrt_inv 	#The transformed outputs.
