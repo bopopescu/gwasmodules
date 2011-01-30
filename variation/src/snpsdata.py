@@ -2828,7 +2828,7 @@ class SNPsDataSet:
 		norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 		accession_means = sp.mean(norm_snps_array, 1)
 		x = sp.mat(norm_snps_array.T - accession_means)
-		cov_mat = x.T * x / len(snps)
+		cov_mat = x.T * x / (len(snps) - 1)
 		print 'Finished calculating covariance matrix'
 		return cov_mat
 

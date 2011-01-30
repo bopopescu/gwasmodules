@@ -15,13 +15,17 @@ import math
 import random
 min_float = 5e-324
 
-def test_correlation(sample_num=200, mac_filter=15, debug_filter=1):
+def test_correlation(sample_num=1000, mac_filter=15, debug_filter=0.1):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
 	sd.filter_mac_snps(mac_filter)
-	K = sd.get_snp_cov_matrix()
-	lm.save_kinship_to_file(env['data_dir'] + 'snp_corr_kinship_cm72.pickled', K, sd.accessions)
+	kinship_matrix_file = env['data_dir'] + 'snp_corr_kinship_cm72.pickled'
+	if not os.path.isfile(kinship_matrix_file):
+		K = sd.get_snp_cov_matrix()
+		lm.save_kinship_to_file(kinship_matrix_file, K, sd.accessions)
+	#else:
+	K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
 	H_sqrt = lm.cholesky(K)
 	H_sqrt_inv = (H_sqrt).I
 
