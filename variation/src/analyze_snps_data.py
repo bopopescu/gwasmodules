@@ -16,7 +16,7 @@ import random
 import pdb
 min_float = 5e-324
 
-def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
+def test_correlation(sample_num=4000, mac_filter=15, debug_filter=0.05):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
@@ -28,11 +28,18 @@ def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
 		lm.save_kinship_to_file(kinship_matrix_file, K, sd.accessions)
 	else:
 		K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
-	H_sqrt = lm.cholesky(K)
-	H_sqrt_inv = (H_sqrt).I
+	h_inverse_matrix_file = env['data_dir'] + 'snp_corr_kinship_h_inv_cm72.pickled'
+	if not os.path.isfile(h_inverse_matrix_file):
+		H_sqrt = lm.cholesky(K)
+		H_sqrt_inv = (H_sqrt).I
+		with file(h_inverse_matrix_file, 'wb') as f:
+			cPickle.dump(H_sqrt_inv.tolist(), f)
+	else:
+		with file(h_inverse_matrix_file) as f:
+			H_sqrt_inv = sp.mat(cPickle.load(f))
 
 	t_snps_file = env['data_dir'] + 'snps_trans_kinship_cm72.pickled'
-	if not os.path.isfile(t_snps_file):
+	if debug_filter < 1 or not os.path.isfile(t_snps_file):
 		if os.path.isfile(kinship_matrix_file):
 			n_snps_mat = sd.get_normalized_snps().T
 		t_snps_mat = n_snps_mat * H_sqrt_inv
@@ -63,9 +70,14 @@ def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
 			y_snp_t = t_snps[yi]
 			(r, pearson_pval) = st.pearsonr(x_snp, y_snp)
 			r2 = r * r
-			(r_t, pearson_pval_t) = st.pearsonr(x_snp_t, y_snp_t)
-			r2_t = r_t * r_t
-			res_d[(yi, xi)] = [r2_t, r2, pearson_pval, pearson_pval_t]
+			if r2 > 0.05:
+				(r_t, pearson_pval_t) = st.pearsonr(x_snp_t, y_snp_t)
+				r2_t = r_t * r_t
+				if pearson_pval == 0:
+					pearson_pval = min_float
+				if pearson_pval_t == 0:
+					pearson_pval_t = min_float
+				res_d[(yi, xi)] = [r2_t, r2, pearson_pval, pearson_pval_t]
 
 	xs = []
 	for yi, xi in res_d:
@@ -138,6 +150,8 @@ def test_correlation(sample_num=100, mac_filter=15, debug_filter=1):
 	cb = pylab.colorbar()
 	cb.set_label('Count')
 	pylab.savefig(env['results_dir'] + 'pval_pval_t_3Dhist.png')
+
+
 #	ys = -sp.log10(ys)
 #	pylab.plot(xs, ys, '.', markersize=2)
 #	pylab.savefig(env['results_dir'] + 'norm_r2_emma_pval.png')
@@ -153,6 +167,22 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=15, save_thresho
 	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
 					filter=debug_filter)
 	sd.filter_mac_snps(mac_filter)
+	h_inverse_matrix_file = env['data_dir'] + 'snp_corr_kinship_h_inv_cm72.pickled'
+	if not os.path.isfile(h_inverse_matrix_file):
+		kinship_matrix_file = env['data_dir'] + 'snp_corr_kinship_cm72.pickled'
+		if not os.path.isfile(kinship_matrix_file):
+			K = sd.get_snp_cov_matrix()
+			lm.save_kinship_to_file(kinship_matrix_file, K, sd.accessions)
+		else:
+			K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
+		H_sqrt = lm.cholesky(K)
+		H_sqrt_inv = (H_sqrt).I
+		with file(h_inverse_matrix_file, 'wb') as f:
+			cPickle.dump(H_sqrt_inv, f)
+	else:
+		with file(h_inverse_matrix_file) as f:
+			H_sqrt_inv = cPickle.load(f)
+
 	cps_list = sd.getChrPosSNPList()
 	x_cps = cps_list[x_start_i:x_stop_i]
 	y_cps = cps_list
@@ -163,12 +193,20 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=15, save_thresho
 	n_p = n - p
 	for i, (x_c, x_p, x_snp) in enumerate(x_cps):
 		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
+		#Normalize SNP..
+		xs = sp.array(x_snp)
+		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv)
 		for (y_c, y_p, y_snp) in y_cps:
 			if (x_c, x_p) < (y_c, y_p):
-				(r, pearson_pval) = st.pearsonr(x_snp, y_snp) #Done twice, but this is fast..
+				ys = sp.array(y_snp)
+				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
 				if r2 > save_threshold:
-					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval])
+					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv)
+					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
+					t_r2 = t_r * t_r
+					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, \
+								t_r2, t_pearson_pval])
 	file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".csv"
 	with open(file_name, 'w') as f:
 		for r in result_list:
@@ -282,8 +320,6 @@ def run_parallel(x_start_i, x_stop_i):
 
 
 def run_r2_calc():
-	if len(sys.argv) > 3:
-		calc_r2_levels_w_mixed_model(env['results_dir'] + '250K_r2_min01', int(sys.argv[1]), int(sys.argv[2]))
 	if len(sys.argv) > 2:
 		calc_r2_levels(env['results_dir'] + '250K_r2_min01_mac15', int(sys.argv[1]), int(sys.argv[2]))
 	else:
@@ -338,9 +374,29 @@ def run_r2_calc():
 #		f.close()
 #	return res_dict
 
+def _load_r2_res_file_(file_name, res_dict):
+	try:
+		with open(file_name) as f:
+			for line in f:
+				l = map(str.strip, line.split(delim))
+				for j, st in enumerate(l):
+					h = headers[j]
+					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
+						res_dict[h].append(int(st))
+					elif h in ['pval']:
+						v = float(st)
+						res_dict[h].append(v if v != 0.0 else min_float)
+					elif h in ['r2']:
+						res_dict[h].append(float(st))
+					else:
+						raise Exception('Unknown value')
+	except Exception, err_str:
+		print "Problems with file %s: %s" % (file_name, err_str)
+
+
 
 def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']
+	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	if os.path.isfile(file_prefix + '.pickled'):
 		print 'Loading pickled data..'
 		f = open(file_prefix + '.pickled', 'rb')
@@ -357,24 +413,8 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 		delim = ','
 		for i in range(0, num_snps, chunck_size):
 			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
+			_load_r2_res_file_(file_name, res_dict)
 			print i
-			try:
-				f = open(file_name)
-				for line in f:
-					l = map(str.strip, line.split(delim))
-					for j, st in enumerate(l):
-						h = headers[j]
-						if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
-							res_dict[h].append(int(st))
-						elif h in ['pval']:
-							v = float(st)
-							res_dict[h].append(v if v != 0.0 else min_float)
-						elif h in ['r2']:
-							res_dict[h].append(float(st))
-						else:
-							raise Exception('Unknown value')
-			except Exception, err_str:
-				print "Problems with file %s: %s" % (file_name, err_str)
 		f = open(file_prefix + '.pickled', 'wb')
 		cPickle.dump(res_dict, f, 2)
 		f.close()
@@ -383,7 +423,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 
 
 def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.3, 400000), (0.2, 1000000)], final_r2_thres=0.1):
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval']#, 'f_stat', 'emmax_pval', 'beta', 'emmax_r2']
+	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
 	chromosomes = [1, 2, 3, 4, 5]
@@ -559,50 +599,53 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 	vmin = 0.2
 	f = pylab.figure(figsize=(50, 46))
 	chromosomes = [1, 2, 3, 4, 5]
-	r2_plot_file_prefix = file_prefix + '_r2s'
-	pval_file_prefix = file_prefix + '_pvals'
+	plot_info = [('r2', file_prefix + '_r2s', 'Pairwise correlation ($r^2$)'),
+			('pval', file_prefix + '_pvals', 'Correlation p-value'),
+			('t_r2', file_prefix + '_t_r2', 'Pairwise correlation between transformed SNPs'),
+			('t_pval', file_prefix + '_t_pvals', 'Correlation p-value for pairs of transformed SNPs')]
 
 
-	for yi, chr2 in enumerate(chromosomes):
-		for xi, chr1 in enumerate(chromosomes[:chr2]):
+	for h, plot_file_name, label in plot_info:
+		for yi, chr2 in enumerate(chromosomes):
+			for xi, chr1 in enumerate(chromosomes[:chr2]):
 
-			ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi],
-					rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
-			ax.spines['right'].set_visible(False)
-			ax.spines['bottom'].set_visible(False)
-			#ax.tick_params(fontsize='x-large')
-			if xi > 0:
-				ax.spines['left'].set_visible(False)
-				ax.yaxis.set_visible(False)
-			else:
-				ax.yaxis.set_ticks_position('left')
-				ax.set_ylabel('Chromosome %d (Mb)' % chr2, fontsize='x-large')
-			if yi < 4:
-				ax.spines['top'].set_visible(False)
-				ax.xaxis.set_visible(False)
-			else:
-				ax.xaxis.set_ticks_position('top')
-				ax.xaxis.set_label_position('top')
-				ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
-				#ax.set_xlabel('Chromosome %d' % chr1)
+				ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi],
+						rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
+				ax.spines['right'].set_visible(False)
+				ax.spines['bottom'].set_visible(False)
+				#ax.tick_params(fontsize='x-large')
+				if xi > 0:
+					ax.spines['left'].set_visible(False)
+					ax.yaxis.set_visible(False)
+				else:
+					ax.yaxis.set_ticks_position('left')
+					ax.set_ylabel('Chromosome %d (Mb)' % chr2, fontsize='x-large')
+				if yi < 4:
+					ax.spines['top'].set_visible(False)
+					ax.xaxis.set_visible(False)
+				else:
+					ax.xaxis.set_ticks_position('top')
+					ax.xaxis.set_label_position('top')
+					ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
+					#ax.set_xlabel('Chromosome %d' % chr1)
 
-			l_zxy = zip(chr_res_dict[(chr1, chr2)]['r2'], chr_res_dict[(chr1, chr2)]['x_pos'],
-				chr_res_dict[(chr1, chr2)]['y_pos'])
-			l_zxy.sort()
-			l = map(list, zip(*l_zxy))
-			zs = l[0]
-			xs = map(lambda x: x / 1000000.0, l[1])
-			ys = map(lambda x: x / 1000000.0, l[2])
+				l_zxy = zip(chr_res_dict[(chr1, chr2)][h], chr_res_dict[(chr1, chr2)]['x_pos'],
+					chr_res_dict[(chr1, chr2)]['y_pos'])
+				l_zxy.sort()
+				l = map(list, zip(*l_zxy))
+				zs = l[0]
+				xs = map(lambda x: x / 1000000.0, l[1])
+				ys = map(lambda x: x / 1000000.0, l[2])
 
-			scatter_plot = ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
-			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
-				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
+				scatter_plot = ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin, vmax=1.0)
+				ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
+					- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
-	cb = pylab.colorbar(scatter_plot, cax=cax)
-	cb.set_label('Pairwise correlation ($r^2$)', fontsize='x-large')
-	#cb.set_tick_params(fontsize='x-large')
-	f.savefig(r2_plot_file_prefix + '.png', format='png')
+		cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
+		cb = pylab.colorbar(scatter_plot, cax=cax)
+		cb.set_label(label, fontsize='x-large')
+		#cb.set_tick_params(fontsize='x-large')
+		f.savefig(plot_file_name + '.png', format='png')
 
 
 	vmin = 0
@@ -755,7 +798,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 
 
 if __name__ == "__main__":
+	run_r2_calc()
 	#load_and_plot_r2_results()
 	#plot_r2_results()
 	#plot_pval_emmax_correlations()
-	test_correlation()
+	#test_correlation()
