@@ -633,7 +633,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 				l = chr_res_dict[(chr1, chr2)][h]
 				if h in ['pval', 't_pval']:
 					l = -sp.log10(l)
-				l_zxy = zip(l.tolist(), chr_res_dict[(chr1, chr2)]['x_pos'],
+					l = l.tolist()
+				l_zxy = zip(l, chr_res_dict[(chr1, chr2)]['x_pos'],
 					chr_res_dict[(chr1, chr2)]['y_pos'])
 				l_zxy.sort()
 				l = map(list, zip(*l_zxy))
