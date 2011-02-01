@@ -422,7 +422,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 
 
 
-def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.3, 400000), (0.2, 1000000)], final_r2_thres=0.1):
+def load_chr_res_dict(r2_thresholds=[(0.7, 25000), (0.6, 50000), (0.5, 100000), (0.4, 400000), (0.3, 1000000)], final_r2_thres=0.2):
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
