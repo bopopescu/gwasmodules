@@ -374,7 +374,7 @@ def run_r2_calc():
 #		f.close()
 #	return res_dict
 
-def _load_r2_res_file_(file_name, res_dict):
+def _load_r2_res_file_(file_name, res_dict, headers):
 	delim = ','
 	try:
 		with open(file_name) as f:
@@ -384,10 +384,10 @@ def _load_r2_res_file_(file_name, res_dict):
 					h = headers[j]
 					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
 						res_dict[h].append(int(st))
-					elif h in ['pval']:
+					elif h in ['pval', 't_pval']:
 						v = float(st)
 						res_dict[h].append(v if v != 0.0 else min_float)
-					elif h in ['r2']:
+					elif h in ['r2', 't_r2']:
 						res_dict[h].append(float(st))
 					else:
 						raise Exception('Unknown value')
@@ -413,7 +413,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 			res_dict[h] = []
 		for i in range(0, num_snps, chunck_size):
 			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
-			_load_r2_res_file_(file_name, res_dict)
+			_load_r2_res_file_(file_name, res_dict, headers)
 			print i
 		f = open(file_prefix + '.pickled', 'wb')
 		cPickle.dump(res_dict, f, 2)
