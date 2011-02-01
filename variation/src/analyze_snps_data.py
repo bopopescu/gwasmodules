@@ -422,7 +422,7 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 
 
 
-def load_chr_res_dict(r2_thresholds=[(0.7, 25000), (0.6, 50000), (0.5, 100000), (0.4, 400000), (0.3, 1000000)], final_r2_thres=0.2):
+def load_chr_res_dict(r2_thresholds=[(0.6, 25000), (0.5, 50000), (0.4, 100000), (0.2, 400000), (0.1, 1000000)], final_r2_thres=0.1):
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -441,7 +441,7 @@ def load_chr_res_dict(r2_thresholds=[(0.7, 25000), (0.6, 50000), (0.5, 100000), 
 		y_chr = res_dict['y_chr'][i]
 		x_pos = res_dict['x_pos'][i]
 		y_pos = res_dict['y_pos'][i]
-		r2 = res_dict['r2'][i]
+		r2 = res_dict['t_r2'][i]
 		x_chr_pos = (x_chr, x_pos)
 		y_chr_pos = (y_chr, y_pos)
 		if x_chr <= y_chr:
@@ -599,8 +599,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 	vmin = 0
 	f = pylab.figure(figsize=(50, 46))
 	chromosomes = [1, 2, 3, 4, 5]
-	plot_info = [('r2', file_prefix + '_r2s', 'Pairwise correlation ($r^2$)', 1.0),
-			('pval', file_prefix + '_pvals', 'Correlation p-value', -math.log10(min_float)),
+	plot_info = [#('r2', file_prefix + '_r2s', 'Pairwise correlation ($r^2$)', 1.0),
+			#('pval', file_prefix + '_pvals', 'Correlation p-value', -math.log10(min_float)),
 			('t_r2', file_prefix + '_t_r2', 'Pairwise correlation between transformed SNPs', 1.0),
 			('t_pval', file_prefix + '_t_pvals', 'Correlation p-value for pairs of transformed SNPs',
 			- math.log10(min_float))]
