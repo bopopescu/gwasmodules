@@ -798,8 +798,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 
 
 if __name__ == "__main__":
-	run_r2_calc()
+	#run_r2_calc()
 	#load_and_plot_r2_results()
-	#plot_r2_results()
+	plot_r2_results()
 	#plot_pval_emmax_correlations()
 	#test_correlation()
