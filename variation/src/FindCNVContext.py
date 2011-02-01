@@ -54,11 +54,15 @@ class FindCNVContext(object):
 		2008-08-19
 		"""
 		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
+														class_to_have_attr=self)
 	
 	@classmethod
 	def createGenomeRBDict(cls, genome_db, tax_id=3702, max_distance=20000, debug=False):
 		"""
+		2011-1-27
+			require Gene.start, Gene.stop, Gene.chromosome not null.
+			Gene.id is the new gene_id (was Gene.gene_id).
 		2010-10-3
 			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
 		2010-9-23
@@ -67,7 +71,8 @@ class FindCNVContext(object):
 		"""
 		sys.stderr.write("Creating a RBDict for all genes from organism %s ... \n"%tax_id)
 		genomeRBDict = RBDict()
-		query = GenomeDB.EntrezgeneMapping.query.filter_by(tax_id=tax_id)
+		query = GenomeDB.Gene.query.filter_by(tax_id=tax_id).filter(GenomeDB.Gene.start!=None).\
+			filter(GenomeDB.Gene.stop!=None).filter(GenomeDB.Gene.chromosome!=None)
 		counter = 0
 		real_counter = 0
 		for row in query:
@@ -80,7 +85,7 @@ class FindCNVContext(object):
 							min_reciprocal_overlap=1,)	#2010-8-17 any overlap short of identity is tolerated.
 			if segmentKey not in genomeRBDict:
 				genomeRBDict[segmentKey] = []
-			oneGeneData = PassingData(strand = row.strand, gene_id = row.gene_id, gene_start = row.start, \
+			oneGeneData = PassingData(strand = row.strand, gene_id = row.id, gene_start = row.start, \
 										gene_stop = row.stop, geneCommentaryRBDictLs=[])
 			counter += 1
 			for gene_commentary in row.gene_commentaries:
