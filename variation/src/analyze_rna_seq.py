@@ -126,8 +126,12 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True)
 
+		#Process top regions, where are they...
 
-def _load_results_(file_prefix=):
+
+
+def _load_results_(file_prefix=''):
+	pass
 
 
 def run_parallel_rna_seq_gwas():
