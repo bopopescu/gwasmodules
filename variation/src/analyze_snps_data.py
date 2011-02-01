@@ -375,6 +375,7 @@ def run_r2_calc():
 #	return res_dict
 
 def _load_r2_res_file_(file_name, res_dict):
+	delim = ','
 	try:
 		with open(file_name) as f:
 			for line in f:
@@ -410,7 +411,6 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 		res_dict = {}
 		for h in headers:
 			res_dict[h] = []
-		delim = ','
 		for i in range(0, num_snps, chunck_size):
 			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
 			_load_r2_res_file_(file_name, res_dict)
