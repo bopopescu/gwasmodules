@@ -454,6 +454,15 @@ class phenotype_data:
 	def is_constant(self, pid):
 		return len(sp.unique(self.phen_dict[pid]['values'])) == 1
 
+	def is_near_constant(self, pid, min_num_diff=10):
+		vals = sp.array(self.phen_dict[pid]['values'])
+		if sp.std(vals) > 0:
+			vals = 100 * vals / sp.std(vals)
+			b_counts = sp.bincount(sp.array(sp.around(vals), dtype='int'))
+			return b_counts.max() > len(vals) - min_num_diff
+		else:
+			return False
+
 	def insert_into_db(self, pids=None, phenotype_scoring='',
 			   method_description='', growth_condition='', biology_category_id='',
 			   citations='', data_description='', transformation_description=None,

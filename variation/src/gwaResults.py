@@ -2117,6 +2117,18 @@ class Result(object):
 		return zip(self.snp_results['chromosomes'], self.snp_results['positions'], self.snp_results['scores'])
 
 
+	def get_chrom_score_pos_dict(self):
+		cps_list = self.get_chr_pos_score_list()
+		d = {}
+		for chrom in [1, 2, 3, 4, 5]:
+			d[chrom] = {'scores':[], 'positions':[]}
+		for chrom, pos, score in cps_list:
+			d[chrom]['scores'].append(score)
+			d[chrom]['positions'].append(pos)
+		return d
+
+
+
 	def get_chr_pos_list(self):
 		return zip(self.snp_results['chromosomes'], self.snp_results['positions'])
 

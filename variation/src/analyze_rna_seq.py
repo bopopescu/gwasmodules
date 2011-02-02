@@ -17,6 +17,7 @@ from env import *
 import sys
 import cPickle
 import util
+import gwaResults
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
@@ -130,8 +131,76 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 
 
 
-def _load_results_(file_prefix=''):
-	pass
+def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_threshold=15):
+	pickle_file = '%s_%s_mac%d_res.pickled' % (file_prefix, mapping_method, mac_threshold)
+	if os.path.isfile(pickle_file):
+		with open(pickle_file) as f:
+			d = cPickle.load(f)
+	else:
+		phen_file = env['phen_dir'] + 'rna_seq.csv'
+		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+		phed.convert_to_averages()
+		if use_1001_data:
+			sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+		else:
+			sd = dp.load_250K_snps(debug_filter=debug_filter)
+		indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
+		phed.filter_ecotypes(indices_to_keep, pids=range(start_pid, stop_pid))
+		print len(indices_to_keep)
+		sd.filter_mac_snps(mac_threshold)
+
+
+		g_list = _load_genes_list_()
+		res_dict = {}
+		for pid in range(start_pid, stop_pid):
+			gene_tair_id = phed.get_name(pid)
+			curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
+			if phed.is_constant(pid):
+				print "Skipping expressions for %s since it's constant." % gene_tair_id
+				continue
+			if phed.is_near_constant(10):
+				print "Skipping expressions for %s since it's almost constant." % gene_tair_id
+				continue
+			print 'Loading file'
+			res = gwaResults.Result(curr_file_prefix + '.pvals')
+			#Trim results..
+			res.neg_log_trans()
+			res.filter_attr('scores', 4) #Filter everything below 10^-4
+			cgs = g_list[pid - 1]
+			avg_g_pos = sp.mean([(cg.startPos + cg.endPos) / 2.0 for cg in cgs])
+			chrom = cgs[0].chromosome #Current gene chromosome
+
+			#Prepare for plotting results.. x,y style, where gene is x, and y is p-values
+			chrom_pos_score_dict = res.get_chrom_score_pos_dict()
+			dist_dict = {}
+			for score_threshold in [4, 5, 6, 7]: #negative log10 thresholds.
+				res.filter_attr('scores', score_threshold)
+				cps_dict = res.get_chrom_score_pos_dict()
+				pos_list = cps_dict[chrom]['positions']
+				if len(pos_list):
+					distances = sp.absolute(sp.array(pos_list) - avg_g_pos)
+					d_i = sp.argmin(distances)
+					dist_dict[score_threshold] = distances[d_i] #Min distance.
+				else:
+					dist_dict[score_threshold] = -1 #Different chromosome
+
+			res_dict[(chrom, avg_g_pos)] = {'tair_id':gene_tair_id, 'genes':cgs,
+						'chrom_pos_score':chrom_pos_score_dict, 'dist_dict':dist_dict}
+
+		#Now pickle everything...
+		d = {'res_dict':res_dict, 'phed':phed}
+		with open(pickle_file, 'wb') as f:
+			cPickle.dump(d, f)
+
+	return d
+
+
+
+#def plot():
+#	res_dict = d['res_dict']
+#	phed = d['phed']
+
+
 
 
 def run_parallel_rna_seq_gwas():
@@ -198,9 +267,10 @@ def _test_parallel_():
 	run_parallel(sys.argv[1], int(sys.argv[2]), int(sys.argv[2]) + 1)
 
 if __name__ == '__main__':
+	_load_results_()
 	#_gene_list_to_file_()
 	#_test_()
-	run_parallel_rna_seq_gwas()
+	#run_parallel_rna_seq_gwas()
 #	print len(sys.argv)
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
