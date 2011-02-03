@@ -291,7 +291,7 @@ def plot(file_prefix):
 				ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
 				#ax.set_xlabel('Chromosome %d' % chr1)
 
-			l = chr_res_dict[(chr1, chr2)]['scores']
+			l = chrom_dict[(chr1, chr2)]['scores']
 			l = -sp.log10(l)
 			l = l.tolist()
 			l_zxy = zip(l, chrom_dict[(chr1, chr2)]['x_positions'],
