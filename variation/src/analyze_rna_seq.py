@@ -228,7 +228,7 @@ def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_thres
 
 
 
-def plot(file_prefix):
+def plot(file_prefix, min_score=10):
 	#Load in chromosome dict..
 	chrom_dict = {}
 	for x_chrom in [1, 2, 3, 4, 5]:
@@ -242,19 +242,23 @@ def plot(file_prefix):
 		d = res_dict[(x_chrom, x_pos)]
 		for y_chrom in [1, 2, 3, 4, 5]:
 			cps_d = d['chrom_pos_score'][y_chrom]
-			scores.extend(cps_d['scores'])
-			chrom_dict[(x_chrom, y_chrom)]['scores'].extend(cps_d['scores'])
-			chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
-			chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'])
-	pdb.set_trace()
+			for i in range(len(cps_d['scores'])):
+				s = cps_d['scores'][i]
+				if s > min_score:					
+					if s > 25:
+						s = 25
+					scores.append(s)
+					chrom_dict[(x_chrom, y_chrom)]['scores'].append(s)
+					chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
+					chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'][i])
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
 	tot_num_bases = float(sum(chrom_sizes))
-	rel_chrom_sizes = map(lambda x: 0.93 * (x / tot_num_bases), chrom_sizes)
-	rel_cum_chrom_sizes = map(lambda x: 0.93 * (x / tot_num_bases), cum_chrom_sizes)
+	rel_chrom_sizes = map(lambda x: 0.925 * (x / tot_num_bases), chrom_sizes)
+	rel_cum_chrom_sizes = map(lambda x: 0.925 * (x / tot_num_bases), cum_chrom_sizes)
 	for i in range(5):
-		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.01 + 0.01 * i
+		rel_cum_chrom_sizes[i] = rel_cum_chrom_sizes[i] + 0.02 + 0.01 * i
 
 	chromosome_ends = {1:30.425061, 2:19.694800, 3:23.456476, 4:18.578714, 5:26.974904}
 	print rel_chrom_sizes, rel_cum_chrom_sizes
@@ -263,18 +267,21 @@ def plot(file_prefix):
 	#Now plot data!!
 	alpha = 0.8
 	linewidths = 0
-	vmin = 0
-	f = pylab.figure(figsize=(50, 46))
+	vmin = min_score
+	f = pylab.figure(figsize=(50, 45))
 	chromosomes = [1, 2, 3, 4, 5]
-	plot_file_name = file_prefix + '.png'
-	label = ''
-	vmax = -sp.log10(sp.array(scores).min())
+	plot_file_name = file_prefix + '_emmax_%d.png'%(min_score)
+	label = '$-log_{10}$(p-value)'
+	vmax = max(scores)
 
 	for yi, chr2 in enumerate(chromosomes):
 		for xi, chr1 in enumerate(chromosomes):
 
-			ax = f.add_axes([rel_cum_chrom_sizes[xi] + 0.01, rel_cum_chrom_sizes[yi],
-					rel_chrom_sizes[xi], rel_chrom_sizes[yi] ])
+			l = chrom_dict[(chr1, chr2)]['scores']
+			if len(l)==0:
+				continue
+			ax = f.add_axes([0.97*(rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi]-0.02,
+					0.97*(rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			#ax.tick_params(fontsize='x-large')
@@ -293,11 +300,10 @@ def plot(file_prefix):
 				ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
 				#ax.set_xlabel('Chromosome %d' % chr1)
 
-			l = chrom_dict[(chr1, chr2)]['scores']
 			#l = -sp.log10(l)
-			l = l.tolist()
+			#l = l.tolist()
 			l_zxy = zip(l, chrom_dict[(chr1, chr2)]['x_positions'],
-				chrom_dict[(chr1, chr2)]['x_positions'])
+				chrom_dict[(chr1, chr2)]['y_positions'])
 			l_zxy.sort()
 			l = map(list, zip(*l_zxy))
 			zs = l[0]
@@ -309,11 +315,14 @@ def plot(file_prefix):
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
+	cax = f.add_axes([0.975, 0.7, 0.01, 0.2])
 	cb = pylab.colorbar(scatter_plot, cax=cax)
-	cb.set_label(label, fontsize='x-large')
+	cb.set_label(label, fontsize='xx-large')
 	#cb.set_tick_params(fontsize='x-large')
-	f.savefig(plot_file_name + '.png', format='png')
+	f.text(0.005,0.47,'Expressed gene position',size='xx-large', rotation='vertical')
+	f.text(0.47,0.99,'Associated SNP position',size='xx-large')
+	print 'Saving figure:',plot_file_name 
+	f.savefig(plot_file_name, format='png')
 
 
 
