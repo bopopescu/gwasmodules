@@ -261,6 +261,11 @@ class phenotype_data:
 			pids.sort()
 		return [self.phen_dict[pid]['name'] for pid in pids]
 
+	def get_pids(self):
+		pids = self.phen_dict.keys()
+		pids.sort()
+		return pids
+		
 	def get_values(self, pid):
 		return self.phen_dict[pid]['values']
 
@@ -457,9 +462,10 @@ class phenotype_data:
 	def is_near_constant(self, pid, min_num_diff=10):
 		vals = sp.array(self.phen_dict[pid]['values'])
 		if sp.std(vals) > 0:
-			vals = 100 * vals / sp.std(vals)
+			vals = 50 * vals / sp.std(vals)
 			b_counts = sp.bincount(sp.array(sp.around(vals), dtype='int'))
-			return b_counts.max() > len(vals) - min_num_diff
+			b = b_counts.max() > len(vals) - min_num_diff
+			return b 
 		else:
 			return False
 

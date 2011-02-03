@@ -21,6 +21,8 @@ except Exception, err_str:
 	print 'scipy is missing:', err_str
 import random
 import sys
+import os
+import cPickle
 import env
 import tair_converter as tc
 #A dictionary for loaded results.. to avoid reloading. 
@@ -1315,7 +1317,7 @@ class Result(object):
 	"""
 	def __init__(self, result_file=None, snp_results=None, scores=None, snps_data=None, accessions=None, name=None,
 		     result_type=None, phen_id=None, positions=None, chromosomes=None, mafs=None, macs=None,
-		     snps=None, **snp_results_info):
+		     snps=None, auto_pickling_on = True, **snp_results_info):
 		"""
 		A simple init function.
 		snps_data is assumed to match the results, (in term of positions, etc)
@@ -1332,8 +1334,30 @@ class Result(object):
 		self.name = name
 		self.keys = []
 		self.accessions = accessions
+		self.chromosome_ends = []
+		self.orders = None
+		self.ranks = None
+		self.auto_pickling_on=auto_pickling_on
+		pickle_attributes = ['snp_results','keys','orders','ranks','phen_id',
+				'result_type','name','accessions','chromosome_ends']
+
+
 		if result_file:
-			self._load_result_(result_file)
+			pickle_file = result_file+'.pickled'
+			if self.auto_pickling_on and os.path.isfile(pickle_file):
+				try:
+					with open(pickle_file) as f:
+						d = cPickle.load(f)
+					for attr in pickle_attributes:
+						setattr(self, attr, d[attr])
+					pickle_failed = False
+				except Exception,err_str:
+					print 'Loading pickle file failed:',pickle_file
+					self._load_result_(result_file)
+					pickle_failed = True
+
+			else:
+				self._load_result_(result_file)
 		else:
 
 			if chromosomes:
@@ -1352,10 +1376,6 @@ class Result(object):
 				self.keys.append('macs')
 				self.snp_results['macs'] = macs
 
-		self.orders = None
-		self.ranks = None
-		self.chromosome_ends = []
-
 		if snps_data:
 			self._load_snps_(snps_data)
 			if 'mafs' not in self.snp_results:
@@ -1366,15 +1386,27 @@ class Result(object):
 				self.snp_results['snps'] = snps
 
 
+
 		#Adding various info...
 		if snp_results_info:
 			for info in snp_results_info:
 				self.keys.append(info)
 				self.snp_results[info] = snp_results_info[info]
 
+		if result_file and self.auto_pickling_on:
+			if not os.path.isfile(pickle_file) or pickle_failed:
+				d = {}
+				for attr in pickle_attributes:
+					d[attr] = getattr(self, attr)
+				with open(pickle_file,'wb') as f:
+					cPickle.dump(d,f)				
+			
+
+			
 
 
 	def _load_result_(self, result_file, try_delims=[",", "\t", " ", ]):
+			
 		with open(result_file, "r") as f:
 			print 'Loading results..'
 			line = f.next()
@@ -1406,7 +1438,7 @@ class Result(object):
 			chrom_splits = []
 			for i, line in enumerate(f):
 				l = map(float, map(str.strip, line.split(delim)))
-				for v, key in it.izip(l, keys):
+				for v, key in it.izip(l, self.keys):
 					self.snp_results[key].append(v)
 				if int(l[0]) != chrom:
 					chrom_splits.append(i)
@@ -1458,7 +1490,8 @@ class Result(object):
 		self.orders (SNP indices ordered by rank)
 		self.ranks (ranks of the SNPs)
 		"""
-		rank_ls = zip(self.scores, range(len(self.scores)))
+		scores = self.snp_results['scores']
+		rank_ls = zip(scores, range(len(scores)))
 		rank_ls.sort(reverse=True)
 		self.orders = []
 		for j in range(len(rank_ls)):
@@ -1894,7 +1927,8 @@ class Result(object):
 			else:
 				plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
 
-		plt.axis([0, sum(result.chromosome_ends), min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
+		x_range = sum(result.chromosome_ends)
+		plt.axis([-x_range*0.01, x_range*1.01, min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 		plt.xticks(ticksList1, ticksList2, fontsize='x-small')
 		#pdb.set_trace()
 		if not ylab:
