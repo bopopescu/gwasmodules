@@ -20,6 +20,7 @@ import cPickle
 import util
 import gwaResults
 import pylab
+import pdb
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
@@ -293,7 +294,7 @@ def plot(file_prefix):
 				#ax.set_xlabel('Chromosome %d' % chr1)
 
 			l = chrom_dict[(chr1, chr2)]['scores']
-			l = -sp.log10(l)
+			#l = -sp.log10(l)
 			l = l.tolist()
 			l_zxy = zip(l, chrom_dict[(chr1, chr2)]['x_positions'],
 				chrom_dict[(chr1, chr2)]['x_positions'])
