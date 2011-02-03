@@ -19,6 +19,7 @@ import sys
 import cPickle
 import util
 import gwaResults
+import pylab
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
