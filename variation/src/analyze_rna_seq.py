@@ -238,11 +238,12 @@ def plot(file_prefix):
 	scores = []
 	for x_chrom, x_pos in res_dict:
 		d = res_dict[(x_chrom, x_pos)]
-		for y_chrom, score, y_pos in d['chrom_pos_score']:
-			chrom_dict[(x_chrom, y_chrom)]['scores'].append(score)
-			scores.append(score)
-			chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
-			chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(y_pos)
+		for y_chrom in [1, 2, 3, 4, 5]:
+			for score, y_pos in d['chrom_pos_score'][y_chrom]:
+				chrom_dict[(x_chrom, y_chrom)]['scores'].append(score)
+				scores.append(score)
+				chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
+				chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(y_pos)
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
