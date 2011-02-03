@@ -245,6 +245,7 @@ def plot(file_prefix):
 			chrom_dict[(x_chrom, y_chrom)]['scores'].extend(cps_d['scores'])
 			chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
 			chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'])
+	pdb.set_trace()
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
@@ -308,8 +309,8 @@ def plot(file_prefix):
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
 	cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
-	#cb = pylab.colorbar(scatter_plot, cax=cax)
-	#cb.set_label(label, fontsize='x-large')
+	cb = pylab.colorbar(scatter_plot, cax=cax)
+	cb.set_label(label, fontsize='x-large')
 	#cb.set_tick_params(fontsize='x-large')
 	f.savefig(plot_file_name + '.png', format='png')
 
