@@ -308,8 +308,8 @@ def plot(file_prefix):
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
 	cax = f.add_axes([0.62, 0.3, 0.01, 0.2])
-	cb = pylab.colorbar(scatter_plot, cax=cax)
-	cb.set_label(label, fontsize='x-large')
+	#cb = pylab.colorbar(scatter_plot, cax=cax)
+	#cb.set_label(label, fontsize='x-large')
 	#cb.set_tick_params(fontsize='x-large')
 	f.savefig(plot_file_name + '.png', format='png')
 
