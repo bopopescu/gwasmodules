@@ -256,7 +256,6 @@ def plot(file_prefix):
 	chromosome_ends = {1:30.425061, 2:19.694800, 3:23.456476, 4:18.578714, 5:26.974904}
 	print rel_chrom_sizes, rel_cum_chrom_sizes
 
-	max_pval = -math.log10(min_float)
 	#Filter data..
 	#Now plot data!!
 	alpha = 0.8
