@@ -274,7 +274,6 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 	l.sort()
 
 	#Now locate the interesting SNPs in the snps data
-	et_indices = [i for i, et in enumerate(sd.accessions) if et not in snp_ecotypes]
 	chr_pos_list = sd.getChrPosList()
 	snps_indices = []
 	for chr_pos in zip(snp_chromosomes, snp_positions):
@@ -292,25 +291,36 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 
 #	print 'expected_frequency, num_phenotyped, num_not_phenotyped, non_phenotyped_ecotypes..'
 #	for f, c, h in l:
-#		ets = map(int,haplotype_map[h]['et_occurrences'])
+#		ets = map(int, haplotype_map[h]['et_occurrences'])
 #		if len(haplotype_map[h]['et_occurrences']):
-#			print '%f, %d, %d, %s'%(f, c, len(haplotype_map[h]['et_occurrences']),
-#					','.join(map(str,zip(ets,[et_dict[et][0] for et in ets])))) 
+#			print '%f, %d, %d, %s' % (f, c, len(haplotype_map[h]['et_occurrences']),
+#					','.join(map(str, zip(ets, [et_dict[et][0] for et in ets]))))
 
 
+	snps = map(list, snps)
 	haplotype_list = []
 	sd_accessions = sd.accessions
-	while len(sd_accessions) > 0:
-		f, c, h = l[0]
-		ets = haplotype_map[h]['et_occurrences']
+	num_ecotypes = 1
+	while len(snp_ecotypes) < len(sd_accessions):
+		for i, t in enumerate(l):
+			f, c, h = l[i]
+			if len(haplotype_map[h]['et_occurrences']):
+				break
+		else:
+			break
+
+		f, c, h = l[i]
+		ets = [haplotype_map[h]['et_occurrences'][0]]
+		print 'Iteration %d: %f, %d, %d, %s' % (num_ecotypes, f, c, len(haplotype_map[h]['et_occurrences']),
+						str((int(ets[0]), et_dict[int(ets[0])])))
 		haplotype_list.append((f, c, ets))
 		remove_ids = [sd_accessions.index(et) for et in ets]
-		new_snps = []
-		for snp in f_snps:
-			new_snps.append([nt for i, nt in enumerate(snp) if i not in remove_ids])
-		f_snps = new_snps
-		sd_accessions = [acc for i, acc in sd_accessions if i not in remove_ids]
-		et_indices = [i for i, et in enumerate(sd.accessions) if et not in snp_ecotypes]
+		for snp, f_snp in zip(snps, f_snps):
+			for i, nt in enumerate(f_snp):
+				if i in remove_ids:
+					snp.append(nt)
+		for i in remove_ids:
+			snp_ecotypes.append(sd_accessions[i])
 
 
 		snps_array = sp.array(snps, dtype='single')
@@ -327,6 +337,26 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 				f *= fs[i] if nt == 1.0 else 1 - fs[i]
 			haplotype_map[h] = {'f':f, 'c':0, 'et_occurrences':[]}
 
+		haplotypes = zip(*snps) #list of haplotype tuples (hashable)
+		for h in haplotypes:
+			haplotype_map[h]['c'] += 1
+
+		l = []
+		for h in haplotype_map:
+			hm = haplotype_map[h]
+			l.append((hm['f'], hm['c'], h))
+		l.sort()
+		for et, h in it.izip(sd.accessions, zip(*f_snps)):
+			if et in snp_ecotypes: continue
+			haplotype_map[h]['et_occurrences'].append(et)
+
+#		print 'expected_frequency, num_phenotyped, num_not_phenotyped, non_phenotyped_ecotypes..'
+#		for f, c, h in l:
+#			ets = map(int, haplotype_map[h]['et_occurrences'])
+#			if len(haplotype_map[h]['et_occurrences']):
+#				print '%f, %d, %d, %s' % (f, c, len(haplotype_map[h]['et_occurrences']),
+#						','.join(map(str, zip(ets, [et_dict[et][0] for et in ets]))))
+		num_ecotypes += 1
 
 
 
@@ -336,8 +366,8 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 def identify_interesting_haplotypes(chrom_pos_list, phenotype_file, pid):
 	import dataParsers as dp
 	import bisect
-#	sd = dp.load_250K_snps()
-	sd = dp.load_1001_full_snps()
+	sd = dp.load_250K_snps()
+	#sd = dp.load_1001_full_snps()
 	phed = pd.parse_phenotype_file(phenotype_file)
 	phed.convert_to_averages()
 	sd.coordinate_w_phenotype_data(phed, pid)
@@ -353,18 +383,18 @@ def identify_interesting_haplotypes(chrom_pos_list, phenotype_file, pid):
 		snps.append(all_snps[i])
 		snp_chromosomes.append(chrom_pos[0])
 		snp_positions.append(chrom_pos[1])
-#	sd = dp.load_250K_snps()
-	sd = dp.load_1001_full_snps()
+	sd = dp.load_250K_snps()
+	#sd = dp.load_1001_full_snps()
 	identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, phed.get_ecotypes(pid))
 
 
 
 if __name__ == '__main__':
-	#chrom_pos_list = [(1,22349990),(1,25296405),(4,453759),(5,24053984),(5,25458236)]#KW
+	#chrom_pos_list = [(1, 22349990), (1, 25296405), (4, 453759), (5, 24053984), (5, 25458236)]#KW
 	#chrom_pos_list = [(1,5133207),(3,5423868),(4,5795054),(4,10864907),(5,894530)]#EMMAX
-	#chrom_pos_list = [(1,5133207),(3,5423868),(4,5795054),(4,10864907),(5,894530),(1,22349990),
-	#		(1,25296405),(4,453759),(5,24053984),(5,25458236)]#Both
-	chrom_pos_list = [(1, 5133217), (3, 20581778), (4, 5458010), (4, 5727758), (5, 1001970), (1, 1427391), (1, 22360158), (1, 29293376), (5, 21020181), (5, 24054819)]
+	chrom_pos_list = [(1, 5133207), (3, 5423868), (4, 5795054), (4, 10864907), (5, 894530), (1, 22349990),
+			(1, 25296405), (4, 453759), (5, 24053984), (5, 25458236)]#Both
+	#chrom_pos_list = [(1, 5133217), (3, 20581778), (4, 5458010), (4, 5727758), (5, 1001970), (1, 1427391), (1, 22360158), (1, 29293376), (5, 21020181), (5, 24054819)]
 	pid = 1
 	identify_interesting_haplotypes(chrom_pos_list, env.env['phen_dir'] + 'telomere_lengths_all.csv', pid)
 
