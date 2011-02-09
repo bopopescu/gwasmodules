@@ -234,7 +234,7 @@ def plot(file_prefix, min_score=5):
 	chrom_dict = {}
 	for x_chrom in [1, 2, 3, 4, 5]:
 		for y_chrom in [1, 2, 3, 4, 5]:
-			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[]}
+			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[], 'tair_ids':[]}
 	d = _load_results_('emmax', file_prefix='/storage/rna_seq_gwas_results/rna_seq')
 	res_dict = d['res_dict']
 	phed = d['phed']
@@ -251,7 +251,7 @@ def plot(file_prefix, min_score=5):
 						s = 25
 					scores.append(s)
 					chrom_dict[(x_chrom, y_chrom)]['scores'].append(s)
-					chrom_dict[(x_chrom, y_chrom)]['tair_id'].append(tair_id)
+					chrom_dict[(x_chrom, y_chrom)]['tair_ids'].append(tair_id)
 					chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
 					chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'][i])
 
@@ -263,7 +263,7 @@ def plot(file_prefix, min_score=5):
 			with open(file_name, 'w') as f:
 				d = chrom_dict[(x_chrom, y_chrom)]
 				f.write('x_position, y_position, score, tair_id\n')
-				l = zip(d['x_positions'], d['y_positions'], d['scores'], d['tair_id'])
+				l = zip(d['x_positions'], d['y_positions'], d['scores'], d['tair_ids'])
 				l.sort()
 				for t in l:
 					f.write('%d,%d,%f,%s\n' % t)
