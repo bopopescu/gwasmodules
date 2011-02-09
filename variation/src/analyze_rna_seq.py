@@ -261,7 +261,9 @@ def plot(file_prefix, min_score=5):
 			with open(file_name, 'w') as f:
 				d = chrom_dict[(x_chrom, y_chrom)]
 				f.write('x_position, y_position, score,\n')
-				for t in it.izip(d['x_positions'], d['y_positions'], d['scores']):
+				l = zip(d['x_positions'], d['y_positions'], d['scores'])
+				l.sort()
+				for t in l:
 					f.write('%d,%d,%f\n' % t)
 
 
