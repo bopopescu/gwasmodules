@@ -410,11 +410,11 @@ def _test_parallel_():
 
 if __name__ == '__main__':
 	#_load_results_('emmax', file_prefix='/storage/rna_seq_gwas_results/rna_seq')
-	#plot('/storage/rna_seq_gwas_results/rna_seq')
+	plot('/storage/rna_seq_gwas_results/rna_seq')
 	#_gene_list_to_file_()
 	#_test_()
-	print sys.argv
-	run_parallel_rna_seq_gwas()
+#	print sys.argv
+#	run_parallel_rna_seq_gwas()
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:
