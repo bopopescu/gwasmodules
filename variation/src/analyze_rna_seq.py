@@ -256,7 +256,7 @@ def plot(file_prefix, min_score=5):
 	#Write chrom_dict to file..
 	for x_chrom in [1, 2, 3, 4, 5]:
 		for y_chrom in [1, 2, 3, 4, 5]:
-			file_name = env.env['tmp_dir'] + 'rna_seq_chrom%d_chrom%d.txt'
+			file_name = env['tmp_dir'] + 'rna_seq_chrom%d_chrom%d.txt'
 			with open(file_name, 'w') as f:
 				d = chrom_dict[(x_chrom, y_chrom)]
 				f.write('x_position, y_position, score,\n')
@@ -410,16 +410,16 @@ def _test_parallel_():
 
 if __name__ == '__main__':
 	#_load_results_('emmax', file_prefix='/storage/rna_seq_gwas_results/rna_seq')
-	plot('/storage/rna_seq_gwas_results/rna_seq')
+	#plot('/storage/rna_seq_gwas_results/rna_seq')
 	#_gene_list_to_file_()
 	#_test_()
-	#run_parallel_rna_seq_gwas()
-#	print len(sys.argv)
+	print sys.argv
+	run_parallel_rna_seq_gwas()
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:
 #		_test_parallel_()
-#	sys.exit(0)
+	sys.exit(0)
 
 
 
