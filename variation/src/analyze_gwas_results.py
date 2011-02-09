@@ -7,6 +7,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import warnings
 import itertools as it
+import env
+import random
+import phenotypeData as pd
+
 
 
 def qq_plots(results, num_dots, max_log_val, file_prefix, method_types=['kw', 'emma'], mapping_labels=None,
@@ -268,7 +272,6 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 		hm = haplotype_map[h]
 		l.append((hm['f'], hm['c'], h))
 	l.sort()
-	print l
 
 	#Now locate the interesting SNPs in the snps data
 	et_indices = [i for i, et in enumerate(sd.accessions) if et not in snp_ecotypes]
@@ -277,7 +280,6 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 	for chr_pos in zip(snp_chromosomes, snp_positions):
 		i = bisect.bisect(chr_pos_list, chr_pos) - 1
 		if chr_pos_list[i] != chr_pos:
-			print chr_pos_list[i], chr_pos
 			raise Exception('The SNP at chr=%d, pos=%d, was not found in the snps data.' % chr_pos)
 		snps_indices.append(i)
 	snps = sd.getSnps()
@@ -286,40 +288,49 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 		if et in snp_ecotypes: continue
 		haplotype_map[h]['et_occurrences'].append(et)
 
+	et_dict = pd.get_ecotype_id_info_dict()
+	
+	print 'expected_frequency, num_phenotyped, num_not_phenotyped, non_phenotyped_ecotypes..'
 	for f, c, h in l:
-		print f, c, len(haplotype_map[h]['et_occurrences'])
+		ets = map(int,haplotype_map[h]['et_occurrences'])
+		if len(haplotype_map[h]['et_occurrences']):
+			print '%f, %d, %d, %s'%(f, c, len(haplotype_map[h]['et_occurrences']),
+					','.join(map(str,zip(ets,[et_dict[et][0] for et in ets])))) 
 
 
 
-def _test_haplotype_identification_():
+def identify_interesting_haplotypes(chrom_pos_list, phenotype_file, pid):
 	import dataParsers as dp
-	import random
-	sd = dp.load_250K_snps(debug_filter=0.01)
-	cpsl = sd.getChrPosSNPList()
-	l = [cpsl[i] for i in sorted(random.sample(range(len(cpsl)), 5))]
-	l = map(list, zip(*l))
-	snp_chromosomes = l[0]
-	snp_positions = l[1]
-	snps_l = l[2]
-	accessions_indices = random.sample(range(len(sd.accessions)), 200)
-	accessions_indices.sort()
-	snp_ecotypes = []
-	for ai in accessions_indices:
-		snp_ecotypes.append(sd.accessions[ai])
-
+	import bisect
+#	sd = dp.load_250K_snps()
+	sd = dp.load_1001_full_snps()
+	phed = pd.parse_phenotype_file(phenotype_file)
+	phed.convert_to_averages()
+	sd.coordinate_w_phenotype_data(phed,pid)	
+	cpl = sd.getChrPosList()
+	all_snps = sd.getSnps()
 	snps = []
-	for snp in snps_l:
-		new_snp = []
-		for ai in accessions_indices:
-			new_snp.append(snp[ai])
-		snps.append(new_snp)
-
-
-
-	identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, snp_ecotypes)
+	snp_chromosomes = []
+	snp_positions = []
+	for chrom_pos in chrom_pos_list:
+		i = bisect.bisect(cpl,chrom_pos)-1
+		if cpl[i]!=chrom_pos:
+			raise Exception('SNP not found')
+		snps.append(all_snps[i])
+		snp_chromosomes.append(chrom_pos[0])
+		snp_positions.append(chrom_pos[1])
+#	sd = dp.load_250K_snps()
+	sd = dp.load_1001_full_snps()
+	identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, phed.get_ecotypes(pid))
 
 
 
 if __name__ == '__main__':
-	_test_haplotype_identification_()
-
+	#chrom_pos_list = [(1,22349990),(1,25296405),(4,453759),(5,24053984),(5,25458236)]#KW
+	#chrom_pos_list = [(1,5133207),(3,5423868),(4,5795054),(4,10864907),(5,894530)]#EMMAX
+	#chrom_pos_list = [(1,5133207),(3,5423868),(4,5795054),(4,10864907),(5,894530),(1,22349990),
+	#		(1,25296405),(4,453759),(5,24053984),(5,25458236)]#Both
+	chrom_pos_list = [(1,5133217),(3,20581778),(4,5458010),(4,5727758),(5,1001970),(1,1427391),(1,22360158),(1,29293376),(5,21020181),(5,24054819)]
+	pid = 1
+	identify_interesting_haplotypes(chrom_pos_list, env.env['phen_dir']+'telomere_lengths_all.csv', pid)
+	
