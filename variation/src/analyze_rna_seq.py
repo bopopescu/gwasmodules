@@ -256,7 +256,7 @@ def plot(file_prefix, min_score=5):
 	#Write chrom_dict to file..
 	for x_chrom in [1, 2, 3, 4, 5]:
 		for y_chrom in [1, 2, 3, 4, 5]:
-			file_name = env['tmp_dir'] + 'rna_seq_chrom%d_chrom%d.txt' % (x_chrom, y_chrom)
+			file_name = file_prefix + '_chrom%d_chrom%d.txt' % (x_chrom, y_chrom)
 			print 'Writing to file:', file_name
 			with open(file_name, 'w') as f:
 				d = chrom_dict[(x_chrom, y_chrom)]
