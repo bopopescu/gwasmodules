@@ -1682,7 +1682,6 @@ def get_emma_reml_estimates(y, K):
 	lmm.add_random_effect(K)
 	res = lmm.get_REML()
 	res['Y_t'] = res['H_sqrt_inv'] * lmm.Y	#The transformed outputs.
-	print res['Y_t']
 	res['X_t'] = res['H_sqrt_inv'] * lmm.X
 	res['lmm'] = lmm
 	return res

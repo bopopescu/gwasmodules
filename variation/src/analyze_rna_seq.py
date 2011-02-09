@@ -43,7 +43,7 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	elif cluster == 'usc':  #USC cluster.
 		shstr = "#!/bin/csh\n"
 		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
-		shstr += "#PBS -l mem=%s \n" % '2950mb'
+		shstr += "#PBS -l mem=%s \n" % '3950mb'
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
@@ -66,7 +66,7 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 		debug_filter=1.0, use_1001_data=True):
 	if mapping_method not in ['emmax', 'kw']:
 		raise Exception('Mapping method unknown')
-	phen_file = env['phen_dir'] + 'rna_seq.csv'
+	phen_file = env['phen_dir'] + 'rna_seq_020811_10C.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	phed.convert_to_averages()
 	if use_1001_data:
@@ -241,6 +241,7 @@ def plot(file_prefix, min_score=5):
 	scores = []
 	for x_chrom, x_pos in res_dict:
 		d = res_dict[(x_chrom, x_pos)]
+		tair_id = res_dict['tair_id']
 		for y_chrom in [1, 2, 3, 4, 5]:
 			cps_d = d['chrom_pos_score'][y_chrom]
 			for i in range(len(cps_d['scores'])):
@@ -250,6 +251,7 @@ def plot(file_prefix, min_score=5):
 						s = 25
 					scores.append(s)
 					chrom_dict[(x_chrom, y_chrom)]['scores'].append(s)
+					chrom_dict[(x_chrom, y_chrom)]['tair_id'].append(tair_id)
 					chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
 					chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'][i])
 
@@ -260,11 +262,11 @@ def plot(file_prefix, min_score=5):
 			print 'Writing to file:', file_name
 			with open(file_name, 'w') as f:
 				d = chrom_dict[(x_chrom, y_chrom)]
-				f.write('x_position, y_position, score,\n')
-				l = zip(d['x_positions'], d['y_positions'], d['scores'])
+				f.write('x_position, y_position, score, tair_id\n')
+				l = zip(d['x_positions'], d['y_positions'], d['scores'], d['tair_id'])
 				l.sort()
 				for t in l:
-					f.write('%d,%d,%f\n' % t)
+					f.write('%d,%d,%f,%s\n' % t)
 
 
 
