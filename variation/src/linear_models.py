@@ -2642,6 +2642,46 @@ def _emmax_test_():
 	pdb.set_trace()
 
 
+#def _test_phyB_snps_():
+#	"""
+#	Data from Amaury de Montaigu
+#	"""
+#	from env import *
+#	file_name = env['home_dir'] + 'Projects/Amaury_de_Montaigu/SNP_data.csv'
+#	ets = []
+#	phen_LD14 = [] #LD 14 h	LD16-LD14	LD14-LD12
+#	phen_LD16_14 = []
+#	phen_LD14_12 = []
+#	site3 = []
+#	site12 = []
+#	with open(file_name) as f:
+#		print f.next()
+#		print f.next()
+#		for line in f:
+#			l = map(str.strip, line.split(','))
+#			ets.append(l[2])
+#			phen_LD14.append(float(l[3]))
+#			phen_LD16_14.append(float(l[4]))
+#			phen_LD14_12.append(float(l[5]))
+#			site3.append(l[6])
+#			site12.append(l[7])
+#
+#	f = lambda x: 0 if x == 'C' else 1
+#	snps = [map(f, site3), map(f, site12)]
+#	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled', ets)
+#	r = emmax(snps, phen_LD14, K)
+#	print r['ps']
+#	r = emma(snps, phen_LD14, K)
+#	print r['ps']
+#	r = emmax(snps, phen_LD16_14, K)
+#	print r['ps']
+#	r = emma(snps, phen_LD16_14, K)
+#	print r['ps']
+#	r = emmax(snps, phen_LD14_12, K)
+#	print r['ps']
+#	r = emma(snps, phen_LD14_12, K)
+#	print r['ps']
+
 
 if __name__ == "__main__":
 #	kinship_file_name = '/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.pickled'
@@ -2649,4 +2689,4 @@ if __name__ == "__main__":
 #	save_kinship_in_text_format('/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.csv',
 #				k, k_accessions)
 	#_test_joint_analysis_()
-	_emmax_test_()
+	_test_phyB_snps_()

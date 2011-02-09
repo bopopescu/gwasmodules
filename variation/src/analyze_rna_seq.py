@@ -21,6 +21,7 @@ import util
 import gwaResults
 import pylab
 import pdb
+import itertools as it
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
@@ -228,7 +229,7 @@ def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_thres
 
 
 
-def plot(file_prefix, min_score=10):
+def plot(file_prefix, min_score=5):
 	#Load in chromosome dict..
 	chrom_dict = {}
 	for x_chrom in [1, 2, 3, 4, 5]:
@@ -244,13 +245,25 @@ def plot(file_prefix, min_score=10):
 			cps_d = d['chrom_pos_score'][y_chrom]
 			for i in range(len(cps_d['scores'])):
 				s = cps_d['scores'][i]
-				if s > min_score:					
+				if s > min_score:
 					if s > 25:
 						s = 25
 					scores.append(s)
 					chrom_dict[(x_chrom, y_chrom)]['scores'].append(s)
 					chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
 					chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'][i])
+
+	#Write chrom_dict to file..
+	for x_chrom in [1, 2, 3, 4, 5]:
+		for y_chrom in [1, 2, 3, 4, 5]:
+			file_name = env.env['tmp_dir'] + 'rna_seq_chrom%d_chrom%d.txt'
+			with open(file_name, 'w') as f:
+				d = chrom_dict[(x_chrom, y_chrom)]
+				f.write('x_position, y_position, score,\n')
+				for t in it.izip(d['x_positions'], d['y_positions'], d['scores']):
+					f.write('%d,%d,%f\n' % t)
+
+
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
@@ -270,7 +283,7 @@ def plot(file_prefix, min_score=10):
 	vmin = min_score
 	f = pylab.figure(figsize=(50, 45))
 	chromosomes = [1, 2, 3, 4, 5]
-	plot_file_name = file_prefix + '_emmax_%d.png'%(min_score)
+	plot_file_name = file_prefix + '_emmax_%d.png' % (min_score)
 	label = '$-log_{10}$(p-value)'
 	vmax = max(scores)
 
@@ -278,10 +291,10 @@ def plot(file_prefix, min_score=10):
 		for xi, chr1 in enumerate(chromosomes):
 
 			l = chrom_dict[(chr1, chr2)]['scores']
-			if len(l)==0:
+			if len(l) == 0:
 				continue
-			ax = f.add_axes([0.97*(rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi]-0.02,
-					0.97*(rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
+			ax = f.add_axes([0.97 * (rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi] - 0.02,
+					0.97 * (rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			#ax.tick_params(fontsize='x-large')
@@ -319,9 +332,9 @@ def plot(file_prefix, min_score=10):
 	cb = pylab.colorbar(scatter_plot, cax=cax)
 	cb.set_label(label, fontsize='xx-large')
 	#cb.set_tick_params(fontsize='x-large')
-	f.text(0.005,0.47,'Expressed gene position',size='xx-large', rotation='vertical')
-	f.text(0.47,0.99,'Associated SNP position',size='xx-large')
-	print 'Saving figure:',plot_file_name 
+	f.text(0.005, 0.47, 'Expressed gene position', size='xx-large', rotation='vertical')
+	f.text(0.47, 0.99, 'Associated SNP position', size='xx-large')
+	print 'Saving figure:', plot_file_name
 	f.savefig(plot_file_name, format='png')
 
 
@@ -334,9 +347,9 @@ def plot(file_prefix, min_score=10):
 
 def run_parallel_rna_seq_gwas():
 	if len(sys.argv) > 3:
-		run_gwas(env['results_dir'] + 'rna_seq', sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
+		run_gwas(env['results_dir'] + 'rna_seq_10C', sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
 	else:
-		phen_file = env['phen_dir'] + 'rna_seq.csv'
+		phen_file = env['phen_dir'] + 'rna_seq_020811_10C.csv'
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 		num_traits = phed.num_traits()
 		print 'Found %d traits' % num_traits

@@ -495,17 +495,30 @@ def load_phentoype_file_riha():
 
 
 def load_gene_expression_traits():
-	filename = '/Users/bjarni.vilhjalmsson/Projects/Data/rna_seq/gene_expression_table_20110112_10C.tsv'
+	filename = '/Users/bjarni.vilhjalmsson/Projects/Data/rna_seq/gene_expression_table_20110208.tsv'
 	ecotypes = []
+	et_ids = []
 	import scipy as sp
 	with open(filename, "r") as f:
+		i = 0
 		for line in f:
 			if line[0] != '#': break
 			l = line.split('\t')
-			ecotypes.append(l[5])
+			if l[7] == '16C':
+				ecotypes.append(l[5])
+				et_ids.append(i)
+			i += 1
 		gene_ids = line.split('\t')
 		print len(ecotypes), len(set(ecotypes))
 		print ecotypes
+		et_dict = {'Col-0':'6909', 'Col':'6909', 'Ler':'6932', 'Ws-0':'6980'}
+		ets = []
+		for et in ecotypes:
+			if et in et_dict:
+				ets.append(et_dict[et])
+			else:
+				ets.append(et)
+		print ets
 		phen_dict = {}
 		num_const_phen = 0
 		phen_i = 1
@@ -513,17 +526,19 @@ def load_gene_expression_traits():
 			l = line.split()
 			phen_name = l[0]
 			phen_vals = map(float, l[1:])
-			if len(phen_vals) != len(ecotypes):
+			phen_vals = [phen_vals[i] for i in et_ids]
+			if len(phen_vals) != len(ets):
 				raise Exception('Arrg')
 			if len(sp.unique(phen_vals)) > 1:
-				phen_dict[phen_i] = {'name':phen_name, 'ecotypes':ecotypes, 'values':phen_vals}
+				phen_dict[phen_i] = {'name':phen_name, 'ecotypes':ets, 'values':phen_vals}
 				phen_i += 1
 			else:
 				num_const_phen += 1
-	print 'Number of constant phenotypes:', num_const_phen
+	print 'Total number of gene expressions was %d, of which %d were constant (removed), leaving %d gene expressions.' \
+		% ((phen_i - 1) + num_const_phen, num_const_phen, phen_i - 1)
 
 	phed = pd.phenotype_data(phen_dict)
-	phed.write_to_file(env['phen_dir'] + 'rna_seq.csv')
+	phed.write_to_file(env['phen_dir'] + 'rna_seq_020811_16C.csv')
 
 
 
