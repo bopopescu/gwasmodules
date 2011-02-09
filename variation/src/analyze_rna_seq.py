@@ -241,7 +241,7 @@ def plot(file_prefix, min_score=5):
 	scores = []
 	for x_chrom, x_pos in res_dict:
 		d = res_dict[(x_chrom, x_pos)]
-		tair_id = res_dict['tair_id']
+		tair_id = d['tair_id']
 		for y_chrom in [1, 2, 3, 4, 5]:
 			cps_d = d['chrom_pos_score'][y_chrom]
 			for i in range(len(cps_d['scores'])):
