@@ -1501,6 +1501,24 @@ class SNPData(object):
 					allele_index2allele[1] = allele1
 		sys.stderr.write("Done.\n")
 		return newSnpData, allele_index2allele_ls
+	
+	@classmethod
+	def loadSNPDataObj(cls,row_id_key_set=None, row_id_hash_func=None, col_id_key_set=None, col_id_hash_func=None, **keywords):
+		import cPickle as cPickle
+		input_fname = keywords['input_fname']
+		if input_fname  != "":
+			if os.path.isfile(input_fname + ".pickle"):
+				input = open(input_fname + '.pickle','r')
+				data = cPickle.load(input)
+				input.close()
+			else:
+				data = SNPData(**keywords)
+				output = open(input_fname + '.pickle', 'wb')
+				cPickle.dump(data, output, protocol=2)
+				output.close() 
+		else:
+			data = SNPData(row_id_key_set,row_id_hash_func,col_id_key_set,col_id_hash_func,keywords)
+		return data
 		
 from db import TableClass
 class GenomeWideResults(TableClass):
