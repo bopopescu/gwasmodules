@@ -31,7 +31,8 @@ Option:
 	-n					Adds the result(s) to the DB.		
 	--comment=...				Comment for DB. (Only applicable if result is added to DB.)	
 	--no_phenotype_ids			Phenotypes don't have DB id as an prefix in their names.  
-						(The phenotype index should be used instead.)	
+						(The phenotype index should be used instead.)
+	--suggest_new_genotypes=...		Suggest new genotypes base on the top X snps, where X is the given argument
 
 	--region_plots=...			Include region plots for the top N (given num) peaks.
 	--cand_genes_file=...			A file with a list of candidate genes.  (added to plots)	

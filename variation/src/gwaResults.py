@@ -1767,7 +1767,7 @@ class Result(object):
 				score = max_score
 			scores[s_i] = score
 
-		plt.plot(positions, scores, ".", markersize=3, alpha=0.7, color=color)
+		plt.plot(positions, scores, ".", markersize=4, alpha=0.7, color=color)
 
 
 		if tair_genes:
