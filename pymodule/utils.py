@@ -220,8 +220,10 @@ class FigureOutTaxID(object):
 				break
 		return tax_id_to_return
 
-def getColName2IndexFromHeader(header):
+def getColName2IndexFromHeader(header, skipEmptyColumn=False):
 	"""
+	2011-2-11
+		add argument skipEmptyColumn
 	2008-09-16
 		convenient function to read input files with flexible column order.
 		One variable doesn't have to be in the same column in different files, as far as the name is same.
@@ -229,6 +231,8 @@ def getColName2IndexFromHeader(header):
 	col_name2index = {}
 	for i in range(len(header)):
 		column_name = header[i]
+		if skipEmptyColumn and not column_name:	#skips empty column
+			continue
 		col_name2index[column_name] = i
 	return col_name2index
 
