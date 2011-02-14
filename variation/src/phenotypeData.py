@@ -81,6 +81,9 @@ class phenotype_data:
 	def num_traits(self):
 		return len(self.phen_dict)
 
+	def num_vals(self, pid):
+		return len(self.phen_dict[pid]['values'])
+
 	def get_pseudo_heritability(self, pid, K):
 		"""
 		Returns the REML estimate of the heritability.
@@ -255,6 +258,33 @@ class phenotype_data:
 		for pid in pids_to_keep:
 			d[pid] = self.phen_dict[pid]
 		self.phen_dict = d
+
+
+	def filter_near_const_phens(self, min_num_diff=15):
+		"""
+		"""
+		n1 = self.num_traits()
+		pids_to_keep = []
+		for pid in self.phen_ids:
+			if not self.is_near_constant(pid, min_num_diff):
+				pids_to_keep.append(pid)
+		self.filter_phenotypes(pids_to_keep)
+		n2 = self.num_traits()
+		print '%d traits out of %d traits were filtered, leaving %d.' % (n1 - n2, n1, n2)
+
+
+
+	def filter_unique_ecotypes(self, ets, pids):
+		"""
+		Removes ecotypes which are not in the given list of ecotypes.
+		"""
+		if not pids:
+			pids = self.phen_ids
+		for pid in pids:
+			ecotypes = self.get_ecotypes(pid)
+			indices_to_keep = [i for i, et in enumerate(ecotypes) if et in ets ]
+			self.filter_ecotypes(indices_to_keep, pids=[pid])
+
 
 
 	def filter_ecotypes(self, indices_to_keep, pids=None):

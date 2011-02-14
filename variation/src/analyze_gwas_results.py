@@ -10,6 +10,7 @@ import itertools as it
 import env
 import random
 import phenotypeData as pd
+import math
 
 
 
@@ -55,19 +56,12 @@ def _estAreaBetweenCurves_(quantiles, expQuantiles):
 	return area
 
 def _calcKS_(scores, exp_scores=None):
-	ret = {}
-	ret["D"] = -1
-	try:
-		from rpy import r
-		if exp_scores:
-			res = r.ks_test(scores, exp_scores)
-		else:
-			res = r.ks_test(scores, "punif")
-		ret = res["statistic"]
-		ret["p.value"] = res["p.value"]
-	except Exception, message:
-		print "Calculating KS failed??", message
-	return ret
+	from scipy import stats
+	if exp_scores:
+		(D, p_val) = stats.ks_2samp(scores, exp_scores)
+	else:
+		(D, p_val) = stats.kstest(scores, stats.uniform.cdf)
+	return {'D':D, 'p_val':p_val}
 
 
 def _getExpectedPvalueQuantiles_(numQuantiles):
@@ -96,7 +90,7 @@ def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=N
 	medians = []
 	for method_type, label in zip(method_types, mapping_labels):
 		result = results[label]
-		newScores = result.scores[:]
+		newScores = result.snp_results['scores'][:]
 		quantiles = _getQuantiles_(newScores, numQuantiles)
 		if perm_pvalues and method_type in ['kw', 'ft']:
 			print "Getting exp. quantiles for permuted p-values"
@@ -112,7 +106,8 @@ def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=N
 			expQuantiles = _getExpectedPvalueQuantiles_(numQuantiles)
 		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
 		median = _calcMedian_(newScores, exp_median)
-		plt.plot(expQuantiles, quantiles, label=label + ", A=" + str(round(area, 3)) + ", M=" + str(round(median, 3)))
+		plt.plot(expQuantiles, quantiles, label=label + ", A=" + str(round(area, 3)) + \
+			", M=" + str(round(median, 3)))
 		areas.append(area)
 		medians.append(median)
 
@@ -190,7 +185,7 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_l
 		mapping_labels = method_types
 	plt.figure(figsize=(5, 4))
 	plt.axes([0.15, 0.14, 0.82, 0.79])
-	maxVal = min(math.log10(len(results[mapping_labels[0]].scores)), maxVal)
+	maxVal = min(math.log10(len(results[mapping_labels[0]].snp_results['scores'])), maxVal)
 	minVal = (1.0 / numDots) * maxVal
 	valRange = maxVal - minVal
 	plt.plot([minVal, maxVal], [minVal, maxVal], "k", label="Expected")
@@ -203,14 +198,14 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_l
 		if perm_pvalues and method_type in ['kw', 'ft']:
 			exp_maxVal = _getLogQuantilesMaxVal_(perm_pvalues[:], maxVal)
 			expQuantiles = _getLogQuantiles_(perm_pvalues[:], numDots, exp_maxVal)
-			ks_res = _calcKS_(result.scores, perm_pvalues)
-			quantiles = _getLogQuantiles_(result.scores[:], numDots, exp_maxVal)
-			slope = _estLogSlope_(result.scores[:], perm_pvalues)
+			ks_res = _calcKS_(result.snp_results['scores'], perm_pvalues)
+			quantiles = _getLogQuantiles_(result.snp_results['scores'][:], numDots, exp_maxVal)
+			slope = _estLogSlope_(result.snp_results['scores'][:], perm_pvalues)
 		else:
-			quantiles = _getLogQuantiles_(result.scores[:], numDots, maxVal)
+			quantiles = _getLogQuantiles_(result.snp_results['scores'][:], numDots, maxVal)
 			expQuantiles = _getExpectedLogQuantiles_()
-			ks_res = _calcKS_(result.scores)
-			slope = _estLogSlope_(result.scores[:])
+			ks_res = _calcKS_(result.snp_results['scores'])
+			slope = _estLogSlope_(result.snp_results['scores'][:])
 
 		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
 		areas.append(area)

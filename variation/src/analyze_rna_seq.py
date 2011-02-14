@@ -22,6 +22,7 @@ import gwaResults
 import pylab
 import pdb
 import itertools as it
+import math
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	"""
@@ -43,7 +44,7 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 	elif cluster == 'usc':  #USC cluster.
 		shstr = "#!/bin/csh\n"
 		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
-		shstr += "#PBS -l mem=%s \n" % '3950mb'
+		shstr += "#PBS -l mem=%s \n" % '4950mb'
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
@@ -62,19 +63,22 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 
 
 
-def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15, filter_threshold=0.1,
+def run_gwas(file_prefix, mapping_method, start_i, stop_i, mac_threshold=15, filter_threshold=0.05,
 		debug_filter=1.0, use_1001_data=True):
 	if mapping_method not in ['emmax', 'kw']:
 		raise Exception('Mapping method unknown')
 	phen_file = env['phen_dir'] + 'rna_seq_020811_10C.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+	phed.filter_near_const_phens(15)
 	phed.convert_to_averages()
+	num_traits = phed.num_traits()
+	pids = phed.phen_ids[start_i :stop_i]
 	if use_1001_data:
 		sd = dp.load_1001_full_snps(debug_filter=debug_filter)
 	else:
 		sd = dp.load_250K_snps(debug_filter=debug_filter)
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
-	phed.filter_ecotypes(indices_to_keep, pids=range(start_pid, stop_pid))
+	phed.filter_ecotypes(indices_to_keep, pids=pids)
 	print len(indices_to_keep)
 	if mapping_method == 'emmax':
 		k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
@@ -87,13 +91,13 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 	macs = r['mafs']
 	mafs = r['marfs']
 	print 'In total there are %d SNPs to be mapped.' % len(snps)
-	g_list = _load_genes_list_()
-	for pid in range(start_pid, stop_pid):
+	gene_dict = _load_genes_list_('rna_seq_020811_10C')
+	for i, pid in enumerate(pids):
+		if not pid in phed.phen_ids: continue
+		cgs = gene_dict[pid]
+		print i
 		gene_tair_id = phed.get_name(pid)
 		curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
-		if phed.is_constant(pid):
-			print "Skipping expressions for %s since it's constant." % gene_tair_id
-			continue
 
 		if mapping_method == 'kw':
 			phen_vals = phed.get_values(pid)
@@ -119,17 +123,19 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 			continue
 		res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions,
 				chromosomes=chromosomes)
+		num_scores = res.get_num_scores()
 
 		#filter, top 10%...
 		res.filter_percentile(filter_threshold, reversed=True)
 		res.write_to_file(curr_file_prefix + '.pvals')
 
 		#Plot GWAs...
-		cgs = g_list[pid - 1]
-		print [cg.tairID for cg in cgs]
-		f_prefix = curr_file_prefix + '_manhattan'
-		res.neg_log_trans()
-		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True)
+		if res.min_score() < 10e-7:
+			#print [cg.tairID for cg in cgs]
+			f_prefix = curr_file_prefix + '_manhattan'
+			res.neg_log_trans()
+			res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True,
+					b_threshold= -math.log10(1.0 / (num_traits * num_scores * 20.0)))
 
 		#Process top regions, where are they...?
 
@@ -159,10 +165,11 @@ def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_thres
 				cPickle.dump(phed, f)
 		#sd.filter_mac_snps(mac_threshold)
 
-		g_list = _load_genes_list_()
+		gene_dict = _load_genes_list_()
 		res_dict = {}
 		pids = phed.get_pids()
 		for pid in pids:
+			if not pid in phed.phen_ids: continue
 			gene_tair_id = phed.get_name(pid)
 			curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
 			if phed.is_constant(pid):
@@ -181,7 +188,7 @@ def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_thres
 				if len(res.snp_results['scores']) == 0:
 					print "Skipping file since nothing is below 10^-5"
 					continue
-				cgs = g_list[pid - 1]
+				cgs = gene_dict[pid]
 				avg_g_pos = sp.mean([(cg.startPos + cg.endPos) / 2.0 for cg in cgs])
 				chrom = cgs[0].chromosome #Current gene chromosome
 				print 'Working on gene: %s, chrom=%d, pos=%0.1f' % (gene_tair_id, chrom, avg_g_pos)
@@ -356,51 +363,54 @@ def run_parallel_rna_seq_gwas():
 	else:
 		phen_file = env['phen_dir'] + 'rna_seq_020811_10C.csv'
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+		phed.filter_near_const_phens(15)
 		num_traits = phed.num_traits()
 		print 'Found %d traits' % num_traits
 		chunck_size = int(sys.argv[2])
 		for i in range(0, num_traits, chunck_size):
-			run_parallel(sys.argv[1], i + 1, i + chunck_size + 1)
+			run_parallel(sys.argv[1], i, i + chunck_size)
 
 
-def _gene_list_to_file_():
+def _gene_list_to_file_(file_prefix='rna_seq_020811_10C'):
 	import bisect
-	phen_file = env['phen_dir'] + 'rna_seq.csv'
+	phen_file = env['phen_dir'] + file_prefix + '.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+	phed.filter_near_const_phens(15)
 	tair_gene_versions = phed.get_names()
 	tair_ids = [s.split('.')[0] for s in tair_gene_versions]
+	pids = phed.phen_ids
 	gl = gr.get_gene_list(include_intron_exons=False)
 	g_tair_ids = [g.tairID for g in gl]
 	l = zip(g_tair_ids, gl)
 	l.sort()
 	(g_tair_ids, gl) = map(list, zip(*l))
-	genes = []
+	gene_dict = {}
 	g_chrom_pos = []
-	for tid in tair_ids:
+	for pid, tid in zip(pids, tair_ids):
 		g_i = bisect.bisect_left(g_tair_ids, tid)
 		if tid != g_tair_ids[g_i]:
 			print tid, g_tair_ids[g_i - 1], g_tair_ids[g_i]
-			genes.append([gl[g_i - 1], gl[g_i]])
+			gene_dict[pid] = [gl[g_i - 1], gl[g_i]]
 			pos_l = [gl[g_i - 1].startPos, gl[g_i - 1].endPos, gl[g_i].startPos, gl[g_i].endPos]
 		else:
 			pos_l = [gl[g_i].startPos, gl[g_i].endPos]
-			genes.append([gl[g_i]])
+			gene_dict[pid] = [gl[g_i]]
 		chr_pos_t = (gl[g_i].chromosome, min(pos_l), max(pos_l))
 		if chr_pos_t[2] - chr_pos_t[1] > 50000 or chr_pos_t[2] - chr_pos_t[1] < 0:
 			print chr_pos_t
 		g_chrom_pos.append(chr_pos_t)
-	print len(genes), len(tair_ids), len(g_chrom_pos)
-	rna_gene_pickle_file = env['phen_dir'] + 'rna_seq.genes'
+	print len(gene_dict), len(tair_ids), len(g_chrom_pos)
+	rna_gene_pickle_file = env['phen_dir'] + file_prefix + '.genes'
 	with open(rna_gene_pickle_file, 'wb') as f:
-		cPickle.dump(genes, f)
+		cPickle.dump(gene_dict, f)
 
 
-def _load_genes_list_():
+def _load_genes_list_(file_prefix='rna_seq_020811_10C'):
 
-	rna_gene_pickle_file = env['phen_dir'] + 'rna_seq.genes'
+	rna_gene_pickle_file = env['phen_dir'] + file_prefix + '.genes'
 	with open(rna_gene_pickle_file) as f:
-		genes = cPickle.load(f)
-	return genes
+		gene_dict = cPickle.load(f)
+	return gene_dict
 
 
 
@@ -415,16 +425,16 @@ def _test_parallel_():
 
 if __name__ == '__main__':
 	#_load_results_('emmax', file_prefix='/storage/rna_seq_gwas_results/rna_seq')
-	plot('/storage/rna_seq_gwas_results/rna_seq')
+	#plot('/storage/rna_seq_gwas_results/rna_seq')
 	#_gene_list_to_file_()
 	#_test_()
-#	print sys.argv
-#	run_parallel_rna_seq_gwas()
+	print sys.argv
+	run_parallel_rna_seq_gwas()
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:
 #		_test_parallel_()
-	sys.exit(0)
+#	sys.exit(0)
 
 
 

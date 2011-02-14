@@ -21,6 +21,7 @@ import sys
 import time
 from pdb import Pdb
 import itertools as it
+import math
 
 
 
@@ -63,11 +64,15 @@ class LinearModel(object):
 		"""
 		self.p = 0
 		if include_intercept:
-			self.X = sp.mat(sp.repeat(1, self.n)).T #The intercept
+			self.X = sp.mat(sp.repeat(1, self.n, dtype='single')).T #The intercept
 			self.p = 1
-		if len(factors) > 0:
-			self.X = sp.hstack([self.X, sp.matrix(factors).T])
+			if len(factors) > 0:
+				self.X = sp.hstack([self.X, sp.matrix(factors, dtype='single').T])
 			self.p += len(factors)
+
+		else:
+			self.X = sp.matrix(factors, dtype='single').T
+			self.p = len(factors)
 
 
 
@@ -726,7 +731,7 @@ class LinearMixedModel(LinearModel):
 				opt_delta = new_opt_delta
 				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			else:
-				warnings.warn('Local maximum outside of suggested possible areas?')
+				print 'Local maximum outside of suggested possible areas?'
 				print 'opt_i:', opt_i
 				print 'Grid optimal delta:', opt_delta
 				print "Newton's optimal delta:", new_opt_delta
@@ -782,147 +787,10 @@ class LinearMixedModel(LinearModel):
 
 
 
-#	def get_expedited_REMLE(self, eig_L=None, xs=None, ngrids=100, llim= -5, ulim=10, esp=1e-6,
-#				return_pvalue=False, return_f_stat=False):
-#		"""
-#		Get ML estimates for the effect sizes, as well as the random effect contributions.
-#		
-#		Using the algorithm adopted in EMMA [Kang et al. (2008)].		
-#		"""
-#		if not eig_L:
-#			raise Exception
-#		if xs:
-#			X = sp.hstack([self.X, matrix([[v] for x in xs for v in x ])])
-#		else:
-#			X = self.X
-#		eig_R = self._get_eigen_R_(X)
-#		K = self.random_effects[1][1]
-#		t = K.shape[0] #number of rows
-#		q = X.shape[1] #number of columns
-#		#print 'X, number of columns: % d, number of rows: % d' % (q, t)
-#		n = self.n
-#		p = n - q
-#		assert K.shape[0] == K.shape[1] == X.shape[0] == n, 'Dimensions are wrong.'
-#
-#		etas = eig_R['vectors'] * self.Y
-#		sq_etas = [float(eta) * float(eta) for eta in etas]
-#		log_deltas = [float(i) / ngrids * (ulim - llim) + llim  for i in range(ngrids + 1)] #a list of deltas to search
-#		assert len(log_deltas) == ngrids + 1, 'Delta list size error.'
-#		deltas = map(sp.exp, log_deltas)
-#		eig_vals = list(eig_R['values'])
-#		assert len(eig_vals) == p, 'Number of eigenvalues is incorrect.'
-#
-#		#LL <- 0.5*(p*(log((p)/(2*pi))-1-log(colSums(Etasq/Lambdas)))-colSums(log(Lambdas)))
-#
-#		c_1 = 0.5 * p * (sp.log((p) / (2.0 * sp.pi)) - 1)
-#
-#
-#		def calc_ll(d):
-#			"""
-#			Calculates the likelihood, and the derivative given a delta.
-#			"""
-#			sum_1 = 0
-#			sum_2 = 0
-#			sum_3 = 0
-#			sum_4 = 0
-#			for j in range(p):
-#				v_1 = eig_vals[j] + d
-#				v_2 = sq_etas[j] / v_1
-#				sum_1 += v_2
-#				sum_2 += sp.log(v_1)
-#				sum_3 += v_2 / v_1
-#				sum_4 += 1.0 / v_1
-#			#LL <- 0.5*((p)*(log((p)/(2*pi))-1-log(colSums(Etasq/Lambdas)))-colSums(log(Lambdas)))
-#			ll = c_1 - (0.5) * ((p) * sp.log(sum_1) + sum_2)  #log-likelihoods (eq. 7 from paper)
-#			#dLL <- 0.5*((p)*colSums(Etasq/(Lambdas*Lambdas))/colSums(Etasq/Lambdas)-colSums(1/Lambdas))
-#			dll = 0.5 * ((p) * sum_3 / sum_1 - sum_4)  #diffrentiated log-likelihoods (eq. 9 from paper)
-#			return ll, dll
-#
-#
-#		last_ll, last_dll = calc_ll(deltas[0])
-#		max_ll = last_ll
-#		max_ll_i = 0
-#		zero_intervals = []
-#		lls = [max_ll]
-#		dlls = [last_dll]
-#		for i, d in enumerate(deltas[1:]):
-#			ll, dll = calc_ll(d)
-#			lls.append(ll)
-#			dlls.append(dll)
-#			if ll > max_ll:
-#				max_ll = ll
-#				max_ll_i = i
-#			if last_dll > 0 and dll < 0:
-#				zero_intervals.append(((ll + last_ll) * 0.5, i))
-#			last_dll = dll
-#		#pdb.set_trace()
-#
-#		if len(zero_intervals) > 0:
-#			#print 'local maximum found:',zero_intervals
-#			opt_ll, opt_i = max(zero_intervals)
-#			opt_delta = 0.5 * (deltas[opt_i] + deltas[opt_i + 1])
-#			#Newton-Raphson
-#			new_opt_delta = optimize.newton(self._redll_, opt_delta, args=(eig_vals, sq_etas), tol=esp, maxiter=50)
-#			if deltas[opt_i] - esp < new_opt_delta < deltas[opt_i + 1] + esp:
-#				opt_delta = new_opt_delta
-#				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
-#			else:
-#				opt_delta = new_opt_delta
-#				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
-#				print 'Local maximum outside of suggested area??'
-#				print opt_delta, new_opt_delta
-#				raise Exception('Local maximum outside of suggested area??')
-#			if opt_ll < max_ll:
-#				opt_delta = deltas[max_ll_i]
-#		else:
-#			opt_delta = deltas[max_ll_i]
-#			opt_ll = max_ll
-#
-#
-#		#eig_vals.reverse()
-#		l = map(lambda x, y: x / (y + opt_delta), sq_etas, eig_vals)
-#		opt_vg = sum(l) / (p)  #vg   
-#		opt_ve = opt_vg * opt_delta  #ve
-#
-#		H_sqrt = eig_L['vectors'].T * sp.diag([sp.sqrt(ev + opt_delta) for ev in eig_L['values']])
-#		H_inverse = eig_L['vectors'].T * sp.diag([1.0 / (ev + opt_delta) for ev in eig_L['values']]) * eig_L['vectors']
-#		H_sqrt_inv = eig_L['vectors'].T * sp.diag([1.0 / sp.sqrt(ev + opt_delta) for ev in eig_L['values']])
-#		XX = X.T * (H_inverse * X)
-#		iXX = linalg.pinv(XX)
-#		beta_est = iXX * X.T * (H_inverse * self.Y)
-#		x_beta = X * beta_est
-#		residuals = self.Y - x_beta
-#		mahalanobis_rss = residuals.T * H_inverse * residuals
-#		rss = residuals.T * residuals
-#		x_beta_var = sp.var(x_beta, ddof=1)
-#		var_perc = x_beta_var / self.y_var
-#		res_dict = {'max_ll':opt_ll, 'delta':opt_delta, 'beta':beta_est, 've':opt_ve, 'vg':opt_vg,
-#			    'var_perc':var_perc, 'rss':rss, 'mahalanobis_rss':mahalanobis_rss, 'H_sqrt':H_sqrt,
-#			    'H_sqrt_inv':H_sqrt_inv, 'pseudo_heritability':1.0 / (1 + opt_delta)}
-#		if xs and return_f_stat:
-#			q = X.shape[1] - self.X.shape[1]
-#			h0_iXX = linalg.pinv(self.X.T * (H_inverse * self.X))
-#			h0_beta_est = h0_iXX * self.X.T * (H_inverse * self.Y)
-#			h0_residuals = self.Y - self.X * h0_beta_est
-#			h0_rss = h0_residuals.T * H_inverse * h0_residuals
-#			f_stat = ((h0_rss - rss) / (q)) / (rss / p)
-#
-#			#Redo this t-statistic.
-##			t_stat = self.beta_est[q-1]/sp.sqrt(float(iXX[q-1,q-1])*opt_vg)
-#			res_dict['f_stat'] = float(f_stat)
-#		if return_pvalue:
-#			#p_val = stats.t.sf(abs(t_stat), p)*2
-#			p_val = stats.f.sf(f_stat, q, p)
-#			res_dict['p_val'] = float(p_val)
-#
-#		print res_dict
-#		return res_dict
-
-
-
 	def expedited_REML_t_test(self, snps, ngrids=50, llim= -4, ulim=10, esp=1e-6, verbose=True):
 		"""
-		Single SNP analysis (Not as fast as the R-version?)
+		Single SNP analysis 
+		Faster than R EMMA.
 		"""
 		assert len(self.random_effects) == 2, "Expedited REMLE only works when we have exactly two random effects."
 		K = self.random_effects[1][1]
@@ -1225,6 +1093,7 @@ class LinearMixedModel(LinearModel):
 			M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
 		else:
 			betas_list = [h0_betas] * num_snps
+			M = H_sqrt_inv.T
 
 		rss_list = sp.repeat(h0_rss, num_snps)
 		if return_transformed_snps:
@@ -1232,10 +1101,7 @@ class LinearMixedModel(LinearModel):
 		chunk_size = len(Y)
 		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
-			if with_betas:
-				Xs = snps_chunk * (H_sqrt_inv.T)
-			else:
-				Xs = snps_chunk * M
+			Xs = snps_chunk * M
 			for j in range(len(Xs)):
 				if return_transformed_snps:
 					t_snps.append(sp.array(Xs[j]).flatten())
@@ -1250,8 +1116,6 @@ class LinearMixedModel(LinearModel):
 					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
 				if rss:
 					rss_list[i + j] = rss[0]
-				else:
-					h0_rss
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					sys.stdout.write('.')
@@ -1272,6 +1136,101 @@ class LinearMixedModel(LinearModel):
 			res_d['t_snps'] = t_snps
 		return res_d
 
+
+	def emmax_full_model_gxe(self, snps, E, H_sqrt_inv, Z, verbose=True,):
+		"""
+		EMMAX implementation (in python), for GxE interaction..
+		
+		Tests: 	- Y=E+G (H1) vs. Y=E (H0)
+			- Y=E+G+GE (H2) vs. Y=E (H0)
+			- Y=E+G+GE (H2) vs. Y=E+G (H1)
+				
+		Methods:
+			normal - Normal regression
+			qr - Uses QR decomposition to speed up regression with many co-factors.
+			
+		"""
+		dtype = 'single'
+		n = self.n
+		num_snps = len(snps)
+
+		h0_X = sp.mat(H_sqrt_inv * self.X, dtype=dtype) #inlcudes E (which is static)
+		Y = H_sqrt_inv * self.Y	#The transformed outputs.
+		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
+		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
+		h0_betas = map(float, list(h0_betas))
+
+		(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+		Q = sp.mat(Q)
+		Q2 = Q * Q.T
+		M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
+		M_E = sp.mat(sp.array(Z.T) * E, dtype=dtype) * M
+		M = Z.T * M
+
+		rss_h1_list = sp.repeat(h0_rss, num_snps)
+		rss_h2_list = sp.repeat(h0_rss, num_snps)
+		chunk_size = len(Y)
+
+		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
+
+			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
+			Xs = snps_chunk * M # snps_chunk*Z_t*H_sqrt_inv_t *(I-Q*Q_t)
+			X_Es = snps_chunk * M_E # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
+
+			for j in range(len(Xs)):
+				(betas, rss_h1, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+				rss_h1_list[i + j] = rss_h1[0]
+				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack([Xs[j], X_Es[j]])), Y,
+									overwrite_a=True)
+				rss_h2_list[i + j] = rss_h2[0]
+
+				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
+					sys.stdout.write('.')
+					sys.stdout.flush()
+
+		if verbose and num_snps >= 10:
+			sys.stdout.write('\n')
+
+		q_h01 = 1  # Single SNP is being tested
+		n_p_h01 = n - h0_rank + q_h01
+		rss_h01_ratio = h0_rss / rss_h1_list
+		var_perc_h01 = 1 - 1 / rss_h01_ratio
+		f_stats_h01 = (rss_h01_ratio - 1) * n_p_h01 / float(q_h01)
+		p_vals_h01 = stats.f.sf(f_stats_h01, q_h01, n_p_h01)
+
+		q_h02 = 2  # A SNP and SNP X E is being tested
+		n_p_h02 = n - h0_rank + q_h02
+		rss_h02_ratio = h0_rss / rss_h2_list
+		var_perc_h02 = 1 - 1 / rss_h02_ratio
+		f_stats_h02 = (rss_h02_ratio - 1) * n_p_h02 / float(q_h02)
+		p_vals_h02 = stats.f.sf(f_stats_h02, q_h02, n_p_h02)
+
+		q_h12 = 1  # Only SNP X E is being tested
+		n_p_h12 = n - h0_rank + 1 + q_h12
+		rss_h12_ratio = rss_h1_list / rss_h2_list
+		var_perc_h12 = 1 - 1 / rss_h12_ratio
+		f_stats_h12 = (rss_h12_ratio - 1) * n_p_h12 / float(q_h12)
+		p_vals_h12 = stats.f.sf(f_stats_h12, q_h12, n_p_h12)
+
+
+		res_d = {'ps_h01':p_vals_h01, 'f_stats_h01':f_stats_h01, 'rss_h1':rss_h1_list, 'var_perc_h01':var_perc_h01,
+			'h0_rss':h0_rss, 'h0_betas':h0_betas,
+			'ps_h02':p_vals_h02, 'f_stats_h02':f_stats_h02, 'rss_h2':rss_h2_list, 'var_perc_h02':var_perc_h02,
+			'ps_h12':p_vals_h12, 'f_stats_h12':f_stats_h12, 'var_perc_h12':var_perc_h12}
+		return res_d
+
+
+
+
+
+	def emmax_general_f_test(self, snps, Z=None, with_betas=False, method='REML'):
+		"""
+		"""
+		#Tests to do:
+		# 1. G against mean 
+		# 2. E against mean
+		# 3. G+E against E (mean is implicit)
+		# 4. G+GxE+E against E (mean is implicit)
 
 
 	def emmax_two_snps(self, snps, verbose=True):
@@ -2473,9 +2432,11 @@ def _test_stepwise_emmax_():
 
 
 
+
 def _test_joint_analysis_():
 	import dataParsers as dp
 	import phenotypeData as pd
+	import analyze_gwas_results as agr
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
 	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
 	phed = pd.parse_phenotype_file(filename)
@@ -2490,15 +2451,16 @@ def _test_joint_analysis_():
 	joint_ecotypes = []
 	gen_var_list = []
 	err_var_list = []
+	her_list = []
 	k_list = []
 	for pid in pids:
 		print phed.get_name(pid)
 		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
 						filter=0.01)
 		sd.coordinate_w_phenotype_data(phed, pid)
-		phed.log_transform(pid)
 		phed.normalize_values(pid)
 		phenotypes = phed.get_values(pid)
+		phed.log_transform(pid)
 		#Create a new phenotype.
 		joint_phen_vals.extend(phenotypes)
 		ecotypes = phed.get_ecotypes(pid)
@@ -2511,12 +2473,25 @@ def _test_joint_analysis_():
 		lmm.add_random_effect(K)
 		res = lmm.get_REML()
 		print 'Pseudo-heritatbility:', res['pseudo_heritability']
+		her_list.append(res['pseudo_heritability'])
 		err_var_list.append(res['ve'])
-		gen_var_list.append(sp.sqrt(res['vg']))
+		gen_var_list.append(res['vg'])
+
+
+	#E in the model.
+	joint_X = []
+	num_vals = len(joint_phen_vals)
+	shift = 0
+	for pid in pids:
+
+		n = phed.num_vals(pid)
+		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
+		shift += n
+
 
 	#Get correlations between traits..
 	corr_mat, pids = phed.get_correlations(pids)
-	corr_mat = corr_mat * corr_mat
+	#corr_mat = corr_mat * corr_mat
 	print gen_var_list, err_var_list, corr_mat, pids
 
 	unique_ecotypes = list(set(joint_ecotypes))
@@ -2548,9 +2523,19 @@ def _test_joint_analysis_():
 		for j, pid2 in enumerate(pids):
 			ets_map2 = ecotype_maps[pid2]
 			num_ets2 = len(ets_map2)
-			var_sclice = corr_mat[i, j] * gen_var_list[i] * gen_var_list[j] * K[ets_map1, :][:, ets_map2]
-			if pid1 == pid2:
-				var_sclice += err_var_list[i] * sp.eye(num_ets1)
+			if i == j:
+				var_sclice = math.sqrt(gen_var_list[i] * gen_var_list[j]) * \
+						K[ets_map1, :][:, ets_map2] + err_var_list[i] * sp.eye(num_ets1)
+			else:
+				if  her_list[i] > 0 and her_list[j] > 0:
+					rho = corr_mat[i, j] / sp.sqrt(her_list[i] * her_list[j])
+					if rho > 1.0: rho = 1.0
+					if rho < -1.0: rho = 1.0
+				else:
+					rho = 0
+				print i, j, rho
+				var_sclice = rho * math.sqrt(gen_var_list[i] * gen_var_list[j]) * \
+						K[ets_map1, :][:, ets_map2]
 			V[m_i:m_i + num_ets1, m_j:m_j + num_ets2] = var_sclice
 			m_j += num_ets2
 		m_i += num_ets1
@@ -2563,6 +2548,8 @@ def _test_joint_analysis_():
 
 	#5. Run analysis..
 	lmm = LinearMixedModel(joint_phen_vals)
+	lmm.set_factors(joint_X, False)
+	#print lmm.X
 	#Need to fix the SNPs!!!
 	Z = sp.int16(sp.mat(joint_ecotypes).T == sp.mat(unique_ecotypes))
 	snps = sd.getSnps()
@@ -2573,14 +2560,140 @@ def _test_joint_analysis_():
 	#pdb.set_trace()
 	png_file_name = '/Users/bjarni.vilhjalmsson/tmp/test.png'
 	import gwaResults as gr
-	res = gr.Result(scores=res['ps'], positions=positions, chromosomes=chromosomes)
-	gr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
+	res = gr.Result(scores=res['ps'].tolist(), positions=positions, chromosomes=chromosomes)
+	agr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
 		pngFile='/Users/bjarni.vilhjalmsson/tmp/qq_plot.png')
-	gr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
+	agr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
 			phenName='joint', pngFile='/Users/bjarni.vilhjalmsson/tmp/log_qq_plot.png')
 	res.neg_log_trans()
 	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
 
+
+
+#def joint_emmax_analysis(phed, pids, sd, mac_threshold=15,
+#			kinship_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled'):
+#	"""
+#	Perform joint trait analysis. 
+#	"""
+#
+#	import dataParsers as dp
+#	import phenotypeData as pd
+#	import analyze_gwas_results as agr
+#
+#	joint_phen_vals = []
+#	joint_ecotypes = []
+#	gen_var_list = []
+#	err_var_list = []
+#	her_list = []
+#	k_list = []
+#	for pid in pids:
+#		print phed.get_name(pid)
+#		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
+#		phed.filter_unique_ecotypes(sd.accessions, [pid])
+#		phed.normalize_values(pid)
+#		phenotypes = phed.get_values(pid)
+#		#Create a new phenotype.
+#		joint_phen_vals.extend(phenotypes)
+#		ecotypes = phed.get_ecotypes(pid)
+#		joint_ecotypes.extend(ecotypes)
+#		K = load_kinship_from_file(kinship_file, ecotypes)
+#		#Get pseudoheritabilities for all phenotypes
+#		lmm = LinearMixedModel(phenotypes)
+#		lmm.add_random_effect(K)
+#		res = lmm.get_REML()
+#		print 'Pseudo-heritatbility:', res['pseudo_heritability']
+#		her_list.append(res['pseudo_heritability'])
+#		err_var_list.append(res['ve'])
+#		gen_var_list.append(res['vg'])
+#
+#
+#	#E in the model.
+#	joint_X = []
+#	num_vals = len(joint_phen_vals)
+#	shift = 0
+#	for pid in pids:
+#
+#		n = phed.num_vals(pid)
+#		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
+#		shift += n
+#
+#
+#	#Get correlations between traits..
+#	corr_mat, pids = phed.get_correlations(pids)
+#	#corr_mat = corr_mat * corr_mat
+#	print gen_var_list, err_var_list, corr_mat, pids
+#
+#	unique_ecotypes = list(set(joint_ecotypes))
+#	sd.filter_accessions(unique_ecotypes)
+#	if mac_threshold:
+#		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
+#
+#	K = load_kinship_from_file(kinship_file, unique_ecotypes)
+#
+#	#Create ecotype maps
+#	ecotype_maps = {}
+#	for pid in pids:
+#		l = []
+#		ets = phed.get_ecotypes(pid)
+#		for et in ets:
+#			l.append(unique_ecotypes.index(et))
+#		ecotype_maps[pid] = l
+#
+#	#Construct new variance matrix
+#	V = sp.zeros((len(joint_ecotypes), len(joint_ecotypes)))
+#	m_i = 0
+#	for i, pid1 in enumerate(pids):
+#		ets_map1 = ecotype_maps[pid1]
+#		num_ets1 = len(ets_map1)
+#		m_j = 0
+#		for j, pid2 in enumerate(pids):
+#			ets_map2 = ecotype_maps[pid2]
+#			num_ets2 = len(ets_map2)
+#			if i != j and her_list[i] > 0 and her_list[j] > 0:
+#				rho = corr_mat[i, j] / math.sqrt(her_list[i] * her_list[j])
+#				#print 'rho:', rho
+#				#pdb.set_trace()
+#				#rho = min(1.0, rho)
+#			elif i == j:
+#				rho = 1.0
+#			else:
+#				rho = 0
+#			print i, j, rho
+#			var_sclice = rho * math.sqrt(gen_var_list[i] * gen_var_list[j]) * K[ets_map1, :][:, ets_map2]
+#			if pid1 == pid2:
+#				var_sclice += err_var_list[i] * sp.eye(num_ets1)
+#			V[m_i:m_i + num_ets1, m_j:m_j + num_ets2] = var_sclice
+#			m_j += num_ets2
+#		m_i += num_ets1
+#
+#	print'Performing Cholesky decomposition'
+#	H_sqrt = cholesky(V)
+#	H_sqrt_inv = sp.mat(H_sqrt.T).I
+#
+#	#pdb.set_trace()
+#
+#	#5. Run analysis..
+#	lmm = LinearMixedModel(joint_phen_vals)
+#	lmm.set_factors(joint_X, False)
+#	print lmm.X
+#	pdb.set_trace()
+#	#Need to fix the SNPs!!!
+#	Z = sp.int16(sp.mat(joint_ecotypes).T == sp.mat(unique_ecotypes))
+#	snps = sd.getSnps()
+# 	positions = sd.getPositions()
+# 	chromosomes = sd.get_chr_list()
+#	#pdb.set_trace()
+#	res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
+#	#pdb.set_trace()
+#	png_file_name = '/Users/bjarni.vilhjalmsson/tmp/test.png'
+#	import gwaResults as gr
+#	res = gr.Result(scores=res['ps'].tolist(), positions=positions, chromosomes=chromosomes)
+#	agr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
+#		pngFile='/Users/bjarni.vilhjalmsson/tmp/qq_plot.png')
+#	agr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
+#			phenName='joint', pngFile='/Users/bjarni.vilhjalmsson/tmp/log_qq_plot.png')
+#	res.neg_log_trans()
+#	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
 
 
 
@@ -2687,5 +2800,5 @@ if __name__ == "__main__":
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format('/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.csv',
 #				k, k_accessions)
-	#_test_joint_analysis_()
-	_test_phyB_snps_()
+	_test_joint_analysis_()
+	#_test_phyB_snps_()

@@ -1868,10 +1868,9 @@ class Result(object):
 
 
 
-	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None,
-		       percentile=90, type="pvals", ylab="$-$log$_{10}(p-$value$)$",
-		       plot_bonferroni=False, cand_genes=None, threshold=0, highlight_markers=None,
-		       tair_file=None, plot_genes=True):
+	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None, percentile=90,
+			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
+			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
@@ -2009,7 +2008,8 @@ class Result(object):
 
 
 		if plot_bonferroni:
-			b_threshold = -math.log10(1.0 / (num_scores * 20.0))
+			if not b_threshold:
+				b_threshold = -math.log10(1.0 / (num_scores * 20.0))
 			if threshold :
 				plt.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], ":")
 				threshold = -math.log10(threshold)
@@ -2411,6 +2411,10 @@ class Result(object):
 #				self.scores[i] = "NA"
 
 
+	def get_num_scores(self):
+		return len(self.snp_results['scores'])
+
+
 	def get_max_snp(self):
 		max_val = max(self.snp_results['scores'])
 		mi = self.snp_results['scores'].index(max_val)
@@ -2418,6 +2422,11 @@ class Result(object):
 			self.snp_results['chromosomes'][mi], self.snp_results['positions'][mi])
 
 
+	def min_score(self):
+		return min(self.snp_results['scores'])
+
+	def max_score(self):
+		return max(self.snp_results['scores'])
 
 
 	def write_to_file(self, filename, additional_columns=None):
