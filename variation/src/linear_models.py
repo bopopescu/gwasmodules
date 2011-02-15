@@ -558,7 +558,6 @@ class LinearMixedModel(LinearModel):
 
 	def _get_eigen_L_(self, K, dtype='single'):
 		evals, evecs = linalg.eigh(K)
-		pylab.set_trace()
 		return {'values':evals, 'vectors':sp.mat(evecs).T}
 
 
@@ -615,11 +614,12 @@ class LinearMixedModel(LinearModel):
 		This is EMMA
 		"""
 		K = self.random_effects[1][1]
-		eig_L = self._get_eigen_L_(K)
+		#eig_L = self._get_eigen_L_(K)
 
 		#Get the variance estimates..
-		res = self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML')
-		res['eig_L'] = eig_L
+		#res = self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
+		res = self.get_estimates(ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
+		#res['eig_L'] = eig_L
 		return res
 
 
@@ -637,7 +637,7 @@ class LinearMixedModel(LinearModel):
 
 	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
-				dtype='single'):
+				dtype='single', K=None):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
 		Using the EMMA algorithm.
@@ -646,8 +646,6 @@ class LinearMixedModel(LinearModel):
 		"""
 		if verbose:
 			print 'Retrieving %s variance estimates' % method
-		if not eig_L:
-			raise Exception
 		if len(xs):
 			X = sp.hstack([self.X, xs])
 		else:
@@ -753,8 +751,10 @@ class LinearMixedModel(LinearModel):
 		opt_vg = sp.sum(l) / p  #vg   
 		opt_ve = opt_vg * opt_delta  #ve
 
-		H_sqrt_inv = sp.mat(sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)), dtype=dtype) * eig_L['vectors']
-		pdb.set_trace()
+		#H_sqrt_inv = sp.mat(sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)), dtype=dtype) * eig_L['vectors']
+		V = opt_vg * K + opt_ve * sp.eye(len(K))
+		H_sqrt = cholesky(V).T
+		H_sqrt_inv = H_sqrt.I
 		X_t = H_sqrt_inv * X
 		Y_t = H_sqrt_inv * self.Y
 		(beta_est, mahalanobis_rss, rank, sigma) = linalg.lstsq(X_t, Y_t)
@@ -776,7 +776,6 @@ class LinearMixedModel(LinearModel):
 		if return_pvalue:
 			p_val = stats.f.sf(f_stat, (xs.shape[1]), p)
 			res_dict['p_val'] = float(p_val)
-		pdb.set_trace()
 
 		return res_dict #, lls, dlls, sp.log(deltas)
 
@@ -1046,10 +1045,9 @@ class LinearMixedModel(LinearModel):
 		With interactions between SNP and possible cofactors.
 		"""
 		K = self.random_effects[1][1]
-		eig_L = self._get_eigen_L_(K)
-		#s = time.time()
-		res = self.get_estimates(eig_L=eig_L, method=method) #Get the variance estimates..
-		#print 'Took % .6f secs.' % (time.time() - s)
+		#eig_L = self._get_eigen_L_(K)
+		#res = self.get_estimates(eig_L=eig_L, method=method, K=K) #Get the variance estimates..
+		res = self.get_estimates(method=method, K=K) #Get the variance estimates..
 		print 'pseudo_heritability:', res['pseudo_heritability']
 
 		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], Z=Z, with_betas=with_betas)
@@ -1690,7 +1688,6 @@ def emmax(snps, phenotypes, K, cofactors=None, Z=None, with_betas=False):
 			for cofactor in cofactors:
 				lmm.add_factor(cofactor)
 
-	pdb.set_trace()
 	print "Running EMMAX"
 	s1 = time.time()
 	res = lmm.emmax_f_test(snps, Z=Z, with_betas=with_betas)

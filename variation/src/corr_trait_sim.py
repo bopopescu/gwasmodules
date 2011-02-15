@@ -158,7 +158,7 @@ def run_joint_analysis(start_i, stop_i, heritability, mac_threshold=15, debug_fi
 		res1.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
 		png_file_name = f_prefix + '_manhattan_res2.png'
 		res2.neg_log_trans()
-		res1.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+		res2.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
 
 		gen_var_list = [trait1_res['vg'], trait2_res['vg']]
 		err_var_list = [trait1_res['ve'], trait2_res['ve']]
@@ -181,7 +181,6 @@ def run_joint_analysis(start_i, stop_i, heritability, mac_threshold=15, debug_fi
 		corr_mat = sp.corrcoef(trait_pair[0], trait_pair[1])
 		print her_list, gen_var_list, err_var_list, corr_mat[0, 1]
 		res_dict['trait_corr'].append(corr_mat[0, 1])
-		pdb.set_trace()
 
 
 
