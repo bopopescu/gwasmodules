@@ -558,6 +558,7 @@ class LinearMixedModel(LinearModel):
 
 	def _get_eigen_L_(self, K, dtype='single'):
 		evals, evecs = linalg.eigh(K)
+		pylab.set_trace()
 		return {'values':evals, 'vectors':sp.mat(evecs).T}
 
 
@@ -753,6 +754,7 @@ class LinearMixedModel(LinearModel):
 		opt_ve = opt_vg * opt_delta  #ve
 
 		H_sqrt_inv = sp.mat(sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)), dtype=dtype) * eig_L['vectors']
+		pdb.set_trace()
 		X_t = H_sqrt_inv * X
 		Y_t = H_sqrt_inv * self.Y
 		(beta_est, mahalanobis_rss, rank, sigma) = linalg.lstsq(X_t, Y_t)
@@ -774,6 +776,7 @@ class LinearMixedModel(LinearModel):
 		if return_pvalue:
 			p_val = stats.f.sf(f_stat, (xs.shape[1]), p)
 			res_dict['p_val'] = float(p_val)
+		pdb.set_trace()
 
 		return res_dict #, lls, dlls, sp.log(deltas)
 
@@ -1687,6 +1690,7 @@ def emmax(snps, phenotypes, K, cofactors=None, Z=None, with_betas=False):
 			for cofactor in cofactors:
 				lmm.add_factor(cofactor)
 
+	pdb.set_trace()
 	print "Running EMMAX"
 	s1 = time.time()
 	res = lmm.emmax_f_test(snps, Z=Z, with_betas=with_betas)
