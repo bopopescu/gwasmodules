@@ -1179,10 +1179,9 @@ class LinearMixedModel(LinearModel):
 			X_Es = snps_chunk * M_E # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
 
 			for j in range(len(Xs)):
-				(betas, rss_h1, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+				(betas, rss_h1, p, sigma) = linalg.lstsq(Xs[j].T, Y)
 				rss_h1_list[i + j] = rss_h1[0]
-				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack([Xs[j], X_Es[j]])), Y,
-									overwrite_a=True)
+				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack([Xs[j], X_Es[j]])), Y, overwrite_a=True)
 				rss_h2_list[i + j] = rss_h2[0]
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
@@ -1193,25 +1192,26 @@ class LinearMixedModel(LinearModel):
 			sys.stdout.write('\n')
 
 		q_h01 = 1  # Single SNP is being tested
-		n_p_h01 = n - h0_rank + q_h01
+		n_p_h01 = n - h0_rank - q_h01
 		rss_h01_ratio = h0_rss / rss_h1_list
 		var_perc_h01 = 1 - 1 / rss_h01_ratio
 		f_stats_h01 = (rss_h01_ratio - 1) * n_p_h01 / float(q_h01)
 		p_vals_h01 = stats.f.sf(f_stats_h01, q_h01, n_p_h01)
 
 		q_h02 = 2  # A SNP and SNP X E is being tested
-		n_p_h02 = n - h0_rank + q_h02
+		n_p_h02 = n - h0_rank - q_h02
 		rss_h02_ratio = h0_rss / rss_h2_list
 		var_perc_h02 = 1 - 1 / rss_h02_ratio
 		f_stats_h02 = (rss_h02_ratio - 1) * n_p_h02 / float(q_h02)
 		p_vals_h02 = stats.f.sf(f_stats_h02, q_h02, n_p_h02)
 
 		q_h12 = 1  # Only SNP X E is being tested
-		n_p_h12 = n - h0_rank + 1 + q_h12
+		n_p_h12 = n - h0_rank - 1 - q_h12
 		rss_h12_ratio = rss_h1_list / rss_h2_list
 		var_perc_h12 = 1 - 1 / rss_h12_ratio
 		f_stats_h12 = (rss_h12_ratio - 1) * n_p_h12 / float(q_h12)
 		p_vals_h12 = stats.f.sf(f_stats_h12, q_h12, n_p_h12)
+		#pdb.set_trace()
 
 
 		res_d = {'ps_h01':p_vals_h01, 'f_stats_h01':f_stats_h01, 'rss_h1':rss_h1_list, 'var_perc_h01':var_perc_h01,

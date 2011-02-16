@@ -2125,14 +2125,15 @@ class Result(object):
 		print "%i scores were removed." % (count - len(self.scores))
 
 
-	def filter_attr(self, attr_name, attr_threshold, reversed=False):
+	def filter_attr(self, attr_name, attr_threshold, reversed=False, verbose=False):
 		"""
 		Filter out scores / pvalues etc. which have attr < attr_threshold.
 
 		attr are e.g.
 		'mafs', 'macs', 'scores', etc.
 		"""
-		print "Filtering for attribute ' % s' with threshold: %g" % (attr_name, attr_threshold)
+		if verbose:
+			print "Filtering for attribute ' % s' with threshold: %g" % (attr_name, attr_threshold)
 		attr = self.snp_results[attr_name]
 		snp_results = {}
 		for info in self.snp_results:
@@ -2152,8 +2153,31 @@ class Result(object):
 
 		self.snp_results = snp_results
 		num_scores = len(self.snp_results['scores'])
-		print "%i scores were removed out of %i." % (count - num_scores, count)
+		if verbose:
+			print "%i scores were removed out of %i." % (count - num_scores, count)
 		return num_scores
+
+
+
+	def get_min_distances(self, chrom_pos_list):
+		"""
+		Return distance statistics on this result object in relation to the chromosome position list.
+		"""
+		cpl = self.get_chr_pos_list()
+		cp_array = sp.array(chrom_pos_list)
+		cpl_dists = map(sp.absolute, [sp.array(cpt) - cp_array for cpt in cpl])
+		min_dists = []
+		for cp_dists in cpl_dists:
+			curr_min = -1 #different chromosome.
+			for cp_dist in cp_dists:
+				if cp_dist[0] == 0:
+					if curr_min == -1:
+						curr_min = cp_dist[1]
+					else:
+						curr_min = min(curr_min, cp_dist[1])
+			min_dists.append(curr_min)
+		return min_dists
+
 
 
 
