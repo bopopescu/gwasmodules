@@ -414,6 +414,9 @@ class AccessionSet2Ecotype(Entity):
 
 class ResultsMethod(Entity):
 	"""
+	2011-2-6
+		add column cnv_method to hold CNV association results
+		change unique constraint to include cnv_method_id
 	2010-9-21
 		add remove_outliers, pseudo_heritability, transformation_parameters
 	2010-1-22
@@ -430,6 +433,7 @@ class ResultsMethod(Entity):
 	results_method_type = ManyToOne('%s.ResultsMethodType'%__name__, colname='results_method_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_method = ManyToOne("%s.CNVMethod"%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	rm_json = OneToMany('%s.ResultsMethodJson'%__name__)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -441,7 +445,7 @@ class ResultsMethod(Entity):
 	using_options(tablename='results_method', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
-										'results_method_type_id', 'analysis_method_id'))
+										'results_method_type_id', 'analysis_method_id', 'cnv_method_id'))
 
 class ResultsMethodJson(Entity):
 	"""
@@ -2835,6 +2839,8 @@ class Stock_250kDB(ElixirDB):
 	
 	def getSNPChrPos2ID(self, keyType=1):
 		"""
+		2011-2-15	
+			report how many entries were fetched
 		2011-1-24
 			add status reporting
 		2010-10-13
@@ -2857,7 +2863,7 @@ class Stock_250kDB(ElixirDB):
 				key = row.id
 				value = (row.chromosome, row.position)
 			dict_to_return[key] = value
-		sys.stderr.write("Done.\n")
+		sys.stderr.write("%s entries. Done.\n"%(len(dict_to_return)))
 		return dict_to_return
 	
 	def getSNPID2ChrPos(self,):
