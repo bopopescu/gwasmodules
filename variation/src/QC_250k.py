@@ -249,6 +249,8 @@ class QC_250k(TwoSNPData):
 	@classmethod
 	def read_call_matrix(cls, call_info_id2fname, min_probability=-1, snps_name_set=None, db_id2chr_pos=None, db_id2index=None):
 		"""
+		2011-2-5
+			replace chr_pos in the header with db_id
 		2010-10-13
 			add argument db_id2chr_pos & db_id2index to deal with call info files that have snp db id in first column,
 				instead of chr_pos.
@@ -303,13 +305,14 @@ class QC_250k(TwoSNPData):
 				else:
 					column_index = None
 					chr, pos = SNP_id_ls[:2]
+					db_id = '%s_%s'%(chr, pos)
 				
 				if counter==0:	#first file
-					chr_pos = '%s_%s'%(chr, pos)
-					if column_index is not None:
-						header[column_index+2] = chr_pos
+					#chr_pos = '%s_%s'%(chr, pos)
+					if column_index is not None:	# 2011-2-5 replace chr_pos with db_id
+						header[column_index+2] = db_id
 					else:
-						header.append(chr_pos)
+						header.append(db_id)
 				if len(row)==3:
 					probability = float(row[2])
 					if probability < min_probability:
