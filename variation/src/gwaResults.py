@@ -1361,19 +1361,19 @@ class Result(object):
 				self._load_result_(result_file)
 		else:
 
-			if chromosomes:
+			if chromosomes!=None:
 				self.keys.append('chromosomes')
 				self.snp_results['chromosomes']	 = chromosomes
-			if positions:
+			if positions!=None:
 				self.keys.append('positions')
 				self.snp_results['positions'] = positions
-			if scores:
+			if scores!=None:
 				self.keys.append('scores')
 				self.snp_results['scores'] = scores
-			if mafs:
+			if mafs!=None:
 				self.keys.append('mafs')
 				self.snp_results['mafs'] = mafs
-			if macs:
+			if macs!=None:
 				self.keys.append('macs')
 				self.snp_results['macs'] = macs
 

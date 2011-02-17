@@ -614,12 +614,12 @@ class LinearMixedModel(LinearModel):
 		This is EMMA
 		"""
 		K = self.random_effects[1][1]
-		#eig_L = self._get_eigen_L_(K)
+		eig_L = self._get_eigen_L_(K)
 
 		#Get the variance estimates..
-		#res = self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
-		res = self.get_estimates(ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
-		#res['eig_L'] = eig_L
+		res = self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
+		#res = self.get_estimates(ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
+		res['eig_L'] = eig_L
 		return res
 
 
