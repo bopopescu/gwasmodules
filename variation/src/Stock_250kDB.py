@@ -2837,8 +2837,14 @@ class Stock_250kDB(ElixirDB):
 					(TableClass.table.name, CNVTableClass.table.name, " and ".join(where_sql_ls))
 		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
 	
-	def getSNPChrPos2ID(self, keyType=1):
+	def getSNPChrPos2ID(self, keyType=1, priorTAIRVersion=False):
 		"""
+		2011-2-15
+			add argument priorTAIRVersion
+				if =true:
+					(chr,pos) would be from (tair8_chromosome, tair8_position)
+				else:
+					(chr,pos) would be from (chromosome, position)
 		2011-2-15	
 			report how many entries were fetched
 		2011-1-24
@@ -2853,8 +2859,16 @@ class Stock_250kDB(ElixirDB):
 		"""
 		sys.stderr.write("Getting a map between Snps.id and (chr,pos), keyType %s ..."%(keyType))
 		dict_to_return = {}
-		rows = self.metadata.bind.execute("select id, chromosome, position from %s where chromosome is not null and position is not null"\
-										%Snps.table.name)
+		if priorTAIRVersion==True:
+			chromosome_table_fieldname = 'tair8_chromosome'
+			position_table_fieldname = 'tair8_position'
+		else:
+			chromosome_table_fieldname = 'chromosome'
+			position_table_fieldname = 'position'
+		
+		rows = self.metadata.bind.execute("select id, %s, %s from %s where %s is not null and %s is not null"\
+										%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
+										chromosome_table_fieldname, position_table_fieldname, ))
 		for row in rows:
 			if keyType==1:
 				key = (row.chromosome, row.position)
