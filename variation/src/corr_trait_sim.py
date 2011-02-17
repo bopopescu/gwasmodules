@@ -37,8 +37,8 @@ def simulate_traits(sd, num_traits=max_num, heritabilities=['0.01', '0.1', '0.25
 	num_accessions = len(sd.accessions)
 
 	sim_traits_dict = {}
-	for h in heritabilities:
-		h = float(h)
+	for her in heritabilities:
+		h = float(her)
 		trait_pairs = []
 		sample_indices_list = []
 		snp_effects_list = []
@@ -89,7 +89,7 @@ def simulate_traits(sd, num_traits=max_num, heritabilities=['0.01', '0.1', '0.25
 			#Variance contributions.
 
 
-		sim_traits_dict[h] = {'trait_pairs':trait_pairs, 'sample_indices_list':sample_indices_list,
+		sim_traits_dict[her] = {'trait_pairs':trait_pairs, 'sample_indices_list':sample_indices_list,
 				'num_non_overlapping_list':num_non_overlapping_list, 'snp_effects_list':snp_effects_list,
 				'rho_est_list':rho_est_list, 'trait1_perc_var_list':trait1_perc_var_list,
 				'trait2_perc_var_list':trait2_perc_var_list}
@@ -116,7 +116,7 @@ def _load_sim_data_(use_pickle=True):
 
 def run_joint_analysis(start_i, stop_i, heritability, debug_filter=1.0, run_id='joint_trait'):
 
-	file_prefix = env.env['results_dir'] + '%s_corr_sim_h%0.2f_si%d_%d' % (run_id, heritability, start_i, stop_i)
+	file_prefix = env.env['results_dir'] + '%s_corr_sim_h%0.2f_si%d_%d' % (run_id, float(heritability), start_i, stop_i)
 	pickle_file = file_prefix + '_res_dict.pickled'
 	if os.path.isfile(pickle_file):
 		with open(pickle_file) as f:
@@ -236,7 +236,7 @@ def run_joint_analysis(start_i, stop_i, heritability, debug_filter=1.0, run_id='
 			rho_est = corr_mat[0, 1] / math.sqrt(her_list[0] * her_list[1])
 			if rho_est > 1: rho_est = 1.0
 			if rho_est < -1: rho_est = -1.0
-			rho_est_2 = corr_mat[0, 1] / heritability
+			rho_est_2 = corr_mat[0, 1] / float(heritability)
 			if rho_est_2 > 1: rho_est_2 = 1.0
 			if rho_est_2 < -1: rho_est_2 = -1.0
 
@@ -603,7 +603,7 @@ def run_parallel(heritability, x_start_i, x_stop_i, cluster='usc'):
 	"""
 	run_id = 'corr_trait_sim'
 	job_id = '%s_%d_%d' % (run_id, x_start_i, x_stop_i)
-	file_prefix = env['results_dir'] + run_id + '_' + str(x_start_i) + '_' + str(x_stop_i)
+	file_prefix = env.env['results_dir'] + run_id + '_' + str(x_start_i) + '_' + str(x_stop_i)
 
 	#Cluster specific parameters	
 	if cluster == 'gmi': #GMI cluster.
@@ -617,11 +617,11 @@ def run_parallel(heritability, x_start_i, x_stop_i, cluster='usc'):
 	elif cluster == 'usc':  #USC cluster.
 		shstr = "#!/bin/csh\n"
 		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
-		shstr += "#PBS -l mem=%s \n" % '4950mb'
+		shstr += "#PBS -l mem=%s \n" % '1950mb'
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
-	shstr += "(python %scorr_trait_sim.py %s %d %d " % (env['script_dir'], heritability, x_start_i, x_stop_i)
+	shstr += "(python %scorr_trait_sim.py %s %d %d " % (env.env['script_dir'], heritability, x_start_i, x_stop_i)
 
 	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
@@ -647,12 +647,14 @@ def run_parallel_gwas():
 
 def _test_():
 	sim_traits_dict = _load_sim_data_()
-#	chunk_size = 2
+	chunk_size = 2
 #	for i in range(0, max_num, chunk_size):
 #		run_joint_analysis(i, i + chunk_size, 0.75, debug_filter=0.1)
-#	plot_results(chunk_size, 0.75)
+	plot_results(chunk_size, 0.5)
+
 
 if __name__ == '__main__':
 	_test_()
+	#run_parallel_gwas()
 
 

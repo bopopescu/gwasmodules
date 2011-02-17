@@ -751,10 +751,10 @@ class LinearMixedModel(LinearModel):
 		opt_vg = sp.sum(l) / p  #vg   
 		opt_ve = opt_vg * opt_delta  #ve
 
-		#H_sqrt_inv = sp.mat(sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)), dtype=dtype) * eig_L['vectors']
-		V = opt_vg * K + opt_ve * sp.eye(len(K))
-		H_sqrt = cholesky(V).T
-		H_sqrt_inv = H_sqrt.I
+		H_sqrt_inv = sp.mat(sp.diag(1.0 / sp.sqrt(eig_L['values'] + opt_delta)), dtype=dtype) * eig_L['vectors']
+		#V = opt_vg * K + opt_ve * sp.eye(len(K))
+		#H_sqrt = cholesky(V).T
+		#H_sqrt_inv = H_sqrt.I
 		X_t = H_sqrt_inv * X
 		Y_t = H_sqrt_inv * self.Y
 		(beta_est, mahalanobis_rss, rank, sigma) = linalg.lstsq(X_t, Y_t)
@@ -1045,9 +1045,9 @@ class LinearMixedModel(LinearModel):
 		With interactions between SNP and possible cofactors.
 		"""
 		K = self.random_effects[1][1]
-		#eig_L = self._get_eigen_L_(K)
-		#res = self.get_estimates(eig_L=eig_L, method=method, K=K) #Get the variance estimates..
-		res = self.get_estimates(method=method, K=K) #Get the variance estimates..
+		eig_L = self._get_eigen_L_(K)
+		res = self.get_estimates(eig_L=eig_L, method=method, K=K) #Get the variance estimates..
+		#res = self.get_estimates(method=method, K=K) #Get the variance estimates..
 		print 'pseudo_heritability:', res['pseudo_heritability']
 
 		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], Z=Z, with_betas=with_betas)
