@@ -14,10 +14,12 @@ Examples:
 	DB_250k2data.py -y 0.85 -w 1 -m1 -x1 -l 3 -t -o 250k_l3_y.85_uniq_ecotype_20080919.tsv -i ~/banyan_fs/Network/Data/250k/db/calls/method_3/
 	
 Description:
-	Simple program to output/filter 250k data based on QC recorded in database in Strain X SNP format.
 	2008-05-06
-
-	1st column is array id. 2nd column is ecotype id.
+		program to output/filter 250k data based on QC recorded in database in Strain X SNP format.
+	
+	2011-2-15
+	Input: 1st column is Snps.id, 2nd column is ATCG call. 1st row is header. Data starts from 2nd row.
+	Output format: 1st column is array id. 2nd column is ecotype id. 1st row is Snps.id. Data starts from 2nd row.
 
 """
 import sys, os, math
