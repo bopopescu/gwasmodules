@@ -156,6 +156,8 @@ class Kruskal_Wallis:
 	
 	def _kruskal_wallis_whole_matrix(self, data_matrix, phenotype_ls, min_data_point=3, **keywords):
 		"""
+		2011-2-17
+			in debug mode, function exits after 2000 loops.
 		2008-09-07
 			_kruskal_wallis() spinned off.
 		2008-05-21
@@ -175,15 +177,38 @@ class Kruskal_Wallis:
 				results.append(pdata)
 				real_counter += 1
 			counter += 1
-			if self.report and counter%2000==0:
+			if (self.report or self.debug) and counter%2000==0:
 				sys.stderr.write("%s\t%s\t%s"%('\x08'*40, counter, real_counter))
+				if self.debug:	#2011-2-17 break if in debug mode.
+					break
 		if self.report:
 			sys.stderr.write("%s\t%s\t%s"%('\x08'*40, counter, real_counter))
 		sys.stderr.write("Done.\n")
 		return results
 	
+	def returnSNPIdLs(self, SNP_header, snp_index=None):
+		"""
+		2011-2-17
+			called by output_xxx() functions.
+			It decides whether to split the element in SNP_header into chr, pos or not.
+		"""
+		if hasattr(snp_index, '__len__'):
+			no_of_snps = len(snp_index)
+			SNP_pos_ls = [SNP_header[i] for i in snp_index]
+			# 2010-3-22
+			# snp_index could be a tuple or list, which means a couple of SNPs.
+			# right now only handles first 2 SNPs.
+		else:
+			SNP_name = SNP_header[snp_index]
+			SNP_pos_ls = SNP_name.split('_')
+		if len(SNP_pos_ls)<2:
+			SNP_pos_ls += [0]*(2-len(SNP_pos_ls))
+		return [SNP_pos_ls[0], SNP_pos_ls[1]]
+	
 	def output_kw_results(self, kw_results, SNP_header, output_fname, log_pvalue=0):
 		"""
+		2011-2-17
+			call returnSNPIdLs() to format the SNP id output
 		2009-6-17
 			last two columns now boast MAF, MAC instead of the counts of two alleles
 		2008-05-27
@@ -199,8 +224,7 @@ class Kruskal_Wallis:
 			pdata = kw_results[i]
 			snp_index = pdata.snp_index
 			pvalue = pdata.pvalue
-			SNP_name = SNP_header[snp_index]
-			SNP_pos_ls = SNP_name.split('_')
+			SNPIdLs = self.returnSNPIdLs(SNP_header, snp_index)
 			if log_pvalue:
 				if pvalue>0:
 					pvalue = -math.log10(pvalue)
@@ -208,7 +232,7 @@ class Kruskal_Wallis:
 					pvalue = 'NA'
 			MAC = min(pdata.count_ls)
 			MAF = float(MAC)/sum(pdata.count_ls)
-			writer.writerow([SNP_pos_ls[0], SNP_pos_ls[1], pvalue, MAF, MAC])
+			writer.writerow(SNPIdLs + [pvalue, MAF, MAC])	#2011-2-17
 		del writer
 		sys.stderr.write("Done.\n")
 	
