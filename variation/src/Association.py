@@ -926,6 +926,8 @@ class Association(Kruskal_Wallis):
 	@classmethod
 	def output_emma_results(cls, results, SNP_header, output_fname, log_pvalue=0):
 		"""
+		2011-2-17
+			call returnSNPIdLs() to format the SNP id output
 		2008-11-12
 			this is written when rpy.r.emma_REML_t() is used in Emma_whole_matrix().
 		"""
@@ -937,8 +939,7 @@ class Association(Kruskal_Wallis):
 		counter = 0
 		real_counter = 0
 		for i in range(no_of_snps):
-			SNP_name = SNP_header[i]
-			SNP_pos_ls = SNP_name.split('_')
+			SNPIdLs = self.returnSNPIdLs(SNP_header, snp_index=i)	#2011-2-17
 			
 			pvalue = results['ps'][i][0]
 			var_perc = results['genotype_var_perc'][i][0]
@@ -948,7 +949,7 @@ class Association(Kruskal_Wallis):
 			#pdata = PassingData(snp_index=i, pvalue=pvalue, count_ls=[0.5,20], var_perc=var_perc, coeff_list=coeff_list, coeff_p_value_list=coeff_p_value_list)
 			MAF = 0.5
 			MAC = 20
-			writer.writerow([SNP_pos_ls[0], SNP_pos_ls[1], pvalue, MAF, MAC, var_perc] + coeff_list)
+			writer.writerow(SNPIdLs + [pvalue, MAF, MAC, var_perc] + coeff_list)	#2011-2-17
 			
 			real_counter += 1
 			counter += 1
@@ -963,6 +964,8 @@ class Association(Kruskal_Wallis):
 	@classmethod
 	def output_lm_results(cls, results, SNP_header, output_fname, log_pvalue=0):
 		"""
+		2011-2-17
+			call returnSNPIdLs() to format the SNP id output
 		2010-3-22
 			pdata.snp_index could be a tuple or list, which means a couple of SNPs.
 			right now only handles first 2 SNPs.
@@ -983,12 +986,7 @@ class Association(Kruskal_Wallis):
 			pdata = results[i]
 			pvalue = pdata.pvalue
 			snp_index = pdata.snp_index
-			if hasattr(snp_index, '__len__'):	# 2010-3-22
-				no_of_snps = len(snp_index)
-				SNP_pos_ls = [SNP_header[i] for i in snp_index]
-			else:
-				SNP_name = SNP_header[snp_index]
-				SNP_pos_ls = SNP_name.split('_')
+			SNPIdLs = self.returnSNPIdLs(SNP_header, snp_index)	#2010-3-22, 2011-2-17
 			if log_pvalue:
 				if pvalue>0:
 					pvalue = -math.log10(pvalue)
@@ -1004,7 +1002,7 @@ class Association(Kruskal_Wallis):
 				if coeff_pvalue is not None:	#2009-9-19 different from "if coeff_pvalue:", which would skip 0.0
 					coeff_and_pvalue += ':%s'%coeff_pvalue
 				coeff_and_pvalue_ls.append(coeff_and_pvalue)
-			writer.writerow([SNP_pos_ls[0], SNP_pos_ls[1], pvalue, MAF, MAC, pdata.var_perc] + coeff_and_pvalue_ls)
+			writer.writerow(SNPIdLs + [pvalue, MAF, MAC, pdata.var_perc] + coeff_and_pvalue_ls)	#2011-2-17
 		del writer
 		sys.stderr.write("Done.\n")
 	
