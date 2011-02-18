@@ -523,7 +523,7 @@ class MPI4pywrapper(MPIwrapper):
 				if free_computing_node_request==1:	#there's an old request for free_computing_node.
 					if self.report:
 						sys.stderr.write("send the newly-free node %s to node %s.\n"%(source, request_node))
-					communicator.send(str(source), dest=request_node, 2)	#WATCH tag is 2.
+					communicator.send(str(source), dest=request_node, tag=2)	#WATCH tag is 2.
 					free_computing_node_request = 0
 				else:
 					if self.report:
