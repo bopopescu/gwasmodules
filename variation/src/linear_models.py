@@ -64,7 +64,7 @@ class LinearModel(object):
 		"""
 		self.p = 0
 		if include_intercept:
-			self.X = sp.mat(sp.repeat(1, self.n, dtype='single')).T #The intercept
+			self.X = sp.mat(sp.repeat(1, self.n), dtype='single').T #The intercept
 			self.p = 1
 			if len(factors) > 0:
 				self.X = sp.hstack([self.X, sp.matrix(factors, dtype='single').T])
@@ -1137,7 +1137,7 @@ class LinearMixedModel(LinearModel):
 		return res_d
 
 
-	def emmax_full_model_gxe(self, snps, E, H_sqrt_inv, Z, verbose=True,):
+	def emmax_full_model_gxe(self, snps, Es, H_sqrt_inv, Z, verbose=True,):
 		"""
 		EMMAX implementation (in python), for GxE interaction..
 		
@@ -1164,7 +1164,9 @@ class LinearMixedModel(LinearModel):
 		Q = sp.mat(Q)
 		Q2 = Q * Q.T
 		M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
-		M_E = sp.mat(sp.array(Z.T) * E, dtype=dtype) * M
+		M_Es = []
+		for E in Es:
+			M_Es.append(sp.mat(sp.array(Z.T) * E, dtype=dtype) * M)
 		M = Z.T * M
 
 		rss_h1_list = sp.repeat(h0_rss, num_snps)
@@ -1175,12 +1177,18 @@ class LinearMixedModel(LinearModel):
 
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M # snps_chunk*Z_t*H_sqrt_inv_t *(I-Q*Q_t)
-			X_Es = snps_chunk * M_E # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
+			X_E_list = []
+			for M_E in M_Es:
+				X_E_list.append(snps_chunk * M_E) # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
 
 			for j in range(len(Xs)):
 				(betas, rss_h1, p, sigma) = linalg.lstsq(Xs[j].T, Y)
 				rss_h1_list[i + j] = rss_h1[0]
-				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack([Xs[j], X_Es[j]])), Y, overwrite_a=True)
+				Xs_full = [Xs[j]]
+				for X_E in X_E_list:
+					Xs_full.append(X_E[j])
+					
+				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack(Xs_full)), Y, overwrite_a=True)
 				rss_h2_list[i + j] = rss_h2[0]
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
@@ -1197,14 +1205,14 @@ class LinearMixedModel(LinearModel):
 		f_stats_h01 = (rss_h01_ratio - 1) * n_p_h01 / float(q_h01)
 		p_vals_h01 = stats.f.sf(f_stats_h01, q_h01, n_p_h01)
 
-		q_h02 = 2  # A SNP and SNP X E is being tested
+		q_h02 = 1+len(Es)  # A SNP and SNP X E is being tested
 		n_p_h02 = n - h0_rank - q_h02
 		rss_h02_ratio = h0_rss / rss_h2_list
 		var_perc_h02 = 1 - 1 / rss_h02_ratio
 		f_stats_h02 = (rss_h02_ratio - 1) * n_p_h02 / float(q_h02)
 		p_vals_h02 = stats.f.sf(f_stats_h02, q_h02, n_p_h02)
 
-		q_h12 = 1  # Only SNP X E is being tested
+		q_h12 = len(Es)  # Only SNP X E is being tested
 		n_p_h12 = n - h0_rank - 1 - q_h12
 		rss_h12_ratio = rss_h1_list / rss_h2_list
 		var_perc_h12 = 1 - 1 / rss_h12_ratio
@@ -2433,19 +2441,21 @@ def _test_stepwise_emmax_():
 
 
 
-def _test_joint_analysis_():
+def _test_joint_analysis_(run_id='FT_suzi_log'):
 	import dataParsers as dp
 	import phenotypeData as pd
 	import analyze_gwas_results as agr
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
-	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
+	import env
+	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
+	filename = env.env['phen_dir']+'phen_raw_112210.csv'
 	phed = pd.parse_phenotype_file(filename)
 	phed.convert_to_averages()
 
 	mac_threshold = 15
 	#pids = [187, 188, 189, 190]
-	#pids = [5, 6, 7]
-	pids = [1, 2, 3, 4]
+	pids = [5, 6, 7]
+	#pids = [164, 165, 166]
+	#pids = [1, 2, 3, 4]
 
 	joint_phen_vals = []
 	joint_ecotypes = []
@@ -2455,8 +2465,7 @@ def _test_joint_analysis_():
 	k_list = []
 	for pid in pids:
 		print phed.get_name(pid)
-		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
-						filter=0.01)
+		sd = dp.load_250K_snps(debug_filter=0.05)
 		sd.coordinate_w_phenotype_data(phed, pid)
 		phed.normalize_values(pid)
 		phenotypes = phed.get_values(pid)
@@ -2466,8 +2475,7 @@ def _test_joint_analysis_():
 		ecotypes = phed.get_ecotypes(pid)
 		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
 		joint_ecotypes.extend(ecotypes)
-		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-					ecotypes)
+		K = load_kinship_from_file(env.env['data_dir']+'kinship_matrix_cm72.pickled',ecotypes)
 		#Get pseudoheritabilities for all phenotypes
 		lmm = LinearMixedModel(phenotypes)
 		lmm.add_random_effect(K)
@@ -2479,11 +2487,10 @@ def _test_joint_analysis_():
 
 
 	#E in the model.
-	joint_X = []
 	num_vals = len(joint_phen_vals)
-	shift = 0
-	for pid in pids:
-
+	joint_X = [[1]*num_vals]
+	shift = phed.num_vals(pids[0])
+	for pid in pids[1:]:
 		n = phed.num_vals(pid)
 		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
 		shift += n
@@ -2495,14 +2502,12 @@ def _test_joint_analysis_():
 	print gen_var_list, err_var_list, corr_mat, pids
 
 	unique_ecotypes = list(set(joint_ecotypes))
-	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
-					filter=1)
+	sd = dp.load_250K_snps()
 	sd.filter_accessions(unique_ecotypes)
 	if mac_threshold:
 		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
 	#unique_ecotypes = sd.accessions
-	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-				unique_ecotypes)
+	K = load_kinship_from_file(env.env['data_dir']+'kinship_matrix_cm72.pickled',unique_ecotypes)
 
 	#Create ecotype maps
 	ecotype_maps = {}
@@ -2556,17 +2561,25 @@ def _test_joint_analysis_():
  	positions = sd.getPositions()
  	chromosomes = sd.get_chr_list()
 	#pdb.set_trace()
-	res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
+	res = lmm.emmax_full_model_gxe(snps, joint_X[1:],H_sqrt_inv, Z=Z)
 	#pdb.set_trace()
-	png_file_name = '/Users/bjarni.vilhjalmsson/tmp/test.png'
 	import gwaResults as gr
-	res = gr.Result(scores=res['ps'].tolist(), positions=positions, chromosomes=chromosomes)
-	agr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
-		pngFile='/Users/bjarni.vilhjalmsson/tmp/qq_plot.png')
-	agr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
-			phenName='joint', pngFile='/Users/bjarni.vilhjalmsson/tmp/log_qq_plot.png')
-	res.neg_log_trans()
-	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+	res_h01 = gr.Result(scores=res['ps_h01'].tolist(), positions=positions, chromosomes=chromosomes)
+	res_h02 = gr.Result(scores=res['ps_h02'].tolist(), positions=positions, chromosomes=chromosomes)
+	res_h12 = gr.Result(scores=res['ps_h12'].tolist(), positions=positions, chromosomes=chromosomes)
+	agr.qq_plot({'EMMAX_G':res_h01, 'EMMAX_FULL':res_h02,'EMMAX_GxE':res_h12}, 1000, method_types=['emma','emma','emma'], 
+		mapping_labels=['EMMAX_G', 'EMMAX_FULL','EMMAX_GxE'], phenName='joint',pngFile=env.env['results_dir']+'qq_plot_%s.png'%run_id)
+	agr.log_qq_plot({'EMMAX_G':res_h01, 'EMMAX_FULL':res_h02,'EMMAX_GxE':res_h12}, 1000, 7, method_types=['emma','emma','emma'], 
+		mapping_labels=['EMMAX_G', 'EMMAX_FULL','EMMAX_GxE'],phenName='joint', pngFile=env.env['results_dir']+'log_qq_plot%s.png'%run_id)
+	png_file_name = env.env['results_dir']+'manhattan_h01%s.png'%run_id
+	res_h01.neg_log_trans()
+	res_h01.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+	png_file_name = env.env['results_dir']+'manhattan_h02%s.png'%run_id
+	res_h02.neg_log_trans()
+	res_h02.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+	png_file_name = env.env['results_dir']+'manhattan_h12%s.png'%run_id
+	res_h12.neg_log_trans()
+	res_h12.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
 
 
 
