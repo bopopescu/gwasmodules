@@ -939,7 +939,7 @@ class Association(Kruskal_Wallis):
 		counter = 0
 		real_counter = 0
 		for i in range(no_of_snps):
-			SNPIdLs = self.returnSNPIdLs(SNP_header, snp_index=i)	#2011-2-17
+			SNPIdLs = cls.returnSNPIdLs(SNP_header, snp_index=i)	#2011-2-17
 			
 			pvalue = results['ps'][i][0]
 			var_perc = results['genotype_var_perc'][i][0]
@@ -986,7 +986,7 @@ class Association(Kruskal_Wallis):
 			pdata = results[i]
 			pvalue = pdata.pvalue
 			snp_index = pdata.snp_index
-			SNPIdLs = self.returnSNPIdLs(SNP_header, snp_index)	#2010-3-22, 2011-2-17
+			SNPIdLs = cls.returnSNPIdLs(SNP_header, snp_index)	#2010-3-22, 2011-2-17
 			if log_pvalue:
 				if pvalue>0:
 					pvalue = -math.log10(pvalue)
