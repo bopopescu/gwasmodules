@@ -186,8 +186,11 @@ class Kruskal_Wallis:
 		sys.stderr.write("Done.\n")
 		return results
 	
-	def returnSNPIdLs(self, SNP_header, snp_index=None):
+	@classmethod
+	def returnSNPIdLs(cls, SNP_header, snp_index=None):
 		"""
+		2011-2-22
+			become a clasmethod
 		2011-2-17
 			called by output_xxx() functions.
 			It decides whether to split the element in SNP_header into chr, pos or not.
