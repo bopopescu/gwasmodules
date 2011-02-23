@@ -10,6 +10,7 @@ else:   #32bit
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import sys, getopt, csv
 import Stock_250kDB
+from pymodule import runLocalCommand
 
 class Calls2DB_250k_old:
 	"""
