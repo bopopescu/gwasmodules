@@ -1496,11 +1496,14 @@ class CNVArrayCall(Entity):
 
 class CNVMethod(Entity):
 	"""
+	2011-2-17
+		add column filename
 	2009-10-26
 		which type of method is used to infer CNVs
 	"""
 	short_name = Field(String(200), unique=True)
 	description = Field(String(8000))
+	filename = Field(Text)
 	comment = Field(String(8000))
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
