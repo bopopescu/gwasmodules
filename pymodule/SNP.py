@@ -1817,6 +1817,10 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False):
 	"""
+	2011-2-24
+		deal with input_fname with db id for locus id , rather than chr, pos
+			if 2nd_column (pos) is nothing or "0", it's regarded as db_id.
+		use pdata.id2chr_pos to translate db id into chr, pos
 	2010-10-13
 		new structure, pdata.chr_pos_map to map chr,pos to new chr, pos (like TAIR8 to TAIR9 mapping)
 	2010-3-15
@@ -1862,16 +1866,14 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	"""
 	
 	#A dictionary to understand new headers:
-	header_dict = {
-				   
-				   }
-	
+	header_dict = {}
 	
 	sys.stderr.write("Getting genome wide result from %s ... "%input_fname)
 	construct_chr_pos2index = getattr(pdata, 'construct_chr_pos2index', construct_chr_pos2index)	#2008-09-24
 	construct_data_obj_id2index = getattr(pdata, 'construct_data_obj_id2index', construct_data_obj_id2index)	#2008-10-28 for get_data_obj_by_obj_index()
 	is_4th_col_stop_pos = getattr(pdata, 'is_4th_col_stop_pos', is_4th_col_stop_pos)	#2008-10-14
 	chr_pos2index = getattr(pdata, 'chr_pos2index', chr_pos2index)	#2008-10-21
+	db_id2chr_pos = getattr(pdata, 'db_id2chr_pos', None)	#2011-2-24
 	score_for_0_pvalue = getattr(pdata, 'score_for_0_pvalue', 50)
 	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(input_fname))
 	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
@@ -1896,8 +1898,18 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			header = row
 			col_name2index = getColName2IndexFromHeader(header) #Returns a dictionary
 			continue
-		chr = int(row[0])
-		start_pos = int(float(row[1]))
+		if row[1] and row[1]!='0':	#2011-2-24 non-zero on 2nd column, it's position
+			chr = int(row[0])
+			start_pos = int(float(row[1]))
+		elif db_id2chr_pos:	#2011-2-24
+			db_id = int(row[0])
+			if db_id in db_id2chr_pos:
+				chr, start_pos = db_id2chr_pos.get(db_id)[:2]
+			else:	#ignore this row
+				continue
+		else:
+			sys.stderr.write("db_id2chr_pos is none. but this row %s seems to be using db_id as locus id."%(repr(row)))
+			continue
 		column_4th = None	#it's MAF probably
 		column_5th = None	#it's MAC probably
 		column_6 = None	#it's genotype_var_perc probably
