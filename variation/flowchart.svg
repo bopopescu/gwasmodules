@@ -188,13 +188,13 @@
      inkscape:pageshadow="2"
      inkscape:zoom="0.57848045"
      inkscape:cx="839.08962"
-     inkscape:cy="1801.5322"
+     inkscape:cy="2008.1079"
      inkscape:document-units="px"
      inkscape:current-layer="g4663"
      inkscape:window-width="1394"
      inkscape:window-height="1067"
-     inkscape:window-x="0"
-     inkscape:window-y="25"
+     inkscape:window-x="328"
+     inkscape:window-y="49"
      showguides="true"
      inkscape:guide-bbox="true"
      borderlayer="false"
@@ -1733,14 +1733,14 @@
            id="tspan3838">  (one input is db, the other is the reference data.)</tspan></text>
       <text
          xml:space="preserve"
-         style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
+         style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
          x="-217.81865"
-         y="2219.9927"
+         y="2229.9927"
          id="text3830"><tspan
            sodipodi:role="line"
            id="tspan3832"
            x="-217.81865"
-           y="2219.9927">QC.py (take two files as input)</tspan></text>
+           y="2229.9927">QC.py (take two files as input)</tspan></text>
       <path
          sodipodi:nodetypes="csc"
          id="path3898"
