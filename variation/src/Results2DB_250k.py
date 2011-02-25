@@ -69,7 +69,7 @@ class Results2DB_250k(object):
 							('method_description', 0, ): [None, 'm', 1, 'Describe your method and what type of score, association (-log or not), recombination etc.'],\
 							('results_method_type_id', 1, int): [1, 's', 1, 'which type of method. field id in table results_method_type. 1="association"',],\
 							('analysis_method_id', 1, int): [None, 'l', 1, ''],\
-							('cnv_method_id', 1, int): [None, '', 1, 'for CNV association results, need this cnv_method_id'],\
+							('cnv_method_id', 1, int): [None, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
 							('comment',0, ): [None, 't', 1, 'Anything more worth for other people to know?'],\
 							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
