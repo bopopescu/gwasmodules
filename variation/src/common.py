@@ -569,8 +569,10 @@ def getResultForComparison(rm_x,rm_y,no_of_top_snps = 500):
 	
 		
 
-def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000):
+def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 	"""
+	2011-2-24
+		add argument pdata, to pass db_id2chr_pos to getGenomeWideResultFromFile() in pymodule/SNP.py
 	2010-5-3
 		moved here from DisplayResults.py
 		script to create a json structure for GWAS plot out of an association result given in rm (db object)
@@ -579,9 +581,10 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000):
 		called upon only if its return is not in db.
 	"""
 	sys.stderr.write("Getting json_data from result %s ... "%rm.id)
-	param_data = PassingData(min_MAF=min_MAF)
+	if pdata is None:	#2011-2-24 create a PassingData() only when
+		pdata = PassingData(min_MAF=min_MAF)
 	from GeneListRankTest import GeneListRankTest
-	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=param_data)
+	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=pdata)
 	
 	max_value = genome_wide_result.max_value
 	chr2length = {}
