@@ -2018,6 +2018,9 @@ class Stock_250kDB(ElixirDB):
 		
 		self.metadata = __metadata__
 		self.session = __session__
+		
+		self._cnv_id2chr_pos = {}	#2011-2-24
+		self._cnv_method_id = None	#2011-2-24
 	
 	def setup(self, create_tables=True):
 		"""
@@ -2891,7 +2894,53 @@ class Stock_250kDB(ElixirDB):
 			
 		"""
 		return self.getSNPChrPos2ID(keyType=2)
-		
+	
+	@property
+	def snp_id2chr_pos(self,):
+		"""
+		2011-2-24
+			convenient function
+		"""
+		return self.getSNPChrPos2ID(keyType=2)
+	
+	@property
+	def chr_pos2snp_id(self,):
+		"""
+		2011-2-24
+			convenient function
+		"""
+		return self.getSNPChrPos2ID(keyType=1)
+	
+	
+	@property
+	def cnv_id2chr_pos(self):
+		"""
+		2011-2-24
+			get self._cnv_id2chr_pos
+		"""
+		return self._cnv_id2chr_pos
+	
+	@cnv_id2chr_pos.setter
+	def cnv_id2chr_pos(self, cnv_method_id=None):
+		"""
+		2011-2-24
+			setter of cnv_id2chr_pos
+			
+			usage:
+				if db._cnv_method_id!=20:
+					db.cnv_id2chr_pos = 20
+				chr_pos = db.cnv_id2chr_pos.get(222244)
+		"""
+		sys.stderr.write("Getting a map between CNV.id and (chr,pos), cnv method %s ..."%(cnv_method_id))
+		self._cnv_id2chr_pos = {}
+		self._cnv_method_id = cnv_method_id
+		rows = self.metadata.bind.execute("select id, chromosome, start, stop from %s where cnv_method_id=%s"\
+										%(CNV.table.name, cnv_method_id))
+		for row in rows:
+			key = row.id
+			value = (row.chromosome, row.start, row.stop)
+			self._cnv_id2chr_pos[key] = value
+		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
