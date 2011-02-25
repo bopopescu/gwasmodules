@@ -11,11 +11,16 @@ Examples:
 	#omit short_name
 	Results2DB_250k.py -a 17 -e 186 -i /Network/KW_newDataset_186_Bact_titer.pvals -l 1 -u yh -c
 	
+	# 2011-2-24 submit cnv association results (locus identified by CNV.ID) into db.
+	# set the call_method_id (-a) to -1 so that no call method will be fetched from db.
+	Results2DB_250k.py -i cnvMethod20_cnvID/cnvMethod20_cnvID_y1_pheno_pheno_183_Trichome\ avg\ C.tsv 
+		-g 20 -a -1 -e 183 -l 1 -u yh -z banyan -s 3 -c
+	
 Description:
 	This program would submit simple association results into database.
 
-	The input file format could be 3-column, tab-delimited or 4-column with MAF (minor allele frequency)
-		chromosome	position	score/pvalue	MAF
+	The input file format could be 3-column, tab-delimited or 4-column with MAF (minor allele frequency) or more.
+		snp.id	2nd-column-to-ignore	score/pvalue	MAF
 		
 	If analysis_method_id is 13 (boolean SNP pair), format is totally different. This program just copies it over.
 	
@@ -31,11 +36,11 @@ else:   #32bit
 
 import csv, stat, getopt, re
 import traceback, gc, subprocess
-from Stock_250kDB import Stock_250kDB, Results, ResultsMethod, PhenotypeMethod, CallMethod, \
+from Stock_250kDB import Results, ResultsMethod, PhenotypeMethod, CallMethod, \
 	ResultsMethodType, AnalysisMethod, ResultsMethodJson
 from Stock_250kDB import Snps as SNPs
-#from db import Results, ResultsMethod, Stock_250kDatabase, PhenotypeMethod, CallMethod, SNPs, ResultsMethodType
-from pymodule import figureOutDelimiter
+import Stock_250kDB
+from pymodule import figureOutDelimiter, PassingData
 
 import sqlalchemy as sql
 from common import getOneResultJsonData
@@ -64,6 +69,7 @@ class Results2DB_250k(object):
 							('method_description', 0, ): [None, 'm', 1, 'Describe your method and what type of score, association (-log or not), recombination etc.'],\
 							('results_method_type_id', 1, int): [1, 's', 1, 'which type of method. field id in table results_method_type. 1="association"',],\
 							('analysis_method_id', 1, int): [None, 'l', 1, ''],\
+							('cnv_method_id', 1, int): [None, '', 1, 'for CNV association results, need this cnv_method_id'],\
 							('comment',0, ): [None, 't', 1, 'Anything more worth for other people to know?'],\
 							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
@@ -112,6 +118,7 @@ class Results2DB_250k(object):
 		
 	marker_pos2snp_id = None
 	is_new_marker_added = False	#2008-05-26 flag whether new markers were generated. to check after commit/rollback
+	@classmethod
 	def reset_marker_pos2snp_id(cls):
 		"""
 		2008-05-27
@@ -123,8 +130,8 @@ class Results2DB_250k(object):
 			del cls.marker_pos2snp_id
 			cls.marker_pos2snp_id = cls.get_marker_pos2snp_id(db)
 			cls.is_new_marker_added = False
-	reset_marker_pos2snp_id = classmethod(reset_marker_pos2snp_id)
 	
+	@classmethod
 	def get_marker_pos2snp_id(cls, db):
 		"""
 		2008-05-24
@@ -139,10 +146,12 @@ class Results2DB_250k(object):
 			marker_pos2snp_id[key] = row.id
 		sys.stderr.write("Done.\n")
 		return marker_pos2snp_id
-	get_marker_pos2snp_id = classmethod(get_marker_pos2snp_id)
 	
+	@classmethod
 	def submit_results(cls, db, input_fname, rm, user, output_fname=None):
 		"""
+		2011-2-22
+			Locus are now identified as Snps.id / CNV.id in association result files. (chr, pos) before.
 		2009-1-7
 			insert float into the middle below
 				column_5th=int(float(row[4]))	#int('89.0') would raise an exception
@@ -218,8 +227,12 @@ class Results2DB_250k(object):
 			#check if 1st line is header or not
 			if no_of_lines ==0 and cls.pa_has_characters.search(row[1]):	#check the 2nd one, which is strict digits. while the 1st column, chromosome could be 'X' or something
 				continue
-			chr = int(row[0])
-			start_pos = int(row[1])
+			snp_id = int(row[0])
+			if row[1] and row[1]!='0':	#2011-2-22 something on 2nd column. wrong format.
+				chr = int(row[0])
+				start_pos = int(row[1])
+				sys.stderr.write("Error: current version doesn't take chr,pos as marker ID anymore. Has to be one id (either Snps.id or CNV.id).\n")
+				sys.exit(4)
 			score = row[2]
 			stop_pos = None
 			column_4th = None
@@ -228,7 +241,7 @@ class Results2DB_250k(object):
 			rest_of_row = []
 			rest_of_header = []
 			
-			marker_name = '%s_%s'%(chr, start_pos)
+			#marker_name = '%s_%s'%(chr, start_pos)	#2011-2-22
 			if len(row)>=4:
 				column_4th=row[3]
 				#stop_pos = int(row[2])
@@ -246,11 +259,11 @@ class Results2DB_250k(object):
 			
 			if output_fname:	#go to file system
 				if not header_outputted:	#3-column or 4-column header
-					if stop_pos is not None:
-						position_header = ['start_position', 'stop_position']
-					else:
-						position_header = ['position']
-					header = ['chromosome'] + position_header + ['score']
+					#if stop_pos is not None:	#2011-2-22
+					#	position_header = ['start_position', 'stop_position']
+					#else:
+					#	position_header = ['position']
+					header = ['snp_id', 'none', 'score']	#2011-2-22
 					if column_4th is not None:
 						header.append('MAF')
 					if column_5th is not None:
@@ -261,9 +274,10 @@ class Results2DB_250k(object):
 						header += rest_of_header
 					writer.writerow(header)
 					header_outputted = 1
-				data_row = [chr, start_pos]
-				if stop_pos is not None:
-					data_row.append(stop_pos)
+				#data_row = [chr, start_pos]	#2011-2-22
+				data_row = [snp_id, '']	#2011-2-22
+				#if stop_pos is not None:	#2011-2-22
+				#	data_row.append(stop_pos)
 				data_row.append(score)
 				if column_4th is not None:
 					data_row.append(column_4th)
@@ -274,7 +288,10 @@ class Results2DB_250k(object):
 				if rest_of_row:
 					data_row += rest_of_row
 				writer.writerow(data_row)
+			"""
+			# 2011-2-22 store the results directly into db. only for old SNP association results.
 			else:
+				
 				key = (chr, start_pos, stop_pos)
 				if key in cls.marker_pos2snp_id:
 					snps_id = cls.marker_pos2snp_id[key]
@@ -296,6 +313,7 @@ class Results2DB_250k(object):
 				r.results_method = rm
 				session.add(r)
 				del r
+			"""
 			no_of_lines += 1
 		
 		del reader
@@ -304,12 +322,13 @@ class Results2DB_250k(object):
 		sys.stderr.write("Done.\n")
 		return True
 	
-	submit_results = classmethod(submit_results)
-	
+	@classmethod
 	def come_up_new_results_filename(cls, output_dir, results_method_id, results_method_type_id,
 							call_method_id=None, phenotype_method_id=None,\
-							analysis_method_id=None):
+							analysis_method_id=None, cnv_method_id=None):
 		"""
+		2011-2-22
+			add cnv_method_id
 		2010-9-21
 			add argument call_method_id, phenotype_method_id, analysis_method_id
 				and incorporate the non-None ones into the filename 
@@ -323,17 +342,18 @@ class Results2DB_250k(object):
 		filename_ls = [results_method_id]
 		if call_method_id is not None:
 			filename_ls.append(call_method_id)
+		if cnv_method_id is not None:
+			filename_ls.append(cnv_method_id)
 		if phenotype_method_id is not None:
 			filename_ls.append(phenotype_method_id)
 		if analysis_method_id is not None:
 			filename_ls.append(analysis_method_id)
 		filename_ls = map(str, filename_ls)
 		
-		output_fname = os.path.join(output_dir, '%s_%s_results.tsv'%(results_method_id, '_'.join(filename_ls)))
+		output_fname = os.path.join(output_dir, '%s_results.tsv'%('_'.join(filename_ls)))
 		return output_fname
 	
-	come_up_new_results_filename = classmethod(come_up_new_results_filename)
-	
+	@classmethod
 	def copyResultsFile(cls, db, input_fname, rm, user, output_fname=None):
 		"""
 		2008-09-30
@@ -350,13 +370,16 @@ class Results2DB_250k(object):
 		sys.stderr.write("Done.\n")
 		return True
 		
-	copyResultsFile = classmethod(copyResultsFile)
 	
 	@classmethod
 	def plone_run(cls, db, short_name, phenotype_method_id, call_method_id, data_description, \
 				method_description, comment, input_fname, user, results_method_type_id=None, \
-				analysis_method_id=None, results_method_type_short_name=None, output_dir=None, commit=0):
+				analysis_method_id=None, results_method_type_short_name=None, output_dir=None, commit=0,\
+				cnv_method_id=None):
 		"""
+		2011-2-22
+			add argument cnv_method_id
+			deal with the association file format change. locus is now identified by Snps.id or CNV.id
 		2010-5-3
 			becomes classmethod
 			store the json structure of top 10000 SNPs from the rm into db
@@ -384,7 +407,7 @@ class Results2DB_250k(object):
 		if not output_dir:
 			output_dir = cls.option_default_dict[('output_dir',1)][0]	#to get default from option_default_dict
 		
-		rmt = session.query(ResultsMethodType).get(results_method_type_id)
+		rmt = ResultsMethodType.get(results_method_type_id)
 		if not rmt and results_method_type_short_name is not None:	#create a new results method type
 			rmt = ResultsMethodType(short_name=results_method_type_short_name)
 			session.add(rmt)
@@ -399,8 +422,9 @@ class Results2DB_250k(object):
 			sys.exit(3)
 		
 		cm = CallMethod.query.get(call_method_id)
-		if not cm:
-			sys.stderr.write("No call method available for call_method_id=%s.\n"%call_method_id)
+		cnv_m = Stock_250kDB.CNVMethod.get(cnv_method_id)
+		if not cm and not cnv_m:
+			sys.stderr.write("Neither call method (%s) nor cnv method (%s) available.\n"%(call_method_id, cnv_method_id))
 			sys.exit(3)
 		
 		am = AnalysisMethod.query.get(analysis_method_id)
@@ -408,22 +432,28 @@ class Results2DB_250k(object):
 			sys.stderr.write("No analysis method available for analysis_method_id=%s.\n"%analysis_method_id)
 			sys.exit(3)
 		
-		rm = ResultsMethod.query.filter_by(call_method_id=cm.id).filter_by(phenotype_method_id=pm.id).\
+		query = ResultsMethod.query.filter_by(phenotype_method_id=pm.id).\
 			filter_by(analysis_method_id=am.id).filter_by(results_method_type_id=rmt.id)
-		if rm.count()>0:
-			rm = rm.first()
+		if cm:	#2011-2-22
+			query = query.filter_by(call_method_id=cm.id)
+		elif cnv_m:	#2011-2-22
+			query = query.filter_by(cnv_method_id=cnv_m.id)
+		if query.count()>0:
+			rm = query.first()
 			sys.stderr.write("There is already an entry in results_method (id=%s) with same (call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id)=(%s, %s, %s, %s).\n"\
 							%(rm.id, call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id))
 			sys.exit(3)
 		
 		if not short_name:
-			short_name = '%s_%s_%s'%(am.short_name, pm.short_name, cm.id)
+			short_name = '%s_%s_%s_%s_%s'%(am.short_name, pm.short_name, getattr(cm, 'id',0), getattr(cnv_m, 'id',0),\
+										results_method_type_id)
 		
 		rm = ResultsMethod(short_name=short_name, method_description=method_description, \
 						data_description=data_description, comment=comment, created_by=user)
 		rm.phenotype_method = pm
 		rm.call_method = cm
 		rm.analysis_method = am
+		rm.cnv_method = cnv_m
 		
 		session.add(rm)
 		if rmt:
@@ -435,8 +465,8 @@ class Results2DB_250k(object):
 		session.flush()	#not necessary as no immediate query on the new results after this and commit() would execute this.
 		if commit:
 			rm.filename = cls.come_up_new_results_filename(output_dir, rm.id, rm.results_method_type.id, \
-										call_method_id=call_method_id, phenotype_method_id=phenotype_method_id,\
-										analysis_method_id=analysis_method_id)
+										call_method_id=getattr(cm, 'id',0), phenotype_method_id=pm.id,\
+										analysis_method_id=am.id, cnv_method_id=getattr(cnv_m, 'id',0))
 			if rm.analysis_method_id==13:
 				return_value = cls.copyResultsFile(db, input_fname, rm, user, rm.filename)
 			else:
@@ -450,7 +480,15 @@ class Results2DB_250k(object):
 				else:
 					min_MAF = 0
 				try:
-					json_data = getOneResultJsonData(rm, min_MAF, no_of_top_snps)
+					#2011-2-24
+					if cm:	#call method, snp dataset
+						db_id2chr_pos = db.snp_id2chr_pos
+					elif cnv_m:
+						if db._cnv_method_id!=cnv_m.id:
+							db.cnv_id2chr_pos = cnv_m.id
+						db_id2chr_pos = db.cnv_id2chr_pos
+					pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
+					json_data = getOneResultJsonData(rm, min_MAF, no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
 					rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
 					rm_json.result = rm
 					rm_json.json_data = json_data
@@ -480,8 +518,8 @@ class Results2DB_250k(object):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		db = Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
+		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
+				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db.setup()
 		#db = Stock_250kDatabase(username=self.user,
 		#		   password=self.passwd, hostname=self.hostname, database=self.dbname)
@@ -490,7 +528,8 @@ class Results2DB_250k(object):
 			sys.exit(3)
 		self.plone_run(db, self.short_name, self.phenotype_method_id, self.call_method_id, self.data_description, \
 				self.method_description, self.comment, self.input_fname, self.db_user, results_method_type_id=self.results_method_type_id,\
-				analysis_method_id=self.analysis_method_id, output_dir=self.output_dir, commit=self.commit)
+				analysis_method_id=self.analysis_method_id, output_dir=self.output_dir, commit=self.commit,
+				cnv_method_id=self.cnv_method_id)
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
