@@ -247,8 +247,12 @@ class QC_250k(TwoSNPData):
 	
 	
 	@classmethod
-	def read_call_matrix(cls, call_info_id2fname, min_probability=-1, snps_name_set=None, db_id2chr_pos=None, db_id2index=None):
+	def read_call_matrix(cls, call_info_id2fname, min_probability=-1, snps_name_set=None, db_id2chr_pos=None, \
+						db_id2index=None, colIDCastType=str):
 		"""
+		2011-2-26
+			add argument colIDCastType (default=str) to cast col ID into a specific type.
+			colIDCastType=None means no casting. and then db_id in header stays as integer.
 		2011-2-5
 			replace chr_pos in the header with db_id
 		2010-10-13
@@ -302,10 +306,12 @@ class QC_250k(TwoSNPData):
 					if column_index is None:	#2010-10-13 ignore this as it's no longer included in the snp set.
 						continue
 					chr, pos = db_id2chr_pos.get(db_id)
-				else:
+				elif len(SNP_id_ls)>=2:
 					column_index = None
 					chr, pos = SNP_id_ls[:2]
 					db_id = '%s_%s'%(chr, pos)
+				else:
+					db_id = SNP_id_ls[0]
 				
 				if counter==0:	#first file
 					#chr_pos = '%s_%s'%(chr, pos)
@@ -324,6 +330,9 @@ class QC_250k(TwoSNPData):
 			del reader
 			call_matrix.append(data_row)
 			counter += 1
+		if colIDCastType is not None:	#2011-2-26
+			col_id_ls = map(colIDCastType, header[2:])
+			header = header[:2] + col_id_ls
 		pdata = PassingData(header=header, call_info_id_ls=call_info_id_ls, array_id_ls=array_id_ls,\
 			ecotype_id_ls=ecotype_id_ls, data_matrix=call_matrix)
 		sys.stderr.write("Done.\n")
@@ -356,7 +365,7 @@ class QC_250k(TwoSNPData):
 						no_of_NAs=no_of_NAs, no_of_totals=no_of_totals, no_of_mismatches=no_of_mismatches, no_of_non_NA_pairs=no_of_non_NA_pairs,\
 						created_by=user)
 			callqc.readme = readme
-			session.save(callqc)
+			session.add(callqc)
 			"""
 			data_insert_ls = [row_id[0]] + NA_mismatch_ls + [QC_method_id, user]	#row_id is (call_info_id, ecotypeid)
 			curs.execute("insert into " + call_QC_table + " (call_info_id, NA_rate, mismatch_rate, no_of_NAs, no_of_totals, no_of_mismatches, no_of_non_NA_pairs, QC_method_id, created_by)\
@@ -403,7 +412,7 @@ class QC_250k(TwoSNPData):
 				call_info.NA_rate = float(no_of_NAs)/no_of_totals
 				sys.stderr.write("%s\n"%call_info.NA_rate)
 				call_info.readme = readme
-				db.session.save_or_update(call_info)
+				db.session.add(call_info)
 			del reader
 			#curs.execute("update " + call_info_table + " set NA_rate=%s where id=%s",\
 			#		(NA_rate, call_info_id))
@@ -517,8 +526,8 @@ class QC_250k(TwoSNPData):
 		"""
 		#database connection and etc
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-				   password=self.passwd, hostname=self.hostname, database=self.dbname)
-		db.setup()
+				password=self.passwd, hostname=self.hostname, database=self.dbname)
+		db.setup(create_tables=False)
 		session = db.session
 		session.begin()
 		#transaction = session.create_transaction()
@@ -535,7 +544,7 @@ class QC_250k(TwoSNPData):
 			pdb.set_trace()
 		
 		readme = formReadmeObj(sys.argv, self.ad, Stock_250kDB.README)
-		session.save(readme)
+		session.add(readme)
 		
 		QC_method_id2snps_table = self.QC_method_id2snps_table
 		
@@ -577,6 +586,9 @@ class QC_250k(TwoSNPData):
 				snps_name2snps_id = None
 			
 			if call_info_id2fname:
+				db_id2chr_pos = db.getSNPID2ChrPos()	#2011-22
+				from DB_250k2data import DB_250k2Data
+				db_id2index = DB_250k2Data.getSNPID2index(call_info_id2fname.values()[0][1], db_id2chr_pos)
 				if self.one_by_one and self.run_type==1:	#one_by_one only for QC by accession
 					row_id2NA_mismatch_rate = {}
 					row_id12row_id2 = {}
@@ -586,7 +598,9 @@ class QC_250k(TwoSNPData):
 						print "No", counter
 						tmp_dict = {}
 						tmp_dict[call_info_id] = value
-						pdata = self.read_call_matrix(tmp_dict, self.min_probability)	#05/20/09 no need for qm.ignore_het because 250k is all homo
+						pdata = self.read_call_matrix(tmp_dict, self.min_probability,
+									db_id2chr_pos=db_id2chr_pos, db_id2index=db_id2index)
+									#05/20/09 no need for qm.ignore_het because 250k is all homo
 						passingdata = self.qcDataMatrixVSsnpData(pdata, snps_name2snps_id, snpData2, curs, session, readme)
 						row_id2NA_mismatch_rate.update(passingdata.row_id2NA_mismatch_rate)
 						row_id12row_id2.update(passingdata.row_id12row_id2)
@@ -595,7 +609,9 @@ class QC_250k(TwoSNPData):
 						if self.debug and counter==10:
 							break
 				else:
-					pdata = self.read_call_matrix(call_info_id2fname, self.min_probability)	#05/20/09 no need for qm.ignore_het because 250k is all homo
+					pdata = self.read_call_matrix(call_info_id2fname, self.min_probability,
+										db_id2chr_pos=db_id2chr_pos, db_id2index=db_id2index)
+								#05/20/09 no need for qm.ignore_het because 250k is all homo
 					passingdata = self.qcDataMatrixVSsnpData(pdata, snps_name2snps_id, snpData2, curs, session, readme)
 					row_id2NA_mismatch_rate = passingdata.row_id2NA_mismatch_rate
 					row_id12row_id2 = passingdata.row_id12row_id2
