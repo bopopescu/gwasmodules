@@ -2021,6 +2021,8 @@ class Stock_250kDB(ElixirDB):
 		
 		self._cnv_id2chr_pos = {}	#2011-2-24
 		self._cnv_method_id = None	#2011-2-24
+		self._chr_pos2snp_id = {}	#2011-2-28
+		self._snp_id2chr_pos = {}	#2011-2-28
 	
 	def setup(self, create_tables=True):
 		"""
@@ -2895,13 +2897,58 @@ class Stock_250kDB(ElixirDB):
 		"""
 		return self.getSNPChrPos2ID(keyType=2)
 	
+	def get_db_id_given_chr_pos2db_id(self, snp_id):
+		"""
+		2011-2-27
+			snp_id could be chr_pos or just Snps.id
+			
+			called by Calls2DB_250k.py and others.
+		"""
+		snp_id = snp_id.split('_')[:2]
+		chr_pos = tuple(map(int, snp_id))
+		if len(chr_pos)==1 or (len(chr_pos)>=2 and chr_pos[1]==0):
+			db_id = chr_pos[0]
+		else:
+			db_id = self.chr_pos2snp_id.get(chr_pos)
+		return db_id
+	
+	def get_chr_pos_given_db_id2chr_pos(self, snp_id=None):
+		"""
+		2011-2-27
+			snp_id could be chr_pos or just Snps.id
+			
+			called by QC_250k.py and Calls2DB_250k.py
+		"""
+		snp_id = snp_id.split('_')[:2]
+		chr_pos = tuple(map(int, snp_id))
+		if len(chr_pos)==1 or (len(chr_pos)>=2 and chr_pos[1]==0):
+			db_id = chr_pos[0]
+			chr_pos = self.snp_id2chr_pos.get(db_id)
+		if chr_pos:
+			snp_id = '%s_%s'%(chr_pos[0], chr_pos[1])
+			return snp_id
+		else:
+			return None
+	
 	@property
 	def snp_id2chr_pos(self,):
 		"""
 		2011-2-24
 			convenient function
 		"""
-		return self.getSNPChrPos2ID(keyType=2)
+		if not self._snp_id2chr_pos:
+			self.snp_id2chr_pos = False
+		return self._snp_id2chr_pos
+	
+	@snp_id2chr_pos.setter
+	def snp_id2chr_pos(self, priorTAIRVersion=False):
+		"""
+		2011-2-28
+			usage:
+				db.snp_id2chr_pos = True	#if you need to set priorTAIRVersion to True.
+				chr_pos = db.snp_id2chr_pos.get(1)
+		"""
+		self._snp_id2chr_pos = self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
 	
 	@property
 	def chr_pos2snp_id(self,):
@@ -2909,8 +2956,20 @@ class Stock_250kDB(ElixirDB):
 		2011-2-24
 			convenient function
 		"""
-		return self.getSNPChrPos2ID(keyType=1)
+		if not self._chr_pos2snp_id:	#set it if it's empty
+			self.chr_pos2snp_id = False
+		return self._chr_pos2snp_id
 	
+	@chr_pos2snp_id.setter
+	def chr_pos2snp_id(self, priorTAIRVersion=False):
+		"""
+		2011-2-28
+		
+			usage:
+				db.chr_pos2snp_id = True	# if you need to set priorTAIRVersion to True.
+				snp_id = db.chr_pos2snp_id.get((1,657))
+		"""
+		self._chr_pos2snp_id = self.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion)
 	
 	@property
 	def cnv_id2chr_pos(self):
@@ -2918,6 +2977,8 @@ class Stock_250kDB(ElixirDB):
 		2011-2-24
 			get self._cnv_id2chr_pos
 		"""
+		if not self._cnv_id2chr_pos:
+			sys.stderr.write("Warning: cnv_id2chr_pos has not been initialized. Run 'cnvMethodID=20;self.cnv_id2chr_pos=cnvMethodID;'.\n")
 		return self._cnv_id2chr_pos
 	
 	@cnv_id2chr_pos.setter
