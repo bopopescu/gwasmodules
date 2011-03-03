@@ -64,7 +64,7 @@ class LinearModel(object):
 		"""
 		self.p = 0
 		if include_intercept:
-			self.X = sp.mat(sp.repeat(1, self.n, dtype='single')).T #The intercept
+			self.X = sp.mat(sp.repeat(1, self.n), dtype='single').T #The intercept
 			self.p = 1
 			if len(factors) > 0:
 				self.X = sp.hstack([self.X, sp.matrix(factors, dtype='single').T])
@@ -557,19 +557,27 @@ class LinearMixedModel(LinearModel):
 		self.random_effects.append((effect_type, cov_matrix))
 
 	def _get_eigen_L_(self, K, dtype='single'):
-		evals, evecs = linalg.eigh(K)
-		return {'values':evals, 'vectors':sp.mat(evecs).T}
+		evals, evecs = linalg.eigh(K) #this function has some bugs!!!
+		#evals, evecs = linalg.eig(K)
+		evals = sp.array(evals, dtype=dtype)
+		return {'values':evals, 'vectors':sp.mat(evecs, dtype=dtype).T}
 
 
 
 	def _get_eigen_R_(self, X, hat_matrix=None, dtype='single'):
+		#Potentially buggy for large number of steps...??  Switch to linalg.eig
 		q = X.shape[1]
 		if not hat_matrix:
 			X_squared_inverse = linalg.pinv(X.T * X) #(X.T*X).I
 			hat_matrix = X * X_squared_inverse * X.T
 		S = sp.mat(sp.identity(self.n, dtype=dtype)) - hat_matrix	#S=I-X(X'X)^{-1}X'
 		evals, evecs = linalg.eigh(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S) #eigen of S(K+I)S
-		return {'values':map(lambda x: x - 1, evals[q:]), 'vectors':(sp.mat(evecs).T[q:])}   #Because of S(K+I)S?
+#		evals, evecs = linalg.eig(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S) #eigen of S(K+I)S
+#		evals = sp.array(sp.flipud(evals), dtype=dtype)
+#		evecs = sp.flipud(sp.mat(evecs, dtype=dtype).T)
+#		#pdb.set_trace()
+		return {'values':map(lambda x: x - 1, sp.array(evals[q:], dtype=dtype)), 'vectors':(sp.mat(evecs, dtype=dtype).T[q:])}   #Because of S(K+I)S?
+		#return {'values':map(lambda x: x - 1, evals[q:]), 'vectors':(evecs[q:])}   #Because of S(K+I)S?
 
 
 
@@ -1137,7 +1145,7 @@ class LinearMixedModel(LinearModel):
 		return res_d
 
 
-	def emmax_full_model_gxe(self, snps, E, H_sqrt_inv, Z, verbose=True,):
+	def emmax_full_model_gxe(self, snps, Es, H_sqrt_inv, Z, verbose=True,):
 		"""
 		EMMAX implementation (in python), for GxE interaction..
 		
@@ -1164,7 +1172,9 @@ class LinearMixedModel(LinearModel):
 		Q = sp.mat(Q)
 		Q2 = Q * Q.T
 		M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
-		M_E = sp.mat(sp.array(Z.T) * E, dtype=dtype) * M
+		M_Es = []
+		for E in Es:
+			M_Es.append(sp.mat(sp.array(Z.T) * E, dtype=dtype) * M)
 		M = Z.T * M
 
 		rss_h1_list = sp.repeat(h0_rss, num_snps)
@@ -1175,12 +1185,18 @@ class LinearMixedModel(LinearModel):
 
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M # snps_chunk*Z_t*H_sqrt_inv_t *(I-Q*Q_t)
-			X_Es = snps_chunk * M_E # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
+			X_E_list = []
+			for M_E in M_Es:
+				X_E_list.append(snps_chunk * M_E) # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
 
 			for j in range(len(Xs)):
 				(betas, rss_h1, p, sigma) = linalg.lstsq(Xs[j].T, Y)
 				rss_h1_list[i + j] = rss_h1[0]
-				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack([Xs[j], X_Es[j]])), Y, overwrite_a=True)
+				Xs_full = [Xs[j]]
+				for X_E in X_E_list:
+					Xs_full.append(X_E[j])
+
+				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack(Xs_full)), Y, overwrite_a=True)
 				rss_h2_list[i + j] = rss_h2[0]
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
@@ -1197,14 +1213,14 @@ class LinearMixedModel(LinearModel):
 		f_stats_h01 = (rss_h01_ratio - 1) * n_p_h01 / float(q_h01)
 		p_vals_h01 = stats.f.sf(f_stats_h01, q_h01, n_p_h01)
 
-		q_h02 = 2  # A SNP and SNP X E is being tested
+		q_h02 = 1 + len(Es)  # A SNP and SNP X E is being tested
 		n_p_h02 = n - h0_rank - q_h02
 		rss_h02_ratio = h0_rss / rss_h2_list
 		var_perc_h02 = 1 - 1 / rss_h02_ratio
 		f_stats_h02 = (rss_h02_ratio - 1) * n_p_h02 / float(q_h02)
 		p_vals_h02 = stats.f.sf(f_stats_h02, q_h02, n_p_h02)
 
-		q_h12 = 1  # Only SNP X E is being tested
+		q_h12 = len(Es)  # Only SNP X E is being tested
 		n_p_h12 = n - h0_rank - 1 - q_h12
 		rss_h12_ratio = rss_h1_list / rss_h2_list
 		var_perc_h12 = 1 - 1 / rss_h12_ratio
@@ -2193,6 +2209,51 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 
 
+def _get_joint_var_matrix_(trait_corr_mat, joint_ecotypes, ecotype_maps, lmm_list, K):
+	gen_var_list = []
+	err_var_list = []
+	for lmm in lmm_list:
+		res = lmm.get_REML()
+		print 'Pseudo-heritatbility:', res['pseudo_heritability']
+		her_list.append(res['pseudo_heritability'])
+		err_var_list.append(res['ve'])
+		gen_var_list.append(res['vg'])
+
+	#Construct new variance matrix
+	V = sp.zeros((len(joint_ecotypes), len(joint_ecotypes)))
+	m_i = 0
+	for i, pid1 in enumerate(pids):
+		ets_map1 = ecotype_maps[pid1]
+		num_ets1 = len(ets_map1)
+		m_j = 0
+		for j, pid2 in enumerate(pids):
+			ets_map2 = ecotype_maps[pid2]
+			num_ets2 = len(ets_map2)
+			if i == j:
+				var_sclice = math.sqrt(gen_var_list[i] * gen_var_list[j]) * \
+						K[ets_map1, :][:, ets_map2] + err_var_list[i] * sp.eye(num_ets1)
+			else:
+				if  her_list[i] > 0 and her_list[j] > 0:
+					rho = trait_corr_mat[i, j] / sp.sqrt(her_list[i] * her_list[j])
+					if rho > 1.0: rho = 1.0
+					if rho < -1.0: rho = 1.0
+				else:
+					rho = 0
+				print i, j, rho
+				var_sclice = rho * math.sqrt(gen_var_list[i] * gen_var_list[j]) * \
+						K[ets_map1, :][:, ets_map2]
+			V[m_i:m_i + num_ets1, m_j:m_j + num_ets2] = var_sclice
+			m_j += num_ets2
+		m_i += num_ets1
+
+	print'Performing Cholesky decomposition'
+	H_sqrt = cholesky(V)
+	H_sqrt_inv = sp.mat(H_sqrt.T).I
+	return H_sqrt_inv
+
+
+def _get_static_mls_(lmm):
+	pass
 
 def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
@@ -2200,8 +2261,93 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 	"""
 	Run EMMAX stepwise.. forward, with one possible backward at each step.
 	"""
-	#import plotResults as pr
+	import dataParsers as dp
+	import phenotypeData as pd
+	import analyze_gwas_results as agr
 	import gwaResults as gr
+	import env
+	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
+	filename = env.env['phen_dir'] + 'phen_raw_112210.csv'
+	phed = pd.parse_phenotype_file(filename)
+	phed.convert_to_averages()
+
+	mac_threshold = 15
+	#pids = [187, 188, 189, 190]
+	pids = [5, 6, 7]
+	#pids = [164, 165, 166]
+	#pids = [1, 2, 3, 4]
+
+	phenotype_list = []
+	ecotype_list = []
+	lmm_list = []
+	joint_phen_vals = []
+	joint_ecotypes = []
+	gen_var_list = []
+	err_var_list = []
+	her_list = []
+	k_list = []
+	for pid in pids:
+		print phed.get_name(pid)
+		sd = dp.load_250K_snps(debug_filter=0.01)
+		sd.coordinate_w_phenotype_data(phed, pid)
+		phed.normalize_values(pid)
+		phenotypes = phed.get_values(pid)
+		phenotype_list.append(phenotypes)
+		phed.log_transform(pid)
+		#Create a new phenotype.
+		joint_phen_vals.extend(phenotypes)
+		ecotypes = phed.get_ecotypes(pid)
+		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
+		joint_ecotypes.extend(ecotypes)
+		ecotype_list.append(ecotypes)
+		K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', ecotypes)
+		#Get pseudoheritabilities for all phenotypes
+		lmm = LinearMixedModel(phenotypes)
+		lmm.add_random_effect(K)
+		lmm_list.append(lmm)
+
+
+	#E in the model.  #ONLY DONE ONCE
+	num_vals = len(joint_phen_vals)
+	joint_X = [[1] * num_vals]
+	shift = phed.num_vals(pids[0])
+	for pid in pids[1:]:
+		n = phed.num_vals(pid)
+		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
+		shift += n
+
+	#Get correlations between traits..  
+	corr_mat, pids = phed.get_correlations(pids)
+
+	unique_ecotypes = list(set(joint_ecotypes))
+	sd = dp.load_250K_snps()
+	sd.filter_accessions(unique_ecotypes)
+	if mac_threshold:
+		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
+	K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', unique_ecotypes)
+
+	#Create ecotype maps
+	ecotype_maps = {}
+	for pid in pids:
+		l = []
+		ets = phed.get_ecotypes(pid)
+		for et in ets:
+			l.append(unique_ecotypes.index(et))
+		ecotype_maps[pid] = l
+
+	#Get joint variance matrix
+	H_sqrt_inv = _get_joint_var_matrix_(corr_mat, joint_ecotypes, ecotype_maps, lmm_list, K)
+	#pdb.set_trace()
+
+	lmm = LinearMixedModel(joint_phen_vals)
+	lmm.set_factors(joint_X, False)
+	#Need to fix the SNPs!!!
+	Z = sp.int16(sp.mat(joint_ecotypes).T == sp.mat(unique_ecotypes))
+	snps = sd.getSnps()
+ 	positions = sd.getPositions()
+ 	chromosomes = sd.get_chr_list()
+	#pdb.set_trace()
+	#res = lmm.emmax_full_model_gxe(snps, joint_X[1:], H_sqrt_inv, Z=Z)
 
 	def _to_string_(cofactors):
 		st = ''
@@ -2211,17 +2357,9 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 			st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
 		return st
 
-	if sd:
-	 	all_snps = sd.getSnps()
-	 	all_positions = sd.getPositions()
-	 	all_chromosomes = sd.get_chr_list()
-
-	snps = all_snps[:]
-	positions = all_positions[:]
-	chromosomes = all_chromosomes[:]
 	chr_pos_list = zip(chromosomes, positions)
-       	lmm = LinearMixedModel(phenotypes)
-	lmm.add_random_effect(K)
+#       lmm = LinearMixedModel(phenotypes)
+#	lmm.add_random_effect(K)
 
 	print "Running EMMAX stepwise"
 	s1 = time.time()
@@ -2249,7 +2387,7 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 	print 'Cofactors:', _to_string_(cofactors)
 
 	for step_i in range(1, num_steps + 1):
-		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
+		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
 		min_pval_i = sp.argmin(emmax_res['ps'])
 		min_pval = emmax_res['ps'][min_pval_i]
 		mahalnobis_rss = emmax_res['rss'][min_pval_i]
@@ -2271,17 +2409,6 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list)
-#			if local:
-#			else: #Manhattan plot
-#				pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-#					 png_file=png_file_name)
-#			#QQ plot
-
-		if cand_gene_list:
-			#Calculate candidate gene enrichments.
-			pass
-
-
 
 
 		#Adding the new SNP as a cofactor
@@ -2307,39 +2434,11 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 			cofactors[i][2] = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
 		lmm.set_factors(cofactor_snps)
 
-
 		#Remove the found SNP from considered SNPs
 		del snps[min_pval_i]
 		del positions[min_pval_i]
 		del chromosomes[min_pval_i]
 		del chr_pos_list[min_pval_i]
-
-		#Try adding an interaction.... 
-#		if allow_interactions and len(cofactor_snps) > 1:
-#			isnps, cofactor_indices = _get_interactions_(cofactor_snps[-1], cofactor_snps[:-1])
-#			if isnps:
-#				emmax_res = lmm._emmax_f_test_(isnps, H_sqrt_inv)
-#				min_pval_i = sp.argmin(emmax_res['ps'])
-#				print emmax_res['ps'][min_pval_i], emmax_res['rss'][min_pval_i]
-#				if emmax_res['ps'][min_pval_i] < interaction_pval_thres and emmax_res['rss'][min_pval_i] < rss:
-#					if lmm.add_factor(snps[min_pval_i]):
-#						cofactor_snps.append(isnps[min_pval_i])
-#						interactions.append(((cofactors[min_pval_i][0], cofactors[min_pval_i][1]),
-#								(cofactors[-1][0], cofactors[-1][1]), emmax_res['ps'][min_pval_i]))
-#						cofactors_str += '%d_%d_X_%d_%d,' \
-#								% (cofactors[min_pval_i][0], cofactors[min_pval_i][1],
-#								cofactors[-1][0], cofactors[-1][1])
-#						step_info['interactions'] = interactions
-#						action += 'i'
-#						reml_res = lmm.get_REML()
-#						ml_res = lmm.get_ML()
-#						H_sqrt_inv = reml_res['H_sqrt_inv']
-#						ll = reml_res['max_ll']
-#						rss = float(reml_res['rss'])
-#						reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-#						num_par += 1
-#						print "Just added an interaction:", interactions
-
 
 		(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
 		criterias['ebics'].append(extended_bic)
@@ -2431,36 +2530,6 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 				'min_pval_chr_pos':None}
 			step_info_list.append(step_info)
 			print cofactors
-
-
-	for c in criterias:
-		print 'GWAs for optimal %s criteria:' % c
-		i_opt = sp.array(criterias[c]).argmin()
-		print "    %d'th step was optimal." % i_opt
-		cofactor_snps = step_info_list[i_opt]['cofactor_snps']
-		cofactors = step_info_list[i_opt]['cofactors']
-		print cofactors
-		lmm.set_factors(cofactor_snps)
-		reml_res = lmm.get_REML()
-		H_sqrt_inv = reml_res['H_sqrt_inv']
-		emmax_res = lmm._emmax_f_test_(all_snps, H_sqrt_inv)
-		min_pval_i = emmax_res['ps'].argmin()
-		min_pval = emmax_res['ps'][min_pval_i]
-		mahalnobis_rss = emmax_res['rss'][min_pval_i]
-		min_pval_chr_pos = chr_pos_list[min_pval_i]
-		print 'Min p-value:', min_pval
-		print 'Min Mahalanobis RSS:', mahalnobis_rss
-
-		if file_prefix:
-			pdf_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.pdf'
-			png_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.png'
-			res = gr.Result(scores=emmax_res['ps'], positions=all_positions, chromosomes=all_chromosomes)
-			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list)
-#			pr.plot_raw_result(emmax_res['ps'], all_chromosomes, all_positions, highlight_markers=cofactors,
-#					 png_file=png_file_name)
-
 
 
 
@@ -2828,19 +2897,21 @@ def _test_stepwise_emmax_():
 
 
 
-def _test_joint_analysis_():
+def _test_joint_analysis_(run_id='FT_suzi_log'):
 	import dataParsers as dp
 	import phenotypeData as pd
 	import analyze_gwas_results as agr
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
-	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
+	import env
+	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
+	filename = env.env['phen_dir'] + 'phen_raw_112210.csv'
 	phed = pd.parse_phenotype_file(filename)
 	phed.convert_to_averages()
 
 	mac_threshold = 15
 	#pids = [187, 188, 189, 190]
-	#pids = [5, 6, 7]
-	pids = [1, 2, 3, 4]
+	pids = [5, 6, 7]
+	#pids = [164, 165, 166]
+	#pids = [1, 2, 3, 4]
 
 	joint_phen_vals = []
 	joint_ecotypes = []
@@ -2850,8 +2921,7 @@ def _test_joint_analysis_():
 	k_list = []
 	for pid in pids:
 		print phed.get_name(pid)
-		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
-						filter=0.01)
+		sd = dp.load_250K_snps(debug_filter=0.05)
 		sd.coordinate_w_phenotype_data(phed, pid)
 		phed.normalize_values(pid)
 		phenotypes = phed.get_values(pid)
@@ -2861,8 +2931,7 @@ def _test_joint_analysis_():
 		ecotypes = phed.get_ecotypes(pid)
 		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
 		joint_ecotypes.extend(ecotypes)
-		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-					ecotypes)
+		K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', ecotypes)
 		#Get pseudoheritabilities for all phenotypes
 		lmm = LinearMixedModel(phenotypes)
 		lmm.add_random_effect(K)
@@ -2874,11 +2943,10 @@ def _test_joint_analysis_():
 
 
 	#E in the model.
-	joint_X = []
 	num_vals = len(joint_phen_vals)
-	shift = 0
-	for pid in pids:
-
+	joint_X = [[1] * num_vals]
+	shift = phed.num_vals(pids[0])
+	for pid in pids[1:]:
 		n = phed.num_vals(pid)
 		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
 		shift += n
@@ -2890,14 +2958,12 @@ def _test_joint_analysis_():
 	print gen_var_list, err_var_list, corr_mat, pids
 
 	unique_ecotypes = list(set(joint_ecotypes))
-	sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary',
-					filter=1)
+	sd = dp.load_250K_snps()
 	sd.filter_accessions(unique_ecotypes)
 	if mac_threshold:
 		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
 	#unique_ecotypes = sd.accessions
-	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-				unique_ecotypes)
+	K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', unique_ecotypes)
 
 	#Create ecotype maps
 	ecotype_maps = {}
@@ -2951,17 +3017,25 @@ def _test_joint_analysis_():
  	positions = sd.getPositions()
  	chromosomes = sd.get_chr_list()
 	#pdb.set_trace()
-	res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
+	res = lmm.emmax_full_model_gxe(snps, joint_X[1:], H_sqrt_inv, Z=Z)
 	#pdb.set_trace()
-	png_file_name = '/Users/bjarni.vilhjalmsson/tmp/test.png'
 	import gwaResults as gr
-	res = gr.Result(scores=res['ps'].tolist(), positions=positions, chromosomes=chromosomes)
-	agr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
-		pngFile='/Users/bjarni.vilhjalmsson/tmp/qq_plot.png')
-	agr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
-			phenName='joint', pngFile='/Users/bjarni.vilhjalmsson/tmp/log_qq_plot.png')
-	res.neg_log_trans()
-	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+	res_h01 = gr.Result(scores=res['ps_h01'].tolist(), positions=positions, chromosomes=chromosomes)
+	res_h02 = gr.Result(scores=res['ps_h02'].tolist(), positions=positions, chromosomes=chromosomes)
+	res_h12 = gr.Result(scores=res['ps_h12'].tolist(), positions=positions, chromosomes=chromosomes)
+	agr.qq_plot({'EMMAX_G':res_h01, 'EMMAX_FULL':res_h02, 'EMMAX_GxE':res_h12}, 1000, method_types=['emma', 'emma', 'emma'],
+		mapping_labels=['EMMAX_G', 'EMMAX_FULL', 'EMMAX_GxE'], phenName='joint', pngFile=env.env['results_dir'] + 'qq_plot_%s.png' % run_id)
+	agr.log_qq_plot({'EMMAX_G':res_h01, 'EMMAX_FULL':res_h02, 'EMMAX_GxE':res_h12}, 1000, 7, method_types=['emma', 'emma', 'emma'],
+		mapping_labels=['EMMAX_G', 'EMMAX_FULL', 'EMMAX_GxE'], phenName='joint', pngFile=env.env['results_dir'] + 'log_qq_plot%s.png' % run_id)
+	png_file_name = env.env['results_dir'] + 'manhattan_h01%s.png' % run_id
+	res_h01.neg_log_trans()
+	res_h01.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+	png_file_name = env.env['results_dir'] + 'manhattan_h02%s.png' % run_id
+	res_h02.neg_log_trans()
+	res_h02.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
+	png_file_name = env.env['results_dir'] + 'manhattan_h12%s.png' % run_id
+	res_h12.neg_log_trans()
+	res_h12.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
 
 
 

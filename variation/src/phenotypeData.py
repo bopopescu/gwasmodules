@@ -528,7 +528,7 @@ class phenotype_data:
 				ets_ix2 = map(ets2.index, common_ets)
 				vs1 = [pvs1[et_i] for et_i in ets_ix1]
 				vs2 = [pvs2[et_i] for et_i in ets_ix2]
-				corr_mat[i, j] = sp.corrcoef(vs1, vs2, ddof=1)[0, 1]
+				corr_mat[i, j] = sp.corrcoef(vs1, vs2)[0, 1]
 				corr_mat[j, i] = corr_mat[i, j]
 		return corr_mat, pids
 
