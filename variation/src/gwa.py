@@ -152,7 +152,7 @@ def parse_parameters():
 
 
 	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
-		'call_method_id':72, 'walltime_req':'12:00:00', 'proc_per_node':8,
+		'call_method_id':75, 'walltime_req':'12:00:00', 'proc_per_node':8,
 		'specific_methods':['kw', 'ft', 'lm', 'emma', 'emmax'], 'specific_transformations':['none'],
 		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
 		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
