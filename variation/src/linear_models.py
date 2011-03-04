@@ -3265,9 +3265,9 @@ def _emmax_test_():
 
 
 if __name__ == "__main__":
-#	kinship_file_name = '/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.pickled'
-#	k, k_accessions = cPickle.load(open(kinship_file_name))
-#	save_kinship_in_text_format('/Users/bjarni.vilhjalmsson/Projects/Data/1001genomes/kinship_matrix.csv',
-#				k, k_accessions)
-	_test_joint_analysis_()
+	import env
+	kinship_file_name = env.env['data_dir']+'kinship_matrix_cm75.pickled'
+	k, k_accessions = cPickle.load(open(kinship_file_name))
+	save_kinship_in_text_format(env.env['data_dir']+'kinship_matrix_cm75.csv',k, k_accessions)
+	#_test_joint_analysis_()
 	#_test_phyB_snps_()
