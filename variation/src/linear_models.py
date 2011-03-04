@@ -168,8 +168,8 @@ class LinearModel(object):
 		h0_betas = map(float, list(h0_betas))
 
 		if not with_betas:
-			(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
-			Q = sp.mat(Q)
+			(Q, R) = qr_decomp(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
+			Q = sp.mat(Q, dtype=dtype)
 			Q2 = Q * Q.T
 			M = sp.mat((sp.eye(n) - Q2), dtype=dtype)
 		else:
@@ -530,6 +530,13 @@ def cholesky(V):
 	return H_sqrt
 
 
+def qr_decomp(X):
+	if sp.__version__ >= '0.9':
+		return linalg.qr(X, mode='economic')  #Do the QR-decomposition for the Gram-Schmidt process.			
+	else:
+		return linalg.qr(X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+
+
 
 class LinearMixedModel(LinearModel):
 	"""
@@ -558,7 +565,7 @@ class LinearMixedModel(LinearModel):
 
 	def _get_eigen_L_(self, K, dtype='single'):
 		evals, evecs = linalg.eigh(K) #this function has some bugs!!!
-		#evals, evecs = linalg.eig(K)
+		#evals, evecs = linalg.eig(K)  #Switch to this for speed improvements..
 		evals = sp.array(evals, dtype=dtype)
 		return {'values':evals, 'vectors':sp.mat(evecs, dtype=dtype).T}
 
@@ -570,14 +577,10 @@ class LinearMixedModel(LinearModel):
 		if not hat_matrix:
 			X_squared_inverse = linalg.pinv(X.T * X) #(X.T*X).I
 			hat_matrix = X * X_squared_inverse * X.T
-		S = sp.mat(sp.identity(self.n, dtype=dtype)) - hat_matrix	#S=I-X(X'X)^{-1}X'
-		evals, evecs = linalg.eigh(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S) #eigen of S(K+I)S
-#		evals, evecs = linalg.eig(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S) #eigen of S(K+I)S
-#		evals = sp.array(sp.flipud(evals), dtype=dtype)
-#		evecs = sp.flipud(sp.mat(evecs, dtype=dtype).T)
-#		#pdb.set_trace()
+		S = sp.mat(sp.identity(self.n)) - hat_matrix	#S=I-X(X'X)^{-1}X'
+		M = sp.mat(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S, dtype='double')
+		evals, evecs = linalg.eigh(M) #eigen of S(K+I)S
 		return {'values':map(lambda x: x - 1, sp.array(evals[q:], dtype=dtype)), 'vectors':(sp.mat(evecs, dtype=dtype).T[q:])}   #Because of S(K+I)S?
-		#return {'values':map(lambda x: x - 1, evals[q:]), 'vectors':(evecs[q:])}   #Because of S(K+I)S?
 
 
 
@@ -1095,7 +1098,7 @@ class LinearMixedModel(LinearModel):
 			H_sqrt_inv = H_sqrt_inv * Z
 
 		if not with_betas:
-			(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+			(Q, R) = qr_decomp(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
 			Q = sp.mat(Q)
 			Q2 = Q * Q.T
 			M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
@@ -1168,7 +1171,7 @@ class LinearMixedModel(LinearModel):
 		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
 		h0_betas = map(float, list(h0_betas))
 
-		(Q, R) = linalg.qr(h0_X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+		(Q, R) = qr_decomp(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
 		Q = sp.mat(Q)
 		Q2 = Q * Q.T
 		M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
@@ -2838,7 +2841,7 @@ def filter_k_for_accessions(k, k_accessions, accessions):
 			continue
 	return k[indices_to_keep, :][:, indices_to_keep]
 
-def load_kinship_from_file(kinship_file, accessions=None, dtype='single'):
+def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	assert os.path.isfile(kinship_file), 'File not found.'
 	#sys.stdout.write("Loading K.\n")
 	#sys.stdout.flush()
@@ -3266,8 +3269,8 @@ def _emmax_test_():
 
 if __name__ == "__main__":
 	import env
-	kinship_file_name = env.env['data_dir']+'kinship_matrix_cm75.pickled'
+	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 	k, k_accessions = cPickle.load(open(kinship_file_name))
-	save_kinship_in_text_format(env.env['data_dir']+'kinship_matrix_cm75.csv',k, k_accessions)
+	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()

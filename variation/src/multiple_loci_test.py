@@ -40,6 +40,7 @@ import snpsdata
 import sys
 import os
 import env
+import random
 
 #Parse Vincent's phenotype file...?  Why?
 #Or create my phenotypes..
@@ -115,39 +116,32 @@ def get_snps_heritabilities(snps, phenotype):
 	return h_expl
 
 
-def get_latent_snp(latent_variable, snpsdata=None):
+def get_latent_snp(latent_var, ets):
 	ecotype_info_dict = phenotypeData.get_ecotype_id_info_dict()
-	accessions = snpsdata.accessions
 	latent_snp = []
-	if latent_variable == "swedish":
-		for acc in accessions:
-			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(acc)]
+	if latent_var == "swedish":
+		for et in ets:
+			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(et)]
 			if country in ["SWE", "FIN"]:
 				latent_snp.append(1)
 			else:
 				latent_snp.append(0)
-	elif latent_variable == "northern_swedish":
-		for acc in accessions:
+	elif latent_var == "northern_swedish":
+		for et in ets:
 			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(acc)]
 			if country in ["SWE", "FIN"] and latitude >= 60:
 				latent_snp.append(1)
 			else:
 				latent_snp.append(0)
-	elif latent_variable == "northern":
-		for acc in accessions:
+	elif latent_var == "northern":
+		for et in ets:
 			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(acc)]
 			if latitude > 50: #Where is the mean split?
 				latent_snp.append(1)
 			else:
 				latent_snp.append(0)
-	elif latent_variable == "random":
-		for acc in accessions:
-			if random.random() < 0.5:
-				latent_snp.append(1)
-			else:
-				latent_snp.append(0)
-	elif latent_variable[0:2] == "pc": #Principle component
-		pc_num = int(latent_variable[2:])
+	elif latent_var[0:2] == "pc": #Principle component
+		pc_num = int(latent_var[2:])
 		pc_file = env.env['tmp_dir'] + "pc" + str(pc_num) + "_r0.1_pickle.dump"
 		import os.path
 		if os.path.isfile(pc_file):
@@ -155,7 +149,7 @@ def get_latent_snp(latent_variable, snpsdata=None):
 			pc = cPickle.load(f)
 			f.close()
 		else:
-			print "PC file wasn't found, calculating " + latent_variable + "."
+			print "PC file wasn't found, calculating " + latent_var + "."
 			pc = snpsdata.get_pc()
 			f = open(pc_file, 'w')
 			pc = cPickle.dump(pc, f)
@@ -180,7 +174,7 @@ def simulate_phenotypes(phen_file, sd, maf_threshold=0, debug_filter=1.0, num_ph
 	Simulate the phenotypes
 	"""
 	print 'Generating the phenotypes'
-	latent_var_keys = ['random_snp', 'random', 'swedish', 'northern', 'pc']
+	latent_var_keys = ['random_snp', 'random', 'north_south_split', 'pc_split']
 	phenotype_models = ['xor', 'or', 'plus', 'xor2']
 	heritabilities = [0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99]
 
@@ -190,23 +184,43 @@ def simulate_phenotypes(phen_file, sd, maf_threshold=0, debug_filter=1.0, num_ph
 	if debug_filter:
 		sd.sample_snps(debug_filter)
 	snp_chr_pos_maf_list = sd.get_all_snp_w_info()
+	all_indices = range(len(snp_chr_pos_maf_list))
+	snp_indices = random.sample(all_indices, num_phens)
+	map(all_indices.remove, snp_indices)
 
-	for i in range(num_phens):
+	#The first locus..
+	snp_chr_pos_maf_list = [snp_chr_pos_maf_list[i] for i in snp_indices]
 
-		if latent_var not in ['random_snp', 'random']:
-			latent_snp = get_latent_snp(latent_var, sd)
-
-	d3['chr_pos_list'] = []
-	d3['mafs_list'] = []
-
-	phen_dict = {}
+	phen_dict = {'snp_chr_pos_maf_list': snp_chr_pos_maf_list, 'snp_indices':snp_indices}
 	for latent_var in latent_var_keys:
 		d = {}
+		latent_snps = []
+		if latent_var == 'random_snp':
+			l_snp_indices = random.sample(all_indices, num_phens)
+			latent_snps = [snp_chr_pos_maf_list[i][0] for i in l_snp_indices]
+			d['latent_chr_pos_maf_list'] = \
+				[(snp_chr_pos_maf_list[i][1], snp_chr_pos_maf_list[i][2], \
+				snp_chr_pos_maf_list[i][3]) for i in l_snp_indices]
+		elif latent_var == 'random':
+			for i in range(num_phens):
+				num_ones = random.randint(1, num_lines - 1)
+				l_snp = [0] * num_lines
+				one_indices = random.sample(range(num_lines), num_ones)
+				for i in one_indices:
+					l_snp[i] = 1
+				latent_snps.append(l_snp)
+		elif latent_var == 'north_south_split':
+
+		elif latent_var == 'pc_split':
+			pass
+
+
+		d['latent_snps'] = latent_snps
 		for h in heritabilities:
 			d2 = {}
 			for phen_model in phenotype_models:  #Simulate all phenotype models.
 				d3['phenotypes'] = []
-				d3['h_estimates'] = [] #The marginal variance explained by each loci
+				d3['h_estimates'] = [] #The marginal variance explained by each causal variant
 				d3['h_loci_est_list'] = []
 				d3['effects_list'] = []
 				d3['phenotype'] = []
