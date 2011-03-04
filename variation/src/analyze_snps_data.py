@@ -655,11 +655,6 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 
 
 
-def get_principle_components(kinship_matrix):
-	"""
-	Returns the principle components using the covariance matrix.
-	"""
-
 
 
 #
