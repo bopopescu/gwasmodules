@@ -116,57 +116,21 @@ def get_snps_heritabilities(snps, phenotype):
 	return h_expl
 
 
-def get_latent_snp(latent_var, ets):
+def __get_latent_snps__(ets):
 	ecotype_info_dict = phenotypeData.get_ecotype_id_info_dict()
-	latent_snp = []
-	if latent_var == "swedish":
-		for et in ets:
-			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(et)]
-			if country in ["SWE", "FIN"]:
-				latent_snp.append(1)
-			else:
-				latent_snp.append(0)
-	elif latent_var == "northern_swedish":
-		for et in ets:
-			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(acc)]
-			if country in ["SWE", "FIN"] and latitude >= 60:
-				latent_snp.append(1)
-			else:
-				latent_snp.append(0)
-	elif latent_var == "northern":
-		for et in ets:
-			(native_name, stock_parent, latitude, longitude, country) = ecotype_info_dict[int(acc)]
-			if latitude > 50: #Where is the mean split?
-				latent_snp.append(1)
-			else:
-				latent_snp.append(0)
-	elif latent_var[0:2] == "pc": #Principle component
-		pc_num = int(latent_var[2:])
-		pc_file = env.env['tmp_dir'] + "pc" + str(pc_num) + "_r0.1_pickle.dump"
-		import os.path
-		if os.path.isfile(pc_file):
-			f = open(pc_file, 'r')
-			pc = cPickle.load(f)
-			f.close()
-		else:
-			print "PC file wasn't found, calculating " + latent_var + "."
-			pc = snpsdata.get_pc()
-			f = open(pc_file, 'w')
-			pc = cPickle.dump(pc, f)
-			f.close()
-
-		mean_pc_val = sum(pc) / len(pc)
-		for v in pc:
-			if v > mean_pc_val:
-				latent_snp.append(1)
-			else:
-				latent_snp.append(0)
-
-	else:
-		latent_snp = [0] * len(accessions)
-	print latent_snp
-	print latent_snp.count(0)
-	return latent_snp
+	north_south_split_snp = []
+	lats = [ecotype_info_dict[int(et)][2] for et in ets]
+	m = sp.median(lats)
+	for et in ets:
+		north_south_split_snp.append(1) if latitude > m else north_south_split_snp.append(0)
+	pc_snp = []
+	K = lm.load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled') #All ecotypes
+	(evals, evecs) = linalg.eigh(K)
+	pc = sp.mat(evecs).T[-1]
+	m = sp.median(pc)
+	for v in pc:
+		pc_snp.append(1) if v > m else pc_snp.append(0)
+	return north_south_split_snp, pc_snp
 
 
 def simulate_phenotypes(phen_file, sd, maf_threshold=0, debug_filter=1.0, num_phens=1000):
@@ -190,18 +154,22 @@ def simulate_phenotypes(phen_file, sd, maf_threshold=0, debug_filter=1.0, num_ph
 
 	#The first locus..
 	snp_chr_pos_maf_list = [snp_chr_pos_maf_list[i] for i in snp_indices]
+	north_south_split_snp, pc_snp = __get_latent_snps__(sd.accessions)
 
-	phen_dict = {'snp_chr_pos_maf_list': snp_chr_pos_maf_list, 'snp_indices':snp_indices}
+	phen_dict = {'snp_chr_pos_maf_list': snp_chr_pos_maf_list, 'snp_indices':snp_indices,
+			'north_south_split_snp':north_south_split_snp, 'pc_snp':pc_snp}
 	for latent_var in latent_var_keys:
 		d = {}
-		latent_snps = []
 		if latent_var == 'random_snp':
 			l_snp_indices = random.sample(all_indices, num_phens)
 			latent_snps = [snp_chr_pos_maf_list[i][0] for i in l_snp_indices]
 			d['latent_chr_pos_maf_list'] = \
 				[(snp_chr_pos_maf_list[i][1], snp_chr_pos_maf_list[i][2], \
 				snp_chr_pos_maf_list[i][3]) for i in l_snp_indices]
+			d['latent_snps'] = latent_snps
+
 		elif latent_var == 'random':
+			latent_snps = []
 			for i in range(num_phens):
 				num_ones = random.randint(1, num_lines - 1)
 				l_snp = [0] * num_lines
@@ -209,13 +177,16 @@ def simulate_phenotypes(phen_file, sd, maf_threshold=0, debug_filter=1.0, num_ph
 				for i in one_indices:
 					l_snp[i] = 1
 				latent_snps.append(l_snp)
+			d['latent_snps'] = latent_snps
+
 		elif latent_var == 'north_south_split':
+			latent_snp = north_south_split_snp
+			d['latent_snp'] = latent_snp
 
-		elif latent_var == 'pc_split':
-			pass
+		elif latent_var == 'pc_snp':
+			latent_snp = pc_snp
+			d['latent_snp'] = latent_snp
 
-
-		d['latent_snps'] = latent_snps
 		for h in heritabilities:
 			d2 = {}
 			for phen_model in phenotype_models:  #Simulate all phenotype models.
@@ -225,7 +196,7 @@ def simulate_phenotypes(phen_file, sd, maf_threshold=0, debug_filter=1.0, num_ph
 				d3['effects_list'] = []
 				d3['phenotype'] = []
 				for i in range(num_phens):
-					pass
+
 
 				d2[phen_model] = d3
 			d[h] = d2
