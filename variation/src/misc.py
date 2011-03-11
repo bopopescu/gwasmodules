@@ -6208,11 +6208,25 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 	
 	
 class FileFormatExchange(object):
-	"""
-	2008-03-18
-		check chiamo output
-	"""
+	
+	@classmethod
+	def combineMultiFastaIntoOne(cls, input_dir, numberChrOrder, nonNumberChrOrder, output_fname):
+		"""
+		2011-1-31
+			recover a function that has been lost.
+			
+			Given a directory of chromosome sequences downloaded from NCBI, find out which chromosome is in which file,
+				order them in a pre-specified way (number + X Y chl MT) that is same as IGV, and output in a 
+				multi-record fasta file.
+				
+		"""
+		
+	
 	def convertChiamoOutput(chiamo_infname, chiamo_outfname, ref_250k_infname, output_fname, posterior_min=0.95):
+		"""
+		2008-03-18
+			check chiamo output
+		"""
 		from variation.src.common import nt2number
 		import csv
 		import numpy
@@ -6603,7 +6617,7 @@ FileFormatExchange.strip_2010_strain_info('./script/variation/data/2010/2010_str
 	"""
 	
 	@classmethod
-	def outputEachSequenceInFastaFileIntoSingleFile(cls, input_fname, output_dir):
+	def splitMultiRecordFastaFileIntoSingleRecordFastaFiles(cls, input_fname, output_dir):
 		"""
 		2010-12-3
 			One fasta file contains >1 sequences. This function writes each sequence to an individual file in output_dir.
@@ -6636,20 +6650,30 @@ FileFormatExchange.strip_2010_strain_info('./script/variation/data/2010/2010_str
 		#2010-12-3
 		input_fname = os.path.expanduser("~/script/variation/data/CNV/TAIR9/tair9.fas")
 		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/thaliana/sequence/pseudo/")
-		FileFormatExchange.outputEachSequenceInFastaFileIntoSingleFile(input_fname, output_dir)
+		FileFormatExchange.splitMultiRecordFastaFileIntoSingleRecordFastaFiles(input_fname, output_dir)
 		sys.exit(0)
 		
 		input_fname = os.path.expanduser("~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta")
 		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/lyrata/sequence/pseudo/")
-		FileFormatExchange.outputEachSequenceInFastaFileIntoSingleFile(input_fname, output_dir)
+		FileFormatExchange.splitMultiRecordFastaFileIntoSingleRecordFastaFiles(input_fname, output_dir)
 		sys.exit(0)
 		
-				#2010-12-3
+		#2010-12-3
 		input_fname = os.path.expanduser("~/script/variation/data/lyrata/Araly1_assembly_scaffolds.fasta")
 		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/lyrata/sequence/pseudo/")
-		FileFormatExchange.outputEachSequenceInFastaFileIntoSingleFile(input_fname, output_dir)
+		FileFormatExchange.splitMultiRecordFastaFileIntoSingleRecordFastaFiles(input_fname, output_dir)
 		sys.exit(0)
 		
+		#2011-1-31
+		input_fname = os.path.expanduser("/Network/Data/NCBI/hs_genome.fasta")
+		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/hg19/sequence/pseudo/")
+		FileFormatExchange.splitMultiRecordFastaFileIntoSingleRecordFastaFiles(input_fname, output_dir)
+		
+		input_fname = os.path.expanduser("/Network/Data/NCBI/mm_genome.fasta")
+		output_dir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/macaque/sequence/pseudo/")
+		FileFormatExchange.splitMultiRecordFastaFileIntoSingleRecordFastaFiles(input_fname, output_dir)
+		
+		sys.exit(0)
 		
 	"""
 		
@@ -8506,15 +8530,18 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	"""	
 	
 	@classmethod
-	def convertOldFormatCallFileIntoNewFormat(cls, db_250k, method_id=3):
+	def convertOldFormatCallFileIntoNewFormat(cls, db_250k, method_id=3, priorTAIRVersion=False):
 		"""
+		2011-2-24
+			add argument priorTAIRVersion, if true, it means using Snps.tair8_chromosome,Snps.tair8_position
+				rather than Snps.chromosome,Snps.position.
 		2011-1-24
 			use Stock_250kDB.Snps.id to replace chr_pos... in the call file.
 			i.e.
 				old format: 1_3102_A_G      G       0.985079453549666
 				new format: 2       G       0.985079453549666
 		"""
-		chr_pos2db_id = db_250k.getSNPChrPos2ID()
+		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=False)
 		import Stock_250kDB, os, sys, csv
 		sys.stderr.write("Converting old format call files from method %s into new format ... \n"%(method_id))
 		query = Stock_250kDB.CallInfo.query.filter_by(method_id=method_id)
@@ -8533,6 +8560,8 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 			del reader
 			
 			if convertData:
+				no_of_lines = 0
+				no_of_lines_after_conversion = 0
 				sys.stderr.write("...")
 				# backup the old file first
 				oldFormatFname = '%s.old.tsv'%(os.path.splitext(row.filename)[0])
@@ -8544,23 +8573,72 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				writer = csv.writer(open(row.filename, 'w'), delimiter='\t')
 				writer.writerow(header_row)
 				for row in reader:
+					no_of_lines += 1
 					chr_pos = row[0].split('_')[:2]
 					chr_pos = tuple(map(int, chr_pos))
 					db_id = chr_pos2db_id.get(chr_pos)
 					if db_id is not None:
+						no_of_lines_after_conversion += 1
 						new_row = [db_id] + row[1:]
 						writer.writerow(new_row)
 				del reader, writer
+				sys.stderr.write("%s lines different after conversion.\n"%(no_of_lines_after_conversion-no_of_lines))
+			else:
+				sys.stderr.write("no conversion. (maybe converted already).\n")
 			counter += 1
-			sys.stderr.write(".\n")
 	
 	"""
 		# 2011-1-24
 		# 
 		DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, method_id=3)
 		sys.exit(0)
+		
+		# 2011-2-15
+		# 	Watch: use papaya's TAIR8 db because the call info files contains calls in TAIR8 coordinates.
+		for call_method_id in xrange(20,73):
+			DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, method_id=call_method_id)
+		sys.exit(0)
+		
 	"""
 	
+	@classmethod
+	def convertSNPDatasetLocusIDIntoDBID(cls, db, input_fname, output_fname):
+		"""
+		2011-2-24
+			input_fname is Strain X SNP format.
+			This function replaces SNP id in chr_pos format with db id. Snps.id.
+			
+			
+		"""
+		from pymodule import read_data
+		chr_pos_set = set()
+		chr_pos2snp_id = db.getSNPChrPos2ID(keyType=1)
+		#chr_pos2snp_id = db.chr_pos2snp_id
+		for chr_pos, db_id in chr_pos2snp_id.iteritems():
+			chr, pos = chr_pos[:2]
+			chr_pos = '%s_%s'%(chr, pos)
+			chr_pos_set.add(chr_pos)
+		
+		header, strain_acc_list, category_list, data_matrix = read_data(input_fname, col_id_key_set=chr_pos_set)
+		
+		new_header = header[:2]
+		for chr_pos in header[2:]:
+			chr_pos = map(int, chr_pos.split('_'))
+			chr_pos = tuple(chr_pos)
+			db_id = chr_pos2snp_id[chr_pos]
+			new_header.append(db_id)
+		header = new_header
+		from pymodule.SNP import write_data_matrix
+		write_data_matrix(data_matrix, output_fname, header, strain_acc_list, category_list, rows_to_be_tossed_out=None, \
+			cols_to_be_tossed_out=None, nt_alphabet=0, transform_to_numpy=0,\
+			discard_all_NA_rows=0, strain_acc2other_info=None, delimiter='\t', )
+	"""
+		# 2011-2-24
+		input_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005.csv"
+		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
+		DB250k.convertSNPDatasetLocusIDIntoDBID(db, input_fname, output_fname)
+		sys.exit(2)
+	"""
 	@classmethod
 	def convertRMIntoJson(cls, db_250k, call_method_id_ls_str="", analysis_method_id_ls_str="", \
 						phenotype_method_id_ls_str="", no_of_top_snps = 10000, commit=False):
@@ -9167,7 +9245,10 @@ class CNV(object):
 	@classmethod
 	def outputNonOverlappingCNVAsSNP(cls, db_250k, output_fname, cnv_method_id=None, cnv_type_id=None):
 		"""
+		2011-2-17
+			use CNV.id as column ID
 		2010-8-7
+			in matrix, normal is represented as 0. deletion or other chosen cnv type -> 1.
 		"""
 		sys.stderr.write("Outputting non-overlapping CNVs as SNPs for method %s, type %s ...\n"%(cnv_method_id, \
 																			cnv_type_id))
@@ -9179,7 +9260,8 @@ class CNV(object):
 			order_by(Stock_250kDB.CNV.chromosome).order_by(Stock_250kDB.CNV.start).order_by(Stock_250kDB.CNV.stop)
 		
 		for row in query:
-			col_id = '%s_%s_%s'%(row.chromosome, row.start, row.stop)
+			#col_id = '%s_%s_%s'%(row.chromosome, row.start, row.stop)
+			col_id = row.id		#2011-2-17 use CNV.id as column ID
 			col_id_ls.append(col_id)
 			col_id2index[col_id] = len(col_id2index)
 			cnv_id2index[row.id] = col_id2index[col_id]
@@ -9231,7 +9313,6 @@ class CNV(object):
 		output_fname = os.path.expanduser('~/script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod%s.tsv'%cnv_method_id)
 		CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
 		sys.exit(0)
-		
 		
 	"""
 		
@@ -20047,6 +20128,11 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
+		# 2011-2-24 be careful which db (old TAIR8 or TAIR9) to use. this case is TAIR8 (papaya).
+		input_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005.csv"
+		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
+		DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname)
+		sys.exit(2)
 
 
 #2007-03-05 common codes to initiate database connection
