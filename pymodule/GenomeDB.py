@@ -622,6 +622,119 @@ class GenomeDatabase(ElixirDB):
 		
 		sys.stderr.write("Done.\n")
 		return gene_id2model, chr_id2gene_id_ls, geneSpanRBDict
+	
+	def createGenomeRBDict(self, tax_id=3702, max_distance=20000, debug=False):
+		"""
+		2011-3-10
+			copied from FindCNVContext.py
+		2011-1-27
+			require Gene.start, Gene.stop, Gene.chromosome not null.
+			Gene.id is the new gene_id (was Gene.gene_id).
+		2010-10-3
+			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
+		2010-9-23
+			becomes a classmethod
+		2010-8-17
+		"""
+		sys.stderr.write("Creating a RBDict for all genes from organism %s ... \n"%tax_id)
+		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from RBTree import RBDict
+		from utils import PassingData
+		genomeRBDict = RBDict()
+		query = Gene.query.filter_by(tax_id=tax_id).filter(Gene.start!=None).\
+			filter(Gene.stop!=None).filter(Gene.chromosome!=None)
+		counter = 0
+		real_counter = 0
+		for row in query:
+			try:	# convert to integer except when "C" or "M"/mitochondria is encountered.
+				chromosome = int(row.chromosome)	#integer chromosomes should be converted as CNV.chromosome is integer.
+			except:
+				chromosome = row.chromosome
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, \
+							span_ls=[max(1, row.start - max_distance), row.stop + max_distance], \
+							min_reciprocal_overlap=1,)	#2010-8-17 any overlap short of identity is tolerated.
+			if segmentKey not in genomeRBDict:
+				genomeRBDict[segmentKey] = []
+			oneGeneData = PassingData(strand = row.strand, gene_id = row.id, gene_start = row.start, \
+										gene_stop = row.stop, geneCommentaryRBDictLs=[])
+			counter += 1
+			for gene_commentary in row.gene_commentaries:
+				if not gene_commentary.gene_commentary_id:
+					# ignore gene_commentary that are derived from other gene_commentaries. 
+					# they'll be handled within the parental gene_commentary.
+					geneCommentaryRBDict = RBDict()
+					geneCommentaryRBDict.gene_commentary_id = gene_commentary.id
+					#gene_commentary.construct_annotated_box()
+					box_ls = gene_commentary.constructAnnotatedBox()
+					#box_ls=gene_commentary.box_ls
+					no_of_boxes = len(box_ls)
+					
+					numberPorter = PassingData(cds_number = 0,\
+											intron_number = 0,\
+											utr_number = 0,\
+											exon_number = 0)
+					for i in xrange(no_of_boxes):
+						if row.strand == "-1":	#reverse
+							box = box_ls[-i-1]
+						else:
+							box = box_ls[i]
+						start, stop, box_type, is_translated, gene_segment_id = box[:5]
+						numberVariableName = None
+						if box_type=='3UTR' or box_type=='5UTR':
+							numberPorter.utr_number += 1
+							numberVariableName = 'utr_number'
+						elif box_type=='CDS':
+							numberPorter.cds_number += 1
+							numberVariableName = 'cds_number'
+						elif box_type=='intron':
+							numberPorter.intron_number += 1
+							numberVariableName = 'intron_number'
+						elif box_type=='exon':
+							numberPorter.exon_number += 1
+							numberVariableName = 'exon_number'
+						genePartKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, span_ls=[start, stop], \
+											min_reciprocal_overlap=1, label=box_type, cds_number=None,\
+											intron_number=None, utr_number=None, exon_number=None, \
+											gene_segment_id=gene_segment_id)
+									#2010-8-17 any overlap is tolerated.
+						if numberVariableName is not None:	#set the specific number
+							setattr(genePartKey, numberVariableName, getattr(numberPorter, numberVariableName, None))
+						geneCommentaryRBDict[genePartKey] = None
+						real_counter += 1
+					oneGeneData.geneCommentaryRBDictLs.append(geneCommentaryRBDict)
+			genomeRBDict[segmentKey].append(oneGeneData)
+			if counter%1000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*100, counter, real_counter))
+				if debug:
+					break
+		sys.stderr.write("%s%s\t%s\n"%('\x08'*100, counter, real_counter))
+		sys.stderr.write("%s Done.\n"%(str(genomeRBDict)))
+		return genomeRBDict
+	
+	def dealWithGenomeRBDict(self, genomeRBDictPickleFname, tax_id=3702, max_distance=20000, debug=None):
+		"""
+		2011-3-10
+		"""
+		sys.stderr.write("Dealing with genomeRBDict ...")
+		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from RBTree import RBDict
+		from utils import PassingData
+		import cPickle
+		if genomeRBDictPickleFname:
+			if os.path.isfile(genomeRBDictPickleFname):	#if this file is already there, suggest to un-pickle it.
+				picklef = open(genomeRBDictPickleFname)
+				genomeRBDict = cPickle.load(picklef)
+				del picklef
+			else:	#if the file doesn't exist, but the filename is given, pickle snps_context_wrapper into it
+				genomeRBDict = self.createGenomeRBDict(tax_id=tax_id, max_distance=max_distance, debug=debug)
+				#2008-09-07 pickle the snps_context_wrapper object
+				picklef = open(genomeRBDictPickleFname, 'w')
+				cPickle.dump(genomeRBDict, picklef, -1)
+				picklef.close()
+		else:
+			genomeRBDict = self.createGenomeRBDict(tax_id=tax_id, max_distance=max_distance, debug=debug)
+		sys.stderr.write("Done.\n")
+		return genomeRBDict
 
 def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
 	annot_assembly_table='genome.annot_assembly'):
