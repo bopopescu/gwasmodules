@@ -1139,6 +1139,36 @@ class SNPData(object):
 		sys.stderr.write("%s columns discarded. Done.\n"%(newSnpData.no_of_cols_removed))
 		return newSnpData
 	
+	def convertSNPIDToChrPos(self, db):
+		"""
+		2011-03-10 (not tested)
+			assuming col_id is Snps.id, and convert them into chr_pos through db (stock_250k).
+			If col_id is already chr_pos format, no conversion.
+			A new SNPData is generated in the end.
+		"""
+		#2011-2-27 translate the db_id into chr_pos because the new StrainXSNP dataset uses db_id to identify SNPs.
+		# but if col-id is already chr_pos, it's fine.
+		new_col_id_ls = []
+		data_matrix_col_index_to_be_kept = []
+		for i in xrange(len(self.col_id_ls)):
+			snp_id = self.col_id_ls[i]
+			chr_pos = db.get_chr_pos_given_db_id2chr_pos(snp_id,)
+			if chr_pos is not None:
+				data_matrix_col_index_to_be_kept.append(i)
+				new_col_id_ls.append(chr_pos)
+		
+		# to remove no-db_id columns from data matrix
+		import numpy
+		#data_matrix = numpy.array(self.data_matrix)
+		data_matrix = self.data_matrix[:, data_matrix_col_index_to_be_kept]
+		
+		no_of_rows = len(self.row_id_ls)
+		newSnpData = SNPData(row_id_ls=copy.deepcopy(self.row_id_ls), col_id_ls=self.col_id_ls)
+		newSnpData.data_matrix = data_matrix
+		newSnpData.no_of_cols_removed = len(self.col_id_ls)-no_of_cols
+		newSnpData.processRowIDColID()	# to initiate a new row_id2row_index since row_id_ls is changed
+		sys.stderr.write("%s columns discarded. Done.\n"%(newSnpData.no_of_cols_removed))
+		return newSnpData
 	
 	@classmethod
 	def convertHetero2NA(cls, snpData):
