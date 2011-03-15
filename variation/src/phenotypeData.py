@@ -197,6 +197,12 @@ class phenotype_data:
 			self.sqr_transform(pid, method=method)
 		elif trans_type == 'exp':
 			self.exp_transform(pid, method=method)
+		elif trans_type == 'most_normal':
+			self.most_normal_transformation(pid)
+		elif trans_type == 'none':
+			pass
+		else:
+			raise Exception('Transformation unknown')
 
 	def revert_to_raw_values(self, pid):
 		if not self.phen_dict[pid]['transformation']:
@@ -431,6 +437,7 @@ class phenotype_data:
 		if not pids:
 			pids = self.phen_dict.keys()
 		for pid in pids:
+			if len(set(self.phen_dict[pid]['ecotypes'])) == len(self.phen_dict[pid]['ecotypes']): continue
 			phen_name = self.get_name(pid)
 			trans = self.phen_dict[pid]['transformation']
 			self.phen_dict[pid] = self.get_avg_value_dict(pid)
@@ -2527,7 +2534,7 @@ def get_250K_accession_to_ecotype_dict(call_method=72, dict_key='nativename'):
 	"""
 	"""
 	delim = '\t'
-	fn = env['data_dir'] + 'call_method_72_ecotype_info.tsv'
+	fn = env['data_dir'] + 'call_method_%d_info.tsv' % call_method
 	f = open(fn)
 	header = f.next().split(delim)
 	#print header
