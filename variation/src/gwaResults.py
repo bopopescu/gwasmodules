@@ -1269,6 +1269,21 @@ class Result(object):
 		return regions
 
 
+	def count_nearby(self, chrom_pos_list, radius):
+		"""
+		Counts how many of the chrom_pos tuples are within a radius of a SNP in the result.
+		"""
+		cpl = self.get_chr_pos_list()
+		count = 0
+		for (chrom1, pos1) in chrom_pos_list:
+			for (chrom2, pos2) in cpl:
+				if chrom1 == chrom2 and abs(pos1 - pos2) <= radius:
+					count += 1
+					break
+		return count
+
+
+
 	def get_region_result(self, chromosome, start_pos, end_pos, buffer=0):
 		"""
 		returns a result object with only the SNPs, etc. within the given boundary.

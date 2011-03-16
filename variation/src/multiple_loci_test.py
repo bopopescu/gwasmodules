@@ -299,6 +299,9 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 		#Filter data
 		gwa_res.filter_attr('scores', pval_thres)
 		for window_size in __window_sizes:
+			num_caus_found = gwa_res.count_nearby(cpl)
+			tpr = float(num_caus_found) / len(cpl)
+			gwa_res
 			#calculate Power (sensitivity, TPR), FDR, FPR
 			min_dist = gwa_res.get_min_distances(cpl)
 

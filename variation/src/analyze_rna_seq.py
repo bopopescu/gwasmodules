@@ -193,20 +193,20 @@ def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_thre
 
 
 
-def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
+def _load_results_(mapping_method, temperature, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
 	pickle_file = '%s_%s_mac%d_res.pickled' % (file_prefix, mapping_method, mac_threshold)
 	if os.path.isfile(pickle_file):
 		with open(pickle_file) as f:
 			d = cPickle.load(f)
 	else:
-		phen_file = env['phen_dir'] + 'rna_seq.csv'
+		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
 		phen_pickle_file = phen_file + 'sd_overlap.pickled'
 		if os.path.isfile(phen_pickle_file):
 			with file(phen_pickle_file) as f:
 				phed = cPickle.load(f)
 		else:
 			phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-			phed.convert_to_averages()
+			#phed.convert_to_averages()
 			if use_1001_data:
 				sd = dp.load_1001_full_snps(debug_filter=debug_filter)
 			else:
