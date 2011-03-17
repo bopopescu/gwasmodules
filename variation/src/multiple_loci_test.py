@@ -369,9 +369,8 @@ def run_analysis(latent_var, heritability, phen_model, phen_index, phen_d):
 
 	kinship_file = snpsdata.get_call_method_kinship_file(72)
 	K = lm.load_kinship_from_file(kinship_file)
-	print 'Running EX'
-	#First step..
 	print 'Running SW EX'
+	lm.emmax_step_wise(phen_vals, K)
 	#The other steps.. until pseudo-heritability is 0 or at most 10 steps.. 
 
 
