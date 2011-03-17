@@ -280,30 +280,35 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 	gwa_res._rank_scores_()
 
 	#Get causal p-values, and ranks
-	caus_pvals = [gwa_res.snp_results['scores'][i] in caus_indices]
-	caus_ranks = [gwa_res.ranks[i] in caus_indices]
+	res_dict['causal_pvals'] = [gwa_res.snp_results['scores'][i] in caus_indices]
+	res_dict['causal_ranks'] = [gwa_res.ranks[i] in caus_indices]
 
 	#Get significant chrom_pos_pvals..
 	if (not sign_res) and significance_threshold :
 		sign_res = gwa_res.filter_attr('scores', significance_threshold, reversed=True, return_clone=True)
-		sign_chr_pos_score = sign_res.get_chr_pos_score_list()
-		sign_dist = sign_res.get_distances(cpl)
+		res_dict['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
+		res_dict['causal_dist_matrix'] = sign_res.get_distances(cpl)
+	elif sign_res:
+		res_dict['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
+		res_dict['causal_dist_matrix'] = sign_res.get_distances(cpl)
+
 
 	#Of all SNPs ranked higher than the second causative... which is farthest from a nearest causative.
 	dist = gwa_res.get_farthest_w_stronger_association(cpl)
-	dist = -1 if dist[0] > 0 else dist[1]
+	res_dict['dist_f_w_s_a'] = -1 if dist[0] > 0 else dist[1]
 
 	#Perform power (sensitivity, TPR), FDR, FPR calculations..
 	gwa_res.neg_log_trans()
+	tprs_list = []
+	fdrs_list = []
 	for pval_thres in __pval_thresholds:
 		#Filter data
 		gwa_res.filter_attr('scores', pval_thres)
-		for window_size in __window_sizes:
-			num_caus_found = gwa_res.count_nearby(cpl)
-			tpr = float(num_caus_found) / len(cpl)
-			gwa_res
-			#calculate Power (sensitivity, TPR), FDR, FPR
-			min_dist = gwa_res.get_min_distances(cpl)
+		tprs, fdrs = gwa_res.get_power_analysis(cpl, __window_sizes)
+		tprs_list.append(tprs)
+		fdrs_list.append(fdrs)
+	res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
+	res_dict['fdrs'] = fdrs_list #[p_valthreshold][window_size]
 
 
 
@@ -333,11 +338,7 @@ def run_analysis(latent_var, heritability, phen_model, phen_index, phen_d):
 
 	result_dict = {}
 	for mm in mapping_methods:
-		d = {'stats':{}, 'sign_chr_pos': [], 'sign_pvals':[], 'causal_dist_matrix':None}
-		if latent_var in ['random_snp', 'random']:
-			d['causal_pvals'] = []
-			d['causal_ranks'] = []
-		result_dict[mm] = d
+		result_dict[mm] = {}
 
 	print "Loading SNPS dataset (again)"
 	sd = dp.load_250K_snps(call_method_id=72)
@@ -356,11 +357,13 @@ def run_analysis(latent_var, heritability, phen_model, phen_index, phen_d):
 		_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos, l_chr, l_pos,
 				significance_threshold=bonferroni_threshold)
 	else:
-		_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos, significance_threshold=bonferroni_threshold)
+		_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos,
+				significance_threshold=bonferroni_threshold)
 
 
 	print 'Running LM'
 	#First step..
+
 	print 'Running SW LM'
 	#The other steps.. 10 steps..
 
