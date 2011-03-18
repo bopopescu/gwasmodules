@@ -1874,6 +1874,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 	for step_i in range(1, num_steps + 1):
 		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
+		if step_i == 1:
+			first_emmax_res = emmax_res
 		min_pval_i = sp.argmin(emmax_res['ps'])
 		min_pval = emmax_res['ps'][min_pval_i]
 		mahalnobis_rss = emmax_res['rss'][min_pval_i]
@@ -2208,7 +2210,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
 		pylab.savefig(file_prefix + '_stats_variances_forward.pdf', format='pdf')
 
-	return step_info_list
+	res_dict = {'step_info_list':step_info_list, 'first_emmax_res':first_emmax_res}
+
+	return res_dict
 
 
 

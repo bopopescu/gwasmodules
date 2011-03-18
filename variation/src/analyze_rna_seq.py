@@ -406,50 +406,60 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 
 
 
-def load_info_files(mapping_method, temperature, file_prefix='', use_1001_data=True, debug_filter=1.0):
-	pickle_file = '%s_%s_%s_mac%d_res.pickled' % (file_prefix, temperature, mapping_method)
-	if os.path.isfile(pickle_file):
-		with open(pickle_file) as f:
-			d = cPickle.load(f)
+def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
+	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
+	phen_pickle_file = phen_file + 'sd_overlap.pickled'
+	if os.path.isfile(phen_pickle_file):
+		with file(phen_pickle_file) as f:
+			phed = cPickle.load(f)
 	else:
-		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
-		phen_pickle_file = phen_file + 'sd_overlap.pickled'
-		if os.path.isfile(phen_pickle_file):
-			with file(phen_pickle_file) as f:
-				phed = cPickle.load(f)
+		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+		phed.filter_near_const_phens(15)
+		phed.convert_to_averages()
+		if use_1001_data:
+			sd = dp.load_1001_full_snps(debug_filter=debug_filter)
 		else:
-			phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-			phed.filter_near_const_phens(15)
-			phed.convert_to_averages()
-			if use_1001_data:
-				sd = dp.load_1001_full_snps(debug_filter=debug_filter)
-			else:
-				sd = dp.load_250K_snps(debug_filter=debug_filter)
-			indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
-			phed.filter_ecotypes(indices_to_keep)
-			with file(phen_pickle_file, 'wb') as f:
-				cPickle.dump(phed, f)
+			sd = dp.load_250K_snps(debug_filter=debug_filter)
+		indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
+		phed.filter_ecotypes(indices_to_keep)
+		with file(phen_pickle_file, 'wb') as f:
+			cPickle.dump(phed, f)
 
-		gene_dict = _load_genes_list_(temperature=temperature)
-		res_dict = {}
-		pids = phed.get_pids()
-		heritabilities = []
-		for pid in pids:
-			if not pid in phed.phen_ids: continue
-			gene_tair_id = phed.get_name(pid)
-			curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
-				(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
-			if phed.is_constant(pid):
-				print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
-				continue
-			if phed.is_near_constant(pid, 15):
-				print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
-				continue
-			print 'Loading file'
-			info_filename = curr_file_prefix + '_info.txt'
-			if os.path.isfile(curr_file_prefix + '_info.txt'):
-				with open(info_filename) as f:
-					f.next()
+	gene_dict = _load_genes_list_(temperature=temperature)
+	res_dict = {}
+	pids = phed.get_pids()
+	heritabilities = []
+	for i, pid in enumerate(pids):
+		if not pid in phed.phen_ids: continue
+
+		gene_tair_id = phed.get_name(pid)
+		curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
+			(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
+#		if phed.is_constant(pid):
+#			print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
+#			continue
+		if phed.is_near_constant(pid, 15):
+#			print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
+			continue
+		if (i + 1) % (len(pids) / 100) == 0:
+			sys.stdout.write('.')
+			sys.stdout.flush()
+		info_filename = curr_file_prefix + '_info.txt'
+		if os.path.isfile(curr_file_prefix + '_info.txt'):
+			with open(info_filename) as f:
+				line = f.next()
+				l = map(str.strip, line.split())
+				heritabilities.append(float(l[1]))
+	print ''
+	print len(heritabilities), sp.mean(heritabilities)
+	pylab.hist(heritabilities, alpha=0.6, bins=20)
+	ymin, ymax = pylab.ylim()
+	y_range = ymax - 0
+	pylab.axis([-.025, 1.025, -.025 * y_range, y_range])
+	fig_file = env['tmp_dir'] + 'rna_seq_031311_%s_herits.png' % temperature
+	pylab.xlabel('Expression heritability')
+	pylab.ylabel('Frequency')
+	pylab.savefig(fig_file)
 
 
 
@@ -525,7 +535,8 @@ def _test_parallel_():
 
 if __name__ == '__main__':
 	#_load_results_('emmax', '16C', file_prefix='/storage/rna_seq_results/rna_seq')
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results/rna_seq', '16C', 'emmax', 11)
+	load_and_plot_info_files('emmax', '10C', file_prefix='/storage/rna_seq_results/rna_seq')
+	#plot('/tmp/rna_seq_16C', '/storage/rna_seq_results/rna_seq', '16C', 'emmax', 11)
 	#_load_genes_list_()
 	#_test_()
 	#print sys.argv

@@ -191,11 +191,13 @@ class phenotype_data:
 		elif trans_type == 'exp':
 			self.exp_transform(pid, method=method)
 		elif trans_type == 'most_normal':
-			self.most_normal_transformation(pid)
+			trans_type, shapiro_pval = self.most_normal_transformation(pid)
 		elif trans_type == 'none':
 			pass
 		else:
 			raise Exception('Transformation unknown')
+		return trans_type
+
 
 	def revert_to_raw_values(self, pid):
 		if not self.phen_dict[pid]['transformation']:
@@ -205,7 +207,7 @@ class phenotype_data:
 			self.phen_dict[pid]['values'] = self.phen_dict[pid]['raw_values']
 
 
-	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp']):
+	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp'], perform_trans=True):
 		"""
 		Performs the transformation which results in most normal looking data, according to Shapiro-Wilk's test
 		"""
@@ -231,7 +233,8 @@ class phenotype_data:
 		argmin_i = sp.argmax(shapiro_pvals)
 		trans_type = trans_types[argmin_i]
 		shapiro_pval = shapiro_pvals[argmin_i]
-		self.transform(pid, trans_type=trans_type)
+		if perform_trans:
+			self.transform(pid, trans_type=trans_type)
 		print "The most normal-looking transformation was %s, with a Shapiro-Wilk's p-value of %0.6f" % \
 			(trans_type, shapiro_pval)
 		return trans_type, shapiro_pval

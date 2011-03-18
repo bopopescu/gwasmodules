@@ -399,6 +399,8 @@ def analysis_plots(phed, p_dict):
 	for p_i in p_dict['pids']:
 		phenotype_name = phed.get_name(p_i)
 		phen_is_binary = phed.is_binary(p_i)
+		if trans_method == 'most_normal':
+			trans_method, shapiro_pval = phed.most_normal_transformation(p_i, perform_trans=False)
 		print "Plotting analysis plots for phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
 		for trans_method in p_dict['specific_transformations']:
 			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
@@ -469,6 +471,8 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 	phed = copy.deepcopy(phed)
 	phenotype_name = phed.get_name(p_i)
 	phen_is_binary = phed.is_binary(p_i)
+	if trans_method == 'most_normal':
+		trans_method, shapiro_pval = phed.most_normal_transformation(p_i, perform_trans=False)
 	file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i),
 				mapping_method, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 	result_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)

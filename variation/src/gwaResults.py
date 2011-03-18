@@ -1283,6 +1283,29 @@ class Result(object):
 		return count
 
 
+	def get_power_analysis(self, caus_chrom_pos_list, window_sizes=[0]):
+		"""
+		Calculate Power and FDR..
+		"""
+		for window_size in __window_sizes:
+			cpl = self.get_chr_pos_list()
+			num_caus_found = 0
+			num_false_found = 0
+			for (chrom1, pos1) in caus_chrom_pos_list:
+				caus_found = False
+				for (chrom2, pos2) in cpl:
+					if chrom1 == chrom2 and abs(pos1 - pos2) <= radius:
+						caus_found = True
+					else:
+						num_false_found += 1
+				if caus_found:
+					num_caus_found += 1
+			tprs.append(float(num_caus_found) / len(caus_chrom_pos_list))
+			fdrs.append(float(num_false_found) / len(cpl))
+
+		return tprs, fdrs
+
+
 
 	def get_region_result(self, chromosome, start_pos, end_pos, buffer=0):
 		"""
