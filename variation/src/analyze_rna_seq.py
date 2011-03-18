@@ -537,7 +537,6 @@ if __name__ == '__main__':
 	#_load_results_('emmax', '16C', file_prefix='/storage/rna_seq_results/rna_seq')
 	#load_and_plot_info_files('emmax', '10C', file_prefix='/storage/rna_seq_results/rna_seq')
 	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results/rna_seq', '10C', 'emmax', 5)
-	pass
 	#_load_genes_list_()
 	#_test_()
 	#print sys.argv
