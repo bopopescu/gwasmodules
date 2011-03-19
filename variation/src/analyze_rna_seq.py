@@ -429,10 +429,14 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_10
 	res_dict = {}
 	pids = phed.get_pids()
 	heritabilities = []
+	transformations = []
+	shapiro_wilk_pvals = []
+	tair_ids = []
 	for i, pid in enumerate(pids):
 		if not pid in phed.phen_ids: continue
 
 		gene_tair_id = phed.get_name(pid)
+		tair_ids.append(gene_tair_id)
 		curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
 			(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
 #		if phed.is_constant(pid):
@@ -450,6 +454,12 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_10
 				line = f.next()
 				l = map(str.strip, line.split())
 				heritabilities.append(float(l[1]))
+				line = f.next()
+				l = map(str.strip, line.split())
+				transformations.append(l[1])
+				line = f.next()
+				l = map(str.strip, line.split())
+				shapiro_wilk_pvals.append(float(l[1]))
 	print ''
 	print len(heritabilities), sp.mean(heritabilities)
 	pylab.hist(heritabilities, alpha=0.6, bins=20)
@@ -461,6 +471,14 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_10
 	pylab.ylabel('Frequency')
 	pylab.savefig(fig_file)
 
+	info_file_name = env['tmp_dir'] + 'rna_seq_info%s.csv' % temperature
+	with open(info_file_name,'w') as f:
+		f.write('tair_id, heritability, shapiro_wilks_pval, transformation')
+		for tair_id, h, swp, trans in it.izip(tair_ids,heritabilities,shapiro_wilk_pvals,transformations):
+			f.write('%s,%f,%f,%s\n'%(tair_id,h,swp,trans))
+	
+
+	
 
 
 
