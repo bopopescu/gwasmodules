@@ -160,6 +160,9 @@ class Result(object):
 	"""
 	Contains information on the result.  (The old object is renamed Result_old, for now..)  Poised to cause problems?
 	"""
+	pickle_attributes = ['snp_results', 'keys', 'orders', 'ranks', 'phen_id', 'result_type', 'name',
+				'accessions', 'chromosome_ends']
+
 	def __init__(self, result_file=None, snp_results=None, scores=None, snps_data=None, accessions=None, name=None,
 		     result_type=None, phen_id=None, positions=None, chromosomes=None, mafs=None, macs=None,
 		     snps=None, auto_pickling_on=True, keys=None, **snp_results_info):
@@ -185,8 +188,6 @@ class Result(object):
 		self.orders = None
 		self.ranks = None
 		self.auto_pickling_on = auto_pickling_on
-		pickle_attributes = ['snp_results', 'keys', 'orders', 'ranks', 'phen_id',
-				'result_type', 'name', 'accessions', 'chromosome_ends']
 
 
 		if result_file:
@@ -195,7 +196,7 @@ class Result(object):
 				try:
 					with open(pickle_file) as f:
 						d = cPickle.load(f)
-					for attr in pickle_attributes:
+					for attr in self.pickle_attributes:
 						setattr(self, attr, d[attr])
 					pickle_failed = False
 				except Exception, err_str:
@@ -243,7 +244,7 @@ class Result(object):
 		if result_file and self.auto_pickling_on:
 			if not os.path.isfile(pickle_file) or pickle_failed:
 				d = {}
-				for attr in pickle_attributes:
+				for attr in self.pickle_attributes:
 					d[attr] = getattr(self, attr)
 				with open(pickle_file, 'wb') as f:
 					cPickle.dump(d, f)
@@ -1428,24 +1429,28 @@ class Result(object):
 	def num_scores(self):
 		return len(self.snp_results['scores'])
 
-	def write_to_file(self, filename, additional_columns=None):
+	def write_to_file(self, filename, additional_columns=None, auto_pickling_on=True, only_pickled=False):
 		columns = ['chromosomes', 'positions', 'scores', 'mafs', 'macs']
 		if additional_columns:
 			for info in additional_columns:
 				if info in self.snp_results:
 					columns.append(info)
 		try:
-			f = open(filename, "w")
-
-			f.write(','.join(columns) + "\n")
-
-			for i in range(len(self.snp_results[columns[0]])):
-				l = []
-				for c in columns:
-					l.append(self.snp_results[c][i])
-				l = map(str, l)
-				f.write(",".join(l) + "\n")
-			f.close()
+			if not only_pickled:
+				with open(filename, "w") as f:
+					f.write(','.join(columns) + "\n")
+					for i in range(len(self.snp_results[columns[0]])):
+						l = [self.snp_results[c][i] for c in columns]
+						l = map(str, l)
+						f.write(",".join(l) + "\n")
+			if auto_pickling_on or only_pickled:
+				pickle_file = filename + '.pickled'
+				d = {}
+				for attr in self.pickle_attributes:
+					d[attr] = getattr(self, attr)
+				with open(pickle_file, 'wb') as f:
+					cPickle.dump(d, f)
+				pass
 		except Exception, err_str:
 			print 'Failed writing the resultfile:', err_str
 			print 'Make sure the given path is correct, and you have write rights.'
