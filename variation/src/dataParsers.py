@@ -1972,7 +1972,7 @@ def _test_full_seq_parser_():
 			sd = parse_numerical_snp_data(file_name, use_pickle=True)
 
 
-def load_250K_snps(call_method_id=72, data_format='binary', debug_filter=1.0):
+def load_250K_snps(call_method_id=75, data_format='binary', debug_filter=1.0):
 	data_file = '%s250K_t%d.csv' % (env['data_dir'], call_method_id)
 	return parse_snp_data(data_file , format=data_format, filter=debug_filter)
 

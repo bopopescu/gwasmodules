@@ -9,7 +9,7 @@ Option:
 	-o ...					ID string, used for output files.
 	-i ...					The phenotype IDs, to be run. 
 
-	-t ...					What data set is used.  Default is 72.
+	-t ...					What data set is used.  Default is 75.
 	-f ...					Load a specific data file, e.g. for heteroplasmy.
 	-r ...					Phenotype file, if left out then phenotypes are retireved from the DB 
 						(transformed values).
@@ -19,7 +19,7 @@ Option:
 	-a ...					Apply specific methods, otherwise all available are applied:
 						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step etc.
 	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
-						log_trans, box_cox_lambda (where lambda is a number), best (picks a most "normal" transformation).
+						log, sqrt, exp, sqr, most_normal (picks a most Gaussian looking transformation).
 	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
 						else the outlier fence is given in IQRs. (An int is required).
 												 
@@ -102,10 +102,11 @@ matplotlib.use("Agg")
 
 
 transformation_method_dict = {
+			'sqrt':0,
 			'none':1,
-			'log_trans':2,
-			'box_cox':3,
-			'sqrt_trans':0,
+			'log':2,
+			'sqr':3,
+			'exp':4,
 			}
 
 
@@ -152,7 +153,7 @@ def parse_parameters():
 
 
 	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
-		'call_method_id':72, 'walltime_req':'12:00:00', 'proc_per_node':8,
+		'call_method_id':75, 'walltime_req':'12:00:00', 'proc_per_node':8,
 		'specific_methods':['kw', 'ft', 'lm', 'emma', 'emmax'], 'specific_transformations':['none'],
 		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
 		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
@@ -203,37 +204,25 @@ def parse_parameters():
 
 
 
-def _prepare_transformation_(phed, p_i, transformation_type, remove_outliers):
+def _prepare_transformation_(phed, pid, trans_type, remove_outliers):
 	num_outliers_removed = 0
-	if "log_trans" == transformation_type:
-		print 'log transforming phenotypes..'
-		phed.log_transform(p_i)
-
-	if "sqrt_trans" == transformation_type:
-		print 'sqrt transforming phenotypes..'
-		phed.sqrt_transform(p_i)
-
-	if 'best' == transformation_type:
-		print 'Transforming phenotypes..'
-		trans_type, shapiro_pval = phed.most_normal_transformation(p_i)
-		print 'Picked %s transformation.' % trans_type
-
+	phed.transform(pid, trans_type)
 	if remove_outliers:
-		print 'removing outliers above IQR fence of', remove_outliers, '..'
-		num_outliers_removed = phed.na_outliers(p_i, iqr_threshold=remove_outliers)
+		print 'Removing outliers above IQR fence of', remove_outliers, '..'
+		num_outliers_removed = phed.na_outliers(pid, iqr_threshold=remove_outliers)
 	return num_outliers_removed
 
 
 
-def prepare_data(sd, phed, p_i, transformation_type, remove_outliers, with_replicates=False):
+def prepare_data(sd, phed, pid, trans_type, remove_outliers, with_replicates=False):
 	"""
 	Coordinates phenotype and snps data for different mapping methods.
 	"""
 	if not with_replicates:
 		print 'Converting replicates of phenotypes to averages'
-		phed.convert_to_averages([p_i])
-	num_outliers_removed = _prepare_transformation_(phed, p_i, transformation_type, remove_outliers)
-	sd.coordinate_w_phenotype_data(phed, p_i)
+		phed.convert_to_averages([pid])
+	num_outliers_removed = _prepare_transformation_(phed, pid, trans_type, remove_outliers)
+	sd.coordinate_w_phenotype_data(phed, pid)
 	return num_outliers_removed
 
 
@@ -410,6 +399,8 @@ def analysis_plots(phed, p_dict):
 	for p_i in p_dict['pids']:
 		phenotype_name = phed.get_name(p_i)
 		phen_is_binary = phed.is_binary(p_i)
+		if trans_method == 'most_normal':
+			trans_method, shapiro_pval = phed.most_normal_transformation(p_i, perform_trans=False)
 		print "Plotting analysis plots for phenotype:%s, phenotype_id:%s" % (phenotype_name, p_i)
 		for trans_method in p_dict['specific_transformations']:
 			prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
@@ -480,9 +471,12 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 	phed = copy.deepcopy(phed)
 	phenotype_name = phed.get_name(p_i)
 	phen_is_binary = phed.is_binary(p_i)
+	if trans_method == 'most_normal':
+		trans_method, shapiro_pval = phed.most_normal_transformation(p_i, perform_trans=False)
 	file_prefix = _get_file_prefix_(p_dict['run_id'], p_i, phed.get_name(p_i),
 				mapping_method, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
 	result_name = "%s_%s_%s" % (phenotype_name, mapping_method, trans_method)
+	emmax_perm_threshold = None
 	k = None
 
 	res = None
@@ -605,16 +599,16 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				res = lm.emma(snps, phen_vals, k)
 			elif mapping_method in ['emmax']:
 				if p_dict['emmax_perm']:
-					sd = _get_genotype_data_(p_dict)
+					perm_sd = _get_genotype_data_(p_dict)
 					num_outliers = prepare_data(perm_sd, phed, p_i, 'none', 0, p_dict['with_replicates'])
 					perm_sd.filter_mac_snps(p_dict['mac_threshold'])
 					t_snps = perm_sd.getSnps()
 					t_phen_vals = phed.get_values(p_i)
 					res = lm.emmax_perm_test(t_snps, t_phen_vals, k, p_dict['emmax_perm'])
-					p_dict['emmax_perm'] = res['threshold_05'][0]
+					emmax_perm_threshold = res['threshold_05'][0]
 					import pylab
 					hist_res = pylab.hist(-sp.log10(res['min_ps']))
-					threshold = -sp.log10(p_dict['emmax_perm'])
+					threshold = -sp.log10(emmax_perm_threshold)
 					b_threshold = -sp.log10(1.0 / (len(t_snps) * 20.0))
 					pylab.vlines(threshold, 0, max(hist_res[0]), color='g')
 					pylab.vlines(b_threshold, 0, max(hist_res[0]), color='r')
@@ -717,14 +711,14 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
 				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",
 						ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
-						cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
+						cand_genes=cand_genes, threshold=emmax_perm_threshold)
 			else:
 				if res.filter_attr("macs", p_dict['mac_threshold']) > 0:
 					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
 					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
 					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",
 							ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
-							cand_genes=cand_genes, threshold=p_dict['emmax_perm'])
+							cand_genes=cand_genes, threshold=emmax_perm_threshold)
 		else:
 			pass
 

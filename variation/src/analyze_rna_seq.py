@@ -21,14 +21,16 @@ import util
 import gwaResults
 import pylab
 import pdb
+import itertools as it
+import math
 
-def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
+def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
 	run_id = 'rs'
-	job_id = '%s_%d_%d' % (run_id, x_start_i, x_stop_i)
-	file_prefix = env['results_dir'] + run_id + '_' + str(x_start_i) + '_' + str(x_stop_i)
+	job_id = '%s_%d_%d_%s_%s' % (run_id, x_start_i, x_stop_i, mapping_method, temperature)
+	file_prefix = env['results_dir'] + job_id
 
 	#Cluster specific parameters	
 	if cluster == 'gmi': #GMI cluster.
@@ -46,7 +48,8 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
-	shstr += "(python %sanalyze_rna_seq.py %s %d %d " % (env['script_dir'], mapping_method, x_start_i, x_stop_i)
+	shstr += "(python %sanalyze_rna_seq.py %s %d %d %s " % \
+			(env['script_dir'], mapping_method, x_start_i, x_stop_i, temperature)
 
 	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
@@ -61,22 +64,28 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, cluster='usc'):
 
 
 
-def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15, filter_threshold=0.1,
-		debug_filter=1.0, use_1001_data=True):
-	if mapping_method not in ['emmax', 'kw']:
+def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
+		debug_filter=1.0, use_1001_data=False):
+	if mapping_method not in ['emmax', 'kw', 'lm']:
 		raise Exception('Mapping method unknown')
-	phen_file = env['phen_dir'] + 'rna_seq.csv'
+	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+	phed.filter_near_const_phens(15)
 	phed.convert_to_averages()
+	num_traits = phed.num_traits()
+	pids = phed.phen_ids[start_i :stop_i]
 	if use_1001_data:
 		sd = dp.load_1001_full_snps(debug_filter=debug_filter)
 	else:
 		sd = dp.load_250K_snps(debug_filter=debug_filter)
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
-	phed.filter_ecotypes(indices_to_keep, pids=range(start_pid, stop_pid))
+	phed.filter_ecotypes(indices_to_keep, pids=pids)
 	print len(indices_to_keep)
 	if mapping_method == 'emmax':
-		k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
+		if use_1001_data:
+			k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
+		else:
+			k_file = env['data_dir'] + "kinship_matrix_cm75.pickled"
 		K = lm.load_kinship_from_file(k_file, sd.accessions)
 	sd.filter_mac_snps(mac_threshold)
 	snps = sd.getSnps()
@@ -86,67 +95,120 @@ def run_gwas(file_prefix, mapping_method, start_pid, stop_pid, mac_threshold=15,
 	macs = r['mafs']
 	mafs = r['marfs']
 	print 'In total there are %d SNPs to be mapped.' % len(snps)
-	g_list = _load_genes_list_()
-	for pid in range(start_pid, stop_pid):
+	gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
+	for i, pid in enumerate(pids):
+		if not pid in phed.phen_ids: continue
+		cgs = gene_dict[pid]
+		print i
 		gene_tair_id = phed.get_name(pid)
 		curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
-		if phed.is_constant(pid):
-			print "Skipping expressions for %s since it's constant." % gene_tair_id
-			continue
 
 		if mapping_method == 'kw':
 			phen_vals = phed.get_values(pid)
 			kw_res = util.kruskal_wallis(snps, phen_vals)
 			pvals = kw_res['ps'].tolist()
 
-		elif mapping_method == 'emmax':
+		else:
 			#Identify the right transformation
 			trans_type, shapiro_pval = phed.most_normal_transformation(pid)
 			phen_vals = phed.get_values(pid)
-			#Get pseudo-heritabilities
-			res = lm.get_emma_reml_estimates(phen_vals, K)
+			if mapping_method == 'lm':
+				res = lm.linear_model(snps, phen_vals)
+				pvals = res['ps'].tolist()
+			elif mapping_method == 'emmax':
+				#Get pseudo-heritabilities
+				res = lm.get_emma_reml_estimates(phen_vals, K)
+				res = lm.emmax(snps, phen_vals, K)
+				pvals = res['ps'].tolist()
+				p_her = res['pseudo_heritability']
 
+
+
+		res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
+		num_scores = res.get_num_scores()
+
+		#Record distance to the most significant SNP from the gene.
+		min_i = res.arg_min_attr()
+		min_chr = chromosomes[min_i]
+		min_pos = positions[min_i]
+		min_dist = -1
+		min_pos = 100000000
+		max_pos = 0
+		cur_chrom = cgs[0].chromosome
+		for g in cgs:
+			if min_dist != 0 and g.chromosome == min_chr:
+				if g.startPos <= min_pos <= g.endPos:
+					min_dist = 0
+				else:
+					dist = min(abs(g.startPos - min_pos), abs(g.endPos - min_pos))
+					if min_dist == -1 or min_dist > dist:
+						min_dist = dist
+			min_pos = min(g.startPos, min_pos)
+			max_pos = max(g.endPos, max_pos)
+
+		#Record most significant p-value within 0kb, 5kb, 10kb, 25kb, 50kb, and 100kb window, and SNP count.
+#		window_sizes = [0, 5000, 10000, 25000, 50000, 100000]
+#		window_dict = {}
+#		for window_size in window_sizes:
+#			reg_res = res.get_region_result(cur_chrom, min_pos, max_pos, buffer=window_size)
+#			num_snps = reg_res.num_scores()
+#			if num_scores:
+#				min_pval = reg_res.min_score()
+#			else:
+#				min_pval = -1
+#			window_dict[window_size] = {'min_pval':min_pval, 'num_snps':num_snps}
+
+
+		#Write info to file..
+		with open(curr_file_prefix + '_info.txt', 'w') as f:
+			if mapping_method == 'emmax':
+				f.write('pseudo_heritability: %f \n' % p_her)
+			if mapping_method == 'emmax' or mapping_method == 'lm':
+				f.write('transformation_type: %s \n' % trans_type)
+				f.write('transformation_shapiro_pval: %f \n' % shapiro_pval)
+			f.write('dist_to_cand_gene: %f \n' % min_dist)
+#			for window_size in window_sizes:
+#				min_pval = window_dict[window_size]['min_pval']
+#				num_snps = window_dict[window_size]['num_snps']
+#				f.write('window_size: %d, min_pval: %f \n' % (window_size, min_pval))
+#				f.write('window_size: %d, num_snps: %d \n' % (window_size, num_snps))
+
+
+		#filter, top 10%...
+		res.filter_percentile(filter_threshold, reversed=True)
+		res.write_to_file(curr_file_prefix + '.pvals', only_pickled=True)
+
+
+		#Plot GWAs...
+		if res.min_score() < 10e-11:
+			#print [cg.tairID for cg in cgs]
 			f_prefix = curr_file_prefix + '_hist'
 			phed.plot_histogram(pid, title='Gene expressions for %s' % gene_tair_id,
 					png_file=f_prefix + '.png', p_her=res['pseudo_heritability'],
 					x_label='RNA seq expression levels (%s transformed)' % trans_type)
-			res = lm.emmax(snps, phen_vals, K)
-			pvals = res['ps'].tolist()
-
-		else:
-			raise Exception(mapping_method)
-			continue
-		res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions,
-				chromosomes=chromosomes)
-
-		#filter, top 10%...
-		res.filter_percentile(filter_threshold, reversed=True)
-		res.write_to_file(curr_file_prefix + '.pvals')
-
-		#Plot GWAs...
-		cgs = g_list[pid - 1]
-		print [cg.tairID for cg in cgs]
-		f_prefix = curr_file_prefix + '_manhattan'
-		res.neg_log_trans()
-		res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True)
-
-		#Process top regions, where are they...?
+			f_prefix = curr_file_prefix + '_manhattan'
+			res.neg_log_trans()
+			res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True,
+					b_threshold= -math.log10(1.0 / (num_traits * num_scores * 20.0)))
 
 
 
-def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
-	pickle_file = '%s_%s_mac%d_res.pickled' % (file_prefix, mapping_method, mac_threshold)
+
+
+def _load_results_(mapping_method, temperature, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
+	pickle_file = '%s_%s_%s_mac%d_res.pickled' % (file_prefix, temperature, mapping_method, mac_threshold)
 	if os.path.isfile(pickle_file):
 		with open(pickle_file) as f:
 			d = cPickle.load(f)
 	else:
-		phen_file = env['phen_dir'] + 'rna_seq.csv'
+		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
 		phen_pickle_file = phen_file + 'sd_overlap.pickled'
 		if os.path.isfile(phen_pickle_file):
 			with file(phen_pickle_file) as f:
 				phed = cPickle.load(f)
 		else:
 			phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+			phed.filter_near_const_phens(15)
 			phed.convert_to_averages()
 			if use_1001_data:
 				sd = dp.load_1001_full_snps(debug_filter=debug_filter)
@@ -158,29 +220,32 @@ def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_thres
 				cPickle.dump(phed, f)
 		#sd.filter_mac_snps(mac_threshold)
 
-		g_list = _load_genes_list_()
+		gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
 		res_dict = {}
 		pids = phed.get_pids()
 		for pid in pids:
+			print 'pid: %d' % pid
+			if not pid in phed.phen_ids: continue
 			gene_tair_id = phed.get_name(pid)
-			curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
+			curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
+				(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
 			if phed.is_constant(pid):
 				print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
 				continue
-			if phed.is_near_constant(pid, 10):
+			if phed.is_near_constant(pid, 15):
 				print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
 				continue
 			print 'Loading file'
-			if os.path.isfile(curr_file_prefix + '.pvals'):
+			if os.path.isfile(curr_file_prefix + '.pvals') or os.path.isfile(curr_file_prefix + '.pvals.pickled'):
 				res = gwaResults.Result(curr_file_prefix + '.pvals')
 				#Trim results..
 				res.neg_log_trans()
 
 				res.filter_attr('scores', 5) #Filter everything below 10^-5
-				if len(res.snp_results['scores']) == 0:
+				if res.num_scores() == 0:
 					print "Skipping file since nothing is below 10^-5"
 					continue
-				cgs = g_list[pid - 1]
+				cgs = gene_dict[pid]
 				avg_g_pos = sp.mean([(cg.startPos + cg.endPos) / 2.0 for cg in cgs])
 				chrom = cgs[0].chromosome #Current gene chromosome
 				print 'Working on gene: %s, chrom=%d, pos=%0.1f' % (gene_tair_id, chrom, avg_g_pos)
@@ -228,29 +293,46 @@ def _load_results_(mapping_method, file_prefix='', use_1001_data=True, mac_thres
 
 
 
-def plot(file_prefix, min_score=10):
+def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_score=5):
 	#Load in chromosome dict..
 	chrom_dict = {}
 	for x_chrom in [1, 2, 3, 4, 5]:
 		for y_chrom in [1, 2, 3, 4, 5]:
-			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[]}
-	d = _load_results_('emmax', file_prefix='/storage/rna_seq_gwas_results/rna_seq')
+			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[], 'tair_ids':[]}
+	d = _load_results_(mapping_method, temperature, file_prefix=results_file_prefix)
 	res_dict = d['res_dict']
 	phed = d['phed']
 	scores = []
 	for x_chrom, x_pos in res_dict:
 		d = res_dict[(x_chrom, x_pos)]
+		tair_id = d['tair_id']
 		for y_chrom in [1, 2, 3, 4, 5]:
 			cps_d = d['chrom_pos_score'][y_chrom]
 			for i in range(len(cps_d['scores'])):
 				s = cps_d['scores'][i]
-				if s > min_score:					
+				if s > min_score:
 					if s > 25:
 						s = 25
 					scores.append(s)
 					chrom_dict[(x_chrom, y_chrom)]['scores'].append(s)
+					chrom_dict[(x_chrom, y_chrom)]['tair_ids'].append(tair_id)
 					chrom_dict[(x_chrom, y_chrom)]['x_positions'].append(x_pos)
 					chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'][i])
+
+	#Write chrom_dict to file..
+	for x_chrom in [1, 2, 3, 4, 5]:
+		for y_chrom in [1, 2, 3, 4, 5]:
+			file_name = file_prefix + '_chrom%d_chrom%d_%s_%d.txt' % (x_chrom, y_chrom, mapping_method, min_score)
+			print 'Writing to file:', file_name
+			with open(file_name, 'w') as f:
+				d = chrom_dict[(x_chrom, y_chrom)]
+				f.write('x_position, y_position, score, tair_id\n')
+				l = zip(d['x_positions'], d['y_positions'], d['scores'], d['tair_ids'])
+				l.sort()
+				for t in l:
+					f.write('%d,%d,%f,%s\n' % t)
+
+
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
@@ -270,7 +352,7 @@ def plot(file_prefix, min_score=10):
 	vmin = min_score
 	f = pylab.figure(figsize=(50, 45))
 	chromosomes = [1, 2, 3, 4, 5]
-	plot_file_name = file_prefix + '_emmax_%d.png'%(min_score)
+	plot_file_name = file_prefix + '_%s_%d.png' % (mapping_method, min_score)
 	label = '$-log_{10}$(p-value)'
 	vmax = max(scores)
 
@@ -278,10 +360,10 @@ def plot(file_prefix, min_score=10):
 		for xi, chr1 in enumerate(chromosomes):
 
 			l = chrom_dict[(chr1, chr2)]['scores']
-			if len(l)==0:
+			if len(l) == 0:
 				continue
-			ax = f.add_axes([0.97*(rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi]-0.02,
-					0.97*(rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
+			ax = f.add_axes([0.97 * (rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi] - 0.02,
+					0.97 * (rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			#ax.tick_params(fontsize='x-large')
@@ -319,13 +401,84 @@ def plot(file_prefix, min_score=10):
 	cb = pylab.colorbar(scatter_plot, cax=cax)
 	cb.set_label(label, fontsize='xx-large')
 	#cb.set_tick_params(fontsize='x-large')
-	f.text(0.005,0.47,'Expressed gene position',size='xx-large', rotation='vertical')
-	f.text(0.47,0.99,'Associated SNP position',size='xx-large')
-	print 'Saving figure:',plot_file_name 
+	f.text(0.005, 0.47, 'Associated SNP position', size='xx-large', rotation='vertical')
+	f.text(0.47, 0.99, 'Expressed gene position', size='xx-large')
+	print 'Saving figure:', plot_file_name
 	f.savefig(plot_file_name, format='png')
 
 
 
+
+def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
+	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
+	phen_pickle_file = phen_file + 'sd_overlap.pickled'
+	if os.path.isfile(phen_pickle_file):
+		with file(phen_pickle_file) as f:
+			phed = cPickle.load(f)
+	else:
+		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+		phed.filter_near_const_phens(15)
+		phed.convert_to_averages()
+		if use_1001_data:
+			sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+		else:
+			sd = dp.load_250K_snps(debug_filter=debug_filter)
+		indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
+		phed.filter_ecotypes(indices_to_keep)
+		with file(phen_pickle_file, 'wb') as f:
+			cPickle.dump(phed, f)
+
+	gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
+	res_dict = {}
+	pids = phed.get_pids()
+	heritabilities = []
+	transformations = []
+	shapiro_wilk_pvals = []
+	tair_ids = []
+	for i, pid in enumerate(pids):
+		if not pid in phed.phen_ids: continue
+
+		gene_tair_id = phed.get_name(pid)
+		tair_ids.append(gene_tair_id)
+		curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
+			(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
+#		if phed.is_constant(pid):
+#			print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
+#			continue
+		if phed.is_near_constant(pid, 15):
+#			print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
+			continue
+		if (i + 1) % (len(pids) / 100) == 0:
+			sys.stdout.write('.')
+			sys.stdout.flush()
+		info_filename = curr_file_prefix + '_info.txt'
+		if os.path.isfile(curr_file_prefix + '_info.txt'):
+			with open(info_filename) as f:
+				line = f.next()
+				l = map(str.strip, line.split())
+				heritabilities.append(float(l[1]))
+				line = f.next()
+				l = map(str.strip, line.split())
+				transformations.append(l[1])
+				line = f.next()
+				l = map(str.strip, line.split())
+				shapiro_wilk_pvals.append(float(l[1]))
+	print ''
+	print len(heritabilities), sp.mean(heritabilities)
+	pylab.hist(heritabilities, alpha=0.6, bins=20)
+	ymin, ymax = pylab.ylim()
+	y_range = ymax - 0
+	pylab.axis([-.025, 1.025, -.025 * y_range, y_range])
+	fig_file = env['tmp_dir'] + 'rna_seq_031311_%s_herits.png' % temperature
+	pylab.xlabel('Expression heritability')
+	pylab.ylabel('Frequency')
+	pylab.savefig(fig_file)
+
+	info_file_name = env['tmp_dir'] + 'rna_seq_info%s.csv' % temperature
+	with open(info_file_name, 'w') as f:
+		f.write('tair_id, heritability, shapiro_wilks_pval, transformation')
+		for tair_id, h, swp, trans in it.izip(tair_ids, heritabilities, shapiro_wilk_pvals, transformations):
+			f.write('%s,%f,%f,%s\n' % (tair_id, h, swp, trans))
 
 
 
@@ -333,56 +486,63 @@ def plot(file_prefix, min_score=10):
 
 
 def run_parallel_rna_seq_gwas():
-	if len(sys.argv) > 3:
-		run_gwas(env['results_dir'] + 'rna_seq', sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
+	if len(sys.argv) > 4:
+		temperature = sys.argv[4]
+		file_prefix = env['results_dir'] + 'rna_seq_%s' % temperature
+		run_gwas(file_prefix, sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), temperature)
 	else:
-		phen_file = env['phen_dir'] + 'rna_seq.csv'
+		temperature = sys.argv[3]
+		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+		phed.filter_near_const_phens(15)
 		num_traits = phed.num_traits()
 		print 'Found %d traits' % num_traits
 		chunck_size = int(sys.argv[2])
 		for i in range(0, num_traits, chunck_size):
-			run_parallel(sys.argv[1], i + 1, i + chunck_size + 1)
+			run_parallel(sys.argv[1], i, i + chunck_size, temperature)
 
 
-def _gene_list_to_file_():
+def _gene_list_to_file_(file_prefix='rna_seq_031311'):
 	import bisect
-	phen_file = env['phen_dir'] + 'rna_seq.csv'
+	phen_file = env['phen_dir'] + file_prefix + '.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+	phed.filter_near_const_phens(15)
 	tair_gene_versions = phed.get_names()
 	tair_ids = [s.split('.')[0] for s in tair_gene_versions]
+	pids = phed.phen_ids
 	gl = gr.get_gene_list(include_intron_exons=False)
 	g_tair_ids = [g.tairID for g in gl]
 	l = zip(g_tair_ids, gl)
 	l.sort()
 	(g_tair_ids, gl) = map(list, zip(*l))
-	genes = []
+	gene_dict = {}
 	g_chrom_pos = []
-	for tid in tair_ids:
+	for pid, tid in zip(pids, tair_ids):
 		g_i = bisect.bisect_left(g_tair_ids, tid)
 		if tid != g_tair_ids[g_i]:
 			print tid, g_tair_ids[g_i - 1], g_tair_ids[g_i]
-			genes.append([gl[g_i - 1], gl[g_i]])
+			gene_dict[pid] = [gl[g_i - 1], gl[g_i]]
 			pos_l = [gl[g_i - 1].startPos, gl[g_i - 1].endPos, gl[g_i].startPos, gl[g_i].endPos]
 		else:
 			pos_l = [gl[g_i].startPos, gl[g_i].endPos]
-			genes.append([gl[g_i]])
+			gene_dict[pid] = [gl[g_i]]
 		chr_pos_t = (gl[g_i].chromosome, min(pos_l), max(pos_l))
 		if chr_pos_t[2] - chr_pos_t[1] > 50000 or chr_pos_t[2] - chr_pos_t[1] < 0:
 			print chr_pos_t
 		g_chrom_pos.append(chr_pos_t)
-	print len(genes), len(tair_ids), len(g_chrom_pos)
-	rna_gene_pickle_file = env['phen_dir'] + 'rna_seq.genes'
+	print len(gene_dict), len(tair_ids), len(g_chrom_pos)
+	rna_gene_pickle_file = env['phen_dir'] + file_prefix + '.genes'
 	with open(rna_gene_pickle_file, 'wb') as f:
-		cPickle.dump(genes, f)
+		cPickle.dump(gene_dict, f)
 
 
-def _load_genes_list_():
-
-	rna_gene_pickle_file = env['phen_dir'] + 'rna_seq.genes'
+def _load_genes_list_(file_prefix):
+	rna_gene_pickle_file = env['phen_dir'] + file_prefix + '.genes'
+	if not os.path.isfile(rna_gene_pickle_file):
+		_gene_list_to_file_(file_prefix)
 	with open(rna_gene_pickle_file) as f:
-		genes = cPickle.load(f)
-	return genes
+		gene_dict = cPickle.load(f)
+	return gene_dict
 
 
 
@@ -396,12 +556,14 @@ def _test_parallel_():
 	run_parallel(sys.argv[1], int(sys.argv[2]), int(sys.argv[2]) + 1)
 
 if __name__ == '__main__':
-	#_load_results_('emmax', file_prefix='/storage/rna_seq_gwas_results/rna_seq')
-	plot('/storage/rna_seq_gwas_results/rna_seq')
-	#_gene_list_to_file_()
+	_load_results_('emmax', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
+	load_and_plot_info_files('emmax', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
+	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 5)
+	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'lm', 12)
+	#_load_genes_list_()
 	#_test_()
+	#print sys.argv
 	#run_parallel_rna_seq_gwas()
-#	print len(sys.argv)
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:

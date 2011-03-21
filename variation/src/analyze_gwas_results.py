@@ -10,6 +10,7 @@ import itertools as it
 import env
 import random
 import phenotypeData as pd
+import math
 
 
 
@@ -55,19 +56,12 @@ def _estAreaBetweenCurves_(quantiles, expQuantiles):
 	return area
 
 def _calcKS_(scores, exp_scores=None):
-	ret = {}
-	ret["D"] = -1
-	try:
-		from rpy import r
-		if exp_scores:
-			res = r.ks_test(scores, exp_scores)
-		else:
-			res = r.ks_test(scores, "punif")
-		ret = res["statistic"]
-		ret["p.value"] = res["p.value"]
-	except Exception, message:
-		print "Calculating KS failed??", message
-	return ret
+	from scipy import stats
+	if exp_scores:
+		(D, p_val) = stats.ks_2samp(scores, exp_scores)
+	else:
+		(D, p_val) = stats.kstest(scores, stats.uniform.cdf)
+	return {'D':D, 'p_val':p_val}
 
 
 def _getExpectedPvalueQuantiles_(numQuantiles):
@@ -96,7 +90,7 @@ def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=N
 	medians = []
 	for method_type, label in zip(method_types, mapping_labels):
 		result = results[label]
-		newScores = result.scores[:]
+		newScores = result.snp_results['scores'][:]
 		quantiles = _getQuantiles_(newScores, numQuantiles)
 		if perm_pvalues and method_type in ['kw', 'ft']:
 			print "Getting exp. quantiles for permuted p-values"
@@ -112,7 +106,8 @@ def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=N
 			expQuantiles = _getExpectedPvalueQuantiles_(numQuantiles)
 		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
 		median = _calcMedian_(newScores, exp_median)
-		plt.plot(expQuantiles, quantiles, label=label + ", A=" + str(round(area, 3)) + ", M=" + str(round(median, 3)))
+		plt.plot(expQuantiles, quantiles, label=label + ", A=" + str(round(area, 3)) + \
+			", M=" + str(round(median, 3)))
 		areas.append(area)
 		medians.append(median)
 
@@ -190,7 +185,7 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_l
 		mapping_labels = method_types
 	plt.figure(figsize=(5, 4))
 	plt.axes([0.15, 0.14, 0.82, 0.79])
-	maxVal = min(math.log10(len(results[mapping_labels[0]].scores)), maxVal)
+	maxVal = min(math.log10(len(results[mapping_labels[0]].snp_results['scores'])), maxVal)
 	minVal = (1.0 / numDots) * maxVal
 	valRange = maxVal - minVal
 	plt.plot([minVal, maxVal], [minVal, maxVal], "k", label="Expected")
@@ -203,14 +198,14 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_l
 		if perm_pvalues and method_type in ['kw', 'ft']:
 			exp_maxVal = _getLogQuantilesMaxVal_(perm_pvalues[:], maxVal)
 			expQuantiles = _getLogQuantiles_(perm_pvalues[:], numDots, exp_maxVal)
-			ks_res = _calcKS_(result.scores, perm_pvalues)
-			quantiles = _getLogQuantiles_(result.scores[:], numDots, exp_maxVal)
-			slope = _estLogSlope_(result.scores[:], perm_pvalues)
+			ks_res = _calcKS_(result.snp_results['scores'], perm_pvalues)
+			quantiles = _getLogQuantiles_(result.snp_results['scores'][:], numDots, exp_maxVal)
+			slope = _estLogSlope_(result.snp_results['scores'][:], perm_pvalues)
 		else:
-			quantiles = _getLogQuantiles_(result.scores[:], numDots, maxVal)
+			quantiles = _getLogQuantiles_(result.snp_results['scores'][:], numDots, maxVal)
 			expQuantiles = _getExpectedLogQuantiles_()
-			ks_res = _calcKS_(result.scores)
-			slope = _estLogSlope_(result.scores[:])
+			ks_res = _calcKS_(result.snp_results['scores'])
+			slope = _estLogSlope_(result.snp_results['scores'][:])
 
 		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
 		areas.append(area)
@@ -241,7 +236,7 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_l
 
 
 
-def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, snp_ecotypes):
+def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, snp_ecotypes, num_picked=100):
 	"""
 	Identifies accessions which share rare haplotype combinations of the given SNPs. 
 	"""
@@ -274,7 +269,6 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 	l.sort()
 
 	#Now locate the interesting SNPs in the snps data
-	et_indices = [i for i, et in enumerate(sd.accessions) if et not in snp_ecotypes]
 	chr_pos_list = sd.getChrPosList()
 	snps_indices = []
 	for chr_pos in zip(snp_chromosomes, snp_positions):
@@ -282,55 +276,120 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 		if chr_pos_list[i] != chr_pos:
 			raise Exception('The SNP at chr=%d, pos=%d, was not found in the snps data.' % chr_pos)
 		snps_indices.append(i)
-	snps = sd.getSnps()
-	snps = [snps[i] for i in snps_indices]
-	for et, h in it.izip(sd.accessions, zip(*snps)):
+	f_snps = sd.getSnps() #full SNPs
+	f_snps = [f_snps[i] for i in snps_indices]
+	for et, h in it.izip(sd.accessions, zip(*f_snps)):
 		if et in snp_ecotypes: continue
 		haplotype_map[h]['et_occurrences'].append(et)
 
 	et_dict = pd.get_ecotype_id_info_dict()
-	
-	print 'expected_frequency, num_phenotyped, num_not_phenotyped, non_phenotyped_ecotypes..'
-	for f, c, h in l:
-		ets = map(int,haplotype_map[h]['et_occurrences'])
-		if len(haplotype_map[h]['et_occurrences']):
-			print '%f, %d, %d, %s'%(f, c, len(haplotype_map[h]['et_occurrences']),
-					','.join(map(str,zip(ets,[et_dict[et][0] for et in ets])))) 
+
+#	print 'expected_frequency, num_phenotyped, num_not_phenotyped, non_phenotyped_ecotypes..'
+#	for f, c, h in l:
+#		ets = map(int, haplotype_map[h]['et_occurrences'])
+#		if len(haplotype_map[h]['et_occurrences']):
+#			print '%f, %d, %d, %s' % (f, c, len(haplotype_map[h]['et_occurrences']),
+#					','.join(map(str, zip(ets, [et_dict[et][0] for et in ets]))))
+
+
+	snps = map(list, snps)
+	haplotype_list = []
+	sd_accessions = sd.accessions
+	num_ecotypes = 1
+	while len(snp_ecotypes) < len(sd_accessions):
+		for i, t in enumerate(l):
+			f, c, h = l[i]
+			if len(haplotype_map[h]['et_occurrences']):
+				break
+		else:
+			break
+
+		f, c, h = l[i]
+		ets = [haplotype_map[h]['et_occurrences'][0]]
+		print 'Iteration %d: %f, %d, %d, %s' % (num_ecotypes, f, c, len(haplotype_map[h]['et_occurrences']),
+						str((int(ets[0]), et_dict[int(ets[0])])))
+		haplotype_list.append((f, c, ets))
+		remove_ids = [sd_accessions.index(et) for et in ets]
+		for snp, f_snp in zip(snps, f_snps):
+			for i, nt in enumerate(f_snp):
+				if i in remove_ids:
+					snp.append(nt)
+		for i in remove_ids:
+			snp_ecotypes.append(sd_accessions[i])
+
+
+		snps_array = sp.array(snps, dtype='single')
+		fs = sp.sum(snps_array, 1) / len(snp_ecotypes)  #Frequencies of 1's
+
+		haplotype_map = {}
+		for i in range(2 ** len(snps)):
+			hl = map(int, list(bin(i)[2:]))
+			l = [0] * (len(snps) - len(hl))
+			l.extend(hl)
+			h = tuple(l)
+			f = 1
+			for i, nt in enumerate(h):
+				f *= fs[i] if nt == 1.0 else 1 - fs[i]
+			haplotype_map[h] = {'f':f, 'c':0, 'et_occurrences':[]}
+
+		haplotypes = zip(*snps) #list of haplotype tuples (hashable)
+		for h in haplotypes:
+			haplotype_map[h]['c'] += 1
+
+		l = []
+		for h in haplotype_map:
+			hm = haplotype_map[h]
+			l.append((hm['f'], hm['c'], h))
+		l.sort()
+		for et, h in it.izip(sd.accessions, zip(*f_snps)):
+			if et in snp_ecotypes: continue
+			haplotype_map[h]['et_occurrences'].append(et)
+
+#		print 'expected_frequency, num_phenotyped, num_not_phenotyped, non_phenotyped_ecotypes..'
+#		for f, c, h in l:
+#			ets = map(int, haplotype_map[h]['et_occurrences'])
+#			if len(haplotype_map[h]['et_occurrences']):
+#				print '%f, %d, %d, %s' % (f, c, len(haplotype_map[h]['et_occurrences']),
+#						','.join(map(str, zip(ets, [et_dict[et][0] for et in ets]))))
+		num_ecotypes += 1
+
+
+
 
 
 
 def identify_interesting_haplotypes(chrom_pos_list, phenotype_file, pid):
 	import dataParsers as dp
 	import bisect
-#	sd = dp.load_250K_snps()
+	#sd = dp.load_250K_snps()
 	sd = dp.load_1001_full_snps()
 	phed = pd.parse_phenotype_file(phenotype_file)
 	phed.convert_to_averages()
-	sd.coordinate_w_phenotype_data(phed,pid)	
+	sd.coordinate_w_phenotype_data(phed, pid)
 	cpl = sd.getChrPosList()
 	all_snps = sd.getSnps()
 	snps = []
 	snp_chromosomes = []
 	snp_positions = []
 	for chrom_pos in chrom_pos_list:
-		i = bisect.bisect(cpl,chrom_pos)-1
-		if cpl[i]!=chrom_pos:
+		i = bisect.bisect(cpl, chrom_pos) - 1
+		if cpl[i] != chrom_pos:
 			raise Exception('SNP not found')
 		snps.append(all_snps[i])
 		snp_chromosomes.append(chrom_pos[0])
 		snp_positions.append(chrom_pos[1])
-#	sd = dp.load_250K_snps()
+	#sd = dp.load_250K_snps()
 	sd = dp.load_1001_full_snps()
 	identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, phed.get_ecotypes(pid))
 
 
 
 if __name__ == '__main__':
-	#chrom_pos_list = [(1,22349990),(1,25296405),(4,453759),(5,24053984),(5,25458236)]#KW
+	#chrom_pos_list = [(1, 22349990), (1, 25296405), (4, 453759), (5, 24053984), (5, 25458236)]#KW
 	#chrom_pos_list = [(1,5133207),(3,5423868),(4,5795054),(4,10864907),(5,894530)]#EMMAX
-	#chrom_pos_list = [(1,5133207),(3,5423868),(4,5795054),(4,10864907),(5,894530),(1,22349990),
-	#		(1,25296405),(4,453759),(5,24053984),(5,25458236)]#Both
-	chrom_pos_list = [(1,5133217),(3,20581778),(4,5458010),(4,5727758),(5,1001970),(1,1427391),(1,22360158),(1,29293376),(5,21020181),(5,24054819)]
+	#chrom_pos_list = [(1, 5133207), (3, 5423868), (4, 5795054), (4, 10864907), (5, 894530), (1, 22349990),
+	#		(1, 25296405), (4, 453759), (5, 24053984), (5, 25458236)]#Both
+	chrom_pos_list = [(1, 5133217), (3, 20581778), (4, 5458010), (4, 5727758), (5, 1001970), (1, 1427391), (1, 22360158), (1, 29293376), (5, 21020181), (5, 24054819)]
 	pid = 1
-	identify_interesting_haplotypes(chrom_pos_list, env.env['phen_dir']+'telomere_lengths_all.csv', pid)
-	
+	identify_interesting_haplotypes(chrom_pos_list, env.env['phen_dir'] + 'telomere_lengths_all.csv', pid)
+
