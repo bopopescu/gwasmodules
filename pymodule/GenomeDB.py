@@ -27,7 +27,7 @@ from sqlalchemy.schema import ThreadLocalMetaData, MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy import and_, or_, not_
-
+from utils import PassingData
 
 from db import ElixirDB
 
@@ -522,6 +522,195 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 	sys.stderr.write("Done.\n")
 	return chromosome2anchor_gene_tuple_ls, gene_id2coord
 
+class OneGenomeData(PassingData):
+	"""
+	2011-3-25
+		a structure to wrap data related to one genome (identified by tax_id)
+		
+		All these data used to be handled by class GenomeDatabase. Previous solution is not good because GenomeDatabase
+			is an umbrella of genome data from different species.
+	"""
+	def __init__(self, db_genome=None, tax_id=3702, **keywords):
+		#2011-3-25
+		self.db_genome = db_genome
+		self._chr_id2size = None
+		self._chr_id2cumu_size = None
+		self._chr_id2cumu_start = None
+		self.tax_id = tax_id
+		self.chr_gap = None
+		self.chr_id_ls = None
+		
+		self._cumuSpan2ChrRBDict = None
+		
+		PassingData.__init__(self, **keywords)	#keywords could contain chr_gap
+	
+	@property
+	def chr_id2size(self):
+		"""
+		2011-3-13
+		"""
+		if self._chr_id2size is None:
+			self.chr_id2size = (self.tax_id)
+		return self._chr_id2size
+	
+	@chr_id2size.setter
+	def chr_id2size(self, argument_ls):
+		"""
+		2011-3-12
+			modified from get_chr_id2size() of variation/src/common.py
+			keywords could include, tax_id=3702.
+		2008-10-07 curs could be elixirdb.metadata.bind
+		2007-10-12
+		"""
+		if len(argument_ls)==0:
+			tax_id = self.tax_id
+		tax_id = argument_ls[0]
+		sys.stderr.write("Getting chr_id2size for tax_id %s ..."%(tax_id))
+		
+		#query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
+		rows = self.db_genome.metadata.bind.execute("select chromosome, stop from %s where tax_id=%s and start=1"%\
+						(AnnotAssembly.table.name, tax_id))
+		chr_id2size = {}
+		for row in rows:
+			chr_id = row.chromosome
+			size = row.stop
+			chr_id2size[chr_id] = size
+		self._chr_id2size = chr_id2size
+		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2size)))
+	
+	@property
+	def chr_id2cumu_size(self):
+		"""
+		2011-3-13
+		"""
+		if self._chr_id2cumu_size is None:
+			self.chr_id2cumu_size = (self.tax_id, self.chr_gap)
+		return self._chr_id2cumu_size
+	
+	@chr_id2cumu_size.setter
+	def chr_id2cumu_size(self, argument_list):
+		"""
+		2011-3-12
+			modified from get_chr_id2cumu_size() of variation/src/common.py
+			cumu_size of one chr = sum of length of (all prior chromosomes + current chromosome) + all gaps between them
+		2008-02-04
+			add chr_id_ls
+			turn chr_id all into 'str' form
+		2008-02-01
+			add chr_gap, copied from variation.src.misc
+		2007-10-16
+		"""
+		tax_id, chr_gap = argument_list[:2]
+		sys.stderr.write("Getting chr_id2cumu_size for %s ..."%tax_id)
+		if self._chr_id2size is None:
+			self.chr_id2size = (tax_id)
+		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
+		if chr_gap==None:
+			chr_size_ls = self.chr_id2size.values()
+			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
+		
+		chr_id_ls = self.chr_id2size.keys()
+		chr_id_ls.sort()
+		#no more chromosome 0
+		first_chr = chr_id_ls[0] 
+		#chr_id_ls might not be continuous integers. so dictionary is better
+		self._chr_id2cumu_size = {first_chr:self.chr_id2size[first_chr]}
+		for i in range(1,len(chr_id_ls)):
+			chr_id = chr_id_ls[i]
+			prev_chr_id = chr_id_ls[i-1]
+			self._chr_id2cumu_size[chr_id] = self._chr_id2cumu_size[prev_chr_id] + chr_gap + self.chr_id2size[chr_id]
+		self.chr_id_ls = chr_id_ls
+		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_size)))
+	
+	@property
+	def chr_id2cumu_start(self):
+		"""
+		2011-3-13
+		"""
+		if self._chr_id2cumu_start is None:
+			self.chr_id2cumu_start = (self.tax_id, self.chr_gap)
+		return self._chr_id2cumu_start
+	
+	@chr_id2cumu_start.setter
+	def chr_id2cumu_start(self, argument_list):
+		"""
+		2011-3-15
+			Treat one genome of multiple chromsomes as one continuous chromosome.
+			
+			For one chr, cumu_start = sum of length of all prior chromosomes + all gaps between them.
+			
+				cumu_start is 1-based.
+			
+			The difference between chr_id2cumu_size and chr_id2cumu_start is that the former includes the length of
+				the current chromosome and the gap before it.
+		"""
+		tax_id, chr_gap = argument_list[:2]
+		sys.stderr.write("Getting chr_id2cumu_start for %s, ..."%tax_id)
+		if self._chr_id2size is None:
+			self.chr_id2size = (tax_id)
+		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
+		if chr_gap==None:
+			chr_size_ls = self.chr_id2size.values()
+			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
+		
+		chr_id_ls = self.chr_id2size.keys()
+		chr_id_ls.sort()
+		first_chr = chr_id_ls[0] 
+		self._chr_id2cumu_start = {first_chr:1}	#chr_id_ls might not be continuous integers. so dictionary is better
+			#start from 0.
+		for i in range(1, len(chr_id_ls)):
+			chr_id = chr_id_ls[i]
+			prev_chr_id = chr_id_ls[i-1]
+			self._chr_id2cumu_start[chr_id] = self._chr_id2cumu_start[prev_chr_id] + chr_gap + self.chr_id2size[prev_chr_id]
+		self.chr_id_ls = chr_id_ls
+		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_start)))
+	
+	@property
+	def cumuSpan2ChrRBDict(self):
+		"""
+		2011-3-25
+		"""
+		if self._cumuSpan2ChrRBDict is None:
+			self.cumuSpan2ChrRBDict = (self.tax_id, self.chr_gap)
+		return self._cumuSpan2ChrRBDict
+	
+	@cumuSpan2ChrRBDict.setter
+	def cumuSpan2ChrRBDict(self, argument_list):
+		"""
+		2011-3-25
+			turn it into a setter of cumuSpan2ChrRBDict
+			usage example:
+				tax_id = 3702
+				chr_gap = 0
+				self.cumuSpan2ChrRBDict = (tax_id, chr_gap)
+			
+		2011-3-16
+			Treat one genome of multiple chromsomes as one continuous chromosome (uber-chomosome).
+			This function creates a RB dictionary, which stores a map between 
+				uberchromosome coordinate and individual chromosome coordinate.
+		"""
+		tax_id, chr_gap = argument_list[:2]
+		sys.stderr.write("Creating cumuSpan2ChrRBDict for tax_id=%s, chr_gap=%s  \n"%(tax_id, chr_gap))
+		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from RBTree import RBDict
+		self._cumuSpan2ChrRBDict = RBDict()
+		if self._chr_id2size is None:
+			self.chr_id2size = [tax_id,]
+		if self._chr_id2cumu_start is None:
+			self.chr_id2cumu_start = (tax_id, chr_gap)
+		for chr_id, cumu_start in self.chr_id2cumu_start.iteritems():
+			chr_size = self.chr_id2size.get(chr_id)
+			span_ls=[cumu_start, cumu_start+chr_size-1]
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=0, \
+							span_ls=span_ls, \
+							min_reciprocal_overlap=0.00000000000001,)
+							#2010-8-17 overlapping keys are regarded as separate instances as long as they are identical.
+			if segmentKey not in self._cumuSpan2ChrRBDict:
+				self._cumuSpan2ChrRBDict[segmentKey] = [chr_id, 1, chr_size]
+			else:
+				sys.stderr.write("Error: %s of chr %s is already in cumuSpan2ChrRBDict.\n"%(segmentKey, chr_id))
+		sys.stderr.write("%s chromosomes Done.\n"%(len(self._cumuSpan2ChrRBDict)))
+
 class GenomeDatabase(ElixirDB):
 	__doc__ = __doc__
 	option_default_dict = ElixirDB.option_default_dict.copy()
@@ -529,6 +718,8 @@ class GenomeDatabase(ElixirDB):
 	option_default_dict[('database', 1,)][0] = 'genome'
 	def __init__(self, **keywords):
 		"""
+		2011-3-25
+			wrap _chr_id2size, _chr_id2cumu_size, _chr_id2cumu_start etc. into OneGenomeData class.
 		2011-3-13
 			to store some internal data structures
 		2008-10-08
@@ -541,13 +732,9 @@ class GenomeDatabase(ElixirDB):
 			import pdb
 			pdb.set_trace()
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
-		#2011-3-13
-		self._chr_id2size = None
-		self._chr_id2cumu_size = None
-		self._chr_id2cumu_start = None
-		self.tax_id = 3702
-		self.chr_gap = None
-		self.chr_id_ls = None
+		#2011-3-25
+		self.tax_id2genomeData = {}
+	
 	
 	def get_gene_id2model(self, tax_id=3702):
 		"""
@@ -652,7 +839,6 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("Creating a RBDict for all genes from organism %s ... \n"%tax_id)
 		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		from RBTree import RBDict
-		from utils import PassingData
 		genomeRBDict = RBDict()
 		query = Gene.query.filter_by(tax_id=tax_id).filter(Gene.start!=None).\
 			filter(Gene.stop!=None).filter(Gene.chromosome!=None)
@@ -733,7 +919,6 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("Dealing with genomeRBDict ...")
 		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		from RBTree import RBDict
-		from utils import PassingData
 		import cPickle
 		if genomeRBDictPickleFname:
 			if os.path.isfile(genomeRBDictPickleFname):	#if this file is already there, suggest to un-pickle it.
@@ -751,164 +936,15 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("%s unique genomic spans. Done.\n"%(len(genomeRBDict)))
 		return genomeRBDict
 	
-
-	
-	@property
-	def chr_id2size(self):
+	def getOneGenomeData(self, tax_id=3702, chr_gap=0):
 		"""
-		2011-3-13
+		2011-3-25
+			API to get & set OneGenomeData for one taxonomy.
 		"""
-		if self._chr_id2size is None:
-			tax_id = self.tax_id	#by default
-			self.chr_id2size = (tax_id)
-		return self._chr_id2size
-	
-	@chr_id2size.setter
-	def chr_id2size(self, argument_ls):
-		"""
-		2011-3-12
-			modified from get_chr_id2size() of variation/src/common.py
-			keywords could include, tax_id=3702.
-		2008-10-07 curs could be elixirdb.metadata.bind
-		2007-10-12
-		"""
-		if len(argument_ls)==0:
-			tax_id = self.tax_id
-		tax_id = argument_ls[0]
-		sys.stderr.write("Getting chr_id2size for tax_id %s ..."%(tax_id))
-		
-		#query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
-		rows = self.metadata.bind.execute("select chromosome, stop from %s where tax_id=%s and start=1"%\
-						(AnnotAssembly.table.name, tax_id))
-		chr_id2size = {}
-		for row in rows:
-			chr_id = row.chromosome
-			size = row.stop
-			chr_id2size[chr_id] = size
-		self._chr_id2size = chr_id2size
-		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2size)))
-	
-	@property
-	def chr_id2cumu_size(self):
-		"""
-		2011-3-13
-		"""
-		if self._chr_id2cumu_size is None:
-			tax_id = self.tax_id
-			chr_gap = 0
-			self.chr_id2cumu_size = (tax_id, chr_gap)
-		return self._chr_id2cumu_size
-	
-	@chr_id2cumu_size.setter
-	def chr_id2cumu_size(self, argument_list):
-		"""
-		2011-3-12
-			modified from get_chr_id2cumu_size() of variation/src/common.py
-			cumu_size of one chr = sum of length of (all prior chromosomes + current chromosome) + all gaps between them
-		2008-02-04
-			add chr_id_ls
-			turn chr_id all into 'str' form
-		2008-02-01
-			add chr_gap, copied from variation.src.misc
-		2007-10-16
-		"""
-		tax_id, chr_gap = argument_list[:2]
-		sys.stderr.write("Getting chr_id2cumu_size for %s ..."%tax_id)
-		if self._chr_id2size is None:
-			self.chr_id2size = (tax_id)
-		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
-		if chr_gap==None:
-			chr_size_ls = self.chr_id2size.values()
-			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
-		
-		chr_id_ls = self.chr_id2size.keys()
-		chr_id_ls.sort()
-		#no more chromosome 0
-		first_chr = chr_id_ls[0] 
-		#chr_id_ls might not be continuous integers. so dictionary is better
-		self._chr_id2cumu_size = {first_chr:self.chr_id2size[first_chr]}
-		for i in range(1,len(chr_id_ls)):
-			chr_id = chr_id_ls[i]
-			prev_chr_id = chr_id_ls[i-1]
-			self._chr_id2cumu_size[chr_id] = self._chr_id2cumu_size[prev_chr_id] + chr_gap + self.chr_id2size[chr_id]
-		self.chr_gap = chr_gap
-		self.chr_id_ls = chr_id_ls
-		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_size)))
-	
-	@property
-	def chr_id2cumu_start(self):
-		"""
-		2011-3-13
-		"""
-		if self._chr_id2cumu_start is None:
-			tax_id = self.tax_id
-			chr_gap = 0
-			self.chr_id2cumu_start = (tax_id, chr_gap)
-		return self._chr_id2cumu_start
-	
-	@chr_id2cumu_start.setter
-	def chr_id2cumu_start(self, argument_list):
-		"""
-		2011-3-15
-			Treat one genome of multiple chromsomes as one continuous chromosome.
-			
-			For one chr, cumu_start = sum of length of all prior chromosomes + all gaps between them.
-			
-				cumu_start is 1-based.
-			
-			The difference between chr_id2cumu_size and chr_id2cumu_start is that the former includes the length of
-				the current chromosome and the gap before it.
-		"""
-		tax_id, chr_gap = argument_list[:2]
-		sys.stderr.write("Getting chr_id2cumu_start for %s, ..."%tax_id)
-		if self._chr_id2size is None:
-			self.chr_id2size = (tax_id)
-		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
-		if chr_gap==None:
-			chr_size_ls = self.chr_id2size.values()
-			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
-		
-		chr_id_ls = self.chr_id2size.keys()
-		chr_id_ls.sort()
-		first_chr = chr_id_ls[0] 
-		self._chr_id2cumu_start = {first_chr:1}	#chr_id_ls might not be continuous integers. so dictionary is better
-			#start from 0.
-		for i in range(1, len(chr_id_ls)):
-			chr_id = chr_id_ls[i]
-			prev_chr_id = chr_id_ls[i-1]
-			self._chr_id2cumu_start[chr_id] = self._chr_id2cumu_start[prev_chr_id] + chr_gap + self.chr_id2size[prev_chr_id]
-		self.chr_gap = chr_gap
-		self.chr_id_ls = chr_id_ls
-		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_start)))
-	
-	def createCumuSpan2ChrRBDict(self, tax_id=3702, chr_gap=0):
-		"""
-		2011-3-16
-			Treat one genome of multiple chromsomes as one continuous chromosome (uber-chomosome).
-			This function creates a RB dictionary, which stores a map between 
-				uberchromosome coordinate and individual chromosome coordinate.
-		"""
-		sys.stderr.write("Creating cumuSpan2ChrRBDict for tax_id=%s, chr_gap=%s  \n"%(tax_id, chr_gap))
-		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from RBTree import RBDict
-		cumuSpan2ChrRBDict = RBDict()
-		if self._chr_id2size is None:
-			self.chr_id2size = [tax_id,]
-		if self._chr_id2cumu_start is None:
-			self.chr_id2cumu_start = (tax_id, chr_gap)
-		for chr_id, cumu_start in self.chr_id2cumu_start.iteritems():
-			chr_size = self.chr_id2size.get(chr_id)
-			span_ls=[cumu_start, cumu_start+chr_size-1]
-			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=0, \
-							span_ls=span_ls, \
-							min_reciprocal_overlap=0.00000000000001,)
-							#2010-8-17 overlapping keys are regarded as separate instances as long as they are identical.
-			if segmentKey not in cumuSpan2ChrRBDict:
-				cumuSpan2ChrRBDict[segmentKey] = [chr_id, 1, chr_size]
-			else:
-				sys.stderr.write("Error: %s of chr %s is already in cumuSpan2ChrRBDict.\n"%(segmentKey, chr_id))
-		sys.stderr.write("%s chromosomes Done.\n"%(len(cumuSpan2ChrRBDict)))
-		return cumuSpan2ChrRBDict
+		if tax_id not in self.tax_id2genomeData:
+			oneGenomeData = OneGenomeData(db_genome=self, tax_id=tax_id, chr_gap=chr_gap)
+			self.tax_id2genomeData[tax_id] = oneGenomeData
+		return self.tax_id2genomeData.get(tax_id)
 	
 def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
 	annot_assembly_table='genome.annot_assembly'):
@@ -990,7 +1026,6 @@ if __name__ == '__main__':
 	else:
 		#2008-10-01	get gene model and pickle it into a file
 		gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = instance.get_gene_id2model()
-		from pymodule import PassingData
 		gene_annotation = PassingData()
 		gene_annotation.gene_id2model = gene_id2model
 		gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
