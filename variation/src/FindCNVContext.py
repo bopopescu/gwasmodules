@@ -62,6 +62,8 @@ class FindCNVContext(object):
 	def findCNVcontext(self, db_250k, genomeRBDict, cnv_method_id=None, compareIns=None, max_distance=50000, debug=0,
 					param_obj=None):
 		"""
+		2011-3-25
+			cast row.chromosome (from db) into str type.
 		2010-10-3
 			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
 		2010-8-18
@@ -71,7 +73,7 @@ class FindCNVContext(object):
 		TableClass = Stock_250kDB.CNV
 		query = TableClass.query.filter_by(cnv_method_id=cnv_method_id)
 		for row in query:
-			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=str(row.chromosome), \
 							span_ls=[row.start, row.stop], \
 							min_reciprocal_overlap=0.0000001, )	#min_reciprocal_overlap doesn't matter here.
 				# it's decided by compareIns.
@@ -181,7 +183,7 @@ class FindCNVContext(object):
 		#genome_db.createGenomeRBDict(tax_id=self.tax_id, max_distance=self.max_distance, \
 		#									debug=self.debug)
 		#2011-3-10 temporary: exit early , only for the genomeRBDictPickleFname
-		sys.exit(3)
+		#sys.exit(3)
 		
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
 									hostname=self.hostname, database=self.dbname)
