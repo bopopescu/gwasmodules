@@ -249,8 +249,11 @@ class SegmentTreeNodeKey(CNVSegmentBinarySearchTreeKey):
 		"""
 		return rightWithinLeftAlsoEqual(self, other)
 
-class CNVCompare(object):
+
+class CNVCompareBySmallOverlapRatio(object):
 	"""
+	2011-3-16
+		renamed from CNVCompare to CNVCompareByMinRecipOverlapRatio
 	2010-8-16
 		a class to compare two CNVSegmentBinarySearchTreeKey according to any arbitrary min_reciprocal_overlap
 	"""
@@ -306,8 +309,8 @@ class CNVCompare(object):
 					return key1.span_ls[0]<key2.span_ls[0]
 				elif len(key2.span_ls)>1:
 					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-					min_overlap = min(overlap1, overlap2)
-					if min_overlap>=min_reciprocal_overlap:	#should be equal,
+					recip_overlap = min(overlap1, overlap2)
+					if recip_overlap>=min_reciprocal_overlap:	#should be equal,
 						return False
 					
 					#if overlap1>0 and overlap1<=1 and  overlap2>0 and overlap2<=1:	# there's overlap between two segments 
@@ -326,7 +329,175 @@ class CNVCompare(object):
 			not used
 		"""
 		pass
+
+#2011-3-24
+CNVCompare = CNVCompareBySmallOverlapRatio
+
+
+class CNVCompareByOverlapLen(object):
+	"""
+	2011-3-16
+		a class to compare two CNVSegmentBinarySearchTreeKey according to any arbitrary min_overlap_len
+	"""
+	def __init__(self, min_overlap_len = 1):
+		"""
+		2011-3-16
+		"""
+		self.min_overlap_len = min_overlap_len
 	
+	def cmp(self, key1, key2):
+		if self.eq(key1, key2, min_overlap_len=self.min_overlap_len):
+			return 0
+		elif self.lt(key1, key2, min_overlap_len=self.min_overlap_len):
+			return -1
+		else:
+			return +1
+	
+	@classmethod
+	def eq(cls, key1, key2, min_overlap_len=1):
+		if key1.chromosome==key2.chromosome:
+			if len(key1.span_ls)==1:
+				if len(key2.span_ls)==1:
+					return key1.span_ls[0]==key2.span_ls[0]
+				elif len(key2.span_ls)>1:
+					return key1.span_ls[0]>=key2.span_ls[0] and key1.span_ls[0]<=key2.span_ls[1]	# equal if self is within the "other" segment
+				else:
+					return None
+			elif len(key1.span_ls)>1:
+				if len(key2.span_ls)==1:	# self is a segment. other is a point position.
+					return key1.span_ls[0]<=key2.span_ls[0] and key1.span_ls[1]>=key2.span_ls[0]	# if self includes the point position, yes it's equal
+				elif len(key2.span_ls)>1:
+					# need to calculate min_reciprocal_overlap
+					overlap1, overlap2, overlap_len = get_overlap_ratio(key1.span_ls, key2.span_ls)[:3]
+					if overlap_len>=min_overlap_len:	#should be equal,
+						return True
+					else:
+						return False
+				else:
+					return None		#2010-8-16 shouldn't be here
+		else:
+			return False
+		
+		return True
+	
+	@classmethod
+	def lt(cls, key1, key2, min_overlap_len=0.4):
+		"""
+		2011-3-16
+		"""
+		if key1.chromosome==key2.chromosome:
+			if len(key1.span_ls)==1:
+				if len(key2.span_ls)==1:
+					return key1.span_ls[0]<key2.span_ls[0]
+				elif len(key2.span_ls)>1:
+					return key1.span_ls[0]<key2.span_ls[0]
+				else:
+					return None
+			elif len(key1.span_ls)>1:
+				if len(key2.span_ls)==1:
+					return key1.span_ls[0]<key2.span_ls[0]
+				elif len(key2.span_ls)>1:
+					overlap1, overlap2, overlap_len = get_overlap_ratio(key1.span_ls, key2.span_ls)[:3]
+					if overlap_len>=min_overlap_len:	#should be equal,
+						return False
+					else:
+						return key1.span_ls[0]<key2.span_ls[0]	# whether the start of key1 is ahead of the start of key2
+				else:
+					return None	#shouldn't be here
+		else:
+			return key1.chromosome<key2.chromosome
+	
+	@classmethod
+	def gt(cls, key1, key2, min_reciprocal_overlap=0.4):
+		"""
+		2011-3-16
+			not used
+		"""
+		pass
+
+class CNVCompareByBigOverlapRatio(object):
+	"""
+	2011-3-16
+		similar to CNVCompareBySmallOverlapRatio, but use max(overlap1, overlap2) to compare aginst min_overlap_len, \
+			rather than min(overlap1, overlap2)
+	2010-8-16
+		a class to compare two CNVSegmentBinarySearchTreeKey according to any arbitrary min_reciprocal_overlap
+	"""
+	def __init__(self, min_reciprocal_overlap = 0.4):
+		"""
+		2010-8-16
+		"""
+		self.min_reciprocal_overlap = min_reciprocal_overlap
+	
+	def cmp(self, key1, key2):
+		if self.eq(key1, key2, min_reciprocal_overlap=self.min_reciprocal_overlap):
+			return 0
+		elif self.lt(key1, key2, min_reciprocal_overlap=self.min_reciprocal_overlap):
+			return -1
+		else:
+			return +1
+	
+	@classmethod
+	def eq(cls, key1, key2, min_reciprocal_overlap=0.4):
+		if key1.chromosome==key2.chromosome:
+			if len(key1.span_ls)==1:
+				if len(key2.span_ls)==1:
+					return key1.span_ls[0]==key2.span_ls[0]
+				elif len(key2.span_ls)>1:
+					return key1.span_ls[0]>=key2.span_ls[0] and key1.span_ls[0]<=key2.span_ls[1]	# equal if self is within the "other" segment
+				else:
+					return None
+			elif len(key1.span_ls)>1:
+				if len(key2.span_ls)==1:	# self is a segment. other is a point position.
+					return key1.span_ls[0]<=key2.span_ls[0] and key1.span_ls[1]>=key2.span_ls[0]	# if self includes the point position, yes it's equal
+				elif len(key2.span_ls)>1:
+					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
+					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
+					recip_overlap = max(overlap1, overlap2)
+					if recip_overlap>=min_reciprocal_overlap:	#should be equal,
+						return True
+					else:
+						return False
+				else:
+					return None		#2010-8-16 shouldn't be here
+		else:
+			return False
+		
+		return True
+	
+	@classmethod
+	def lt(cls, key1, key2, min_reciprocal_overlap=0.4):
+		if key1.chromosome==key2.chromosome:
+			if len(key1.span_ls)==1:
+				if len(key2.span_ls)==1:
+					return key1.span_ls[0]<key2.span_ls[0]
+				elif len(key2.span_ls)>1:
+					return key1.span_ls[0]<key2.span_ls[0]
+				else:
+					return None
+			elif len(key1.span_ls)>1:
+				if len(key2.span_ls)==1:
+					return key1.span_ls[0]<key2.span_ls[0]
+				elif len(key2.span_ls)>1:
+					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
+					recip_overlap = max(overlap1, overlap2)
+					if recip_overlap>=min_reciprocal_overlap:	#should be equal,
+						return False
+					else:
+						return key1.span_ls[0]<key2.span_ls[0]	# whether the start of key1 is ahead of the start of key2
+				else:
+					return None	#shouldn't be here
+		else:
+			return key1.chromosome<key2.chromosome
+	
+	@classmethod
+	def gt(cls, key1, key2, min_reciprocal_overlap=0.4):
+		"""
+		2010-8-16
+			not used
+		"""
+		pass
+
 def leftWithinRightAlsoEqual(key1, key2):
 	"""
 	2010-1-28
