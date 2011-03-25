@@ -1656,6 +1656,16 @@ class GenomeWideResult(object):
 		self.data_obj_ls = []	#list and dictionary are crazy references.
 		self.data_obj_id2index = {}
 	
+	def __len__(self):
+		"""
+		2011-3-21
+			return the length of data_obj_ls if it's not None.
+		"""
+		if self.data_obj_ls is not None:
+			return len(self.data_obj_ls)
+		else:
+			return None
+	
 	def get_data_obj_by_obj_id(self, obj_id):
 		return self.data_obj_ls[self.data_obj_id2index[obj_id]]
 	
@@ -1750,6 +1760,21 @@ class GenomeWideResult(object):
 		else:
 			return self.argsort_data_obj_ls[-rank]	#value bigger, rank smaller
 	
+	def getTopLoci(self, no_of_top_loci=1000):
+		"""
+		2011-3-21
+			return data_obj directly, rather than (chr, start, stop)
+		2011-3-16
+			get the top loci out of gwr
+		"""
+		sys.stderr.write("Get the top %s loci out of gwr ..."%(no_of_top_loci))
+		top_loci = []
+		for i in range(no_of_top_loci):
+			data_obj = self.get_data_obj_at_given_rank(i+1)
+			top_loci.append(data_obj)
+		sys.stderr.write("%s loci. Done.\n"%(len(top_loci)))
+		return top_loci
+	
 	def keepGWRObjectsWithinGivenRBDict(self, rbDict, min_reciprocal_overlap=0.6):
 		"""
 		2010-3-18
@@ -1788,12 +1813,16 @@ class DataObject(object):
 	"""
 	def __init__(self, **keywords):
 		"""
+		2011-3-10
+			add db_id to identify the locus by db id
 		2010-4-15
 			add target_seq_id, target_start, target_stop
 		"""
+		self.db_id = None
 		self.chromosome = None
 		self.position = None
 		self.stop_position = None
+		
 		self.target_seq_id = None
 		self.target_start = None
 		self.target_stop = None
@@ -1837,7 +1866,15 @@ class DataObject(object):
 		if self.comment:
 			output_str += "\tcomment: %s\n"%(self.comment)
 		return output_str
-	
+
+def cmpDataObjByChrPos(x, y):
+	"""
+	2011-3-21
+		used to sort a list of DataObject via its (chromosome, position).
+		i.e. data_obj_ls.sort(cmp=cmpDataObjByChrPos)
+	"""
+	return cmp((x.chromosome, x.position), (y.chromosome, y.position))
+
 import re
 pa_has_characters = re.compile(r'[a-zA-Z_]')
 import math
@@ -1847,6 +1884,10 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False):
 	"""
+	2011-3-21
+		process chromosome, start, stop of pdata in the beginning
+	2011-3-10
+		db_id2chr_pos's value could be in the format of (chr,pos) OR (chr,start,stop).
 	2011-2-24
 		deal with input_fname with db id for locus id , rather than chr, pos
 			if 2nd_column (pos) is nothing or "0", it's regarded as db_id.
@@ -1910,6 +1951,25 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
 	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
 	
+	#2011-3-21
+	chromosome_request = getattr(pdata, 'chromosome', None)
+	try:
+		chromosome_request = int(chromosome_request)	#chromosome passed from web interface functions is of str type
+	except:
+		pass
+	start_request = getattr(pdata, 'start', None)
+	try:
+		start_request = float(start_request)	#passed from web interface functions is of str type
+	except:
+		pass
+	stop_request = getattr(pdata, 'stop', None)
+	try:
+		stop_request = float(stop_request)	#passed from web interface functions is of str type. int('12384.84') results in failure.
+	except:
+		pass
+	min_MAF_request = getattr(pdata, 'min_MAF', None)
+	min_MAC_request = getattr(pdata, 'min_MAC', None)	#2009-1-29
+	
 	gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=construct_chr_pos2index, \
 						construct_data_obj_id2index=construct_data_obj_id2index)
 	gwr.data_obj_ls = []	#list and dictionary are crazy references.
@@ -1928,24 +1988,31 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			header = row
 			col_name2index = getColName2IndexFromHeader(header) #Returns a dictionary
 			continue
+		
+		#2011-3-10 initialize all variables
+		db_id = None
+		column_4th = None	#it's MAF probably
+		column_5th = None	#it's MAC probably
+		column_6 = None	#it's genotype_var_perc probably
+		rest_of_row = []
+		stop_pos = None
 		if row[1] and row[1]!='0':	#2011-2-24 non-zero on 2nd column, it's position
 			chr = int(row[0])
 			start_pos = int(float(row[1]))
 		elif db_id2chr_pos:	#2011-2-24
 			db_id = int(row[0])
 			if db_id in db_id2chr_pos:
-				chr, start_pos = db_id2chr_pos.get(db_id)[:2]
+				chr_pos = db_id2chr_pos.get(db_id)
+				if len(chr_pos)>=2:
+					chr, start_pos = chr_pos[:2]
+				if len(chr_pos)>=3:
+					stop_pos = chr_pos[2]
 			else:	#ignore this row
 				continue
 		else:
 			sys.stderr.write("db_id2chr_pos is none. but this row %s seems to be using db_id as locus id."%(repr(row)))
 			continue
-		column_4th = None	#it's MAF probably
-		column_5th = None	#it's MAC probably
-		column_6 = None	#it's genotype_var_perc probably
-		rest_of_row = []
 		
-		stop_pos = None
 		if len(row)>=3:
 			score = float(row[2])
 		
@@ -1965,22 +2032,16 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			sys.stderr.write("only 3 or 4 columns are allowed in input file.\n")
 			return gwr
 		"""
-		if pdata:	#2008-08-03
-			pdata.chromosome = getattr(pdata, 'chromosome', None)
-			pdata.start = getattr(pdata, 'start', None)
-			pdata.stop = getattr(pdata, 'stop', None)
-			pdata.min_MAF = getattr(pdata, 'min_MAF', None)
-			pdata.min_MAC = getattr(pdata, 'min_MAC', None)	#2009-1-29
-			if pdata.chromosome!=None and chr!=pdata.chromosome:
-				continue
-			if pdata.start!=None and start_pos<pdata.start:
-				continue
-			if pdata.stop!=None and start_pos>pdata.stop:
-				continue
-			if pdata.min_MAF!=None and column_4th!=None and column_4th<pdata.min_MAF:	#MAF too small
-				continue
-			if pdata.min_MAC!=None and column_5th!=None and column_5th<pdata.min_MAC:	#2009-1-29 MAC too small
-				continue
+		if chromosome_request!=None and chr!=chromosome_request:
+			continue
+		if start_request!=None and start_pos<start_request:
+			continue
+		if stop_request!=None and start_pos>stop_request:
+			continue
+		if min_MAF_request!=None and column_4th!=None and column_4th<min_MAF_request:	#MAF too small
+			continue
+		if min_MAC_request!=None and column_5th!=None and column_5th<min_MAC_request:	#2009-1-29 MAC too small
+			continue
 		if do_log10_transformation:
 			if score<=0:
 				sys.stderr.write("score <=0. can't do log10. row is %s. assign %s to it.\n"%(repr(row), score_for_0_pvalue))
@@ -2018,10 +2079,7 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 				if len(new_chr_start_stop)>2:
 					stop_pos = new_chr_start_stop[2]
 		if include_the_data_point:
-			if stop_pos is not None:
-				data_obj = DataObject(chromosome=chr, position=start_pos, stop_position=stop_pos, value =score)
-			else:
-				data_obj = DataObject(chromosome=chr, position=start_pos, value =score)
+			data_obj = DataObject(db_id=db_id, chromosome=chr, position=start_pos, stop_position=stop_pos, value =score)
 			if column_4th is not None:
 				data_obj.maf = column_4th
 			if column_5th is not None:
