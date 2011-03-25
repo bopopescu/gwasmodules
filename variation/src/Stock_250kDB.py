@@ -35,7 +35,7 @@ from sqlalchemy import and_, or_, not_
 
 from datetime import datetime
 
-from pymodule import SNPData
+from pymodule import SNPData, PassingData
 from pymodule.db import ElixirDB, TableClass
 import os
 import hashlib 
@@ -3002,6 +3002,112 @@ class Stock_250kDB(ElixirDB):
 			value = (row.chromosome, row.start, row.stop)
 			self._cnv_id2chr_pos[key] = value
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
+	
+	@classmethod
+	def getResultMethodContent(cls, results_method_id, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, pdata=None, min_value_cutoff=None,):
+		"""
+		2011-3-10
+			moved from GeneListRankTest
+		2010-3-8
+			add argument min_value_cutoff and pass it to getGenomeWideResultFromFile()
+		2010-2-2
+			add the db object "rm" to genome_wide_result to make other db info accessible
+		2008-10-23
+			if pdata doesn't have construct_chr_pos2index defined. otherwise, pdata overrides the option.
+		2008-10-22
+			before deciding do_log10_transformation based on analysis_method, try to get it from pdata
+		2008-10-21
+			add pdata to conceal the passing of chr_pos2index to getGenomeWideResultFromFile()
+		2008-10-15
+			cache the genome_wide_result under cls.genome_wide_result, if cls.genome_wide_result.results_id==rm.id, directly return that.
+		2008-09-24
+			add option construct_chr_pos2index
+		2008-09-16
+			if result_fname is not a file, return None
+		2008-09-15
+			use field smaller_score_more_significant from ResultsMethod to set do_log10_transformation
+		2008-08-13
+			split from getGeneID2MostSignificantHit()
+		"""
+		#genome_wide_result = getattr(cls, 'genome_wide_result', None)
+		do_log10_transformation = getattr(pdata, 'do_log10_transformation', None)
+		rm = ResultsMethod.get(results_method_id)
+		from pymodule import getGenomeWideResultFromFile
+		# 2011-3-21 no more caching
+		#if genome_wide_result is not None and genome_wide_result.results_id==rm.id:
+		#	return genome_wide_result
+		
+		if rm.analysis_method_id==13: #Huh -Bjarni
+			sys.stderr.write("Analysis method id=%s is not supported.\n"%rm.analysis_method_id)
+			return None
+		
+		if results_directory:	#given a directory where all results are.
+			result_fname = os.path.join(results_directory, os.path.basename(rm.filename))
+		else:
+			result_fname = rm.filename
+		
+		if do_log10_transformation is None:
+			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
+			if hasattr(rm, 'analysis_method'):
+					if rm.analysis_method.smaller_score_more_significant==1:
+						do_log10_transformation = True
+					else:
+						do_log10_transformation = False
+			else:
+				return None
+		if pdata is None:
+			pdata = PassingData()
+		
+		#2011-3-21 assign min_MAF to pdata only when pdata.min_MAF is None or doesn't exist.
+		min_MAF_request = getattr(pdata, 'min_MAF', None)
+		if min_MAF_request is None:
+			pdata.min_MAF = min_MAF
+		if not hasattr(pdata, 'construct_chr_pos2index'):	#if pdata doesn't have construct_chr_pos2index defined. otherwise, pdata overrides the option.
+			pdata.construct_chr_pos2index = construct_chr_pos2index
+		if os.path.isfile(result_fname):
+			genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
+													pdata=pdata, min_value_cutoff=min_value_cutoff)
+			genome_wide_result.results_id = rm.id
+			genome_wide_result.rm = rm	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
+		else:
+			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
+			genome_wide_result = None
+		cls.genome_wide_result = genome_wide_result
+		return genome_wide_result
+	
+	def getGeneList(self, list_type_id):
+		"""
+		2011-3-16
+			moved from GeneListRankTest.py
+		"""
+		sys.stderr.write("Getting gene_list %s ... "%list_type_id)
+		rows = GeneList.query.filter_by(list_type_id=list_type_id)
+		candidate_gene_list = []
+		for row in rows:
+			candidate_gene_list.append(row.gene_id)
+		sys.stderr.write("%s genes. Done.\n"%(len(candidate_gene_list)))
+		return candidate_gene_list
+	
+	list_type_id2candidate_gene_list_info = {}
+	def dealWithCandidateGeneList(self, list_type_id, return_set=False):
+		"""
+		2011-3-16
+			moved from GeneListRankTest.py
+		2008-10-30
+			turn this into a classmethod
+		2008-10-23
+			add option return_set
+		2008-10-15
+			to make caching candidate gene list possible
+		"""
+		if list_type_id not in self.list_type_id2candidate_gene_list_info:	#internal cache
+			candidate_gene_list = self.getGeneList(list_type_id)
+			self.list_type_id2candidate_gene_list_info[list_type_id] = PassingData(candidate_gene_list=candidate_gene_list, \
+																	candidate_gene_set=set(candidate_gene_list))
+		if return_set:
+			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_set
+		else:
+			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_list
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
