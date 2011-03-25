@@ -78,7 +78,7 @@ class TopCNVTest(GeneListRankTest):
 		"""
 		GeneListRankTest.__init__(self, **keywords)
 	
-	def translateChrPosIntoCumuPos(self, top_loci, chr_id2cumu_start):
+	def translateChrPosDataObjectIntoCumuPos(self, top_loci, chr_id2cumu_start):
 		"""
 		2011-3-21
 			top_loci has become a list of DataObject of GWR.
@@ -116,19 +116,19 @@ class TopCNVTest(GeneListRankTest):
 				top_loci.append([chr, start, stop])
 		return top_loci
 	
-	def prepareDataForPermutationRankTest(self, top_loci, genomeRBDict, param_data, report=False):
+	def prepareDataForPermutationRankTest(self, top_loci_in_chr_pos, genomeRBDict, param_data, report=False):
 		"""
 		2011-3-16
 		"""
 		if report:
 			sys.stderr.write("Preparing data out of  %s top loci for permutation test ...\n"%\
-							(len(top_loci)))
+							(len(top_loci_in_chr_pos)))
 		permData = PassingData(candidate_gene_snp_rank_ls=[],\
 							non_candidate_gene_snp_rank_ls=[],\
 							captured_candidate_gene_set = set())
 		compareIns = CNVCompareByBigOverlapRatio(min_reciprocal_overlap=param_data.min_big_overlap)
-		for i in range(len(top_loci)):
-			chr, start, stop = top_loci[i][:3]
+		for i in range(len(top_loci_in_chr_pos)):
+			chr, start, stop = top_loci_in_chr_pos[i][:3]
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=str(chr), \
 							span_ls=[start, stop], \
 							min_reciprocal_overlap=0.0000001,)
@@ -218,10 +218,8 @@ class TopCNVTest(GeneListRankTest):
 									hostname=self.hostname, database=self.dbname)
 		db_250k.setup(create_tables=False)
 		
-		genome_db.tax_id = self.tax_id
-		genome_db.chr_id2size = (self.tax_id,)
-		genome_db.chr_id2cumu_start = (self.tax_id, 0)
-		cumuSpan2ChrRBDict = genome_db.createCumuSpan2ChrRBDict(self.tax_id, chr_gap=0)
+		oneGenomeData = genome_db.getOneGenomeData(tax_id=self.tax_id, chr_gap=0)
+		cumuSpan2ChrRBDict = oneGenomeData.cumuSpan2ChrRBDict
 		genomeRBDict = genome_db.dealWithGenomeRBDict(self.genomeRBDictPickleFname, tax_id=self.tax_id, \
 									max_distance=self.max_distance, debug=self.debug)
 		#genomeRBDict = None
@@ -252,10 +250,10 @@ class TopCNVTest(GeneListRankTest):
 			gwr = db_250k.getResultMethodContent(result_id, pdata=pd)
 		
 			top_loci = gwr.getTopLoci(no_of_top_loci=self.no_of_top_loci)
-			top_loci_in_cumu_pos = self.translateChrPosIntoCumuPos(top_loci, genome_db.chr_id2cumu_start)
-			
+			top_loci_in_cumu_pos = self.translateChrPosDataObjectIntoCumuPos(top_loci, oneGenomeData.chr_id2cumu_start)
+			top_loci_in_chr_pos = self.translateCumuPosIntoChrPos(top_loci_in_cumu_pos, cumuSpan2ChrRBDict)
 			param_data = pd
-			permData = self.prepareDataForPermutationRankTest(top_loci, genomeRBDict, param_data, report=True)
+			permData = self.prepareDataForPermutationRankTest(top_loci_in_chr_pos, genomeRBDict, param_data, report=True)
 			
 			#m = self.dealWithNoOfSNPsAssociatedWithCandidateGeneList(pd.list_type_id, rm, pd)	#cache is internally going on
 			#n = permData.no_of_total_snps - m
