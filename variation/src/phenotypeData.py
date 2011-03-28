@@ -647,7 +647,7 @@ class phenotype_data:
 					except Exception, err_str:
 						print 'Failed at inserting data:', err_str
 						print 'Trying to update.'
-						sql_statement = "UPDATE stock_250k.phenotype_avg SET value=%d, transformed_value=%d \
+						sql_statement = "UPDATE stock_250k.phenotype_avg SET value=%f, transformed_value=%f \
 								 WHERE ecotype_id=%d and method_id=%d" % (val, val, int(e_i), cur_method_id)
 						print sql_statement
 						numRows = int(cursor.execute(sql_statement))
