@@ -582,7 +582,7 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000):
 	param_data = PassingData(min_MAF=min_MAF)
 	from GeneListRankTest import GeneListRankTest
 	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=param_data)
-	
+	no_of_tests = len(genome_wide_result.data_obj_ls)
 	max_value = genome_wide_result.max_value
 	chr2length = {}
 	max_length = 0
@@ -613,6 +613,7 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000):
 			'chr2length': chr2length,
 			'max_value': max_value,
 			'max_length': max_length,
+			'no_of_tests': no_of_tests,
 			}
 	sys.stderr.write("Done.\n")
 	import simplejson
