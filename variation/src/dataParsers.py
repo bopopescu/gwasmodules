@@ -1949,6 +1949,7 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 	if os.path.isfile(ped_pickled_filename):
 		print 'Loading pickled ped file'
 		individ_dict = cPickle.load(open(ped_pickled_filename))
+                print 'Pickled file was loaded.'
 	else:
 		individ_dict = {}
 		with open(ped_filename) as f:
@@ -1980,6 +1981,7 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 		print 'Pickling..'
 		cPickle.dump(individ_dict, open(ped_pickled_filename, 'wb'), protocol=2)
 
+
 	missing_indices_set = set()
 	missing_nums = []
 	num_retained = 0
@@ -1996,27 +1998,34 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 	pylab.hist(missing_nums, bins=50, alpha=0.6)
 	pylab.savefig(env['tmp_dir'] + 'missing_data_hist.png')
 
-#
-#	snp_mat = sp.zeros((num_markers, len(individ_dict)), dtype='int8')
-#	for i, ind in enumerate(individ_dict):
-#		snp_mat[i] = individ_dict[i]['snps']
-#
-#
-#	num_incomplete_snps = 0
-#	snps = []
-#	for snp_i in range(num_markers):
-#		snp = snp_mat[:, snp_i]
-#		alleles = sp.unique(snp)
-#		if 0 in alleles:
-#			num_incomplete_snps += 1
-#			if len(alleles) == 4:
-#				snps.append(snp)
-#		else:
-#			if len(alleles) == 3:
-#				snps.append(snp)
-#
-#	print 'Number of incomplete SNPs is %d, out of %d' % (num_incomplete_snps, num_markers)
-#	accessions = individ_dict.keys()
+
+	snp_mat = sp.zeros((len(individ_dict), num_markers), dtype='int8')
+	for i, ind_id in enumerate(individ_dict):
+                snp_mat[i] = individ_dict[ind_id]['snps']
+
+        print 'Finished construcing matrix.'
+
+
+	num_weird_snps = 0
+	snps = []
+	for snp_i in range(num_markers):
+		if snp_i % 1000 == 0:
+                        print snp_i, num_weird_snps
+                snp = snp_mat[:, snp_i]
+		alleles = sp.unique(snp)
+		if 0 in alleles:
+			if 3 <= len(alleles) <= 4:
+				snps.append(snp)
+                        else:
+                                num_weird_snps += 1
+		else:
+			if 2 <= len(alleles) <= 3:
+				snps.append(snp)
+                        else:
+                                num_weird_snps += 1
+
+	print 'Number of weird SNPs is %d, out of %d' % (num_weird_snps, num_markers)
+	accessions = individ_dict.keys()
 
 
 
@@ -2136,7 +2145,7 @@ def _bug_test_():
 
 
 def _test_plink_ped_parser_():
-	plink_prefix = '/Users/bjarni.vilhjalmsson/Projects/Data/NFBC_20091001/NFBC_20091001'
+	plink_prefix = env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
 	parse_plink_ped_file(plink_prefix)
 
 if __name__ == "__main__":
