@@ -10,6 +10,7 @@ import cPickle
 import pdb
 from snpsdata import *
 from env import *
+import scipy as sp
 
 # this should be fixed
 
@@ -1898,6 +1899,127 @@ def parse_full_snp_data(data_file_prefix, chromosome, data_format='nucleotides')
 	return sd
 
 
+def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
+	"""
+	Requires a .ped and a .map file.
+	
+	- Converts (on-the-fly) to a integer format. 
+	- Ignores missing data?  Or imputes missing data.
+	
+	"""
+	assert only_binary_snps, 'Can only deal with binary SNPs for now.'
+	map_filename = file_prefix + '.map'
+	map_pickled_filename = map_filename + '.pickled'
+	ped_filename = file_prefix + '.ped'
+	ped_pickled_filename = ped_filename + '.pickled'
+	if os.path.isfile(map_pickled_filename):
+		print 'Loading pickled map file'
+		chrom_pos_dict = cPickle.load(open(map_pickled_filename))
+	else:
+		chrom_pos_dict = {}
+		with open(map_filename) as f:
+			cur_chrom = -1
+			for line in f:
+				l = map(str.strip, line.split())
+				chrom = int(l[0])
+				if chrom != cur_chrom:
+					chrom_pos_dict[chrom] = {'positions':[]}
+					cur_chrom = chrom
+				chrom_pos_dict[chrom]['positions'].append(int(l[3]))
+		print 'The map file was loaded:'
+		print 'Pickling..'
+		cPickle.dump(chrom_pos_dict, open(map_pickled_filename, 'wb'), protocol=2)
+	num_markers = 0
+	for chrom in sorted(chrom_pos_dict):
+		n = len(chrom_pos_dict[chrom]['positions'])
+		print 'Chromosome %d has %d markers.' % (chrom, n)
+		num_markers += n
+	print 'In total there are %d markers.' % num_markers
+
+	nt_pair_map = {('0', '0'):0}
+	for i, nt1 in enumerate(['A', 'C', 'G', 'T']):
+		for j, nt2 in enumerate(['A', 'C', 'G', 'T']):
+			nt_pair_map[(nt1, nt2)] = i * 4 + j + 1
+
+	homozygotes = [1, 6, 11, 16]
+	homo_hetero_map = {(1, 6):[2, 5], (1, 11):[3, 9], (1, 16):[4, 13],
+				(6, 11):[7, 10], (6, 16):[8, 14],
+				(11, 16):[12, 15]}
+
+	if os.path.isfile(ped_pickled_filename):
+		print 'Loading pickled ped file'
+		individ_dict = cPickle.load(open(ped_pickled_filename))
+	else:
+		individ_dict = {}
+		with open(ped_filename) as f:
+			for line_i, line in enumerate(f):
+				if line_i % 10 == 0:
+					print line_i
+				if debug and line_i > 500:
+					break
+				l = map(str.strip, line.split('\t'))
+				ind_id = int(l[1])
+				fam_id = int(l[0])
+				assert not ind_id in individ_dict, 'The indivual %d is already in dictionary??' % ind_id
+				individ_dict[ind_id] = {'fam_id':int(l[0]), 'pat_id':int(l[2]), 'mat_id':int(l[3]),
+							'sex':int(l[4]), 'phen_val':int(l[5])}
+				#print individ_dict[ind_id]
+				nt_pairs = sp.zeros(num_markers, dtype='int8')
+				#missing_count = 0
+				missing_indices = []
+				for snp_i, genotype in enumerate(l[6:]):
+					nt_pair = genotype.split()
+					if nt_pair == ['0', '0']:
+						#missing_count += 1
+						missing_indices.append(snp_i)
+					nt_pairs[snp_i] = nt_pair_map[tuple(nt_pair)]
+				#print '%d missing values were found' % missing_count
+				individ_dict[ind_id]['snps'] = nt_pairs
+				individ_dict[ind_id]['missing_indices'] = missing_indices
+		print 'The ped file was loaded:'
+		print 'Pickling..'
+		cPickle.dump(individ_dict, open(ped_pickled_filename, 'wb'), protocol=2)
+
+	missing_indices_set = set()
+	missing_nums = []
+	num_retained = 0
+	for ind_id in individ_dict:
+		num_missing = len(individ_dict[ind_id]['missing_indices'])
+		if num_missing < 400:
+			num_retained += 1
+			for i in individ_dict[ind_id]['missing_indices']:
+				missing_indices_set.add(i)
+		missing_nums.append(num_missing)
+	print len(missing_indices_set)
+	print num_retained
+	import pylab
+	pylab.hist(missing_nums, bins=50, alpha=0.6)
+	pylab.savefig(env['tmp_dir'] + 'missing_data_hist.png')
+
+#
+#	snp_mat = sp.zeros((num_markers, len(individ_dict)), dtype='int8')
+#	for i, ind in enumerate(individ_dict):
+#		snp_mat[i] = individ_dict[i]['snps']
+#
+#
+#	num_incomplete_snps = 0
+#	snps = []
+#	for snp_i in range(num_markers):
+#		snp = snp_mat[:, snp_i]
+#		alleles = sp.unique(snp)
+#		if 0 in alleles:
+#			num_incomplete_snps += 1
+#			if len(alleles) == 4:
+#				snps.append(snp)
+#		else:
+#			if len(alleles) == 3:
+#				snps.append(snp)
+#
+#	print 'Number of incomplete SNPs is %d, out of %d' % (num_incomplete_snps, num_markers)
+#	accessions = individ_dict.keys()
+
+
+
 
 def parse_1001genomes_data(file_name, convert_to_binary=True, remove_non_binary=True, mac_filter=5, delimiter=',',
 		reference_ecotype='6909'):
@@ -2012,6 +2134,11 @@ def _bug_test_():
 	print len(accs1 - accs2)
 	print accs1 - accs2
 
+
+def _test_plink_ped_parser_():
+	plink_prefix = '/Users/bjarni.vilhjalmsson/Projects/Data/NFBC_20091001/NFBC_20091001'
+	parse_plink_ped_file(plink_prefix)
+
 if __name__ == "__main__":
 
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
@@ -2041,5 +2168,5 @@ if __name__ == "__main__":
 	#pass
 	#_testDBParser_()
 	#load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
-	_bug_test_()
-	pdb.set_trace()
+	_test_plink_ped_parser_()
+	#pdb.set_trace()
