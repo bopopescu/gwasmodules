@@ -10,6 +10,7 @@ import sys, warnings
 import pdb
 import env
 from itertools import *
+
 try:
 	import scipy as sp
 except Exception, err_str:
@@ -3628,7 +3629,7 @@ def get_AW_common_dataset():
 
 
 def write_out_01_dataset():
-	sd_t75 = dataParsers.parse_snp_data(env.env['data_dir']+'250K_t75.csv',format='binary')
+	sd_t75 = dataParsers.parse_snp_data(env.env['data_dir'] + '250K_t75.csv', format='binary')
 	file_name = '/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t75.csv.binary'
 	sd_t54.writeToFile(file_name)
 
