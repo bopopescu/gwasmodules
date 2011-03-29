@@ -655,52 +655,43 @@ def load_gene_expression_traits_2():
 
 
 
+def parse_NFBC_traits():
+	phen_dict = {}
+	height_file = env['data_dir'] + 'NFBC_20091001/pheno.Height'
+	with open(height_file) as f:
+		f.next()
+		ets = []
+		values = []
+		for line in f:
+			l = line.split()
+			ets.append(int(l[0]))
+			values.append(float(l[2]))
+	phen_dict[1] = {'name':'height', 'ecotypes':ets, 'values':values}
 
+	metabolite_file = env['data_dir'] + 'NFBC_20091001/MetaboPheno.txt'
+	with open(metabolite_file) as f:
+		line = f.next()
+		l = map(str.strip, line.split())
+		phen_names = l[2:]
+		for i, pname in enumerate(phen_names):
+			phen_dict[i + 2] = {'name':pname, 'ecotypes':[], 'values':[]}
+		ets = []
+		values = []
+		for line in f:
+			l = line.split()
+			et = int(l[0])
+			for i, v in enumerate(l[2:]):
+				try:
+					val = int(v)
+				except Exception:
+					val = float(v)
+				if val != -9 and type(val) != int:
+					phen_dict[i + 2]['ecotypes'].append(et)
+					phen_dict[i + 2]['values'].append(val)
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['data_dir'] + 'NFBC_20091001/phenotype.scv')
+	return phed
 
-def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, method_descriptions=None, data_descriptions=None, host="papaya.usc.edu", user="bvilhjal", passwd="bjazz32"):
-	"""
-	Insert phenotypes into the DB
-	
-	Use the format from above...
-	"""
-	import MySQLdb
-	print "Connecting to db, host=" + host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Inserting data"
-
-	for i in range(len(phenotype_names)):
-		sql_statement = "INSERT INTO stock_250k.phenotype_method  (id, short_name, only_first_96, biology_category_id, method_description, data_description, data_type) VALUES (" + str(method_ids[i]) + ", '" + phenotype_names[i] + "', true, 1, '" + method_descriptions[i] + "', '" + data_descriptions[i] + "', 'quantitative')"
-		print sql_statement
-		numRows = int(cursor.execute(sql_statement))
-		row = cursor.fetchone()
-		if row:
-			print row
-
-		for j in range(0, len(ecotypes)):
-			val = phenotypes[i][j]
-			if val != "NA":
-				sql_statement = "INSERT INTO stock_250k.phenotype_avg (ecotype_id, value, ready_for_publication, method_id, transformed_value) VALUES ( " + str(ecotypes[j]) + ", " + str(val) + ", 0, " + str(method_ids[i]) + ", " + str(val) + " )"
-				print sql_statement
-				numRows = int(cursor.execute(sql_statement))
-				row = cursor.fetchone()
-				if row:
-					print row
-	conn.commit()
-	cursor.close ()
-	conn.close ()
 
 def _run_():
 	pd = load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
@@ -720,7 +711,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_gene_expression_traits_2()
+	parse_NFBC_traits()
 	print "Done!"
 
 

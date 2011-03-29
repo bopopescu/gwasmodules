@@ -2042,9 +2042,9 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 	tfam_pickled_filename = tfam_filename + '.pickled'
 
 	if os.path.isfile(tfam_pickled_filename):
-		print 'Loading pickled tped file'
+		print 'Loading pickled tfam file'
 		individs, sex_list = cPickle.load(open(tfam_pickled_filename))
-                print 'Pickled tped file was loaded.'
+                print 'Pickled tfam file was loaded.'
 	else:
 		individs = []
 		sex_list = []
@@ -2095,6 +2095,35 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 						snp[snp == 3] = most_common_val
 				chrom_pos_snp_dict[chrom]['snps'].append(snp)
 		cPickle.dump(chrom_pos_snp_dict, open(tped_pickled_filename, 'wb'), protocol=2)
+
+        chromosomes = sorted(chrom_pos_snp_dict.keys())
+        snpsds = []
+        for chrom in chromosomes:
+                snps = chrom_pos_snp_dict[chrom]['snps']
+                positions = chrom_pos_snp_dict[chrom]['positions']
+                snpsds.append(SNPsData(snps, positions, accessions=individs, chromosome=chrom))
+        sd = SNPsDataSet(snpsds, chromosomes, data_format='int')
+        print 'SNPsDataSet constructed!'
+
+        print 'Loading the kinship matrix'
+        ibs_filename = file_prefix + '.mibs'
+        ibs_pickled_filename = ibs_filename + '.pickled'
+        if os.path.isfile(ibs_pickled_filename):
+                print 'Loading pickled IBS kinship file'
+                l = cPickle.load(open(ibs_pickled_filename))
+                K = l[0]
+                print 'Pickled IBS kinship was loaded.'
+        else:
+                print 'Loading K...'
+                K = sp.zeros((num_individs, num_individs), dtype='double')
+                with open(ibs_filename) as f:
+                        for i, line in enumerate(f):
+                                K[i] = map(float, line.split())
+                cPickle.dump([K, individs], open(ibs_pickled_filename, 'wb'), protocol=2)
+                print 'K was loaded.'
+
+        return sd, K
+
 
 
 

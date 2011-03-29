@@ -10,6 +10,7 @@ import sys, warnings
 import pdb
 import env
 from itertools import *
+from bisect import bisect
 
 try:
 	import scipy as sp
@@ -2749,21 +2750,29 @@ class SNPsDataSet:
 		"""
 		Deletes accessions which are not common, and sorts the accessions, removes monomorphic SNPs, etc.
 		"""
-		#import bisect
+#		import bisect
 		print "Coordinating SNP and Phenotype data."
 		ets = phend.phen_dict[pid]['ecotypes']
 		#Checking which accessions to keep and which to remove.
-		#common_ets = list(set(self.accessions).union(set(ets)))
-		#common_ets.sort()
+#		common_ets = list(set(self.accessions + ets))
+#		common_ets.sort()
 
 		sd_indices_to_keep = set()#[]
 		pd_indices_to_keep = []
 
 		for i, acc in enumerate(self.accessions):
 			for j, et in enumerate(ets):
-				if acc == et:
+				if et == acc:
 					sd_indices_to_keep.add(i)
 					pd_indices_to_keep.append(j)
+
+#
+#		for i, acc in enumerate(self.accessions):
+#			if common_ets[bisect.bisect(common_ets, acc) - 1] == acc:
+#					sd_indices_to_keep.add(i)
+#		for j, et in enumerate(ets):
+#			if common_ets[bisect.bisect(common_ets, et) - 1] == et:
+#					pd_indices_to_keep.append(j)
 		sd_indices_to_keep = list(sd_indices_to_keep)
 		sd_indices_to_keep.sort()
 
@@ -2771,6 +2780,7 @@ class SNPsDataSet:
 
 		#Filter accessions which do not have phenotype values (from the genotype data).
 		print "Filtering genotype data"
+		#if len(sd_indices_to_keep) != len(self.accessions):
 		self.filter_accessions_indices(sd_indices_to_keep)
 		if coord_phen:
 			num_values = len(phend.phen_dict[pid]['ecotypes'])

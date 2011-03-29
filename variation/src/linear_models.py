@@ -646,7 +646,7 @@ class LinearMixedModel(LinearModel):
 		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='ML')
 
 
-	def get_estimates(self, eig_L=None, xs=[], ngrids=100, llim= -10, ulim=10, esp=1e-6,
+	def get_estimates(self, eig_L=None, xs=[], ngrids=50, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
 				dtype='single', K=None):
 		"""
@@ -680,11 +680,13 @@ class LinearMixedModel(LinearModel):
   			sp.reshape(sp.repeat(deltas, p), (m, p)).T
 	  	s1 = sp.sum(sq_etas / lambdas, axis=0)
   		if method == 'REML':
+	  		print 'Calculating grid REML values'
 	  		s2 = sp.sum(sp.log(lambdas), axis=0)
 	  		lls = 0.5 * (p * (sp.log((p) / (2.0 * sp.pi)) - 1 - sp.log(s1)) - s2)
 	 		s3 = sp.sum(sq_etas / (lambdas * lambdas), axis=0)
 	 		s4 = sp.sum(1 / lambdas, axis=0)
 	  		dlls = 0.5 * (p * s3 / s1 - s4)
+  			print 'Done'
   		elif method == 'ML':
   			#Xis < -matrix(eig.L$values, n, m) + matrix(delta, n, m, byrow=TRUE)
   			eig_vals_L = sp.array(eig_L['values'], dtype=dtype)
@@ -712,6 +714,7 @@ class LinearMixedModel(LinearModel):
 			last_dll = dlls[i]
 
 		if len(zero_intervals) > 0:
+			print 'Found a zero interval... now performing Newton-Rhapson alg.'
 			opt_ll, opt_i = max(zero_intervals)
 			opt_delta = 0.5 * (deltas[opt_i - 1] + deltas[opt_i])
 			#Newton-Raphson
@@ -747,6 +750,7 @@ class LinearMixedModel(LinearModel):
 				print "Newton's optimal delta:", new_opt_delta
 				print 'Using the maximum grid value instead.'
 
+			print 'Done with Newton-Rahpson'
 			if method == 'REML':
 				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			elif method == 'ML':
@@ -755,9 +759,11 @@ class LinearMixedModel(LinearModel):
 			if opt_ll < max_ll:
 				opt_delta = deltas[max_ll_i]
 		else:
+			print 'No zero-interval was found, taking the maximum grid value.'
 			opt_delta = deltas[max_ll_i]
 			opt_ll = max_ll
 
+		print 'Finishing up.. calculating H_sqrt_inv.'
 		l = sq_etas / (eig_vals + opt_delta)
 		opt_vg = sp.sum(l) / p  #vg   
 		opt_ve = opt_vg * opt_delta  #ve
@@ -774,6 +780,7 @@ class LinearMixedModel(LinearModel):
 		rss = residuals.T * residuals
 		x_beta_var = sp.var(x_beta, ddof=1)
 		var_perc = x_beta_var / self.y_var
+		print 'Done.'
 		res_dict = {'max_ll':opt_ll, 'delta':opt_delta, 'beta':beta_est, 've':opt_ve, 'vg':opt_vg,
 			    'var_perc':var_perc, 'rss':rss, 'mahalanobis_rss':mahalanobis_rss, 'H_sqrt_inv':H_sqrt_inv,
 			    'pseudo_heritability':1.0 / (1 + opt_delta)}
@@ -1055,9 +1062,13 @@ class LinearMixedModel(LinearModel):
 		With interactions between SNP and possible cofactors.
 		"""
 		K = self.random_effects[1][1]
+		print 'Calculating the eigenvalues of K'
 		eig_L = self._get_eigen_L_(K)
+		print 'Done.'
+		print 'Getting variance estimates'
 		res = self.get_estimates(eig_L=eig_L, method=method, K=K) #Get the variance estimates..
 		#resxf = self.get_estimates(method=method, K=K) #Get the variance estimates..
+		print 'Done.'
 		print 'pseudo_heritability:', res['pseudo_heritability']
 
 		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], Z=Z, with_betas=with_betas)
@@ -2835,7 +2846,7 @@ def emmax_snp_pair_plot(snps, positions, phenotypes, K, fm_scatter_plot_file=Non
 
 
 
-def filter_k_for_accessions(k, k_accessions, accessions):
+def prepare_k(k, k_accessions, accessions):
 	indices_to_keep = []
 	for acc in accessions:
 		try:
@@ -2843,7 +2854,11 @@ def filter_k_for_accessions(k, k_accessions, accessions):
 			indices_to_keep.append(i)
 		except:
 			continue
-	return k[indices_to_keep, :][:, indices_to_keep]
+	k = k[indices_to_keep, :][:, indices_to_keep]
+	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
+	k = (len(k) - 1) * k / c
+	print c
+	return sp.mat(k)
 
 def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	assert os.path.isfile(kinship_file), 'File not found.'
@@ -2855,7 +2870,7 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	k = l[0]
 	k_accessions = l[1]
 	if accessions:
-		return filter_k_for_accessions(sp.mat(k, dtype=dtype), k_accessions, accessions)
+		return prepare_k(sp.mat(k, dtype=dtype), k_accessions, accessions)
 	else:
 		return k
 
@@ -3270,11 +3285,32 @@ def _emmax_test_():
 #	r = emma(snps, phen_LD14_12, K)
 #	print r['ps']
 
+def perform_emmax():
+	pid = 1
+	import dataParsers as dp
+	import phenotypeData as pd
+	import env
+	plink_prefix = env.env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
+	sd, K = dp.parse_plink_tped_file(plink_prefix)
+	individs = sd.accessions[:]
+	phed = pd.parse_phenotype_file(env.env['data_dir'] + 'NFBC_20091001/phenotype.csv')
+	sd.coordinate_w_phenotype_data(phed, pid)
+	K = prepare_k(K, individs, sd.accessions)
+	phen_vals = phed.get_values(pid)
+	snps = sd.getSnps()
+	emmax_res = emmax(snps, phen_vals, K)
+	res = gwaResults.Result(scores=emmax_res['ps'].tolist(), snps_data=sd, name=result_name, **kwargs)
+	res.write_to_file(env.env['result_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
+	res.plot_manhattan(png_file=env.env['result_dir'] + 'NFBC_emmax_pid%d.png' % pid)
+
+
+
 
 if __name__ == "__main__":
-	import env
-	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
-	k, k_accessions = cPickle.load(open(kinship_file_name))
-	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
+#	import env
+#	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
+#	k, k_accessions = cPickle.load(open(kinship_file_name))
+#	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
+	perform_emmax()
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()

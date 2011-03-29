@@ -154,12 +154,12 @@ def parse_parameters():
 
 	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
 		'call_method_id':75, 'walltime_req':'12:00:00', 'proc_per_node':8,
-		'specific_methods':['kw', 'ft', 'lm', 'emma', 'emmax'], 'specific_transformations':['none'],
+		'specific_methods':['kw', 'emmax'], 'specific_transformations':['none'],
 		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
 		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
 		'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15, 'data_file':None,
 		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False, 'with_betas':False,
-		'num_steps':50, 'local_gwas':None, 'use_imputed_full_data':False}
+		'num_steps':50, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None}
 
 
 	for opt, arg in opts:
@@ -774,15 +774,15 @@ def _run_():
 		print 'Retrieving the phenotypes from the DB.'
 		phed = phenotypeData.get_all_phenotypes_from_db()
 
+	if not p_dict['pids']:  #phenotype index arguement is missing, hence all phenotypes are run/analyzed.
+		if not p_dict['phen_file']:
+			raise Exception('Phenotype file or phenotype ID is missing.')
+		p_dict['pids'] = phed.phen_dict.keys()
+	else:
+		raise Exception('Too many arguments..')
+
 	#If on the cluster, then set up runs..
 	if p_dict['parallel']:
-		if len(p_dict['pids']) == 0:  #phenotype index arguement is missing, hence all phenotypes are run/analyzed.
-			if not p_dict['phen_file']:
-				raise Exception('Phenotype file or phenotype ID is missing.')
-			p_dict['pids'] = phed.phen_dict.keys()
-		else:
-			raise Exception('Too many arguments..')
-
 		if analysis_plots:  #Running on the cluster..
 			for p_i in p_dict['pids']:
 				run_parallel(p_i, phed, p_dict)
