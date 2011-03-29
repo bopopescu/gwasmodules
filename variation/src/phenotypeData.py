@@ -880,7 +880,7 @@ class phenotype_data:
 
 
 
-def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_format='guess', with_db_ids=False):
+def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_format='guess', with_db_ids=True):
 	"""
 	Parses a phenotype file, and returns a new phenotype_data object.
 	
