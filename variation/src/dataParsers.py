@@ -2029,6 +2029,76 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 
 
 
+def parse_plink_tped_file(file_prefix, imputation_type='simple'):
+	"""
+	Requires a .tped file in 12 format.
+	
+	- Converts (on-the-fly) to a integer format. 
+	- Imputes missing data.
+	"""
+	tped_filename = file_prefix + '.tped'
+	tped_pickled_filename = tped_filename + '.pickled'
+	tfam_filename = file_prefix + '.tfam'
+	tfam_pickled_filename = tfam_filename + '.pickled'
+
+	if os.path.isfile(tfam_pickled_filename):
+		print 'Loading pickled tped file'
+		individs, sex_list = cPickle.load(open(tfam_pickled_filename))
+                print 'Pickled tped file was loaded.'
+	else:
+		individs = []
+		sex_list = []
+		with open(tfam_filename) as f:
+			for line in f:
+				l = map(str.strip, line.split())
+				individs.append(l[1])
+				sex_list.append(int(l[4]))
+		cPickle.dump((individs, sex_list), open(tfam_pickled_filename, 'wb'), protocol=2)
+	num_individs = len(individs)
+
+
+	if os.path.isfile(tped_pickled_filename):
+		print 'Loading pickled tped file'
+		chrom_pos_snp_dict = cPickle.load(open(tped_pickled_filename))
+                print 'Pickled tped file was loaded.'
+	else:
+		chrom_pos_snp_dict = {}
+		with open(tped_filename) as f:
+			cur_chrom = -1
+			for line_i, line in enumerate(f):
+				if line_i % 100 == 0:
+					print line_i
+				l = map(str.strip, line.split())
+				chrom = int(l[0])
+				if chrom != cur_chrom:
+					chrom_pos_snp_dict[chrom] = {'positions':[], 'snps':[]}
+					cur_chrom = chrom
+				chrom_pos_snp_dict[chrom]['positions'].append(int(l[3]))
+				snp = sp.zeros(num_individs, dtype='int8')
+				j = 0
+				w_missing = False
+				for i in range(4, 2 * num_individs + 4, 2):
+					nt1 = int(l[i])
+					nt2 = int(l[i + 1])
+					if nt1 == 0  or nt2 == 0:
+						snp[j] = 3
+						w_missing = True
+					elif nt1 == 2 and nt2 == 2:
+						snp[j] = 2
+					elif nt1 != 1  or nt2 != 1:
+						snp[j] = 1
+					j += 1
+				if w_missing:
+					if imputation_type == 'simple':
+						bin_counts = sp.bincount(snp)
+						most_common_val = sp.argmax(bin_counts[:-1])
+						snp[snp == 3] = most_common_val
+				chrom_pos_snp_dict[chrom]['snps'].append(snp)
+		cPickle.dump(chrom_pos_snp_dict, open(tped_pickled_filename, 'wb'), protocol=2)
+
+
+
+
 
 def parse_1001genomes_data(file_name, convert_to_binary=True, remove_non_binary=True, mac_filter=5, delimiter=',',
 		reference_ecotype='6909'):
@@ -2148,6 +2218,10 @@ def _test_plink_ped_parser_():
 	plink_prefix = env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
 	parse_plink_ped_file(plink_prefix)
 
+def _test_plink_tped_parser_():
+	plink_prefix = env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
+	parse_plink_tped_file(plink_prefix)
+
 if __name__ == "__main__":
 
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
@@ -2177,5 +2251,5 @@ if __name__ == "__main__":
 	#pass
 	#_testDBParser_()
 	#load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
-	_test_plink_ped_parser_()
+	_test_plink_tped_parser_()
 	#pdb.set_trace()
