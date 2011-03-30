@@ -1,4 +1,4 @@
-"""
+1;2c"""
 Contains functions to perform various linear regression schemes, such as simple, and mixed models.
 """
 try:
@@ -3289,24 +3289,30 @@ def _emmax_test_():
 #	r = emma(snps, phen_LD14_12, K)
 #	print r['ps']
 
-def perform_emmax():
-	pid = 2
+def perform_human_emmax():
+	pid = 1
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
 	import gwaResults as gr
+	import random
 	plink_prefix = env.env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
 	sd, K = dp.parse_plink_tped_file(plink_prefix)
+	#sd.sample_snps(0.5)
 	individs = sd.accessions[:]
 	phed = pd.parse_phenotype_file(env.env['data_dir'] + 'NFBC_20091001/phenotype.csv')
+	#phed.filter_ecotypes(pid, random_fraction=0.2)
 	sd.coordinate_w_phenotype_data(phed, pid)
 	K = prepare_k(K, individs, sd.accessions)
 	phen_vals = phed.get_values(pid)
-	snps = sd.getSnps(random_fraction=0.01)
-	emmax_res = emmax(snps, phen_vals, K)
+	
+	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10)
+#	snps = sd.getSnps()
+#	emmax_res = emmax(snps, phen_vals, K)
 	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
 	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
-	res.plot_manhattan(png_file=env.env['results_dir'] + 'NFBC_emmax_pid%d.png' % pid)
+	res.neg_log_trans()
+	res.plot_manhattan(png_file=env.env['results_dir'] + 'NFBC_emmax_pid%d.png' % pid, plot_xaxis=False, plot_bonferroni=True)
 
 
 
@@ -3316,6 +3322,6 @@ if __name__ == "__main__":
 #	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
-	perform_emmax()
+	perform_human_emmax()
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()

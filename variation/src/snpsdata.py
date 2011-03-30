@@ -2810,20 +2810,27 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=1000, snp_dtype='int8', dtype='single', type='binary'):
+		"""
+		
+		"""
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
-		snps_array = sp.array(snps)
+		print 'Constructing a SNP array'
+		snps_array = sp.array(snps, dtype=snp_dtype)
+		print 'Transposing the SNP array'
 		snps_array = snps_array.T
 		num_lines = len(self.accessions)
 		num_snps = float(len(snps))
+		print 'Allocating K matrix'
 		k_mat = sp.ones((num_lines, num_lines), dtype=dtype)
 		num_comp = num_lines * (num_lines - 1) / 2
 		comp_i = 0
+		print 'Starting calculation'
 		for i in range(num_lines):
 			for j in range(i):
 				comp_i += 1
-				k_mat[i, j] = sp.sum(snps_array[i] == snps_array[j]) / num_snps
+				k_mat[i, j] = sp.sum(sp.absolute(snps_array[i] - snps_array[j])) / num_snps
 				k_mat[j, i] = k_mat[i, j]
 				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
 					sys.stdout.write('.')

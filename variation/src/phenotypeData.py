@@ -289,10 +289,11 @@ class phenotype_data:
 
 
 
-	def filter_ecotypes(self, indices_to_keep, pids=None):
+	def filter_ecotypes(self, indices_to_keep, random_fraction=1, pids=None):
 		"""
 		Removes the ecotypes from all data.
 		"""
+		import random
 		if not pids:
 			pids = self.phen_ids
 		for pid in pids:
@@ -301,6 +302,9 @@ class phenotype_data:
 			d = self.phen_dict[pid]
 			if d['transformation']:
 				rvl = []
+			if random_fraction < 1:
+				indices = range(len(d['ecotypes']))
+				indices_to_keep = sorted(random.sample(indices, int(len(d['ecotypes']) * random_fraction)))
 			for i in indices_to_keep:
 				el.append(d['ecotypes'][i])
 				vl.append(d['values'][i])

@@ -717,7 +717,8 @@ class Result(object):
 
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None, percentile=90,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
-			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True):
+			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
+			plot_xaxis=True):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
@@ -813,17 +814,16 @@ class Result(object):
 					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='#FF9900', alpha=0.6)
 
 			oldOffset = offset
-			textPos.append(offset + chromosome_end / 2 - 2000000)
+#			textPos.append(offset + chromosome_end / 2 - 2000000)
 			offset += chromosome_end
-			for j in range(oldOffset, offset, 2000000):
-				ticksList1.append(j)
-			#pdb.set_trace()
-			for j in range(0, chromosome_end, 2000000):
-				if j % 4000000 == 0 and j < chromosome_end - 2000000 :
-					ticksList2.append(j / 1000000)
-				else:
-					ticksList2.append("")
-			#pdb.set_trace()
+			if plot_xaxis:
+				for j in range(oldOffset, offset, 2000000):
+					ticksList1.append(j)
+				for j in range(0, chromosome_end, 2000000):
+					if j % 4000000 == 0 and j < chromosome_end - 2000000 :
+						ticksList2.append(j / 1000000)
+					else:
+						ticksList2.append("")
 
 
 
@@ -867,7 +867,8 @@ class Result(object):
 
 		x_range = sum(result.chromosome_ends)
 		plt.axis([-x_range * 0.01, x_range * 1.01, min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
-		plt.xticks(ticksList1, ticksList2, fontsize='x-small')
+		if plot_xaxis:
+			plt.xticks(ticksList1, ticksList2, fontsize='x-small')
 		#pdb.set_trace()
 		if not ylab:
 			if type == "pvals":
@@ -1435,25 +1436,33 @@ class Result(object):
 			for info in additional_columns:
 				if info in self.snp_results:
 					columns.append(info)
-		try:
-			if not only_pickled:
-				with open(filename, "w") as f:
-					f.write(','.join(columns) + "\n")
-					for i in range(len(self.snp_results[columns[0]])):
-						l = [self.snp_results[c][i] for c in columns]
-						l = map(str, l)
-						f.write(",".join(l) + "\n")
-			if auto_pickling_on or only_pickled:
-				pickle_file = filename + '.pickled'
-				d = {}
-				for attr in self.pickle_attributes:
+#		try:
+		if not only_pickled:
+			with open(filename, "w") as f:
+				f.write(','.join(columns) + "\n")
+				for i in range(len(self.snp_results[columns[0]])):
+					l = [self.snp_results[c][i] for c in columns]
+					l = map(str, l)
+					f.write(",".join(l) + "\n")
+		if auto_pickling_on or only_pickled:
+			pickle_file = filename + '.pickled'
+			d = {}
+			for attr in self.pickle_attributes:
+				if attr == 'snp_results':
+					snp_results = getattr(self, attr)
+					d = {}
+					for k in snp_results:
+						if k != 'snps':
+							d[k] = snp_results[k]
+					d[attr] = d
+				else:
 					d[attr] = getattr(self, attr)
-				with open(pickle_file, 'wb') as f:
-					cPickle.dump(d, f)
-				pass
-		except Exception, err_str:
-			print 'Failed writing the resultfile:', err_str
-			print 'Make sure the given path is correct, and you have write rights.'
+			with open(pickle_file, 'wb') as f:
+				cPickle.dump(d, f)
+
+#		except Exception, err_str:
+#			print 'Failed writing the resultfile:', err_str
+#			print 'Make sure the given path is correct, and you have write rights.'
 
 
 class SNP(object):
