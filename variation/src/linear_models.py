@@ -1,4 +1,4 @@
-1;2c"""
+"""
 Contains functions to perform various linear regression schemes, such as simple, and mixed models.
 """
 try:
@@ -3305,8 +3305,9 @@ def perform_human_emmax():
 	sd.coordinate_w_phenotype_data(phed, pid)
 	K = prepare_k(K, individs, sd.accessions)
 	phen_vals = phed.get_values(pid)
-	
-	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10)
+	print 'Working on %s'%phed.get_name(pid)
+	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_pid%d' % pid
+	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix)
 #	snps = sd.getSnps()
 #	emmax_res = emmax(snps, phen_vals, K)
 	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
