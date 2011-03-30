@@ -564,6 +564,8 @@ class LinearMixedModel(LinearModel):
 		self.random_effects.append((effect_type, cov_matrix))
 
 	def _get_eigen_L_(self, K, dtype='single'):
+		if sp.__version__ < '0.8':
+			K = sp.mat(K, dtype=dtype)
 		evals, evecs = linalg.eigh(K) #this function has some bugs!!!
 		#evals, evecs = linalg.eig(K)  #Switch to this for speed improvements..
 		evals = sp.array(evals, dtype=dtype)
@@ -579,7 +581,9 @@ class LinearMixedModel(LinearModel):
 			hat_matrix = X * X_squared_inverse * X.T
 		S = sp.mat(sp.identity(self.n)) - hat_matrix	#S=I-X(X'X)^{-1}X'
 		M = sp.mat(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S, dtype='double')
-		evals, evecs = linalg.eigh(M) #eigen of S(K+I)S
+		if sp.__version__ < '0.8':
+			M = sp.mat(M, dtype=dtype)
+		evals, evecs = linalg.eigh(M, overwrite_a=True) #eigen of S(K+I)S
 		return {'values':map(lambda x: x - 1, sp.array(evals[q:], dtype=dtype)), 'vectors':(sp.mat(evecs, dtype=dtype).T[q:])}   #Because of S(K+I)S?
 
 
@@ -3286,10 +3290,11 @@ def _emmax_test_():
 #	print r['ps']
 
 def perform_emmax():
-	pid = 1
+	pid = 2
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
+	import gwaResults as gr
 	plink_prefix = env.env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
 	sd, K = dp.parse_plink_tped_file(plink_prefix)
 	individs = sd.accessions[:]
@@ -3297,11 +3302,11 @@ def perform_emmax():
 	sd.coordinate_w_phenotype_data(phed, pid)
 	K = prepare_k(K, individs, sd.accessions)
 	phen_vals = phed.get_values(pid)
-	snps = sd.getSnps()
+	snps = sd.getSnps(random_fraction=0.01)
 	emmax_res = emmax(snps, phen_vals, K)
-	res = gwaResults.Result(scores=emmax_res['ps'].tolist(), snps_data=sd, name=result_name, **kwargs)
-	res.write_to_file(env.env['result_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
-	res.plot_manhattan(png_file=env.env['result_dir'] + 'NFBC_emmax_pid%d.png' % pid)
+	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
+	res.plot_manhattan(png_file=env.env['results_dir'] + 'NFBC_emmax_pid%d.png' % pid)
 
 
 
