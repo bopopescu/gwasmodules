@@ -1483,7 +1483,8 @@ def _calc_bic_(ll, num_snps, num_par, n):
 
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
-		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None):
+		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
+		plot_xaxis=True):
 	"""
 	Run EMMAX stepwise.. forward, with one possible backward at each step.
 	"""
@@ -1562,7 +1563,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list)
+						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
 #			if local:
 #			else: #Manhattan plot
 #				pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
@@ -1668,7 +1669,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-				cand_genes=cand_gene_list)
+				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
 #		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
 #				png_file=png_file_name)
 
@@ -1752,7 +1753,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			res = gr.Result(scores=emmax_res['ps'], positions=all_positions, chromosomes=all_chromosomes)
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list)
+					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
 #			pr.plot_raw_result(emmax_res['ps'], all_chromosomes, all_positions, highlight_markers=cofactors,
 #					 png_file=png_file_name)
 
@@ -2084,7 +2085,7 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 			res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list)
+					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
 
 
 		#Adding the new SNP as a cofactor
@@ -2150,7 +2151,7 @@ def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None
 		res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-				cand_genes=cand_gene_list)
+				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
 #		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
 #				png_file=png_file_name)
 
@@ -2836,13 +2837,13 @@ def perform_human_emmax():
 	print 'Working on %s' % phed.get_name(pid)
 	sys.stdout.flush()
 	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_pid%d' % pid
-	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix)
+	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
 #	snps = sd.getSnps()
 #	emmax_res = emmax(snps, phen_vals, K)
-	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
-	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
-	res.neg_log_trans()
-	res.plot_manhattan(png_file=env.env['results_dir'] + 'NFBC_emmax_pid%d.png' % pid, plot_xaxis=False, plot_bonferroni=True)
+#	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+#	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
+#	res.neg_log_trans()
+#	res.plot_manhattan(png_file=env.env['results_dir'] + 'NFBC_emmax_pid%d.png' % pid, plot_xaxis=False, plot_bonferroni=True)
 
 
 
