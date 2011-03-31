@@ -120,31 +120,6 @@ class LinearModel(object):
 		p_value = 1 - stats.f.cdf(f_stat, q, self.n - self.p)
 		return p_value, f_stat
 
-#	def fast_f_test(self, snps):
-#		"""
-#		A standard linear model, using a F-test
-#		"""
-#		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(self.X, self.Y)
-#		num_snps = len(snps)
-#		rss_list = sp.repeat(h0_rss, num_snps)
-#		h0_betas = map(float, list(h0_betas)) + [0.0]
-#		betas_list = [h0_betas] * num_snps
-#		var_perc = sp.zeros(num_snps)
-#		q = 1
-#		n_p = self.n - self.p
-#		for i, snp in enumerate(snps):
-#			(betas, rss, rank, s) = linalg.lstsq(sp.hstack([self.X, sp.matrix(snp).T]), self.Y)
-#			if not rss:
-#				print 'No predictability in the marker, moving on...'
-#				continue
-#			rss_list[i] = rss[0]
-#			betas_list[i] = map(float, list(betas))
-#		rss_ratio = h0_rss / rss_list
-#		var_perc = 1 - 1 / rss_ratio
-#		f_stats = (rss_ratio - 1) * n_p / float(q)
-#		p_vals = stats.f.sf(f_stats, q, n_p)
-#		return {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'betas':betas_list,
-#			'var_perc':var_perc, 'h0_rss':h0_rss}
 
 
 	def fast_f_test(self, snps, verbose=True, Z=None,
@@ -622,37 +597,42 @@ class LinearMixedModel(LinearModel):
 		return res  #diffrentiated log-likelihoods (*2) (eq. 8 from paper)
 
 
-	def get_REML(self, ngrids=100, llim= -10, ulim=10, esp=1e-6):
+	def get_REML(self, ngrids=100, llim= -10, ulim=10, esp=1e-6, eig_L=None, eig_R=None):
 		"""
 		Get REML estimates for the effect sizes, as well as the random effect contributions.
 		
 		This is EMMA
 		"""
-		K = self.random_effects[1][1]
-		eig_L = self._get_eigen_L_(K)
+		if not eig_L:
+			K = self.random_effects[1][1]
+			eig_L = self._get_eigen_L_(K)
 
 		#Get the variance estimates..
-		res = self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
+		res = self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML',
+					eig_R=eig_R)
 		#res = self.get_estimates(ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='REML', K=K)
 		res['eig_L'] = eig_L
 		return res
 
-
-	def get_ML(self, ngrids=100, llim= -10, ulim=10, esp=1e-6):
+	def get_ML(self, ngrids=100, llim= -10, ulim=10, esp=1e-6, eig_L=None, eig_R=None):
 		"""
 		Get REML estimates for the effect sizes, as well as the random effect contributions.
 		
 		This is EMMA
 		"""
-		K = self.random_effects[1][1]
-		eig_L = self._get_eigen_L_(K)
+		if not eig_L:
+			K = self.random_effects[1][1]
+			eig_L = self._get_eigen_L_(K)
 		#Get the variance estimates..
-		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='ML')
+		return self.get_estimates(eig_L=eig_L, ngrids=ngrids, llim=llim, ulim=ulim, esp=esp, method='ML',
+					eig_R=eig_R)
 
 
-	def get_estimates(self, eig_L=None, xs=[], ngrids=50, llim= -10, ulim=10, esp=1e-6,
+
+
+	def get_estimates(self, eig_L=None, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
-				dtype='single', K=None):
+				dtype='single', K=None, eig_R=None):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
 		Using the EMMA algorithm.
@@ -661,12 +641,13 @@ class LinearMixedModel(LinearModel):
 		"""
 		if verbose:
 			print 'Retrieving %s variance estimates' % method
-		if len(xs):
+		if xs:
 			X = sp.hstack([self.X, xs])
 		else:
 			X = self.X
 
-		eig_R = self._get_eigen_R_(X)
+		if not eig_R and not xs:
+			eig_R = self._get_eigen_R_(X)
 		q = X.shape[1] #number of columns
 		n = self.n
 		p = n - q
@@ -784,12 +765,11 @@ class LinearMixedModel(LinearModel):
 		rss = residuals.T * residuals
 		x_beta_var = sp.var(x_beta, ddof=1)
 		var_perc = x_beta_var / self.y_var
-		print 'Done.'
 		res_dict = {'max_ll':opt_ll, 'delta':opt_delta, 'beta':beta_est, 've':opt_ve, 'vg':opt_vg,
 			    'var_perc':var_perc, 'rss':rss, 'mahalanobis_rss':mahalanobis_rss, 'H_sqrt_inv':H_sqrt_inv,
 			    'pseudo_heritability':1.0 / (1 + opt_delta)}
 
-		if len(xs) and return_f_stat:
+		if xs and return_f_stat:
 			h0_X = H_sqrt_inv * self.X
 			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y_t)
 			f_stat = ((h0_rss - mahalanobis_rss) / (xs.shape[1])) / (h0_rss / p)
@@ -799,14 +779,6 @@ class LinearMixedModel(LinearModel):
 			p_val = stats.f.sf(f_stat, (xs.shape[1]), p)
 			res_dict['p_val'] = float(p_val)
 		return res_dict #, lls, dlls, sp.log(deltas)
-
-
-
-	def get_variance_esitimates(self, llim= -10, ulim=10, esp=1e-6, ll_method='REML', opt_method='newton_krylov'):
-		"""
-		A general mixed model estimation of the variance matrices.
-		"""
-		pass
 
 
 
@@ -1163,99 +1135,6 @@ class LinearMixedModel(LinearModel):
 		return res_d
 
 
-	def emmax_full_model_gxe(self, snps, Es, H_sqrt_inv, Z, verbose=True,):
-		"""
-		EMMAX implementation (in python), for GxE interaction..
-		
-		Tests: 	- Y=E+G (H1) vs. Y=E (H0)
-			- Y=E+G+GE (H2) vs. Y=E (H0)
-			- Y=E+G+GE (H2) vs. Y=E+G (H1)
-				
-		Methods:
-			normal - Normal regression
-			qr - Uses QR decomposition to speed up regression with many co-factors.
-			
-		"""
-		dtype = 'single'
-		n = self.n
-		num_snps = len(snps)
-
-		h0_X = sp.mat(H_sqrt_inv * self.X, dtype=dtype) #inlcudes E (which is static)
-		Y = H_sqrt_inv * self.Y	#The transformed outputs.
-		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
-		h0_betas = map(float, list(h0_betas))
-
-		(Q, R) = qr_decomp(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
-		Q = sp.mat(Q)
-		Q2 = Q * Q.T
-		M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
-		M_Es = []
-		for E in Es:
-			M_Es.append(sp.mat(sp.array(Z.T) * E, dtype=dtype) * M)
-		M = Z.T * M
-
-		rss_h1_list = sp.repeat(h0_rss, num_snps)
-		rss_h2_list = sp.repeat(h0_rss, num_snps)
-		chunk_size = len(Y)
-
-		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
-
-			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
-			Xs = snps_chunk * M # snps_chunk*Z_t*H_sqrt_inv_t *(I-Q*Q_t)
-			X_E_list = []
-			for M_E in M_Es:
-				X_E_list.append(snps_chunk * M_E) # (snps_chunk*Z_t*E)*H_sqrt_inv_t *(I-Q*Q_t)
-
-			for j in range(len(Xs)):
-				(betas, rss_h1, p, sigma) = linalg.lstsq(Xs[j].T, Y)
-				rss_h1_list[i + j] = rss_h1[0]
-				Xs_full = [Xs[j]]
-				for X_E in X_E_list:
-					Xs_full.append(X_E[j])
-
-				(betas, rss_h2, p, sigma) = linalg.lstsq(sp.transpose(sp.vstack(Xs_full)), Y, overwrite_a=True)
-				rss_h2_list[i + j] = rss_h2[0]
-
-				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
-					sys.stdout.write('.')
-					sys.stdout.flush()
-
-		if verbose and num_snps >= 10:
-			sys.stdout.write('\n')
-
-		q_h01 = 1  # Single SNP is being tested
-		n_p_h01 = n - h0_rank - q_h01
-		rss_h01_ratio = h0_rss / rss_h1_list
-		var_perc_h01 = 1 - 1 / rss_h01_ratio
-		f_stats_h01 = (rss_h01_ratio - 1) * n_p_h01 / float(q_h01)
-		p_vals_h01 = stats.f.sf(f_stats_h01, q_h01, n_p_h01)
-
-		q_h02 = 1 + len(Es)  # A SNP and SNP X E is being tested
-		n_p_h02 = n - h0_rank - q_h02
-		rss_h02_ratio = h0_rss / rss_h2_list
-		var_perc_h02 = 1 - 1 / rss_h02_ratio
-		f_stats_h02 = (rss_h02_ratio - 1) * n_p_h02 / float(q_h02)
-		p_vals_h02 = stats.f.sf(f_stats_h02, q_h02, n_p_h02)
-
-		q_h12 = len(Es)  # Only SNP X E is being tested
-		n_p_h12 = n - h0_rank - 1 - q_h12
-		rss_h12_ratio = rss_h1_list / rss_h2_list
-		var_perc_h12 = 1 - 1 / rss_h12_ratio
-		f_stats_h12 = (rss_h12_ratio - 1) * n_p_h12 / float(q_h12)
-		p_vals_h12 = stats.f.sf(f_stats_h12, q_h12, n_p_h12)
-		#pdb.set_trace()
-
-
-		res_d = {'ps_h01':p_vals_h01, 'f_stats_h01':f_stats_h01, 'rss_h1':rss_h1_list, 'var_perc_h01':var_perc_h01,
-			'h0_rss':h0_rss, 'h0_betas':h0_betas,
-			'ps_h02':p_vals_h02, 'f_stats_h02':f_stats_h02, 'rss_h2':rss_h2_list, 'var_perc_h02':var_perc_h02,
-			'ps_h12':p_vals_h12, 'f_stats_h12':f_stats_h12, 'var_perc_h12':var_perc_h12}
-		return res_d
-
-
-
-
 
 	def emmax_general_f_test(self, snps, Z=None, with_betas=False, method='REML'):
 		"""
@@ -1436,237 +1315,6 @@ class LinearMixedModel(LinearModel):
 			'pseudo_heritability': pseudo_her, 'haplotype_counts':haplotype_counts,
 			'f_stats':f_stat_array, 'ps':p_val_array}
 		return res_dict
-
-
-
-#	def emmax_two_snps(self, snps, verbose=True):
-#		"""
-#		Every pair of SNPs, Vincent's results.
-#		"""
-#		import util
-#		K = self.random_effects[1][1]
-#		eig_L = self._get_eigen_L_(K)
-#		num_snps = len(snps)
-#
-#		res = self.get_expedited_REMLE(eig_L=eig_L) #Get the variance estimates..
-#		delta = res['delta']
-#		pseudo_her = 1.0 / (1 + delta)
-#		H_sqr = res['H_sqrt']
-#		H_sqrt_inv = H_sqr.I
-#		Y = H_sqrt_inv * self.Y	#The transformed outputs.
-#		h0_X = H_sqrt_inv * self.X     #The transformed fixed inputs.
-#		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-#		full_rss = h0_rss
-#
-#		#Contructing result containers		
-#		f_stat_array = sp.zeros((num_snps, num_snps))
-#		rss_array = sp.repeat(full_rss, num_snps * num_snps)
-#		rss_array.shape = (num_snps, num_snps)
-#		p_val_array = sp.ones((num_snps, num_snps))
-#		var_perc_array = sp.zeros((num_snps, num_snps))
-#		haplotype_counts = [[{} for j in range(i + 1)] for i in range(num_snps)]
-#
-#		q = 1 #Testing one SNP, given the other
-#		p = len(self.X.T) + q
-#		n_p = self.n - p
-#		#Fill the diagonal with the single SNP emmax
-#		for i, snp in enumerate(snps):
-#			hap_set, hap_counts, haplotypes = snpsdata.get_haplotypes([snp], self.n,
-#										count_haplotypes=True)
-#			d = {'num_haps':hap_counts}
-#			for hap, hap_c in zip(hap_set, hap_counts):
-#				d[hap] = hap_c
-#			haplotype_counts[i][i] = d
-#			snp_mat = H_sqrt_inv * sp.matrix(snp).T #Transformed inputs
-#			X = sp.hstack([h0_X, snp_mat])
-#			(betas, rss, rank, s) = linalg.lstsq(X, Y)
-#			if not rss:
-#				if verbose: print 'No predictability in the marker, moving on...'
-#				continue
-#			f_stat = ((h0_rss - rss) / q) / (rss / n_p)
-#			p_val = stats.f.sf(f_stat, q, n_p)
-#			p_val_array[i, i] = p_val[0]
-#			f_stat_array[i, i] = f_stat[0]
-#			rss_array[i, i] = rss[0]
-#			var_perc_array[i, i] = float(1 - rss / h0_rss)
-#
-#		#Fill the upper right part with poorest of two tests.
-#		p = len(self.X.T) + q + 1 #Adding one SNP as a cofactor.
-#		n_p = self.n - p
-#		for i, snp1 in enumerate(snps):
-#			anti_snp1 = get_anti_snp(snp1)
-#			snp_mat = H_sqrt_inv * (sp.matrix(snp1).T) #Transformed inputs
-#			h0_X1 = sp.hstack([h0_X, snp_mat])
-#			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X1, Y)
-#			if not h0_rss:
-#				if verbose: print 'No predictability in the marker, moving on...'
-#				continue
-#			for j, snp2 in enumerate(snps):
-#				if i == j: continue #Skip diagonals..
-#
-#				#Haplotype counts 
-#				if j < i:
-#					hap_set, hap_counts, haplotypes = snpsdata.get_haplotypes([snp1, snp2], self.n,
-#												count_haplotypes=True)
-#					d = {'num_haps':len(hap_counts)}
-#					for hap, hap_c in zip(hap_set, hap_counts):
-#						d[hap] = hap_c
-#					haplotype_counts[i][j] = d
-#
-#				if sp.any(snp1 != snp2) and sp.any(anti_snp1 != snp2):
-#					snp_mat = H_sqrt_inv * (sp.matrix(snp2).T) #Transformed inputs
-#					X = sp.hstack([h0_X1, snp_mat])
-#					(betas, rss, rank, s) = linalg.lstsq(X, Y)
-#					if not rss:
-#						if verbose: print 'No predictability in the marker, moving on...'
-#						continue
-#					f_stat = ((h0_rss - rss) / (q)) / (rss / n_p)
-#					p_val = stats.f.sf(f_stat, q, n_p)
-#					p_val_array[i, j] = p_val[0]
-#					f_stat_array[i, j] = f_stat[0]
-#					rss_array[i, j] = rss[0]
-#					var_perc_array[i, j] = float(1 - rss / h0_rss)
-#				else:
-#					rss_array[i, j] = h0_rss[0]
-#
-#		for i in range(len(snps)):
-#			for j in range(len(snps[:i])):
-#				if p_val_array[i, j] > p_val_array[j, i]:
-#					p_val_array[j, i] = p_val_array[i, j]
-#					f_stat_array[j, i] = f_stat_array[i, j]
-#					rss_array[j, i] = rss_array[i, j]
-#					var_perc_array[j, i] = var_perc_array[i, j]
-#
-#
-#		no_snp_count = 0
-#		identical_snp_count = 0
-#		num_same_snp = 0
-#
-#		#Now the interaction.
-#		p = len(self.X.T) + q + 2 #Adding two SNP as a cofactor.
-#		n_p = self.n - p
-#		for i, snp1 in enumerate(snps):
-#			for j, snp2 in enumerate(snps[:i]):
-#				#t_X = sp.mat(sp.vstack([sp.ones(self.n), snp1, snp2])).T
-#				#(t_beta, t_rss, t_rank, t_sigma) = linalg.lstsq(t_X, sp.matrix(pseudo_snp).T)
-#				failed = False
-#				pseudo_snp = snp1 * snp2 #Interaction
-#				if haplotype_counts[i][j]['num_haps'] == 4:
-#					#DO ANOVA... to simplify beta interpretation.
-#					#if t_rss and t_rss[0] > 1e-20 :
-#					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T #Transformed inputs
-#					h0_X1 = sp.hstack([h0_X, snp_mat])
-#					snp_mat = H_sqrt_inv * (sp.matrix(pseudo_snp).T) #Transformed inputs
-#					X = sp.hstack([h0_X1, snp_mat])
-#					(betas, rss, rank, s) = linalg.lstsq(X, Y)
-#					if rss:
-#						h0_rss = rss_array[j, i]
-#						f_stat = ((h0_rss - rss) / (q)) / (rss / n_p)
-#						p_val = stats.f.sf(f_stat, q, n_p)
-#						p_val_array[i, j] = p_val[0]
-#						f_stat_array[i, j] = f_stat[0]
-#						rss_array[i, j] = rss[0]
-#						var_perc_array[i, j] = float(1 - rss / h0_rss)
-#
-#					else:
-#						failed = True
-#
-#				else:
-#					failed = True
-#
-#				if failed:
-#					anti_snp1 = get_anti_snp(snp1)
-#					anti_snp2 = get_anti_snp(snp2)
-#					if sp.all(snp1 == snp2) or sp.all(snp1 == anti_snp2):
-#						num_same_snp += 1
-#					elif len(sp.unique(pseudo_snp)) == 1:
-#						no_snp_count += 1
-#					elif sp.any(pseudo_snp != snp1) or sp.any(pseudo_snp != snp2) or \
-#						sp.any(pseudo_snp != anti_snp1) or sp.any(pseudo_snp != anti_snp2):
-#						identical_snp_count += 1
-#					p_val_array[i, j] = 1
-#					f_stat_array[i, j] = 0
-#					rss_array[i, j] = full_rss
-#					var_perc_array[i, j] = 0
-#
-#
-#		tot_num = num_snps * (num_snps - 1) / 2.0
-#		print 'fail_fraction =%f, no_snp_fraction=%f, identical_pseudo_snp_fraction=%f, num_same_snp=%f'\
-#			% ((no_snp_count + identical_snp_count + num_same_snp) / tot_num, \
-#			no_snp_count / tot_num, identical_snp_count / tot_num, num_same_snp / tot_num)
-#
-#		res_dict = {'vincent_ps':p_val_array, 'vincent_f_stats':f_stat_array, 'vincent_rss':rss_array, \
-#			    'vincent_var_perc':var_perc_array, 'pseudo_heritability': pseudo_her, \
-#			    'haplotype_counts':haplotype_counts}
-#
-#		#Filling up the diagonal
-#		f_stat_array = sp.zeros((num_snps, num_snps))
-#		rss_array = sp.repeat(full_rss, num_snps * num_snps)
-#		rss_array.shape = (num_snps, num_snps)
-#		p_val_array = sp.ones((num_snps, num_snps))
-#		var_perc_array = sp.zeros((num_snps, num_snps))
-#		for i in range(num_snps):
-#			p_val_array[i, i] = res_dict['vincent_ps'][i, i]
-#			f_stat_array[i, i] = res_dict['vincent_f_stats'][i, i]
-#			rss_array[i, i] = res_dict['vincent_rss'][i, i]
-#			var_perc_array[i, i] = res_dict['vincent_var_perc'][i, i]
-#
-#		q1 = 2 #Testing significance of two SNPs, compared to none
-#		p1 = len(self.X.T) + q1
-#		n_p1 = self.n - p1
-#		q2 = 3 #Testing significance of two SNPs and the interaction, compared to none
-#		p2 = len(self.X.T) + q2
-#		n_p2 = self.n - p2
-#		for i, snp1 in enumerate(snps):
-#			for j, snp2 in enumerate(snps[:i]):
-#				anti_snp1 = get_anti_snp(snp1)
-#				anti_snp2 = get_anti_snp(snp2)
-#				pseudo_snp = snp1 * snp2
-#				if sp.any(snp1 != snp2) and sp.any(snp1 != anti_snp2):
-#					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T #Transformed inputs
-#					X = sp.hstack([h0_X, snp_mat])
-#					(betas, rss, rank, s) = linalg.lstsq(X, Y)
-#					f_stat = ((full_rss - rss) / (q1)) / (rss / n_p1)
-#					p_val = stats.f.sf(f_stat, q1, n_p1)
-#					p_val_array[j, i] = p_val[0]
-#					f_stat_array[j, i] = f_stat[0]
-#					rss_array[j, i] = rss[0]
-#					var_perc_array[j, i] = float(1 - rss / full_rss)
-#				else:
-#					rss = res_dict['vincent_rss'][j, i]
-#					f_stat = ((full_rss - rss) / (q1)) / (rss / n_p1)
-#					p_val = stats.f.sf(f_stat, q1, n_p1)
-#					p_val_array[j, i] = p_val[0]
-#					f_stat_array[j, i] = f_stat[0]
-#					rss_array[j, i] = rss
-#					var_perc_array[j, i] = float(1 - rss / full_rss)
-#
-#				t_X = sp.mat(sp.vstack([sp.ones(self.n), snp1, snp2])).T
-#				(t_beta, t_rss, t_rank, t_sigma) = linalg.lstsq(t_X, sp.matrix(pseudo_snp).T)
-#				if t_rss and t_rss[0] > 1e-20 :
-#					snp_mat = H_sqrt_inv * sp.mat(sp.vstack([snp1, snp2])).T  #Transformed inputs
-#					X = sp.hstack([h0_X, snp_mat])
-#					(betas, rss, rank, s) = linalg.lstsq(X, Y)
-#					f_stat = ((full_rss - rss) / (q2)) / (rss / n_p2)
-#					p_val = stats.f.sf(f_stat, q2, n_p2)
-#					p_val_array[i, j] = p_val[0]
-#					f_stat_array[i, j] = f_stat[0]
-#					rss_array[i, j] = rss[0]
-#					var_perc_array[i, j] = float(1 - rss / full_rss)
-#				else:
-#					rss = rss_array[j, i]
-#					f_stat = ((full_rss - rss) / (q2)) / (rss / n_p2)
-#					p_val = stats.f.sf(f_stat, q2, n_p2)
-#					p_val_array[i, j] = p_val[0]
-#					f_stat_array[i, j] = f_stat[0]
-#					rss_array[i, j] = rss
-#					var_perc_array[i, j] = var_perc_array[j, i]
-#
-#		res_dict['ps'] = p_val_array
-#		res_dict['f_stats'] = f_stat_array
-#		res_dict['rss'] = rss_array
-#		res_dict['var_perc'] = var_perc_array
-#		return res_dict
 
 
 
@@ -1871,8 +1519,11 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
  	step_i = 0
  	num_par = 2 #mean and variance scalar
 
-	reml_res = lmm.get_REML()
-	ml_res = lmm.get_ML()
+	eig_L = lmm._get_eigen_L_(K)
+	eig_R = lmm._get_eigen_R_(lmm.X)
+
+	reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
+	ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
 	H_sqrt_inv = reml_res['H_sqrt_inv']
 	ll = ml_res['max_ll']
 	rss = float(reml_res['rss'])
@@ -1928,8 +1579,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		#Adding the new SNP as a cofactor
 		lmm.add_factor(snps[min_pval_i])
 		cofactor_snps.append(snps[min_pval_i])
-		reml_res = lmm.get_REML()
-		ml_res = lmm.get_ML()
+		eig_R = lmm._get_eigen_R_(lmm.X)
+		reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
+		ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
 		H_sqrt_inv = reml_res['H_sqrt_inv']
 		ll = ml_res['max_ll']
 		rss = float(reml_res['rss'])
@@ -2040,8 +1692,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 
 			#Re-estimating the REML and ML.
-			reml_res = lmm.get_REML()
-			ml_res = lmm.get_ML()
+			eig_R = lmm._get_eigen_R_(lmm.X)
+			reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
+			ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
 			ll = ml_res['max_ll']
 			rss = float(reml_res['rss'])
 			reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
@@ -2082,7 +1735,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		cofactors = step_info_list[i_opt]['cofactors']
 		print cofactors
 		lmm.set_factors(cofactor_snps)
-		reml_res = lmm.get_REML()
+		eig_R = lmm._get_eigen_R_(lmm.X)
+		reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
 		H_sqrt_inv = reml_res['H_sqrt_inv']
 		emmax_res = lmm._emmax_f_test_(all_snps, H_sqrt_inv)
 		min_pval_i = emmax_res['ps'].argmin()
@@ -3065,133 +2719,6 @@ def _test_joint_analysis_(run_id='FT_suzi_log'):
 
 
 
-#def joint_emmax_analysis(phed, pids, sd, mac_threshold=15,
-#			kinship_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled'):
-#	"""
-#	Perform joint trait analysis. 
-#	"""
-#
-#	import dataParsers as dp
-#	import phenotypeData as pd
-#	import analyze_gwas_results as agr
-#
-#	joint_phen_vals = []
-#	joint_ecotypes = []
-#	gen_var_list = []
-#	err_var_list = []
-#	her_list = []
-#	k_list = []
-#	for pid in pids:
-#		print phed.get_name(pid)
-#		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
-#		phed.filter_unique_ecotypes(sd.accessions, [pid])
-#		phed.normalize_values(pid)
-#		phenotypes = phed.get_values(pid)
-#		#Create a new phenotype.
-#		joint_phen_vals.extend(phenotypes)
-#		ecotypes = phed.get_ecotypes(pid)
-#		joint_ecotypes.extend(ecotypes)
-#		K = load_kinship_from_file(kinship_file, ecotypes)
-#		#Get pseudoheritabilities for all phenotypes
-#		lmm = LinearMixedModel(phenotypes)
-#		lmm.add_random_effect(K)
-#		res = lmm.get_REML()
-#		print 'Pseudo-heritatbility:', res['pseudo_heritability']
-#		her_list.append(res['pseudo_heritability'])
-#		err_var_list.append(res['ve'])
-#		gen_var_list.append(res['vg'])
-#
-#
-#	#E in the model.
-#	joint_X = []
-#	num_vals = len(joint_phen_vals)
-#	shift = 0
-#	for pid in pids:
-#
-#		n = phed.num_vals(pid)
-#		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
-#		shift += n
-#
-#
-#	#Get correlations between traits..
-#	corr_mat, pids = phed.get_correlations(pids)
-#	#corr_mat = corr_mat * corr_mat
-#	print gen_var_list, err_var_list, corr_mat, pids
-#
-#	unique_ecotypes = list(set(joint_ecotypes))
-#	sd.filter_accessions(unique_ecotypes)
-#	if mac_threshold:
-#		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
-#
-#	K = load_kinship_from_file(kinship_file, unique_ecotypes)
-#
-#	#Create ecotype maps
-#	ecotype_maps = {}
-#	for pid in pids:
-#		l = []
-#		ets = phed.get_ecotypes(pid)
-#		for et in ets:
-#			l.append(unique_ecotypes.index(et))
-#		ecotype_maps[pid] = l
-#
-#	#Construct new variance matrix
-#	V = sp.zeros((len(joint_ecotypes), len(joint_ecotypes)))
-#	m_i = 0
-#	for i, pid1 in enumerate(pids):
-#		ets_map1 = ecotype_maps[pid1]
-#		num_ets1 = len(ets_map1)
-#		m_j = 0
-#		for j, pid2 in enumerate(pids):
-#			ets_map2 = ecotype_maps[pid2]
-#			num_ets2 = len(ets_map2)
-#			if i != j and her_list[i] > 0 and her_list[j] > 0:
-#				rho = corr_mat[i, j] / math.sqrt(her_list[i] * her_list[j])
-#				#print 'rho:', rho
-#				#pdb.set_trace()
-#				#rho = min(1.0, rho)
-#			elif i == j:
-#				rho = 1.0
-#			else:
-#				rho = 0
-#			print i, j, rho
-#			var_sclice = rho * math.sqrt(gen_var_list[i] * gen_var_list[j]) * K[ets_map1, :][:, ets_map2]
-#			if pid1 == pid2:
-#				var_sclice += err_var_list[i] * sp.eye(num_ets1)
-#			V[m_i:m_i + num_ets1, m_j:m_j + num_ets2] = var_sclice
-#			m_j += num_ets2
-#		m_i += num_ets1
-#
-#	print'Performing Cholesky decomposition'
-#	H_sqrt = cholesky(V)
-#	H_sqrt_inv = sp.mat(H_sqrt.T).I
-#
-#	#pdb.set_trace()
-#
-#	#5. Run analysis..
-#	lmm = LinearMixedModel(joint_phen_vals)
-#	lmm.set_factors(joint_X, False)
-#	print lmm.X
-#	pdb.set_trace()
-#	#Need to fix the SNPs!!!
-#	Z = sp.int16(sp.mat(joint_ecotypes).T == sp.mat(unique_ecotypes))
-#	snps = sd.getSnps()
-# 	positions = sd.getPositions()
-# 	chromosomes = sd.get_chr_list()
-#	#pdb.set_trace()
-#	res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
-#	#pdb.set_trace()
-#	png_file_name = '/Users/bjarni.vilhjalmsson/tmp/test.png'
-#	import gwaResults as gr
-#	res = gr.Result(scores=res['ps'].tolist(), positions=positions, chromosomes=chromosomes)
-#	agr.qq_plot({'EMMAX_joint':res}, 1000, method_types=["emma"], mapping_labels=['EMMAX_joint'], phenName='joint',
-#		pngFile='/Users/bjarni.vilhjalmsson/tmp/qq_plot.png')
-#	agr.log_qq_plot({'EMMAX_joint':res}, 1000, 7, method_types=['emma'], mapping_labels=['EMMAX_joint'],
-#			phenName='joint', pngFile='/Users/bjarni.vilhjalmsson/tmp/log_qq_plot.png')
-#	res.neg_log_trans()
-#	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True)
-
-
-
 
 #
 #def _check_emma_bug_():
@@ -3306,7 +2833,7 @@ def perform_human_emmax():
 	sd.coordinate_w_phenotype_data(phed, pid)
 	K = prepare_k(K, individs, sd.accessions)
 	phen_vals = phed.get_values(pid)
-	print 'Working on %s'%phed.get_name(pid)
+	print 'Working on %s' % phed.get_name(pid)
 	sys.stdout.flush()
 	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_pid%d' % pid
 	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix)

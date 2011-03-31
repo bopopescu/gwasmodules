@@ -778,8 +778,6 @@ def _run_():
 		if not p_dict['phen_file']:
 			raise Exception('Phenotype file or phenotype ID is missing.')
 		p_dict['pids'] = phed.phen_dict.keys()
-	else:
-		raise Exception('Too many arguments..')
 
 	#If on the cluster, then set up runs..
 	if p_dict['parallel']:
