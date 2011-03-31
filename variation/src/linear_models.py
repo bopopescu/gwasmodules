@@ -2818,7 +2818,7 @@ def _emmax_test_():
 #	print r['ps']
 
 def perform_human_emmax():
-	pid = 6
+	pid = 3
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
