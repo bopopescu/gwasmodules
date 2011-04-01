@@ -1484,9 +1484,9 @@ def _calc_bic_(ll, num_snps, num_par, n):
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True):
+		plot_xaxis=True, with_qq_plots=False):
 	"""
-	Run EMMAX stepwise.. forward, with one possible backward at each step.
+	Run EMMAX stepwise forward-backward.
 	"""
 	#import plotResults as pr
 	import gwaResults as gr
@@ -1529,10 +1529,11 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	ll = ml_res['max_ll']
 	rss = float(reml_res['rss'])
 	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-	criterias = {'ebics':[], 'mbics':[]}
+	criterias = {'ebics':[], 'mbics':[], 'bonf':[], 'mbonf':[]}
 	(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
 	criterias['ebics'].append(extended_bic)
 	criterias['mbics'].append(modified_bic)
+	criterias['mbonf'].append(0)
 	action = 'None'
 	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
@@ -1548,6 +1549,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		mahalnobis_rss = emmax_res['rss'][min_pval_i]
 		min_pval_chr_pos = chr_pos_list[min_pval_i]
 		print 'Min p-value:', min_pval
+		criterias['bonf'].append(min_pval)
 		print 'Min Mahalanobis RSS:', mahalnobis_rss
 		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
@@ -1564,16 +1566,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#			if local:
-#			else: #Manhattan plot
-#				pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-#					 png_file=png_file_name)
-#			#QQ plot
+
+			#Plot QQ plot
+			if with_qq_plots:
+				pass
 
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
 			pass
-
 
 
 
@@ -1594,13 +1594,16 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 
 		#Re-estimate the p-value of the cofactors... with the smallest in the list.
+		cofactor_pvals = []
 		for i, snp in enumerate(cofactor_snps):
 			t_cofactors = cofactor_snps[:]
 			del t_cofactors[i]
 			lmm.set_factors(t_cofactors)
-			cofactors[i][2] = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
+			pval = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
+			cofactor_pvals.append(pval)
+			cofactors[i][2] = pval
 		lmm.set_factors(cofactor_snps)
-
+		criterias['mbonf'].append(max(cofactor_pvals))
 
 		#Remove the found SNP from considered SNPs
 		del snps[min_pval_i]
@@ -1650,6 +1653,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
 	min_pval_i = sp.argmin(emmax_res['ps'])
 	min_pval = emmax_res['ps'][min_pval_i]
+	criterias['bonf'].append(min_pval)
 	mahalnobis_rss = emmax_res['rss'][min_pval_i]
 	min_pval_chr_pos = chr_pos_list[min_pval_i]
 	print 'Min p-value:', min_pval
@@ -1670,8 +1674,6 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-#				png_file=png_file_name)
 
 	#Now backward stepwise.
 	if forward_backwards:
@@ -1703,12 +1705,16 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			action = '-'
 
 			#Update the p-values
+			cofactor_pvals = []
 			for i, snp in enumerate(cofactor_snps):
 				t_cofactors = cofactor_snps[:]
 				del t_cofactors[i]
 				lmm.set_factors(t_cofactors)
 				res = lmm._emmax_f_test_([snp], H_sqrt_inv)
-				cofactors[i][2] = res['ps'][0]
+				pval = res['ps'][0]
+				cofactor_pvals.append(pval)
+				cofactors[i][2] = pval
+			criterias['mbonf'].append(max(cofactor_pvals))
 
 			#Calculate the BICs
 			(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n)
@@ -1754,9 +1760,6 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#			pr.plot_raw_result(emmax_res['ps'], all_chromosomes, all_positions, highlight_markers=cofactors,
-#					 png_file=png_file_name)
-
 
 
 
@@ -2818,7 +2821,7 @@ def _emmax_test_():
 #	print r['ps']
 
 def perform_human_emmax():
-	pid = 3
+	pid = 7
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
