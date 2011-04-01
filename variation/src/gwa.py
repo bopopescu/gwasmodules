@@ -54,7 +54,6 @@ Option:
 						If phenotype index is missing, then all phenotypes are used.
 	-q ...					Request memory (on cluster), otherwise use defaults 4GB for Kruskal-Wallis, 12GB for Emma.
 	-l ...			 		Request time limit (on cluster), otherwise use defaults
-	--proc_per_node=...			Request number of processors per node, default is 8. (Works only for EMMA.)
 	--only_add_2_db				Does not submit jobs, but only adds available result files to DB. (hack for usc hpc)
 	
 	
@@ -140,9 +139,9 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'proc_per_node=',
-			'only_add_2_db', 'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=',
-			'local_gwas=', 'use_imputed_full_data']
+	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
+			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
+			'use_imputed_full_data']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -153,13 +152,12 @@ def parse_parameters():
 
 
 	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
-		'call_method_id':75, 'walltime_req':'12:00:00', 'proc_per_node':8,
-		'specific_methods':['kw', 'emmax'], 'specific_transformations':['none'],
-		'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False, 'use_existing_results':False,
-		'region_plots':0, 'cand_genes_file':None, 'debug_filter':1, 'phen_file':None,
-		'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15, 'data_file':None,
-		'data_format':'binary', 'emmax_perm':None, 'with_replicates':False, 'with_betas':False,
-		'num_steps':50, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None}
+		'call_method_id':75, 'walltime_req':'12:00:00', 'specific_methods':['kw', 'emmax'],
+		'specific_transformations':['none'], 'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False,
+		'use_existing_results':False, 'region_plots':0, 'cand_genes_file':None, 'debug_filter':1,
+		'phen_file':None, 'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
+		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
+		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None}
 
 
 	for opt, arg in opts:
@@ -187,7 +185,6 @@ def parse_parameters():
 		elif opt in ("--no_phenotype_ids"): p_dict['no_phenotype_ids'] = True
 		elif opt in ("--region_plots"): p_dict['region_plots'] = int(arg)
 		elif opt in ("--cand_genes_file"): p_dict['cand_genes_file'] = arg
-		elif opt in ("--proc_per_node"): p_dict['proc_per_node'] = int(arg)
 		elif opt in ("--only_add_2_db"): p_dict['only_add_2_db'] = True
 		elif opt in ("--data_format"): p_dict['data_format'] = arg
 		elif opt in ("--emmax_perm"): p_dict['emmax_perm'] = int(arg)
@@ -338,8 +335,6 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 
 	shstr = "#!/bin/csh\n"
 	shstr += "#PBS -l walltime=%s \n" % p_dict['wall_time_req']
-	if mapping_method in ['emma']:
-		shstr += "#PBS -l nodes=1:ppn=%d \n" % p_dict['proc_per_node']
 	shstr += "#PBS -l mem=%s \n" % p_dict['mem_req']
 	shstr += "#PBS -q cmb\n"
 
@@ -350,8 +345,8 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 					p_dict['remove_outliers'], p_dict['debug_filter'],
 					p_dict['call_method_id'], p_dict['mac_threshold'])
 
-	shstr += "--region_plots=%d --proc_per_node=%d --data_format=%s " % \
-		(p_dict['region_plots'], p_dict['proc_per_node'], p_dict['data_format'])
+	shstr += "--region_plots=%d  --data_format=%s " % \
+		(p_dict['region_plots'], p_dict['data_format'])
 
 
 	if p_dict['use_existing_results']: shstr += "--use_existing_results  "
@@ -815,124 +810,6 @@ def _run_():
 						print 'Mapping method:', mapping_method
 						map_phenotype(p_i, phed, mapping_method, trans_method, p_dict)
 
-
-
-
-#def _run_emma_mp_(in_que, out_que, confirm_que, num_splits=10):
-#	from rpy import r
-#	args = in_que.get(block=True)
-#	#r_source(script_dir+"emma_fast.R")
-#	#r_emma_REML_t = robjects.r['emma.REML.t']
-#	r.source(env['script_dir'] + "emma_fast.R")
-#	phenArray = array([args[2]])
-#	snps = args[1]
-#	print "Found data nr. %i, starting run.  pid=%d" % (args[0], os.getpid())
-#	sys.stdout.flush()
-#	confirm_que.put([args[0], "start confirmation!"], block=False)
-#	results = []
-#	for i in range(num_splits):
-#		snp_slice = snps[(len(snps) * i) / num_splits:(len(snps) * (i + 1)) / num_splits]
-#		snpsArray = array(snp_slice)
-#	        results.append(r.emma_REML_t(phenArray, snpsArray, args[3], [args[4]]))
-#		#results.append(r_emma_REML_t(phenArray,snpsArray,args[3],[args[4]]))
-#		if args[0] == 0:
-#			print "About %d.0%% is done now." % (100 * (i + 1.0) / num_splits)
-#			sys.stdout.flush()
-#	new_res = {}
-#	for k in results[0]:
-#		new_res[k] = []
-#	for nr in results:
-#		for k in nr:
-#			new_res[k].extend(list(nr[k]))
-#	out_que.put([args[0], new_res])
-#
-	#def run_emma_parallel(snps, phen_vals, k, num_proc=8):
-	#	"""
-	#	Run EMMA on multiple processors, using multiprocessing
-	#	"""
-	#	processes = []
-	#	in_que = mp.Queue()
-	#	out_que = mp.Queue()
-	#	confirm_que = mp.Queue()
-	#	import scipy
-	#	phen_var = scipy.var(phen_vals)
-	#
-	#	#Populating the in_que
-	#	for i in range(num_proc):
-	#		snp_slice = snps[(len(snps) * i) / num_proc:(len(snps) * (i + 1)) / num_proc]
-	#		print len(snp_slice)
-	#		in_que.put([i, snp_slice, phen_vals, k, phen_var], block=False)
-	#		p = mp.Process(target=_run_emma_mp_, args=(in_que, out_que, confirm_que))
-	#		p.start()
-	#		done = False
-	#		fail_count = 0
-	#		while not done:
-	#			try:
-	#				confirm = confirm_que.get(block=True, timeout=90)
-	#				done = True
-	#			except:
-	#				p.terminate()
-	#				fail_count += 1
-	#				if fail_count > 10:
-	#					print "Giving up!!"
-	#					for p in processes:
-	#						p.terminate()
-	#					raise Exception("Failed to start all processes.")
-	#				else:
-	#					print "Trying again with a new process!"
-	#					in_que.put([i, snp_slice, phen_vals, k, phen_var], block=False)
-	#					p = mp.Process(target=_run_emma_mp_, args=(in_que, out_que, confirm_que))
-	#					p.start()
-	#
-	#
-	#		print "ID=%i, Recieved %s" % (confirm[0], confirm[1])
-	#		sys.stdout.flush()
-	#		processes.append(p)
-	#
-	#	for p in processes:
-	#		print p, p.is_alive()
-	#
-	#	results = []
-	#	for i in range(num_proc):
-	#		#import pdb;pdb.set_trace()
-	#		if i > 0:
-	#			try:
-	#				res = out_que.get(block=True, timeout=10000) #waits about 3 hours, if needed. 
-	#				results.append(res)
-	#			except Exception, err_str:
-	#				print "The parent process didn't receive the results, after waiting over almost 3 hours."
-	#
-	#		else:
-	#			res = out_que.get()
-	#			results.append(res)
-	#
-	#	for p in processes:
-	#		p.terminate()
-	#
-	#	results.sort()
-	#	new_res = {}
-	#	for k in results[0][1]:
-	#		new_res[k] = []
-	#	for nr in results:
-	#		for k in nr[1]:
-	#			new_res[k].extend(list(nr[1][k]))
-	#
-	#	#import pdb;pdb.set_trace()
-	#	return new_res
-	#	#print "len(q):",len(q)
-
-
-
-#def runEmma(snps, phenValues, k):
-#	from rpy import r
-#	#Assume that the accessions are ordered.
-#	r.source("emma.R")
-#	#r_emma_REML_t = robjects.r['emma.REML.t']
-#
-#	phenArray = array([phenValues])
-#	snpsArray = array(snps)
-#	res = r.emma_REML_t(phenArray, snpsArray, k)
-#	return res
 
 
 def run_fet(snps, phenotypeValues, verbose=False):
