@@ -171,8 +171,9 @@ def _get_expected_log_quantiles_(num_dots, max_val=5):
 
 def simple_log_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=None, num_dots=1000, max_val=5,
 			title=None):
-	plt.figure(figsize=(5, 4))
-	plt.axes([0.15, 0.14, 0.82, 0.79])
+	plt.figure(figsize=(8, 7))
+	plt.axes([0.09, 0.08, 0.89, 0.86])
+	plt.plot([0, max_val], [0, max_val], 'k--', alpha=0.5, linewidth=2.0)
 	exp_quantiles = sp.arange(1, num_dots + 1, dtype='single') / (num_dots + 1) * max_val
 	for i, quantiles in enumerate(quantiles_list):
 		if line_colors:
@@ -180,19 +181,18 @@ def simple_log_qqplot(quantiles_list, png_file, quantile_labels=None, line_color
 		else:
 			c = 'b'
 		if quantile_labels:
-			plt.plot(exp_quantiles, quantiles, label=quantile_labels[i], c=c, alpha=0.8)
+			plt.plot(exp_quantiles, quantiles, label=quantile_labels[i], c=c, alpha=0.7, linewidth=2.0)
 		else:
-			plt.plot(exp_quantiles, quantiles, c=c, alpha=0.8)
+			plt.plot(exp_quantiles, quantiles, c=c, alpha=0.7, linewidth=2.0)
 	plt.ylabel("Observed $-log_{10}(p$-value$)$")
 	plt.xlabel("Expected $-log_{10}(p$-value$)$")
 	if title:
 		plt.title(title)
 	max_x = max_val
 	max_y = max(map(max, quantiles_list))
-	plt.plot([0, max_val], [0, max_val], 'k--', alpha=0.5)
 	plt.axis([-0.025 * max_x, 1.025 * max_x, -0.025 * max_y, 1.025 * max_y])
-	fontProp = matplotlib.font_manager.FontProperties(size=8)
 	if quantile_labels:
+		fontProp = matplotlib.font_manager.FontProperties(size=10)
 		plt.legend(loc=2, numpoints=2, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
 	plt.savefig(png_file)
 

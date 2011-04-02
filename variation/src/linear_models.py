@@ -1487,7 +1487,7 @@ def _calc_bic_(ll, num_snps, num_par, n):
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True, with_qq_plots=True, sign_threshold=None):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
 	"""
 	Run EMMAX stepwise forward-backward.
 	"""
@@ -1582,21 +1582,25 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			#Plot QQ plot
 			if with_qq_plots:
 				#calculate qq-plot line..
-				log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000, max_val=7)
+				log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
+								max_val=log_qq_max_val)
 				log_quantiles_list.append(log_quantiles)
 				quantiles_labels.append('Step %d' % (step_i - 1))
 				#plot all lines
 				png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
-				color_list = [cm(i / float(step_i)) for i in range(step_i)]
-				if step_i > 2:
-					qs = [log_quantiles_list[0], log_quantiles]
-					q_labs = [quantiles_labels[0], quantiles_labels[-1]]
-					lcols = [color_list[0], color_list[-1]]
+				if step_i == 1:
+					color_list = [cm(0.0)]
+				else:
+					color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
+				if step_i > 5:
+					qs = log_quantiles_list[0:4] + [log_quantiles]
+					q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
+					lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
 					agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
-							num_dots=1000, max_val=7)
+							num_dots=1000, max_val=log_qq_max_val)
 				else:
 					agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
-							line_colors=color_list, num_dots=1000, max_val=7)
+							line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
 
 
 		if cand_gene_list:
@@ -1845,16 +1849,17 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 				#Plot QQ plot
 				if with_qq_plots:
 					#calculate qq-plot line..
-					log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000, max_val=7)
+					log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
+									max_val=log_qq_max_val)
 					qlab = 'Step %d' % (i_opt)
 					#plot all lines
 					qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
 					if step_i > 2:
 						qs = [log_quantiles_list[0], log_quantiles]
 						q_labs = [quantiles_labels[0], qlab]
-						lcols = [cm(0.1), cm(0.9)]
+						lcols = [cm(0), cm(0.7)]
 						agr.simple_log_qqplot(qs, qq_png_file_name, q_labs, line_colors=lcols,
-								num_dots=1000, max_val=7)
+								num_dots=1000, max_val=log_qq_max_val)
 
 					opt_file_dict[i_opt]['qq'] = qq_png_file_name
 
