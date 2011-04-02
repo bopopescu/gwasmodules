@@ -2252,7 +2252,7 @@ def _test_plink_tped_parser_():
 	sd, k = parse_plink_tped_file(plink_prefix)
         K = sd.get_ibs_kinship_matrix()
         import linear_models as lm
-        lm.save_kinship_to_file(env['data_dir'] + 'NFBC_20091001/NFBC_20091001_kinship.ibs', K, sd.accessions)
+        lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
 
 
 
