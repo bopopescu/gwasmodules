@@ -878,7 +878,11 @@ class Result(object):
 				plt.ylabel('score')
 		else:
 			plt.ylabel(ylab)
-		plt.xlabel("Mb")
+		if plot_xaxis:
+			plt.xlabel("Mb")
+		else:
+			plt.xlabel("bases")
+
 
 		if pdf_file:
 			plt.savefig(pdf_file, format="pdf")
