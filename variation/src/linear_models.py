@@ -22,7 +22,8 @@ import time
 from pdb import Pdb
 import itertools as it
 import math
-
+import platform
+import os
 
 
 
@@ -665,14 +666,14 @@ class LinearMixedModel(LinearModel):
   			sp.reshape(sp.repeat(deltas, p), (m, p)).T
 	  	s1 = sp.sum(sq_etas / lambdas, axis=0)
   		if method == 'REML':
-	  		print 'Calculating grid REML values'
+	  		if verbose: print 'Calculating grid REML values'
 	  		s2 = sp.sum(sp.log(lambdas), axis=0)
 	  		lls = 0.5 * (p * (sp.log((p) / (2.0 * sp.pi)) - 1 - sp.log(s1)) - s2)
 	 		s3 = sp.sum(sq_etas / (lambdas * lambdas), axis=0)
 	 		s4 = sp.sum(1 / lambdas, axis=0)
 	  		dlls = 0.5 * (p * s3 / s1 - s4)
-  			print 'Done'
   		elif method == 'ML':
+	  		if verbose: print 'Calculating grid ML values'
   			#Xis < -matrix(eig.L$values, n, m) + matrix(delta, n, m, byrow=TRUE)
   			eig_vals_L = sp.array(eig_L['values'], dtype=dtype)
   			xis = sp.reshape(sp.repeat(eig_vals_L, m), (n, m)) + \
@@ -699,7 +700,7 @@ class LinearMixedModel(LinearModel):
 			last_dll = dlls[i]
 
 		if len(zero_intervals) > 0:
-			print 'Found a zero interval... now performing Newton-Rhapson alg.'
+			if verbose: print 'Found a zero interval... now performing Newton-Rhapson alg.'
 			opt_ll, opt_i = max(zero_intervals)
 			opt_delta = 0.5 * (deltas[opt_i - 1] + deltas[opt_i])
 			#Newton-Raphson
@@ -735,7 +736,7 @@ class LinearMixedModel(LinearModel):
 				print "Newton's optimal delta:", new_opt_delta
 				print 'Using the maximum grid value instead.'
 
-			print 'Done with Newton-Rahpson'
+			if verbose: print 'Done with Newton-Rahpson'
 			if method == 'REML':
 				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			elif method == 'ML':
@@ -748,7 +749,7 @@ class LinearMixedModel(LinearModel):
 			opt_delta = deltas[max_ll_i]
 			opt_ll = max_ll
 
-		print 'Finishing up.. calculating H_sqrt_inv.'
+		if verbose: print 'Finishing up.. calculating H_sqrt_inv.'
 		l = sq_etas / (eig_vals + opt_delta)
 		opt_vg = sp.sum(l) / p  #vg   
 		opt_ve = opt_vg * opt_delta  #ve
@@ -1471,6 +1472,8 @@ def _log_choose_(n, k):
 		raise Exception('Out of range.')
 	return sum(map(sp.log, range(n, n - k, -1))) - sum(map(sp.log, range(k, 0, -1)))
 
+
+
 def _calc_bic_(ll, num_snps, num_par, n):
 	bic = -2 * (ll) + num_par * sp.log(n)
 	extended_bic = bic + \
@@ -1484,12 +1487,14 @@ def _calc_bic_(ll, num_snps, num_par, n):
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None):
 	"""
-	Run EMMAX stepwise.. forward, with one possible backward at each step.
+	Run EMMAX stepwise forward-backward.
 	"""
 	#import plotResults as pr
 	import gwaResults as gr
+	import analyze_gwas_results as agr
+	import pylab
 
 	def _to_string_(cofactors):
 		st = ''
@@ -1511,6 +1516,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
        	lmm = LinearMixedModel(phenotypes)
 	lmm.add_random_effect(K)
 
+	if not sign_threshold: #Then use Bonferroni threshold
+		sign_threshold = 1.0 / (len(snps) * 20.0)
+
 	print "Running EMMAX stepwise"
 	s1 = time.time()
  	step_info_list = []
@@ -1529,16 +1537,21 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	ll = ml_res['max_ll']
 	rss = float(reml_res['rss'])
 	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-	criterias = {'ebics':[], 'mbics':[]}
+	criterias = {'ebics':[], 'mbics':[], 'bonf':[], 'mbonf':[]}
 	(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
 	criterias['ebics'].append(extended_bic)
 	criterias['mbics'].append(modified_bic)
+	criterias['mbonf'].append(0)
+	criterias['bonf'].append(0)
 	action = 'None'
 	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 		 bic, extended_bic, modified_bic)
 	print 'Cofactors:', _to_string_(cofactors)
-
+	if with_qq_plots:
+		log_quantiles_list = []
+		quantiles_labels = []
+		cm = pylab.get_cmap('hsv')
 	for step_i in range(1, num_steps + 1):
 		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
 		if step_i == 1:
@@ -1548,6 +1561,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		mahalnobis_rss = emmax_res['rss'][min_pval_i]
 		min_pval_chr_pos = chr_pos_list[min_pval_i]
 		print 'Min p-value:', min_pval
+		criterias['bonf'].append(min_pval)
 		print 'Min Mahalanobis RSS:', mahalnobis_rss
 		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
@@ -1558,22 +1572,36 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 		#Plot gwas results per step 
 		if file_prefix:
-			pdf_file_name = file_prefix + '_step' + str(step_i - 1) + '.pdf'
-			png_file_name = file_prefix + '_step' + str(step_i - 1) + '.png'
+
+			png_file_name = '%s_step%d.png' % (file_prefix, step_i - 1)
 			res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 			res.neg_log_trans()
 			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#			if local:
-#			else: #Manhattan plot
-#				pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-#					 png_file=png_file_name)
-#			#QQ plot
+
+			#Plot QQ plot
+			if with_qq_plots:
+				#calculate qq-plot line..
+				log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000, max_val=7)
+				log_quantiles_list.append(log_quantiles)
+				quantiles_labels.append('Step %d' % (step_i - 1))
+				#plot all lines
+				png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
+				color_list = [cm(i / float(step_i)) for i in range(step_i)]
+				if step_i > 2:
+					qs = [log_quantiles_list[0], log_quantiles]
+					q_labs = [quantiles_labels[0], quantiles_labels[-1]]
+					lcols = [color_list[0], color_list[-1]]
+					agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
+							num_dots=1000, max_val=7)
+				else:
+					agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
+							line_colors=color_list, num_dots=1000, max_val=7)
+
 
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
 			pass
-
 
 
 
@@ -1594,13 +1622,16 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 
 		#Re-estimate the p-value of the cofactors... with the smallest in the list.
+		cofactor_pvals = []
 		for i, snp in enumerate(cofactor_snps):
 			t_cofactors = cofactor_snps[:]
 			del t_cofactors[i]
 			lmm.set_factors(t_cofactors)
-			cofactors[i][2] = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
+			pval = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
+			cofactor_pvals.append(pval)
+			cofactors[i][2] = pval
 		lmm.set_factors(cofactor_snps)
-
+		criterias['mbonf'].append(max(cofactor_pvals))
 
 		#Remove the found SNP from considered SNPs
 		del snps[min_pval_i]
@@ -1664,19 +1695,17 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	#Now plotting!
 	print "Generating plots"
 	if file_prefix:
-		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
-		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
+		png_file_name = '%s_step%d.png' % (file_prefix, step_i)
 		res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-#				png_file=png_file_name)
+	max_num_cofactors = len(cofactors)
 
 	#Now backward stepwise.
 	if forward_backwards:
 		print 'Starting backwards..'
-		while len(cofactor_snps) > 0:
+		while len(cofactor_snps) > 1:
 			step_i += 1
 			f_stats = sp.zeros(len(cofactor_snps))
 			for i, snp in enumerate(cofactor_snps):
@@ -1703,12 +1732,19 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			action = '-'
 
 			#Update the p-values
+			cofactor_pvals = []
 			for i, snp in enumerate(cofactor_snps):
 				t_cofactors = cofactor_snps[:]
 				del t_cofactors[i]
 				lmm.set_factors(t_cofactors)
 				res = lmm._emmax_f_test_([snp], H_sqrt_inv)
-				cofactors[i][2] = res['ps'][0]
+				pval = res['ps'][0]
+				cofactor_pvals.append(pval)
+				cofactors[i][2] = pval
+			#if len(cofactor_pvals):
+			criterias['mbonf'].append(max(cofactor_pvals))
+			#else:
+			#	criterias['mbonf'].append(1)
 
 			#Calculate the BICs
 			(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n)
@@ -1728,36 +1764,99 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			print cofactors
 
 
+	opt_file_dict = {}
 	for c in criterias:
 		print 'GWAs for optimal %s criteria:' % c
-		i_opt = sp.array(criterias[c]).argmin()
+		if c == 'bonf':
+			opt_list = sp.arange(max_num_cofactors + 1)
+			for i, pval in enumerate(criterias['bonf']):
+				if pval > sign_threshold:
+					opt_list[i] = -1
+			i_opt = opt_list.argmax()
+		elif c == 'mbonf':
+			fw_opt_list = sp.arange(max_num_cofactors + 1)
+			for i in range(max_num_cofactors + 1):
+				pval = criterias['mbonf'][i]
+				if pval > sign_threshold:
+					fw_opt_list[i] = -1
+			fw_i_opt = fw_opt_list.argmax()
+			fw_max = fw_opt_list[fw_i_opt]
+
+			shift = max_num_cofactors + 1
+			bw_opt_list = sp.arange(max_num_cofactors - 1, 0, -1)
+			for i in range(len(bw_opt_list)):
+				pval = criterias['mbonf'][i + shift]
+				if pval > sign_threshold:
+					bw_opt_list[i] = -1
+			bw_i_opt = bw_opt_list.argmax()
+			bw_max = bw_opt_list[bw_i_opt]
+			bw_i_opt = bw_opt_list.argmax() + shift
+			if bw_max == fw_max:
+				i_opt = bw_i_opt if criterias['mbonf'][fw_i_opt] > criterias['mbonf'][bw_i_opt] else fw_i_opt
+			else:
+				i_opt = bw_i_opt if bw_max > fw_max else fw_i_opt
+
+		else:
+			i_opt = sp.array(criterias[c]).argmin()
 		print "    %d'th step was optimal." % i_opt
-		cofactor_snps = step_info_list[i_opt]['cofactor_snps']
-		cofactors = step_info_list[i_opt]['cofactors']
-		print cofactors
-		lmm.set_factors(cofactor_snps)
-		eig_R = lmm._get_eigen_R_(lmm.X)
-		reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
-		H_sqrt_inv = reml_res['H_sqrt_inv']
-		emmax_res = lmm._emmax_f_test_(all_snps, H_sqrt_inv)
-		min_pval_i = emmax_res['ps'].argmin()
-		min_pval = emmax_res['ps'][min_pval_i]
-		mahalnobis_rss = emmax_res['rss'][min_pval_i]
-		min_pval_chr_pos = chr_pos_list[min_pval_i]
-		print 'Min p-value:', min_pval
-		print 'Min Mahalanobis RSS:', mahalnobis_rss
+		if i_opt <= max_num_cofactors:
+			#Copy the pngs...
+			png_file_name = '%s_step%d.png' % (file_prefix, i_opt)
+			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
+			if platform.system() == 'Linux' or platform.system() == 'Darwin':
+				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+				if with_qq_plots:
+					qq_png_file_name = '%s_step%d_qqplot.png' % (file_prefix, i_opt)
+					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
+					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+		elif i_opt in opt_file_dict:
+			png_file_name = opt_file_dict[i_opt]['manhattan']
+			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
+			if platform.system() == 'Linux' or platform.system() == 'Darwin':
+				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+				if with_qq_plots:
+					qq_png_file_name = opt_file_dict[i_opt]['qq']
+					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
+					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+		else:
+			if file_prefix:
+				#Perfom GWAS witht he optimal cofactors
+				cofactor_snps = step_info_list[i_opt]['cofactor_snps']
+				cofactors = step_info_list[i_opt]['cofactors']
+				print cofactors
+				lmm.set_factors(cofactor_snps)
+				eig_R = lmm._get_eigen_R_(lmm.X)
+				reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
+				H_sqrt_inv = reml_res['H_sqrt_inv']
+				emmax_res = lmm._emmax_f_test_(all_snps, H_sqrt_inv)
+				min_pval_i = emmax_res['ps'].argmin()
+				min_pval = emmax_res['ps'][min_pval_i]
+				mahalnobis_rss = emmax_res['rss'][min_pval_i]
+				min_pval_chr_pos = chr_pos_list[min_pval_i]
+				print 'Min p-value:', min_pval
+				print 'Min Mahalanobis RSS:', mahalnobis_rss
+				png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
+				res = gr.Result(scores=emmax_res['ps'], positions=all_positions, chromosomes=all_chromosomes)
+				res.neg_log_trans()
+				res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
+				opt_file_dict[i_opt] = {'manhattan':png_file_name}
 
-		if file_prefix:
-			pdf_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.pdf'
-			png_file_name = file_prefix + '_step' + str(i_opt) + '_opt_' + c + '.png'
-			res = gr.Result(scores=emmax_res['ps'], positions=all_positions, chromosomes=all_chromosomes)
-			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#			pr.plot_raw_result(emmax_res['ps'], all_chromosomes, all_positions, highlight_markers=cofactors,
-#					 png_file=png_file_name)
+				#Plot QQ plot
+				if with_qq_plots:
+					#calculate qq-plot line..
+					log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000, max_val=7)
+					qlab = 'Step %d' % (i_opt)
+					#plot all lines
+					qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
+					if step_i > 2:
+						qs = [log_quantiles_list[0], log_quantiles]
+						q_labs = [quantiles_labels[0], qlab]
+						lcols = [cm(0.1), cm(0.9)]
+						agr.simple_log_qqplot(qs, qq_png_file_name, q_labs, line_colors=lcols,
+								num_dots=1000, max_val=7)
 
-
+					opt_file_dict[i_opt]['qq'] = qq_png_file_name
 
 
 	secs = time.time() - s1
@@ -1803,52 +1902,56 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			if si['min_pval']:
 				min_pval_list.append(float(si['min_pval']))
 		f.close()
-		import pylab
 		pylab.figure(figsize=(6, 4))
 		#pylab.axes([0.05, 0.05, 0.92, 0.95])
+		num_steps = step_i + 1
 		pylab.plot(range(len(p_her_list)), p_her_list, 'o-')
 		pylab.ylabel('Pseudo-heritability')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_p_her.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_p_her.png')
 		pylab.clf()
 		pylab.plot(range(len(rss_list)), rss_list, 'o-')
 		pylab.ylabel('RSS')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_rss.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_rss.png')
 		pylab.clf()
 		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-')
 		pylab.ylabel('REML Mahalanobis RSS')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.png')
 		pylab.clf()
 		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-')
 		pylab.ylabel('Mahalanobis RSS')
-		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.pdf', format='pdf')
+		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.png')
 		pylab.clf()
 		pylab.plot(range(len(ll_list)), ll_list, 'o-')
 		pylab.ylabel('Log likelihood')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ll.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_ll.png')
 		pylab.clf()
 		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-')
 		pylab.ylabel('Min. p-value')
-		pylab.savefig(file_prefix + '_stats_pval.pdf', format='pdf')
+		pylab.savefig(file_prefix + '_stats_pval.png')
 		pylab.clf()
 		pylab.plot(range(len(bic_list)), bic_list, 'o-')
 		pylab.ylabel('BIC')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_bic.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_bic.png')
 		pylab.clf()
 		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-')
 		pylab.ylabel('Extended BIC')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ebic.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_ebic.png')
 		pylab.clf()
 		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-')
 		pylab.ylabel('Modified BIC')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_mbic.pdf', format='pdf')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_mbic.png')
 		pylab.clf()
+
+		#Plotting variance partition plots
+		rss_list.append(rss_list[0])
+		p_her_list.append(p_her_list[0])
 		max_rss = max(rss_list)
 		rss_array = sp.array(rss_list) / max_rss
 		p_her_array = rss_array * sp.array(p_her_list)
@@ -1856,33 +1959,33 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		variance_explained = (1 - rss_array)
 		pylab.figure(figsize=(12, 6))
 		pylab.axes([0.05, 0.08, 0.94, 0.90])
-		pylab.fill_between([0, step_i], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.fill_between([0, num_steps], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
 		pylab.ylabel('Percentage of variance')
 		pylab.xlabel('Step number')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.legend(loc=1, ncol=3, shadow=True)
-		pylab.axis([0, step_i, 0, 1])
+		pylab.axis([0, num_steps, 0, 1])
 		pylab.savefig(file_prefix + '_stats_variances.png', format='png')
-		pylab.savefig(file_prefix + '_stats_variances.pdf', format='pdf')
 
 		pylab.figure(figsize=(10, 6))
 		pylab.axes([0.06, 0.08, 0.92, 0.90])
-		step_i = step_i / 2
-		pylab.fill_between([0, step_i ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance[:step_i + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained[:step_i + 1], color='#2255AA', alpha=0.8, label='Variance explained')
+		num_steps = num_steps / 2
+		pylab.fill_between([0, num_steps ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance[:num_steps + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained[:num_steps + 1], color='#2255AA', alpha=0.8, label='Variance explained')
 		pylab.ylabel('Percentage of variance')
 		pylab.xlabel('Step number')
 		pylab.legend(loc=1, ncol=3, shadow=True)
-		pylab.axis([0, step_i, 0, 1])
+		pylab.axis([0, num_steps, 0, 1])
 		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
-		pylab.savefig(file_prefix + '_stats_variances_forward.pdf', format='pdf')
 
 	res_dict = {'step_info_list':step_info_list, 'first_emmax_res':first_emmax_res}
 
 	return res_dict
+
+
 
 
 
@@ -2516,7 +2619,6 @@ def prepare_k(k, k_accessions, accessions):
 	k = k[indices_to_keep, :][:, indices_to_keep]
 	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
 	k = (len(k) - 1) * k / c
-	print c
 	return sp.mat(k)
 
 def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
@@ -2818,7 +2920,7 @@ def _emmax_test_():
 #	print r['ps']
 
 def perform_human_emmax():
-	pid = 3
+	pid = 7
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env

@@ -2810,9 +2810,10 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=1000, snp_dtype='int8', dtype='single', type='binary'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=1000, snp_dtype='int8', dtype='single', max_val=1):
 		"""
-		
+		Calculate the IBS kinship matrix. 
+		(un-scaled)
 		"""
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
@@ -2830,12 +2831,12 @@ class SNPsDataSet:
 		for i in range(num_lines):
 			for j in range(i):
 				comp_i += 1
-				k_mat[i, j] = sp.sum(sp.absolute(snps_array[i] - snps_array[j])) / num_snps
+				k_mat[i, j] = sp.sum(sp.absolute(snps_array[i] - snps_array[j]))
 				k_mat[j, i] = k_mat[i, j]
 				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
 					sys.stdout.write('.')
 					sys.stdout.flush()
-		return k_mat
+		return sp.absolute(k_mat / (max_val * num_snps) - 1)
 
 
 	def get_snp_cov_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
