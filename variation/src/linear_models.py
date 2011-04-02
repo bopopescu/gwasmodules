@@ -1704,6 +1704,29 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
 				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
+		#Plot QQ plot
+		if with_qq_plots:
+			#calculate qq-plot line..
+			log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
+							max_val=log_qq_max_val)
+			log_quantiles_list.append(log_quantiles)
+			quantiles_labels.append('Step %d' % (step_i - 1))
+			#plot all lines
+			png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
+			if step_i == 1:
+				color_list = [cm(0.0)]
+			else:
+				color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
+			if step_i > 5:
+				qs = log_quantiles_list[0:4] + [log_quantiles]
+				q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
+				lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
+				agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
+						num_dots=1000, max_val=log_qq_max_val)
+			else:
+				agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
+						line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
+
 	max_num_cofactors = len(cofactors)
 
 	#Now backward stepwise.
@@ -1730,6 +1753,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
 			ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
 			ll = ml_res['max_ll']
+			H_sqrt_inv = reml_res['H_sqrt_inv']
 			rss = float(reml_res['rss'])
 			reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
 			num_par -= 1
