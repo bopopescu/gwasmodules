@@ -17,7 +17,7 @@ Option:
 						(otherwise default file is used or it's generated.)
 
 	-a ...					Apply specific methods, otherwise all available are applied:
-						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step etc.
+						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step, lm_step etc.
 	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
 						log, sqrt, exp, sqr, most_normal (picks a most Gaussian looking transformation).
 	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
