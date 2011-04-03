@@ -312,7 +312,7 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 
 
 
-def run_analysis(latent_var, heritability, phen_model, phen_index, phen_d):
+def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -348,83 +348,38 @@ def run_analysis(latent_var, heritability, phen_model, phen_index, phen_d):
 	phen_vals = pd['phenotypes'][phen_index]
 	(c_snp, c_chr, c_pos, c_maf) = phen_d['snp_chr_pos_maf_list'][phen_index] #Causal SNP
 
+	if latent_var == 'random_snp':
+		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list']
+	else:
+		l_chr, l_pos = None, None
+
 	print "Running Analysis"
 	print 'Running KW'
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
 	kw_res = gr.Result(snps_data=sd, scores=p_values)
-	if latent_var == 'random_snp':
-		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list']
-		_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos, l_chr, l_pos,
-				significance_threshold=bonferroni_threshold)
-	else:
-		_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos,
-				significance_threshold=bonferroni_threshold)
+	print 'Updating stats for KW'
+	_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos, l_chr, l_pos,
+			significance_threshold=bonferroni_threshold)
 
 
 	print 'Running SW LM'
-	#The other steps.. 10 steps..
+	lm_step_info, lm_res = lm.lm_step_wise(phen_vals, sd, num_steps=10, file_prefix=file_prefix, with_qq_plots=True)
+	print 'Updating stats for LM'
+	_update_stats_(result_dict['LM'], lm_res, c_chr, c_pos, l_chr, l_pos,
+			significance_threshold=bonferroni_threshold)
+	print 'Updating stats for SW LM'
+	#FINISH THIS!!
+
 
 	kinship_file = snpsdata.get_call_method_kinship_file(72)
 	K = lm.load_kinship_from_file(kinship_file)
 	print 'Running SW EX'
-	step_info, reslm.emmax_step_wise(phen_vals, K)
-	#The other steps.. until pseudo-heritability is 0 or at most 10 steps.. 
-
-
-
-
-
-        print 'Setting up global runs'
-	for i, phenotype in enumerate(phenotypes):
-		highlight_loci = [phen_chr_pos[i]]
-		if latent_loci_snp_chr_pos_mafs:
-			latent_snp = latent_loci_snp_chr_pos_mafs[i][0]
-			latent_chr_pos = (latent_loci_snp_chr_pos_mafs[i][1], latent_loci_snp_chr_pos_mafs[i][2])
-			highlight_loci.append(latent_chr_pos)
-			print highlight_loci
-                print "\nThe %d'th phenotype, variance=%0.3f :" % (i + phen_index, phenotype.var(ddof=1))
-                #print phenotype
-		sys.stdout.flush()
-
-		if mapping_method == 'emmax':
-			print 'Estimated heritability: %0.4f' % h_estimates[i]
- 			file_prefix = '%s_%s_%d' % (outputFile, mapping_method, i + phen_index)
-			results.append(emmax_step_wise(phenotypes, K, snps=snps_list, positions=snps_positions,
-						chromosomes=chromosomes, file_prefix=file_prefix,
-						num_steps=p_dict['num_steps']))
-			print 'Performing the KS test'
-			snps_sample = random.sample(snps_list, len(snps_list) / 5)
-		       	kw_pvals = util.kruskal_wallis(snps_sample, phenotype, verbose=False)["ps"]
-			perm_kw_pvals = gwa.get_perm_pvals(snps_sample, phenotype, snps_filter=0.25)
-			ks_res = gwaResults._calcKS_(kw_pvals, perm_kw_pvals)
-			ks_pval_statistic.append(ks_res['D'])
-			print 'KS test finished, D=%0.4f' % (ks_res['D'])
-			print 'Calculating the k_correlation.'
-			k_corr = util.snp_kinship_correlation([causative_snps[i], latent_snp], k)['corr']
-			k_correlation.append(k_corr)
-			print 'Finished: corr=%0.4f' % k_corr
-		elif mapping_method == 'lm':
-			raise NotImplementedError
-	print "len(results):", len(results)
-
-
-	# ------------------------------------- SUMMARIZING RESULTS!!!!!! -------------------------------------
-#	#Calculating various statistics.
-
-	#Needs to be expanded for 
-	min_dists_to_closest_causative = [[] for i in range(p_dict['num_steps'] + 1)]
-	min_dists_to_second_causative = [[] for i in range(p_dict['num_steps'])]
-	for i, phenotype in enumerate(phenotypes):
-		step_infos = results[i]
-		causatives = [phen_chr_pos[i], (latent_loci_snp_chr_pos_mafs[i][1], latent_loci_snp_chr_pos_mafs[i][2])]
-		for j, si in enumerate(step_infos):
-			distances = map(tuple,
-				list(sp.absolute(sp.array(si['min_pval_chr_pos']) - sp.array(causatives))))
-			min_dist = min(distances)
-			min_dists_to_closest_causative[j].append(min_dist)
-			distances.remove(min_dist)
-			min_dists_to_second_causative[j].append(min(distances))
-
+	emmax_step_info, emmax_res = lm.emmax_step_wise(phen_vals, K, sd, num_steps=10, file_prefix=file_prefix, with_qq_plots=True)
+	print 'Updating stats for SW LM'
+	_update_stats_(result_dict['EX'], emmax_res, c_chr, c_pos, l_chr, l_pos,
+			significance_threshold=bonferroni_threshold)
+	print 'Updating stats for SW EX'
+	#FINISH THIS!!
 
 
 
