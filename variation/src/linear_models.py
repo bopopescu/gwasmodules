@@ -123,8 +123,25 @@ class LinearModel(object):
 
 
 
-	def fast_f_test(self, snps, verbose=True, Z=None,
-			with_betas=False):
+	def get_rss(self, dtype='single'):
+		"""
+		Returns the RSS
+		"""
+		h0_X = sp.mat(self.X, dtype=dtype)
+		(betas, rss, r, s) = linalg.lstsq(h0_X, self.Y)
+		return rss
+
+
+	def get_ll(self, rss=None, dtype='single'):
+		"""
+		Returns the log-likelihood
+		"""
+		if not rss:
+			rss = self.get_rss(dtype)
+		return (-self.n / 2) * (1 + sp.log(2 * sp.pi) + sp.log(rss / self.n))
+
+
+	def fast_f_test(self, snps, verbose=True, Z=None, with_betas=False):
 		"""
 		LM implementation 
 		Single SNPs
@@ -138,9 +155,8 @@ class LinearModel(object):
 		num_snps = len(snps)
 
 		h0_X = sp.mat(self.X, dtype=dtype)
-		Y = self.Y	#The transformed outputs.
-		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
-		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
+		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, self.Y)
+		Y = sp.mat(self.Y - h0_X * h0_betas, dtype=dtype)
 		h0_betas = map(float, list(h0_betas))
 
 		if not with_betas:
@@ -1319,6 +1335,14 @@ class LinearMixedModel(LinearModel):
 
 
 
+class MultipleTraitLMM(LinearMixedModel):
+	"""
+	A class to encompass multiple traits/environments mixed model.
+	"""
+	pass
+
+
+
 def get_emma_reml_estimates(y, K):
 	lmm = LinearMixedModel(y)
 	lmm.add_random_effect(K)
@@ -1448,24 +1472,24 @@ def emmax_anova(snps, phenotypes, K):
 	return res
 
 
-
-def _get_interactions_(isnp, snps, mac_threshold=15):
-	isnps = []
-	cofactor_indices = []
-	anti_isnp = sp.vectorize(lambda x: 1 if x == 0 else 0)(isnp)
-	for i, snp in enumerate(snps):
-		min_count = min(min(sp.bincount(isnp & snp)), min(sp.bincount(isnp | snp)), \
-			min(sp.bincount(snp & anti_isnp)), min(sp.bincount(snp | anti_isnp)))
-		if min_count > mac_threshold and min:
-			isnps.append(isnp & snp)
-			cofactor_indices.append(i)
-	return isnps, cofactor_indices
+#
+#def _get_interactions_(isnp, snps, mac_threshold=15):
+#	isnps = []
+#	cofactor_indices = []
+#	anti_isnp = sp.vectorize(lambda x: 1 if x == 0 else 0)(isnp)
+#	for i, snp in enumerate(snps):
+#		min_count = min(min(sp.bincount(isnp & snp)), min(sp.bincount(isnp | snp)), \
+#			min(sp.bincount(snp & anti_isnp)), min(sp.bincount(snp | anti_isnp)))
+#		if min_count > mac_threshold and min:
+#			isnps.append(isnp & snp)
+#			cofactor_indices.append(i)
+#	return isnps, cofactor_indices
 
 
 
 def _log_choose_(n, k):
- 	#Srinivasa Ramanujan approximation of log(n!)
  	#log_fact = lambda n: n * sp.log(n) - n + (sp.log(n * (1 + 4 * n * (1 + 2 * n))) / 6) + sp.log(sp.pi) / 2
+ 	#Srinivasa Ramanujan approximation of log(n!)
 	if k == 0 or n == k:
 		return 0
 	if n < k:
@@ -1484,12 +1508,131 @@ def _calc_bic_(ll, num_snps, num_par, n):
 
 
 
+def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
+			snps, positions, chromosomes, type='emmax'):
+	"""
+	Copies or plots optimal criterias
+	"""
+	opt_file_dict = {}
+	for c in criterias:
+		print 'GWAs for optimal %s criteria:' % c
+		if c == 'bonf':
+			opt_list = sp.arange(max_num_cofactors + 1)
+			for i, pval in enumerate(criterias['bonf']):
+				if pval > sign_threshold:
+					opt_list[i] = -1
+			i_opt = opt_list.argmax()
+		elif c == 'mbonf':
+			fw_opt_list = sp.arange(max_num_cofactors + 1)
+			for i in range(max_num_cofactors + 1):
+				pval = criterias['mbonf'][i]
+				if pval > sign_threshold:
+					fw_opt_list[i] = -1
+			fw_i_opt = fw_opt_list.argmax()
+			fw_max = fw_opt_list[fw_i_opt]
+
+			if max_num_cofactors > 1:
+				shift = max_num_cofactors + 1
+				bw_opt_list = sp.arange(max_num_cofactors - 1, 0, -1)
+				for i in range(len(bw_opt_list)):
+					pval = criterias['mbonf'][i + shift]
+					if pval > sign_threshold:
+						bw_opt_list[i] = -1
+				bw_i_opt = bw_opt_list.argmax()
+				bw_max = bw_opt_list[bw_i_opt]
+				bw_i_opt = bw_opt_list.argmax() + shift
+				if bw_max == fw_max:
+					i_opt = bw_i_opt if criterias['mbonf'][fw_i_opt] > criterias['mbonf'][bw_i_opt] else fw_i_opt
+				else:
+					i_opt = bw_i_opt if bw_max > fw_max else fw_i_opt
+			else:
+				i_opt = fw_i_opt
+
+		else:
+			cur_min_val = criterias[c][0]
+			min_indices = [0]
+			for i in range(1, len(criterias[c])):
+				v = criterias[c][i]
+				if v < cur_min_val:
+					cur_min_val = v
+					min_indices = [i]
+				if v == cur_min_val:
+					min_indices.append(i)
+			min(min_indices)
+			#i_opt = sp.argmin(criterias[c])
+		print "    %d'th step was optimal." % i_opt
+		if i_opt <= max_num_cofactors:
+			#Copy the pngs...
+			png_file_name = '%s_step%d.png' % (file_prefix, i_opt)
+			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
+			if platform.system() == 'Linux' or platform.system() == 'Darwin':
+				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+				if with_qq_plots:
+					qq_png_file_name = '%s_step%d_qqplot.png' % (file_prefix, i_opt)
+					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
+					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+		elif i_opt in opt_file_dict:
+			png_file_name = opt_file_dict[i_opt]['manhattan']
+			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
+			if platform.system() == 'Linux' or platform.system() == 'Darwin':
+				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+				if with_qq_plots:
+					qq_png_file_name = opt_file_dict[i_opt]['qq']
+					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
+					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+		else:
+			if file_prefix:
+				#Perfom GWAS witht he optimal cofactors
+				cofactor_snps = step_info_list[i_opt]['cofactor_snps']
+				cofactors = step_info_list[i_opt]['cofactors']
+				print cofactors
+				lm.set_factors(cofactor_snps)
+				if type == 'emmax':
+					eig_R = lm._get_eigen_R_(lm.X)
+					reml_res = lm.get_REML(eig_L=eig_L, eig_R=eig_R)
+					H_sqrt_inv = reml_res['H_sqrt_inv']
+					l_res = lm._emmax_f_test_(snps, H_sqrt_inv)
+					mahalnobis_rss = l_res['rss'][min_pval_i]
+					print 'Min Mahalanobis RSS:', mahalnobis_rss
+				elif type == 'lm':
+					l_res = lm.fast_f_test(all_snps)
+				min_pval_i = l_res['ps'].argmin()
+				min_pval = l_res['ps'][min_pval_i]
+				min_pval_chr_pos = chr_pos_list[min_pval_i]
+				print 'Min p-value:', min_pval
+				png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
+				res = gr.Result(scores=l_res['ps'], positions=positions, chromosomes=chromosomes)
+				res.neg_log_trans()
+				res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
+				opt_file_dict[i_opt] = {'manhattan':png_file_name}
+
+				#Plot QQ plot
+				if with_qq_plots:
+					#calculate qq-plot line..
+					log_quantiles = agr.get_log_quantiles(l_res['ps'], num_dots=1000,
+									max_val=log_qq_max_val)
+					qlab = 'Step %d' % (i_opt)
+					#plot all lines
+					qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
+					if step_i > 2:
+						qs = [log_quantiles_list[0], log_quantiles]
+						q_labs = [quantiles_labels[0], qlab]
+						lcols = [cm(0), cm(0.7)]
+						agr.simple_log_qqplot(qs, qq_png_file_name, q_labs, line_colors=lcols,
+								num_dots=1000, max_val=log_qq_max_val)
+
+					opt_file_dict[i_opt]['qq'] = qq_png_file_name
+
+
+
+
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
 		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
 	"""
-	Run EMMAX stepwise forward-backward.
+	Run step-wise EMMAX forward-backward.
 	"""
 	#import plotResults as pr
 	import gwaResults as gr
@@ -1515,9 +1658,10 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	chr_pos_list = zip(chromosomes, positions)
        	lmm = LinearMixedModel(phenotypes)
 	lmm.add_random_effect(K)
+	num_snps = len(snps)
 
 	if not sign_threshold: #Then use Bonferroni threshold
-		sign_threshold = 1.0 / (len(snps) * 20.0)
+		sign_threshold = 1.0 / (num_snps * 20.0)
 
 	print "Running EMMAX stepwise"
 	s1 = time.time()
@@ -1538,15 +1682,16 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	rss = float(reml_res['rss'])
 	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
 	criterias = {'ebics':[], 'mbics':[], 'bonf':[], 'mbonf':[]}
-	(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
+	(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
 	criterias['ebics'].append(extended_bic)
 	criterias['mbics'].append(modified_bic)
-	criterias['mbonf'].append(0)
+	max_cofactor_pval = 0
+	criterias['mbonf'].append(max_cofactor_pval)
 	criterias['bonf'].append(0)
 	action = 'None'
-	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f, num_snps=%d' % \
 		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
-		 bic, extended_bic, modified_bic)
+		 bic, extended_bic, modified_bic, num_snps)
 	print 'Cofactors:', _to_string_(cofactors)
 	if with_qq_plots:
 		log_quantiles_list = []
@@ -1565,9 +1710,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		print 'Min Mahalanobis RSS:', mahalnobis_rss
 		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
-			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-			'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
-			'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
+			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
+			'ps': emmax_res['ps'], 'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
+			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 		step_info_list.append(step_info)
 
 		#Plot gwas results per step 
@@ -1635,13 +1780,15 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			cofactor_pvals.append(pval)
 			cofactors[i][2] = pval
 		lmm.set_factors(cofactor_snps)
-		criterias['mbonf'].append(max(cofactor_pvals))
+		max_cofactor_pval = max(cofactor_pvals)
+		criterias['mbonf'].append(max_cofactor_pval)
 
 		#Remove the found SNP from considered SNPs
 		del snps[min_pval_i]
 		del positions[min_pval_i]
 		del chromosomes[min_pval_i]
 		del chr_pos_list[min_pval_i]
+		num_snps -= 1
 
 		#Try adding an interaction.... 
 #		if allow_interactions and len(cofactor_snps) > 1:
@@ -1670,13 +1817,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 #						print "Just added an interaction:", interactions
 
 
-		(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
+		(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
 		criterias['ebics'].append(extended_bic)
 		criterias['mbics'].append(modified_bic)
 
-		print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+		print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f, num_snps=%d' % \
 			(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
-			bic, extended_bic, modified_bic)
+			 bic, extended_bic, modified_bic, num_snps)
+
 		print 'Cofactors:', _to_string_(cofactors)
 		if reml_res['pseudo_heritability'] < 0.01:
 			print 'Breaking early, since pseudoheritability is close to 0.'
@@ -1691,9 +1839,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	print 'Min Mahalanobis RSS:', mahalnobis_rss
 	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 		'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
-		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-		'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
-		'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
+		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
+		'ps': emmax_res['ps'], 'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
+		'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
 	step_info_list.append(step_info)
 
 	#Now plotting!
@@ -1710,14 +1858,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
 							max_val=log_qq_max_val)
 			log_quantiles_list.append(log_quantiles)
-			quantiles_labels.append('Step %d' % (step_i - 1))
+			quantiles_labels.append('Step %d' % (step_i))
 			#plot all lines
-			png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
-			if step_i == 1:
+			png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i)
+			if step_i == 0:
 				color_list = [cm(0.0)]
-			else:
-				color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
-			if step_i > 5:
+			elif 5 > step_i > 0:
+				color_list = [cm(i / float(step_i) * 0.7) for i in range(step_i + 1)]
+			if step_i > 4:
 				qs = log_quantiles_list[0:4] + [log_quantiles]
 				q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
 				lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
@@ -1746,6 +1894,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			del cofactor_snps[i_to_remove]
 			del cofactors[i_to_remove]
 			lmm.set_factors(cofactor_snps)
+			num_snps += 1
 
 
 			#Re-estimating the REML and ML.
@@ -1769,124 +1918,30 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 				pval = res['ps'][0]
 				cofactor_pvals.append(pval)
 				cofactors[i][2] = pval
-			#if len(cofactor_pvals):
-			criterias['mbonf'].append(max(cofactor_pvals))
-			#else:
-			#	criterias['mbonf'].append(1)
+			max_cofactor_pval = max(cofactor_pvals)
+			criterias['mbonf'].append(max_cofactor_pval)
 
 			#Calculate the BICs
-			(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n)
+			(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n)
 			criterias['ebics'].append(extended_bic)
 			criterias['mbics'].append(modified_bic)
-			print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+			print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f, num_snps=%d' % \
 				(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss,
-				reml_mahalanobis_rss, bic, extended_bic, modified_bic)
+				reml_mahalanobis_rss, bic, extended_bic, modified_bic, num_snps)
+
 			print 'Cofactors:', _to_string_(cofactors)
 
 			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
-				'e_bic':extended_bic, 'm_bic':modified_bic, 'cofactors':map(tuple, cofactors[:]),
-				'cofactor_snps':cofactor_snps[:], 'mahalanobis_rss':None, 'min_pval':None,
-				'min_pval_chr_pos':None}
+				'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
+				'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
+				'mahalanobis_rss':None, 'min_pval':None, 'min_pval_chr_pos':None}
 			step_info_list.append(step_info)
 			print cofactors
 
 
-	opt_file_dict = {}
-	for c in criterias:
-		print 'GWAs for optimal %s criteria:' % c
-		if c == 'bonf':
-			opt_list = sp.arange(max_num_cofactors + 1)
-			for i, pval in enumerate(criterias['bonf']):
-				if pval > sign_threshold:
-					opt_list[i] = -1
-			i_opt = opt_list.argmax()
-		elif c == 'mbonf':
-			fw_opt_list = sp.arange(max_num_cofactors + 1)
-			for i in range(max_num_cofactors + 1):
-				pval = criterias['mbonf'][i]
-				if pval > sign_threshold:
-					fw_opt_list[i] = -1
-			fw_i_opt = fw_opt_list.argmax()
-			fw_max = fw_opt_list[fw_i_opt]
-
-			shift = max_num_cofactors + 1
-			bw_opt_list = sp.arange(max_num_cofactors - 1, 0, -1)
-			for i in range(len(bw_opt_list)):
-				pval = criterias['mbonf'][i + shift]
-				if pval > sign_threshold:
-					bw_opt_list[i] = -1
-			bw_i_opt = bw_opt_list.argmax()
-			bw_max = bw_opt_list[bw_i_opt]
-			bw_i_opt = bw_opt_list.argmax() + shift
-			if bw_max == fw_max:
-				i_opt = bw_i_opt if criterias['mbonf'][fw_i_opt] > criterias['mbonf'][bw_i_opt] else fw_i_opt
-			else:
-				i_opt = bw_i_opt if bw_max > fw_max else fw_i_opt
-
-		else:
-			i_opt = sp.array(criterias[c]).argmin()
-		print "    %d'th step was optimal." % i_opt
-		if i_opt <= max_num_cofactors:
-			#Copy the pngs...
-			png_file_name = '%s_step%d.png' % (file_prefix, i_opt)
-			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
-			if platform.system() == 'Linux' or platform.system() == 'Darwin':
-				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
-				if with_qq_plots:
-					qq_png_file_name = '%s_step%d_qqplot.png' % (file_prefix, i_opt)
-					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
-					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
-		elif i_opt in opt_file_dict:
-			png_file_name = opt_file_dict[i_opt]['manhattan']
-			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
-			if platform.system() == 'Linux' or platform.system() == 'Darwin':
-				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
-				if with_qq_plots:
-					qq_png_file_name = opt_file_dict[i_opt]['qq']
-					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
-					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
-		else:
-			if file_prefix:
-				#Perfom GWAS witht he optimal cofactors
-				cofactor_snps = step_info_list[i_opt]['cofactor_snps']
-				cofactors = step_info_list[i_opt]['cofactors']
-				print cofactors
-				lmm.set_factors(cofactor_snps)
-				eig_R = lmm._get_eigen_R_(lmm.X)
-				reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
-				H_sqrt_inv = reml_res['H_sqrt_inv']
-				emmax_res = lmm._emmax_f_test_(all_snps, H_sqrt_inv)
-				min_pval_i = emmax_res['ps'].argmin()
-				min_pval = emmax_res['ps'][min_pval_i]
-				mahalnobis_rss = emmax_res['rss'][min_pval_i]
-				min_pval_chr_pos = chr_pos_list[min_pval_i]
-				print 'Min p-value:', min_pval
-				print 'Min Mahalanobis RSS:', mahalnobis_rss
-				png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
-				res = gr.Result(scores=emmax_res['ps'], positions=all_positions, chromosomes=all_chromosomes)
-				res.neg_log_trans()
-				res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-				opt_file_dict[i_opt] = {'manhattan':png_file_name}
-
-				#Plot QQ plot
-				if with_qq_plots:
-					#calculate qq-plot line..
-					log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
-									max_val=log_qq_max_val)
-					qlab = 'Step %d' % (i_opt)
-					#plot all lines
-					qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
-					if step_i > 2:
-						qs = [log_quantiles_list[0], log_quantiles]
-						q_labs = [quantiles_labels[0], qlab]
-						lcols = [cm(0), cm(0.7)]
-						agr.simple_log_qqplot(qs, qq_png_file_name, q_labs, line_colors=lcols,
-								num_dots=1000, max_val=log_qq_max_val)
-
-					opt_file_dict[i_opt]['qq'] = qq_png_file_name
-
+	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
+				step_info_list, all_snps, all_positions, all_chromosomes, type='emmax')
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -1906,6 +1961,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		bic_list = []
 		e_bic_list = []
 		m_bic_list = []
+		mbonf_list = []
 		min_pval_list = []
 		f = open(file_prefix + "_stats.csv", 'w')
 		d_keys = ['pseudo_heritability', 'rss', 'reml_mahalanobis_rss', 'mahalanobis_rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval']
@@ -1928,54 +1984,61 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			bic_list.append(si['bic'])
 			e_bic_list.append(si['e_bic'])
 			m_bic_list.append(si['m_bic'])
+			mbonf_list.append(si['mbonf'])
 			if si['min_pval']:
 				min_pval_list.append(float(si['min_pval']))
 		f.close()
 		pylab.figure(figsize=(6, 4))
 		#pylab.axes([0.05, 0.05, 0.92, 0.95])
 		num_steps = step_i + 1
-		pylab.plot(range(len(p_her_list)), p_her_list, 'o-')
+		pylab.plot(range(len(p_her_list)), p_her_list, 'o-', alpha=0.7)
 		pylab.ylabel('Pseudo-heritability')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_p_her.png')
 		pylab.clf()
-		pylab.plot(range(len(rss_list)), rss_list, 'o-')
+		pylab.plot(range(len(rss_list)), rss_list, 'o-', alpha=0.7)
 		pylab.ylabel('RSS')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_rss.png')
 		pylab.clf()
-		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-')
+		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-', alpha=0.7)
 		pylab.ylabel('REML Mahalanobis RSS')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.png')
 		pylab.clf()
-		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-')
+		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-', alpha=0.7)
 		pylab.ylabel('Mahalanobis RSS')
 		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.png')
 		pylab.clf()
-		pylab.plot(range(len(ll_list)), ll_list, 'o-')
+		pylab.plot(range(len(ll_list)), ll_list, 'o-', alpha=0.7)
 		pylab.ylabel('Log likelihood')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_ll.png')
 		pylab.clf()
-		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-')
+		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-', alpha=0.7)
 		pylab.ylabel('Min. p-value')
 		pylab.savefig(file_prefix + '_stats_pval.png')
 		pylab.clf()
-		pylab.plot(range(len(bic_list)), bic_list, 'o-')
+		pylab.plot(range(len(bic_list)), bic_list, 'o-', alpha=0.7)
 		pylab.ylabel('BIC')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_bic.png')
 		pylab.clf()
-		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-')
+		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-', alpha=0.7)
 		pylab.ylabel('Extended BIC')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_ebic.png')
 		pylab.clf()
-		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-')
+		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-', alpha=0.7)
 		pylab.ylabel('Modified BIC')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_mbic.png')
+		pylab.clf()
+		mbonf_list = -sp.log10(mbonf_list[1:])
+		pylab.plot(range(1, len(mbonf_list) + 1), mbonf_list, 'o-', alpha=0.7)
+		pylab.ylabel('Max cofactor pvalue (-log10[pval])')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_mbonf.png')
 		pylab.clf()
 
 		#Plotting variance partition plots
@@ -2012,6 +2075,346 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 	res_dict = {'step_info_list':step_info_list, 'first_emmax_res':first_emmax_res}
 
+	return res_dict
+
+
+
+
+
+def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
+		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
+		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
+	"""
+	Run simple step-wise linear model forward-backward.
+	"""
+	#import plotResults as pr
+	import gwaResults as gr
+	import analyze_gwas_results as agr
+	import pylab
+
+	def _to_string_(cofactors):
+		st = ''
+		if len(cofactors) > 0:
+			for tup in cofactors[:-1]:
+				st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
+			st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
+		return st
+
+	if sd:
+	 	all_snps = sd.getSnps()
+	 	all_positions = sd.getPositions()
+	 	all_chromosomes = sd.get_chr_list()
+
+	snps = all_snps[:]
+	positions = all_positions[:]
+	chromosomes = all_chromosomes[:]
+	chr_pos_list = zip(chromosomes, positions)
+       	lm = LinearModel(phenotypes)
+       	num_snps = len(snps)
+
+	if not sign_threshold: #Then use Bonferroni threshold
+		sign_threshold = 1.0 / (num_snps * 20.0)
+
+	print "Running step-wise LM"
+	s1 = time.time()
+ 	step_info_list = []
+	cofactors = []  #A list of the loci found, together with their statistics.
+	cofactor_snps = []
+	interactions = []
+ 	step_i = 0
+ 	num_par = 2 #mean and variance scalar
+
+	rss = lm.get_rss()
+	ll = lm.get_ll(rss)
+	criterias = {'ebics':[], 'mbics':[], 'bonf':[], 'mbonf':[]}
+	(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lm.n) #Calculate the BICs
+	criterias['ebics'].append(extended_bic)
+	criterias['mbics'].append(modified_bic)
+	max_cofactor_pval = 0
+	criterias['mbonf'].append(max_cofactor_pval)
+	criterias['bonf'].append(0)
+	action = 'None'
+	print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+		(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
+	print 'Cofactors:', _to_string_(cofactors)
+	if with_qq_plots:
+		log_quantiles_list = []
+		quantiles_labels = []
+		cm = pylab.get_cmap('hsv')
+	for step_i in range(1, num_steps + 1):
+		lm_res = lm.fast_f_test(snps)
+		if step_i == 1:
+			first_lm_res = lm_res
+		min_pval_i = sp.argmin(lm_res['ps'])
+		min_pval = lm_res['ps'][min_pval_i]
+		min_pval_chr_pos = chr_pos_list[min_pval_i]
+		print 'Min p-value:', min_pval
+		criterias['bonf'].append(min_pval)
+		step_info = {'rss':rss, 'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic,
+				'mbonf':max_cofactor_pval, 'ps': lm_res['ps'], 'cofactors':map(tuple, cofactors[:]),
+				'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
+		step_info_list.append(step_info)
+
+		#Plot gwas results per step 
+		if file_prefix:
+
+			png_file_name = '%s_step%d.png' % (file_prefix, step_i - 1)
+			res = gr.Result(scores=lm_res['ps'], positions=positions, chromosomes=chromosomes)
+			res.neg_log_trans()
+			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
+
+			#Plot QQ plot
+			if with_qq_plots:
+				#calculate qq-plot line..
+				log_quantiles = agr.get_log_quantiles(lm_res['ps'], num_dots=1000,
+								max_val=log_qq_max_val)
+				log_quantiles_list.append(log_quantiles)
+				quantiles_labels.append('Step %d' % (step_i - 1))
+				#plot all lines
+				png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
+				if step_i == 1:
+					color_list = [cm(0.0)]
+				else:
+					color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
+				if step_i > 5:
+					qs = log_quantiles_list[0:4] + [log_quantiles]
+					q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
+					lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
+					agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
+							num_dots=1000, max_val=log_qq_max_val)
+				else:
+					agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
+							line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
+
+
+		if cand_gene_list:
+			#Calculate candidate gene enrichments.
+			pass
+
+
+
+		#Adding the new SNP as a cofactor
+		lm.add_factor(snps[min_pval_i])
+		cofactor_snps.append(snps[min_pval_i])
+		rss = lm.get_rss()
+		ll = lm.get_ll(rss)
+		num_par += 1
+		action = '+'
+
+		cofactors.append([min_pval_chr_pos[0], min_pval_chr_pos[1], min_pval])
+
+
+		#Re-estimate the p-value of the cofactors... with the smallest in the list.
+		cofactor_pvals = []
+		for i, snp in enumerate(cofactor_snps):
+			t_cofactors = cofactor_snps[:]
+			del t_cofactors[i]
+			lm.set_factors(t_cofactors)
+			pval = lm.fast_f_test([snp])['ps'][0]
+			cofactor_pvals.append(pval)
+			cofactors[i][2] = pval
+		lm.set_factors(cofactor_snps)
+		max_cofactor_pval = max(cofactor_pvals)
+		criterias['mbonf'].append(max_cofactor_pval)
+
+		#Remove the found SNP from considered SNPs
+		del snps[min_pval_i]
+		del positions[min_pval_i]
+		del chromosomes[min_pval_i]
+		del chr_pos_list[min_pval_i]
+		num_snps -= 1
+
+
+		(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lm.n) #Calculate the BICs
+		criterias['ebics'].append(extended_bic)
+		criterias['mbics'].append(modified_bic)
+
+		print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+			(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
+		print 'Cofactors:', _to_string_(cofactors)
+
+	lm_res = lm.fast_f_test(snps)
+	min_pval_i = sp.argmin(lm_res['ps'])
+	min_pval = lm_res['ps'][min_pval_i]
+	min_pval_chr_pos = chr_pos_list[min_pval_i]
+	print 'Min p-value:', min_pval
+	step_info = {'rss':rss, 'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic,
+		'mbonf':max_cofactor_pval, 'ps': lm_res['ps'], 'cofactors':map(tuple, cofactors[:]),
+		'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos,
+		'interactions':interactions}
+	step_info_list.append(step_info)
+
+	#Now plotting!
+	print "Generating plots"
+	if file_prefix:
+		png_file_name = '%s_step%d.png' % (file_prefix, step_i)
+		res = gr.Result(scores=lm_res['ps'], positions=positions, chromosomes=chromosomes)
+		res.neg_log_trans()
+		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
+				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
+		#Plot QQ plot
+		if with_qq_plots:
+			#calculate qq-plot line..
+			log_quantiles = agr.get_log_quantiles(lm_res['ps'], num_dots=1000,
+							max_val=log_qq_max_val)
+			log_quantiles_list.append(log_quantiles)
+			quantiles_labels.append('Step %d' % (step_i))
+			#plot all lines
+			png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i)
+			if step_i == 0:
+				color_list = [cm(0.0)]
+			else:
+				color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
+			if step_i > 4:
+				qs = log_quantiles_list[0:4] + [log_quantiles]
+				q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
+				lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
+				agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
+						num_dots=1000, max_val=log_qq_max_val)
+			else:
+				agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
+						line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
+
+	max_num_cofactors = len(cofactors)
+
+	#Now backward stepwise.
+	if forward_backwards:
+		print 'Starting backwards..'
+		while len(cofactor_snps) > 1:
+			step_i += 1
+			f_stats = sp.zeros(len(cofactor_snps))
+			for i, snp in enumerate(cofactor_snps):
+				t_cofactors = cofactor_snps[:]
+				del t_cofactors[i]
+				lm.set_factors(t_cofactors)
+				res = lm.fast_f_test([snp])
+				cofactors[i][2] = res['ps'][0]
+				f_stats[i] = res['f_stats'][0]
+			i_to_remove = f_stats.argmin()
+			del cofactor_snps[i_to_remove]
+			del cofactors[i_to_remove]
+			lm.set_factors(cofactor_snps)
+			num_snps += 1
+
+
+			#Re-estimating the REML and ML.
+			rss = lm.get_rss()
+			ll = lm.get_ll(rss)
+			num_par -= 1
+			action = '-'
+
+			#Update the p-values
+			cofactor_pvals = []
+			for i, snp in enumerate(cofactor_snps):
+				t_cofactors = cofactor_snps[:]
+				del t_cofactors[i]
+				lm.set_factors(t_cofactors)
+				res = lm.fast_f_test([snp])
+				pval = res['ps'][0]
+				cofactor_pvals.append(pval)
+				cofactors[i][2] = pval
+			max_cofactor_pval = max(cofactor_pvals)
+			criterias['mbonf'].append(max_cofactor_pval)
+
+			#Calculate the BICs
+			(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lm.n)
+			criterias['ebics'].append(extended_bic)
+			criterias['mbics'].append(modified_bic)
+			print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
+				(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
+			print 'Cofactors:', _to_string_(cofactors)
+
+			step_info = {'rss':rss, 'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic,
+				'mbonf':max_cofactor_pval, 'cofactors':map(tuple, cofactors[:]),
+				'cofactor_snps':cofactor_snps[:], 'min_pval':None, 'min_pval_chr_pos':None}
+			step_info_list.append(step_info)
+			print cofactors
+
+
+	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
+				step_info_list, all_snps, all_positions, all_chromosomes, type='lm')
+
+	secs = time.time() - s1
+	if secs > 60:
+		mins = int(secs) / 60
+		secs = secs - mins * 60
+		print 'Took %d mins and %f seconds.' % (mins, secs)
+	else:
+		print 'Took %f seconds.' % (secs)
+
+
+	if file_prefix:
+		rss_list = []
+		ll_list = []
+		bic_list = []
+		e_bic_list = []
+		m_bic_list = []
+		min_pval_list = []
+		mbonf_list = []
+		f = open(file_prefix + "_stats.csv", 'w')
+		d_keys = ['rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf']
+		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
+		for i, si in enumerate(step_info_list):
+			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
+			if si['min_pval_chr_pos']:
+				st += ',%d_%d,' % si['min_pval_chr_pos']
+			else:
+				st += ',,'
+			st += _to_string_(si['cofactors'])
+			st += '\n'
+			f.write(st)
+			rss_list.append(float(si['rss']))
+			ll_list.append(si['ll'])
+			bic_list.append(si['bic'])
+			e_bic_list.append(si['e_bic'])
+			m_bic_list.append(si['m_bic'])
+			mbonf_list.append(si['mbonf'])
+
+			if si['min_pval']:
+				min_pval_list.append(float(si['min_pval']))
+		f.close()
+		pylab.figure(figsize=(6, 4))
+		#pylab.axes([0.05, 0.05, 0.92, 0.95])
+		num_steps = step_i + 1
+		pylab.plot(range(len(rss_list)), rss_list, 'o-', alpha=0.7)
+		pylab.ylabel('RSS')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_rss.png')
+		pylab.clf()
+		pylab.plot(range(len(ll_list)), ll_list, 'o-', alpha=0.7)
+		pylab.ylabel('Log likelihood')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_ll.png')
+		pylab.clf()
+		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-', alpha=0.7)
+		pylab.ylabel('Min. p-value')
+		pylab.savefig(file_prefix + '_stats_pval.png')
+		pylab.clf()
+		pylab.plot(range(len(bic_list)), bic_list, 'o-', alpha=0.7)
+		pylab.ylabel('BIC')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_bic.png')
+		pylab.clf()
+		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-', alpha=0.7)
+		pylab.ylabel('Extended BIC')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_ebic.png')
+		pylab.clf()
+		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-', alpha=0.7)
+		pylab.ylabel('Modified BIC')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_mbic.png')
+		pylab.clf()
+		mbonf_list = -sp.log10(mbonf_list[1:])
+		pylab.plot(range(1, len(mbonf_list) + 1), mbonf_list, 'o-', alpha=0.7)
+		pylab.ylabel('Max cofactor pvalue (-log10[pval])')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_mbonf.png')
+		pylab.clf()
+
+	res_dict = {'step_info_list':step_info_list, 'first_lm_res':first_lm_res}
 	return res_dict
 
 
@@ -2061,410 +2464,6 @@ def _get_joint_var_matrix_(trait_corr_mat, joint_ecotypes, ecotype_maps, lmm_lis
 	return H_sqrt_inv
 
 
-def _get_static_mls_(lmm):
-	pass
-
-def emmax_gxe_stepwise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
-		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
-		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None):
-	"""
-	Run EMMAX stepwise.. forward, with one possible backward at each step.
-	"""
-	import dataParsers as dp
-	import phenotypeData as pd
-	import analyze_gwas_results as agr
-	import gwaResults as gr
-	import env
-	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
-	filename = env.env['phen_dir'] + 'phen_raw_112210.csv'
-	phed = pd.parse_phenotype_file(filename)
-	phed.convert_to_averages()
-
-	mac_threshold = 15
-	#pids = [187, 188, 189, 190]
-	pids = [5, 6, 7]
-	#pids = [164, 165, 166]
-	#pids = [1, 2, 3, 4]
-
-	phenotype_list = []
-	ecotype_list = []
-	lmm_list = []
-	joint_phen_vals = []
-	joint_ecotypes = []
-	gen_var_list = []
-	err_var_list = []
-	her_list = []
-	k_list = []
-	for pid in pids:
-		print phed.get_name(pid)
-		sd = dp.load_250K_snps(debug_filter=0.01)
-		sd.coordinate_w_phenotype_data(phed, pid)
-		phed.normalize_values(pid)
-		phenotypes = phed.get_values(pid)
-		phenotype_list.append(phenotypes)
-		phed.log_transform(pid)
-		#Create a new phenotype.
-		joint_phen_vals.extend(phenotypes)
-		ecotypes = phed.get_ecotypes(pid)
-		#Figure out all ecotypes which are in 250K and for which we have phenotypic values.
-		joint_ecotypes.extend(ecotypes)
-		ecotype_list.append(ecotypes)
-		K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', ecotypes)
-		#Get pseudoheritabilities for all phenotypes
-		lmm = LinearMixedModel(phenotypes)
-		lmm.add_random_effect(K)
-		lmm_list.append(lmm)
-
-
-	#E in the model.  #ONLY DONE ONCE
-	num_vals = len(joint_phen_vals)
-	joint_X = [[1] * num_vals]
-	shift = phed.num_vals(pids[0])
-	for pid in pids[1:]:
-		n = phed.num_vals(pid)
-		joint_X.append([0] * shift + [1] * n + [0] * (num_vals - n - shift))
-		shift += n
-
-	#Get correlations between traits..  
-	corr_mat, pids = phed.get_correlations(pids)
-
-	unique_ecotypes = list(set(joint_ecotypes))
-	sd = dp.load_250K_snps()
-	sd.filter_accessions(unique_ecotypes)
-	if mac_threshold:
-		sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
-	K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', unique_ecotypes)
-
-	#Create ecotype maps
-	ecotype_maps = {}
-	for pid in pids:
-		l = []
-		ets = phed.get_ecotypes(pid)
-		for et in ets:
-			l.append(unique_ecotypes.index(et))
-		ecotype_maps[pid] = l
-
-	#Get joint variance matrix
-	H_sqrt_inv = _get_joint_var_matrix_(corr_mat, joint_ecotypes, ecotype_maps, lmm_list, K)
-	#pdb.set_trace()
-
-	lmm = LinearMixedModel(joint_phen_vals)
-	lmm.set_factors(joint_X, False)
-	#Need to fix the SNPs!!!
-	Z = sp.int16(sp.mat(joint_ecotypes).T == sp.mat(unique_ecotypes))
-	snps = sd.getSnps()
- 	positions = sd.getPositions()
- 	chromosomes = sd.get_chr_list()
-	#pdb.set_trace()
-	#res = lmm.emmax_full_model_gxe(snps, joint_X[1:], H_sqrt_inv, Z=Z)
-
-	def _to_string_(cofactors):
-		st = ''
-		if len(cofactors) > 0:
-			for tup in cofactors[:-1]:
-				st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
-			st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
-		return st
-
-	chr_pos_list = zip(chromosomes, positions)
-#       lmm = LinearMixedModel(phenotypes)
-#	lmm.add_random_effect(K)
-
-	print "Running EMMAX stepwise"
-	s1 = time.time()
- 	step_info_list = []
-	cofactors = []  #A list of the loci found, together with their statistics.
-	cofactor_snps = []
-	interactions = []
- 	step_i = 0
- 	num_par = 2 #mean and variance scalar
-
-	reml_res = lmm.get_REML()
-	ml_res = lmm.get_ML()
-	H_sqrt_inv = reml_res['H_sqrt_inv']
-	ll = ml_res['max_ll']
-	rss = float(reml_res['rss'])
-	reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-	criterias = {'ebics':[], 'mbics':[]}
-	(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
-	criterias['ebics'].append(extended_bic)
-	criterias['mbics'].append(modified_bic)
-	action = 'None'
-	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
-		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
-		 bic, extended_bic, modified_bic)
-	print 'Cofactors:', _to_string_(cofactors)
-
-	for step_i in range(1, num_steps + 1):
-		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv, Z=Z)
-		min_pval_i = sp.argmin(emmax_res['ps'])
-		min_pval = emmax_res['ps'][min_pval_i]
-		mahalnobis_rss = emmax_res['rss'][min_pval_i]
-		min_pval_chr_pos = chr_pos_list[min_pval_i]
-		print 'Min p-value:', min_pval
-		print 'Min Mahalanobis RSS:', mahalnobis_rss
-		step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
-			'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
-			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-			'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
-			'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
-		step_info_list.append(step_info)
-
-		#Plot gwas results per step 
-		if file_prefix:
-			pdf_file_name = file_prefix + '_step' + str(step_i - 1) + '.pdf'
-			png_file_name = file_prefix + '_step' + str(step_i - 1) + '.png'
-			res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
-			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-
-
-		#Adding the new SNP as a cofactor
-		lmm.add_factor(snps[min_pval_i])
-		cofactor_snps.append(snps[min_pval_i])
-		reml_res = lmm.get_REML()
-		ml_res = lmm.get_ML()
-		H_sqrt_inv = reml_res['H_sqrt_inv']
-		ll = ml_res['max_ll']
-		rss = float(reml_res['rss'])
-		reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-		num_par += 1
-		action = '+'
-
-		cofactors.append([min_pval_chr_pos[0], min_pval_chr_pos[1], min_pval])
-
-
-		#Re-estimate the p-value of the cofactors... with the smallest in the list.
-		for i, snp in enumerate(cofactor_snps):
-			t_cofactors = cofactor_snps[:]
-			del t_cofactors[i]
-			lmm.set_factors(t_cofactors)
-			cofactors[i][2] = lmm._emmax_f_test_([snp], H_sqrt_inv)['ps'][0]
-		lmm.set_factors(cofactor_snps)
-
-		#Remove the found SNP from considered SNPs
-		del snps[min_pval_i]
-		del positions[min_pval_i]
-		del chromosomes[min_pval_i]
-		del chr_pos_list[min_pval_i]
-
-		(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n) #Calculate the BICs
-		criterias['ebics'].append(extended_bic)
-		criterias['mbics'].append(modified_bic)
-
-		print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
-			(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
-			bic, extended_bic, modified_bic)
-		print 'Cofactors:', _to_string_(cofactors)
-		if reml_res['pseudo_heritability'] < 0.01:
-			print 'Breaking early, since pseudoheritability is close to 0.'
-			break
-
-	emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
-	min_pval_i = sp.argmin(emmax_res['ps'])
-	min_pval = emmax_res['ps'][min_pval_i]
-	mahalnobis_rss = emmax_res['rss'][min_pval_i]
-	min_pval_chr_pos = chr_pos_list[min_pval_i]
-	print 'Min p-value:', min_pval
-	print 'Min Mahalanobis RSS:', mahalnobis_rss
-	step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
-		'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'mahalanobis_rss':mahalnobis_rss,
-		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'ps': emmax_res['ps'],
-		'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval,
-		'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
-	step_info_list.append(step_info)
-
-	#Now plotting!
-	print "Generating plots"
-	if file_prefix:
-		pdf_file_name = file_prefix + '_step' + str(step_i) + '.pdf'
-		png_file_name = file_prefix + '_step' + str(step_i) + '.png'
-		res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
-		res.neg_log_trans()
-		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-#		pr.plot_raw_result(emmax_res['ps'], chromosomes, positions, highlight_markers=cofactors,
-#				png_file=png_file_name)
-
-	#Now backward stepwise.
-	if forward_backwards:
-		print 'Starting backwards..'
-		while len(cofactor_snps) > 0:
-			step_i += 1
-			f_stats = sp.zeros(len(cofactor_snps))
-			for i, snp in enumerate(cofactor_snps):
-				t_cofactors = cofactor_snps[:]
-				del t_cofactors[i]
-				lmm.set_factors(t_cofactors)
-				res = lmm._emmax_f_test_([snp], H_sqrt_inv)
-				cofactors[i][2] = res['ps'][0]
-				f_stats[i] = res['f_stats'][0]
-			i_to_remove = f_stats.argmin()
-			del cofactor_snps[i_to_remove]
-			del cofactors[i_to_remove]
-			lmm.set_factors(cofactor_snps)
-
-
-			#Re-estimating the REML and ML.
-			reml_res = lmm.get_REML()
-			ml_res = lmm.get_ML()
-			ll = ml_res['max_ll']
-			rss = float(reml_res['rss'])
-			reml_mahalanobis_rss = float(reml_res['mahalanobis_rss'])
-			num_par -= 1
-			action = '-'
-
-			#Update the p-values
-			for i, snp in enumerate(cofactor_snps):
-				t_cofactors = cofactor_snps[:]
-				del t_cofactors[i]
-				lmm.set_factors(t_cofactors)
-				res = lmm._emmax_f_test_([snp], H_sqrt_inv)
-				cofactors[i][2] = res['ps'][0]
-
-			#Calculate the BICs
-			(bic, extended_bic, modified_bic) = _calc_bic_(ll, len(snps), num_par, lmm.n)
-			criterias['ebics'].append(extended_bic)
-			criterias['mbics'].append(modified_bic)
-			print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
-				(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss,
-				reml_mahalanobis_rss, bic, extended_bic, modified_bic)
-			print 'Cofactors:', _to_string_(cofactors)
-
-			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
-				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
-				'e_bic':extended_bic, 'm_bic':modified_bic, 'cofactors':map(tuple, cofactors[:]),
-				'cofactor_snps':cofactor_snps[:], 'mahalanobis_rss':None, 'min_pval':None,
-				'min_pval_chr_pos':None}
-			step_info_list.append(step_info)
-			print cofactors
-
-
-
-	secs = time.time() - s1
-	if secs > 60:
-		mins = int(secs) / 60
-		secs = secs - mins * 60
-		print 'Took %d mins and %f seconds.' % (mins, secs)
-	else:
-		print 'Took %f seconds.' % (secs)
-
-
-	if file_prefix:
-		p_her_list = []
-		rss_list = []
-		reml_mahalanobis_rss_list = []
-		mahalanobis_rss_list = []
-		ll_list = []
-		bic_list = []
-		e_bic_list = []
-		m_bic_list = []
-		min_pval_list = []
-		f = open(file_prefix + "_stats.csv", 'w')
-		d_keys = ['pseudo_heritability', 'rss', 'reml_mahalanobis_rss', 'mahalanobis_rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval']
-		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
-		for i, si in enumerate(step_info_list):
-			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-			if si['min_pval_chr_pos']:
-				st += ',%d_%d,' % si['min_pval_chr_pos']
-			else:
-				st += ',,'
-			st += _to_string_(si['cofactors'])
-			st += '\n'
-			f.write(st)
-			p_her_list.append(float(si['pseudo_heritability']))
-			rss_list.append(float(si['rss']))
-			reml_mahalanobis_rss_list.append(float(si['reml_mahalanobis_rss']))
-			if si['mahalanobis_rss']:
-				mahalanobis_rss_list.append(float(si['mahalanobis_rss']))
-			ll_list.append(si['ll'])
-			bic_list.append(si['bic'])
-			e_bic_list.append(si['e_bic'])
-			m_bic_list.append(si['m_bic'])
-			if si['min_pval']:
-				min_pval_list.append(float(si['min_pval']))
-		f.close()
-		import pylab
-		pylab.figure(figsize=(6, 4))
-		#pylab.axes([0.05, 0.05, 0.92, 0.95])
-		pylab.plot(range(len(p_her_list)), p_her_list, 'o-')
-		pylab.ylabel('Pseudo-heritability')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_p_her.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(rss_list)), rss_list, 'o-')
-		pylab.ylabel('RSS')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_rss.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-')
-		pylab.ylabel('REML Mahalanobis RSS')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-')
-		pylab.ylabel('Mahalanobis RSS')
-		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(ll_list)), ll_list, 'o-')
-		pylab.ylabel('Log likelihood')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ll.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-')
-		pylab.ylabel('Min. p-value')
-		pylab.savefig(file_prefix + '_stats_pval.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(bic_list)), bic_list, 'o-')
-		pylab.ylabel('BIC')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_bic.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-')
-		pylab.ylabel('Extended BIC')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ebic.pdf', format='pdf')
-		pylab.clf()
-		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-')
-		pylab.ylabel('Modified BIC')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_mbic.pdf', format='pdf')
-		pylab.clf()
-		max_rss = max(rss_list)
-		rss_array = sp.array(rss_list) / max_rss
-		p_her_array = rss_array * sp.array(p_her_list)
-		genetic_variance = p_her_array + (1 - rss_array)
-		variance_explained = (1 - rss_array)
-		pylab.figure(figsize=(12, 6))
-		pylab.axes([0.05, 0.08, 0.94, 0.90])
-		pylab.fill_between([0, step_i], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
-		pylab.ylabel('Percentage of variance')
-		pylab.xlabel('Step number')
-		pylab.axvline(x=step_i / 2, c='k', linestyle=':')
-		pylab.legend(loc=1, ncol=3, shadow=True)
-		pylab.axis([0, step_i, 0, 1])
-		pylab.savefig(file_prefix + '_stats_variances.png', format='png')
-		pylab.savefig(file_prefix + '_stats_variances.pdf', format='pdf')
-
-		pylab.figure(figsize=(10, 6))
-		pylab.axes([0.06, 0.08, 0.92, 0.90])
-		step_i = step_i / 2
-		pylab.fill_between([0, step_i ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(step_i + 1), 0, genetic_variance[:step_i + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(step_i + 1), 0, variance_explained[:step_i + 1], color='#2255AA', alpha=0.8, label='Variance explained')
-		pylab.ylabel('Percentage of variance')
-		pylab.xlabel('Step number')
-		pylab.legend(loc=1, ncol=3, shadow=True)
-		pylab.axis([0, step_i, 0, 1])
-		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
-		pylab.savefig(file_prefix + '_stats_variances_forward.pdf', format='pdf')
-
-	return step_info_list
-
-
 
 def linear_model(snps, phenotypes, cofactors=None):
 	lm = LinearModel(phenotypes)
@@ -2482,6 +2481,8 @@ def linear_model(snps, phenotypes, cofactors=None):
 	else:
 		print 'Took %f seconds.' % (secs)
 	return res
+
+
 
 def emmax_two_snps(snps, phenotypes, K, cofactors=None):
 	lmm = LinearMixedModel(phenotypes)
@@ -2522,7 +2523,6 @@ def linear_model_two_snps(snps, phenotypes, cofactors=None):
 	else:
 		print 'Took %f seconds.' % (secs)
 	return res
-
 
 
 
@@ -2650,6 +2650,7 @@ def prepare_k(k, k_accessions, accessions):
 	k = (len(k) - 1) * k / c
 	return sp.mat(k)
 
+
 def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	assert os.path.isfile(kinship_file), 'File not found.'
 	#sys.stdout.write("Loading K.\n")
@@ -2675,37 +2676,6 @@ def save_kinship_in_text_format(filename, k, accessions):
 	with open(filename, 'w') as f:
 		for acc, row in it.izip(accessions, k):
 			f.write('%s,%s\n' % (acc, ','.join(map(str, row.tolist()))))
-
-
-
-def _test_stepwise_emmax_():
-	import dataParsers as dp
-	import phenotypeData as pd
-	#filename = "/Users/bjarnivilhjalmsson/Projects/FLC_analysis/FLC_expression_101011.txt"
-	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_raw_112210.csv"
-	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/b_dilkes_metabolites.csv"
-	mac_threshold = 15
-	for pid, trans in [(0, 'log_trans')]:#[ (5, False)]:#, (2, False)]:#(617, False), (619, False), (621, False), (623, False), (625, False), (627, False), (629, False), (631, False), (633, False)]:#, (5, False), (226, True), (264, False), (1025, False)]:#[(264, False), (265, False), (266, False), (267, False)]:
-		phed = pd.parse_phenotype_file(filename)
-		phed.convert_to_averages()
-		if trans == 'sqrt_trans':
-			phed.sqrt_transform(pid)
-		elif trans == 'log_trans':
-			phed.log_transform(pid)
-		phen_name = phed.get_name(pid)
-		sd = dp.parse_numerical_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t72.csv.binary', filter=0.02)
-		sd.coordinate_w_phenotype_data(phed, pid)
-		if mac_threshold:
-			sd.filter_mac_snps(mac_threshold) #Filter MAF SNPs!
-		phenotypes = phed.get_values(pid)
-		K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled',
-					phed.get_ecotypes(pid))
-
-		info_list = emmax_step_wise(phenotypes, K, sd=sd, \
-					file_prefix='/Users/bjarni.vilhjalmsson/tmp/emmax_stepwise_dilkes' \
-					+ str(pid) + '_' + phen_name, num_steps=10, allow_interactions=True,
-					interaction_pval_thres=0.001)
-
 
 
 
@@ -2908,45 +2878,6 @@ def _emmax_test_():
 	pdb.set_trace()
 
 
-#def _test_phyB_snps_():
-#	"""
-#	Data from Amaury de Montaigu
-#	"""
-#	from env import *
-#	file_name = env['home_dir'] + 'Projects/Amaury_de_Montaigu/SNP_data.csv'
-#	ets = []
-#	phen_LD14 = [] #LD 14 h	LD16-LD14	LD14-LD12
-#	phen_LD16_14 = []
-#	phen_LD14_12 = []
-#	site3 = []
-#	site12 = []
-#	with open(file_name) as f:
-#		print f.next()
-#		print f.next()
-#		for line in f:
-#			l = map(str.strip, line.split(','))
-#			ets.append(l[2])
-#			phen_LD14.append(float(l[3]))
-#			phen_LD16_14.append(float(l[4]))
-#			phen_LD14_12.append(float(l[5]))
-#			site3.append(l[6])
-#			site12.append(l[7])
-#
-#	f = lambda x: 0 if x == 'C' else 1
-#	snps = [map(f, site3), map(f, site12)]
-#	K = load_kinship_from_file('/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm72.pickled', ets)
-#	r = emmax(snps, phen_LD14, K)
-#	print r['ps']
-#	r = emma(snps, phen_LD14, K)
-#	print r['ps']
-#	r = emmax(snps, phen_LD16_14, K)
-#	print r['ps']
-#	r = emma(snps, phen_LD16_14, K)
-#	print r['ps']
-#	r = emmax(snps, phen_LD14_12, K)
-#	print r['ps']
-#	r = emma(snps, phen_LD14_12, K)
-#	print r['ps']
 
 def perform_human_emmax():
 	pid = 7

@@ -17,7 +17,7 @@ Option:
 						(otherwise default file is used or it's generated.)
 
 	-a ...					Apply specific methods, otherwise all available are applied:
-						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step etc.
+						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step, lm_step etc.
 	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
 						log, sqrt, exp, sqr, most_normal (picks a most Gaussian looking transformation).
 	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
@@ -625,6 +625,16 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				res = lm.emmax_step_wise(phen_vals, k, sd=sd, num_steps=p_dict['num_steps'],
 							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes)
 				print 'Step-wise EMMAX finished!'
+				return
+			elif mapping_method in ['lm_step']:
+				sd.filter_mac_snps(p_dict['mac_threshold'])
+				local = False
+				if p_dict['local_gwas']:
+					local = True
+					file_prefix += '_' + '_'.join(map(str, p_dict['local_gwas']))
+				res = lm.lm_step_wise(phen_vals, sd=sd, num_steps=p_dict['num_steps'],
+							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes)
+				print 'Step-wise LM finished!'
 				return
 			elif mapping_method in ['lm']:
 				res = lm.linear_model(snps, phen_vals)
