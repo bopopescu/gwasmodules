@@ -273,7 +273,7 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 	"""
 	Update result dictionary.
 	"""
-	cpl = [(c_chr, c_pos)]
+	cpl = [(c_chr, c_pos)]#Causal chr_pos_list
 	if l_chr != None:
 		cpl.append((l_chr, l_pos))
 	caus_indices = gwa_res.get_indices(cpl)
