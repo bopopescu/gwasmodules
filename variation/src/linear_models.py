@@ -1508,8 +1508,57 @@ def _calc_bic_(ll, num_snps, num_par, n):
 
 
 
+def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, quantiles_dict, plot_bonferroni=True,
+			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, with_qq_plots=True,
+			num_dots=1000):
+	import pylab
+	import gwaResults as gr
+	import analyze_gwas_results as agr
+	cm = pylab.get_cmap('hsv')
+
+	png_file_name = '%s_step%d.png' % (file_prefix, step_i)
+	res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
+	res.neg_log_trans()
+	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=highlight_markers,
+				cand_genes=cand_genes, plot_xaxis=plot_xaxis)
+
+	ret_dict = {'manhattan':png_file_name}
+	#Plot QQ plot
+	if with_qq_plots:
+		#calculate qq-plot line..
+		log_quantiles = agr.get_log_quantiles(pvals, num_dots=num_dots, max_val=log_qq_max_val)
+		quantiles = agr.get_quantiles(pvals, num_dots=num_dots)
+		quantiles_dict['log'].append(log_quantiles)
+		quantiles_dict['norm'].append(quantiles)
+		quantiles_dict['labels'].append('Step %d' % (step_i))
+		#plot all lines
+		log_png_file_name = '%s_step%d_log_qqplot.png' % (file_prefix, step_i)
+		png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i)
+		if step_i == 0:
+			color_list = [cm(0.0)]
+		else:
+			color_list = [cm(i / float(step_i) * 0.7) for i in range(step_i + 1)]
+		if step_i > 6:
+			log_qs = quantiles_dict['log'][0:6] + [log_quantiles]
+			qs = quantiles_dict['norm'][0:6] + [quantiles]
+			q_labs = quantiles_dict['labels'][0:6] + [quantiles_dict['labels'][-1]]
+			lcols = [cm(i / 6.0 * 0.7) for i in range(7)]
+			agr.simple_log_qqplot(log_qs, log_png_file_name, q_labs, line_colors=lcols, num_dots=num_dots,
+					max_val=log_qq_max_val)
+			agr.simple_qqplot(qs, png_file_name, q_labs, line_colors=lcols, num_dots=num_dots)
+		else:
+			agr.simple_log_qqplot(quantiles_dict['log'], log_png_file_name, quantiles_dict['labels'],
+					line_colors=color_list, num_dots=num_dots, max_val=log_qq_max_val)
+			agr.simple_qqplot(quantiles_dict['norm'], png_file_name, quantiles_dict['labels'],
+					line_colors=color_list, num_dots=num_dots)
+		ret_dict['log_qq'] = log_png_file_name
+		ret_dict['qq'] = png_file_name
+	return ret_dict
+
+
 def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
-			snps, positions, chromosomes, type='emmax'):
+			snps, positions, chromosomes, chr_pos_list, quantiles_dict, plot_bonferroni=True,
+			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, type='emmax'):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -1577,7 +1626,7 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 			if platform.system() == 'Linux' or platform.system() == 'Darwin':
 				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
 				if with_qq_plots:
-					qq_png_file_name = opt_file_dict[i_opt]['qq']
+					qq_png_file_name = opt_file_dict[i_opt]['log_qq']
 					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
 					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
 		else:
@@ -1595,35 +1644,181 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 					mahalnobis_rss = l_res['rss'][min_pval_i]
 					print 'Min Mahalanobis RSS:', mahalnobis_rss
 				elif type == 'lm':
-					l_res = lm.fast_f_test(all_snps)
+					l_res = lm.fast_f_test(snps)
 				min_pval_i = l_res['ps'].argmin()
 				min_pval = l_res['ps'][min_pval_i]
 				min_pval_chr_pos = chr_pos_list[min_pval_i]
 				print 'Min p-value:', min_pval
 				png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
-				res = gr.Result(scores=l_res['ps'], positions=positions, chromosomes=chromosomes)
-				res.neg_log_trans()
-				res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-				opt_file_dict[i_opt] = {'manhattan':png_file_name}
+				opt_file_prefix = '%s_opt_%s' % (file_prefix, c)
+				opt_file_dict[i_opt] = _plot_manhattan_and_qq_(opt_file_prefix, i_opt, l_res['ps'],
+								positions, chromosomes, quantiles_dict,
+								plot_bonferroni=True, highlight_markers=cofactors,
+								cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+								log_qq_max_val=log_qq_max_val,
+								with_qq_plots=with_qq_plots)
 
-				#Plot QQ plot
-				if with_qq_plots:
-					#calculate qq-plot line..
-					log_quantiles = agr.get_log_quantiles(l_res['ps'], num_dots=1000,
-									max_val=log_qq_max_val)
-					qlab = 'Step %d' % (i_opt)
-					#plot all lines
-					qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
-					if step_i > 2:
-						qs = [log_quantiles_list[0], log_quantiles]
-						q_labs = [quantiles_labels[0], qlab]
-						lcols = [cm(0), cm(0.7)]
-						agr.simple_log_qqplot(qs, qq_png_file_name, q_labs, line_colors=lcols,
-								num_dots=1000, max_val=log_qq_max_val)
 
-					opt_file_dict[i_opt]['qq'] = qq_png_file_name
 
+def _cofactors_to_string_(cofactors):
+	st = ''
+	if len(cofactors) > 0:
+		for tup in cofactors[:-1]:
+			st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
+		st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
+	return st
+
+
+
+def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emmax'):
+	import pylab
+	rss_list = []
+	ll_list = []
+	bic_list = []
+	e_bic_list = []
+	m_bic_list = []
+	mbonf_list = []
+	min_pval_list = []
+	d_keys = [ 'rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf']
+	if type == 'emmax':
+		p_her_list = []
+		reml_mahalanobis_rss_list = []
+		mahalanobis_rss_list = []
+		d_keys += ['pseudo_heritability', 'reml_mahalanobis_rss', 'mahalanobis_rss']
+
+	f = open(file_prefix + "_stats.csv", 'w')
+	f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
+	for i, si in enumerate(step_info_list):
+		st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
+		if si['min_pval_chr_pos']:
+			st += ',%d_%d,' % si['min_pval_chr_pos']
+		else:
+			st += ',,'
+		st += _cofactors_to_string_(si['cofactors'])
+		st += '\n'
+		f.write(st)
+		rss_list.append(float(si['rss']))
+		if type == 'emmax':
+			p_her_list.append(float(si['pseudo_heritability']))
+			reml_mahalanobis_rss_list.append(float(si['reml_mahalanobis_rss']))
+			if si['mahalanobis_rss']:
+				mahalanobis_rss_list.append(float(si['mahalanobis_rss']))
+		ll_list.append(si['ll'])
+		bic_list.append(si['bic'])
+		e_bic_list.append(si['e_bic'])
+		m_bic_list.append(si['m_bic'])
+		mbonf_list.append(si['mbonf'])
+		if si['min_pval']:
+			min_pval_list.append(float(si['min_pval']))
+	f.close()
+	pylab.figure(figsize=(6, 4))
+	pylab.axes([0.15, 0.1, 0.83, 0.85])
+	num_steps = len(step_info_list)
+	rss_list.append(rss_list[0])
+	y_max = max(rss_list)
+	pylab.axis([-0.025 * num_steps, 1.025 * num_steps, 0, 1.025 * y_max])
+	pylab.plot(range(len(rss_list)), rss_list, 'o-', alpha=0.7)
+	pylab.ylabel('RSS')
+	pylab.xlabel('Number of steps')
+	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+	pylab.savefig(file_prefix + '_stats_rss.png')
+	pylab.clf()
+	pylab.axes([0.15, 0.1, 0.83, 0.85])
+	pylab.axis([-0.025 * num_steps / 2, 1.025 * num_steps / 2, 0, 1.025 * y_max])
+	pylab.plot(range((num_steps / 2) + 1), rss_list[:(num_steps / 2) + 1], 'o-', alpha=0.7)
+	pylab.ylabel('RSS')
+	pylab.xlabel('Number of steps')
+	pylab.savefig(file_prefix + '_stats_rss2.png')
+	pylab.clf()
+	ll_list.append(ll_list[0])
+	pylab.plot(range(len(ll_list)), ll_list, 'o-', alpha=0.7)
+	pylab.ylabel('Log likelihood')
+	pylab.xlabel('Number of steps')
+	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+	pylab.savefig(file_prefix + '_stats_ll.png')
+	pylab.clf()
+	bic_list.append(bic_list[0])
+	pylab.plot(range(len(bic_list)), bic_list, 'o-', alpha=0.7)
+	pylab.ylabel('BIC')
+	pylab.xlabel('Number of steps')
+	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+	pylab.savefig(file_prefix + '_stats_bic.png')
+	pylab.clf()
+	e_bic_list.append(e_bic_list[0])
+	pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-', alpha=0.7)
+	pylab.ylabel('Extended BIC')
+	pylab.xlabel('Number of steps')
+	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+	pylab.savefig(file_prefix + '_stats_ebic.png')
+	pylab.clf()
+	m_bic_list.append(m_bic_list[0])
+	pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-', alpha=0.7)
+	pylab.ylabel('Modified BIC')
+	pylab.xlabel('Number of steps')
+	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+	pylab.savefig(file_prefix + '_stats_mbic.png')
+	pylab.clf()
+	pylab.plot(range(len(min_pval_list)), -sp.log10(min_pval_list), 'o-', alpha=0.7)
+	pylab.axhline(y= -sp.log10(sign_threshold), c='k', linestyle='--')
+	pylab.ylabel('Min. p-value')
+	pylab.xlabel('Number of steps')
+	pylab.savefig(file_prefix + '_stats_pval.png')
+	pylab.clf()
+	pylab.plot(range(1, len(mbonf_list)), -sp.log10(mbonf_list[1:]), 'o-', alpha=0.7)
+	pylab.axhline(y= -sp.log10(sign_threshold), c='k', linestyle='--')
+	pylab.ylabel('Max cofactor pvalue (-log10[pval])')
+	pylab.xlabel('Number of steps')
+	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+	pylab.savefig(file_prefix + '_stats_mbonf.png')
+	pylab.clf()
+
+	#Plotting variance partition plots
+	if type == 'emmax':
+		p_her_list.append(p_her_list[0])
+		pylab.plot(range(len(p_her_list)), p_her_list, 'o-', alpha=0.7)
+		pylab.ylabel('Pseudo-heritability')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_p_her.png')
+		pylab.clf()
+		reml_mahalanobis_rss_list.append(reml_mahalanobis_rss_list[0])
+		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-', alpha=0.7)
+		pylab.ylabel('REML Mahalanobis RSS')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.png')
+		pylab.clf()
+		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-', alpha=0.7)
+		pylab.ylabel('Mahalanobis RSS')
+		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.png')
+		pylab.clf()
+
+		max_rss = max(rss_list)
+		rss_array = sp.array(rss_list) / max_rss
+		p_her_array = rss_array * sp.array(p_her_list)
+		genetic_variance = p_her_array + (1 - rss_array)
+		variance_explained = (1 - rss_array)
+		pylab.figure(figsize=(12, 6))
+		pylab.axes([0.05, 0.08, 0.94, 0.90])
+		pylab.fill_between([0, num_steps], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.ylabel('Percentage of variance')
+		pylab.xlabel('Step number')
+		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
+		pylab.legend(loc=1, ncol=3, shadow=True)
+		pylab.axis([0, num_steps, 0, 1])
+		pylab.savefig(file_prefix + '_stats_variances.png', format='png')
+
+		pylab.figure(figsize=(10, 6))
+		pylab.axes([0.06, 0.08, 0.92, 0.90])
+		num_steps = num_steps / 2
+		pylab.fill_between([0, num_steps ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance[:num_steps + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
+		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained[:num_steps + 1], color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.ylabel('Percentage of variance')
+		pylab.xlabel('Step number')
+		pylab.legend(loc=1, ncol=3, shadow=True)
+		pylab.axis([0, num_steps, 0, 1])
+		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
 
 
 
@@ -1635,17 +1830,6 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	Run step-wise EMMAX forward-backward.
 	"""
 	#import plotResults as pr
-	import gwaResults as gr
-	import analyze_gwas_results as agr
-	import pylab
-
-	def _to_string_(cofactors):
-		st = ''
-		if len(cofactors) > 0:
-			for tup in cofactors[:-1]:
-				st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
-			st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
-		return st
 
 	if sd:
 	 	all_snps = sd.getSnps()
@@ -1693,11 +1877,10 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f, num_snps=%d' % \
 		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 		 bic, extended_bic, modified_bic, num_snps)
-	print 'Cofactors:', _to_string_(cofactors)
+	print 'Cofactors:', _cofactors_to_string_(cofactors)
 	if with_qq_plots:
-		log_quantiles_list = []
-		quantiles_labels = []
-		cm = pylab.get_cmap('hsv')
+		quantiles_dict = {'log':[], 'norm':[], 'labels':[]}
+
 	for step_i in range(1, num_steps + 1):
 		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
 		if step_i == 1:
@@ -1718,36 +1901,10 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 		#Plot gwas results per step 
 		if file_prefix:
-
-			png_file_name = '%s_step%d.png' % (file_prefix, step_i - 1)
-			res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
-			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-
-			#Plot QQ plot
-			if with_qq_plots:
-				#calculate qq-plot line..
-				log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
-								max_val=log_qq_max_val)
-				log_quantiles_list.append(log_quantiles)
-				quantiles_labels.append('Step %d' % (step_i - 1))
-				#plot all lines
-				png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
-				if step_i == 1:
-					color_list = [cm(0.0)]
-				else:
-					color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
-				if step_i > 5:
-					qs = log_quantiles_list[0:4] + [log_quantiles]
-					q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
-					lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
-					agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
-							num_dots=1000, max_val=log_qq_max_val)
-				else:
-					agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
-							line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
-
+			_plot_manhattan_and_qq_(file_prefix, step_i - 1, emmax_res['ps'], positions, chromosomes,
+					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
+					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
+					with_qq_plots=with_qq_plots)
 
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
@@ -1826,7 +1983,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 			 bic, extended_bic, modified_bic, num_snps)
 
-		print 'Cofactors:', _to_string_(cofactors)
+		print 'Cofactors:', _cofactors_to_string_(cofactors)
 		if reml_res['pseudo_heritability'] < 0.01 and num_pher_0 < 1:
 			num_pher_0 += 1
 		elif reml_res['pseudo_heritability'] < 0.01:
@@ -1850,33 +2007,10 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	#Now plotting!
 	print "Generating plots"
 	if file_prefix:
-		png_file_name = '%s_step%d.png' % (file_prefix, step_i)
-		res = gr.Result(scores=emmax_res['ps'], positions=positions, chromosomes=chromosomes)
-		res.neg_log_trans()
-		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-		#Plot QQ plot
-		if with_qq_plots:
-			#calculate qq-plot line..
-			log_quantiles = agr.get_log_quantiles(emmax_res['ps'], num_dots=1000,
-							max_val=log_qq_max_val)
-			log_quantiles_list.append(log_quantiles)
-			quantiles_labels.append('Step %d' % (step_i))
-			#plot all lines
-			png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i)
-			if step_i == 0:
-				color_list = [cm(0.0)]
-			elif 5 > step_i > 0:
-				color_list = [cm(i / float(step_i) * 0.7) for i in range(step_i + 1)]
-			if step_i > 4:
-				qs = log_quantiles_list[0:4] + [log_quantiles]
-				q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
-				lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
-				agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
-						num_dots=1000, max_val=log_qq_max_val)
-			else:
-				agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
-						line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
+		_plot_manhattan_and_qq_(file_prefix, step_i, emmax_res['ps'], positions, chromosomes,
+					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
+					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
+					with_qq_plots=with_qq_plots)
 
 	max_num_cofactors = len(cofactors)
 
@@ -1932,7 +2066,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 				(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss,
 				reml_mahalanobis_rss, bic, extended_bic, modified_bic, num_snps)
 
-			print 'Cofactors:', _to_string_(cofactors)
+			print 'Cofactors:', _cofactors_to_string_(cofactors)
 
 			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
@@ -1942,9 +2076,10 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			step_info_list.append(step_info)
 			print cofactors
 
-
 	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
-				step_info_list, all_snps, all_positions, all_chromosomes, type='emmax')
+				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
+				plot_bonferroni=True, highlight_markers=cofactors, cand_genes=cand_gene_list,
+				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='emmax')
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -1954,127 +2089,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	else:
 		print 'Took %f seconds.' % (secs)
 
-
 	if file_prefix:
-		p_her_list = []
-		rss_list = []
-		reml_mahalanobis_rss_list = []
-		mahalanobis_rss_list = []
-		ll_list = []
-		bic_list = []
-		e_bic_list = []
-		m_bic_list = []
-		mbonf_list = []
-		min_pval_list = []
-		f = open(file_prefix + "_stats.csv", 'w')
-		d_keys = ['pseudo_heritability', 'rss', 'reml_mahalanobis_rss', 'mahalanobis_rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval']
-		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
-		for i, si in enumerate(step_info_list):
-			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-			if si['min_pval_chr_pos']:
-				st += ',%d_%d,' % si['min_pval_chr_pos']
-			else:
-				st += ',,'
-			st += _to_string_(si['cofactors'])
-			st += '\n'
-			f.write(st)
-			p_her_list.append(float(si['pseudo_heritability']))
-			rss_list.append(float(si['rss']))
-			reml_mahalanobis_rss_list.append(float(si['reml_mahalanobis_rss']))
-			if si['mahalanobis_rss']:
-				mahalanobis_rss_list.append(float(si['mahalanobis_rss']))
-			ll_list.append(si['ll'])
-			bic_list.append(si['bic'])
-			e_bic_list.append(si['e_bic'])
-			m_bic_list.append(si['m_bic'])
-			mbonf_list.append(si['mbonf'])
-			if si['min_pval']:
-				min_pval_list.append(float(si['min_pval']))
-		f.close()
-		pylab.figure(figsize=(6, 4))
-		#pylab.axes([0.05, 0.05, 0.92, 0.95])
-		num_steps = step_i + 1
-		pylab.plot(range(len(p_her_list)), p_her_list, 'o-', alpha=0.7)
-		pylab.ylabel('Pseudo-heritability')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_p_her.png')
-		pylab.clf()
-		pylab.plot(range(len(rss_list)), rss_list, 'o-', alpha=0.7)
-		pylab.ylabel('RSS')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_rss.png')
-		pylab.clf()
-		pylab.plot(range(len(reml_mahalanobis_rss_list)), reml_mahalanobis_rss_list, 'o-', alpha=0.7)
-		pylab.ylabel('REML Mahalanobis RSS')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.png')
-		pylab.clf()
-		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-', alpha=0.7)
-		pylab.ylabel('Mahalanobis RSS')
-		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.png')
-		pylab.clf()
-		pylab.plot(range(len(ll_list)), ll_list, 'o-', alpha=0.7)
-		pylab.ylabel('Log likelihood')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ll.png')
-		pylab.clf()
-		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-', alpha=0.7)
-		pylab.ylabel('Min. p-value')
-		pylab.savefig(file_prefix + '_stats_pval.png')
-		pylab.clf()
-		pylab.plot(range(len(bic_list)), bic_list, 'o-', alpha=0.7)
-		pylab.ylabel('BIC')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_bic.png')
-		pylab.clf()
-		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-', alpha=0.7)
-		pylab.ylabel('Extended BIC')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ebic.png')
-		pylab.clf()
-		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-', alpha=0.7)
-		pylab.ylabel('Modified BIC')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_mbic.png')
-		pylab.clf()
-		mbonf_list = -sp.log10(mbonf_list[1:])
-		pylab.plot(range(1, len(mbonf_list) + 1), mbonf_list, 'o-', alpha=0.7)
-		pylab.ylabel('Max cofactor pvalue (-log10[pval])')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_mbonf.png')
-		pylab.clf()
-
-		#Plotting variance partition plots
-		rss_list.append(rss_list[0])
-		p_her_list.append(p_her_list[0])
-		max_rss = max(rss_list)
-		rss_array = sp.array(rss_list) / max_rss
-		p_her_array = rss_array * sp.array(p_her_list)
-		genetic_variance = p_her_array + (1 - rss_array)
-		variance_explained = (1 - rss_array)
-		pylab.figure(figsize=(12, 6))
-		pylab.axes([0.05, 0.08, 0.94, 0.90])
-		pylab.fill_between([0, num_steps], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
-		pylab.ylabel('Percentage of variance')
-		pylab.xlabel('Step number')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.legend(loc=1, ncol=3, shadow=True)
-		pylab.axis([0, num_steps, 0, 1])
-		pylab.savefig(file_prefix + '_stats_variances.png', format='png')
-
-		pylab.figure(figsize=(10, 6))
-		pylab.axes([0.06, 0.08, 0.92, 0.90])
-		num_steps = num_steps / 2
-		pylab.fill_between([0, num_steps ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
-		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance[:num_steps + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained[:num_steps + 1], color='#2255AA', alpha=0.8, label='Variance explained')
-		pylab.ylabel('Percentage of variance')
-		pylab.xlabel('Step number')
-		pylab.legend(loc=1, ncol=3, shadow=True)
-		pylab.axis([0, num_steps, 0, 1])
-		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
+		_plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emmax')
 
 	res_dict = {'step_info_list':step_info_list, 'first_emmax_res':first_emmax_res}
 
@@ -2092,17 +2108,6 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	Run simple step-wise linear model forward-backward.
 	"""
 	#import plotResults as pr
-	import gwaResults as gr
-	import analyze_gwas_results as agr
-	import pylab
-
-	def _to_string_(cofactors):
-		st = ''
-		if len(cofactors) > 0:
-			for tup in cofactors[:-1]:
-				st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
-			st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
-		return st
 
 	if sd:
 	 	all_snps = sd.getSnps()
@@ -2140,11 +2145,10 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	action = 'None'
 	print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 		(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
-	print 'Cofactors:', _to_string_(cofactors)
+	print 'Cofactors:', _cofactors_to_string_(cofactors)
 	if with_qq_plots:
-		log_quantiles_list = []
-		quantiles_labels = []
-		cm = pylab.get_cmap('hsv')
+		quantiles_dict = {'log':[], 'norm':[], 'labels':[]}
+
 	for step_i in range(1, num_steps + 1):
 		lm_res = lm.fast_f_test(snps)
 		if step_i == 1:
@@ -2161,41 +2165,15 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 
 		#Plot gwas results per step 
 		if file_prefix:
-
-			png_file_name = '%s_step%d.png' % (file_prefix, step_i - 1)
-			res = gr.Result(scores=lm_res['ps'], positions=positions, chromosomes=chromosomes)
-			res.neg_log_trans()
-			res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-						cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-
-			#Plot QQ plot
-			if with_qq_plots:
-				#calculate qq-plot line..
-				log_quantiles = agr.get_log_quantiles(lm_res['ps'], num_dots=1000,
-								max_val=log_qq_max_val)
-				log_quantiles_list.append(log_quantiles)
-				quantiles_labels.append('Step %d' % (step_i - 1))
-				#plot all lines
-				png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i - 1)
-				if step_i == 1:
-					color_list = [cm(0.0)]
-				else:
-					color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
-				if step_i > 5:
-					qs = log_quantiles_list[0:4] + [log_quantiles]
-					q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
-					lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
-					agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
-							num_dots=1000, max_val=log_qq_max_val)
-				else:
-					agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
-							line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
+			_plot_manhattan_and_qq_(file_prefix, step_i - 1, lm_res['ps'], positions, chromosomes,
+					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
+					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
+					with_qq_plots=with_qq_plots)
 
 
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
 			pass
-
 
 
 		#Adding the new SNP as a cofactor
@@ -2236,7 +2214,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 
 		print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 			(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
-		print 'Cofactors:', _to_string_(cofactors)
+		print 'Cofactors:', _cofactors_to_string_(cofactors)
 
 	lm_res = lm.fast_f_test(snps)
 	min_pval_i = sp.argmin(lm_res['ps'])
@@ -2252,33 +2230,10 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	#Now plotting!
 	print "Generating plots"
 	if file_prefix:
-		png_file_name = '%s_step%d.png' % (file_prefix, step_i)
-		res = gr.Result(scores=lm_res['ps'], positions=positions, chromosomes=chromosomes)
-		res.neg_log_trans()
-		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cofactors,
-				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis)
-		#Plot QQ plot
-		if with_qq_plots:
-			#calculate qq-plot line..
-			log_quantiles = agr.get_log_quantiles(lm_res['ps'], num_dots=1000,
-							max_val=log_qq_max_val)
-			log_quantiles_list.append(log_quantiles)
-			quantiles_labels.append('Step %d' % (step_i))
-			#plot all lines
-			png_file_name = '%s_step%d_qqplot.png' % (file_prefix, step_i)
-			if step_i == 0:
-				color_list = [cm(0.0)]
-			else:
-				color_list = [cm(i / float(step_i - 1) * 0.7) for i in range(step_i)]
-			if step_i > 4:
-				qs = log_quantiles_list[0:4] + [log_quantiles]
-				q_labs = quantiles_labels[0:4] + [quantiles_labels[-1]]
-				lcols = [cm(i / 4.0 * 0.7) for i in range(5)]
-				agr.simple_log_qqplot(qs, png_file_name, q_labs, line_colors=lcols,
-						num_dots=1000, max_val=log_qq_max_val)
-			else:
-				agr.simple_log_qqplot(log_quantiles_list, png_file_name, quantiles_labels,
-						line_colors=color_list, num_dots=1000, max_val=log_qq_max_val)
+		_plot_manhattan_and_qq_(file_prefix, step_i, lm_res['ps'], positions, chromosomes,
+					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
+					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
+					with_qq_plots=with_qq_plots)
 
 	max_num_cofactors = len(cofactors)
 
@@ -2300,7 +2255,6 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 			del cofactors[i_to_remove]
 			lm.set_factors(cofactor_snps)
 			num_snps += 1
-
 
 			#Re-estimating the REML and ML.
 			rss = lm.get_rss()
@@ -2327,7 +2281,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 			criterias['mbics'].append(modified_bic)
 			print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 				(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
-			print 'Cofactors:', _to_string_(cofactors)
+			print 'Cofactors:', _cofactors_to_string_(cofactors)
 
 			step_info = {'rss':rss, 'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic,
 				'mbonf':max_cofactor_pval, 'cofactors':map(tuple, cofactors[:]),
@@ -2335,9 +2289,15 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 			step_info_list.append(step_info)
 			print cofactors
 
-
 	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
-				step_info_list, all_snps, all_positions, all_chromosomes, type='lm')
+				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
+				plot_bonferroni=True, highlight_markers=cofactors, cand_genes=cand_gene_list,
+				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='lm')
+
+	if file_prefix:
+		_plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type == 'lm')
+
+	res_dict = {'step_info_list':step_info_list, 'first_lm_res':first_lm_res}
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -2346,78 +2306,6 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		print 'Took %d mins and %f seconds.' % (mins, secs)
 	else:
 		print 'Took %f seconds.' % (secs)
-
-
-	if file_prefix:
-		rss_list = []
-		ll_list = []
-		bic_list = []
-		e_bic_list = []
-		m_bic_list = []
-		min_pval_list = []
-		mbonf_list = []
-		f = open(file_prefix + "_stats.csv", 'w')
-		d_keys = ['rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf']
-		f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
-		for i, si in enumerate(step_info_list):
-			st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-			if si['min_pval_chr_pos']:
-				st += ',%d_%d,' % si['min_pval_chr_pos']
-			else:
-				st += ',,'
-			st += _to_string_(si['cofactors'])
-			st += '\n'
-			f.write(st)
-			rss_list.append(float(si['rss']))
-			ll_list.append(si['ll'])
-			bic_list.append(si['bic'])
-			e_bic_list.append(si['e_bic'])
-			m_bic_list.append(si['m_bic'])
-			mbonf_list.append(si['mbonf'])
-
-			if si['min_pval']:
-				min_pval_list.append(float(si['min_pval']))
-		f.close()
-		pylab.figure(figsize=(6, 4))
-		#pylab.axes([0.05, 0.05, 0.92, 0.95])
-		num_steps = step_i + 1
-		pylab.plot(range(len(rss_list)), rss_list, 'o-', alpha=0.7)
-		pylab.ylabel('RSS')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_rss.png')
-		pylab.clf()
-		pylab.plot(range(len(ll_list)), ll_list, 'o-', alpha=0.7)
-		pylab.ylabel('Log likelihood')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ll.png')
-		pylab.clf()
-		pylab.plot(range(len(min_pval_list)), map(lambda x:-sp.log10(x), min_pval_list), 'o-', alpha=0.7)
-		pylab.ylabel('Min. p-value')
-		pylab.savefig(file_prefix + '_stats_pval.png')
-		pylab.clf()
-		pylab.plot(range(len(bic_list)), bic_list, 'o-', alpha=0.7)
-		pylab.ylabel('BIC')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_bic.png')
-		pylab.clf()
-		pylab.plot(range(len(e_bic_list)), e_bic_list, 'o-', alpha=0.7)
-		pylab.ylabel('Extended BIC')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_ebic.png')
-		pylab.clf()
-		pylab.plot(range(len(m_bic_list)), m_bic_list, 'o-', alpha=0.7)
-		pylab.ylabel('Modified BIC')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_mbic.png')
-		pylab.clf()
-		mbonf_list = -sp.log10(mbonf_list[1:])
-		pylab.plot(range(1, len(mbonf_list) + 1), mbonf_list, 'o-', alpha=0.7)
-		pylab.ylabel('Max cofactor pvalue (-log10[pval])')
-		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
-		pylab.savefig(file_prefix + '_stats_mbonf.png')
-		pylab.clf()
-
-	res_dict = {'step_info_list':step_info_list, 'first_lm_res':first_lm_res}
 	return res_dict
 
 

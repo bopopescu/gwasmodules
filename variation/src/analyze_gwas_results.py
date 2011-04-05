@@ -165,9 +165,6 @@ def get_log_quantiles(scores, num_dots, max_val=5):
 	return - sp.log10(scores[indices])
 
 
-def _get_expected_log_quantiles_(num_dots, max_val=5):
-	return sp.arange(1, num_dots + 1, dtype='single') / (num_dots + 1) * max_val
-
 
 def simple_log_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=None, num_dots=1000, max_val=5,
 			title=None):
@@ -195,6 +192,43 @@ def simple_log_qqplot(quantiles_list, png_file, quantile_labels=None, line_color
 		fontProp = matplotlib.font_manager.FontProperties(size=10)
 		plt.legend(loc=2, numpoints=2, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
 	plt.savefig(png_file)
+
+
+
+def get_quantiles(scores, num_dots):
+	"""
+	Uses scipy
+	"""
+	scores.sort()
+	indices = [int(len(scores) * i / (num_dots + 2)) for i in range(1, num_dots + 1)]
+	return scores[indices]
+
+
+
+def simple_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=None, num_dots=1000, title=None):
+	plt.figure(figsize=(8, 7))
+	plt.axes([0.09, 0.08, 0.89, 0.86])
+	plt.plot([0, 1], [0, 1], 'k--', alpha=0.5, linewidth=2.0)
+	exp_quantiles = sp.arange(1, num_dots + 1, dtype='single') / (num_dots + 1)
+	for i, quantiles in enumerate(quantiles_list):
+		if line_colors:
+			c = line_colors[i]
+		else:
+			c = 'b'
+		if quantile_labels:
+			plt.plot(exp_quantiles, quantiles, label=quantile_labels[i], c=c, alpha=0.7, linewidth=2.0)
+		else:
+			plt.plot(exp_quantiles, quantiles, c=c, alpha=0.7, linewidth=2.0)
+	plt.ylabel("Observed $p$-value")
+	plt.xlabel("Expected $p$-value")
+	if title:
+		plt.title(title)
+	plt.axis([-0.025, 1.025, -0.025, 1.025])
+	if quantile_labels:
+		fontProp = matplotlib.font_manager.FontProperties(size=10)
+		plt.legend(loc=2, numpoints=2, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
+	plt.savefig(png_file)
+
 
 
 def _estLogSlope_(ys, xs=None):
