@@ -1,0 +1,75 @@
+
+R version 2.5.1 (2007-06-27)
+Copyright (C) 2007 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> command_args = commandArgs()
+> print(command_args)
+[1] "/usr/lib/R/bin/exec/R"             "-f"                               
+[3] "./plot-mean-intensity-348arrays.R" "--restore"                        
+[5] "--save"                            "--no-readline"                    
+> program_name = 'plot-mean-intensity-348arrays.R'
+> output_fname = 'dist-raw-intensity-348arrays.pdf'
+> 
+> if (FALSE)
++ {
++ if (length(command_args)!=5)	#2008-05-17 command_args looks like ["/usr/lib/R/bin/exec/R" "--vanilla"] by default
++ {
++ 	cat("\n")
++ 	cat("Usage:", program_name, "OUTPUT_DIR START_ARRAY_ID END_ARRAY_ID\n")
++ 	cat("	Plot histogram of normalized intensity and unnormalized intensity from each array\n")
++ 	cat("	Output goes to", output_fname, "\n")
++ 	q('no')	#dont' save this session
++ }
++ 
++ output_dir = command_args[3]
++ start_array_id = command_args[4]
++ end_array_id = command_args[5]
++ }
+> 
+> output_dir = "/tmp/other_output"
+> start_array_id = 164
+> end_array_id = 348
+> 
+> load("m.norm.107arrays.rda")
+> m.norm <- m.norm/107
+> pdf(output_fname)
+> 
+> for (i in seq(start_array_id, end_array_id))
++ {
++ 	probe_mean_fname = cat(output_dir, '/', i , '_mprobe_mean.rda', sep="")
++ 	cat(probe_mean_fname)
++ 	load('/tmp/other_output/164_mprobe_mean.rda')
++ 	plot(density(m.norm), "l", xlim=c(1, 10), ylim=c(0, 1), main=cat("array id = ", i))
++ 	lines(density(mprobe.mean), col="red")
++ 	rm(mprobe.mean)
++ 	cat("\n")
++ }
+/tmp/other_output/164_mprobe_mean.rdaarray id =  164
+/tmp/other_output/165_mprobe_mean.rdaarray id =  165
+/tmp/other_output/166_mprobe_mean.rdaarray id =  166
+/tmp/other_output/167_mprobe_mean.rdaarray id =  167
+/tmp/other_output/168_mprobe_mean.rdaarray id =  168
+/tmp/other_output/169_mprobe_mean.rdaarray id =  169
+/tmp/other_output/170_mprobe_mean.rdaarray id =  170
+/tmp/other_output/171_mprobe_mean.rdaarray id =  171
+/tmp/other_output/172_mprobe_mean.rdaarray id =  172
+/tmp/other_output/173_mprobe_mean.rdaarray id =  173
+/tmp/other_output/174_mprobe_mean.rdaarray id =  174
+/tmp/other_output/175_mprobe_mean.rda
+Execution halted
