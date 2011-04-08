@@ -1941,35 +1941,46 @@ class SNPsData(_SnpsData_):
 
 
 
-	def filter_mac(self, min_mac=15, w_missing=False):
+
+
+	def filter_mac(self, min_mac=15, w_missing=False, type='classes'):
        		"""
        		Filter minor allele count SNPs.
        		"""
        		new_snps = []
        		new_positions = []
 		if w_missing and self.missingVal in snp:
-			for snp, pos in izip(self.snps, self.positions):
-				missing_count = list(snp).count(self.missingVal)
-				num_nts = len(snp) - missing_count
-				nts = set(snp)
-				nts.remove(self.missingVal)
-				mac = list(snp).count(nts.pop())
-				if mac > num_nts * 0.5: mac = num_nts - mac
-
-				if mac >= min_mac:
-					new_snps.append(snp)
-					new_positions.append(pos)
+			raise NotImplementedError()
+#			for snp, pos in izip(self.snps, self.positions):
+#				missing_count = list(snp).count(self.missingVal)
+#				num_nts = len(snp) - missing_count
+#				nts = set(snp)
+#				nts.remove(self.missingVal)
+#				mac = list(snp).count(nts.pop())
+#				if mac > num_nts * 0.5: mac = num_nts - mac
+#
+#				if mac >= min_mac:
+#					new_snps.append(snp)
+#					new_positions.append(pos)
 		else:
-			for snp, pos in izip(self.snps, self.positions):
-				if min(sp.bincount(snp)) >= min_mac:
-					new_snps.append(snp)
-					new_positions.append(pos)
+			if type == 'classes':
+				for snp, pos in izip(self.snps, self.positions):
+					if min(sp.bincount(snp)) >= min_mac:
+						new_snps.append(snp)
+						new_positions.append(pos)
+			elif type == 'diploid_ints':
+				for snp, pos in izip(self.snps, self.positions):
+					bin_counts = sp.bincount(snp)
+					l = [bin_counts[0] * 2 + bin_counts[1], bin_counts[2] * 2]
+					if min(l) >= min_mac:
+						new_snps.append(snp)
+						new_positions.append(pos)
+
 
 		print 'Removed %d SNPs out of %d, leaving %d SNPs.' % (len(self.positions) - len(new_positions),
 								len(self.positions), len(new_positions))
 		self.positions = new_positions
 		self.snps = new_snps
-
 
 
 
@@ -2280,7 +2291,7 @@ class SnpsData(_SnpsData_):
 		return snpsDatas
 
 
-	def snpsFilterMAF(self, mafs):
+	def snpsFilterMAF(self, mafs, type='classes'):
 		"""
 		Filters all snps with MAF not in the interval out of dataset.
 		"""
@@ -2810,7 +2821,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=1000, snp_dtype='int8', dtype='single', max_val=1):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
@@ -2831,12 +2842,14 @@ class SNPsDataSet:
 		for i in range(num_lines):
 			for j in range(i):
 				comp_i += 1
-				k_mat[i, j] = sp.sum(sp.absolute(snps_array[i] - snps_array[j]))
+				bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+				k_mat[i, j] = (bin_counts[0] + 0.5 * bin_counts[1]) / num_snps
 				k_mat[j, i] = k_mat[i, j]
 				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
 					sys.stdout.write('.')
 					sys.stdout.flush()
-		return sp.absolute(k_mat / (max_val * num_snps) - 1)
+
+		return k_mat
 
 
 	def get_snp_cov_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
@@ -3190,14 +3203,14 @@ class SNPsDataSet:
 
 
 
-	def filter_maf_snps(self, maf, maf_ub=1):
+	def filter_maf_snps(self, maf, maf_ub=1, type='classes'):
 		for snpsd in self.snpsDataList:
-			snpsd.snpsFilterMAF([maf, maf_ub])
+			snpsd.snpsFilterMAF([maf, maf_ub], type='classes')
 
 
-	def filter_mac_snps(self, mac_threshold=15):
+	def filter_mac_snps(self, mac_threshold=15, type='classes'):
 		for snpsd in self.snpsDataList:
-			snpsd.filter_mac(mac_threshold)
+			snpsd.filter_mac(mac_threshold, type=type)
 
 
 	def filter_monomorphic_snps(self):

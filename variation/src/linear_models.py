@@ -1558,7 +1558,7 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 
 def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
 			snps, positions, chromosomes, chr_pos_list, quantiles_dict, plot_bonferroni=True,
-			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, type='emmax'):
+			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, type='emmax'):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -1654,7 +1654,7 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 				opt_file_dict[i_opt] = _plot_manhattan_and_qq_(opt_file_prefix, i_opt, l_res['ps'],
 								positions, chromosomes, quantiles_dict,
 								plot_bonferroni=True, highlight_markers=cofactors,
-								cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+								cand_genes=cand_genes, plot_xaxis=plot_xaxis,
 								log_qq_max_val=log_qq_max_val,
 								with_qq_plots=with_qq_plots)
 
@@ -2078,8 +2078,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
-				plot_bonferroni=True, highlight_markers=cofactors, cand_genes=cand_gene_list,
-				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='emmax')
+				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='emmax')
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -2291,8 +2290,8 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 
 	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
-				plot_bonferroni=True, highlight_markers=cofactors, cand_genes=cand_gene_list,
-				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='lm')
+				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+				log_qq_max_val=log_qq_max_val, type='lm')
 
 	if file_prefix:
 		_plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type == 'lm')
@@ -2761,13 +2760,14 @@ def _emmax_test_():
 
 
 def perform_human_emmax():
-	pid = 7
+	pid = 1
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
 	import gwaResults as gr
 	import random
 	import sys
+	s1 = time.time()
 	plink_prefix = env.env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
 	sd, K = dp.parse_plink_tped_file(plink_prefix)
 	#sd.sample_snps(0.5)
@@ -2775,18 +2775,34 @@ def perform_human_emmax():
 	phed = pd.parse_phenotype_file(env.env['data_dir'] + 'NFBC_20091001/phenotype.csv')
 	#phed.filter_ecotypes(pid, random_fraction=0.2)
 	sd.coordinate_w_phenotype_data(phed, pid)
+	sd.filter_mac_snps(50, type='diploid_ints')
 	K = prepare_k(K, individs, sd.accessions)
 	phen_vals = phed.get_values(pid)
-	print 'Working on %s' % phed.get_name(pid)
+	phen_name = phed.get_name(pid)
+	print 'Working on %s' % phen_name
 	sys.stdout.flush()
-	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_pid%d' % pid
-	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
-#	snps = sd.getSnps()
-#	emmax_res = emmax(snps, phen_vals, K)
-#	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
-#	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
-#	res.neg_log_trans()
-#	res.plot_manhattan(png_file=env.env['results_dir'] + 'NFBC_emmax_pid%d.png' % pid, plot_xaxis=False, plot_bonferroni=True)
+	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_%s_pid%d' % (phen_name, pid)
+	secs = time.time() - s1
+	if secs > 60:
+		mins = int(secs) / 60
+		secs = secs - mins * 60
+		print 'Took %d mins and %f seconds to load and preprocess the data.' % (mins, secs)
+	else:
+		print 'Took %f seconds to load and preprocess the data..' % (secs)
+#	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
+	snps = sd.getSnps()
+	emmax_res = emmax(snps, phen_vals, K)
+	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
+	res.neg_log_trans()
+	res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
+	secs = time.time() - s1
+	if secs > 60:
+		mins = int(secs) / 60
+		secs = secs - mins * 60
+		print 'Took %d mins and %f seconds in total.' % (mins, secs)
+	else:
+		print 'Took %f seconds in total.' % (secs)
 
 
 
