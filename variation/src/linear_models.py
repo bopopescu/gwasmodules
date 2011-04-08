@@ -1558,7 +1558,7 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 
 def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
 			snps, positions, chromosomes, chr_pos_list, quantiles_dict, plot_bonferroni=True,
-			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, type='emmax'):
+			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax'):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -1641,11 +1641,12 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 					reml_res = lm.get_REML(eig_L=eig_L, eig_R=eig_R)
 					H_sqrt_inv = reml_res['H_sqrt_inv']
 					l_res = lm._emmax_f_test_(snps, H_sqrt_inv)
+					min_pval_i = l_res['ps'].argmin()
 					mahalnobis_rss = l_res['rss'][min_pval_i]
 					print 'Min Mahalanobis RSS:', mahalnobis_rss
 				elif type == 'lm':
 					l_res = lm.fast_f_test(snps)
-				min_pval_i = l_res['ps'].argmin()
+					min_pval_i = l_res['ps'].argmin()
 				min_pval = l_res['ps'][min_pval_i]
 				min_pval_chr_pos = chr_pos_list[min_pval_i]
 				print 'Min p-value:', min_pval
@@ -2078,7 +2079,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 
 	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
-				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='emmax')
+				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax')
 
 	secs = time.time() - s1
 	if secs > 60:
