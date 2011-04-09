@@ -44,6 +44,7 @@ import random
 import dataParsers as dp
 import util
 import gwaResults as gr
+import analyze_gwas_results as agr
 
 
 #Parse Vincent's phenotype file...?  Why?
@@ -312,6 +313,34 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 
 
 
+def _update_sw_stats_(res_dict, step_info_list, c_chr, c_pos, l_chr=None, l_pos=None, significance_threshold=None, sign_res=None):
+	"""
+	Update result dictionary for a stepwise result.
+	"""
+	cpl = [(c_chr, c_pos)]#Causal chr_pos_list
+	if l_chr != None:
+		cpl.append((l_chr, l_pos))
+	caus_indices = gwa_res.get_indices(cpl)
+	gwa_res._rank_scores_()
+	#WHAT STATISTICS TO SAVE!!!
+
+
+	#Perform power (sensitivity, TPR), FDR, FPR calculations..
+	gwa_res.neg_log_trans()
+	tprs_list = []
+	fdrs_list = []
+	for pval_thres in __pval_thresholds:
+		#Filter data
+		gwa_res.filter_attr('scores', pval_thres)
+		tprs, fdrs = gwa_res.get_power_analysis(cpl, __window_sizes)
+		tprs_list.append(tprs)
+		fdrs_list.append(fdrs)
+	res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
+	res_dict['fdrs'] = fdrs_list #[p_valthreshold][window_size]
+
+
+
+
 def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d):
 	"""
 	Perform the GWA mapping..
@@ -368,6 +397,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	_update_stats_(result_dict['LM'], lm_res, c_chr, c_pos, l_chr, l_pos,
 			significance_threshold=bonferroni_threshold)
 	print 'Updating stats for SW LM'
+
 	#FINISH THIS!!
 
 

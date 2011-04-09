@@ -44,7 +44,7 @@ def _getQuantiles_(scores, numQuantiles):
 	return quantiles
 
 
-def _calcMedian_(scores, exp_median=0.5):
+def calc_median(scores, exp_median=0.5):
         scores.sort()
 	median = scores[len(scores) / 2]
 	return (exp_median - median)
@@ -55,7 +55,7 @@ def _estAreaBetweenCurves_(quantiles, expQuantiles):
 		area += (expQuantiles[i + 1] - expQuantiles[i]) * (abs(quantiles[i + 1] - expQuantiles[i + 1] + quantiles[i] - expQuantiles[i])) / 2.0
 	return area
 
-def _calcKS_(scores, exp_scores=None):
+def calc_ks_stats(scores, exp_scores=None):
 	from scipy import stats
 	if exp_scores:
 		(D, p_val) = stats.ks_2samp(scores, exp_scores)
@@ -105,7 +105,7 @@ def qq_plot(results, numQuantiles, method_types=["kw", "emma"], mapping_labels=N
 			exp_median = 0.5
 			expQuantiles = _getExpectedPvalueQuantiles_(numQuantiles)
 		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
-		median = _calcMedian_(newScores, exp_median)
+		median = calc_median(newScores, exp_median)
 		plt.plot(expQuantiles, quantiles, label=label + ", A=" + str(round(area, 3)) + \
 			", M=" + str(round(median, 3)))
 		areas.append(area)
@@ -276,13 +276,13 @@ def log_qq_plot(results, numDots, maxVal, method_types=['kw', 'emma'], mapping_l
 		if perm_pvalues and method_type in ['kw', 'ft']:
 			exp_maxVal = _getLogQuantilesMaxVal_(perm_pvalues[:], maxVal)
 			expQuantiles = _getLogQuantiles_(perm_pvalues[:], numDots, exp_maxVal)
-			ks_res = _calcKS_(result.snp_results['scores'], perm_pvalues)
+			ks_res = calc_ks_stats(result.snp_results['scores'], perm_pvalues)
 			quantiles = _getLogQuantiles_(result.snp_results['scores'][:], numDots, exp_maxVal)
 			slope = _estLogSlope_(result.snp_results['scores'][:], perm_pvalues)
 		else:
 			quantiles = _getLogQuantiles_(result.snp_results['scores'][:], numDots, maxVal)
 			expQuantiles = _getExpectedLogQuantiles_()
-			ks_res = _calcKS_(result.snp_results['scores'])
+			ks_res = calc_ks_stats(result.snp_results['scores'])
 			slope = _estLogSlope_(result.snp_results['scores'][:])
 
 		area = _estAreaBetweenCurves_(quantiles, expQuantiles)
