@@ -30,8 +30,7 @@ Option:
 						transformations, etc.
 	-n					Adds the result(s) to the DB.		
 	--comment=...				Comment for DB. (Only applicable if result is added to DB.)	
-	--no_phenotype_ids			Phenotypes don't have DB id as an prefix in their names.  
-						(The phenotype index should be used instead.)
+	--with_db_ids				The phenotype IDs given are the DB IDs.
 	--suggest_new_genotypes=...		Suggest new genotypes base on the top X snps, where X is the given argument
 
 	--region_plots=...			Include region plots for the top N (given num) peaks.
@@ -139,7 +138,7 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ["comment=", 'no_phenotype_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
+	long_options_list = ["comment=", 'with_db_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
 			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
 			'use_imputed_full_data']
 	try:
@@ -155,7 +154,7 @@ def parse_parameters():
 		'call_method_id':75, 'walltime_req':'12:00:00', 'specific_methods':['kw', 'emmax'],
 		'specific_transformations':['none'], 'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False,
 		'use_existing_results':False, 'region_plots':0, 'cand_genes_file':None, 'debug_filter':1,
-		'phen_file':None, 'no_phenotype_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
+		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
 		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None}
 
@@ -182,7 +181,7 @@ def parse_parameters():
 		elif opt in ('-q'): p_dict['mem_req'] = arg
 		elif opt in ('-l'): p_dict['walltime_req'] = arg
 		elif opt in ("--comment"): p_dict['comment'] = arg
-		elif opt in ("--no_phenotype_ids"): p_dict['no_phenotype_ids'] = True
+		elif opt in ("--with_db_ids"): p_dict['with_db_ids'] = True
 		elif opt in ("--region_plots"): p_dict['region_plots'] = int(arg)
 		elif opt in ("--cand_genes_file"): p_dict['cand_genes_file'] = arg
 		elif opt in ("--only_add_2_db"): p_dict['only_add_2_db'] = True
@@ -311,10 +310,10 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 			result_file = score_file
 		if result_file:
 			sys.stdout.write("..... found!\n")
-			if p_dict['no_phenotype_ids']:
-				db_pid = phed.get_db_pid(p_i)
-			else:
+			if p_dict['with_db_ids']:
 				db_pid = p_i
+			else:
+				db_pid = phed.get_db_pid(p_i)
 
 			import results_2_db as rdb
 			short_name = "cm" + str(p_dict['call_method_id']) + "_pid" + str(db_pid) + "_" + phenotype_name \
@@ -354,7 +353,7 @@ def run_parallel(p_i, phed, p_dict, mapping_method="analysis", trans_method='non
 	if p_dict['phen_file']: shstr += "-r %s " % p_dict['phen_file']
 	if p_dict['kinship_file']: shstr += "-k %s " % p_dict['kinship_file']
 	if p_dict['cand_genes_file']: shstr += "--cand_genes_file=%s " % p_dict['cand_genes_file']
-	if p_dict['no_phenotype_ids']: shstr += "--no_phenotype_ids "
+	if p_dict['with_db_ids']: shstr += "--with_db_ids "
 	if p_dict['add_to_db']: shstr += "-n "
 	if p_dict['comment']: shstr += "--comment=%s " % comment
 
@@ -682,10 +681,10 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 
 	if p_dict['add_to_db']:
 		print 'Adding results to DB.'
-		if p_dict['no_phenotype_ids']:
-			db_pid = phed.get_db_pid(p_i)
-		else:
+		if p_dict['with_db_ids']:
 			db_pid = p_i
+		else:
+			db_pid = phed.get_db_pid(p_i)
 
 		import results_2_db as rdb
 
@@ -774,7 +773,7 @@ def _run_():
 	#Load phenotype file
 	if p_dict['phen_file']:
 		print 'Loading phenotypes from file.'
-		phed = phenotypeData.parse_phenotype_file(p_dict['phen_file'], with_db_ids=(not p_dict['no_phenotype_ids']))  #load phenotype file
+		phed = phenotypeData.parse_phenotype_file(p_dict['phen_file'], with_db_ids=p_dict['with_db_ids'])  #load phenotype file
 	else:
 		print 'Retrieving the phenotypes from the DB.'
 		phed = phenotypeData.get_all_phenotypes_from_db()
