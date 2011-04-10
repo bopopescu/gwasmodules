@@ -24,6 +24,8 @@ import itertools as it
 import math
 import platform
 import os
+import analyze_gwas_results as agr
+
 
 
 
@@ -1510,10 +1512,9 @@ def _calc_bic_(ll, num_snps, num_par, n):
 
 def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, quantiles_dict, plot_bonferroni=True,
 			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, with_qq_plots=True,
-			num_dots=1000):
+			num_dots=1000, simple_qq=False):
 	import pylab
 	import gwaResults as gr
-	import analyze_gwas_results as agr
 	cm = pylab.get_cmap('hsv')
 
 	png_file_name = '%s_step%d.png' % (file_prefix, step_i)
@@ -1538,7 +1539,16 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 			color_list = [cm(0.0)]
 		else:
 			color_list = [cm(i / float(step_i) * 0.7) for i in range(step_i + 1)]
-		if step_i > 6:
+		if simple_qq:
+			log_qs = [quantiles_dict['log'][0], log_quantiles]
+			qs = [quantiles_dict['norm'][0], quantiles]
+			q_labs = [quantiles_dict['labels'][0], quantiles_dict['labels'][-1]]
+			lcols = [cm(0), cm(0.7)]
+			agr.simple_log_qqplot(log_qs, log_png_file_name, q_labs, line_colors=lcols,
+					num_dots=num_dots, max_val=log_qq_max_val)
+			agr.simple_qqplot(qs, png_file_name, q_labs, line_colors=color_list, num_dots=num_dots)
+
+		elif step_i > 6:
 			log_qs = quantiles_dict['log'][0:6] + [log_quantiles]
 			qs = quantiles_dict['norm'][0:6] + [quantiles]
 			q_labs = quantiles_dict['labels'][0:6] + [quantiles_dict['labels'][-1]]
@@ -1562,6 +1572,7 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 	"""
 	Copies or plots optimal criterias
 	"""
+	ret_dict = {}
 	opt_file_dict = {}
 	for c in criterias:
 		print 'GWAs for optimal %s criteria:' % c
@@ -1607,7 +1618,7 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 					min_indices = [i]
 				if v == cur_min_val:
 					min_indices.append(i)
-			min(min_indices)
+			i_opt = min(min_indices)
 			#i_opt = sp.argmin(criterias[c])
 		print "    %d'th step was optimal." % i_opt
 		if i_opt <= max_num_cofactors:
@@ -1620,15 +1631,21 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 					qq_png_file_name = '%s_step%d_qqplot.png' % (file_prefix, i_opt)
 					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
 					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+					log_qq_png_file_name = '%s_step%d_log_qqplot.png' % (file_prefix, i_opt)
+					opt_log_qq_png_file_name = '%s_step%d_opt_%s_log_qqplot.png' % (file_prefix, i_opt, c)
+					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
 		elif i_opt in opt_file_dict:
 			png_file_name = opt_file_dict[i_opt]['manhattan']
 			opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
 			if platform.system() == 'Linux' or platform.system() == 'Darwin':
 				os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
 				if with_qq_plots:
-					qq_png_file_name = opt_file_dict[i_opt]['log_qq']
+					qq_png_file_name = opt_file_dict[i_opt]['qq']
 					opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
 					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+					log_qq_png_file_name = opt_file_dict[i_opt]['log_qq']
+					opt_log_qq_png_file_name = '%s_step%d_opt_%s_log_qqplot.png' % (file_prefix, i_opt, c)
+					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
 		else:
 			if file_prefix:
 				#Perfom GWAS witht he optimal cofactors
@@ -1647,6 +1664,7 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 				elif type == 'lm':
 					l_res = lm.fast_f_test(snps)
 					min_pval_i = l_res['ps'].argmin()
+
 				min_pval = l_res['ps'][min_pval_i]
 				min_pval_chr_pos = chr_pos_list[min_pval_i]
 				print 'Min p-value:', min_pval
@@ -1657,7 +1675,13 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 								plot_bonferroni=True, highlight_markers=cofactors,
 								cand_genes=cand_genes, plot_xaxis=plot_xaxis,
 								log_qq_max_val=log_qq_max_val,
-								with_qq_plots=with_qq_plots)
+								with_qq_plots=with_qq_plots, simple_qq=True)
+				ret_dict[i_opt] = {'min_pval':min_pval, 'min_pval_chr_pos':min_pval_chr_pos,
+							'kolmogorov_smirnov':agr.calc_ks_stats(l_res['ps']),
+							'pval_median':agr.calc_median(l_res['ps'])}
+				if type == 'emmax':
+					ret_dict[i_opt]['mahalanobis_rss'] = mahalnobis_rss
+	return ret_dict
 
 
 
@@ -1680,7 +1704,10 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 	m_bic_list = []
 	mbonf_list = []
 	min_pval_list = []
-	d_keys = [ 'rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf']
+	ks_stat_list = []
+	pval_median_list = []
+	full_steps = []
+	d_keys = [ 'rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf', 'kolmogorov_smirnov', 'pval_median']
 	if type == 'emmax':
 		p_her_list = []
 		reml_mahalanobis_rss_list = []
@@ -1711,6 +1738,9 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		mbonf_list.append(si['mbonf'])
 		if si['min_pval']:
 			min_pval_list.append(float(si['min_pval']))
+			ks_stat_list.append(si['kolmogorov_smirnov']['D'])
+			pval_median_list.append(si['pval_median'])
+			full_steps.append(i)
 	f.close()
 	pylab.figure(figsize=(6, 4))
 	pylab.axes([0.15, 0.1, 0.83, 0.85])
@@ -1759,11 +1789,22 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 	pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 	pylab.savefig(file_prefix + '_stats_mbic.png')
 	pylab.clf()
-	pylab.plot(range(len(min_pval_list)), -sp.log10(min_pval_list), 'o-', alpha=0.7)
+	pylab.plot(full_steps, -sp.log10(min_pval_list), 'o-', alpha=0.7)
 	pylab.axhline(y= -sp.log10(sign_threshold), c='k', linestyle='--')
 	pylab.ylabel('Min. p-value')
 	pylab.xlabel('Number of steps')
 	pylab.savefig(file_prefix + '_stats_pval.png')
+	pylab.clf()
+	pylab.plot(full_steps, ks_stat_list, 'o-', alpha=0.7)
+	pylab.ylabel('Kolmogorov-Smirnov statistic')
+	pylab.xlabel('Number of steps')
+	pylab.savefig(file_prefix + '_stats_ks.png')
+	pylab.clf()
+	pylab.plot(full_steps, pval_median_list, 'o-', alpha=0.7)
+	pylab.axhline(y=0, c='k', linestyle='--')
+	pylab.ylabel('0.5 - median p-value')
+	pylab.xlabel('Number of steps')
+	pylab.savefig(file_prefix + '_stats_mpval.png')
 	pylab.clf()
 	pylab.plot(range(1, len(mbonf_list)), -sp.log10(mbonf_list[1:]), 'o-', alpha=0.7)
 	pylab.axhline(y= -sp.log10(sign_threshold), c='k', linestyle='--')
@@ -1787,7 +1828,7 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
 		pylab.savefig(file_prefix + '_stats_reml_mahalanobis_rss.png')
 		pylab.clf()
-		pylab.plot(range(len(mahalanobis_rss_list)), mahalanobis_rss_list, 'o-', alpha=0.7)
+		pylab.plot(full_steps, mahalanobis_rss_list, 'o-', alpha=0.7)
 		pylab.ylabel('Mahalanobis RSS')
 		pylab.savefig(file_prefix + '_stats_mahalanobis_rss.png')
 		pylab.clf()
@@ -1831,6 +1872,9 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	Run step-wise EMMAX forward-backward.
 	"""
 	#import plotResults as pr
+	if local:
+		with_qq_plots = False
+
 
 	if sd:
 	 	all_snps = sd.getSnps()
@@ -1898,7 +1942,6 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
 			'ps': emmax_res['ps'], 'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
 			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
-		step_info_list.append(step_info)
 
 		#Plot gwas results per step 
 		if file_prefix:
@@ -1911,6 +1954,12 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			#Calculate candidate gene enrichments.
 			pass
 
+
+
+		step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(emmax_res['ps'])
+		step_info['pval_median'] = agr.calc_median(emmax_res['ps'])
+		print step_info['kolmogorov_smirnov'], step_info['pval_median']
+		step_info_list.append(step_info)
 
 
 		#Adding the new SNP as a cofactor
@@ -2003,7 +2052,6 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
 		'ps': emmax_res['ps'], 'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
 		'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
-	step_info_list.append(step_info)
 
 	#Now plotting!
 	print "Generating plots"
@@ -2012,6 +2060,11 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
 					with_qq_plots=with_qq_plots)
+
+	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(emmax_res['ps'])
+	step_info['pval_median'] = agr.calc_median(emmax_res['ps'])
+	print step_info['kolmogorov_smirnov'], step_info['pval_median']
+	step_info_list.append(step_info)
 
 	max_num_cofactors = len(cofactors)
 
@@ -2073,14 +2126,20 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
 				'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
 				'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
-				'mahalanobis_rss':None, 'min_pval':None, 'min_pval_chr_pos':None}
+				'mahalanobis_rss':None, 'min_pval':None, 'min_pval_chr_pos':None,
+				'kolmogorov_smirnov':None, 'pval_median':None}
 			step_info_list.append(step_info)
+			print step_info['kolmogorov_smirnov'], step_info['pval_median']
 			print cofactors
 
-	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
+	ret_dict = _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
 				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax')
+
+	for step_i in ret_dict:
+		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
+			step_info_list[step_i][h] = ret_dict[step_i][h]
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -2109,6 +2168,8 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	Run simple step-wise linear model forward-backward.
 	"""
 	#import plotResults as pr
+	if local:
+		with_qq_plots = False
 
 	if sd:
 	 	all_snps = sd.getSnps()
@@ -2155,14 +2216,15 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		if step_i == 1:
 			first_lm_res = lm_res
 		min_pval_i = sp.argmin(lm_res['ps'])
+
 		min_pval = lm_res['ps'][min_pval_i]
 		min_pval_chr_pos = chr_pos_list[min_pval_i]
 		print 'Min p-value:', min_pval
 		criterias['bonf'].append(min_pval)
 		step_info = {'rss':rss, 'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic,
 				'mbonf':max_cofactor_pval, 'ps': lm_res['ps'], 'cofactors':map(tuple, cofactors[:]),
-				'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
-		step_info_list.append(step_info)
+				'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos,
+				 'interactions':interactions}
 
 		#Plot gwas results per step 
 		if file_prefix:
@@ -2175,6 +2237,10 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
 			pass
+		step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(lm_res['ps'])
+		step_info['pval_median'] = agr.calc_median(lm_res['ps'])
+		print step_info['kolmogorov_smirnov'], step_info['pval_median']
+		step_info_list.append(step_info)
 
 
 		#Adding the new SNP as a cofactor
@@ -2226,7 +2292,6 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		'mbonf':max_cofactor_pval, 'ps': lm_res['ps'], 'cofactors':map(tuple, cofactors[:]),
 		'cofactor_snps':cofactor_snps[:], 'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos,
 		'interactions':interactions}
-	step_info_list.append(step_info)
 
 	#Now plotting!
 	print "Generating plots"
@@ -2237,6 +2302,10 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 					with_qq_plots=with_qq_plots)
 
 	max_num_cofactors = len(cofactors)
+	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(lm_res['ps'])
+	step_info['pval_median'] = agr.calc_median(lm_res['ps'])
+	print step_info['kolmogorov_smirnov'], step_info['pval_median']
+	step_info_list.append(step_info)
 
 	#Now backward stepwise.
 	if forward_backwards:
@@ -2286,14 +2355,19 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 
 			step_info = {'rss':rss, 'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic,
 				'mbonf':max_cofactor_pval, 'cofactors':map(tuple, cofactors[:]),
-				'cofactor_snps':cofactor_snps[:], 'min_pval':None, 'min_pval_chr_pos':None}
+				'cofactor_snps':cofactor_snps[:], 'min_pval':None, 'min_pval_chr_pos':None,
+				'kolmogorov_smirnov':None, 'pval_median':None}
 			step_info_list.append(step_info)
 			print cofactors
 
-	_plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
+	ret_dict = _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
 				log_qq_max_val=log_qq_max_val, type='lm')
+
+	for step_i in ret_dict:
+		for h in ['min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
+			step_info_list[step_i][h] = ret_dict[step_i][h]
 
 	if file_prefix:
 		_plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type == 'lm')
@@ -2564,7 +2638,6 @@ def save_kinship_in_text_format(filename, k, accessions):
 def _test_joint_analysis_(run_id='FT_suzi_log'):
 	import dataParsers as dp
 	import phenotypeData as pd
-	import analyze_gwas_results as agr
 	import env
 	#filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/seed_size.csv"
 	filename = env.env['phen_dir'] + 'phen_raw_112210.csv'
