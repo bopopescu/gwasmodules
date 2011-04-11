@@ -2269,6 +2269,10 @@ def _test_plink_tped_parser_():
         lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
 
 
+def load_kinship(call_method_id=75, accessions=None):
+	import linear_models as lm
+	kinship_file = get_call_method_kinship_file(call_method_id)
+	return lm.load_kinship_from_file(kinship_file, accessions=accessions)
 
 if __name__ == "__main__":
 

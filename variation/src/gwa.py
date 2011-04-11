@@ -65,7 +65,7 @@ Option:
 	--cofactor_no_interact			Exclude interaction terms for cofactors.
 
 Examples:
-~/gwas_data$ python gwa.py -o test -i 1,5 -a kw,emmax -r ~/Projects/Data/phenotypes/phen_raw_092910.tsv 
+~/gwas_data$ python gwa.py -o test -i 1,5 -a kw,emmax -b most_normal -r ~/Projects/Data/phenotypes/phen_raw_092910.tsv 
 Description:
   Applies various GWA methods to to phenotypes.
 

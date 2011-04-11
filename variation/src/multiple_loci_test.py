@@ -3,19 +3,17 @@ Tests involving stepwise regressions, and model selection.
 
 Option:
 
-	-i ...			The run_id.  Note that if this option is used then no output file should be specified.
-	-a ...			Mapping method, e.g emmax, lm
+	-i ...			The run phenotype index/indices.  
+	-o ...			The run_id, used as unique identifier for this run.  
 	-s			Collect results and plot things (Does not generate pvalue files...) 
 
-	-t ...			What data set is used. (54 is default)
-	-k ...			For running EMMAX.
+	-t ...			What data set is used. (75 is default)
 
-	-n ...			Number of SNPs (phenotypes) per node, default is 100
-	-f ...			Random fraction (given as parameters) of phenotypes will be used.
+	-n ...			Number of SNPs (phenotypes) per node, default is 1
+	-d ...			Debug filter, random fraction of phenotypes or snps will be used.
 
 	-l ...			Type of latent variable: random_snps (default), etc..
-	-e ...			Percentage of variance, due to error.
-	-g ...			Fraction of error, du to kinship term.
+	-h ...			Heritability in percentages, possible values are 1,10,25,50,75,90,99
 	
 	-m ...			How to generate the phenotypes: additive, xor, or
 
@@ -23,11 +21,11 @@ Option:
 	--plot_pvals           	Plot Manhattan plots
 	--phen_file=...		File where the phenotypes will be saved, and loaded from.
 	--sim_phen		Simulate phenotype, write to phenotype file.
-	--num_steps=...		Number of steps in the regression.
+	--num_steps=...		Number of steps in the regression. (Default is 10)
 
-	-h			show this help
 
-Additional parameters are ...
+Examples:
+python multiple_loci_test.py run_index test -i 1,5 -a kw,emmax -b most_normal -r ~/Projects/Data/phenotypes/phen_raw_092910.tsv 
 
 """
 
@@ -45,6 +43,8 @@ import dataParsers as dp
 import util
 import gwaResults as gr
 import analyze_gwas_results as agr
+import traceback
+import getopt
 
 
 #Parse Vincent's phenotype file...?  Why?
@@ -59,35 +59,32 @@ def parse_parameters():
 
 	long_options_list = ["maf_filter=", 'plot_pvals', 'phen_file=', 'sim_phen', 'num_steps=']
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "a:i:t:k:n:f:l:e:g:m:hs", long_options_list)
+		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
 	except:
 		traceback.print_exc()
 		print __doc__
 		sys.exit(2)
 
-	p_dict = {'number_per_run':100, 'filter':None, 'summarize':False, 'maf_filter':0,
-		'latent_variable':'random_snps', 'phenotype_model':None, 'run_id':None,
-		'mapping_method':'emmax', 'kinship_file':None, 'phenotype_error':0,
-		'kinship_error':0, 'plot_pvals':False, 'call_method_id':54, 'phen_file':None,
-		'num_steps':5}
+	p_dict = {'number_per_run':1, 'debug_filter':1.0, 'summarize':False, 'maf_filter':0,
+		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
+		'mapping_method':'emmax', 'heritability':50, 'plot_pvals':False, 'call_method_id':75,
+		'phen_file':None, 'num_steps':5, 'phen_index':1, 'sim_phen':False}
 
 
 	for opt, arg in opts:
 		if opt in ("-h"):
 			print __doc__
 			return
-		elif opt in ('-i'): p_dict['run_id'] = arg
+		elif opt in ('-i'): p_dict['phen_index'] = util.parse_ids(arg)
+		elif opt in ('-o'): p_dict['run_id'] = arg
 		elif opt in ('-t'): p_dict['call_method_id'] = int(arg)
 		elif opt in ('-n'): p_dict['number_per_run'] = int(arg)
 		elif opt in ('-m'): p_dict['phenotype_model'] = int(arg)
-		elif opt in ('-f'): p_dict['filter'] = float(arg)
+		elif opt in ('-d'): p_dict['debug_filter'] = float(arg)
 		elif opt in ('-l'): p_dict['latent_variable'] = arg
 		elif opt in ("-s"): p_dict['summarize'] = arg
-		elif opt in ('-a'):p_dict['mapping_method'] = arg
-		elif opt in ('-k'):p_dict['kinship_file'] = arg
-		elif opt in ('-e'):p_dict['phenotype_error'] = float(arg)
-		elif opt in ('-g'):p_dict['kinship_error'] = float(arg)
+		elif opt in ('-h'): p_dict['heritability'] = float(arg)
 		elif opt in ("--phen_file"): p_dict['phen_file'] = arg
 		elif opt in ("--plot_pvals"): p_dict['plot_pvals'] = True
 		elif opt in ("--maf_filter"): p_dict['maf_filter'] = float(arg)
@@ -130,7 +127,7 @@ def __get_latent_snps__(ets):
 		latitude = ecotype_info_dict[int(et)][2]
 		north_south_split_snp.append(1) if latitude > m else north_south_split_snp.append(0)
 	pc_snp = []
-	K = lm.load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled') #All ecotypes
+	K = dp.load_kinship() #All ecotypes
 	(evals, evecs) = linalg.eigh(K)
 	pc = (sp.mat(evecs).T[-1]).tolist()[0]
 	m = sp.median(pc)
@@ -146,7 +143,7 @@ def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_ph
 	print 'Generating the phenotypes'
 	latent_var_keys = ['random_snp', 'random', 'north_south_split', 'pc_split']
 	phenotype_models = ['xor', 'or', 'plus', 'xor2']
-	heritabilities = [0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99]
+	heritabilities = [1, 10, 25, 50, 75, 90, 99] #in percentages
 
 	if mac_threshold > 0:
 		sd.filter_mac_snps(mac_threshold)
@@ -203,6 +200,7 @@ def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_ph
 			d['latent_snp'] = latent_snp
 
 		for h in heritabilities:
+			her = h / 100.0
 			d2 = {}
 			for phen_model in phenotype_models:  #Simulate all phenotype models.
 				d3 = {'phenotypes': [], 'h_estimates': [], 'h_loci_est_list': []}
@@ -222,12 +220,12 @@ def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_ph
 						phen_var = sp.var(phenotype, ddof=1)
 						error_vector = sp.random.normal(0, 1, size=num_lines)
 						error_var = sp.var(error_vector, ddof=1)
-						scalar = sp.sqrt((phen_var / error_var) * ((1 - h) / h))
+						scalar = sp.sqrt((phen_var / error_var) * ((1 - her) / her))
 						phenotype = phenotype + error_vector * scalar
 						h_est = phen_var / sp.var(phenotype, ddof=1)
 						h_est_snp1 = sp.corrcoef(snp, phenotype)[0, 1]
 						h_est_snp2 = sp.corrcoef(latent_snp, phenotype)[0, 1]
-						#print phen_model, latent_var, h, h_est, h_est_snp1 ** 2, h_est_snp2 ** 2
+						#print phen_model, latent_var, her, h_est, h_est_snp1 ** 2, h_est_snp2 ** 2
 						d3['h_loci_est_list'].append(h_est)
 						d3['h_estimates'].append((h_est_snp1 ** 2, h_est_snp2 ** 2))
 					else:
@@ -266,9 +264,9 @@ def __get_thresholds(min_thres=10, max_thres=4, num_thres=12):
 		pval_thresholds.append(max_thres + i * thres_step)
 	return pval_thresholds
 
-__pval_thresholds = __get_thresholds()
+pval_thresholds = __get_thresholds()
 
-__window_sizes = [0, 1000, 5000, 10000, 20000, 50000, 100000]
+window_sizes = [0, 1000, 5000, 10000, 20000, 50000, 100000]
 
 def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_threshold=None, sign_res=None):
 	"""
@@ -281,8 +279,8 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 	gwa_res._rank_scores_()
 
 	#Get causal p-values, and ranks
-	res_dict['causal_pvals'] = [gwa_res.snp_results['scores'][i] in caus_indices]
-	res_dict['causal_ranks'] = [gwa_res.ranks[i] in caus_indices]
+	res_dict['causal_pvals'] = [gwa_res.snp_results['scores'][i] for i in caus_indices]
+	res_dict['causal_ranks'] = [gwa_res.ranks[i] for i in caus_indices]
 
 	#Get significant chrom_pos_pvals..
 	if (not sign_res) and significance_threshold :
@@ -302,10 +300,10 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 	gwa_res.neg_log_trans()
 	tprs_list = []
 	fdrs_list = []
-	for pval_thres in __pval_thresholds:
+	for pval_thres in pval_thresholds:
 		#Filter data
 		gwa_res.filter_attr('scores', pval_thres)
-		tprs, fdrs = gwa_res.get_power_analysis(cpl, __window_sizes)
+		tprs, fdrs = gwa_res.get_power_analysis(cpl, window_sizes)
 		tprs_list.append(tprs)
 		fdrs_list.append(fdrs)
 	res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
@@ -341,7 +339,7 @@ def _update_sw_stats_(res_dict, step_info_list, c_chr, c_pos, l_chr=None, l_pos=
 
 
 
-def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d):
+def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d, call_method_id):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -353,6 +351,8 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	Stepwise Linear Model (bonf. and ext. BIC)
 	Stepwise EMMA (bonf. and ext. BIC)
 	"""
+	file_prefix += file_prefix + '_%d_%s_%s' % (heritability, latent_var, phen_model)
+
 	pd = phen_d[latent_var][heritability][phen_model]
 	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_LM_extBIC', 'Stepw_EX_Bonf', 'Stepw_EX_extBIC'] #7 in total
 
@@ -370,7 +370,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 		result_dict[mm] = {}
 
 	print "Loading SNPS dataset (again)"
-	sd = dp.load_250K_snps(call_method_id=72)
+	sd = dp.load_250K_snps(call_method_id)
 	bonferroni_threshold = 1.0 / (20.0 * sd.num_snps())
 
 	snps_list = sd.getSnps()
@@ -378,21 +378,22 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	(c_snp, c_chr, c_pos, c_maf) = phen_d['snp_chr_pos_maf_list'][phen_index] #Causal SNP
 
 	if latent_var == 'random_snp':
-		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list']
+		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list'][phen_index]
 	else:
 		l_chr, l_pos = None, None
 
 	print "Running Analysis"
 	print 'Running KW'
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
-	kw_res = gr.Result(snps_data=sd, scores=p_values)
+	kw_res = gr.Result(snps_data=sd, scores=p_vals)
 	print 'Updating stats for KW'
 	_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos, l_chr, l_pos,
 			significance_threshold=bonferroni_threshold)
 
 
 	print 'Running SW LM'
-	lm_step_info, lm_res = lm.lm_step_wise(phen_vals, sd, num_steps=10, file_prefix=file_prefix, with_qq_plots=True)
+	lm_file_prefix = file_prefix + '_lm'
+	lm_step_info, lm_res = lm.lm_step_wise(phen_vals, sd, num_steps=10, file_prefix=lm_file_prefix, with_qq_plots=True)
 	print 'Updating stats for LM'
 	_update_stats_(result_dict['LM'], lm_res, c_chr, c_pos, l_chr, l_pos,
 			significance_threshold=bonferroni_threshold)
@@ -401,10 +402,10 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	#FINISH THIS!!
 
 
-	kinship_file = snpsdata.get_call_method_kinship_file(72)
-	K = lm.load_kinship_from_file(kinship_file)
+	K = dp.load_kinship(call_method_id)
 	print 'Running SW EX'
-	emmax_step_info, emmax_res = lm.emmax_step_wise(phen_vals, K, sd, num_steps=10, file_prefix=file_prefix, with_qq_plots=True)
+	emmax_file_prefix = file_prefix + '_emmax'
+	emmax_step_info, emmax_res = lm.emmax_step_wise(phen_vals, K, sd, num_steps=10, file_prefix=emmax_file_prefix, with_qq_plots=True)
 	print 'Updating stats for SW LM'
 	_update_stats_(result_dict['EX'], emmax_res, c_chr, c_pos, l_chr, l_pos,
 			significance_threshold=bonferroni_threshold)
@@ -412,13 +413,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	#FINISH THIS!!
 
 
-
-
-def emmax_stepwise():
-	"""
-	A specialized version of EMMAX stepwise, designed for this
-	"""
-
+	#Save these results..
 
 
 #	#Distances to min p-val.
@@ -656,81 +651,98 @@ def emmax_stepwise():
 
 def _run_():
 	p_dict, args = parse_parameters()
+	print args
 
-	phenotype_models = range(1, 5)
-	p_dict['snps_dataset'] = None
+	if p_dict['sim_phen'] and p_dict['phen_file']: 	#Simulate phenotypes
+		print 'Setting up phenotype simulations'
+		sd = dp.load_250K_snps(p_dict['call_method_id'])
+		simulate_phenotypes(p_dict['phen_file'], sd, debug_filter=p_dict['debug_filter'])
 
-	if p_dict['summarize']: #Set up a summary run..
+	#elif parallel..
 
-		if not p_dict['phenotype_model']: #Then run on cluster, summarize for all phenotype models
-			for pm in phenotype_models:
-				p_dict['phenotype_model'] = pm
-				run_parallel(p_dict, summary_run=True)
-		else:
-			summarise_runs(p_dict)
-		return  #Exit...
-
-	else: #Then load SNPs data
-		snps_data_file = snpsdata.get_call_method_dataset_file(p_dict['call_method_id'], binary_format=True)
-		p_dict['snps_dataset'] = dataParsers.parse_binary_snp_data(snpsDataFile)
-
-	if p_dict['phen_file']:
-		phen_file = p_dict['phen_file']
-	else:
-		phen_file = env.env['tmp_dir'] + p_dict['run_id'] + ".phen"
-
-	if p_dict['phenotype_model']:  #If phenotype model is specified, then use that, otherwise run all..
-		phenotype_models = [p_dict['phenotype_model']]
-
-
-	if p_dict['sim_phen']:
-		phen_d = simulate_phenotype(phen_file, p_dict)
-	else:
-		phen_d = load_phenotypes(phen_file)
-
-	if args:
-		phen_index = int(args[0])
-	else:
-		#Running on the cluster..
-		phen_indices = range(0, num_phenotypes, numberPerRun)
-		for pm in phenotype_models:
-			print "Submitting jobs for phenotype model:", pm
-			p_dict['phenotype_model'] = pm
-			for phen_index in phen_indices:
-				run_parallel(p_dict, phen_index=phen_index)
-		return #Exiting
-
-	print "phen_index:", phen_index
-	print "\nStarting analysis now!\n"
-	print "run_id:", run_id
-	run_analysis(phen_index, phen_d, p_dict, phenotype_models)
+	elif p_dict['phen_index']: #Run things..
+		for pid in p_dict['phen_index']:
+			file_prefix = env.env['results_dir'] + p_dict['run_id']
+			run_analysis(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
+					p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
+					p_dict['call_method_id'])
 
 
 
-def _run_vincent_scripts_():
-	type = sys.argv[1]
-	start = int(sys.argv[2])
-	end = int(sys.argv[3])
-	if type == 'add_emmax':
-		exec_str = 'sim2loci_add_fwdbwdemmax.sh'
-	elif type == 'add_lm':
-		exec_str = 'sim2loci_add_fwdbwdlm.sh'
-	elif type == 'or_emmax':
-		exec_str = 'sim2loci_or_fwdbwdemmax.sh'
-	elif type == 'or_lm':
-		exec_str = 'sim2loci_or_fwdbwdlm.sh'
-	elif type == 'xor_emmax':
-		exec_str = 'sim2loci_xor_fwdbwdemmax.sh'
-	elif type == 'xor_lm':
-		exec_str = 'sim2loci_xor_fwdbwdlm.sh'
-	for i in range(start, end + 1):
-		exec_st = 'qsub -q cmb -l walltime=6:00:00 -l mem=2950mb /home/cmbpanfs-01/bvilhjal/vincent/jobs/' + exec_str + ' -v VARIABLE=' + str(i)
-		print exec_st
-		os.system(exec_st)
+#	phenotype_models = range(1, 5)
+#	p_dict['snps_dataset'] = None
+#
+#	if p_dict['summarize']: #Set up a summary run..
+#
+#		if not p_dict['phenotype_model']: #Then run on cluster, summarize for all phenotype models
+#			for pm in phenotype_models:
+#				p_dict['phenotype_model'] = pm
+#				run_parallel(p_dict, summary_run=True)
+#		else:
+#			summarise_runs(p_dict)
+#		return  #Exit...
+#
+#	else: #Then load SNPs data
+#		snps_data_file = snpsdata.get_call_method_dataset_file(p_dict['call_method_id'], binary_format=True)
+#		p_dict['snps_dataset'] = dataParsers.parse_binary_snp_data(snpsDataFile)
+#
+#	if p_dict['phen_file']:
+#		phen_file = p_dict['phen_file']
+#	else:
+#		phen_file = env.env['tmp_dir'] + p_dict['run_id'] + ".phen"
+#
+#	if p_dict['phenotype_model']:  #If phenotype model is specified, then use that, otherwise run all..
+#		phenotype_models = [p_dict['phenotype_model']]
+#
+#
+#	if p_dict['sim_phen']:
+#		phen_d = simulate_phenotype(phen_file, p_dict)
+#	else:
+#		phen_d = load_phenotypes(phen_file)
+#
+#	if args:
+#		phen_index = int(args[0])
+#	else:
+#		#Running on the cluster..
+#		phen_indices = range(0, num_phenotypes, numberPerRun)
+#		for pm in phenotype_models:
+#			print "Submitting jobs for phenotype model:", pm
+#			p_dict['phenotype_model'] = pm
+#			for phen_index in phen_indices:
+#				run_parallel(p_dict, phen_index=phen_index)
+#		return #Exiting
+#
+#	print "phen_index:", phen_index
+#	print "\nStarting analysis now!\n"
+#	print "run_id:", run_id
+#	run_analysis(phen_index, phen_d, p_dict, phenotype_models)
+
+
+
+#def _run_vincent_scripts_():
+#	type = sys.argv[1]
+#	start = int(sys.argv[2])
+#	end = int(sys.argv[3])
+#	if type == 'add_emmax':
+#		exec_str = 'sim2loci_add_fwdbwdemmax.sh'
+#	elif type == 'add_lm':
+#		exec_str = 'sim2loci_add_fwdbwdlm.sh'
+#	elif type == 'or_emmax':
+#		exec_str = 'sim2loci_or_fwdbwdemmax.sh'
+#	elif type == 'or_lm':
+#		exec_str = 'sim2loci_or_fwdbwdlm.sh'
+#	elif type == 'xor_emmax':
+#		exec_str = 'sim2loci_xor_fwdbwdemmax.sh'
+#	elif type == 'xor_lm':
+#		exec_str = 'sim2loci_xor_fwdbwdlm.sh'
+#	for i in range(start, end + 1):
+#		exec_st = 'qsub -q cmb -l walltime=6:00:00 -l mem=2950mb /home/cmbpanfs-01/bvilhjal/vincent/jobs/' + exec_str + ' -v VARIABLE=' + str(i)
+#		print exec_st
+#		os.system(exec_st)
 
 
 if __name__ == '__main__':
-	#_run_()
-	sd = dp.load_250K_snps()
-	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
+	_run_()
+#	sd = dp.load_250K_snps()
+#	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
 	print "Done!!\n"
