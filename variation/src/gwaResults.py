@@ -340,7 +340,7 @@ class Result(object):
 		"""
 		scores = self.snp_results['scores']
 		rank_ls = zip(scores, range(len(scores)))
-		rank_ls.sort(reverse=True)
+		rank_ls.sort()#reverse=True)
 		self.orders = []
 		for j in range(len(rank_ls)):
 			(s, i) = rank_ls[j]
@@ -1057,6 +1057,8 @@ class Result(object):
 		c_ranks = [self.ranks[i] for i in c_indices]
 		max_rank_i = sp.argmax(c_ranks)
 		stronger_indices = self.orders[:max_rank_i - 1]
+		if len(stronger_indices) == 0:
+			return [0, 0] #chrom,pos 
 		cpl = self.get_chr_pos_list()
 		stronger_cpl = sp.array([cpl[i] for i in stronger_indices])
 		cp = chrom_pos_list[0]
@@ -1311,7 +1313,6 @@ class Result(object):
 			tprs.append(float(num_caus_found) / len(caus_chrom_pos_list))
 			fdrs.append(float(num_false_found) / (len(caus_chrom_pos_list) * len(cpl)))
 
-		pdb.set_trace()
 		return tprs, fdrs
 
 
