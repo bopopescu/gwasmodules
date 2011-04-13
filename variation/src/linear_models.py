@@ -1566,13 +1566,14 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 	return ret_dict
 
 
-def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
+def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
 			snps, positions, chromosomes, chr_pos_list, quantiles_dict, plot_bonferroni=True,
 			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax'):
 	"""
 	Copies or plots optimal criterias
 	"""
 	ret_dict = {}
+	opt_indices = {}
 	opt_file_dict = {}
 	for c in criterias:
 		print 'GWAs for optimal %s criteria:' % c
@@ -1621,6 +1622,7 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 			i_opt = min(min_indices)
 			#i_opt = sp.argmin(criterias[c])
 		print "    %d'th step was optimal." % i_opt
+		ret_dict[c] = i_opt
 		if i_opt <= max_num_cofactors:
 			#Copy the pngs...
 			png_file_name = '%s_step%d.png' % (file_prefix, i_opt)
@@ -1676,12 +1678,12 @@ def _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_pref
 								cand_genes=cand_genes, plot_xaxis=plot_xaxis,
 								log_qq_max_val=log_qq_max_val,
 								with_qq_plots=with_qq_plots, simple_qq=True)
-				ret_dict[i_opt] = {'min_pval':min_pval, 'min_pval_chr_pos':min_pval_chr_pos,
+				opt_indices[i_opt] = {'min_pval':min_pval, 'min_pval_chr_pos':min_pval_chr_pos,
 							'kolmogorov_smirnov':agr.calc_ks_stats(l_res['ps']),
 							'pval_median':agr.calc_median(l_res['ps'])}
 				if type == 'emmax':
-					ret_dict[i_opt]['mahalanobis_rss'] = mahalnobis_rss
-	return ret_dict
+					opt_indices[i_opt]['mahalanobis_rss'] = mahalnobis_rss
+	return ret_dict, opt_indices
 
 
 
@@ -1923,8 +1925,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
 		 bic, extended_bic, modified_bic, num_snps)
 	print 'Cofactors:', _cofactors_to_string_(cofactors)
-	if with_qq_plots:
-		quantiles_dict = {'log':[], 'norm':[], 'labels':[]}
+	quantiles_dict = {'log':[], 'norm':[], 'labels':[]}
 
 	for step_i in range(1, num_steps + 1):
 		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
@@ -2132,14 +2133,14 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			print step_info['kolmogorov_smirnov'], step_info['pval_median']
 			print cofactors
 
-	ret_dict = _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
+	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
 				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax')
 
-	for step_i in ret_dict:
+	for step_i in opt_indices:
 		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
-			step_info_list[step_i][h] = ret_dict[step_i][h]
+			step_info_list[step_i][h] = opt_indices[step_i][h]
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -2152,7 +2153,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	if file_prefix:
 		_plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emmax')
 
-	res_dict = {'step_info_list':step_info_list, 'first_emmax_res':first_emmax_res}
+	res_dict = {'step_info_list':step_info_list, 'first_emmax_res':first_emmax_res, 'opt_dict':opt_dict}
 
 	return res_dict
 
@@ -2208,8 +2209,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	print '\nStep %d: action=%s, num_par=%d, ll=%0.2f, rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f' % \
 		(step_i, action, num_par, ll, rss, bic, extended_bic, modified_bic)
 	print 'Cofactors:', _cofactors_to_string_(cofactors)
-	if with_qq_plots:
-		quantiles_dict = {'log':[], 'norm':[], 'labels':[]}
+	quantiles_dict = {'log':[], 'norm':[], 'labels':[]}
 
 	for step_i in range(1, num_steps + 1):
 		lm_res = lm.fast_f_test(snps)
@@ -2360,19 +2360,19 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 			step_info_list.append(step_info)
 			print cofactors
 
-	ret_dict = _plot_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
+	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
 				log_qq_max_val=log_qq_max_val, type='lm')
 
-	for step_i in ret_dict:
+	for step_i in opt_indices:
 		for h in ['min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
-			step_info_list[step_i][h] = ret_dict[step_i][h]
+			step_info_list[step_i][h] = opt_indices[step_i][h]
 
 	if file_prefix:
 		_plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type == 'lm')
 
-	res_dict = {'step_info_list':step_info_list, 'first_lm_res':first_lm_res}
+	res_dict = {'step_info_list':step_info_list, 'first_lm_res':first_lm_res, 'opt_dict':opt_dict}
 
 	secs = time.time() - s1
 	if secs > 60:
@@ -2602,8 +2602,6 @@ def prepare_k(k, k_accessions, accessions):
 		except:
 			continue
 	k = k[indices_to_keep, :][:, indices_to_keep]
-	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
-	k = (len(k) - 1) * k / c
 	return sp.mat(k)
 
 
@@ -2617,9 +2615,10 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	k = l[0]
 	k_accessions = l[1]
 	if accessions:
-		return prepare_k(sp.mat(k, dtype=dtype), k_accessions, accessions)
-	else:
-		return k
+		k = prepare_k(sp.mat(k, dtype=dtype), k_accessions, accessions)
+	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
+	k = (len(k) - 1) * k / c
+	return k
 
 
 def save_kinship_to_file(kinship_file, kinship_mat, k_accessions):
