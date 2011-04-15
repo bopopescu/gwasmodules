@@ -6,7 +6,7 @@ Examples:
 	
 	# for mysql tables
 	# "2>/dev/null" is used to direct stderr to /dev/null so it won't mix with the table names outputed to stdout.
-	FindTablesWithLogColumns.py -v mysql -d vervetdb -u yh 2>/dev/null
+	FindTablesWithLogColumns.py -v mysql -z banyan -d stock_250k -u yh 2>/dev/null
 
 Description:
 	2011-4-14
