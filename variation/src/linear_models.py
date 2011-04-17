@@ -2605,7 +2605,7 @@ def prepare_k(k, k_accessions, accessions):
 	return sp.mat(k)
 
 
-def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
+def load_kinship_from_file(kinship_file, accessions=None, dtype='double', return_accessions=False, scaled=True):
 	assert os.path.isfile(kinship_file), 'File not found.'
 	#sys.stdout.write("Loading K.\n")
 	#sys.stdout.flush()
@@ -2616,9 +2616,13 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	k_accessions = l[1]
 	if accessions:
 		k = prepare_k(sp.mat(k, dtype=dtype), k_accessions, accessions)
-	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
-	k = (len(k) - 1) * k / c
-	return k
+	if scaled:
+		c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
+		k = (len(k) - 1) * k / c
+	if return_accessions:
+		return k, k_accessions
+	else:
+		return k
 
 
 def save_kinship_to_file(kinship_file, kinship_mat, k_accessions):

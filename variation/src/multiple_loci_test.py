@@ -21,6 +21,7 @@ Option:
 	--plot_pvals           	Plot Manhattan plots
 	--phen_file=...		File where the phenotypes will be saved, and loaded from.
 	--sim_phen		Simulate phenotype, write to phenotype file.
+	--parallel		Run parallel on the cluster
 	--num_steps=...		Number of steps in the regression. (Default is 10)
 
 
@@ -46,6 +47,7 @@ import analyze_gwas_results as agr
 import traceback
 import getopt
 import time
+import pdb
 
 
 #Parse Vincent's phenotype file...?  Why?
@@ -58,7 +60,7 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ["maf_filter=", 'plot_pvals', 'phen_file=', 'sim_phen', 'num_steps=']
+	long_options_list = ["maf_filter=", 'plot_pvals', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
@@ -67,10 +69,10 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	p_dict = {'number_per_run':1, 'debug_filter':1.0, 'summarize':False, 'maf_filter':0,
+	p_dict = {'number_per_run':10, 'debug_filter':1.0, 'summarize':False, 'maf_filter':0,
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
 		'mapping_method':'emmax', 'heritability':50, 'plot_pvals':False, 'call_method_id':75,
-		'phen_file':None, 'num_steps':5, 'phen_index':1, 'sim_phen':False}
+		'phen_file':None, 'num_steps':5, 'phen_index':1, 'sim_phen':False, 'parallel':False}
 
 
 	for opt, arg in opts:
@@ -88,6 +90,7 @@ def parse_parameters():
 		elif opt in ("--maf_filter"): p_dict['maf_filter'] = float(arg)
 		elif opt in ("--sim_phen"): p_dict['sim_phen'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
+		elif opt in ("--parallel"): p_dict['parallel'] = True
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -134,7 +137,7 @@ def __get_latent_snps__(ets):
 	return sp.array(north_south_split_snp, dtype='int8'), sp.array(pc_snp, dtype='int8')
 
 
-def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=1000):
+def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=100):
 	"""
 	Simulate the phenotypes
 	"""
@@ -319,9 +322,8 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 	cpl = [(c_chr, c_pos)]#Causal chr_pos_list
 	if l_chr != None:
 		cpl.append((l_chr, l_pos))
-	caus_indices = gwa_res.get_indices(cpl)
 
-	for criteria in ['mbonf', 'mbic', 'ebic']:
+	for criteria in ['mbonf', 'mbics', 'ebics']:
 		opt_i = opt_dict[criteria]
 		d = {'opt_i':opt_i}
 		si = step_info_list[opt_i]
@@ -334,20 +336,21 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 		else:
 			cpst = map(list, zip(*si['cofactors']))
 			#Create a result object..
-			sig_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
+			sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
 			d['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
 			d['causal_dist_matrix'] = sign_res.get_distances(cpl)
-			d['tprs'], d['fdrs'] = gwa_res.get_power_analysis(cpl, window_sizes)
+			d['tprs'], d['fdrs'] = sign_res.get_power_analysis(cpl, window_sizes)
 		d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
 		d['pval_median'] = si['pval_median']
 		d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
 		if type == 'EX':
 			d['pseudo_heritability'] = si['pseudo_heritability']
+		res_dict[criteria] = d
 
 
 
 
-def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d, call_method_id, debug_filter=1.0):
+def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d, call_method_id, debug_filter=1.0, num_steps=10):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -402,7 +405,8 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 
 	print 'Running SW LM'
 	lm_file_prefix = file_prefix + '_lm'
-	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=10, file_prefix=lm_file_prefix, with_qq_plots=True)
+	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
+					with_qq_plots=True)
 	lm_step_info = ret_dict['step_info_list']
 	lm_pvals = ret_dict['first_lm_res']['ps']
 	lm_opt_dict = ret_dict['opt_dict']
@@ -413,13 +417,14 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	print 'Updating stats for SW LM'
 	_update_sw_stats_(result_dict, lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
-	#FINISH THIS!!
+	pdb.set_trace()
 
 
 	print 'Running SW EX'
 	K = dp.load_kinship(call_method_id)
 	emmax_file_prefix = file_prefix + '_emmax'
-	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=10, file_prefix=emmax_file_prefix, with_qq_plots=True)
+	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
+					with_qq_plots=True)
 	emmax_step_info = ret_dict['step_info_list']
 	emmax_pvals = ret_dict['first_emmax_res']['ps']
 	emmax_opt_dict = ret_dict['opt_dict']
@@ -434,10 +439,62 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	#Record trait pseudo-heritability:
 	result_dict['p_her'] = emmax_step_info[0]['pseudo_heritability']
 
-	#pdb.set_trace()
+	pdb.set_trace()
 	return result_dict
 
 
+def run_parallel(file_prefix, latent_var, heritability, phen_model, phen_indices_range,
+		phen_d, call_method_id, debug_filter=1.0, num_steps=10, cluster='gmi',
+		summary_run=False):
+	"""
+	If no mapping_method, then analysis run is set up.
+	"""
+	run_id = 'rs'
+	job_id = '%s_%d_%d_%s_%s' % (run_id, x_start_i, x_stop_i, mapping_method, temperature)
+	file_prefix = env['results_dir'] + job_id
+
+	#Cluster specific parameters	
+	if cluster == 'gmi': #GMI cluster.  #Sumit to the memory node
+		shstr = '#!/bin/sh\n'
+		shstr += 'source /etc/modules-env.sh\n'
+		shstr += 'modules load scipy/GotoBLAS2/core2/0.9.0\n'
+		shstr += 'export $GOTO_THREAD_NUM=1\n'
+		shstr += 'export $OMP_THREAD_NUM=1\n'
+		shstr += '#$ -N %s\n' % job_id
+		shstr += "#$ -q q.norm@blade*\n"
+		shstr += '#$ -o %s.log\n' % job_id
+		#shstr += '#$ -cwd /home/GMI/$HOME\n'
+		#shstr += '#$ -M bjarni.vilhjalmsson@gmi.oeaw.ac.at\n\n'
+
+	elif cluster == 'usc':  #USC cluster.
+		shstr = "#!/bin/csh\n"
+		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
+		shstr += "#PBS -l mem=%s \n" % '2950mb'
+		shstr += "#PBS -q cmb\n"
+		shstr += "#PBS -N p%s \n" % job_id
+
+	shstr += "(python %multiple_loci_test.py -i %s %d %d %s " % \
+			(env['script_dir'], mapping_method, x_start_i, x_stop_i, temperature)
+
+	"""
+	$JOB_ID
+	8:36 PM
+	-o blah-$JOB_ID.log
+	8:36 PM
+	$JOB_ID will be set by SGE
+	8:36 PM
+	for every job
+	"""
+
+	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
+	print '\n', shstr, '\n'
+	script_file_name = run_id + ".sh"
+	f = open(script_file_name, 'w')
+	f.write(shstr)
+	f.close()
+
+	#Execute qsub script
+	os.system("qsub -q q.norm@mem* " + script_file_name)
 
 
 def _run_():
@@ -449,8 +506,13 @@ def _run_():
 		sd = dp.load_250K_snps(p_dict['call_method_id'])
 		simulate_phenotypes(p_dict['phen_file'], sd, debug_filter=p_dict['debug_filter'])
 
-	#elif parallel..
+	elif p_dict['parallel']:
 		#set up parallel runs
+		pid_batches = []
+		phen_d = load_phenotypes(p_dict['phen_file'])
+		phenotypes = phen_d[p_dict['latent_variable']][ p_dict['heritability']][p_dict['phenotype_model']]['phenotypes']
+		for i in range(0, len(phenotypes), p_dict['number_per_run']):
+			pass
 
 	elif p_dict['phen_index']: #Run things..
 		results_list = []
@@ -458,7 +520,7 @@ def _run_():
 		for pid in p_dict['phen_index']:
 			result_dict = run_analysis(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
-						p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
+						p_dict['call_method_id'], debug_filter=p_dict['debug_filter'], num_steps=4)
 			results_list.append(result_dict)
 		#Save as pickled
 		pickled_results_file = file_prefix + '.pickled'
