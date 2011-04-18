@@ -3035,6 +3035,13 @@ class SNPsDataSet:
 		return chr_list
 
 
+	def get_chromosome_ends(self):
+		chr_ends = []
+		for snpsd in self.snpsDataList:
+			chr_ends.append(snpsd.positions[-1])
+		return chr_ends
+
+
 	def get_mafs(self):
 		"""
 		Returns the mafs and marfs as a dictionary.

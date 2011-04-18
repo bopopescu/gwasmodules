@@ -1512,7 +1512,7 @@ def _calc_bic_(ll, num_snps, num_par, n):
 
 def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, quantiles_dict, plot_bonferroni=True,
 			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, with_qq_plots=True,
-			num_dots=1000, simple_qq=False):
+			num_dots=1000, simple_qq=False, highlight_loci=None):
 	import pylab
 	import gwaResults as gr
 	cm = pylab.get_cmap('hsv')
@@ -1521,7 +1521,7 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 	res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
 	res.neg_log_trans()
 	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=highlight_markers,
-				cand_genes=cand_genes, plot_xaxis=plot_xaxis)
+				cand_genes=cand_genes, plot_xaxis=plot_xaxis, highlight_loci=highlight_loci)
 
 	ret_dict = {'manhattan':png_file_name}
 	#Plot QQ plot
@@ -1568,7 +1568,8 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 
 def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
 			snps, positions, chromosomes, chr_pos_list, quantiles_dict, plot_bonferroni=True,
-			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax'):
+			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax',
+			highlight_loci=None):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -1677,7 +1678,8 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 								plot_bonferroni=True, highlight_markers=cofactors,
 								cand_genes=cand_genes, plot_xaxis=plot_xaxis,
 								log_qq_max_val=log_qq_max_val,
-								with_qq_plots=with_qq_plots, simple_qq=True)
+								with_qq_plots=with_qq_plots, simple_qq=True,
+								highlight_loci=highlight_loci)
 				opt_indices[i_opt] = {'min_pval':min_pval, 'min_pval_chr_pos':min_pval_chr_pos,
 							'kolmogorov_smirnov':agr.calc_ks_stats(l_res['ps']),
 							'pval_median':agr.calc_median(l_res['ps'])}
@@ -1869,7 +1871,8 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5,
+		highlight_loci=None):
 	"""
 	Run step-wise EMMAX forward-backward.
 	"""
@@ -1949,7 +1952,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			_plot_manhattan_and_qq_(file_prefix, step_i - 1, emmax_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
@@ -2060,7 +2063,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		_plot_manhattan_and_qq_(file_prefix, step_i, emmax_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(emmax_res['ps'])
 	step_info['pval_median'] = agr.calc_median(emmax_res['ps'])
@@ -2136,7 +2139,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
-				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax')
+				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax', highlight_loci=highlight_loci)
 
 	for step_i in opt_indices:
 		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
@@ -2164,7 +2167,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5,
+		highlight_loci=None):
 	"""
 	Run simple step-wise linear model forward-backward.
 	"""
@@ -2231,7 +2235,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 			_plot_manhattan_and_qq_(file_prefix, step_i - 1, lm_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 
 		if cand_gene_list:
@@ -2299,7 +2303,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		_plot_manhattan_and_qq_(file_prefix, step_i, lm_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 	max_num_cofactors = len(cofactors)
 	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(lm_res['ps'])
@@ -2363,7 +2367,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
-				log_qq_max_val=log_qq_max_val, type='lm')
+				log_qq_max_val=log_qq_max_val, type='lm', highlight_loci=highlight_loci)
 
 	for step_i in opt_indices:
 		for h in ['min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:

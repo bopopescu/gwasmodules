@@ -15,7 +15,7 @@ Option:
 	-l ...			Type of latent variable: random_snps (default), etc..
 	-h ...			Heritability in percentages, possible values are 1,10,25,50,75,90,99
 	
-	-m ...			How to generate the phenotypes: additive, xor, or
+	-m ...			How to generate the phenotypes: plus, xor, or
 
 	--maf_filter=...	Generate the phenotypes on the fly, using SNPs with MAF greater than the given value.	
 	--plot_pvals           	Plot Manhattan plots
@@ -80,7 +80,7 @@ def parse_parameters():
 		elif opt in ('-o'): p_dict['run_id'] = arg
 		elif opt in ('-t'): p_dict['call_method_id'] = int(arg)
 		elif opt in ('-n'): p_dict['number_per_run'] = int(arg)
-		elif opt in ('-m'): p_dict['phenotype_model'] = int(arg)
+		elif opt in ('-m'): p_dict['phenotype_model'] = arg
 		elif opt in ('-d'): p_dict['debug_filter'] = float(arg)
 		elif opt in ('-l'): p_dict['latent_variable'] = arg
 		elif opt in ("-s"): p_dict['summarize'] = arg
@@ -388,16 +388,22 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	snps_list = sd.getSnps()
 	phen_vals = pd['phenotypes'][phen_index]
 	(c_snp, c_chr, c_pos, c_maf) = phen_d['snp_chr_pos_maf_list'][phen_index] #Causal SNP
-
+	highlight_loci = [(c_chr, c_pos)]
 	if latent_var == 'random_snp':
 		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list'][phen_index]
+		highlight_loci.append((l_chr, l_pos))
 	else:
 		l_chr, l_pos = None, None
 
 	print "Running Analysis"
 	print 'Running KW'
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
+	print len(p_vals)
 	kw_res = gr.Result(snps_data=sd, scores=p_vals)
+	#plot KW result
+	kw_file_prefix = file_prefix + '_kw'
+	kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
+				plot_bonferroni=True)
 	print 'Updating stats for KW'
 	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
@@ -406,7 +412,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	print 'Running SW LM'
 	lm_file_prefix = file_prefix + '_lm'
 	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
-					with_qq_plots=True)
+					with_qq_plots=True, highlight_loci=highlight_loci)
 	lm_step_info = ret_dict['step_info_list']
 	lm_pvals = ret_dict['first_lm_res']['ps']
 	lm_opt_dict = ret_dict['opt_dict']
@@ -424,7 +430,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	K = dp.load_kinship(call_method_id)
 	emmax_file_prefix = file_prefix + '_emmax'
 	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
-					with_qq_plots=True)
+					with_qq_plots=True, highlight_loci=highlight_loci)
 	emmax_step_info = ret_dict['step_info_list']
 	emmax_pvals = ret_dict['first_emmax_res']['ps']
 	emmax_opt_dict = ret_dict['opt_dict']
