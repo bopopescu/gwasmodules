@@ -883,6 +883,63 @@ class phenotype_data:
 		fig.savefig(plot_file, format=plot_format, dpi=300)
 
 
+	def plot_phen_relatedness(self, k, k_accessions, plot_file_prefix, pids=None):
+		import linear_models as lm
+		import pylab
+		import scipy as sp
+		from scipy import linalg
+		if not pids:
+			pids = self.get_pids()
+		self.convert_to_averages(pids)
+		self.filter_ecotypes_2(k_accessions, pids)
+		for pid in pids:
+			ets = self.get_ecotypes(pid)
+			vals = self.get_values(pid)
+			k_m = lm.prepare_k(k, k_accessions, ets)
+			c = sp.sum((sp.eye(len(k_m)) - (1.0 / len(k_m)) * sp.ones(k_m.shape)) * sp.array(k_m))
+			k_scaled = (len(k) - 1) * k / c
+			p_her = self.get_pseudo_heritability(pid, k_m)
+			x_list = []
+			y_list = []
+			for i in range(len(ets)):
+				for j in range(i):
+					x_list.append(k_m[i, j])
+					y_list.append(vals[i] - vals[j])
+			ys = sp.array(y_list)
+			ys = ys * ys
+			xs = sp.array(x_list)
+			phen_name = self.get_name(pid)
+			phen_name = phen_name.replace('<i>', '')
+			phen_name = phen_name.replace('</i>', '')
+			phen_name = phen_name.replace('+', '_plus_')
+			phen_name = phen_name.replace('/', '_div_')
+			file_name = plot_file_prefix + '_%d_%s.png' % (pid, phen_name)
+			pylab.figure()
+			pylab.plot(xs, ys, 'k.', alpha=0.2)
+			pylab.xlabel('Relatedness')
+			pylab.ylabel('Squared phenotypic difference')
+			#Plot regression line
+			Y_mat = sp.mat(ys).T
+			X_mat = sp.hstack((sp.mat(sp.ones(len(xs))).T, sp.mat(xs).T))
+			(betas, residues, rank, s) = linalg.lstsq(X_mat, Y_mat)
+			x_min, x_max = pylab.xlim()
+			pylab.plot([x_min, x_max], [betas[0] + x_min * betas[1], betas[0] + x_max * betas[1]])
+			corr = sp.corrcoef(xs, ys)[0, 1]
+			y_min, y_max = pylab.ylim()
+			x_range = x_max - x_min
+			y_range = y_max - y_min
+			pylab.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range,
+					y_min - 0.025 * y_range, y_max + 0.15 * y_range])
+			pylab.text(x_min + 0.1 * x_range, y_max + 0.03 * y_range, 'Correlation: %0.4f' % (corr))
+			pylab.text(x_min + 0.5 * x_range, y_max + 0.03 * y_range, 'Pseudo-heritability: %0.4f' % (p_her))
+			pylab.savefig(file_name)
+			del k_m
+			del k_scaled
+
+
+
+
+
 
 def parse_phenotype_file(file_name=None, file_object=None, delim=',', file_format='guess', with_db_ids=True):
 	"""
@@ -1741,11 +1798,19 @@ def _get_107_traits_():
 #	sd.writeToFile(env['data_dir'] + '199_genotypes.csv')
 #	print len(sd.accessions)
 
+def plot_test():
+	import dataParsers as dp
+	k, k_accessions = dp.load_kinship(return_accessions=True, scaled=False)
+	phed = get_all_phenotypes_from_db() #parse_phenotype_file(env['phen_dir'] + 'phen_raw_112210.csv')
+	phed.plot_phen_relatedness(k, k_accessions, env['tmp_dir'] + 'rel_plots')
+
+
+
 if __name__ == '__main__':
 #	insert_phenotypes_into_db(env['phen_dir'] + 'b_dilkes_metabolites.csv', method_description='Metabolites, mass spec?',
 #			comment='Data from Brian Dilkes')
 	#_castric_plot_()
 	#_test_bs_herits_()
-	_get_107_traits_()
+	plot_test()
 	print "Done!"
 

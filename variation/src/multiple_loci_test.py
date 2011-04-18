@@ -12,10 +12,10 @@ Option:
 	-n ...			Number of SNPs (phenotypes) per node, default is 1
 	-d ...			Debug filter, random fraction of phenotypes or snps will be used.
 
-	-l ...			Type of latent variable: random_snps (default), etc..
+	-l ...			Type of latent variable: random_snps (default), random, pc_split, etc..
 	-h ...			Heritability in percentages, possible values are 1,10,25,50,75,90,99
 	
-	-m ...			How to generate the phenotypes: additive, xor, or
+	-m ...			How to generate the phenotypes: plus, xor, or
 
 	--maf_filter=...	Generate the phenotypes on the fly, using SNPs with MAF greater than the given value.	
 	--plot_pvals           	Plot Manhattan plots
@@ -80,7 +80,7 @@ def parse_parameters():
 		elif opt in ('-o'): p_dict['run_id'] = arg
 		elif opt in ('-t'): p_dict['call_method_id'] = int(arg)
 		elif opt in ('-n'): p_dict['number_per_run'] = int(arg)
-		elif opt in ('-m'): p_dict['phenotype_model'] = int(arg)
+		elif opt in ('-m'): p_dict['phenotype_model'] = arg
 		elif opt in ('-d'): p_dict['debug_filter'] = float(arg)
 		elif opt in ('-l'): p_dict['latent_variable'] = arg
 		elif opt in ("-s"): p_dict['summarize'] = arg
@@ -99,12 +99,6 @@ def parse_parameters():
 	print p_dict, args
 	return p_dict, args
 
-
-def run_parallel(p_dict, phen_index=None, summary_run=False):
-	"""
-	Set up a parallel run on the cluster.
-	"""
-	raise NotImplementedError
 
 
 def get_snps_heritabilities(snps, phenotype):
@@ -137,7 +131,7 @@ def __get_latent_snps__(ets):
 	return sp.array(north_south_split_snp, dtype='int8'), sp.array(pc_snp, dtype='int8')
 
 
-def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=1000):
+def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=100):
 	"""
 	Simulate the phenotypes
 	"""
@@ -318,7 +312,7 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 	"""
 	Update result dictionary for a stepwise result.
 	"""
-	res_dict = {'step_info_list':step_info_list}
+	res_dict['step_info_list'] = step_info_list
 	cpl = [(c_chr, c_pos)]#Causal chr_pos_list
 	if l_chr != None:
 		cpl.append((l_chr, l_pos))
@@ -327,24 +321,28 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 		opt_i = opt_dict[criteria]
 		d = {'opt_i':opt_i}
 		si = step_info_list[opt_i]
-		if opt_i == 0:
-			#Set default values (Are these appropriate?)
-			d['tprs'] = [0 for ws in window_sizes]
-			d['fdrs'] = [0 for ws in window_sizes]
-			d['sign_chr_pos'] = []
-			d['causal_dist_matrix'] = []
+		if criteria == 'mbonf':
+			#Calculate fdr/tpr for different thresholds... which yield different opt_i!
+			pass
 		else:
-			cpst = map(list, zip(*si['cofactors']))
-			#Create a result object..
-			sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
-			d['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
-			d['causal_dist_matrix'] = sign_res.get_distances(cpl)
-			d['tprs'], d['fdrs'] = sign_res.get_power_analysis(cpl, window_sizes)
-		d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
-		d['pval_median'] = si['pval_median']
-		d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
-		if type == 'EX':
-			d['pseudo_heritability'] = si['pseudo_heritability']
+			if opt_i == 0:
+				#Set default values (Are these appropriate?)
+				d['tprs'] = [0 for ws in window_sizes]
+				d['fdrs'] = [0 for ws in window_sizes]
+				d['sign_chr_pos'] = []
+				d['causal_dist_matrix'] = []
+			else:
+				cpst = map(list, zip(*si['cofactors']))
+				#Create a result object..
+				sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
+				d['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
+				d['causal_dist_matrix'] = sign_res.get_distances(cpl)
+				d['tprs'], d['fdrs'] = sign_res.get_power_analysis(cpl, window_sizes)
+			d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
+			d['pval_median'] = si['pval_median']
+			d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
+			if type == 'EX':
+				d['pseudo_heritability'] = si['pseudo_heritability']
 		res_dict[criteria] = d
 
 
@@ -362,10 +360,10 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	Stepwise Linear Model (bonf. and ext. BIC)
 	Stepwise EMMA (bonf. and ext. BIC)
 	"""
-	file_prefix += '_%d_%s_%s' % (heritability, latent_var, phen_model)
+	file_prefix += '_%d_%s_%s_%d' % (heritability, latent_var, phen_model, phen_index)
 
 	pd = phen_d[latent_var][heritability][phen_model]
-	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_LM_extBIC', 'Stepw_EX_Bonf', 'Stepw_EX_extBIC'] #7 in total
+	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM', 'Stepw_EX'] #5 in total
 
 	#What to save...
 	#Distance of significant SNPs to all causative SNPs
@@ -388,16 +386,27 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	snps_list = sd.getSnps()
 	phen_vals = pd['phenotypes'][phen_index]
 	(c_snp, c_chr, c_pos, c_maf) = phen_d['snp_chr_pos_maf_list'][phen_index] #Causal SNP
-
+	highlight_loci = [(c_chr, c_pos)]
 	if latent_var == 'random_snp':
 		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list'][phen_index]
+		highlight_loci.append((l_chr, l_pos))
 	else:
 		l_chr, l_pos = None, None
 
 	print "Running Analysis"
 	print 'Running KW'
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
+	print len(p_vals)
 	kw_res = gr.Result(snps_data=sd, scores=p_vals)
+	#plot KW result
+	kw_file_prefix = file_prefix + '_kw'
+	kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
+				plot_bonferroni=True)
+
+	#FINISH!!
+	#plot QQ-plots..
+	#Calculate KS and P-med..
+
 	print 'Updating stats for KW'
 	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
@@ -406,7 +415,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	print 'Running SW LM'
 	lm_file_prefix = file_prefix + '_lm'
 	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
-					with_qq_plots=True)
+					with_qq_plots=True, highlight_loci=highlight_loci)
 	lm_step_info = ret_dict['step_info_list']
 	lm_pvals = ret_dict['first_lm_res']['ps']
 	lm_opt_dict = ret_dict['opt_dict']
@@ -415,7 +424,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	result_dict['LM'] = _update_stats_(lm_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
 	print 'Updating stats for SW LM'
-	_update_sw_stats_(result_dict, lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
+	_update_sw_stats_(result_dict['Stepw_LM'], lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
 	pdb.set_trace()
 
@@ -424,7 +433,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	K = dp.load_kinship(call_method_id)
 	emmax_file_prefix = file_prefix + '_emmax'
 	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
-					with_qq_plots=True)
+					with_qq_plots=True, highlight_loci=highlight_loci)
 	emmax_step_info = ret_dict['step_info_list']
 	emmax_pvals = ret_dict['first_emmax_res']['ps']
 	emmax_opt_dict = ret_dict['opt_dict']
@@ -433,7 +442,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	result_dict['EX'] = _update_stats_(emmax_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
 	print 'Updating stats for SW EX'
-	_update_sw_stats_(result_dict, emmax_step_info, emmax_opt_dict, c_chr, c_pos, l_chr, l_pos,
+	_update_sw_stats_(result_dict['Stepw_EX'], emmax_step_info, emmax_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold, type='EX')
 
 	#Record trait pseudo-heritability:
@@ -450,7 +459,7 @@ def run_parallel(file_prefix, latent_var, heritability, phen_model, phen_indices
 	If no mapping_method, then analysis run is set up.
 	"""
 	run_id = 'rs'
-	job_id = '%s_%d_%d_%s_%s' % (run_id, x_start_i, x_stop_i, mapping_method, temperature)
+	job_id = ' % s_ % d_ % d_ % s_ % s' % (run_id, x_start_i, x_stop_i, mapping_method, temperature)
 	file_prefix = env['results_dir'] + job_id
 
 	#Cluster specific parameters	
@@ -508,10 +517,10 @@ def _run_():
 
 	elif p_dict['parallel']:
 		#set up parallel runs
-		pid_batches = []
 		phen_d = load_phenotypes(p_dict['phen_file'])
 		phenotypes = phen_d[p_dict['latent_variable']][ p_dict['heritability']][p_dict['phenotype_model']]['phenotypes']
-		for i in range(0, len(phenotypes), p_dict['number_per_run']):
+		num_per_run = p_dict['number_per_run']
+		for i in range(0, len(phenotypes), num_per_run):
 			pass
 
 	elif p_dict['phen_index']: #Run things..

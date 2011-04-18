@@ -303,18 +303,10 @@ class Result(object):
 		"""
 		This only loads SNPs...
 		"""
-		snps = []
-		positions = []
-		chromosomes = []
-		for i, snpsd in enumerate(snps_data.snpsDataList):
-			snps.extend(snpsd.snps)
-			pl = snpsd.positions
-			positions.extend(pl)
-			chromosomes.extend([snps_data.chromosomes[i]] * len(pl))
-			self.chromosome_ends.append(snpsd.positions[-1])
-		self.snp_results['snps'] = snps
-		self.snp_results['positions'] = positions
-		self.snp_results['chromosomes'] = chromosomes
+		self.chromosome_ends = snps_data.get_chromosome_ends()
+		self.snp_results['snps'] = snps_data.getSnps()
+		self.snp_results['positions'] = snps_data.getPositions()
+		self.snp_results['chromosomes'] = snps_data.get_chr_list()
 		self.keys.append('chromosomes')
 		self.keys.append('positions')
 		self.keys.append('snps')
@@ -718,7 +710,7 @@ class Result(object):
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None, percentile=90,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
 			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
-			plot_xaxis=True):
+			plot_xaxis=True, highlight_loci=None, neg_log_transform=False):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
@@ -727,13 +719,15 @@ class Result(object):
 		import matplotlib
 		#matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
+
 		num_scores = len(self.snp_results['scores'])
 
 		"Plotting a Manhattan-style plot with %i markers." % num_scores
 
 		chromosome_ends = self.get_chromosome_ends()
 		result = self.simple_clone()
-
+		if neg_log_transform:
+			result.neg_log_trans()
 		chrom_set = set(result.snp_results['chromosomes'])
 		chromosomes = list(chrom_set)
 		chromosomes.sort()
@@ -744,8 +738,14 @@ class Result(object):
 
 		if highlight_markers:
 			new_h_markers = []
-			for c, p, pval in highlight_markers:
-				new_h_markers.append((c, p, -math.log10(pval)))
+			if len(highlight_markers[0]) == 2:
+				indices = result.get_indices(highlight_markers)
+				pvals = [result.snp_results['scores'][i] for i in indices]
+				for i, (c, p) in enumerate(highlight_markers):
+					new_h_markers.append((c, p, -math.log10(pvals[i])))
+			elif len(highlight_markers[0]) == 3:
+				for c, p, pval in highlight_markers:
+					new_h_markers.append((c, p, -math.log10(pval)))
 			highlight_markers = new_h_markers
 
 		if not max_score:
@@ -767,6 +767,13 @@ class Result(object):
 				chr_cand_genes[chrom] = []
 			for cg in cand_genes:
 				chr_cand_genes[cg.chromosome].append(cg)
+
+		if highlight_loci:
+			hl_dict = {}
+			for chrom in chromosomes:
+				hl_dict[chrom] = []
+			for c, p in highlight_loci:
+				hl_dict[c].append(p)
 
 		if len(chrom_set) == 1:
 			chrom = chrom_set.pop()
@@ -811,7 +818,12 @@ class Result(object):
 
 			if cand_genes:
 				for cg in chr_cand_genes[chrom]:
-					plt.axvspan(offset + cg.startPos, offset + cg.endPos, facecolor='#FF9900', alpha=0.6)
+					plt.axvspan(offset + cg.startPos, offset + cg.endPos,
+							facecolor='#FF9900', alpha=0.6)
+
+			if highlight_loci:
+				for p in hl_dict[chrom]:
+					plt.axvline(offset + p, color='#1166FF', alpha=0.6)
 
 			oldOffset = offset
 #			textPos.append(offset + chromosome_end / 2 - 2000000)
@@ -1200,6 +1212,7 @@ class Result(object):
 		"""
 		Returns the ranks of loci.
 		"""
+		pass
 
 
 	def analyse_loci(self,):
@@ -1299,23 +1312,26 @@ class Result(object):
 		fdrs = []
 		for window_size in window_sizes:
 			cpl = self.get_chr_pos_list()
+			pdb.set_trace()
+			filtered_cpl = []
 			if len(cpl):
 				num_caus_found = 0
 				num_false_found = 0
 				for (chrom1, pos1) in caus_chrom_pos_list:
 					caus_found = False
-					for (chrom2, pos2) in cpl:
+					for chrom2, pos2 in cpl:
 						if chrom1 == chrom2 and abs(pos1 - pos2) <= window_size:
 							caus_found = True
 						else:
-							num_false_found += 1
+							filtered_cpl.append((chrom2, pos2))
 					if caus_found:
 						num_caus_found += 1
 				tprs.append(float(num_caus_found) / len(caus_chrom_pos_list))
-				fdrs.append(float(num_false_found) / (len(caus_chrom_pos_list) * len(cpl)))
+				fdrs.append(float(len(filtered_cpl)) / len(cpl))
 			else:
 				tprs.append(0)
 				fdrs.append(0)
+			pdb.set_trace()
 
 		return tprs, fdrs
 

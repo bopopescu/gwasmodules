@@ -557,18 +557,18 @@ class LinearMixedModel(LinearModel):
 			raise Exception('Currently, only Normal random effects are allowed.')
 		self.random_effects.append((effect_type, cov_matrix))
 
-	def _get_eigen_L_(self, K, dtype='single'):
+	def _get_eigen_L_(self, K=None, dtype='single'):
+		if K == None:
+			K = self.random_effects[1][1]
 		if sp.__version__ < '0.8':
 			K = sp.mat(K, dtype=dtype)
-		evals, evecs = linalg.eigh(K) #this function has some bugs!!!
-		#evals, evecs = linalg.eig(K)  #Switch to this for speed improvements..
+		evals, evecs = linalg.eigh(K)
 		evals = sp.array(evals, dtype=dtype)
 		return {'values':evals, 'vectors':sp.mat(evecs, dtype=dtype).T}
 
 
 
 	def _get_eigen_R_(self, X, hat_matrix=None, dtype='single'):
-		#Potentially buggy for large number of steps...??  Switch to linalg.eig
 		q = X.shape[1]
 		if not hat_matrix:
 			X_squared_inverse = linalg.pinv(X.T * X) #(X.T*X).I
@@ -578,8 +578,8 @@ class LinearMixedModel(LinearModel):
 		if sp.__version__ < '0.8':
 			M = sp.mat(M, dtype=dtype)
 		evals, evecs = linalg.eigh(M, overwrite_a=True) #eigen of S(K+I)S
-		return {'values':map(lambda x: x - 1, sp.array(evals[q:], dtype=dtype)), 'vectors':(sp.mat(evecs, dtype=dtype).T[q:])}   #Because of S(K+I)S?
-
+		eig_values = sp.array(evals[q:], dtype=dtype) - 1  #Because of S(K+I)S?
+		return {'values':eig_values, 'vectors':(sp.mat(evecs, dtype=dtype).T[q:])}
 
 
 	def _rell_(self, delta, eig_vals, sq_etas):
@@ -649,9 +649,9 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def get_estimates(self, eig_L=None, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-6,
+	def get_estimates(self, eig_L, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
-				dtype='single', K=None, eig_R=None):
+				dtype='single', eig_R=None):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
 		Using the EMMA algorithm.
@@ -1049,20 +1049,24 @@ class LinearMixedModel(LinearModel):
 		return res_d
 
 
-	def emmax_f_test(self, snps, Z=None, with_betas=False, method='REML'):
+	def emmax_f_test(self, snps, Z=None, with_betas=False, method='REML', return_stepw_stats=False, eig_L=None, eig_R=None):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
 		
-		With interactions between SNP and possible cofactors.
+		Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
 		"""
-		K = self.random_effects[1][1]
-		print 'Calculating the eigenvalues of K'
-		eig_L = self._get_eigen_L_(K)
-		print 'Done.'
+		if not eig_L:
+			print 'Calculating the eigenvalues of K'
+			eig_L = self._get_eigen_L_()
+			print 'Done.'
+		if not eig_R:
+			print "Calculating the eigenvalues of S(K+I)S where S = I-X(X'X)^-1X'"
+			eig_R = self._get_eigen_R_(self.X)
+			print 'Done'
+
 		print 'Getting variance estimates'
-		res = self.get_estimates(eig_L=eig_L, method=method, K=K) #Get the variance estimates..
-		#resxf = self.get_estimates(method=method, K=K) #Get the variance estimates..
+		res = self.get_estimates(eig_L, method=method, eig_R=eig_R) #Get the variance estimates..
 		print 'Done.'
 		print 'pseudo_heritability:', res['pseudo_heritability']
 
@@ -1073,6 +1077,72 @@ class LinearMixedModel(LinearModel):
 		r['max_ll'] = res['max_ll']
 		return r
 
+
+	def emmax_step(self, snps, Z=None, with_betas=False, eig_L=None, eig_R=None):
+		"""
+		EMMAX implementation (in python)
+		Single SNPs
+		
+		Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
+		"""
+		K = self.random_effects[1][1]
+		if not eig_L:
+			print 'Calculating the eigenvalues of K'
+			eig_L = self._get_eigen_L_(K)
+			print 'Done.'
+		if not eig_R:
+			print "Calculating the eigenvalues of S(K+I)S where S = I-X(X'X)^-1X'"
+			eig_R = self._get_eigen_R_(self.X)
+			print 'Done'
+
+		print 'Getting variance estimates'
+		res_dict = {'REML':self.get_estimates(eig_L, method='REML', eig_R=eig_R),
+				'ML':self.get_estimates(eig_L, method='ML', eig_R=eig_R)}
+		print 'Done.'
+		print 'pseudo_heritability:', res_dict['REML']['pseudo_heritability']
+
+		r = self._emmax_f_test_(snps, res_dict['REML']['H_sqrt_inv'], Z=Z, with_betas=with_betas)
+		r['pseudo_heritability'] = res_dict['REML']['pseudo_heritability']
+		r['ve'] = res_dict['REML']['ve']
+		r['vg'] = res_dict['REML']['vg']
+		ll = res_dict['ML']['max_ll']
+		r['max_ll'] = ll
+		r['rss'] = float(res_dict['REML']['rss'])
+		r['reml_mahalanobis_rss'] = float(res_dict['REML']['mahalanobis_rss'])
+		num_snps = len(snps)
+		num_par = len()
+		(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
+#		r[]
+#			H_sqrt_inv = reml_res['H_sqrt_inv']
+#			ll = ml_res['max_ll']
+#			reml_mahalanobis_rss =
+#			criterias = {'ebics':[], 'mbics':[], 'bonf':[], 'mbonf':[]}
+#			(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
+#			criterias['ebics'].append(extended_bic)
+#			criterias['mbics'].append(modified_bic)
+#			max_cofactor_pval = 0
+#			criterias['mbonf'].append(max_cofactor_pval)
+#			criterias['bonf'].append(0)
+#			action = 'None'
+#			print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f, num_snps=%d' % \
+#				(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
+#				 bic, extended_bic, modified_bic, num_snps)
+		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
+		if step_i == 1:
+			first_emmax_res = emmax_res
+		min_pval_i = sp.argmin(emmax_res['ps'])
+		min_pval = emmax_res['ps'][min_pval_i]
+		mahalnobis_rss = emmax_res['rss'][min_pval_i]
+		min_pval_chr_pos = chr_pos_list[min_pval_i]
+		print 'Min p-value:', min_pval
+		criterias['bonf'].append(min_pval)
+		print 'Min Mahalanobis RSS:', mahalnobis_rss
+		step_info = {'mahalanobis_rss':mahalnobis_rss,
+			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
+			'ps': emmax_res['ps'], 'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
+			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
+
+		return r
 
 
 
@@ -1154,15 +1224,6 @@ class LinearMixedModel(LinearModel):
 		return res_d
 
 
-
-	def emmax_general_f_test(self, snps, Z=None, with_betas=False, method='REML'):
-		"""
-		"""
-		#Tests to do:
-		# 1. G against mean 
-		# 2. E against mean
-		# 3. G+E against E (mean is implicit)
-		# 4. G+GxE+E against E (mean is implicit)
 
 
 	def emmax_two_snps(self, snps, verbose=True):
@@ -1336,6 +1397,14 @@ class LinearMixedModel(LinearModel):
 		return res_dict
 
 
+	def calc_statistics(self):
+		"""
+		Returns all sorts of statistics used in stepwise regression
+		
+		Log Likelihood, BIC, modified BIC, extended BIC, RSS, mahalnobis RSS 
+		"""
+		pass
+
 
 class MultipleTraitLMM(LinearMixedModel):
 	"""
@@ -1499,7 +1568,6 @@ def _log_choose_(n, k):
 	return sum(map(sp.log, range(n, n - k, -1))) - sum(map(sp.log, range(k, 0, -1)))
 
 
-
 def _calc_bic_(ll, num_snps, num_par, n):
 	bic = -2 * (ll) + num_par * sp.log(n)
 	extended_bic = bic + \
@@ -1509,10 +1577,9 @@ def _calc_bic_(ll, num_snps, num_par, n):
 	return (bic, extended_bic, modified_bic)
 
 
-
 def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, quantiles_dict, plot_bonferroni=True,
 			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, with_qq_plots=True,
-			num_dots=1000, simple_qq=False):
+			num_dots=1000, simple_qq=False, highlight_loci=None):
 	import pylab
 	import gwaResults as gr
 	cm = pylab.get_cmap('hsv')
@@ -1521,7 +1588,7 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 	res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
 	res.neg_log_trans()
 	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=highlight_markers,
-				cand_genes=cand_genes, plot_xaxis=plot_xaxis)
+				cand_genes=cand_genes, plot_xaxis=plot_xaxis, highlight_loci=highlight_loci)
 
 	ret_dict = {'manhattan':png_file_name}
 	#Plot QQ plot
@@ -1568,7 +1635,8 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, positions, chromosomes, 
 
 def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
 			snps, positions, chromosomes, chr_pos_list, quantiles_dict, plot_bonferroni=True,
-			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax'):
+			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax',
+			highlight_loci=None):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -1677,14 +1745,14 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 								plot_bonferroni=True, highlight_markers=cofactors,
 								cand_genes=cand_genes, plot_xaxis=plot_xaxis,
 								log_qq_max_val=log_qq_max_val,
-								with_qq_plots=with_qq_plots, simple_qq=True)
+								with_qq_plots=with_qq_plots, simple_qq=True,
+								highlight_loci=highlight_loci)
 				opt_indices[i_opt] = {'min_pval':min_pval, 'min_pval_chr_pos':min_pval_chr_pos,
 							'kolmogorov_smirnov':agr.calc_ks_stats(l_res['ps']),
 							'pval_median':agr.calc_median(l_res['ps'])}
 				if type == 'emmax':
 					opt_indices[i_opt]['mahalanobis_rss'] = mahalnobis_rss
 	return ret_dict, opt_indices
-
 
 
 def _cofactors_to_string_(cofactors):
@@ -1694,7 +1762,6 @@ def _cofactors_to_string_(cofactors):
 			st += '%d_%d_%f,' % (tup[0], tup[1], -sp.log10(tup[2]))
 		st += '%d_%d_%f' % (cofactors[-1][0], cofactors[-1][1], -sp.log10(cofactors[-1][2]))
 	return st
-
 
 
 def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emmax'):
@@ -1709,7 +1776,7 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 	ks_stat_list = []
 	pval_median_list = []
 	full_steps = []
-	d_keys = [ 'rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf', 'kolmogorov_smirnov', 'pval_median']
+	d_keys = [ 'rss', 'll', 'bic', 'e_bic', 'm_bic', 'min_pval', 'mbonf', 'pval_median']
 	if type == 'emmax':
 		p_her_list = []
 		reml_mahalanobis_rss_list = []
@@ -1717,9 +1784,10 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		d_keys += ['pseudo_heritability', 'reml_mahalanobis_rss', 'mahalanobis_rss']
 
 	f = open(file_prefix + "_stats.csv", 'w')
-	f.write(','.join(['step_nr'] + d_keys + ['min_pval_pos_chr', 'cofactors']) + '\n')
+	f.write(','.join(['step_nr'] + d_keys + ['kolmogorov_smirnov', 'min_pval_pos_chr', 'cofactors']) + '\n')
 	for i, si in enumerate(step_info_list):
 		st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
+		st += ',%d' % si['kolmogorov_smirnov']['D']
 		if si['min_pval_chr_pos']:
 			st += ',%d_%d,' % si['min_pval_chr_pos']
 		else:
@@ -1865,11 +1933,11 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
 
 
-
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5,
+		highlight_loci=None):
 	"""
 	Run step-wise EMMAX forward-backward.
 	"""
@@ -1949,7 +2017,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 			_plot_manhattan_and_qq_(file_prefix, step_i - 1, emmax_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 		if cand_gene_list:
 			#Calculate candidate gene enrichments.
@@ -2060,7 +2128,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		_plot_manhattan_and_qq_(file_prefix, step_i, emmax_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(emmax_res['ps'])
 	step_info['pval_median'] = agr.calc_median(emmax_res['ps'])
@@ -2136,7 +2204,7 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
-				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax')
+				log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax', highlight_loci=highlight_loci)
 
 	for step_i in opt_indices:
 		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
@@ -2164,7 +2232,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5,
+		highlight_loci=None):
 	"""
 	Run simple step-wise linear model forward-backward.
 	"""
@@ -2231,7 +2300,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 			_plot_manhattan_and_qq_(file_prefix, step_i - 1, lm_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 
 		if cand_gene_list:
@@ -2299,7 +2368,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 		_plot_manhattan_and_qq_(file_prefix, step_i, lm_res['ps'], positions, chromosomes,
 					quantiles_dict, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci)
 
 	max_num_cofactors = len(cofactors)
 	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(lm_res['ps'])
@@ -2363,7 +2432,7 @@ def lm_step_wise(phenotypes, sd=None, all_snps=None, all_positions=None,
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
 				step_info_list, all_snps, all_positions, all_chromosomes, chr_pos_list, quantiles_dict,
 				plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
-				log_qq_max_val=log_qq_max_val, type='lm')
+				log_qq_max_val=log_qq_max_val, type='lm', highlight_loci=highlight_loci)
 
 	for step_i in opt_indices:
 		for h in ['min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
@@ -2605,7 +2674,7 @@ def prepare_k(k, k_accessions, accessions):
 	return sp.mat(k)
 
 
-def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
+def load_kinship_from_file(kinship_file, accessions=None, dtype='double', return_accessions=False, scaled=True):
 	assert os.path.isfile(kinship_file), 'File not found.'
 	#sys.stdout.write("Loading K.\n")
 	#sys.stdout.flush()
@@ -2616,9 +2685,13 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='double'):
 	k_accessions = l[1]
 	if accessions:
 		k = prepare_k(sp.mat(k, dtype=dtype), k_accessions, accessions)
-	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
-	k = (len(k) - 1) * k / c
-	return k
+	if scaled:
+		c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
+		k = (len(k) - 1) * k / c
+	if return_accessions:
+		return k, k_accessions
+	else:
+		return k
 
 
 def save_kinship_to_file(kinship_file, kinship_mat, k_accessions):
