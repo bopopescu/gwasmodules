@@ -33,8 +33,12 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'
 	file_prefix = env['results_dir'] + job_id
 
 	#Cluster specific parameters	
-	if cluster == 'gmi': #GMI cluster.
+	if cluster == 'gmi': #GMI cluster.  #Sumit to the memory node
 		shstr = '#!/bin/sh\n'
+		shstr += 'source /etc/modules-env.sh\n'
+		shstr += 'modules load scipy/GotoBLAS2/core2/0.9.0\n'
+		shstr += 'export $GOTO_THREAD_NUM=1\n'
+		shstr += 'export $OMP_THREAD_NUM=1\n'
 		shstr += '#$ -N %s\n' % job_id
 		shstr += "#$ -q q.norm@blade*\n"
 		shstr += '#$ -o %s.log\n' % job_id
@@ -51,6 +55,16 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'
 	shstr += "(python %sanalyze_rna_seq.py %s %d %d %s " % \
 			(env['script_dir'], mapping_method, x_start_i, x_stop_i, temperature)
 
+	"""
+	$JOB_ID
+	8:36 PM
+	-o blah-$JOB_ID.log
+	8:36 PM
+	$JOB_ID will be set by SGE
+	8:36 PM
+	for every job
+	"""
+
 	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
 	script_file_name = run_id + ".sh"
@@ -59,7 +73,7 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'
 	f.close()
 
 	#Execute qsub script
-	os.system("qsub " + script_file_name)
+	os.system("qsub -q q.norm@mem* " + script_file_name)
 
 
 

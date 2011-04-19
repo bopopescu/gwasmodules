@@ -2037,7 +2037,7 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 	- Imputes missing data.
 	"""
 	tped_filename = file_prefix + '.tped'
-	tped_pickled_filename = tped_filename + '.pickled'
+	tped_pickled_filename = tped_filename + '.imputed.pickled'
 	tfam_filename = file_prefix + '.tfam'
 	tfam_pickled_filename = tfam_filename + '.pickled'
 
@@ -2057,6 +2057,7 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 	num_individs = len(individs)
 
 
+#	k_mat = sp.zeros((num_individs, num_individs))
 	if os.path.isfile(tped_pickled_filename):
 		print 'Loading pickled tped file'
 		chrom_pos_snp_dict = cPickle.load(open(tped_pickled_filename))
@@ -2066,8 +2067,8 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 		with open(tped_filename) as f:
 			cur_chrom = -1
 			for line_i, line in enumerate(f):
-				if line_i % 100 == 0:
-					print line_i
+				#if line_i % 10 == 0:
+				print line_i
 				l = map(str.strip, line.split())
 				chrom = int(l[0])
 				if chrom != cur_chrom:
@@ -2087,12 +2088,25 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 						snp[j] = 2
 					elif nt1 != 1  or nt2 != 1:
 						snp[j] = 1
+#					#Calculating K
+#					for ind_i in range(j):
+#						if snp[j] != 3 and snp[ind_i] != 3:
+#							k_mat[ind_i, j] = int(snp[j] == snp[ind_i]) + 0.5 * int(sp.absolute(snp[j] - snp[ind_i]) == 1)
+#							k_mat[ind_i, j] += 1
 					j += 1
+#				print k_mat
+
+				bin_counts = sp.bincount(snp)
 				if w_missing:
+
 					if imputation_type == 'simple':
-						bin_counts = sp.bincount(snp)
-						most_common_val = sp.argmax(bin_counts[:-1])
-						snp[snp == 3] = most_common_val
+						mean = (bin_counts[1] + 2 * bin_counts[2]) / (bin_counts[0] + bin_counts[1] + bin_counts[2])
+						snp[snp == 3] = round(mean)
+					if imputation_type == 'simple2':
+						snp[snp == 3] = sp.argmax(bin_counts[:-1])
+
+
+
 				chrom_pos_snp_dict[chrom]['snps'].append(snp)
 		cPickle.dump(chrom_pos_snp_dict, open(tped_pickled_filename, 'wb'), protocol=2)
 
@@ -2254,6 +2268,11 @@ def _test_plink_tped_parser_():
         import linear_models as lm
         lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
 
+
+def load_kinship(call_method_id=75, accessions=None, return_accessions=False, scaled=True):
+	import linear_models as lm
+	kinship_file = get_call_method_kinship_file(call_method_id)
+	return lm.load_kinship_from_file(kinship_file, accessions=accessions, return_accessions=return_accessions, scaled=scaled)
 
 
 if __name__ == "__main__":

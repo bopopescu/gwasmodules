@@ -3,31 +3,30 @@ Tests involving stepwise regressions, and model selection.
 
 Option:
 
-	-i ...			The run_id.  Note that if this option is used then no output file should be specified.
-	-a ...			Mapping method, e.g emmax, lm
+	-i ...			The run phenotype index/indices.  
+	-o ...			The run_id, used as unique identifier for this run.  
 	-s			Collect results and plot things (Does not generate pvalue files...) 
 
-	-t ...			What data set is used. (54 is default)
-	-k ...			For running EMMAX.
+	-t ...			What data set is used. (75 is default)
 
-	-n ...			Number of SNPs (phenotypes) per node, default is 100
-	-f ...			Random fraction (given as parameters) of phenotypes will be used.
+	-n ...			Number of SNPs (phenotypes) per node, default is 1
+	-d ...			Debug filter, random fraction of phenotypes or snps will be used.
 
-	-l ...			Type of latent variable: random_snps (default), etc..
-	-e ...			Percentage of variance, due to error.
-	-g ...			Fraction of error, du to kinship term.
+	-l ...			Type of latent variable: random_snps (default), random, pc_split, etc..
+	-h ...			Heritability in percentages, possible values are 1,10,25,50,75,90,99
 	
-	-m ...			How to generate the phenotypes: additive, xor, or
+	-m ...			How to generate the phenotypes: plus, xor, or
 
 	--maf_filter=...	Generate the phenotypes on the fly, using SNPs with MAF greater than the given value.	
 	--plot_pvals           	Plot Manhattan plots
 	--phen_file=...		File where the phenotypes will be saved, and loaded from.
 	--sim_phen		Simulate phenotype, write to phenotype file.
-	--num_steps=...		Number of steps in the regression.
+	--parallel		Run parallel on the cluster
+	--num_steps=...		Number of steps in the regression. (Default is 10)
 
-	-h			show this help
 
-Additional parameters are ...
+Examples:
+python multiple_loci_test.py run_index test -i 1,5 -a kw,emmax -b most_normal -r ~/Projects/Data/phenotypes/phen_raw_092910.tsv 
 
 """
 
@@ -44,6 +43,11 @@ import random
 import dataParsers as dp
 import util
 import gwaResults as gr
+import analyze_gwas_results as agr
+import traceback
+import getopt
+import time
+import pdb
 
 
 #Parse Vincent's phenotype file...?  Why?
@@ -56,42 +60,37 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ["maf_filter=", 'plot_pvals', 'phen_file=', 'sim_phen', 'num_steps=']
+	long_options_list = ["maf_filter=", 'plot_pvals', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel']
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "a:i:t:k:n:f:l:e:g:m:hs", long_options_list)
+		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
 	except:
 		traceback.print_exc()
 		print __doc__
 		sys.exit(2)
 
-	p_dict = {'number_per_run':100, 'filter':None, 'summarize':False, 'maf_filter':0,
-		'latent_variable':'random_snps', 'phenotype_model':None, 'run_id':None,
-		'mapping_method':'emmax', 'kinship_file':None, 'phenotype_error':0,
-		'kinship_error':0, 'plot_pvals':False, 'call_method_id':54, 'phen_file':None,
-		'num_steps':5}
+	p_dict = {'number_per_run':10, 'debug_filter':1.0, 'summarize':False, 'maf_filter':0,
+		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
+		'mapping_method':'emmax', 'heritability':50, 'plot_pvals':False, 'call_method_id':75,
+		'phen_file':None, 'num_steps':5, 'phen_index':1, 'sim_phen':False, 'parallel':False}
 
 
 	for opt, arg in opts:
-		if opt in ("-h"):
-			print __doc__
-			return
-		elif opt in ('-i'): p_dict['run_id'] = arg
+		if opt in ('-i'): p_dict['phen_index'] = util.parse_ids(arg)
+		elif opt in ('-o'): p_dict['run_id'] = arg
 		elif opt in ('-t'): p_dict['call_method_id'] = int(arg)
 		elif opt in ('-n'): p_dict['number_per_run'] = int(arg)
-		elif opt in ('-m'): p_dict['phenotype_model'] = int(arg)
-		elif opt in ('-f'): p_dict['filter'] = float(arg)
+		elif opt in ('-m'): p_dict['phenotype_model'] = arg
+		elif opt in ('-d'): p_dict['debug_filter'] = float(arg)
 		elif opt in ('-l'): p_dict['latent_variable'] = arg
 		elif opt in ("-s"): p_dict['summarize'] = arg
-		elif opt in ('-a'):p_dict['mapping_method'] = arg
-		elif opt in ('-k'):p_dict['kinship_file'] = arg
-		elif opt in ('-e'):p_dict['phenotype_error'] = float(arg)
-		elif opt in ('-g'):p_dict['kinship_error'] = float(arg)
+		elif opt in ('-h'): p_dict['heritability'] = int(arg)
 		elif opt in ("--phen_file"): p_dict['phen_file'] = arg
 		elif opt in ("--plot_pvals"): p_dict['plot_pvals'] = True
 		elif opt in ("--maf_filter"): p_dict['maf_filter'] = float(arg)
 		elif opt in ("--sim_phen"): p_dict['sim_phen'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
+		elif opt in ("--parallel"): p_dict['parallel'] = True
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -100,12 +99,6 @@ def parse_parameters():
 	print p_dict, args
 	return p_dict, args
 
-
-def run_parallel(p_dict, phen_index=None, summary_run=False):
-	"""
-	Set up a parallel run on the cluster.
-	"""
-	raise NotImplementedError
 
 
 def get_snps_heritabilities(snps, phenotype):
@@ -129,7 +122,7 @@ def __get_latent_snps__(ets):
 		latitude = ecotype_info_dict[int(et)][2]
 		north_south_split_snp.append(1) if latitude > m else north_south_split_snp.append(0)
 	pc_snp = []
-	K = lm.load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled') #All ecotypes
+	K = dp.load_kinship() #All ecotypes
 	(evals, evecs) = linalg.eigh(K)
 	pc = (sp.mat(evecs).T[-1]).tolist()[0]
 	m = sp.median(pc)
@@ -138,14 +131,14 @@ def __get_latent_snps__(ets):
 	return sp.array(north_south_split_snp, dtype='int8'), sp.array(pc_snp, dtype='int8')
 
 
-def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=1000):
+def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=100):
 	"""
 	Simulate the phenotypes
 	"""
 	print 'Generating the phenotypes'
 	latent_var_keys = ['random_snp', 'random', 'north_south_split', 'pc_split']
 	phenotype_models = ['xor', 'or', 'plus', 'xor2']
-	heritabilities = [0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99]
+	heritabilities = [1, 10, 25, 50, 75, 90, 99] #in percentages
 
 	if mac_threshold > 0:
 		sd.filter_mac_snps(mac_threshold)
@@ -202,6 +195,7 @@ def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_ph
 			d['latent_snp'] = latent_snp
 
 		for h in heritabilities:
+			her = h / 100.0
 			d2 = {}
 			for phen_model in phenotype_models:  #Simulate all phenotype models.
 				d3 = {'phenotypes': [], 'h_estimates': [], 'h_loci_est_list': []}
@@ -221,12 +215,12 @@ def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_ph
 						phen_var = sp.var(phenotype, ddof=1)
 						error_vector = sp.random.normal(0, 1, size=num_lines)
 						error_var = sp.var(error_vector, ddof=1)
-						scalar = sp.sqrt((phen_var / error_var) * ((1 - h) / h))
+						scalar = sp.sqrt((phen_var / error_var) * ((1 - her) / her))
 						phenotype = phenotype + error_vector * scalar
 						h_est = phen_var / sp.var(phenotype, ddof=1)
 						h_est_snp1 = sp.corrcoef(snp, phenotype)[0, 1]
 						h_est_snp2 = sp.corrcoef(latent_snp, phenotype)[0, 1]
-						#print phen_model, latent_var, h, h_est, h_est_snp1 ** 2, h_est_snp2 ** 2
+						#print phen_model, latent_var, her, h_est, h_est_snp1 ** 2, h_est_snp2 ** 2
 						d3['h_loci_est_list'].append(h_est)
 						d3['h_estimates'].append((h_est_snp1 ** 2, h_est_snp2 ** 2))
 					else:
@@ -265,14 +259,15 @@ def __get_thresholds(min_thres=10, max_thres=4, num_thres=12):
 		pval_thresholds.append(max_thres + i * thres_step)
 	return pval_thresholds
 
-__pval_thresholds = __get_thresholds()
+pval_thresholds = __get_thresholds()
 
-__window_sizes = [0, 1000, 5000, 10000, 20000, 50000, 100000]
+window_sizes = [0, 1000, 5000, 10000, 20000, 50000, 100000]
 
-def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_threshold=None, sign_res=None):
+def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_threshold=None, sign_res=None):
 	"""
 	Update result dictionary.
 	"""
+	res_dict = {}
 	cpl = [(c_chr, c_pos)]#Causal chr_pos_list
 	if l_chr != None:
 		cpl.append((l_chr, l_pos))
@@ -280,8 +275,8 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 	gwa_res._rank_scores_()
 
 	#Get causal p-values, and ranks
-	res_dict['causal_pvals'] = [gwa_res.snp_results['scores'][i] in caus_indices]
-	res_dict['causal_ranks'] = [gwa_res.ranks[i] in caus_indices]
+	res_dict['causal_pvals'] = [gwa_res.snp_results['scores'][i] for i in caus_indices]
+	res_dict['causal_ranks'] = [gwa_res.ranks[i] for i in caus_indices]
 
 	#Get significant chrom_pos_pvals..
 	if (not sign_res) and significance_threshold :
@@ -301,18 +296,59 @@ def _update_stats_(res_dict, gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, sign
 	gwa_res.neg_log_trans()
 	tprs_list = []
 	fdrs_list = []
-	for pval_thres in __pval_thresholds:
+	for pval_thres in pval_thresholds:
 		#Filter data
 		gwa_res.filter_attr('scores', pval_thres)
-		tprs, fdrs = gwa_res.get_power_analysis(cpl, __window_sizes)
+		tprs, fdrs = gwa_res.get_power_analysis(cpl, window_sizes)
 		tprs_list.append(tprs)
 		fdrs_list.append(fdrs)
 	res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
 	res_dict['fdrs'] = fdrs_list #[p_valthreshold][window_size]
+	return res_dict
+
+
+def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=None, l_pos=None,
+			significance_threshold=None, type='LM'):
+	"""
+	Update result dictionary for a stepwise result.
+	"""
+	res_dict['step_info_list'] = step_info_list
+	cpl = [(c_chr, c_pos)]#Causal chr_pos_list
+	if l_chr != None:
+		cpl.append((l_chr, l_pos))
+
+	for criteria in ['mbonf', 'mbics', 'ebics']:
+		opt_i = opt_dict[criteria]
+		d = {'opt_i':opt_i}
+		si = step_info_list[opt_i]
+		if criteria == 'mbonf':
+			#Calculate fdr/tpr for different thresholds... which yield different opt_i!
+			pass
+		else:
+			if opt_i == 0:
+				#Set default values (Are these appropriate?)
+				d['tprs'] = [0 for ws in window_sizes]
+				d['fdrs'] = [0 for ws in window_sizes]
+				d['sign_chr_pos'] = []
+				d['causal_dist_matrix'] = []
+			else:
+				cpst = map(list, zip(*si['cofactors']))
+				#Create a result object..
+				sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
+				d['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
+				d['causal_dist_matrix'] = sign_res.get_distances(cpl)
+				d['tprs'], d['fdrs'] = sign_res.get_power_analysis(cpl, window_sizes)
+			d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
+			d['pval_median'] = si['pval_median']
+			d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
+			if type == 'EX':
+				d['pseudo_heritability'] = si['pseudo_heritability']
+		res_dict[criteria] = d
 
 
 
-def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d):
+
+def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d, call_method_id, debug_filter=1.0, num_steps=10):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -324,383 +360,205 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	Stepwise Linear Model (bonf. and ext. BIC)
 	Stepwise EMMA (bonf. and ext. BIC)
 	"""
-	pd = phen_d[latent_var][heritability][phen_model]
-	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_LM_extBIC', 'Stepw_EX_Bonf', 'Stepw_EX_extBIC'] #7 in total
+	file_prefix += '_%d_%s_%s_%d' % (heritability, latent_var, phen_model, phen_index)
 
-	#What to save...
-	#Distance of significant SNPs to all causative SNPs
-	#Ranks and p-values of significant SNPs
-	#Chromosome and position of all significant SNPs
-	#Ranks and p-values of causal SNPs
-	#Summarize the following:
-	#	- Power (sensitivity, TPR), FDR, FPR, for different bonf. thresholds.. at 0, 5, 10, 20, and 100 kb window
-	#	- Of all SNPs ranked higher than the second causative... which is farthest from a nearest causative.
+	pd = phen_d[latent_var][heritability][phen_model]
+	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM', 'Stepw_EX'] #5 in total
+
 
 	result_dict = {}
 	for mm in mapping_methods:
 		result_dict[mm] = {}
 
 	print "Loading SNPS dataset (again)"
-	sd = dp.load_250K_snps(call_method_id=72)
+	sd = dp.load_250K_snps(call_method_id, debug_filter=debug_filter)
 	bonferroni_threshold = 1.0 / (20.0 * sd.num_snps())
 
 	snps_list = sd.getSnps()
 	phen_vals = pd['phenotypes'][phen_index]
 	(c_snp, c_chr, c_pos, c_maf) = phen_d['snp_chr_pos_maf_list'][phen_index] #Causal SNP
-
+	highlight_loci = [(c_chr, c_pos)]
 	if latent_var == 'random_snp':
-		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list']
+		(l_chr, l_pos, l_maf) = phen_d[latent_var]['latent_chr_pos_maf_list'][phen_index]
+		highlight_loci.append((l_chr, l_pos))
 	else:
 		l_chr, l_pos = None, None
 
 	print "Running Analysis"
 	print 'Running KW'
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
-	kw_res = gr.Result(snps_data=sd, scores=p_values)
+	print len(p_vals)
+	kw_res = gr.Result(snps_data=sd, scores=p_vals)
+	#plot KW result
+	kw_file_prefix = file_prefix + '_kw'
+	kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
+				plot_bonferroni=True)
+
+	#FINISH!!
+	#plot QQ-plots..
+	agr.get_quantiles(kw_res.snp_results['scores'], 1000)
+	#Calculate KS and P-med..
+
 	print 'Updating stats for KW'
-	_update_stats_(result_dict['KW'], kw_res, c_chr, c_pos, l_chr, l_pos,
-			significance_threshold=bonferroni_threshold)
+	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
+					significance_threshold=bonferroni_threshold)
 
 
 	print 'Running SW LM'
-	lm_step_info, lm_res = lm.lm_step_wise(phen_vals, sd, num_steps=10, file_prefix=file_prefix, with_qq_plots=True)
+	lm_file_prefix = file_prefix + '_lm'
+	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
+					with_qq_plots=True, highlight_loci=highlight_loci)
+	lm_step_info = ret_dict['step_info_list']
+	lm_pvals = ret_dict['first_lm_res']['ps']
+	lm_opt_dict = ret_dict['opt_dict']
+	lm_res = gr.Result(scores=lm_pvals, snps_data=sd)
 	print 'Updating stats for LM'
-	_update_stats_(result_dict['LM'], lm_res, c_chr, c_pos, l_chr, l_pos,
-			significance_threshold=bonferroni_threshold)
+	result_dict['LM'] = _update_stats_(lm_res, c_chr, c_pos, l_chr, l_pos,
+					significance_threshold=bonferroni_threshold)
 	print 'Updating stats for SW LM'
-	#FINISH THIS!!
+	_update_sw_stats_(result_dict['Stepw_LM'], lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
+					significance_threshold=bonferroni_threshold)
+	pdb.set_trace()
 
 
-	kinship_file = snpsdata.get_call_method_kinship_file(72)
-	K = lm.load_kinship_from_file(kinship_file)
 	print 'Running SW EX'
-	emmax_step_info, emmax_res = lm.emmax_step_wise(phen_vals, K, sd, num_steps=10, file_prefix=file_prefix, with_qq_plots=True)
+	K = dp.load_kinship(call_method_id)
+	emmax_file_prefix = file_prefix + '_emmax'
+	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
+					with_qq_plots=True, highlight_loci=highlight_loci)
+	emmax_step_info = ret_dict['step_info_list']
+	emmax_pvals = ret_dict['first_emmax_res']['ps']
+	emmax_opt_dict = ret_dict['opt_dict']
+	emmax_res = gr.Result(scores=emmax_pvals, snps_data=sd)
 	print 'Updating stats for SW LM'
-	_update_stats_(result_dict['EX'], emmax_res, c_chr, c_pos, l_chr, l_pos,
-			significance_threshold=bonferroni_threshold)
+	result_dict['EX'] = _update_stats_(emmax_res, c_chr, c_pos, l_chr, l_pos,
+					significance_threshold=bonferroni_threshold)
 	print 'Updating stats for SW EX'
-	#FINISH THIS!!
+	_update_sw_stats_(result_dict['Stepw_EX'], emmax_step_info, emmax_opt_dict, c_chr, c_pos, l_chr, l_pos,
+					significance_threshold=bonferroni_threshold, type='EX')
+
+	#Record trait pseudo-heritability:
+	result_dict['p_her'] = emmax_step_info[0]['pseudo_heritability']
+
+	pdb.set_trace()
+	return result_dict
 
 
-
-
-def emmax_stepwise():
+def run_parallel(file_prefix, latent_var, heritability, phen_model, phen_indices_range,
+		phen_d, call_method_id, debug_filter=1.0, num_steps=10, cluster='gmi',
+		summary_run=False):
 	"""
-	A specialized version of EMMAX stepwise, designed for this
+	If no mapping_method, then analysis run is set up.
+	"""
+	run_id = 'rs'
+	job_id = ' % s_ % d_ % d_ % s_ % s' % (run_id, x_start_i, x_stop_i, mapping_method, temperature)
+	file_prefix = env['results_dir'] + job_id
+
+	#Cluster specific parameters	
+	if cluster == 'gmi': #GMI cluster.  #Sumit to the memory node
+		shstr = '#!/bin/sh\n'
+		shstr += 'source /etc/modules-env.sh\n'
+		shstr += 'modules load scipy/GotoBLAS2/core2/0.9.0\n'
+		shstr += 'export $GOTO_THREAD_NUM=1\n'
+		shstr += 'export $OMP_THREAD_NUM=1\n'
+		shstr += '#$ -N %s\n' % job_id
+		shstr += "#$ -q q.norm@blade*\n"
+		shstr += '#$ -o %s.log\n' % job_id
+		#shstr += '#$ -cwd /home/GMI/$HOME\n'
+		#shstr += '#$ -M bjarni.vilhjalmsson@gmi.oeaw.ac.at\n\n'
+
+	elif cluster == 'usc':  #USC cluster.
+		shstr = "#!/bin/csh\n"
+		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
+		shstr += "#PBS -l mem=%s \n" % '2950mb'
+		shstr += "#PBS -q cmb\n"
+		shstr += "#PBS -N p%s \n" % job_id
+
+	shstr += "(python %multiple_loci_test.py -i %s %d %d %s " % \
+			(env['script_dir'], mapping_method, x_start_i, x_stop_i, temperature)
+
+	"""
+	$JOB_ID
+	8:36 PM
+	-o blah-$JOB_ID.log
+	8:36 PM
+	$JOB_ID will be set by SGE
+	8:36 PM
+	for every job
 	"""
 
+	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
+	print '\n', shstr, '\n'
+	script_file_name = run_id + ".sh"
+	f = open(script_file_name, 'w')
+	f.write(shstr)
+	f.close()
 
-
-#	#Distances to min p-val.
-#	distances_to_min_pval = []
-#	#Ranks of true SNPs
-#	true_snps_ranks = []
-#	min_pvals = []
-#	obs_pvals = []
-#	rank_statistics = []  #For the max ranks histogram!
-#	sign_statistics = []  #For the max significant histogram!
-#	sign_fractions = []
-#	if latent_corr:
-#		latent_distances_to_min_pval = []
-#		latent_snps_ranks = []
-#		latent_pvals = []
-#		second_dist_to_min_pval = []
-#	print len(results), len(phen_mafs)
-#	for i in range(len(results)):
-#		sys.stdout.write("Summarizing results for the " + str(i) + "'th phenotype.\n")
-#		sys.stdout.flush()
-#		pvals = results[i]
-#		sign_count = 0
-#		tot_count = 0
-#		pval_chr_pos = []
-#		sign_pval_chr_pos = []
-#		for j, pval in enumerate(pvals):
-#			tot_count += 1
-#			if pval < (0.05 / len(snps_list)):
-#				sign_count += 1
-#				sign_pval_chr_pos.append((pval, chr_pos_list[j][0], chr_pos_list[j][1]))
-#			pval_chr_pos.append((pval, chr_pos_list[j][0], chr_pos_list[j][1]))
-#		sign_fractions.append(sign_count / float(tot_count))
-#		pval_chr_pos.sort()
-#
-#		min_pval = min(pvals)
-#		min_pvals.append(min_pval)
-#		min_pvals_indices = list(*sp.where(pvals == min_pval))
-#		if len(min_pvals_indices) > 1:
-#			print 'Found two minimum p-values:'
-#			for j in min_pvals_indices:
-#				print phen_chr_pos[i]
-#			print 'Using the first one.'
-#		j = min_pvals_indices[0]
-#
-#		#chromosome and position of the causative SNP
-#		(phen_chr, phen_pos) = phen_chr_pos[i]
-#
-#		#chromosome and position of the most significant SNP
-#		(chr, pos) = chr_pos_list[j]
-#
-#		if chr == phen_chr:
-#			distances_to_min_pval.append(abs(int(phen_pos) - int(pos)))
-#		else:
-#			distances_to_min_pval.append(-abs(int(phen_chr) - int(chr)))
-#		try:
-#        		snp_i = chr_pos_list.index((phen_chr, phen_pos))
-#        		obs_pval = pvals[snp_i]
-#        		obs_pvals.append(obs_pval)
-#        		r_list = util.getRanks(pvals)
-#        		snp_rank = int(r_list[snp_i])
-#        		true_snps_ranks.append(snp_rank)
-#
-#		except Exception, err_str:
-#        		print "Didn't find causative SNP:", phen_pos
-#        		print err_str
-#        		true_snps_ranks.append(-1)
-#
-#		if latent_corr:
-#			(latent_snp, latent_chr, latent_pos, latent_maf) = latent_loci_snp_chr_pos_mafs[i]
-#			if chr == latent_chr:
-#				latent_distances_to_min_pval.append(abs(int(latent_pos) - int(pos)))
-#			else:
-#				latent_distances_to_min_pval.append(-abs(int(latent_chr) - int(chr)))
-#			try:
-#				latent_snp_i = chr_pos_list.index((latent_chr, latent_pos))
-#				obs_pval = pvals[latent_snp_i]
-#				latent_pvals.append(obs_pval)
-#				latent_rank = int(r_list[latent_snp_i])
-#				latent_snps_ranks.append(latent_rank)
-#			except Exception, err_str:
-#				print "Didn't find latent causative SNP:", phen_pos
-#				print err_str
-#				true_snps_ranks.append(-1)
-#
-#			# Which is the closest one to the min. pval?
-#			if latent_distances_to_min_pval[-1] < 0 and distances_to_min_pval[-1] < 0:
-#				second_dist_to_min_pval.append(-3)  #Both causative loci on diff. chromosomes from the min pval.
-#			elif latent_distances_to_min_pval[-1] < 0:
-#				second_chr = latent_chr
-#				second_pos = latent_pos
-#			elif distances_to_min_pval[-1] < 0:
-#				second_chr = phen_chr
-#				second_pos = phen_pos
-#			else:
-#				second_dist_to_min_pval.append(-2)  #Both causative loci on same chromosome.
-#
-#			# New min pval!!
-#			elif chr != first_chr:
-#				if chr != second_chr:
-#					second_dist_to_min_pval.append(-1)
-#				else:
-#					second_dist_to_min_pval.append(abs(int(second_pos)-pos))
-#			else:
-#				
-#
-#
-#
-#		#Calculating the dist to the farthest SNP with rank greater or equal to the second ranked causative SNP.
-#		if latent_corr:
-#			print latent_corr
-#			max_rank = int(math.ceil(max(latent_rank, snp_rank)) + 0.001)
-#		else:
-#			max_rank = int(math.ceil(snp_rank) + 0.001)
-#
-#		im_pval_chr_pos = pval_chr_pos[:max_rank]
-#		max_dist = 0
-#		diff_chr = False
-#		for (im_pval, im_ch, im_pos) in im_pval_chr_pos:
-#			if latent_corr and im_ch == phen_chr and im_ch == latent_chr:
-#				max_dist = max(max_dist, min(abs(im_pos - phen_pos), abs(im_pos - latent_pos)))
-#			elif im_ch == phen_chr:
-#				max_dist = max(max_dist, abs(im_pos - phen_pos))
-#			elif latent_corr and im_ch == latent_chr:
-#				max_dist = max(max_dist, abs(im_pos - latent_pos))
-#			else:
-#				diff_chr = True
-#				break
-#		if diff_chr:
-#			rank_statistics.append(-1)
-#		else:
-#			rank_statistics.append(max_dist)
-#
-#		#Calculating the max distance to a significant p-val.
-#		if sign_pval_chr_pos:
-#			max_dist = 0
-#			diff_chr = False
-#			for (s_pval, s_ch, s_pos) in sign_pval_chr_pos:
-#				if s_ch == phen_chr:
-#					if latent_corr and phen_chr == latent_chr:
-#						max_dist = max(max_dist, min(abs(s_pos - phen_pos), abs(phen_pos - latent_pos)))
-#					else:
-#						max_dist = max(max_dist, abs(s_pos - phen_pos))
-#				elif latent_corr and s_ch == latent_chr:
-#					max_dist = max(max_dist, abs(phen_pos - latent_pos))
-#				else:
-#					diff_chr = True
-#					break
-#			if diff_chr:
-#				sign_statistics.append(-1)
-#			else:
-#				sign_statistics.append(max_dist)
-##					if max_dist == 0:
-##						print "sign_pval_chr_pos:",sign_pval_chr_pos
-##						print "pvals[snp_i]:",pvals[snp_i]
-##						print "pvals[latent_snp_i]:",pvals[latent_snp_i]
-##						print "phen_pos,phen_chr:",phen_pos,phen_chr
-##						print "latent_pos,latent_chr:",latent_pos,latent_chr
-#		else:
-#			sign_statistics.append(-2)
-#
-#
-#
-#
-#
-#
-#
-#		gc.collect()  #Calling garbage collector, in an attempt to clean up memory..
-#	print "Distances:", distances_to_min_pval
-#	print "Ranks:", true_snps_ranks
-#	print "Obs. pvals:", obs_pvals
-#	print "Min pvals:", min_pvals
-#	print "Significant fractions:", sign_fractions
-#	print "Significant pvals statistics:", sign_statistics
-#	if latent_corr:
-#		print "Distances:", latent_distances_to_min_pval
-#		print "Latent ranks:", latent_snps_ranks
-#		print "Latent obs. pvals:", latent_pvals
-#		print "Intermittent rank statistics:", rank_statistics
-#
-#
-#	#Discarding the missing p-values due to local association mapping. 
-#	#results = map(list,zip(*results))
-#	#print "len(results):",len(results), len(chr_pos)
-#
-#	#Write results to file
-#
-#	if not noPvals and local:
-#		print "Writing p-values to file:"
-#		new_results = []
-#		for pvals in results: #For all phenotypes (results)
-#			chr_pos_pvals = []
-#			for i in range(0, len(chr_pos_list)): #For all SNPs
-#				pval = pvals[i]
-#				if pval != 2 and pval <= pvalueThreshold:
-#					(chr, pos) = chr_pos_list[i]
-#					chr_pos_pvals.append((chr, pos, pval))
-#			new_results.append(chr_pos_pvals)
-#		results = new_results
-#		l = [phen_positions, results]
-#		pvalFile = outputFile + ".pvals"
-#		print "Writing p-values to file:", pvalFile
-#		f = open(pvalFile, "w")
-#		cPickle.dump(l, f)
-#		f.close()
-#
-#	p_d_r_dict = {}
-#	if latent_corr:
-#		p_d_r_dict['latent_pvals'] = latent_pvals
-#		p_d_r_dict['latent_snps_ranks'] = latent_snps_ranks
-#		p_d_r_dict['latent_distances_to_min_pval'] = latent_distances_to_min_pval
-#		p_d_r_dict['latent_loci_snp_chr_pos_mafs'] = latent_loci_snp_chr_pos_mafs
-#
-#	p_d_r_dict['phen_positions'] = phen_positions
-#	p_d_r_dict['distances_to_min_pval'] = distances_to_min_pval
-#	p_d_r_dict['true_snps_ranks'] = true_snps_ranks
-#	p_d_r_dict['phen_mafs'] = phen_mafs
-#	p_d_r_dict['obs_pvals'] = obs_pvals
-#	p_d_r_dict['min_pvals'] = min_pvals
-#	p_d_r_dict['sign_fractions'] = sign_fractions
-#	p_d_r_dict['rank_statistics'] = rank_statistics
-#	p_d_r_dict['sign_statistics'] = sign_statistics
-#	if mapping_method == 'emmax':
-#		p_d_r_dict['pseudo_heritabilities'] = pseudo_heritabilities
-#		p_d_r_dict['h_estimates'] = h_estimates
-#		p_d_r_dict['k_correlation'] = k_correlation
-#		p_d_r_dict['ks_statistic'] = ks_pval_statistic
-#
-#	filename = outputFile + ".stats"
-#	print "Writing results to file:", filename
-#	f = open(filename, "w")
-#	cPickle.dump(p_d_r_dict, f)
-#	f.close
-
+	#Execute qsub script
+	os.system("qsub -q q.norm@mem* " + script_file_name)
 
 
 def _run_():
 	p_dict, args = parse_parameters()
+	print args
 
-	phenotype_models = range(1, 5)
-	p_dict['snps_dataset'] = None
+	if p_dict['sim_phen'] and p_dict['phen_file']: 	#Simulate phenotypes
+		print 'Setting up phenotype simulations'
+		sd = dp.load_250K_snps(p_dict['call_method_id'])
+		simulate_phenotypes(p_dict['phen_file'], sd, debug_filter=p_dict['debug_filter'])
 
-	if p_dict['summarize']: #Set up a summary run..
+	elif p_dict['parallel']:
+		#set up parallel runs
+		phen_d = load_phenotypes(p_dict['phen_file'])
+		phenotypes = phen_d[p_dict['latent_variable']][ p_dict['heritability']][p_dict['phenotype_model']]['phenotypes']
+		num_per_run = p_dict['number_per_run']
+		for i in range(0, len(phenotypes), num_per_run):
+			pass
 
-		if not p_dict['phenotype_model']: #Then run on cluster, summarize for all phenotype models
-			for pm in phenotype_models:
-				p_dict['phenotype_model'] = pm
-				run_parallel(p_dict, summary_run=True)
-		else:
-			summarise_runs(p_dict)
-		return  #Exit...
+	elif p_dict['phen_index']: #Run things..
+		results_list = []
+		file_prefix = env.env['results_dir'] + p_dict['run_id']
+		for pid in p_dict['phen_index']:
+			result_dict = run_analysis(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
+						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
+						p_dict['call_method_id'], debug_filter=p_dict['debug_filter'], num_steps=4)
+			results_list.append(result_dict)
+		#Save as pickled
+		pickled_results_file = file_prefix + '.pickled'
+		with open(pickled_results_file, 'wb') as f:
+			cPickle.dump(results_list, f, protocol=2)
 
-	else: #Then load SNPs data
-		snps_data_file = snpsdata.get_call_method_dataset_file(p_dict['call_method_id'], binary_format=True)
-		p_dict['snps_dataset'] = dataParsers.parse_binary_snp_data(snpsDataFile)
-
-	if p_dict['phen_file']:
-		phen_file = p_dict['phen_file']
-	else:
-		phen_file = env.env['tmp_dir'] + p_dict['run_id'] + ".phen"
-
-	if p_dict['phenotype_model']:  #If phenotype model is specified, then use that, otherwise run all..
-		phenotype_models = [p_dict['phenotype_model']]
-
-
-	if p_dict['sim_phen']:
-		phen_d = simulate_phenotype(phen_file, p_dict)
-	else:
-		phen_d = load_phenotypes(phen_file)
-
-	if args:
-		phen_index = int(args[0])
-	else:
-		#Running on the cluster..
-		phen_indices = range(0, num_phenotypes, numberPerRun)
-		for pm in phenotype_models:
-			print "Submitting jobs for phenotype model:", pm
-			p_dict['phenotype_model'] = pm
-			for phen_index in phen_indices:
-				run_parallel(p_dict, phen_index=phen_index)
-		return #Exiting
-
-	print "phen_index:", phen_index
-	print "\nStarting analysis now!\n"
-	print "run_id:", run_id
-	run_analysis(phen_index, phen_d, p_dict, phenotype_models)
+	#elif p_dict['summarize_results']:
+		#plot things..
 
 
 
-def _run_vincent_scripts_():
-	type = sys.argv[1]
-	start = int(sys.argv[2])
-	end = int(sys.argv[3])
-	if type == 'add_emmax':
-		exec_str = 'sim2loci_add_fwdbwdemmax.sh'
-	elif type == 'add_lm':
-		exec_str = 'sim2loci_add_fwdbwdlm.sh'
-	elif type == 'or_emmax':
-		exec_str = 'sim2loci_or_fwdbwdemmax.sh'
-	elif type == 'or_lm':
-		exec_str = 'sim2loci_or_fwdbwdlm.sh'
-	elif type == 'xor_emmax':
-		exec_str = 'sim2loci_xor_fwdbwdemmax.sh'
-	elif type == 'xor_lm':
-		exec_str = 'sim2loci_xor_fwdbwdlm.sh'
-	for i in range(start, end + 1):
-		exec_st = 'qsub -q cmb -l walltime=6:00:00 -l mem=2950mb /home/cmbpanfs-01/bvilhjal/vincent/jobs/' + exec_str + ' -v VARIABLE=' + str(i)
-		print exec_st
-		os.system(exec_st)
+
+
+#def _run_vincent_scripts_():
+#	type = sys.argv[1]
+#	start = int(sys.argv[2])
+#	end = int(sys.argv[3])
+#	if type == 'add_emmax':
+#		exec_str = 'sim2loci_add_fwdbwdemmax.sh'
+#	elif type == 'add_lm':
+#		exec_str = 'sim2loci_add_fwdbwdlm.sh'
+#	elif type == 'or_emmax':
+#		exec_str = 'sim2loci_or_fwdbwdemmax.sh'
+#	elif type == 'or_lm':
+#		exec_str = 'sim2loci_or_fwdbwdlm.sh'
+#	elif type == 'xor_emmax':
+#		exec_str = 'sim2loci_xor_fwdbwdemmax.sh'
+#	elif type == 'xor_lm':
+#		exec_str = 'sim2loci_xor_fwdbwdlm.sh'
+#	for i in range(start, end + 1):
+#		exec_st = 'qsub -q cmb -l walltime=6:00:00 -l mem=2950mb /home/cmbpanfs-01/bvilhjal/vincent/jobs/' + exec_str + ' -v VARIABLE=' + str(i)
+#		print exec_st
+#		os.system(exec_st)
 
 
 if __name__ == '__main__':
-	#_run_()
-	sd = dp.load_250K_snps()
-	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
+	_run_()
+#	sd = dp.load_250K_snps()
+#	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
 	print "Done!!\n"
