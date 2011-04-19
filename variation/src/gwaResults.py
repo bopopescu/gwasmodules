@@ -303,13 +303,13 @@ class Result(object):
 		"""
 		This only loads SNPs...
 		"""
-		self.chromosome_ends = snps_data.get_chromosome_ends()
 		self.snp_results['snps'] = snps_data.getSnps()
 		self.snp_results['positions'] = snps_data.getPositions()
 		self.snp_results['chromosomes'] = snps_data.get_chr_list()
 		self.keys.append('chromosomes')
 		self.keys.append('positions')
 		self.keys.append('snps')
+		self.chromosome_ends = snps_data.get_chromosome_ends()
 
 
 	def _load_mafs_(self, snps_data):
@@ -1312,7 +1312,8 @@ class Result(object):
 		fdrs = []
 		for window_size in window_sizes:
 			cpl = self.get_chr_pos_list()
-			pdb.set_trace()
+			if window_size == 0:
+				pdb.set_trace()
 			filtered_cpl = []
 			if len(cpl):
 				num_caus_found = 0
@@ -1331,7 +1332,9 @@ class Result(object):
 			else:
 				tprs.append(0)
 				fdrs.append(0)
-			pdb.set_trace()
+			if window_size == 0:
+				pdb.set_trace()
+
 
 		return tprs, fdrs
 

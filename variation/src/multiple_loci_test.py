@@ -274,6 +274,11 @@ def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_t
 	caus_indices = gwa_res.get_indices(cpl)
 	gwa_res._rank_scores_()
 
+	#Calculate KS and P-med..
+	pvals = gwa_res.snp_results['scores'][:]
+	res_dict['ks_stat'] = agr.calc_ks_stats(pvals)
+	res_dict['med_pval'] = agr.calc_median(pvals)
+
 	#Get causal p-values, and ranks
 	res_dict['causal_pvals'] = [gwa_res.snp_results['scores'][i] for i in caus_indices]
 	res_dict['causal_ranks'] = [gwa_res.ranks[i] for i in caus_indices]
@@ -298,7 +303,9 @@ def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_t
 	fdrs_list = []
 	for pval_thres in pval_thresholds:
 		#Filter data
+		pdb.set_trace()
 		gwa_res.filter_attr('scores', pval_thres)
+		pdb.set_trace()
 		tprs, fdrs = gwa_res.get_power_analysis(cpl, window_sizes)
 		tprs_list.append(tprs)
 		fdrs_list.append(fdrs)
@@ -389,15 +396,12 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
 	print len(p_vals)
 	kw_res = gr.Result(snps_data=sd, scores=p_vals)
-	#plot KW result
 	kw_file_prefix = file_prefix + '_kw'
 	kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
 				plot_bonferroni=True)
 
-	#FINISH!!
-	#plot QQ-plots..
-	agr.get_quantiles(kw_res.snp_results['scores'], 1000)
-	#Calculate KS and P-med..
+	agr.plot_simple_qqplots(kw_file_prefix, [kw_res], result_labels=['Kruskal-Wallis'])
+
 
 	print 'Updating stats for KW'
 	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
