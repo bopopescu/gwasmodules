@@ -1312,23 +1312,26 @@ class Result(object):
 		fdrs = []
 		for window_size in window_sizes:
 			cpl = self.get_chr_pos_list()
+			pdb.set_trace()
+			filtered_cpl = []
 			if len(cpl):
 				num_caus_found = 0
 				num_false_found = 0
 				for (chrom1, pos1) in caus_chrom_pos_list:
 					caus_found = False
-					for (chrom2, pos2) in cpl:
+					for chrom2, pos2 in cpl:
 						if chrom1 == chrom2 and abs(pos1 - pos2) <= window_size:
 							caus_found = True
 						else:
-							num_false_found += 1
+							filtered_cpl.append((chrom2, pos2))
 					if caus_found:
 						num_caus_found += 1
 				tprs.append(float(num_caus_found) / len(caus_chrom_pos_list))
-				fdrs.append(float(num_false_found) / (len(caus_chrom_pos_list) * len(cpl)))
+				fdrs.append(float(len(filtered_cpl)) / len(cpl))
 			else:
 				tprs.append(0)
 				fdrs.append(0)
+			pdb.set_trace()
 
 		return tprs, fdrs
 

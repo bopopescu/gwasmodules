@@ -606,7 +606,8 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 					b_threshold = -sp.log10(1.0 / (len(t_snps) * 20.0))
 					pylab.vlines(threshold, 0, max(hist_res[0]), color='g')
 					pylab.vlines(b_threshold, 0, max(hist_res[0]), color='r')
-					pylab.savefig(env['tmp_dir'] + 'test.png', format='png')
+					pylab.savefig(file_prefix + 'perm_%d_min_pval_hist.png' % (p_dict['emmax_perm']),
+						format='png')
 				if p_dict['with_replicates']:
 					#Get values, with ecotypes, construct Z and do GWAM
 					phen_vals = phed.get_values(p_i)
