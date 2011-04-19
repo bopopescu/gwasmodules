@@ -1950,7 +1950,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
 		step_dict['max_cof_pval'] = max(cof_pvals)
 	else:
 		step_dict['max_cof_pval'] = 1
-	step_dict['cofactor_snps'] = cof_snps
+	#step_dict['cofactor_snps'] = cof_snps
 	secs = time.time() - s1
 	if secs > 60:
 		mins = int(secs) / 60
@@ -1960,8 +1960,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
 		print 'Took %f seconds.' % (secs)
 
 	print step_dict
-	step_dict['emmax_res'] = r
-	return step_dict
+	return {'stats':step_dict, 'res':r}
 
 
 
