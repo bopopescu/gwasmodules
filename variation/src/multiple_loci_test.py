@@ -365,15 +365,6 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	pd = phen_d[latent_var][heritability][phen_model]
 	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM', 'Stepw_EX'] #5 in total
 
-	#What to save...
-	#Distance of significant SNPs to all causative SNPs
-	#Ranks and p-values of significant SNPs
-	#Chromosome and position of all significant SNPs
-	#Ranks and p-values of causal SNPs
-	#Summarize the following:
-	#	- Power (sensitivity, TPR), FDR, FPR, for different bonf. thresholds.. at 0, 5, 10, 20, and 100 kb window
-	#	- Of all SNPs ranked higher than the second causative... which is farthest from a nearest causative.
-
 
 	result_dict = {}
 	for mm in mapping_methods:
@@ -405,6 +396,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 
 	#FINISH!!
 	#plot QQ-plots..
+	agr.get_quantiles(kw_res.snp_results['scores'], 1000)
 	#Calculate KS and P-med..
 
 	print 'Updating stats for KW'

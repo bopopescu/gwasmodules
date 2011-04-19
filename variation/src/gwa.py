@@ -601,12 +601,13 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 					res = lm.emmax_perm_test(t_snps, t_phen_vals, k, p_dict['emmax_perm'])
 					emmax_perm_threshold = res['threshold_05'][0]
 					import pylab
-					hist_res = pylab.hist(-sp.log10(res['min_ps']))
+					hist_res = pylab.hist(-sp.log10(res['min_ps']), alpha=0.6)
 					threshold = -sp.log10(emmax_perm_threshold)
 					b_threshold = -sp.log10(1.0 / (len(t_snps) * 20.0))
 					pylab.vlines(threshold, 0, max(hist_res[0]), color='g')
 					pylab.vlines(b_threshold, 0, max(hist_res[0]), color='r')
-					pylab.savefig(env['tmp_dir'] + 'test.png', format='png')
+					pylab.savefig(file_prefix + 'perm_%d_min_pval_hist.png' % (p_dict['emmax_perm']),
+						format='png')
 				if p_dict['with_replicates']:
 					#Get values, with ecotypes, construct Z and do GWAM
 					phen_vals = phed.get_values(p_i)
