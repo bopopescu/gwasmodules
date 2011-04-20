@@ -72,7 +72,7 @@ def parse_parameters():
 	p_dict = {'number_per_run':10, 'debug_filter':1.0, 'summarize':False, 'maf_filter':0,
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
 		'mapping_method':'emmax', 'heritability':50, 'plot_pvals':False, 'call_method_id':75,
-		'phen_file':None, 'num_steps':10, 'phen_index':1, 'sim_phen':False, 'parallel':False}
+		'phen_file':None, 'num_steps':4, 'phen_index':1, 'sim_phen':False, 'parallel':False}
 
 
 	for opt, arg in opts:
@@ -329,6 +329,7 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 		if criteria == 'mbonf':
 			tprs_list = []
 			fdrs_list = []
+			t_opt_i_list = []
 			num_steps = len(step_info_list) / 2
 			max_cof_pvals = -sp.log10([step_info_list[i]['mbonf'] for i in range(2 * num_steps)])
 			for pval_thres in pval_thresholds:
@@ -351,8 +352,11 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 					tprs, fdrs = sign_res.get_power_analysis(cpl, window_sizes)
 				tprs_list.append(tprs)
 				fdrs_list.append(fdrs)
-			res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
-			res_dict['fdrs'] = fdrs_list #[p_valthreshold][window_size]
+				t_opt_i_list.append(t_opt_i)
+			pdb.set_trace()
+			d['tprs'] = tprs_list #[p_valthreshold][window_size]
+			d['fdrs'] = fdrs_list #[p_valthreshold][window_size]
+			d['t_opt_i_list'] = t_opt_i_list
 
 
 		if opt_i == 0:
