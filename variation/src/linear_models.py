@@ -568,7 +568,9 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def _get_eigen_R_(self, X, hat_matrix=None, dtype='single'):
+	def _get_eigen_R_(self, X=None, hat_matrix=None, dtype='single'):
+		if X == None:
+			X = self.X
 		q = X.shape[1]
 		if not hat_matrix:
 			X_squared_inverse = linalg.pinv(X.T * X) #(X.T*X).I
@@ -1077,72 +1079,6 @@ class LinearMixedModel(LinearModel):
 		r['max_ll'] = res['max_ll']
 		return r
 
-
-	def emmax_step(self, snps, Z=None, with_betas=False, eig_L=None, eig_R=None):
-		"""
-		EMMAX implementation (in python)
-		Single SNPs
-		
-		Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
-		"""
-		K = self.random_effects[1][1]
-		if not eig_L:
-			print 'Calculating the eigenvalues of K'
-			eig_L = self._get_eigen_L_(K)
-			print 'Done.'
-		if not eig_R:
-			print "Calculating the eigenvalues of S(K+I)S where S = I-X(X'X)^-1X'"
-			eig_R = self._get_eigen_R_(self.X)
-			print 'Done'
-
-		print 'Getting variance estimates'
-		res_dict = {'REML':self.get_estimates(eig_L, method='REML', eig_R=eig_R),
-				'ML':self.get_estimates(eig_L, method='ML', eig_R=eig_R)}
-		print 'Done.'
-		print 'pseudo_heritability:', res_dict['REML']['pseudo_heritability']
-
-		r = self._emmax_f_test_(snps, res_dict['REML']['H_sqrt_inv'], Z=Z, with_betas=with_betas)
-		r['pseudo_heritability'] = res_dict['REML']['pseudo_heritability']
-		r['ve'] = res_dict['REML']['ve']
-		r['vg'] = res_dict['REML']['vg']
-		ll = res_dict['ML']['max_ll']
-		r['max_ll'] = ll
-		r['rss'] = float(res_dict['REML']['rss'])
-		r['reml_mahalanobis_rss'] = float(res_dict['REML']['mahalanobis_rss'])
-		num_snps = len(snps)
-		num_par = len()
-		(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
-#		r[]
-#			H_sqrt_inv = reml_res['H_sqrt_inv']
-#			ll = ml_res['max_ll']
-#			reml_mahalanobis_rss =
-#			criterias = {'ebics':[], 'mbics':[], 'bonf':[], 'mbonf':[]}
-#			(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
-#			criterias['ebics'].append(extended_bic)
-#			criterias['mbics'].append(modified_bic)
-#			max_cofactor_pval = 0
-#			criterias['mbonf'].append(max_cofactor_pval)
-#			criterias['bonf'].append(0)
-#			action = 'None'
-#			print '\nStep %d: action=%s, num_par=%d, p_her=%0.4f, ll=%0.2f, rss=%0.2f, reml_m_rss=%0.2f, bic=%0.2f, extended_bic=%0.2f, modified_bic=%0.2f, num_snps=%d' % \
-#				(step_i, action, num_par, reml_res['pseudo_heritability'], ll, rss, reml_mahalanobis_rss, \
-#				 bic, extended_bic, modified_bic, num_snps)
-		emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv)
-		if step_i == 1:
-			first_emmax_res = emmax_res
-		min_pval_i = sp.argmin(emmax_res['ps'])
-		min_pval = emmax_res['ps'][min_pval_i]
-		mahalnobis_rss = emmax_res['rss'][min_pval_i]
-		min_pval_chr_pos = chr_pos_list[min_pval_i]
-		print 'Min p-value:', min_pval
-		criterias['bonf'].append(min_pval)
-		print 'Min Mahalanobis RSS:', mahalnobis_rss
-		step_info = {'mahalanobis_rss':mahalnobis_rss,
-			'll':ll, 'bic':bic, 'e_bic':extended_bic, 'm_bic':modified_bic, 'mbonf':max_cofactor_pval,
-			'ps': emmax_res['ps'], 'cofactors':map(tuple, cofactors[:]), 'cofactor_snps':cofactor_snps[:],
-			'min_pval':min_pval, 'min_pval_chr_pos': min_pval_chr_pos, 'interactions':interactions}
-
-		return r
 
 
 
@@ -1787,7 +1723,10 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 	f.write(','.join(['step_nr'] + d_keys + ['kolmogorov_smirnov', 'min_pval_pos_chr', 'cofactors']) + '\n')
 	for i, si in enumerate(step_info_list):
 		st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-		st += ',%d' % si['kolmogorov_smirnov']['D']
+		if si['kolmogorov_smirnov']:
+			st += ',%d' % si['kolmogorov_smirnov']['D']
+		else:
+			st += ','
 		if si['min_pval_chr_pos']:
 			st += ',%d_%d,' % si['min_pval_chr_pos']
 		else:
@@ -1933,6 +1872,101 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		pylab.savefig(file_prefix + '_stats_variances_forward.png', format='png')
 
 
+
+def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
+	"""
+	EMMAX single SNPs
+	
+	Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
+	"""
+	import bisect
+	s1 = time.time()
+       	lmm = LinearMixedModel(phen_vals)
+	lmm.add_random_effect(K)
+	h0_rss = lmm.get_rss()[0]
+	chrom_pos_list = sd.getChrPosList()
+	print 'Looking up cofactors'
+	cof_indices = []
+	for chrom_pos in cof_chr_pos_list:
+		i = bisect.bisect(chrom_pos_list, chrom_pos) - 1
+		assert chrom_pos_list[i] == chrom_pos, 'Cofactor missing??'
+		cof_indices.append(i)
+	snps = sd.getSnps()
+	cof_snps = [snps[i] for i in cof_indices]
+	lmm.set_factors(cof_snps)
+
+	if not eig_L:
+		print 'Calculating the eigenvalues of K'
+		eig_L = lmm._get_eigen_L_()
+		print 'Done.'
+	if not eig_R:
+		print "Calculating the eigenvalues of S(K+I)S where S = I-X(X'X)^-1X'"
+		eig_R = lmm._get_eigen_R_()
+		print 'Done'
+
+	print 'Getting variance estimates'
+	res_dict = {'REML':lmm.get_estimates(eig_L, method='REML', eig_R=eig_R),
+			'ML':lmm.get_estimates(eig_L, method='ML', eig_R=eig_R)}
+	print 'Done.'
+	print 'pseudo_heritability:', res_dict['REML']['pseudo_heritability']
+
+	H_sqrt_inv = res_dict['REML']['H_sqrt_inv']
+
+	r = lmm._emmax_f_test_(snps, H_sqrt_inv)
+	min_pval_i = sp.argmin(r['ps'])
+	step_dict = {}
+	step_dict['min_pval_i'] = min_pval_i
+	step_dict['min_pval'] = r['ps'][min_pval_i]
+	step_dict['mahalanobis_rss'] = r['rss'][min_pval_i]
+	step_dict['min_pval_chr_pos'] = chrom_pos_list[min_pval_i]
+	step_dict['pseudo_heritability'] = res_dict['REML']['pseudo_heritability']
+	step_dict['ve'] = res_dict['REML']['ve']
+	step_dict['vg'] = res_dict['REML']['vg']
+	ll = res_dict['ML']['max_ll']
+	step_dict['max_ll'] = ll
+	step_dict['rss'] = float(res_dict['REML']['rss'])
+	step_dict['h0_rss'] = h0_rss
+	step_dict['perc_var_expl'] = min(0.0, 1.0 - step_dict['rss'] / h0_rss)
+	step_dict['reml_mahalanobis_rss'] = float(res_dict['REML']['mahalanobis_rss'])
+	num_snps = len(snps)
+	num_par = lmm.X.shape[1] + 1
+	step_dict['num_snps'] = num_snps
+	step_dict['num_par'] = num_par
+	(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
+	step_dict['ebic'] = extended_bic
+	step_dict['mbic'] = modified_bic
+	step_dict['bic'] = bic
+
+	#Calculate maximum cofactor p-value
+	cof_pvals = []
+	for i, snp in enumerate(cof_snps):
+		t_cofactors = sp.matrix(cof_snps) * H_sqrt_inv.T
+		t_cofactors = t_cofactors.tolist()
+		del t_cofactors[i]
+		lmm.set_factors(t_cofactors)
+		res = lmm._emmax_f_test_([snp], H_sqrt_inv)
+		cof_pvals.append(res['ps'][0])
+	for i, pval in zip(cof_indices, cof_pvals):
+		print r['ps'][i], pval
+		r['ps'][i] = pval
+	if len(cof_pvals):
+		step_dict['max_cof_pval'] = max(cof_pvals)
+	else:
+		step_dict['max_cof_pval'] = 0.0
+	#step_dict['cofactor_snps'] = cof_snps
+	secs = time.time() - s1
+	if secs > 60:
+		mins = int(secs) / 60
+		secs = secs - mins * 60
+		print 'Took %d mins and %f seconds.' % (mins, secs)
+	else:
+		print 'Took %f seconds.' % (secs)
+
+	return {'stats':step_dict, 'res':r}
+
+
+
+
 def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
 		all_chromosomes=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
@@ -1972,8 +2006,8 @@ def emmax_step_wise(phenotypes, K, sd=None, all_snps=None, all_positions=None,
  	num_par = 2 #mean and variance scalar
  	num_pher_0 = 0
 
-	eig_L = lmm._get_eigen_L_(K)
-	eig_R = lmm._get_eigen_R_(lmm.X)
+	eig_L = lmm._get_eigen_L_()
+	eig_R = lmm._get_eigen_R_()
 
 	reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
 	ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
@@ -2953,12 +2987,28 @@ def perform_human_emmax():
 
 
 
+def _test_emmax_step_():
+	import dataParsers as dp
+	import phenotypeData as pd
+	import env
+	pid = 226
+	sd = dp.load_250K_snps()
+	phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'phen_raw_112210.csv')
+	phed.convert_to_averages()
+	print phed.get_name(pid)
+	sd.coordinate_w_phenotype_data(phed, pid)
+	K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', accessions=sd.accessions)
+	phen_vals = phed.get_values(pid)
+	cpl = sd.getChrPosList()
+	cof_chr_pos_list = [(4, 6392280), (4, 6418442)]#cpl[100]]
+	emmax_res = emmax_step(phen_vals, sd, K, cof_chr_pos_list)
+	pdb.set_trace()
 
 if __name__ == "__main__":
 #	import env
 #	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
-	perform_human_emmax()
+	_test_emmax_step_()
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()

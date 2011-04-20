@@ -159,6 +159,7 @@ def get_log_quantiles(scores, num_dots, max_val=5):
 	"""
 	Uses scipy
 	"""
+	scores = sp.array(scores)
 	scores.sort()
 	indices = sp.array(10 ** ((-sp.arange(1, num_dots + 1, dtype='single') / (num_dots + 1)) * max_val) \
 				* len(scores), dtype='int')
@@ -199,6 +200,7 @@ def get_quantiles(scores, num_dots):
 	"""
 	Uses scipy
 	"""
+	scores = sp.array(scores)
 	scores.sort()
 	indices = [int(len(scores) * i / (num_dots + 2)) for i in range(1, num_dots + 1)]
 	return scores[indices]
@@ -228,6 +230,24 @@ def simple_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=No
 		fontProp = matplotlib.font_manager.FontProperties(size=10)
 		plt.legend(loc=2, numpoints=2, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
 	plt.savefig(png_file)
+
+
+
+def plot_simple_qqplots(png_file_prefix, results, result_labels=None, line_colors=None,
+			num_dots=1000, title=None, max_neg_log_val=5):
+	"""
+	Plots both log QQ-plots and normal QQ plots.
+	"""
+	qs = []
+	log_qs = []
+	for res in results:
+		pvals = res.snp_results['scores'][:]
+		qs.append(get_quantiles(pvals, num_dots))
+		log_qs.append(get_log_quantiles(pvals, num_dots, max_neg_log_val))
+	simple_qqplot(qs, png_file_prefix + '_qq.png', quantile_labels=result_labels,
+				line_colors=line_colors, num_dots=num_dots, title=title)
+	simple_log_qqplot(log_qs, png_file_prefix + '_log_qq.png', quantile_labels=result_labels,
+				line_colors=line_colors, num_dots=num_dots, title=title, max_val=max_neg_log_val)
 
 
 
