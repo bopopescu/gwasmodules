@@ -72,7 +72,7 @@ def parse_parameters():
 	p_dict = {'number_per_run':10, 'debug_filter':1.0, 'summarize':False, 'maf_filter':0,
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
 		'mapping_method':'emmax', 'heritability':50, 'plot_pvals':False, 'call_method_id':75,
-		'phen_file':None, 'num_steps':5, 'phen_index':1, 'sim_phen':False, 'parallel':False}
+		'phen_file':None, 'num_steps':10, 'phen_index':1, 'sim_phen':False, 'parallel':False}
 
 
 	for opt, arg in opts:
@@ -252,7 +252,7 @@ def summarize_runs(p_dict):
 	raise NotImplementedError
 
 
-def __get_thresholds(min_thres=10, max_thres=4, num_thres=12):
+def __get_thresholds(min_thres=10, max_thres=1, num_thres=18):
 	thres_step = (min_thres - max_thres) / float(num_thres)
 	pval_thresholds = []
 	for i in range(num_thres):
@@ -261,7 +261,7 @@ def __get_thresholds(min_thres=10, max_thres=4, num_thres=12):
 
 pval_thresholds = __get_thresholds()
 
-window_sizes = [0, 1000, 5000, 10000, 20000, 50000, 100000]
+window_sizes = [0, 1000, 5000, 10000, 25000, 50000, 100000]
 
 def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_threshold=None, sign_res=None):
 	"""
@@ -303,9 +303,7 @@ def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_t
 	fdrs_list = []
 	for pval_thres in pval_thresholds:
 		#Filter data
-		pdb.set_trace()
 		gwa_res.filter_attr('scores', pval_thres)
-		pdb.set_trace()
 		tprs, fdrs = gwa_res.get_power_analysis(cpl, window_sizes)
 		tprs_list.append(tprs)
 		fdrs_list.append(fdrs)
@@ -329,27 +327,55 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 		d = {'opt_i':opt_i}
 		si = step_info_list[opt_i]
 		if criteria == 'mbonf':
-			#Calculate fdr/tpr for different thresholds... which yield different opt_i!
-			pass
+			tprs_list = []
+			fdrs_list = []
+			num_steps = len(step_info_list) / 2
+			max_cof_pvals = -sp.log10([step_info_list[i]['mbonf'] for i in range(2 * num_steps)])
+			for pval_thres in pval_thresholds:
+				t_opt_i = 0
+				for i in range(num_steps + 1):
+					if max_cof_pvals[i] >= pval_thres:
+						t_opt_i = i
+				for j in range(1, num_steps):
+					i = 2 * num_steps - j
+					if max_cof_pvals[i] >= pval_thres:
+						if j > t_opt_i:
+							t_opt_i = i
+				if t_opt_i == 0:
+					tprs = [-1 for ws in window_sizes]
+					fdrs = [-1 for ws in window_sizes]
+				else:
+					t_si = step_info_list[t_opt_i]
+					cpst = map(list, zip(*t_si['cofactors']))
+					sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
+					tprs, fdrs = sign_res.get_power_analysis(cpl, window_sizes)
+				tprs_list.append(tprs)
+				fdrs_list.append(fdrs)
+			res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
+			res_dict['fdrs'] = fdrs_list #[p_valthreshold][window_size]
+
+
+		if opt_i == 0:
+			#Set default values (Are these appropriate?)
+			d['tprs'] = [-1 for ws in window_sizes]
+			d['fdrs'] = [-1 for ws in window_sizes]
+			d['sign_chr_pos'] = []
+			d['causal_dist_matrix'] = []
 		else:
-			if opt_i == 0:
-				#Set default values (Are these appropriate?)
-				d['tprs'] = [0 for ws in window_sizes]
-				d['fdrs'] = [0 for ws in window_sizes]
-				d['sign_chr_pos'] = []
-				d['causal_dist_matrix'] = []
+			cpst = map(list, zip(*si['cofactors']))
+			#Create a result object..
+			sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
+			d['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
+			d['causal_dist_matrix'] = sign_res.get_distances(cpl)
+			if criteria == 'mbonf':
+				d['mbonf_tprs'], d['mbonf_fdrs'] = sign_res.get_power_analysis(cpl, window_sizes)
 			else:
-				cpst = map(list, zip(*si['cofactors']))
-				#Create a result object..
-				sign_res = gr.Result(scores=cpst[2], chromosomes=cpst[0], positions=cpst[1])
-				d['sign_chr_pos'] = sign_res.get_chr_pos_score_list()
-				d['causal_dist_matrix'] = sign_res.get_distances(cpl)
 				d['tprs'], d['fdrs'] = sign_res.get_power_analysis(cpl, window_sizes)
-			d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
-			d['pval_median'] = si['pval_median']
-			d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
-			if type == 'EX':
-				d['pseudo_heritability'] = si['pseudo_heritability']
+		d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
+		d['pval_median'] = si['pval_median']
+		d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
+		if type == 'EX':
+			d['pseudo_heritability'] = si['pseudo_heritability']
 		res_dict[criteria] = d
 
 
@@ -393,13 +419,12 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 
 	print "Running Analysis"
 	print 'Running KW'
-	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps']
+	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps'].tolist()
 	print len(p_vals)
 	kw_res = gr.Result(snps_data=sd, scores=p_vals)
 	kw_file_prefix = file_prefix + '_kw'
 	kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
 				plot_bonferroni=True)
-
 	agr.plot_simple_qqplots(kw_file_prefix, [kw_res], result_labels=['Kruskal-Wallis'])
 
 
@@ -407,13 +432,12 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
 
-
 	print 'Running SW LM'
 	lm_file_prefix = file_prefix + '_lm'
 	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
 					with_qq_plots=True, highlight_loci=highlight_loci)
 	lm_step_info = ret_dict['step_info_list']
-	lm_pvals = ret_dict['first_lm_res']['ps']
+	lm_pvals = ret_dict['first_lm_res']['ps'].tolist()
 	lm_opt_dict = ret_dict['opt_dict']
 	lm_res = gr.Result(scores=lm_pvals, snps_data=sd)
 	print 'Updating stats for LM'
@@ -422,7 +446,6 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	print 'Updating stats for SW LM'
 	_update_sw_stats_(result_dict['Stepw_LM'], lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
-	pdb.set_trace()
 
 
 	print 'Running SW EX'
@@ -431,10 +454,10 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
 					with_qq_plots=True, highlight_loci=highlight_loci)
 	emmax_step_info = ret_dict['step_info_list']
-	emmax_pvals = ret_dict['first_emmax_res']['ps']
+	emmax_pvals = ret_dict['first_emmax_res']['ps'].tolist()
 	emmax_opt_dict = ret_dict['opt_dict']
 	emmax_res = gr.Result(scores=emmax_pvals, snps_data=sd)
-	print 'Updating stats for SW LM'
+	print 'Updating stats for EX'
 	result_dict['EX'] = _update_stats_(emmax_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
 	print 'Updating stats for SW EX'
@@ -446,6 +469,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 
 	pdb.set_trace()
 	return result_dict
+
 
 
 def run_parallel(file_prefix, latent_var, heritability, phen_model, phen_indices_range,
@@ -502,6 +526,7 @@ def run_parallel(file_prefix, latent_var, heritability, phen_model, phen_indices
 	os.system("qsub -q q.norm@mem* " + script_file_name)
 
 
+
 def _run_():
 	p_dict, args = parse_parameters()
 	print args
@@ -525,7 +550,8 @@ def _run_():
 		for pid in p_dict['phen_index']:
 			result_dict = run_analysis(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
-						p_dict['call_method_id'], debug_filter=p_dict['debug_filter'], num_steps=4)
+						p_dict['call_method_id'], debug_filter=p_dict['debug_filter'],
+						num_steps=p_dict['num_steps'])
 			results_list.append(result_dict)
 		#Save as pickled
 		pickled_results_file = file_prefix + '.pickled'

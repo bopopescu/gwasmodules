@@ -1723,7 +1723,10 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 	f.write(','.join(['step_nr'] + d_keys + ['kolmogorov_smirnov', 'min_pval_pos_chr', 'cofactors']) + '\n')
 	for i, si in enumerate(step_info_list):
 		st = ','.join(map(str, [i] + [si[k] for k in d_keys]))
-		st += ',%d' % si['kolmogorov_smirnov']['D']
+		if si['kolmogorov_smirnov']:
+			st += ',%d' % si['kolmogorov_smirnov']['D']
+		else:
+			st += ','
 		if si['min_pval_chr_pos']:
 			st += ',%d_%d,' % si['min_pval_chr_pos']
 		else:
@@ -1949,7 +1952,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
 	if len(cof_pvals):
 		step_dict['max_cof_pval'] = max(cof_pvals)
 	else:
-		step_dict['max_cof_pval'] = 1
+		step_dict['max_cof_pval'] = 0.0
 	#step_dict['cofactor_snps'] = cof_snps
 	secs = time.time() - s1
 	if secs > 60:
@@ -1959,7 +1962,6 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
 	else:
 		print 'Took %f seconds.' % (secs)
 
-	print step_dict
 	return {'stats':step_dict, 'res':r}
 
 

@@ -1304,7 +1304,7 @@ class Result(object):
 		return count
 
 
-	def get_power_analysis(self, caus_chrom_pos_list, window_sizes=[0]):
+	def get_power_analysis(self, caus_chrom_pos_list, window_sizes=[0], debug=False):
 		"""
 		Calculate Power and FDR..
 		"""
@@ -1312,7 +1312,7 @@ class Result(object):
 		fdrs = []
 		for window_size in window_sizes:
 			cpl = self.get_chr_pos_list()
-			if window_size == 0:
+			if window_size == 0 and debug:
 				pdb.set_trace()
 			filtered_cpl = []
 			if len(cpl):
@@ -1332,7 +1332,7 @@ class Result(object):
 			else:
 				tprs.append(0)
 				fdrs.append(0)
-			if window_size == 0:
+			if window_size == 0 and debug:
 				pdb.set_trace()
 
 
