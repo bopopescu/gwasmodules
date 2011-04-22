@@ -175,6 +175,26 @@
          style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
          transform="matrix(-0.8,0,0,-0.8,-10,0)" />
     </marker>
+    <inkscape:perspective
+       id="perspective4650"
+       inkscape:persp3d-origin="0.5 : 0.33333333 : 1"
+       inkscape:vp_z="1 : 0.5 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_x="0 : 0.5 : 1"
+       sodipodi:type="inkscape:persp3d" />
+    <marker
+       inkscape:stockid="Arrow1Mend"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Mend-0"
+       style="overflow:visible">
+      <path
+         id="path4564-3"
+         d="M 0,0 5,-5 -12.5,0 5,5 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)" />
+    </marker>
   </defs>
   <sodipodi:namedview
      id="base"
@@ -186,11 +206,11 @@
      objecttolerance="10"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.57848045"
+     inkscape:zoom="0.66449955"
      inkscape:cx="839.08962"
-     inkscape:cy="2008.1079"
+     inkscape:cy="1634.5255"
      inkscape:document-units="px"
-     inkscape:current-layer="g4663"
+     inkscape:current-layer="layer1"
      inkscape:window-width="1394"
      inkscape:window-height="1067"
      inkscape:window-x="328"
@@ -2047,30 +2067,29 @@
            x="165.48029"
            id="tspan14938"
            sodipodi:role="line">Phenotype Matrix</tspan></text>
-      <path
-         sodipodi:nodetypes="cc"
-         id="path14940"
-         d="M 18.450931,1784.4552 L 188.85886,1883.2984"
-         style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;marker-end:url(#Arrow1Lend);stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans" />
       <g
          style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
-         transform="matrix(0.9881465,-0.1535137,0.1535137,0.9881465,-267.63205,-273.54839)"
+         transform="matrix(0.9881465,-0.1535137,0.1535137,0.9881465,-267.63205,-287.54839)"
          id="g4187">
-        <path
-           style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;marker-end:url(#Arrow1Lend);stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
-           d="M -68.221732,2102.7098 L 102.18617,2201.553"
-           id="path4179"
-           sodipodi:nodetypes="cc" />
-        <text
-           xml:space="preserve"
-           style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
-           id="text4181"
-           transform="translate(-99.737292,313.29131)"
-           sodipodi:linespacing="125%"><textPath
-             xlink:href="#path14940"
-             id="textPath4183"><tspan
-   style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
-   id="tspan4185">PutGeneListIntoDb.py</tspan></textPath></text>
+        <g
+           id="g4626"
+           transform="matrix(0.99087188,0.13480693,-0.13480693,0.99087188,290.72748,12.747876)">
+          <path
+             sodipodi:nodetypes="cc"
+             id="path4179"
+             d="m -35.238805,2111.8814 170.407845,98.8432"
+             style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend);font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans" />
+          <text
+             sodipodi:linespacing="125%"
+             transform="matrix(-1,0,0,-1,171.87776,3988.6316)"
+             id="text4181"
+             style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
+             xml:space="preserve"><textPath
+               id="textPath4183"
+               xlink:href="#path14940"><tspan
+   id="tspan4185"
+   style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans">PutGeneListIntoDb.py</tspan></textPath></text>
+        </g>
       </g>
       <text
          id="text4420"
@@ -2096,21 +2115,30 @@
          id="path4428"
          d="M -138.36627,1917.9868 C -138.36627,1968.6088 -138.36627,1968.6088 -138.36627,1968.6088"
          style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;marker-end:url(#Arrow1Mend);stroke-miterlimit:4;stroke-dasharray:6, 6;stroke-dashoffset:0;stroke-opacity:1" />
-      <text
-         transform="matrix(0.8660254,0.5,-0.5,0.8660254,0,0)"
-         id="text3187"
-         y="1508.1898"
-         x="915.57129"
-         style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;font-family:Bitstream Vera Sans"
-         xml:space="preserve"><tspan
-           y="1508.1898"
-           x="915.57129"
-           id="tspan3189"
-           sodipodi:role="line">Results2DB_250k.py</tspan><tspan
-           id="tspan3191"
-           y="1523.1898"
-           x="915.57129"
-           sodipodi:role="line">Results2DB_250k.sh</tspan></text>
+      <g
+         id="g4620"
+         transform="translate(209.75336,420.71809)">
+        <path
+           style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend);font-family:Bitstream Vera Sans;-inkscape-font-specification:Bitstream Vera Sans"
+           d="m 205.41267,1875.7739 c 0,0 -99.60771,-9.4962 -121.726507,-28.1063 -44.473369,-37.4185 -57.710772,-299.4804 -57.710772,-299.4804"
+           id="path14940"
+           sodipodi:nodetypes="csc" />
+        <text
+           xml:space="preserve"
+           style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+           x="607.35132"
+           y="1698.4086"
+           id="text3187"
+           transform="matrix(0.95507833,0.29635348,-0.29635348,0.95507833,0,0)"><tspan
+             sodipodi:role="line"
+             id="tspan3189"
+             x="607.35132"
+             y="1698.4086">Results2DB_250k.py</tspan><tspan
+             sodipodi:role="line"
+             x="607.35132"
+             y="1713.4086"
+             id="tspan3191">Results2DB_250k.sh</tspan></text>
+      </g>
       <path
          sodipodi:nodetypes="ccc"
          id="path3307"
@@ -2451,6 +2479,23 @@
            id="tspan5485"
            x="248.14227"
            y="1948.6295">DB250k.convertOldFormatCallFileIntoNewFormat()</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:28px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+         x="746.42639"
+         y="2536.158"
+         id="text4614"
+         transform="translate(-401.56512,-358.50608)"><tspan
+           sodipodi:role="line"
+           id="tspan4616"
+           x="746.42639"
+           y="2536.158"
+           style="font-size:12">Association.py</tspan><tspan
+           sodipodi:role="line"
+           x="746.42639"
+           y="2571.158"
+           id="tspan4618"
+           style="font-size:12">MpiAssociation.py</tspan></text>
     </g>
     <g
        id="g4762"
@@ -3866,7 +3911,7 @@
          y="2831.8577"
          id="tspan5114">PlotCNVIntensityVsQC.py</tspan></text>
     <path
-       style="fill:none;stroke:#000000;stroke-width:1.49251854px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend)"
+       style="fill:#00000c;stroke:#000000;stroke-width:1.49251854000000006px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend);fill-opacity:1"
        d="m 610.07165,2853.4022 142.40206,0"
        id="path3182" />
     <text
@@ -4186,7 +4231,15 @@
          sodipodi:role="line"
          x="911.96448"
          y="3185.9287"
-         id="tspan4530">CNVToNonOverlapping.py</tspan></text>
+         id="tspan4530">CNVToNonOverlapping.py</tspan><tspan
+         sodipodi:role="line"
+         x="911.96448"
+         y="3185.9287"
+         id="tspan4634" /><tspan
+         sodipodi:role="line"
+         x="911.96448"
+         y="3203.4287"
+         id="tspan4632">CNV.outputNonOverlappingCNVAsSNP()</tspan></text>
     <text
        xml:space="preserve"
        style="font-size:40px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
@@ -4306,5 +4359,28 @@
          id="tspan4583"
          x="-239.03679"
          y="2896.9824">Table CNVQCCall</tspan></text>
+    <g
+       id="g4670"
+       transform="translate(-4,-8)">
+      <text
+         transform="translate(-401.56512,-48.506077)"
+         id="text4636"
+         y="3219.3789"
+         x="1238.5261"
+         style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+         xml:space="preserve"><tspan
+           y="3219.3789"
+           x="1238.5261"
+           id="tspan4638"
+           sodipodi:role="line">Association.py</tspan><tspan
+           id="tspan4640"
+           y="3234.3789"
+           x="1238.5261"
+           sodipodi:role="line">MpiAssociation.py</tspan></text>
+      <path
+         id="path3182-7"
+         d="m 810.15129,3174.7945 142.40206,0"
+         style="fill:#00000c;fill-opacity:1;stroke:#000000;stroke-width:1.49251854px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend)" />
+    </g>
   </g>
 </svg>
