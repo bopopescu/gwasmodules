@@ -439,7 +439,8 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 
 
 
-def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d, call_method_id, debug_filter=1.0, num_steps=10):
+def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d,
+		call_method_id, debug_filter=1.0, num_steps=10, pickle_results=True):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -525,6 +526,12 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	#Record trait pseudo-heritability:
 	result_dict['p_her'] = emmax_step_info[0]['pseudo_heritability']
 
+	if pickle_results == True:
+		pickled_results_file = file_prefix + '.pickled'
+		print 'Pickling result dict in file: %s' % pickled_results_file
+		with open(pickled_results_file, 'wb') as f:
+			cPickle.dump(result_dict, f, protocol=2)
+
 	return result_dict
 
 
@@ -566,9 +573,6 @@ def _run_():
 						num_steps=p_dict['num_steps'])
 			results_list.append(result_dict)
 		#Save as pickled
-		pickled_results_file = file_prefix + '.pickled'
-		with open(pickled_results_file, 'wb') as f:
-			cPickle.dump(results_list, f, protocol=2)
 
 	#elif p_dict['summarize_results']:
 		#plot things..
