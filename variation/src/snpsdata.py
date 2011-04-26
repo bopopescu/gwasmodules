@@ -2923,7 +2923,7 @@ class SNPsDataSet:
 						snplist.append(snp)
 		else:
 			for snpsd in self.snpsDataList:
-				snplist += snpsd.snps
+				snplist.extend(snpsd.snps)
 		return snplist
 
 

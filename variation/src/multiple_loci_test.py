@@ -17,7 +17,7 @@ Option:
 	
 	-m ...			How to generate the phenotypes: plus, xor, or
 
-	--plot_pvals           	Plot Manhattan plots
+	--save_plots           	Plot Manhattan plots
 	--phen_file=...		File where the phenotypes will be saved, and loaded from.
 	--sim_phen		Simulate phenotype, write to phenotype file.
 	--parallel		Run parallel on the cluster
@@ -51,9 +51,7 @@ import time
 import pdb
 
 
-#Parse Vincent's phenotype file...?  Why?
-#Or create my phenotypes..
-#3 models. 5 heritabilites.. 1000 phenotypes.
+mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM', 'Stepw_EX'] #5 in total
 
 def parse_parameters():
 	'Parse the parameters into a dict, etc.'
@@ -61,7 +59,7 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ['plot_pvals', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel']
+	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
@@ -72,7 +70,7 @@ def parse_parameters():
 
 	p_dict = {'number_per_run':20, 'debug_filter':1.0, 'summarize':False,
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
-		'mapping_method':'emmax', 'heritability':50, 'plot_pvals':False, 'call_method_id':75,
+		'mapping_method':'emmax', 'heritability':50, 'save_plots':False, 'call_method_id':75,
 		'phen_file':env.env['data_dir'] + 'multi_locus_phen.pickled', 'num_steps':10,
 		'phen_index':None, 'sim_phen':False, 'parallel':False}
 
@@ -88,7 +86,7 @@ def parse_parameters():
 		elif opt in ("-s"): p_dict['summarize'] = True
 		elif opt in ('-h'): p_dict['heritability'] = int(arg)
 		elif opt in ("--phen_file"): p_dict['phen_file'] = arg
-		elif opt in ("--plot_pvals"): p_dict['plot_pvals'] = True
+		elif opt in ("--save_plots"): p_dict['save_plots'] = True
 		elif opt in ("--sim_phen"): p_dict['sim_phen'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		elif opt in ("--parallel"): p_dict['parallel'] = True
@@ -118,7 +116,7 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 		shstr = '#!/bin/bash\n'
 		shstr += '#$ -S /bin/bash\n'
 		shstr += '#$ -N %s\n' % job_id
-		shstr += "#$ -q q.norm@blade*\n"
+		#shstr += "#$ -q q.norm@blade*\n"
 		shstr += '#$ -o %s_$JOB_ID.log\n' % job_id
 		shstr += 'source /etc/modules-env.sh\n'
 		shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
@@ -140,7 +138,7 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 	if summary_run:
 		shstr += '-s '
 
-	shstr += "> " + file_prefix + "_$JOB_ID_job.out) >& " + file_prefix + "_$JOB_ID_job.err\n"
+	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
 	script_file_name = run_id + ".sh"
 	f = open(script_file_name, 'w')
@@ -303,8 +301,26 @@ def load_phenotypes(phen_file):
 	return phen_dict
 
 
-def summarize_runs(p_dict):
-	raise NotImplementedError
+def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, index_list=None):
+	"""
+	Summarize runs.. duh
+	"""
+	pd = phen_d[latent_var][heritability][phen_model]
+	if not index_list:
+		index_list = range(len(pd['phenotypes']))
+
+	summary_dict = {}
+	#Things to plot:
+	#  - pseudo-heritabilities
+	#  - fdrs vs. tprs
+	#
+	#
+	p_her_list = []
+
+	for i in index_list:
+
+		pickled_file = '%s_%d_%s_%s_%dresults.pickled' % (file_prefix, heritability, latent_var, phen_model, i)
+
 
 
 def __get_thresholds(min_thres=10, max_thres=1, num_thres=18):
@@ -439,8 +455,8 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 
 
 
-def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, phen_d,
-		call_method_id, debug_filter=1.0, num_steps=10, pickle_results=True):
+def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_index, phen_d,
+		call_method_id, num_steps=10, pickle_results=True, save_plots=False):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -455,7 +471,6 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	file_prefix += '_%d_%s_%s_%d' % (heritability, latent_var, phen_model, phen_index)
 
 	pd = phen_d[latent_var][heritability][phen_model]
-	mapping_methods = ['LM', 'KW', 'EX', 'Stepw_LM', 'Stepw_EX'] #5 in total
 
 
 	result_dict = {}
@@ -463,7 +478,6 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 		result_dict[mm] = {}
 
 	print "Loading SNPS dataset (again)"
-	sd = dp.load_250K_snps(call_method_id, debug_filter=debug_filter)
 	bonferroni_threshold = 1.0 / (20.0 * sd.num_snps())
 
 	snps_list = sd.getSnps()
@@ -481,20 +495,23 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	p_vals = util.kruskal_wallis(snps_list, phen_vals)['ps'].tolist()
 	print len(p_vals)
 	kw_res = gr.Result(snps_data=sd, scores=p_vals)
-	kw_file_prefix = file_prefix + '_kw'
-	kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
-				plot_bonferroni=True)
-	agr.plot_simple_qqplots(kw_file_prefix, [kw_res], result_labels=['Kruskal-Wallis'])
+	if save_plots:
+		kw_file_prefix = file_prefix + '_kw'
+		kw_res.plot_manhattan(png_file=kw_file_prefix + '.png', highlight_loci=highlight_loci, neg_log_transform=True,
+					plot_bonferroni=True)
+		agr.plot_simple_qqplots(kw_file_prefix, [kw_res], result_labels=['Kruskal-Wallis'])
 
 
 	print 'Updating stats for KW'
 	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
-
 	print 'Running SW LM'
-	lm_file_prefix = file_prefix + '_lm'
+	if save_plots:
+		lm_file_prefix = file_prefix + '_lm'
+	else:
+		lm_file_prefix = None
 	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
-					with_qq_plots=True, highlight_loci=highlight_loci)
+					with_qq_plots=save_plots, highlight_loci=highlight_loci)
 	lm_step_info = ret_dict['step_info_list']
 	lm_pvals = ret_dict['first_lm_res']['ps'].tolist()
 	lm_opt_dict = ret_dict['opt_dict']
@@ -506,10 +523,11 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	_update_sw_stats_(result_dict['Stepw_LM'], lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
 
-
 	print 'Running SW EX'
-	K = dp.load_kinship(call_method_id)
-	emmax_file_prefix = file_prefix + '_emmax'
+	if save_plots:
+		emmax_file_prefix = file_prefix + '_emmax'
+	else:
+		emmax_file_prefix = None
 	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
 					with_qq_plots=True, highlight_loci=highlight_loci)
 	emmax_step_info = ret_dict['step_info_list']
@@ -527,7 +545,7 @@ def run_analysis(file_prefix, latent_var, heritability, phen_model, phen_index, 
 	result_dict['p_her'] = emmax_step_info[0]['pseudo_heritability']
 
 	if pickle_results == True:
-		pickled_results_file = file_prefix + '.pickled'
+		pickled_results_file = file_prefix + 'results.pickled'
 		print 'Pickling result dict in file: %s' % pickled_results_file
 		with open(pickled_results_file, 'wb') as f:
 			cPickle.dump(result_dict, f, protocol=2)
@@ -564,17 +582,26 @@ def _run_():
 					cluster='gmi')
 
 	elif p_dict['phen_index']: #Run things..
+		sd = dp.load_250K_snps(p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
+		K = dp.load_kinship(p_dict['call_method_id'])
 		results_list = []
 		file_prefix = env.env['results_dir'] + p_dict['run_id']
 		for pid in p_dict['phen_index']:
-			result_dict = run_analysis(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
+			result_dict = run_analysis(sd, K, file_prefix, p_dict['latent_variable'], p_dict['heritability'],
+						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
+						p_dict['call_method_id'], num_steps=p_dict['num_steps'])
+			results_list.append(result_dict)
+		#Save as pickled
+
+	elif p_dict['summarize_results']:
+		results_list = []
+		file_prefix = env.env['results_dir'] + p_dict['run_id']
+		for pid in p_dict['phen_index']:
+			result_dict = run_analysis(sd, K, file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
 						p_dict['call_method_id'], debug_filter=p_dict['debug_filter'],
 						num_steps=p_dict['num_steps'])
 			results_list.append(result_dict)
-		#Save as pickled
-
-	#elif p_dict['summarize_results']:
 		#plot things..
 
 
