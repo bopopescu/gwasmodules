@@ -412,13 +412,14 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 			xs = sp.zeros(len(pval_thresholds))
 			ys = sp.zeros(len(pval_thresholds))
 			for pt_i, pt in enumerate(pval_thresholds):
-				xs[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
-				ys[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
+				ys[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
+				xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
 			pylab.plot(xs, ys, label=am)
 		png_file = '%s_w%d.png' % (file_prefix, ws)
-		pylab.xlabel('Power')
-		pylab.ylabel('FDR')
-		pylab.legend()
+		pylab.ylabel('Power')
+		pylab.xlabel('FDR')
+		pylab.setp(ltext, fontsize='small')
+		pylab.legend(loc=4)
 		pylab.savefig(png_file)
 		pylab.clf()
 
