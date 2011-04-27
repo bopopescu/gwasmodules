@@ -415,7 +415,7 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 				xs[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
 				ys[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
 			pylab.plot(xs, ys, label=am)
-		png_file = '%s_w%d.png' % (file_prefix, window_sizes)
+		png_file = '%s_w%d.png' % (file_prefix, ws)
 		pylab.savefig('png_file')
 		pylab.clf()
 
