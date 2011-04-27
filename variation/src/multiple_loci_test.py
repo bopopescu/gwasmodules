@@ -416,6 +416,9 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 				ys[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
 			pylab.plot(xs, ys, label=am)
 		png_file = '%s_w%d.png' % (file_prefix, ws)
+		pylab.xlabel('Power')
+		pylab.ylabel('FDR')
+		pylab.legend()
 		pylab.savefig(png_file)
 		pylab.clf()
 
