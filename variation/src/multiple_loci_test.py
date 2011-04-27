@@ -393,7 +393,7 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 	pdb.set_trace()
 
 
-def plot_run_summaries(summary_dict):
+def plot_tprs_fdrs(file_prefix, summary_dict):
 	"""
 	Plot various things relating to run summaries
 	"""
@@ -404,8 +404,21 @@ def plot_run_summaries(summary_dict):
 	# - pseudoheritabilities vs. ks and med pval. of KW and LM
 
 	# TPRs vs. FDRs
-	for pt_i, pt in enumerate(pval_thresholds):
-		for w_i, ws in enumerate(window_sizes):
+	am_list = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
+
+	for w_i, ws in enumerate(window_sizes):
+		pylab.figure()
+		for am in am_list:
+			xs = sp.zeros(len(pval_thresholds))
+			ys = sp.zeros(len(pval_thresholds))
+			for pt_i, pt in enumerate(pval_thresholds):
+				xs[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
+				ys[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
+			pylab.plot(xs, ys, label=am)
+		png_file = '%s_w%d.png' % (file_prefix, window_sizes)
+		pylab.savefig('png_file')
+		pylab.clf()
+
 
 
 
@@ -683,9 +696,12 @@ def _run_():
 		results_list = []
 		#file_prefix = env.env['results_dir'] + p_dict['run_id']
 		file_prefix = '/storage/mlt_results/' + p_dict['run_id']
-		summarize_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
+		summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], load_phenotypes(p_dict['phen_file']),
 						index_list=p_dict['phen_index'])
+		plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, p_dict['heritability'], p_dict['latent_variable'],
+							p_dict['phenotype_model'])
+		plot_tprs_fdrs(plot_file_prefix, summary_dict)
 
 
 
