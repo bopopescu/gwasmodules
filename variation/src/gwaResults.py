@@ -1314,8 +1314,8 @@ class Result(object):
 			cpl = self.get_chr_pos_list()
 			if window_size == 0 and debug:
 				pdb.set_trace()
-			filtered_cpl = []
 			if len(cpl):
+				filtered_cpl = set(cpl)
 				num_caus_found = 0
 				num_false_found = 0
 				for (chrom1, pos1) in caus_chrom_pos_list:
@@ -1323,8 +1323,7 @@ class Result(object):
 					for chrom2, pos2 in cpl:
 						if chrom1 == chrom2 and abs(pos1 - pos2) <= window_size:
 							caus_found = True
-						else:
-							filtered_cpl.append((chrom2, pos2))
+							filtered_cpl.remove((chrom2, pos2))
 					if caus_found:
 						num_caus_found += 1
 				tprs.append(float(num_caus_found) / len(caus_chrom_pos_list))
