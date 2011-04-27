@@ -410,7 +410,7 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 	am_dot_list = ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']
 
 	for w_i, ws in enumerate(window_sizes):
-		pylab.figure()
+		pylab.figure(figsize=(10, 10))
 		for am in am_list:
 			xs = sp.zeros(len(pval_thresholds))
 			ys = sp.zeros(len(pval_thresholds))
@@ -423,7 +423,7 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 		png_file = '%s_w%d.png' % (file_prefix, ws)
 		pylab.ylabel('Power')
 		pylab.xlabel('FDR')
-		pylab.legend(loc=4, prop=prop)
+		pylab.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
 		x_min, x_max = pylab.xlim()
 		x_range = x_max - x_min
 		y_min, y_max = pylab.ylim()
