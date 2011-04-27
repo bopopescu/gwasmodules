@@ -398,6 +398,8 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 	Plot various things relating to run summaries
 	"""
 	import pylab
+	import matplotlib.font_manager
+	prop = matplotlib.font_manager.FontProperties(size=10)
 
 	#Heritabilities..
 	# - histogram of each category
@@ -418,8 +420,7 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 		png_file = '%s_w%d.png' % (file_prefix, ws)
 		pylab.ylabel('Power')
 		pylab.xlabel('FDR')
-		pylab.setp(ltext, fontsize='small')
-		pylab.legend(loc=4)
+		pylab.legend(loc=4, prop=prop)
 		pylab.savefig(png_file)
 		pylab.clf()
 
