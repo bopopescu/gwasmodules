@@ -419,7 +419,7 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 				xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
 			pylab.plot(xs, ys, label=am)
 		for am in am_dot_list:
-			pylab.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, 'o')
+			pylab.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, marker='o')
 		png_file = '%s_w%d.png' % (file_prefix, ws)
 		pylab.ylabel('Power')
 		pylab.xlabel('FDR')
