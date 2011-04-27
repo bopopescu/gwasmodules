@@ -390,7 +390,7 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 		for k in ['fdrs', 'tprs']:
 			summary_dict[am][k] = summary_dict[am][k] / float(num_files_found)
 
-	pdb.set_trace()
+	return summary_dict
 
 
 def plot_tprs_fdrs(file_prefix, summary_dict):
