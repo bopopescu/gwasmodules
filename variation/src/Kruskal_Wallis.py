@@ -76,7 +76,8 @@ class Kruskal_Wallis:
 		self.report = int(report)
 		"""
 	
-	def get_phenotype_matrix_in_data_matrix_order(self, strain_acc_list, strain_acc_list_phen, data_matrix_phen):
+	@classmethod
+	def get_phenotype_matrix_in_data_matrix_order(cls, strain_acc_list, strain_acc_list_phen, data_matrix_phen):
 		"""
 		2009-7-30
 			empty string is also regarded as missing value (=numpy.nan).
@@ -106,7 +107,6 @@ class Kruskal_Wallis:
 				new_data_matrix_phen[i,:] = numpy.nan
 		sys.stderr.write("Done.\n")
 		return new_data_matrix_phen
-	get_phenotype_matrix_in_data_matrix_order = classmethod(get_phenotype_matrix_in_data_matrix_order)
 	
 	def _kruskal_wallis(cls, genotype_ls, phenotype_ls, min_data_point=3, snp_index=None):
 		"""
@@ -154,8 +154,10 @@ class Kruskal_Wallis:
 	
 	_kruskal_wallis = classmethod(_kruskal_wallis)
 	
-	def _kruskal_wallis_whole_matrix(self, data_matrix, phenotype_ls, min_data_point=3, **keywords):
+	def _kruskal_wallis_whole_matrix(self, snpData, phenotype_ls, min_data_point=3, **keywords):
 		"""
+		2011-4-27
+			argument data_matrix becomes snpData now.
 		2011-2-17
 			in debug mode, function exits after 2000 loops.
 		2008-09-07
@@ -166,12 +168,12 @@ class Kruskal_Wallis:
 		2008-02-14
 		"""
 		sys.stderr.write("Doing kruskal wallis test ...\n")
-		no_of_rows, no_of_cols = data_matrix.shape
+		no_of_rows, no_of_cols = snpData.data_matrix.shape
 		results = []
 		counter = 0
 		real_counter = 0
 		for j in range(no_of_cols):
-			genotype_ls = data_matrix[:,j]
+			genotype_ls = snpData.data_matrix[:,j]
 			pdata = self._kruskal_wallis(genotype_ls, phenotype_ls, min_data_point, snp_index=j)
 			if pdata is not None:
 				results.append(pdata)
@@ -243,13 +245,19 @@ class Kruskal_Wallis:
 		if self.debug:
 			import pdb
 			pdb.set_trace()
+		
+		sys.stderr.write("This program is outdated. Please run Association.py instead.\n")
+		sys.exit(0)
 		header_phen, strain_acc_list_phen, category_list_phen, data_matrix_phen = read_data(self.phenotype_fname, turn_into_integer=0)
 		header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname)
 		if type(data_matrix)==list:
 			data_matrix = numpy.array(data_matrix)
 		
+		snpData = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\
+						data_matrix=data_matrix, turn_into_array=1, ignore_2nd_column=ignore_2nd_column)
+		
 		data_matrix_phen = self.get_phenotype_matrix_in_data_matrix_order(strain_acc_list, strain_acc_list_phen, data_matrix_phen)
-		kw_results = self._kruskal_wallis_whole_matrix(data_matrix, data_matrix_phen[:, self.which_phenotype], self.min_data_point)
+		kw_results = self._kruskal_wallis_whole_matrix(snpData, data_matrix_phen[:, self.which_phenotype], self.min_data_point)
 		self.output_kw_results(kw_results, header[2:], self.output_fname, self.minus_log_pvalue)
 
 if __name__ == '__main__':
