@@ -22,6 +22,7 @@ Option:
 	--sim_phen		Simulate phenotype, write to phenotype file.
 	--parallel		Run parallel on the cluster
 	--num_steps=...		Number of steps in the regression. (Default is 10)
+	--herit_plots=...	Plot heritabilities
 
 
 Examples:
@@ -59,7 +60,7 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel']
+	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel', 'herit_plots=']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
@@ -72,7 +73,7 @@ def parse_parameters():
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
 		'mapping_method':'emmax', 'heritability':50, 'save_plots':False, 'call_method_id':75,
 		'phen_file':env.env['data_dir'] + 'multi_locus_phen.pickled', 'num_steps':10,
-		'phen_index':None, 'sim_phen':False, 'parallel':False}
+		'phen_index':None, 'sim_phen':False, 'parallel':False, 'herit_plots':None}
 
 
 	for opt, arg in opts:
@@ -90,6 +91,7 @@ def parse_parameters():
 		elif opt in ("--sim_phen"): p_dict['sim_phen'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		elif opt in ("--parallel"): p_dict['parallel'] = True
+		elif opt in ("--herit_plots"): p_dict['herit_plots'] = util.parse_ids(arg)
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -117,7 +119,8 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 		shstr += '#$ -S /bin/bash\n'
 		shstr += '#$ -N %s\n' % job_id
 		#shstr += "#$ -q q.norm@blade*\n"
-		shstr += '#$ -o %s_$JOB_ID.log\n' % job_id
+		shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
+		shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
 		shstr += 'source /etc/modules-env.sh\n'
 		shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
 		shstr += 'module load matplotlib/1.0.0\n'
@@ -133,12 +136,12 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
-	shstr += "(python %smultiple_loci_test.py -i %s -l %s -h %d -m %s --phen_file=%s -t %d --num_steps=%d " % \
+	shstr += "python %smultiple_loci_test.py -i %s -l %s -h %d -m %s --phen_file=%s -t %d --num_steps=%d " % \
 			(env.env['script_dir'], phen_ids_str, latent_var, heritability, phen_model, phen_file, call_method_id, num_steps)
 	if summary_run:
 		shstr += '-s '
 
-	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
+	#shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
 	script_file_name = run_id + ".sh"
 	f = open(script_file_name, 'w')
@@ -191,7 +194,7 @@ def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_ph
 	print 'Generating the phenotypes'
 	latent_var_keys = ['random_snp', 'random', 'north_south_split', 'pc_split']
 	phenotype_models = ['xor', 'or', 'plus', 'xor2']
-	heritabilities = [1, 10, 25, 50, 75, 90, 99] #in percentages
+	heritabilities = [1, 2, 5, 10, 15, 20, 25, 50] #in percentages
 
 	if mac_threshold > 0:
 		sd.filter_mac_snps(mac_threshold)
@@ -437,9 +440,48 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 
 
 
-def plot_herit_hist(summary_dict, heritabilities):
-	pass
+def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
+	import pylab
+	file_prefix += '_%s_%s' % (latent_var, phen_model)
+	png_file_name = file_prefix + '_h%s_hist.png' % ('_'.join(map(str, her_dict.keys())))
+	max_bin_count = 0
+	x = []
+	for h in sorted(her_dict):
+		bin_counts, bins, patch_list = pylab.hist(her_dict[h], range=(0, 0.8), bins=25, alpha=0.6)
+		max_bin_count = max(max_bin_count, max(bin_counts))
+		pylab.axvline((h / 100.0), color='k', alpha=0.8, ls='-.')
+		pylab.axvline(sp.median(her_dict[h]), color='#DD3311', alpha=0.8, ls='-.')
+	y_range = max_bin_count - 0
+	pylab.axis([-0.8 * 0.025, 0.8 * 1.025, -0.025 * max_bin_count, max_bin_count * 1.025])
+	pylab.xlabel('heritability')
+	pylab.ylabel('Counts')
+	pylab.savefig(png_file_name)
 
+
+
+	for h in sorted(her_dict):
+		pylab.figure()
+		png_file_name = file_prefix + '_h%d_hist.png' % (h)
+		p_her_bias = (sp.array(her_dict[h]) - h / 100.0)
+		bin_counts, bins, patch_list = pylab.hist(p_her_bias, range=(-0.25, 0.25), bins=25, alpha=0.6)
+		max_bin_count = max(bin_counts)
+		pylab.axvline(0.0, color='k', alpha=0.6, ls='-.')
+		y_range = max_bin_count - 0
+		pylab.axis([-0.25 - 0.025 * 0.5, 0.25 + 0.5 * 0.025, -0.025 * max_bin_count, max_bin_count * 1.025])
+		pylab.xlabel('pseudo-heritability bias')
+		pylab.ylabel('Counts')
+		x.append(p_her_bias)
+		pylab.savefig(png_file_name)
+
+	#Box-plot version
+	png_file_name = file_prefix + '_h%s_boxplot.png' % ('_'.join(map(str, her_dict.keys())))
+	pylab.figure()
+	pylab.boxplot(x)
+	pylab.ylabel('psuedo-heritability bias')
+	pylab.axhline(0.0, color='k', alpha=0.6, ls='-.')
+	pylab.xticks(range(1, len(x) + 1), map(str, sorted(her_dict.keys())))
+	pylab.xlabel('Heritability')
+	pylab.savefig(png_file_name)
 
 
 def __get_thresholds(min_thres=10, max_thres=1, num_thres=18):
@@ -567,8 +609,11 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 		d['kolmogorov_smirnov'] = si['kolmogorov_smirnov']
 		d['pval_median'] = si['pval_median']
 		d['perc_var_expl'] = 1.0 - si['rss'] / step_info_list[0]['rss']
+		d['num_cofactors'] = len(si['cofactors'])
 		if type == 'EX':
-			d['pseudo_heritability'] = si['pseudo_heritability']
+			d['remaining_p_her'] = si['pseudo_heritability']
+			d['perc_her_var_expl'] = (si['pseudo_heritability'] / step_info_list[0]['pseudo_heritability']) * d['perc_var_expl']
+			d['perc_err_var_expl'] = ((1 - si['pseudo_heritability']) / (1 - step_info_list[0]['pseudo_heritability'])) * d['perc_var_expl']
 		res_dict[criteria] = d
 
 
@@ -677,6 +722,7 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 def _run_():
 	p_dict, args = parse_parameters()
 	print args
+	file_prefix = env.env['results_dir'] + p_dict['run_id']
 
 	if p_dict['sim_phen'] and p_dict['phen_file']: 	#Simulate phenotypes
 		print 'Setting up phenotype simulations'
@@ -704,7 +750,6 @@ def _run_():
 		sd = dp.load_250K_snps(p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
 		K = dp.load_kinship(p_dict['call_method_id'])
 		results_list = []
-		file_prefix = env.env['results_dir'] + p_dict['run_id']
 		for pid in p_dict['phen_index']:
 			result_dict = run_analysis(sd, K, file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
@@ -714,7 +759,6 @@ def _run_():
 
 	elif p_dict['summarize']:
 		results_list = []
-		#file_prefix = env.env['results_dir'] + p_dict['run_id']
 		file_prefix = '/storage/mlt_results/' + p_dict['run_id']
 		summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], load_phenotypes(p_dict['phen_file']),
@@ -722,6 +766,16 @@ def _run_():
 		plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, p_dict['heritability'], p_dict['latent_variable'],
 							p_dict['phenotype_model'])
 		plot_tprs_fdrs(plot_file_prefix, summary_dict)
+
+	elif p_dict['herit_plots'] != None:
+		d = {}
+		file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+		pd = load_phenotypes(p_dict['phen_file'])
+		for her in p_dict['herit_plots']:
+			summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], her,
+						p_dict['phenotype_model'], pd, index_list=p_dict['phen_index'])
+			d[her] = summary_dict['p_her']
+		plot_herit_hist(file_prefix, d, p_dict['latent_variable'], p_dict['phenotype_model'])
 
 
 
