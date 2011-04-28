@@ -634,12 +634,15 @@ class OneGenomeData(PassingData):
 	@chr_id2cumu_start.setter
 	def chr_id2cumu_start(self, argument_list):
 		"""
+		2011-4-22
+			cumu_start is now 0-based, which makes it easy to generate adjusted coordinates.
+				new_start = cumu_start + start.
 		2011-3-15
 			Treat one genome of multiple chromsomes as one continuous chromosome.
 			
 			For one chr, cumu_start = sum of length of all prior chromosomes + all gaps between them.
 			
-				cumu_start is 1-based.
+			cumu_start is 0-based.
 			
 			The difference between chr_id2cumu_size and chr_id2cumu_start is that the former includes the length of
 				the current chromosome and the gap before it.
@@ -647,7 +650,7 @@ class OneGenomeData(PassingData):
 		tax_id, chr_gap = argument_list[:2]
 		sys.stderr.write("Getting chr_id2cumu_start for %s, ..."%tax_id)
 		if self._chr_id2size is None:
-			self.chr_id2size = (tax_id)
+			self.chr_id2size = [tax_id]
 		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
 		if chr_gap==None:
 			chr_size_ls = self.chr_id2size.values()
@@ -656,7 +659,7 @@ class OneGenomeData(PassingData):
 		chr_id_ls = self.chr_id2size.keys()
 		chr_id_ls.sort()
 		first_chr = chr_id_ls[0] 
-		self._chr_id2cumu_start = {first_chr:1}	#chr_id_ls might not be continuous integers. so dictionary is better
+		self._chr_id2cumu_start = {first_chr:0}	#chr_id_ls might not be continuous integers. so dictionary is better
 			#start from 0.
 		for i in range(1, len(chr_id_ls)):
 			chr_id = chr_id_ls[i]
@@ -677,6 +680,9 @@ class OneGenomeData(PassingData):
 	@cumuSpan2ChrRBDict.setter
 	def cumuSpan2ChrRBDict(self, argument_list):
 		"""
+		2011-4-22
+			adjust because chr_id2cumu_start is now 0-based.
+			the position in cumuSpan2ChrRBDict is 1-based.
 		2011-3-25
 			turn it into a setter of cumuSpan2ChrRBDict
 			usage example:
@@ -700,11 +706,11 @@ class OneGenomeData(PassingData):
 			self.chr_id2cumu_start = (tax_id, chr_gap)
 		for chr_id, cumu_start in self.chr_id2cumu_start.iteritems():
 			chr_size = self.chr_id2size.get(chr_id)
-			span_ls=[cumu_start, cumu_start+chr_size-1]
+			span_ls=[cumu_start+1, cumu_start+chr_size]
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=0, \
 							span_ls=span_ls, \
 							min_reciprocal_overlap=0.00000000000001,)
-							#2010-8-17 overlapping keys are regarded as separate instances as long as they are identical.
+							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
 			if segmentKey not in self._cumuSpan2ChrRBDict:
 				self._cumuSpan2ChrRBDict[segmentKey] = [chr_id, 1, chr_size]
 			else:
@@ -852,7 +858,7 @@ class GenomeDatabase(ElixirDB):
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, \
 							span_ls=[max(1, row.start - max_distance), row.stop + max_distance], \
 							min_reciprocal_overlap=1,)
-							#2010-8-17 overlapping keys are regarded as separate instances as long as they are identical.
+							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
 			if segmentKey not in genomeRBDict:
 				genomeRBDict[segmentKey] = []
 			oneGeneData = PassingData(strand = row.strand, gene_id = row.id, gene_start = row.start, \
