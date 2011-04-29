@@ -159,6 +159,7 @@ def get_log_quantiles(scores, num_dots, max_val=5):
 	"""
 	Uses scipy
 	"""
+	scores = sp.array(scores)
 	scores.sort()
 	indices = sp.array(10 ** ((-sp.arange(1, num_dots + 1, dtype='single') / (num_dots + 1)) * max_val) \
 				* len(scores), dtype='int')
@@ -199,6 +200,7 @@ def get_quantiles(scores, num_dots):
 	"""
 	Uses scipy
 	"""
+	scores = sp.array(scores)
 	scores.sort()
 	indices = [int(len(scores) * i / (num_dots + 2)) for i in range(1, num_dots + 1)]
 	return scores[indices]

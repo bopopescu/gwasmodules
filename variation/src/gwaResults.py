@@ -532,7 +532,7 @@ class Result(object):
 				cand_genes=None, threshold=0, highlight_markers=None, chromosome=None,
 				tair_file=None, plot_genes=True):
 		import matplotlib
-		#matplotlib.use('Agg')
+		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
 
 		tair_genes = None
@@ -717,7 +717,7 @@ class Result(object):
 		"""
 
 		import matplotlib
-		#matplotlib.use('Agg')
+		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
 
 		num_scores = len(self.snp_results['scores'])
@@ -1304,7 +1304,7 @@ class Result(object):
 		return count
 
 
-	def get_power_analysis(self, caus_chrom_pos_list, window_sizes=[0]):
+	def get_power_analysis(self, caus_chrom_pos_list, window_sizes=[0], debug=False):
 		"""
 		Calculate Power and FDR..
 		"""
@@ -1312,10 +1312,10 @@ class Result(object):
 		fdrs = []
 		for window_size in window_sizes:
 			cpl = self.get_chr_pos_list()
-			if window_size == 0:
+			if window_size == 0 and debug:
 				pdb.set_trace()
-			filtered_cpl = []
 			if len(cpl):
+				filtered_cpl = set(cpl)
 				num_caus_found = 0
 				num_false_found = 0
 				for (chrom1, pos1) in caus_chrom_pos_list:
@@ -1323,8 +1323,7 @@ class Result(object):
 					for chrom2, pos2 in cpl:
 						if chrom1 == chrom2 and abs(pos1 - pos2) <= window_size:
 							caus_found = True
-						else:
-							filtered_cpl.append((chrom2, pos2))
+							filtered_cpl.remove((chrom2, pos2))
 					if caus_found:
 						num_caus_found += 1
 				tprs.append(float(num_caus_found) / len(caus_chrom_pos_list))
@@ -1332,7 +1331,7 @@ class Result(object):
 			else:
 				tprs.append(0)
 				fdrs.append(0)
-			if window_size == 0:
+			if window_size == 0 and debug:
 				pdb.set_trace()
 
 

@@ -10,8 +10,8 @@ import os
 user = os.getenv("USER")
 home_dir = os.getenv("HOME") + "/"
 config_file = home_dir + '.gwa_config'
-results_dir = '/tmp/'
-data_dir = '/Network/Data/250k/'
+results_dir = '/home/GMI/bjarni.vilhjalmsson/gwa_results/'
+data_dir = '/home/GMI/bjarni.vilhjalmsson/data/'
 data_1001_dir = home_dir + 'Projects/Data/1001genomes/'
 rf_dir = None
 env = dict()

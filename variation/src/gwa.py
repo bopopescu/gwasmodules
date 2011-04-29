@@ -54,7 +54,7 @@ Option:
 	-q ...					Request memory (on cluster), otherwise use defaults 4GB for Kruskal-Wallis, 12GB for Emma.
 	-l ...			 		Request time limit (on cluster), otherwise use defaults
 	--only_add_2_db				Does not submit jobs, but only adds available result files to DB. (hack for usc hpc)
-	
+	--save_stepw_pvals			Write  p-values for each step to a file.
 	
 	
 						
@@ -140,7 +140,7 @@ def parse_parameters():
 
 	long_options_list = ["comment=", 'with_db_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
 			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
-			'use_imputed_full_data']
+			'use_imputed_full_data', 'save_stepw_pvals']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -156,7 +156,8 @@ def parse_parameters():
 		'use_existing_results':False, 'region_plots':0, 'cand_genes_file':None, 'debug_filter':1,
 		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
-		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None}
+		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None,
+		'save_stepw_pvals':False}
 
 
 	for opt, arg in opts:
@@ -192,6 +193,7 @@ def parse_parameters():
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		elif opt in ("--local_gwas"): p_dict['local_gwas'] = map(int, arg.split(','))
 		elif opt in ("--use_imputed_full_data"): p_dict['use_imputed_full_data'] = True
+		elif opt in ("--save_stepw_pvals"): p_dict['save_stepw_pvals'] = True
 		else:
 			print "Unkown option:", opt
 			print __doc__
@@ -623,7 +625,8 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 					local = True
 					file_prefix += '_' + '_'.join(map(str, p_dict['local_gwas']))
 				res = lm.emmax_step_wise(phen_vals, k, sd=sd, num_steps=p_dict['num_steps'],
-							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes)
+							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes,
+							save_pvals=p_dict['save_stepw_pvals'])
 				print 'Step-wise EMMAX finished!'
 				return
 			elif mapping_method in ['lm_step']:
@@ -633,7 +636,8 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 					local = True
 					file_prefix += '_' + '_'.join(map(str, p_dict['local_gwas']))
 				res = lm.lm_step_wise(phen_vals, sd=sd, num_steps=p_dict['num_steps'],
-							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes)
+							file_prefix=file_prefix, local=local, cand_gene_list=cand_genes,
+							save_pvals=p_dict['save_stepw_pvals'])
 				print 'Step-wise LM finished!'
 				return
 			elif mapping_method in ['lm']:
