@@ -1902,7 +1902,7 @@ class Users(Entity):
 		"""encrypts password on the fly using the encryption
         algo defined in the configuration
         """
-		self._password = self.__encrypt_password(password)
+		self._password = self._encrypt_password(password)
 
 	def _get_password(self):
 		"""returns password
@@ -1912,7 +1912,7 @@ class Users(Entity):
 	password = property(_get_password,_set_password)
 
 	@classmethod
-	def __encrypt_password(cls,  password):
+	def _encrypt_password(cls,  password):
 		"""Hash the given password with the specified algorithm. Valid values
         for algorithm are 'md5' and 'sha1'. All other algorithm values will
         be essentially a no-op."""
