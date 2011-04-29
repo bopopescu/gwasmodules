@@ -410,6 +410,96 @@ def load_phentoype_file_bergelsson():
 
 
 
+def load_duszynska_file4():
+	"""
+	Loads the heterosis data.
+	"""
+	fn = env['home_dir'] + 'Projects/duszynska_data/seed_size_heterosis.csv'
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+	phen_dict = {}
+
+	name_dict = {'knox-18':'kno-18', 'knox-10':'kno-10', 'kas-1':'kas-2', 'pu-2-7':'pu2-7', 'cs22491':'n13',
+			'shahdara':'sha'}
+
+	with open(fn) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(','))
+		et_indices = [0, 3, 6, 9]
+		phen_names = [phen_names[1], phen_names[4], phen_names[7], phen_names[10]]
+		for i, pn in zip([1, 2, 3, 4], phen_names):
+			phen_dict[i] = {'name': pn, 'values':[], 'ecotypes':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			for e_i, pid in zip(et_indices, [1, 2, 3, 4]):
+				acc = l[e_i].lower()
+				if acc in name_dict:
+					acc = name_dict[acc]
+				if not acc in acc_dict:
+					print "(%s) is missing in dictionary" % (acc)
+				else:
+					phen_dict[pid]['ecotypes'].append(acc_dict[acc][4])
+					phen_dict[pid]['values'].append(float(l[e_i + 1]))
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'duszynska_heterosis_data.csv')
+
+
+def load_duszynska_file3():
+	fn1 = env['home_dir'] + 'Projects/duszynska_data/ANU_proportions_4x2_male.csv'
+	fn2 = env['home_dir'] + 'Projects/duszynska_data/ANU_proportions_2x4_female.csv'
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+	phen_names = []
+	phen_dict = {}
+
+	name_dict = {'knox-18':'kno-18', 'knox-10':'kno-10', 'kas-1':'kas-2', 'pu-2-7':'pu2-7', 'cs22491':'n13',
+			'shahdara':'sha'}
+
+	with open(fn1) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(',')[1:])
+		for i, pn in zip([1, 2, 3, 4, 5, 6, 7], phen_names):
+			phen_dict[i] = {'name':'male_4x2_' + pn, 'values':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc = l[0].lower()
+			if acc in name_dict:
+				acc = name_dict[acc]
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ets.append(acc_dict[acc][4])
+				for pid in [1, 2, 3, 4, 5, 6, 7]:
+					phen_dict[pid]['values'].append(float(l[pid]))
+		for pid in [1, 2, 3, 4, 5, 6, 7]:
+			phen_dict[pid]['ecotypes'] = ets[:]
+
+
+	with open(fn2) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(',')[1:])
+		for i, pn in zip([8, 9, 10, 11, 12, 13, 14], phen_names):
+			phen_dict[i] = {'name':'female_2x4_' + pn, 'values':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc = l[0].lower()
+			if acc in name_dict:
+				acc = name_dict[acc]
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ets.append(acc_dict[acc][4])
+				for pid in [8, 9, 10, 11, 12, 13, 14]:
+					phen_dict[pid]['values'].append(float(l[pid - 7]))
+		for pid in [8, 9, 10, 11, 12, 13, 14]:
+			phen_dict[pid]['ecotypes'] = ets[:]
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'duszynska_data_new.csv')
+
+
 
 def load_duszynska_file2():
 	fn1 = env['home_dir'] + 'Projects/duszynska_data/male_data_proportion_AN.csv'
@@ -500,6 +590,7 @@ def load_phentoype_file_duszynska():
 
 	phed = pd.phenotype_data(phen_dict)
 	phed.write_to_file(env['phen_dir'] + 'seed_size.csv')
+
 
 
 
@@ -711,7 +802,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	parse_NFBC_traits()
+	load_duszynska_file3()
 	print "Done!"
 
 
