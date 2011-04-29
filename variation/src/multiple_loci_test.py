@@ -445,9 +445,8 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 	file_prefix += '_%s_%s' % (latent_var, phen_model)
 	png_file_name = file_prefix + '_h%s_hist.png' % ('_'.join(map(str, her_dict.keys())))
 	max_bin_count = 0
-	x = []
 	for h in sorted(her_dict):
-		bin_counts, bins, patch_list = pylab.hist(her_dict[h], range=(0, 0.8), bins=25, alpha=0.6)
+		bin_counts, bins, patch_list = pylab.hist(her_dict[h]['p_her'], range=(0, 0.8), bins=25, alpha=0.6)
 		max_bin_count = max(max_bin_count, max(bin_counts))
 		pylab.axvline((h / 100.0), color='k', alpha=0.8, ls='-.')
 		pylab.axvline(sp.median(her_dict[h]), color='#DD3311', alpha=0.8, ls='-.')
@@ -457,12 +456,20 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 	pylab.ylabel('Counts')
 	pylab.savefig(png_file_name)
 
+	pylab.figure()
+	png_file_name = file_prefix + '_h%s_ks_her_scatter.png' % ('_'.join(map(str, her_dict.keys())))
+	for h in sorted(her_dict):
+		pylab.plot(her_dict[h]['p_her'], her_dict[h]['LM']['ks'])
+	pylab.xlabel('pseudo_heritability')
+	pylab.ylabel('Kolmogorov-Smirnov statistic')
+	pylab.savefig(png_file_name)
 
 
+	x = []
 	for h in sorted(her_dict):
 		pylab.figure()
 		png_file_name = file_prefix + '_h%d_hist.png' % (h)
-		p_her_bias = (sp.array(her_dict[h]) - h / 100.0)
+		p_her_bias = (sp.array(her_dict[h]['p_her']) - h / 100.0)
 		bin_counts, bins, patch_list = pylab.hist(p_her_bias, range=(-0.25, 0.25), bins=25, alpha=0.6)
 		max_bin_count = max(bin_counts)
 		pylab.axvline(0.0, color='k', alpha=0.6, ls='-.')
@@ -541,6 +548,8 @@ def plot_var(file_prefix, d, latent_variable, heritability, phen_models):
 		pylab.xticks(range(1, len(phen_models) + 1), phen_models)
 		pylab.ylabel('Percentage of error variance explained in the model')
 		pylab.savefig(png_file_name)
+
+
 
 
 def __get_thresholds(min_thres=10, max_thres=1, num_thres=18):
@@ -831,9 +840,8 @@ def _run_():
 			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
 			pd = load_phenotypes(p_dict['phen_file'])
 			for her in p_dict['herit_plots']:
-				summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], her,
+				d[her] = summarize_runs(file_prefix, p_dict['latent_variable'], her,
 							p_dict['phenotype_model'], pd, index_list=p_dict['phen_index'])
-				d[her] = summary_dict['p_her']
 			plot_herit_hist(file_prefix, d, p_dict['latent_variable'], p_dict['phenotype_model'])
 
 

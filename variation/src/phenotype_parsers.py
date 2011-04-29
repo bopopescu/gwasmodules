@@ -797,6 +797,7 @@ def _run_():
 	data_descriptions = ["Stable soil growth condition and new Roch PCR machine." for i in range(len(phenotype_names))]
 	add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids=range(352, 352 + len(phenotype_names)), method_descriptions=method_descriptions, data_descriptions=data_descriptions)
 
+
 if __name__ == "__main__":
 	#_run_()
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
