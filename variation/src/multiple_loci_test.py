@@ -23,6 +23,7 @@ Option:
 	--parallel		Run parallel on the cluster
 	--num_steps=...		Number of steps in the regression. (Default is 10)
 	--herit_plots=...	Plot heritabilities
+	--var_plots		Plot variation analysis
 
 
 Examples:
@@ -60,7 +61,7 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel', 'herit_plots=']
+	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel', 'herit_plots=', 'var_plots']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
@@ -73,7 +74,8 @@ def parse_parameters():
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
 		'mapping_method':'emmax', 'heritability':50, 'save_plots':False, 'call_method_id':75,
 		'phen_file':env.env['data_dir'] + 'multi_locus_phen.pickled', 'num_steps':10,
-		'phen_index':None, 'sim_phen':False, 'parallel':False, 'herit_plots':None}
+		'phen_index':None, 'sim_phen':False, 'parallel':False, 'herit_plots':None,
+		'var_plots':False}
 
 
 	for opt, arg in opts:
@@ -92,6 +94,7 @@ def parse_parameters():
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		elif opt in ("--parallel"): p_dict['parallel'] = True
 		elif opt in ("--herit_plots"): p_dict['herit_plots'] = util.parse_ids(arg)
+		elif opt in ("--var_plots"): p_dict['var_plots'] = True
 		else:
 			print "Unkown option!!\n"
 			print __doc__
@@ -319,21 +322,29 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 				'Stepw_EX_Bonf', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC']
 
 	for am in analysis_methods:
-		if am in ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']:
-			d = {'fdrs':sp.zeros((num_winsizes), dtype='double'),
-				'tprs':sp.zeros((num_winsizes), dtype='double')}
-		else:
+		if am in ['LM', 'EX', 'KW']:
 			d = {'fdrs':sp.zeros((num_pthres, num_winsizes), dtype='double'),
 				'tprs':sp.zeros((num_pthres, num_winsizes), dtype='double')}
-		if am in ['LM', 'EX', 'KW']:
 			d['ks'] = []
 			d['medp'] = []
+		else:
+			if am in ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']:
+				d = {'fdrs':sp.zeros((num_winsizes), dtype='double'),
+					'tprs':sp.zeros((num_winsizes), dtype='double')}
+			else:
+				d = {'fdrs':sp.zeros((num_pthres, num_winsizes), dtype='double'),
+					'tprs':sp.zeros((num_pthres, num_winsizes), dtype='double')}
+			d['perc_var_expl'] = []
+			if 'EX' in am:
+				d['rem_p_her'] = []
+				d['perc_phen_var_expl'] = []
+				d['perc_err_var_expl'] = []
+
 		summary_dict[am] = d
-	#Things to plot:
-	#  - pseudo-heritabilities
-	#  - fdrs vs. tprs
-	#
-	#
+
+	criteria_map = {'mbonf':('Stepw_EX_Bonf', 'Stepw_LM_Bonf'), 'ebics': ('Stepw_EX_EBIC', 'Stepw_LM_EBIC'),
+			'mbics': ('Stepw_EX_MBIC', 'Stepw_LM_MBIC')}
+
 	num_files_found = 0
 	print '%s_%d_%s_%s' % (file_prefix, heritability, latent_var, phen_model)
 	for i in index_list:
@@ -342,47 +353,36 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 			num_files_found += 1
 			with open(pickled_file) as f:
 				r = cPickle.load(f)
-			summary_dict['p_her'].append(r['p_her'])
+			p_her = r['p_her']
+			summary_dict['p_her'].append(p_her)
 			for am in mapping_methods:
 				if am == 'Stepw_LM':
-					mbonf_fdrs = sp.array(r[am]['mbonf']['fdrs'])
-					mbonf_fdrs[mbonf_fdrs == -1.0] = 0
-					ebics_fdrs = sp.array(r[am]['ebics']['fdrs'])
-					ebics_fdrs[ebics_fdrs == -1.0] = 0
-					mbics_fdrs = sp.array(r[am]['mbics']['fdrs'])
-					mbics_fdrs[mbics_fdrs == -1.0] = 0
-					mbonf_tprs = sp.array(r[am]['mbonf']['tprs'])
-					mbonf_tprs[mbonf_tprs == -1.0] = 0
-					ebics_tprs = sp.array(r[am]['ebics']['tprs'])
-					ebics_tprs[ebics_tprs == -1.0] = 0
-					mbics_tprs = sp.array(r[am]['mbics']['tprs'])
-					mbics_tprs[mbics_tprs == -1.0] = 0
-					summary_dict['Stepw_LM_Bonf']['fdrs'] += mbonf_fdrs
-					summary_dict['Stepw_LM_EBIC']['fdrs'] += ebics_fdrs
-					summary_dict['Stepw_LM_MBIC']['fdrs'] += mbics_fdrs
-					summary_dict['Stepw_LM_Bonf']['tprs'] += mbonf_tprs
-					summary_dict['Stepw_LM_EBIC']['tprs'] += ebics_tprs
-					summary_dict['Stepw_LM_MBIC']['tprs'] += mbics_tprs
-				elif am == 'Stepw_EX':
+					for criteria in ['mbonf', 'ebics', 'mbics']:
+						for rs in ['fdrs', 'tprs']:
+							rs_array = sp.array(r[am][criteria][rs])
+							rs_array[rs_array == -1.0] = 0
+							summary_dict[criteria_map[criteria][1]][rs] += rs_array
 
-					mbonf_fdrs = sp.array(r[am]['mbonf']['fdrs'])
-					mbonf_fdrs[mbonf_fdrs == -1.0] = 0
-					ebics_fdrs = sp.array(r[am]['ebics']['fdrs'])
-					ebics_fdrs[ebics_fdrs == -1.0] = 0
-					mbics_fdrs = sp.array(r[am]['mbics']['fdrs'])
-					mbics_fdrs[mbics_fdrs == -1.0] = 0
-					mbonf_tprs = sp.array(r[am]['mbonf']['tprs'])
-					mbonf_tprs[mbonf_tprs == -1.0] = 0
-					ebics_tprs = sp.array(r[am]['ebics']['tprs'])
-					ebics_tprs[ebics_tprs == -1.0] = 0
-					mbics_tprs = sp.array(r[am]['mbics']['tprs'])
-					mbics_tprs[mbics_tprs == -1.0] = 0
-					summary_dict['Stepw_EX_Bonf']['fdrs'] += mbonf_fdrs
-					summary_dict['Stepw_EX_EBIC']['fdrs'] += ebics_fdrs
-					summary_dict['Stepw_EX_MBIC']['fdrs'] += mbics_fdrs
-					summary_dict['Stepw_EX_Bonf']['tprs'] += mbonf_tprs
-					summary_dict['Stepw_EX_EBIC']['tprs'] += ebics_tprs
-					summary_dict['Stepw_EX_MBIC']['tprs'] += mbics_tprs
+						summary_dict[criteria_map[criteria][1]]['perc_var_expl'].append(r[am][criteria]['perc_var_expl'])
+				elif am == 'Stepw_EX':
+					for criteria in ['mbonf', 'ebics', 'mbics']:
+						for rs in ['fdrs', 'tprs']:
+							rs_array = sp.array(r[am][criteria][rs])
+							rs_array[rs_array == -1.0] = 0
+							summary_dict[criteria_map[criteria][0]][rs] += rs_array
+						if 'pseudo_heritability' in r[am][criteria]:
+							rem_p_her = r[am][criteria]['pseudo_heritability']
+						else:
+							rem_p_her = r[am][criteria]['remaining_p_her']
+						perc_var_expl = r[am][criteria]['perc_var_expl']
+						summary_dict[criteria_map[criteria][0]]['rem_p_her'].append(rem_p_her)
+						summary_dict[criteria_map[criteria][0]]['perc_var_expl'].append(perc_var_expl)
+						rss_0 = r[am]['step_info_list'][0]['rss']
+						rss = r[am]['step_info_list'][r[am][criteria]['opt_i']]['rss']
+
+						if p_her > 0.01:
+							summary_dict[criteria_map[criteria][0]]['perc_phen_var_expl'].append(1.0 - ((rss * rem_p_her) / (rss_0 * p_her)))
+							summary_dict[criteria_map[criteria][0]]['perc_err_var_expl'].append(1.0 - ((rss * (1 - rem_p_her)) / (rss_0 * (1 - p_her))))
 				elif am in ['LM', 'KW', 'EX']:
 					summary_dict[am]['fdrs'] += sp.array(r[am]['fdrs'])
 					summary_dict[am]['tprs'] += sp.array(r[am]['tprs'])
@@ -482,6 +482,65 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 	pylab.xticks(range(1, len(x) + 1), map(str, sorted(her_dict.keys())))
 	pylab.xlabel('Heritability')
 	pylab.savefig(png_file_name)
+
+
+def plot_var(file_prefix, d, latent_variable, heritability, phen_models):
+	"""
+	Plots variance explained by the model for plus,  xor, and or.
+	"""
+	import pylab
+
+	#Plot remaining heritability
+	file_prefix += '_%s_%d' % (latent_variable, heritability)
+	for am in ['Stepw_EX_Bonf', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC']:
+		png_file_name = file_prefix + '_%s_pher_boxplot.png' % (am)
+		pylab.figure()
+		rem_pher_list = []
+		for m in phen_models:
+			rem_pher_list.append(d[m][am]['rem_p_her'])
+		pylab.boxplot(rem_pher_list)
+		pylab.axhline(0.0, color='k', alpha=0.6, ls='-.')
+		pylab.xticks(range(1, len(phen_models) + 1), phen_models)
+		pylab.ylabel('Remaining pseudo-heritability in the model')
+		pylab.savefig(png_file_name)
+
+	#Plot % explained variance.
+	for am in ['Stepw_EX_Bonf', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_Bonf', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']:
+		png_file_name = file_prefix + '_%s_var_boxplot.png' % (am)
+		pylab.figure()
+		perc_var_list = []
+		for m in phen_models:
+			perc_var_list.append(d[m][am]['perc_var_expl'])
+		pylab.boxplot(perc_var_list)
+		pylab.axhline(heritability / 100.0, color='k', alpha=0.6, ls='-.')
+		pylab.xticks(range(1, len(phen_models) + 1), phen_models)
+		pylab.ylabel('Percentage of variance explained in the model')
+		pylab.savefig(png_file_name)
+
+	#Plot % explained phenot. variance
+	for am in ['Stepw_EX_Bonf', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC']:
+		png_file_name = file_prefix + '_%s_phen_var_boxplot.png' % (am)
+		pylab.figure()
+		perc_var_list = []
+		for m in phen_models:
+			perc_var_list.append(d[m][am]['perc_phen_var_expl'])
+		pylab.boxplot(perc_var_list)
+		pylab.axhline(1.0, color='k', alpha=0.6, ls='-.')
+		pylab.xticks(range(1, len(phen_models) + 1), phen_models)
+		pylab.ylabel('Percentage of phenotypic variance explained in the model')
+		pylab.savefig(png_file_name)
+	#Plot % explained error variance
+	for am in ['Stepw_EX_Bonf', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC']:
+		png_file_name = file_prefix + '_%s_err_var_boxplot.png' % (am)
+		pylab.figure()
+		perc_var_list = []
+		for m in phen_models:
+			perc_var_list.append(d[m][am]['perc_err_var_expl'])
+		pylab.boxplot(perc_var_list)
+		pylab.axhline(0.0, color='k', alpha=0.6, ls='-.')
+		pylab.xticks(range(1, len(phen_models) + 1), phen_models)
+		pylab.ylabel('Percentage of error variance explained in the model')
+		pylab.savefig(png_file_name)
 
 
 def __get_thresholds(min_thres=10, max_thres=1, num_thres=18):
@@ -756,28 +815,35 @@ def _run_():
 						p_dict['call_method_id'], num_steps=p_dict['num_steps'])
 			results_list.append(result_dict)
 		#Save as pickled
+	else:
+		if p_dict['summarize']:
+			results_list = []
+			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+			summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
+							p_dict['phenotype_model'], load_phenotypes(p_dict['phen_file']),
+							index_list=p_dict['phen_index'])
+			plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, p_dict['heritability'], p_dict['latent_variable'],
+								p_dict['phenotype_model'])
+			plot_tprs_fdrs(plot_file_prefix, summary_dict)
 
-	elif p_dict['summarize']:
-		results_list = []
-		file_prefix = '/storage/mlt_results/' + p_dict['run_id']
-		summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
-						p_dict['phenotype_model'], load_phenotypes(p_dict['phen_file']),
-						index_list=p_dict['phen_index'])
-		plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, p_dict['heritability'], p_dict['latent_variable'],
-							p_dict['phenotype_model'])
-		plot_tprs_fdrs(plot_file_prefix, summary_dict)
-
-	elif p_dict['herit_plots'] != None:
-		d = {}
-		file_prefix = '/storage/mlt_results/' + p_dict['run_id']
-		pd = load_phenotypes(p_dict['phen_file'])
-		for her in p_dict['herit_plots']:
-			summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], her,
-						p_dict['phenotype_model'], pd, index_list=p_dict['phen_index'])
-			d[her] = summary_dict['p_her']
-		plot_herit_hist(file_prefix, d, p_dict['latent_variable'], p_dict['phenotype_model'])
+		if p_dict['herit_plots'] != None:
+			d = {}
+			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+			pd = load_phenotypes(p_dict['phen_file'])
+			for her in p_dict['herit_plots']:
+				summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], her,
+							p_dict['phenotype_model'], pd, index_list=p_dict['phen_index'])
+				d[her] = summary_dict['p_her']
+			plot_herit_hist(file_prefix, d, p_dict['latent_variable'], p_dict['phenotype_model'])
 
 
+		if p_dict['var_plots']:
+			d = {}
+			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+			pd = load_phenotypes(p_dict['phen_file'])
+			for mod in ['plus', 'or', 'xor']:
+				d[mod] = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'], mod, pd, index_list=p_dict['phen_index'])
+			plot_var(file_prefix, d, p_dict['latent_variable'], p_dict['heritability'], ['plus', 'or', 'xor'])
 
 
 
