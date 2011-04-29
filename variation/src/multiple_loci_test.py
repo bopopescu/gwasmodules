@@ -449,7 +449,7 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 		bin_counts, bins, patch_list = pylab.hist(her_dict[h]['p_her'], range=(0, 0.8), bins=25, alpha=0.6)
 		max_bin_count = max(max_bin_count, max(bin_counts))
 		pylab.axvline((h / 100.0), color='k', alpha=0.8, ls='-.')
-		pylab.axvline(sp.median(her_dict[h]), color='#DD3311', alpha=0.8, ls='-.')
+		pylab.axvline(sp.median(her_dict[h]['p_her']), color='#DD3311', alpha=0.8, ls='-.')
 	y_range = max_bin_count - 0
 	pylab.axis([-0.8 * 0.025, 0.8 * 1.025, -0.025 * max_bin_count, max_bin_count * 1.025])
 	pylab.xlabel('heritability')
