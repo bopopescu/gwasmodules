@@ -417,18 +417,18 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 	am_dot_marker = ['s', '^', 's', '^']
 
 	for w_i, ws in enumerate(window_sizes):
-		pylab.figure(figsize=(10, 8))
-		pylab.axes([0.06, 0.05, 0.9, 0.94])
+		pylab.figure(figsize=(8, 6))
+		pylab.axes([0.09, 0.08, 0.85, 0.9])
 		for am, amc, amls in zip(am_list, am_colors, am_ls):
 			xs = sp.zeros(len(pval_thresholds))
 			ys = sp.zeros(len(pval_thresholds))
 			for pt_i, pt in enumerate(pval_thresholds):
 				ys[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
 				xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
-			pylab.plot(xs, ys, label=am, color=amc, ls=amls, alpha=0.8, marker='.')
+			pylab.plot(xs, ys, label=am, color=amc, ls=amls, alpha=0.6, marker='.')
 		for am, amc, amm in zip(am_dot_list, am_dot_colors, am_dot_marker):
 			pylab.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, marker=amm,
-				ls='', color=amc)
+				ls='', color=amc, alpha=0.6)
 		png_file = '%s_w%d.png' % (file_prefix, ws)
 		pylab.ylabel('Power')
 		pylab.xlabel('FDR')
