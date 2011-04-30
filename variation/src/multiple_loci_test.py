@@ -410,20 +410,25 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 
 	# TPRs vs. FDRs
 	am_list = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
+	am_colors = ['r', 'g', 'b', 'r', 'b']
+	am_ls = ['--', '--', '--', '-', '-']
 	am_dot_list = ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']
+	am_dot_colors = ['#22DD66', '#22DD66', '#DD2266', '#DD2266']
+	am_dot_marker = ['s', '^', 's', '^']
 
 	for w_i, ws in enumerate(window_sizes):
 		pylab.figure(figsize=(10, 8))
 		pylab.axes([0.06, 0.05, 0.9, 0.94])
-		for am in am_list:
+		for am, amc, amls in zip(am_list, am_colors, am_ls):
 			xs = sp.zeros(len(pval_thresholds))
 			ys = sp.zeros(len(pval_thresholds))
 			for pt_i, pt in enumerate(pval_thresholds):
 				ys[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
 				xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
-			pylab.plot(xs, ys, label=am)
-		for am in am_dot_list:
-			pylab.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, marker='o')
+			pylab.plot(xs, ys, label=am, color=amc, ls=amls, alpha=0.8, marker='.')
+		for am, amc, amm in zip(am_dot_list, am_dot_colors, am_dot_marker):
+			pylab.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, marker=amm,
+				ls='', color=amc)
 		png_file = '%s_w%d.png' % (file_prefix, ws)
 		pylab.ylabel('Power')
 		pylab.xlabel('FDR')
@@ -461,8 +466,8 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 	pylab.figure()
 	png_file_name = file_prefix + '_h%s_ks_her_scatter.png' % ('_'.join(map(str, her_dict.keys())))
 	for h in sorted(her_dict):
-		pylab.plot(her_dict[h]['p_her'], her_dict[h]['LM']['ks'], ls='', marker='.', alpha=0.5, label='herit. =%0.2f' % (h / 100.0))
-	pylab.xlabel('pseudo_heritability')
+		pylab.plot(her_dict[h]['p_her'], her_dict[h]['LM']['ks'], ls='', marker='.', alpha=0.5, label='herit.=%0.2f' % (h / 100.0))
+	pylab.xlabel('pseudo-heritability')
 	pylab.ylabel('Kolmogorov-Smirnov statistic')
 	pylab.legend(loc=2, prop=prop, numpoints=1, scatterpoints=1)
 	pylab.savefig(png_file_name)
@@ -470,8 +475,8 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 	pylab.figure()
 	png_file_name = file_prefix + '_h%s_pmed_her_scatter.png' % ('_'.join(map(str, her_dict.keys())))
 	for h in sorted(her_dict):
-		pylab.plot(her_dict[h]['p_her'], her_dict[h]['LM']['medp'], ls='', marker='.', alpha=0.5, label='herit. =%0.2f' % (h / 100.0))
-	pylab.xlabel('pseudo_heritability')
+		pylab.plot(her_dict[h]['p_her'], her_dict[h]['LM']['medp'], ls='', marker='.', alpha=0.5, label='herit.=%0.2f' % (h / 100.0))
+	pylab.xlabel('pseudo-heritability')
 	pylab.ylabel('Median pvalue bias')
 	pylab.legend(loc=2, prop=prop, numpoints=1, scatterpoints=1)
 	pylab.savefig(png_file_name)
