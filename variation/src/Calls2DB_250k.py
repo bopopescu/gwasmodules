@@ -210,7 +210,12 @@ class Calls2DB_250k(object):
 		Calls2DB_250k.py -i /tmp/simplecalls -m 1 -c
 		
 		Calls2DB_250k.py -i /Network/Data/250k/finalData_051808/250K_method_5_after_imputation_noRedundant_051908.csv -m 6 -u yh -y 2 -c -l 262_unique
-	
+		
+		#2011-5-2 add a CNV dataset (column id is Snps.id, 0=normal, 1=deletion) into db
+		# The program will use pymodule.SNP.number2nt to translate 0 & 1 into nucleotides (NA and A).
+		Calls2DB_250k.py -i script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod20_snpID.tsv -m 80 -u yh -y3
+			-c -l cnvMethod20InCall32 -z banyan
+		
 	Description:
 		Turn calling algorithm's results into db and associated filesystem directory.
 		
@@ -221,6 +226,7 @@ class Calls2DB_250k(object):
 				SNP_ID	'array_id'
 				1_657_C_T	C
 				3	T
+		2011-5-3 Input type 2 is outdated.
 		output: Apart from entries inserted into db table call_info, files would be created in the output_dir to store
 			actual calls.
 			Format is 2-column and tab-delimited. First column is id in table snps. example:
@@ -228,7 +234,7 @@ class Calls2DB_250k(object):
 				213444	C
 	"""
 	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
+							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
 							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
 							('user', 1, ): [None, 'u', 1, 'database username', ],\
 							('passwd', 1, ): [None, 'p', 1, 'database password', ],\
@@ -279,8 +285,16 @@ class Calls2DB_250k(object):
 		else:
 			return 0
 	
-	def check_method_id_exists(self, curs, call_method_table, method_id):
+	def check_method_id_exists(self, db, method_id):
 		"""
+		2011-5-3
+			directly query Stock_250kDB.CallMethod.
+		"""
+		cm = Stock_250kDB.CallMethod.get(method_id)
+		if cm is None:
+			return 0
+		else:
+			return 1
 		"""
 		curs.execute("select id from %s where id=%s"%(call_method_table, method_id))
 		rows = curs.fetchall()
@@ -288,6 +302,7 @@ class Calls2DB_250k(object):
 			return 0
 		else:
 			return 1
+		"""
 	
 	def get_new_call_id(self, curs, call_info_table, array_id, method_id):
 		"""
@@ -312,6 +327,8 @@ class Calls2DB_250k(object):
 	
 	def submit_call_dir2db(self, curs, input_dir, call_info_table, output_dir, method_id, user, chr_pos2db_id=None, db=None):
 		"""
+		2011-5-2
+			curs is completely useless. keywords must contain the "db" key now.
 		2011-2-27
 			input file could use either db_id or chr_pos to identify locus.
 		2011-1-24
@@ -339,40 +356,50 @@ class Calls2DB_250k(object):
 			filename = file_ls[i]
 			array_id = filename.split('_')[0]
 			sys.stderr.write("%d/%d:\t%s\n"%(i+1,len(file_ls),filename))
-			new_call_id = self.get_new_call_id(curs, call_info_table, array_id, method_id)
-			if new_call_id!=-1:
-				output_fname = os.path.join(output_dir, '%s_call.tsv'%new_call_id)
-				if os.path.isfile(output_fname):
-					sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
-					continue
-				input_fname = os.path.join(input_dir, filename)
-				reader = csv.reader(open(input_fname), delimiter='\t')
-				writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-				header_row = reader.next()
-				writer.writerow(header_row)
-				for row in reader:
-					db_id = db.get_db_id_given_chr_pos2db_id(row[0],)
-					if db_id is not None:
-						new_row = [db_id] + row[1:]
-						writer.writerow(new_row)
-				del reader, writer
-				call_info = Stock_250kDB.CallInfo(id=new_call_id, filename=output_fname, array_id=array_id,\
-												method_id=method_id, created_by=user)
-				db.session.add(call_info)
-				db.session.flush()
-				
-				"""
-				cp_p = subprocess.Popen(['cp', input_fname, output_fname], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-				cp_p_stdout_out = cp_p.stdout.read()
-				cp_p_stderr_out = cp_p.stderr.read()
-				if cp_p_stdout_out:
-					sys.stderr.write("\tcp stdout: %s\n"%cp_p_stdout_out)
-				if cp_p_stderr_out:
-					sys.stderr.write("\tcp stderr: %s\n"%cp_p_stderr_out)
-					continue	#error in cp. skip the db insertion.
-				curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
-						(call_info_table, new_call_id, output_fname, array_id, method_id, user))
-				"""
+			
+			call_info = Stock_250kDB.CallInfo(array_id=array_id, method_id=method_id, created_by=user)
+			db.session.add(call_info)
+			db.session.flush()
+			output_fname = os.path.join(output_dir, '%s_call.tsv'%call_info.id)
+			call_info.filename = output_fname
+			db.session.add(call_info)
+			db.session.flush()
+			
+			#new_call_id = self.get_new_call_id(curs, call_info_table, array_id, method_id)
+			#if new_call_id!=-1:
+				#output_fname = os.path.join(output_dir, '%s_call.tsv'%new_call_id)
+			if os.path.isfile(output_fname):
+				sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
+				continue
+			input_fname = os.path.join(input_dir, filename)
+			reader = csv.reader(open(input_fname), delimiter='\t')
+			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			header_row = reader.next()
+			writer.writerow(header_row)
+			for row in reader:
+				db_id = db.get_db_id_given_chr_pos2db_id(row[0],)
+				if db_id is not None:
+					new_row = [db_id] + row[1:]
+					writer.writerow(new_row)
+			del reader, writer
+			"""
+			call_info = Stock_250kDB.CallInfo(id=new_call_id, filename=output_fname, array_id=array_id,\
+											method_id=method_id, created_by=user)
+			db.session.add(call_info)
+			db.session.flush()
+			
+			
+			cp_p = subprocess.Popen(['cp', input_fname, output_fname], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+			cp_p_stdout_out = cp_p.stdout.read()
+			cp_p_stderr_out = cp_p.stderr.read()
+			if cp_p_stdout_out:
+				sys.stderr.write("\tcp stdout: %s\n"%cp_p_stdout_out)
+			if cp_p_stderr_out:
+				sys.stderr.write("\tcp stderr: %s\n"%cp_p_stderr_out)
+				continue	#error in cp. skip the db insertion.
+			curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
+					(call_info_table, new_call_id, output_fname, array_id, method_id, user))
+			"""
 	
 	def submit_SNPxStrain_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user, chr_pos2db_id=None,\
 								**keywords):
@@ -433,6 +460,8 @@ class Calls2DB_250k(object):
 	def submit_StrainxSNP_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user, chr_pos2db_id=None,
 								**keywords):
 		"""
+		2011-5-2
+			curs is completely useless. keywords must contain the "db" key now.
 		2011-2-27
 			input file could use either db_id or chr_pos to identify locus.
 		2010-10-13
@@ -445,6 +474,7 @@ class Calls2DB_250k(object):
 			submit the calls from a matrix file (Strain X SNP format, tsv, nucleotides in numbers) to db
 		"""
 		sys.stderr.write("Submitting %s to db ...\n"%(input_fname))
+		db = keywords.get("db")	#2011-5-2
 		output_dir = os.path.join(output_dir, 'method_%s'%method_id)
 		if not os.path.isdir(output_dir):
 			os.makedirs(output_dir)
@@ -455,34 +485,46 @@ class Calls2DB_250k(object):
 		for row in reader:
 			ecotype_id, array_id = row[:2]
 			sys.stderr.write("%s\tAssign new call info id to array id=%s ."%('\x08'*80, array_id))
-			new_call_id = self.get_new_call_id(curs, call_info_table, array_id, method_id)
-			if new_call_id!=-1:
-				output_fname = os.path.join(output_dir, '%s_call.tsv'%new_call_id)
-				if os.path.isfile(output_fname):
-					sys.stderr.write("Error: %s already exists. Check why the file exists while db has no record.\n"%output_fname)
-					sys.exit(2)
-				writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-				writer.writerow(['SNP_ID', array_id])
-				for i in range(2, len(row)):
-					snp_id = header[i]
-					if chr_pos2db_id:	#2010-10-13
-						db_id = db.get_db_id_given_chr_pos2db_id(snp_id)
-					else:
-						db_id = snp_id
-					if db_id is not None:
-						writer.writerow([db_id, number2nt[int(row[i])]])	#translate 
-				del writer
-				try:
-					curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
-								(call_info_table, new_call_id, output_fname, array_id, method_id, user))
-				except:
-					traceback.print_exc()
-					sys.stderr.write('%s.\n'%repr(sys.exc_info()))
-					sys.stderr.write('Error encountered while inserting record into %s. Delete the file written.\n'%call_info_table)
-					commandline = 'rm %s'%(output_fname)
-					command_out = runLocalCommand(commandline)
-					sys.exit(3)
-				counter += 1
+			
+			call_info = Stock_250kDB.CallInfo(array_id=array_id, method_id=method_id, created_by=user)
+			db.session.add(call_info)
+			db.session.flush()
+			output_fname = os.path.join(output_dir, '%s_call.tsv'%call_info.id)
+			call_info.filename = output_fname
+			db.session.add(call_info)
+			db.session.flush()
+			
+			#new_call_id = self.get_new_call_id(curs, call_info_table, array_id, method_id)
+			#if new_call_id!=-1:
+			
+			if os.path.isfile(output_fname):
+				sys.stderr.write("Error: %s already exists. Check why the file exists while db has no record.\n"%output_fname)
+				sys.exit(2)
+			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			writer.writerow(['SNP_ID', array_id])
+			for i in range(2, len(row)):
+				snp_id = header[i]
+				if chr_pos2db_id:	#2010-10-13
+					db_id = db.get_db_id_given_chr_pos2db_id(snp_id)
+				else:
+					db_id = snp_id
+				if db_id is not None:
+					writer.writerow([db_id, number2nt[int(row[i])]])	#translate 
+			del writer
+			"""
+			try:
+				
+				#curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
+				#			(call_info_table, new_call_id, output_fname, array_id, method_id, user))
+			except:
+				traceback.print_exc()
+				sys.stderr.write('%s.\n'%repr(sys.exc_info()))
+				sys.stderr.write('Error encountered while inserting record into %s. Delete the file written.\n'%call_info_table)
+				commandline = 'rm %s'%(output_fname)
+				command_out = runLocalCommand(commandline)
+				sys.exit(3)
+			"""
+			counter += 1
 		del reader
 		sys.stderr.write(" %s arrays. Done.\n"%counter)
 	
@@ -510,10 +552,11 @@ class Calls2DB_250k(object):
 		
 		chr_pos2db_id = db.getSNPChrPos2ID()
 		
-		import MySQLdb
-		conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.user, passwd = self.passwd)
-		curs = conn.cursor()
-		if not self.check_method_id_exists(curs, self.call_method_table, self.method_id):
+		#import MySQLdb
+		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.user, passwd = self.passwd)
+		#curs = conn.cursor()
+		curs = None
+		if not self.check_method_id_exists(db, self.method_id):
 			sys.stderr.write("Warning: method_id=%s not in %s. A new entry to be created.\n"%\
 							(self.method_id, self.call_method_table))
 			cm = Stock_250kDB.CallMethod(short_name=self.call_method_short_name, id=self.method_id)
@@ -525,7 +568,7 @@ class Calls2DB_250k(object):
 		if self.commit:
 			self.submit_call2db(curs, self.input_dir, self.call_info_table, self.output_dir, self.method_id, self.user, \
 							chr_pos2db_id=chr_pos2db_id, db=db)
-			curs.execute("commit")
+			#curs.execute("commit")
 			session.flush()
 			session.commit()
 	
