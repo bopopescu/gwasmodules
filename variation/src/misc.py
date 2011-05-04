@@ -2669,30 +2669,6 @@ class JBDataGWA(object):
 		return Z
 	
 	@classmethod
-	def createIndividualToLineIncidenceMatrix(cls, individualID_ls, lineID_ls):
-		"""
-		2010-3-22
-			multiple individuals in individualID_ls share the same ID (lineID).
-			The purpose of this function is to create a matrix mapping each individual to a line, 
-				which would be used to create a new kinship matrix.
-		"""
-		sys.stderr.write("Creating individual-to-line incidence matrix ...")
-		no_of_replicates = len(individualID_ls)
-		no_of_lines = len(lineID_ls)
-		import numpy
-		Z = numpy.zeros([no_of_replicates, no_of_lines], numpy.int8)	# incidence matrix
-		no_of_replicates_with_line = 0
-		for i in range(no_of_replicates):
-			individualID = individualID_ls[i]
-			for j in range(no_of_lines):
-				if individualID==lineID_ls[j]:
-					Z[i,j] = 1
-					no_of_replicates_with_line += 1
-					break
-		sys.stderr.write("%s out of %s without any corresponding line found. Done.\n"%(no_of_replicates-no_of_replicates_with_line, no_of_replicates))
-		return Z
-	
-	@classmethod
 	def encodeEnvrionmentData(cls, data_in_str, encode_dict={}):
 		"""
 		2010-3-22
@@ -3306,39 +3282,7 @@ class JBDataGWA(object):
 	sys.exit(0)
 	
 	"""
-	
-	@classmethod
-	def getExpandedKinship(cls, kinship_output_fname=None, genotype_fname_to_generate_kinship=None, JBData=None):
-		"""
-		2010-8-22
-			return JBData as well
-		2010-4-23
-			split out of getCholeskyInverseData()
-		"""
-		from pymodule.SNP import SNPData
-		from Association import Association
-		import numpy, os, sys
-		if os.path.isfile(kinship_output_fname):
-			kinshipData = SNPData(input_fname=kinship_output_fname, ignore_2nd_column=1, \
-								matrix_data_type=float, turn_into_array=1)
-		else:
-			snpData = SNPData(input_fname=genotype_fname_to_generate_kinship, turn_into_array=1, ignore_2nd_column=1)
-			newSnpData, allele_index2allele_ls = snpData.convert2Binary()
-			snpData = newSnpData
-			kinship_matrix = Association.get_kinship_matrix(snpData.data_matrix)
-			kinshipData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=snpData.row_id_ls, data_matrix=kinship_matrix)
-			del snpData
-			kinshipData.tofile(kinship_output_fname)
-		
-		JBData = JBData.removeRowsNotInTargetSNPData(kinshipData)	#2010-8-22 a new JBData is generated
-		Z = cls.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, kinshipData.row_id_ls)
-		
-		new_K = numpy.dot(numpy.dot(Z, kinshipData.data_matrix), numpy.transpose(Z))
-		#2010-9-8 don't expand the K matrix
-		#new_K = kinshipData.data_matrix
-		
-		return new_K, JBData, Z	#2010-8-22 return JBData as well
-		
+
 	@classmethod
 	def getCholeskyInverseData(cls, L_inverse_fname, kinship_output_fname=None, genotype_fname_to_generate_kinship=None,\
 								JBData=None, logPhenotype=False, preEMMAXCofactor_ls=None, env_variable_coding_ls=None,\
@@ -3364,11 +3308,11 @@ class JBDataGWA(object):
 			L_inverse_Data = SNPData(input_fname=L_inverse_fname, ignore_2nd_column=1, matrix_data_type=float, turn_into_array=1)
 			L_inverse = L_inverse_Data.data_matrix
 			if needKinship:
-				new_K, JBData, Z = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
+				newKinshipData, JBData, Z = Association.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
 			else:
-				new_K = None
+				newKinshipData = None
 		else:
-			new_K, JBData, Z = cls.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
+			newKinshipData, JBData, Z = Association.getExpandedKinship(kinship_output_fname, genotype_fname_to_generate_kinship, JBData)
 			if vg is None or ve is None:
 				phenotype_ls = cls.getPhenotypeLsOutOfJBData(JBData, logPhenotype=logPhenotype,)
 				non_NA_genotype_ls = []
@@ -3378,7 +3322,8 @@ class JBDataGWA(object):
 						factorName = preEMMAXCofactor_ls[i]
 						non_NA_genotype_ls.append(JBDataEnvEncoded.getColDataGivenColName(factorName))
 				non_NA_genotype_ls = numpy.array(non_NA_genotype_ls)
-				preEMMAX_data = Association.preEMMAX(phenotype_ls, new_K, non_NA_genotype_ls=non_NA_genotype_ls, debug=True, Z=None)
+				preEMMAX_data = Association.preEMMAX(phenotype_ls, newKinshipData.data_matrix, non_NA_genotype_ls=non_NA_genotype_ls, \
+											debug=True, Z=None)
 				variance_matrix = preEMMAX_data.variance_matrix
 				non_NA_phenotype_ar = preEMMAX_data.non_NA_phenotype_ar
 				L_inverse = preEMMAX_data.L_inverse
@@ -3400,15 +3345,15 @@ class JBDataGWA(object):
 				pylab.show()
 				"""
 			else:
-				no_of_rows, no_of_cols = new_K.shape
-				variance_matrix = vg*new_K + ve*numpy.identity(no_of_rows)
+				no_of_rows, no_of_cols = newKinshipData.data_matrix.shape
+				variance_matrix = vg*newKinshipData.data_matrix + ve*numpy.identity(no_of_rows)
 				L = numpy.linalg.cholesky(variance_matrix)
 				L_inverse = numpy.linalg.inv(L)
 		
 			L_inverse_Data = SNPData(row_id_ls=JBData.row_id_ls, col_id_ls=JBData.row_id_ls, data_matrix=L_inverse)
 			L_inverse_Data.tofile(L_inverse_fname)
 		sys.stderr.write("Done.\n")
-		return PassingData(L_inverse_Data=L_inverse_Data , kinship_matrix = new_K, JBData = JBData, Z=Z)
+		return PassingData(L_inverse_Data=L_inverse_Data , kinship_matrix = newKinshipData.data_matrix, JBData = JBData, Z=Z)
 	
 	@classmethod
 	def outputPhenotypePrediction(cls, output_fname, covariateData=None, phenotype_ls=[], \
@@ -3644,7 +3589,7 @@ class JBDataGWA(object):
 			# expand the selectSNPData to include replicates
 			if Z is None:
 				JBData = JBData.removeRowsNotInTargetSNPData(selectSNPData)
-				Z = cls.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, selectSNPData.row_id_ls)
+				Z = Association.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, selectSNPData.row_id_ls)
 			snp_matrix_with_replicates = numpy.dot(Z, selectSNPData.data_matrix)
 			selectSNPDataWithReplicates = SNPData(row_id_ls=JBData.row_id_ls, col_id_ls=selectSNPData.col_id_ls, \
 												data_matrix=snp_matrix_with_replicates)
@@ -3696,7 +3641,7 @@ class JBDataGWA(object):
 			snpData = SNPData(input_fname=genotype_fname_to_generate_kinship, turn_into_array=1, ignore_2nd_column=1)
 			newSnpData, allele_index2allele_ls = snpData.convert2Binary(row_id_as_major_allele="6909")
 			snpData = newSnpData
-			Z = cls.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, snpData.row_id_ls)
+			Z = Association.createIndividualToLineIncidenceMatrix(JBData.row_id_ls, snpData.row_id_ls)
 			results = []
 			no_of_cols = snpData.data_matrix.shape[1]
 			if start_snp_id and stop_snp_id:
@@ -5383,12 +5328,14 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 					non_NA_phenotype_ls.append(phenotype_ls[i])
 			
 			non_NA_phenotype_ar = numpy.array(non_NA_phenotype_ls)
-			new_data_matrix = data_matrix[non_phenotype_NA_row_index_ls,:]
+			#new_data_matrix = data_matrix[non_phenotype_NA_row_index_ls,:]
+			newSNPData = SNPData.keepRowsByRowIndex(initData.snpData, non_NA_phenotype_row_index_ls)
+			new_data_matrix = newSNPData.data_matrix
 			if run_type==2:
-				kinship_matrix = Association.get_kinship_matrix(new_data_matrix)
+				kinship_matrix = newSNPData.get_kinship_matrix()
 				eig_L = rpy.r.emma_eigen_L(None, kinship_matrix)	#to avoid repeating the computation of eig_L inside emma.REMLE
 			elif run_type==4:
-				kinship_matrix = Association.get_kinship_matrix(new_data_matrix)
+				kinship_matrix = newSNPData.get_kinship_matrix()
 				preEMMAX_data = Association.preEMMAX(non_NA_phenotype_ls, kinship_matrix, debug=True)
 				variance_matrix = preEMMAX_data.variance_matrix
 				non_NA_phenotype_ar = preEMMAX_data.non_NA_phenotype_ar
@@ -5656,7 +5603,7 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 		
 		Z = None	# to check whether Z would be computed or not
 		
-		kinship_matrix, JBData, Z = JBDataGWA.getExpandedKinship(kinship_output_fname, genotype_fname, JBData)
+		kinshipData, JBData, Z = JBDataGWA.getExpandedKinship(kinship_output_fname, genotype_fname, JBData)
 		phenotype_ls = JBDataGWA.getPhenotypeLsOutOfJBData(JBData, logPhenotype=False, phenotypeColName=phenotypeColName)
 		
 		#2010-3-31 create a snpData with only selected columns
@@ -5695,7 +5642,7 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 			pylab.plot(log_deltas, dlls)
 			pylab.show()
 			"""
-			res = linear_models.emmax(selectSNPDataWithReplicates.data_matrix.T, phenotype_ls, kinship_matrix, cofactors=None, \
+			res = linear_models.emmax(selectSNPDataWithReplicates.data_matrix.T, phenotype_ls, kinshipData.data_matrix, cofactors=None, \
 							with_interactions=False,int_af_threshold=15)
 			import csv
 			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
@@ -5707,7 +5654,7 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 			return
 		elif run_type==4:
 			non_NA_genotype_ls = []
-			preEMMAX_data = Association.preEMMAX(phenotype_ls, kinship_matrix, non_NA_genotype_ls=None, debug=True)
+			preEMMAX_data = Association.preEMMAX(phenotype_ls, kinshipData.data_matrix, non_NA_genotype_ls=None, debug=True)
 			variance_matrix = preEMMAX_data.variance_matrix
 			non_NA_phenotype_ar = preEMMAX_data.non_NA_phenotype_ar
 			L_inverse = preEMMAX_data.L_inverse
@@ -5756,7 +5703,7 @@ GWA.contrastPvalueFromTwoGWA(input_fname1, input_fname2, output_fname_prefix, li
 				
 				pdata = Association.linear_model(genotype_matrix, non_NA_phenotype_ar, min_data_point=3, \
 												snp_index=snp_id, \
-									kinship_matrix=kinship_matrix, eig_L=None, run_type=run_type, \
+									kinship_matrix=kinshipData.data_matrix, eig_L=None, run_type=run_type, \
 									counting_and_NA_checking=True,\
 									variance_matrix=None, lower_triangular_cholesky_inverse=L_inverse)
 				
@@ -6918,16 +6865,23 @@ class Data250k(object):
 	"""
 	
 	@classmethod
-	def filterCallMethod1ToHaveSameArraysAsCallMethod2(cls, call_method_id1, call_method_id2, output_fname):
+	def filterCallMethod1ToHaveSameArraysAsCallMethod2(cls, call_method_id1, call_method_id2, output_fname=None,\
+											call_method1_fname=None):
 		"""
+		2011-4-25
+			add argument call_method1_fname. if given, it replaces call_method1.filename
 		2009-5-19
-			 generate a new snp dataset based on call_method_id1 but without the arrays that are not in call_method_id2
+			 generate a new snp dataset based on call_method_id1 but with only the arrays that are in call_method_id2
 		"""
 		import Stock_250kDB
-		call_method1 = Stock_250kDB.CallMethod.get(call_method_id1)
 		call_method2 = Stock_250kDB.CallMethod.get(call_method_id2)
 		from pymodule import SNPData
-		snpData1 = SNPData(input_fname=call_method1.filename, turn_into_array=1)
+		if call_method1_fname:
+			input_fname = call_method1_fname
+		else:
+			call_method1 = Stock_250kDB.CallMethod.get(call_method_id1)
+			input_fname=call_method1.filename
+		snpData1 = SNPData(input_fname=input_fname, turn_into_array=1)
 		
 		sys.stderr.write("Selecting overlapping arrays ...")
 		array_id_in_call_method2_set = set()
@@ -6950,10 +6904,28 @@ class Data250k(object):
 		del snpData1
 	
 	"""
-	call_method_id1 = 34
-	call_method_id2 = 33
-	output_fname = '/tmp/call_method_%s_arrays_from_%s.tsv'%(call_method_id1, call_method_id2)
-	Data250k.filterCallMethod1ToHaveSameArraysAsCallMethod2(call_method_id1, call_method_id2, output_fname)
+		#2009
+		call_method_id1 = 34
+		call_method_id2 = 33
+		output_fname = '/tmp/call_method_%s_arrays_from_%s.tsv'%(call_method_id1, call_method_id2)
+		Data250k.filterCallMethod1ToHaveSameArraysAsCallMethod2(call_method_id1, call_method_id2, output_fname)
+		sys.exit(0)
+		
+		
+		#2011-4-25
+		cnv_method_id = 20
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod%s_snpID.tsv'%cnv_method_id)
+		#CNV.outputNonOverlappingCNVAsSNP(db_250k, output_fname, cnv_method_id=cnv_method_id, cnv_type_id=1)
+		
+		call_method_id1 = None
+		call_method_id2 = 32
+		call_method1_fname = output_fname
+		output_fname = os.path.expanduser('~/script/variation/data/CNV/cnvMethod%s_arrays_only_in_call%s.tsv'%\
+				(cnv_method_id, call_method_id2))
+		Data250k.filterCallMethod1ToHaveSameArraysAsCallMethod2(call_method_id1, call_method_id2, output_fname,
+				call_method1_fname=call_method1_fname)
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -8541,7 +8513,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				old format: 1_3102_A_G      G       0.985079453549666
 				new format: 2       G       0.985079453549666
 		"""
-		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=False)
+		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=priorTAIRVersion)
 		import Stock_250kDB, os, sys, csv
 		sys.stderr.write("Converting old format call files from method %s into new format ... \n"%(method_id))
 		query = Stock_250kDB.CallInfo.query.filter_by(method_id=method_id)
@@ -8638,7 +8610,97 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
 		DB250k.convertSNPDatasetLocusIDIntoDBID(db, input_fname, output_fname)
 		sys.exit(2)
+		
+		# 2011-2-24 be careful which db (old TAIR8 or TAIR9) to use. this case is TAIR8 (papaya).
+		input_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005.csv"
+		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
+		DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname)
+		sys.exit(2)
 	"""
+	
+	@classmethod
+	def convertOldFormatResultMethodFileIntoNewFormat(cls, db_250k, call_method_id=None, priorTAIRVersion=False):
+		"""
+		2011-2-24
+			add argument priorTAIRVersion, if true, it means using Snps.tair8_chromosome,Snps.tair8_position
+				rather than Snps.chromosome,Snps.position.
+		2011-1-24
+			use Stock_250kDB.Snps.id to replace chr_pos... in the call file.
+			i.e.
+				old format: 1_3102_A_G      G       0.985079453549666
+				new format: 2       G       0.985079453549666
+		"""
+		import Stock_250kDB, os, sys, csv
+		from pymodule import SNP
+		sys.stderr.write("Converting old format results_method files from method %s into new format ... \n"%(call_method_id))
+		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=priorTAIRVersion)
+		
+		#type 2 is segment-based recombination rate. only one result.
+		# analysis method 13 is BooleanSNPPair. ignore
+		TableClass = Stock_250kDB.ResultsMethod
+		query = TableClass.query.filter(TableClass.results_method_type_id!=2).filter(TableClass.analysis_method_id!=13)
+		if call_method_id:
+			query = query.filter_by(call_method_id=call_method_id)
+		counter = 0
+		no_of_files = query.count()
+		for row in query:
+			sys.stderr.write("%d/%d:\t%s "%(counter+1, no_of_files, row.filename))
+			reader = csv.reader(open(row.filename), delimiter='\t')
+			first_data_row = reader.next()
+			hasHeader = False
+			if SNP.pa_has_characters.search(first_data_row[0]):	#first column of 1st row has character in it. this file contains header. 
+				first_data_row = reader.next()
+				hasHeader = True
+			first_data_row = reader.next()
+			if first_data_row[1] and first_data_row[1]!='0':	#2011-5-3 2nd column is something other than '0'. conversion is needed.
+				convertData = True
+			else:
+				convertData = False
+			del reader
+			
+			if convertData:
+				no_of_lines = 0
+				no_of_lines_after_conversion = 0
+				sys.stderr.write("...")
+				# backup the old file first
+				oldFormatFname = '%s.old.tsv'%(os.path.splitext(row.filename)[0])
+				os.rename(row.filename, oldFormatFname)
+				
+				# writing data into the old filename in new format
+				reader = csv.reader(open(oldFormatFname), delimiter='\t')
+				writer = csv.writer(open(row.filename, 'w'), delimiter='\t')
+				if hasHeader:
+					header_row = reader.next()
+					writer.writerow(['snp_id', 'none']+ header_row[2:])
+				for row in reader:
+					no_of_lines += 1
+					chr_pos = row[:2]
+					chr_pos = (chr_pos[0], int(chr_pos[1]))	#chr is of type str. pos is of type int. in chr_pos2db_id
+					db_id = chr_pos2db_id.get(chr_pos)
+					if db_id is not None:
+						no_of_lines_after_conversion += 1
+						new_row = [db_id, ''] + row[2:]	#2nd column (pos) should be empty in new format.
+						writer.writerow(new_row)
+				del reader, writer
+				sys.stderr.write("%s lines different after conversion.\n"%(no_of_lines_after_conversion-no_of_lines))
+			else:
+				sys.stderr.write("no conversion. (maybe converted already).\n")
+			counter += 1
+	
+	"""
+		# 2011-5-4
+		# priorTAIRVersion=True if it's connected to banyan's TAIR9 db while the association results are based off TAIR8.
+		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=1, priorTAIRVersion=True)
+		sys.exit(0)
+		
+		# 2011-2-15
+		# 	Watch: use papaya's TAIR8 db because the call info files contains calls in TAIR8 coordinates.
+		for call_method_id in xrange(20,73):
+			DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+		
+	"""
+	
 	@classmethod
 	def convertRMIntoJson(cls, db_250k, call_method_id_ls_str="", analysis_method_id_ls_str="", \
 						phenotype_method_id_ls_str="", no_of_top_snps = 10000, commit=False):
@@ -8835,6 +8897,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	sys.exit(0)
 	
 	"""
+	
 	
 class CNV(object):
 	class Lyrata(object):
@@ -9243,8 +9306,62 @@ class CNV(object):
 	"""
 	
 	@classmethod
+	def pickCNVsForValidation(cls, db_250k, cnv_method_id=20, cnv_type_id=1, no_of_loci=100):
+		"""
+		2011-4-27
+			select deletions based on frequency, size, probability
+			output:
+				accession name, deletion location, size, sequence deleted, 2-3kb flanking sequence
+				
+				which base in the flanking sequence is a SNP (either 250k or perlegen)
+				
+				avoid region with excessive polymorphism
+		"""
+		sys.stderr.write("Picking %s type %s CNVs from method %s for validation ..."%(no_of_loci, cnv_type_id, cnv_method_id))
+		import Stock_250kDB
+		query = Stock_250kDB.CNVArrayCall.query.filter_by(cnv_type_id=cnv_type_id).filter_by(cnv_method_id=cnv_method_id)
+		
+		sys.stderr.write("Done.\n")
+		
+	
+	@classmethod
+	def putCNVIntoSnps(cls, db_250k, cnv_method_id=None):
+		"""
+		2011-4-22
+			put CNVs from particular cnv_method_id into table Snps
+				so that results_method could just point to call_method, rather than cnv_method
+		"""
+		import Stock_250kDB
+		sys.stderr.write("Putting cnvs from method %s into db ...\n"%(cnv_method_id))
+		query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id)
+		counter = 0
+		real_counter = 0
+		for row in query:
+			counter += 1
+			db_entry = db_250k.getSNP(chromosome=row.chromosome, start=row.start, stop=row.stop)
+			if db_entry.id is None:
+				real_counter += 1
+			if counter%5000==0:
+				sys.stderr.write("%s\t%s\t%s"%('\x08'*80, counter, real_counter))
+		db_250k.session.flush()
+		db_250k.session.commit()
+		sys.stderr.write("%s\t%s\t%s.\n"%('\x08'*80, counter, real_counter))
+	
+	"""
+		#2011-4-22
+		cnv_method_id=20
+		CNV.putCNVIntoSnps(db_250k, cnv_method_id=cnv_method_id)
+		sys.exit(0)
+		
+		
+	"""
+	
+	@classmethod
 	def outputNonOverlappingCNVAsSNP(cls, db_250k, output_fname, cnv_method_id=None, cnv_type_id=None):
 		"""
+		2011-4-24
+			replace CNV.id with Snps.id (same chr,start,stop).
+			you can run CNV.putCNVIntoSnps() to make sure every CNV from that method is in db. 
 		2011-2-17
 			use CNV.id as column ID
 		2010-8-7
@@ -9261,7 +9378,10 @@ class CNV(object):
 		
 		for row in query:
 			#col_id = '%s_%s_%s'%(row.chromosome, row.start, row.stop)
-			col_id = row.id		#2011-2-17 use CNV.id as column ID
+			db_entry = db_250k.getSNP(chromosome=row.chromosome, start=row.start, stop=row.stop)
+			if db_entry.id is None:
+				db_entry.session.flush()
+			col_id = db_entry.id		#2011-2-17 use CNV.id as column ID
 			col_id_ls.append(col_id)
 			col_id2index[col_id] = len(col_id2index)
 			cnv_id2index[row.id] = col_id2index[col_id]
@@ -9538,6 +9658,109 @@ class CNV(object):
 		setattr(param_obj, "no_of_deletions", no_of_deletions)
 		setattr(param_obj, "no_of_valid_deletions", no_of_valid_deletions)
 		sys.stderr.write("\n")
+	
+	@classmethod
+	def comparePeaksFromTwoAssociationResults(cls, db_250k, result1_id=None, result1_peak_type_id=None,\
+											result2_id=None, result2_peak_type_id=None, result2_peak_ext_dist=0):
+		"""
+		2011-4-22
+			peak data is from table ResultPeak.
+			The function tells how many peaks from result1 are not found, and how many are found
+				in result2.
+		"""
+		sys.stderr.write("Comparing peaks from result %s against result %s ...\n"%(result1_id, result2_id))
+		import Stock_250kDB
+		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from pymodule.RBTree import RBDict
+		
+		sys.stderr.write("Constructing RBDict for peaks from result %s ..."%(result2_id))
+		result2_peakRBDict = RBDict()
+		query = Stock_250kDB.ResultPeak.query.filter_by(result_id=result2_id).filter_by(result_peak_type_id=result2_peak_type_id)
+		counter = 0
+		real_counter = 0
+		for row in query:
+			counter += 1
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+							span_ls=[max(1, row.start - result2_peak_ext_dist), row.stop + result2_peak_ext_dist], \
+							min_reciprocal_overlap=1,)
+							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
+			if segmentKey not in result2_peakRBDict:
+				result2_peakRBDict[segmentKey] = []
+			result2_peakRBDict[segmentKey].append(row)
+		sys.stderr.write("%s peaks. Done.\n"%counter)
+		
+		compareIns = CNVCompare(min_reciprocal_overlap=0.0000001)	#any overlap is an overlap
+		query = Stock_250kDB.ResultPeak.query.filter_by(result_id=result1_id).filter_by(result_peak_type_id=result1_peak_type_id)
+		no_of_peaks_not_in_result2 = 0
+		overlap_ls = []
+		score_ls = []
+		counter = 0
+		for row in query:
+			counter += 1
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+							span_ls=[row.start, row.stop], \
+							min_reciprocal_overlap=0.0000001, )	#min_reciprocal_overlap doesn't matter here.
+				# it's decided by compareIns.
+			node_ls = []
+			result2_peakRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
+			total_perc_overlapped_by_result2 = 0.
+			for node in node_ls:
+				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
+										[node.key.start, node.key.stop])[:5]
+				total_perc_overlapped_by_result2 += overlap1
+			score_ls.append(row.peak_score)
+			if total_perc_overlapped_by_result2==0:
+				no_of_peaks_not_in_result2 += 1
+				overlap_ls.append(-0.5)
+			else:
+				overlap_ls.append(total_perc_overlapped_by_result2)
+		
+		sys.stderr.write("%s/%s peaks in result %s not found in result %s. Done.\n"%(no_of_peaks_not_in_result2,\
+												counter, result1_id, result2_id))
+		from pymodule import yh_matplotlib
+		yh_matplotlib.drawHist(overlap_ls, title='Histogram of overlap rate of %s peaks'%(len(overlap_ls)), \
+							xlabel_1D='overlap rate',\
+							outputFname='/tmp/hist_of_result%s_overlap_rate_in_result%s.png'%(result1_id, result2_id), \
+							min_no_of_data_points=10, needLog=False)
+		outputFname = '/tmp/hist_of_result%s_overlap_rate_in_result%s_2D.png'%(result1_id, result2_id)
+		C_ls = [1]*len(overlap_ls)
+		colorBarLabel='log(count)'
+		reduce_C_function = yh_matplotlib.logSum
+		yh_matplotlib.drawHexbin(overlap_ls, score_ls, C_ls, fig_fname=outputFname, gridsize=10, \
+								title='%s peaks in result %s vs %s'%(counter, result1_id, result2_id), \
+								xlabel = 'overlap rate', \
+								ylabel = 'association-score',\
+								colorBarLabel=colorBarLabel, reduce_C_function= reduce_C_function)
+	"""
+		# 2011-4-22
+		result1_id = 4634	#cnv_20_LD_KW
+		result1_peak_type_id = 1
+		result2_id = 3395	#call_32_LD_KW
+		result2_peak_type_id = 2
+		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\
+										result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
+		sys.exit(0)
+		
+		# 2011-4-22
+		result1_id = 3395	#call_32_LD_KW
+		result1_peak_type_id = 2 #min_score=5
+		result2_id = 3396	#call_32_LDV_KW
+		result2_peak_type_id = 2	#min_score=5
+		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\
+										result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
+		sys.exit(0)
+		
+		result1_id_ls = [4634, 4635, 4636, 4637]	#cnv_20_LD_KW, LDV, SD, SDV
+		result1_peak_type_id = 1 #min_score=4
+		result2_id_ls = [3395, 3396, 3397, 3398]	#call_32_LD_KW, LDV, SD, SDV
+		result2_id = 3396	#call_32_LDV_KW
+		result2_peak_type_id = 2	#min_score=5
+		for i in xrange(len(result1_id_ls)):
+			result1_id = result1_id_ls[i]
+			result2_id = result2_id_ls[i]
+		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\						result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
+		sys.exit(0)
+	"""
 	
 	@classmethod
 	def putOneCNVSegmentIntoDBFunctor(cls, param_obj, cnv_segment_obj=None, cnv_qc_call=None):
@@ -18905,7 +19128,7 @@ class AnalyzeSNPData(object):
 		#row_id2pairwise_dist2 = snpData2.calRowPairwiseDist(NA_set =set(['NA', 'N', -2, '|']), ref_row_id=str(ref_ecotype_id))
 		#ecotype_id_pair2dist2 = cls.turn_row_id2pairwise_dist_into_ecotype_id_pair_dict(row_id2pairwise_dist2)
 		# CNV dataset doesn't have ref_ecotype_id 6909
-		row_id2fractionData = snpData2.calFractionOfLociCarryingDifferentAllelePerRow(NA_set =set(['NA', 'N', -2, '|']), ref_allele=0)
+		row_id2fractionData = snpData2.calFractionOfLociCarryingNonRefAllelePerRow(NA_set =set(['NA', 'N', -2, '|']), ref_allele=0)
 		ecotype_id_pair2dist2 = {}
 		for row_id, fractionData in row_id2fractionData.iteritems():
 			row_id = int(row_id)
@@ -20128,11 +20351,21 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		# 2011-2-24 be careful which db (old TAIR8 or TAIR9) to use. this case is TAIR8 (papaya).
-		input_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005.csv"
-		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
-		DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname)
-		sys.exit(2)
+		# 2011-5-4
+		# priorTAIRVersion=True if it's connected to banyan's TAIR9 db because the association results are based off TAIR8.
+		# call_method_id=None if you want the function to go through all possible files.
+		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=None, priorTAIRVersion=True)
+		sys.exit(0)
+		
+		
+		# 2011-4-22
+		result1_id = 4634	#cnv_20_LD_KW
+		result1_peak_type_id = 1 #min_score=4
+		result2_id = 4635	#cnv_20_LDV_KW
+		result2_peak_type_id = 1	#min_score=4
+		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\
+										result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
+		sys.exit(0)
 
 
 #2007-03-05 common codes to initiate database connection
