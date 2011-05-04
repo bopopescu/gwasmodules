@@ -11,6 +11,7 @@ from utils import dict_map, importNumericArray, figureOutDelimiter, PassingData
 import copy
 
 num = importNumericArray()
+numpy = num
 
 #2008-05-06 ab2number and number2ab is for 384-illumina data
 ab2number = {'N': 0,
@@ -51,6 +52,14 @@ nt2number = {'|': -2,	#2008-01-07 not even tried. 'N'/'NA' is tried but produces
 	'g': 3,
 	'T': 4,
 	't': 4,
+	'AA': 1,
+	'aa': 1,
+	'CC': 2,
+	'cc': 2,
+	'GG': 3,
+	'gg': 3,
+	'TT': 4,
+	'tt': 4,
 	'AC': 5,
 	'CA': 5,
 	'M': 5,
@@ -382,8 +391,7 @@ def write_data_matrix(data_matrix, output_fname, header, strain_acc_list, catego
 	
 	#figure out no_of_rows, no_of_cols
 	if type(data_matrix)==list and transform_to_numpy:	#2008-02-06 transform the 2D list into array
-		import numpy
-		data_matrix = numpy.array(data_matrix)
+		data_matrix = numpy.array(data_matrix,dtype="int8")
 		no_of_rows, no_of_cols = data_matrix.shape
 	else:
 		no_of_rows = len(data_matrix)
@@ -515,7 +523,7 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 	if double_header:
 		second_header = reader.next()
 		second_header = second_header[:data_starting_col] + [second_header[i+data_starting_col] for i in col_index_ls]
-		header = [header, second_header]
+		header = zip(second_header,header)
 	
 	data_matrix = []
 	strain_acc_list = []
@@ -710,7 +718,7 @@ class SNPData(object):
 			correct a bug here, opposite judgement of self.data_matrix
 		"""
 		if not self.isDataMatrixEmpty(self.data_matrix) and self.turn_into_array:
-			self.data_matrix = num.array(self.data_matrix)
+			self.data_matrix = num.array(self.data_matrix,dtype="int8")
 		
 		if self.row_id_ls is None and self.strain_acc_list is not None:
 			self.row_id_ls = []
@@ -893,8 +901,7 @@ class SNPData(object):
 		no_of_rows_kept = len(row_index_ls)
 		sys.stderr.write("%s out of %s rows kept. Now call keepRowsByRowIndex() to do actual work.\n"%(no_of_rows_kept, no_of_total))
 		return self.keepRowsByRowIndex(self, row_index_ls)
-
-
+	
 	@classmethod
 	def keepRowsWhoseOneColMatchValue(cls, snpData, col_id, col_value):
 		"""
@@ -1063,7 +1070,7 @@ class SNPData(object):
 			if len(allele2count_ls[j])>2:
 				no_of_SNPs_with_more_than_2_alleles += 1
 				if cls.report:
-					sys.stderr.write("more than 2 alleles at SNP %s (id=%s).\n"%(j, snpData.col_id_ls[j]))
+					sys.stderr.write("Warning: more than 2 alleles at SNP %s (id=%s).\n"%(j, snpData.col_id_ls[j]))
 			MAF = min(allele2count_ls[j].values())/float(sum(allele2count_ls[j].values()))
 			"""
 			print MAF
@@ -1139,6 +1146,35 @@ class SNPData(object):
 		sys.stderr.write("%s columns discarded. Done.\n"%(newSnpData.no_of_cols_removed))
 		return newSnpData
 	
+	def convertSNPIDToChrPos(self, db):
+		"""
+		2011-03-10 (not tested)
+			assuming col_id is Snps.id, and convert them into chr_pos through db (stock_250k).
+			If col_id is already chr_pos format, no conversion.
+			A new SNPData is generated in the end.
+		"""
+		#2011-2-27 translate the db_id into chr_pos because the new StrainXSNP dataset uses db_id to identify SNPs.
+		# but if col-id is already chr_pos, it's fine.
+		new_col_id_ls = []
+		data_matrix_col_index_to_be_kept = []
+		for i in xrange(len(self.col_id_ls)):
+			snp_id = self.col_id_ls[i]
+			chr_pos = db.get_chr_pos_given_db_id2chr_pos(snp_id,)
+			if chr_pos is not None:
+				data_matrix_col_index_to_be_kept.append(i)
+				new_col_id_ls.append(chr_pos)
+		
+		# to remove no-db_id columns from data matrix
+		#data_matrix = numpy.array(self.data_matrix)
+		data_matrix = self.data_matrix[:, data_matrix_col_index_to_be_kept]
+		
+		no_of_rows = len(self.row_id_ls)
+		newSnpData = SNPData(row_id_ls=copy.deepcopy(self.row_id_ls), col_id_ls=self.col_id_ls)
+		newSnpData.data_matrix = data_matrix
+		newSnpData.no_of_cols_removed = len(self.col_id_ls)-no_of_cols
+		newSnpData.processRowIDColID()	# to initiate a new row_id2row_index since row_id_ls is changed
+		sys.stderr.write("%s columns discarded. Done.\n"%(newSnpData.no_of_cols_removed))
+		return newSnpData
 	
 	@classmethod
 	def convertHetero2NA(cls, snpData):
@@ -1282,8 +1318,14 @@ class SNPData(object):
 		return LD.calLD(self.data_matrix[:, snp1_index], self.data_matrix[:, snp2_index])
 		
 	
-	def calRowPairwiseDist(self):
+	def calRowPairwiseDist(self, NA_set =Set([0, 'NA', 'N', -2, '|']), ref_row_id=None, assumeBiAllelic=False,
+						outputFname=None):
 		"""
+		2011-3-31
+			add argument outputFname
+				if given, output row_id2pairwise_dist to it.
+		2010-10-23
+			add argument NA_set and ref_row_id
 		2009-4-18
 			calculate distance between all rows except itself.
 			only calculate half non-redundant pairs.
@@ -1297,12 +1339,26 @@ class SNPData(object):
 			pairwise_dist = []
 			for j in range(i+1, len(self.row_id_ls)):
 				row_id2 = self.row_id_ls[j]
-				no_of_mismatches = 0
+				if ref_row_id is not None and row_id1!=ref_row_id and row_id2!=ref_row_id:
+					#ignore this pair if neither of them is ref_row_id
+					continue
+				no_of_mismatches = 0.0
 				no_of_non_NA_pairs = 0
 				for col_index in range(len(self.col_id_ls)):
-					if self.data_matrix[i][col_index] not in NA_set and self.data_matrix[j][col_index] not in NA_set:
+					row_i_allele = self.data_matrix[i][col_index]
+					row_j_allele = self.data_matrix[j][col_index]
+					if row_i_allele not in NA_set and row_j_allele not in NA_set:
 						no_of_non_NA_pairs += 1
-						if self.data_matrix[i][col_index] != self.data_matrix[j][col_index]:
+						if row_i_allele == row_j_allele:
+							continue
+						elif row_i_allele>=5 and row_j_allele>=5:
+							if row_i_allele != row_j_allele:
+								no_of_mismatches += 1
+						elif assumeBiAllelic and ((row_i_allele>=5 and row_j_allele<5) or (row_i_allele<5 and row_j_allele>=5)):
+							#one of them is heterozygous. can't be both heterozygous.
+							#assuming there is one kind of heterozygous and each locus is biallelic.
+							no_of_mismatches += 0.5
+						elif row_i_allele != row_j_allele:
 							no_of_mismatches += 1
 				if no_of_non_NA_pairs>0:
 					mismatch_rate = no_of_mismatches/float(no_of_non_NA_pairs)
@@ -1314,7 +1370,55 @@ class SNPData(object):
 			pairwise_dist.sort()
 			row_id2pairwise_dist[row_id1] = pairwise_dist
 		sys.stderr.write("Done.\n")
+		if outputFname is not None:	#2011-3-31
+			self.outputRowPairwiseDist(row_id2pairwise_dist, outputFname)
 		return row_id2pairwise_dist
+	
+	@classmethod
+	def outputRowPairwiseDist(cls, row_id2pairwise_dist=None, outputFname=None):
+		"""
+		2011-3-31
+			function to output row_id2pairwise_dist (data structure from calRowPairwiseDist())
+		"""
+		sys.stderr.write("Outputting row pairwise distance to %s ... "%outputFname)
+		import csv
+		writer = csv.writer(open(outputFname, 'w'), delimiter='\t')
+		for row_id, pairwise_dist in row_id2pairwise_dist.iteritems():
+			for dist in pairwise_dist:
+				mismatch_rate, row_id2, no_of_mismatches, no_of_non_NA_pairs = dist[:4]
+				data_row = [row_id, row_id2, mismatch_rate, no_of_mismatches, no_of_non_NA_pairs]
+				writer.writerow(data_row)
+		del writer
+		sys.stderr.write("Done.\n")
+	
+	def calFractionOfLociCarryingNonRefAllelePerRow(self, ref_allele=0, NA_set =Set([0, 'NA', 'N', -2, '|'])):
+		"""
+		2010-10-23
+			for example, after the SNP alleles are converted into bi-allelic, 0 is ancestral, 1 is derived,
+				the fraction returned here would the fraction of derived alleles one row has.
+		"""
+		sys.stderr.write("Calculating fraction of loci with allele !=%s for each row ..."%(ref_allele))
+		row_id2fractionData = {}
+		counter = 0
+		
+		for i in range(len(self.row_id_ls)):
+			row_id1 = self.row_id_ls[i]
+			no_of_mismatches = 0
+			no_of_non_NA_pairs = 0
+			for col_index in xrange(len(self.col_id_ls)):
+				if self.data_matrix[i][col_index] not in NA_set:
+					no_of_non_NA_pairs += 1
+					if self.data_matrix[i][col_index] != ref_allele:
+						no_of_mismatches += 1
+			if no_of_non_NA_pairs>0:
+				mismatch_rate = no_of_mismatches/float(no_of_non_NA_pairs)
+			else:
+				mismatch_rate = -1
+				if self.debug:
+					pass
+			row_id2fractionData[row_id1] = [mismatch_rate, no_of_mismatches, no_of_non_NA_pairs]
+		sys.stderr.write("Done.\n")
+		return row_id2fractionData
 	
 	def convertSNPAllele2Index(self, report=0):
 		"""
@@ -1383,7 +1487,28 @@ class SNPData(object):
 		if convert_type is not None:
 			data_ls = map(convert_type, data_ls)
 		return data_ls
-		
+	
+	def get_kinship_matrix(self):
+		"""
+		2011-4-25
+			moved from variation/src/Association.py
+		2009-2-9
+			make it classmethod
+		2008-11-11
+			only for binary data_matrix. identity_vector[k]=1 only when data_matrix[i,k]=data_matrix[j,k]
+		"""
+		sys.stderr.write("Calculating kinship matrix .... ")
+		no_of_rows, no_of_cols = self.data_matrix.shape
+		kinship_matrix = numpy.identity(no_of_rows, numpy.float)
+		for i in range(no_of_rows):
+			for j in range(i+1, no_of_rows):
+				#only for binary data_matrix. identity_vector[k]=1 only when data_matrix[i,k]=data_matrix[j,k]
+				identity_vector = self.data_matrix[i,:]*self.data_matrix[j,:]+ (1-self.data_matrix[i,:])*(1-self.data_matrix[j,:])
+				kinship_matrix[i,j] = sum(identity_vector)/float(no_of_cols)
+				kinship_matrix[j,i] = kinship_matrix[i,j]
+		sys.stderr.write("Done.\n")
+		return kinship_matrix
+	
 	def codeGenotypeFromThisRowAsAllele(self, row_id_as_major_allele=None, allele_code=0, old_NA_notation_set=set([0, -2])):
 		"""
 		2010-3-31
@@ -1505,6 +1630,7 @@ class SNPData(object):
 	@classmethod
 	def loadSNPDataObj(cls,row_id_key_set=None, row_id_hash_func=None, col_id_key_set=None, col_id_hash_func=None, **keywords):
 		import cPickle as cPickle
+		import pickle as pickle
 		input_fname = keywords['input_fname']
 		if input_fname  != "":
 			if os.path.isfile(input_fname + ".pickle"):
@@ -1513,9 +1639,18 @@ class SNPData(object):
 				input.close()
 			else:
 				data = SNPData(**keywords)
-				output = open(input_fname + '.pickle', 'wb')
-				cPickle.dump(data, output, protocol=2)
-				output.close() 
+				#new_data = transposeSNPData(data)
+				#new_data.strain_acc_list = None
+				#new_data.category_list = None
+				#new_data.tofile(input_fname+".tsv")
+				try:
+					output = open(input_fname + '.pickle', 'wb')
+					cPickle.dump(data, output, protocol=2)
+				except Exception as exp:
+					sys.stderr.write("Error in pickleing file: "+ str(exp))
+				finally:
+					if output is not None:
+						output.close() 
 		else:
 			data = SNPData(row_id_key_set,row_id_hash_func,col_id_key_set,col_id_hash_func,keywords)
 		return data
@@ -1524,8 +1659,22 @@ from db import TableClass
 class GenomeWideResults(TableClass):
 	genome_wide_result_ls = None
 	genome_wide_result_obj_id2index = None
-	max_value = 0	#the current top value for all genome wide results
-	#gap = 1.0	#gap between two genome wide results
+	max_value = 0.0	#the current top value for all genome wide results. #must be 0.0, not None.
+	#gap = 1.0	#vertical gap (y-axis) between two genome wide results
+	
+	def __init__(self, **keywords):
+		"""
+		2010-11-22
+			added to initialize genome_wide_result_ls and genome_wide_result_obj_id2index properly.
+			argument gap is optional.
+				If not specified, the gap between a newly-added gwr and the previous gwr is
+					1/3*(prev_gwr.max_value-prev_gwr.min_value).
+		"""
+		TableClass.__init__(self, **keywords)
+		self.genome_wide_result_ls = []
+		self.genome_wide_result_obj_id2index = {}
+		self.max_value = 0.0	#must be 0.0, not None.
+	
 	def get_genome_wide_result_by_obj_id(self, obj_id):
 		return self.genome_wide_result_ls[self.genome_wide_result_obj_id2index[obj_id]]
 	
@@ -1548,7 +1697,16 @@ class GenomeWideResults(TableClass):
 		
 		self.genome_wide_result_ls.append(genome_wide_result)
 		self.genome_wide_result_obj_id2index[id(genome_wide_result)] = genome_wide_result_index
-
+	
+	def clear(self):
+		"""
+		2010-11-22
+			clear the 
+		"""
+		self.genome_wide_result_ls = []
+		self.genome_wide_result_obj_id2index = {}
+		self.max_value = None
+		
 class GenomeWideResult(object):
 	"""
 	2009-4-24
@@ -1586,6 +1744,16 @@ class GenomeWideResult(object):
 		# 2010-3-9 initialize these two here
 		self.data_obj_ls = []	#list and dictionary are crazy references.
 		self.data_obj_id2index = {}
+	
+	def __len__(self):
+		"""
+		2011-3-21
+			return the length of data_obj_ls if it's not None.
+		"""
+		if self.data_obj_ls is not None:
+			return len(self.data_obj_ls)
+		else:
+			return None
 	
 	def get_data_obj_by_obj_id(self, obj_id):
 		return self.data_obj_ls[self.data_obj_id2index[obj_id]]
@@ -1681,6 +1849,30 @@ class GenomeWideResult(object):
 		else:
 			return self.argsort_data_obj_ls[-rank]	#value bigger, rank smaller
 	
+	def getTopLoci(self, no_of_top_loci=1000, min_score=None):
+		"""
+		2011-4-23
+			add argument min_score. If it's not None, no_of_top_loci would be ignored.
+		2011-3-21
+			return data_obj directly, rather than (chr, start, stop)
+		2011-3-16
+			get the top loci out of gwr
+		"""
+		if min_score is not None:
+			sys.stderr.write("Get the top loci out of gwr whose value >=%s..."%(min_score))
+			no_of_top_loci = len(self.data_obj_ls)	#fake the no_of_top_loci
+		else:
+			sys.stderr.write("Get the top %s loci out of gwr ..."%(no_of_top_loci))
+			
+		top_loci = []
+		for i in range(no_of_top_loci):
+			data_obj = self.get_data_obj_at_given_rank(i+1)
+			if min_score is not None and data_obj.value<=min_score:
+				break
+			top_loci.append(data_obj)
+		sys.stderr.write("%s loci. Done.\n"%(len(top_loci)))
+		return top_loci
+	
 	def keepGWRObjectsWithinGivenRBDict(self, rbDict, min_reciprocal_overlap=0.6):
 		"""
 		2010-3-18
@@ -1719,12 +1911,16 @@ class DataObject(object):
 	"""
 	def __init__(self, **keywords):
 		"""
+		2011-3-10
+			add db_id to identify the locus by db id
 		2010-4-15
 			add target_seq_id, target_start, target_stop
 		"""
+		self.db_id = None
 		self.chromosome = None
 		self.position = None
 		self.stop_position = None
+		
 		self.target_seq_id = None
 		self.target_start = None
 		self.target_stop = None
@@ -1769,6 +1965,25 @@ class DataObject(object):
 			output_str += "\tcomment: %s\n"%(self.comment)
 		return output_str
 	
+	@property
+	def stopPosition(self):
+		"""
+		2011-4-20
+			a wrapper to deal with the case stop_position could be None (it's a single-position locus).
+		"""
+		if self.stop_position is None:
+			return self.position
+		else:
+			return self.stop_position
+
+def cmpDataObjByChrPos(x, y):
+	"""
+	2011-3-21
+		used to sort a list of DataObject via its (chromosome, position).
+		i.e. data_obj_ls.sort(cmp=cmpDataObjByChrPos)
+	"""
+	return cmp((x.chromosome, x.position), (y.chromosome, y.position))
+
 import re
 pa_has_characters = re.compile(r'[a-zA-Z_]')
 import math
@@ -1778,6 +1993,17 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False):
 	"""
+	2011-4-19 no more integer conversion for chromosome & chromosome_request
+	2011-3-21
+		process chromosome, start, stop of pdata in the beginning
+	2011-3-10
+		db_id2chr_pos's value could be in the format of (chr,pos) OR (chr,start,stop).
+	2011-2-24
+		deal with input_fname with db id for locus id , rather than chr, pos
+			if 2nd_column (pos) is nothing or "0", it's regarded as db_id.
+		use pdata.id2chr_pos to translate db id into chr, pos
+	2010-10-13
+		new structure, pdata.chr_pos_map to map chr,pos to new chr, pos (like TAIR8 to TAIR9 mapping)
 	2010-3-15
 		add this
 			data_obj.genome_wide_result_name = gwr.name
@@ -1821,20 +2047,34 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	"""
 	
 	#A dictionary to understand new headers:
-	header_dict = {
-				   
-				   }
-	
+	header_dict = {}
 	
 	sys.stderr.write("Getting genome wide result from %s ... "%input_fname)
 	construct_chr_pos2index = getattr(pdata, 'construct_chr_pos2index', construct_chr_pos2index)	#2008-09-24
 	construct_data_obj_id2index = getattr(pdata, 'construct_data_obj_id2index', construct_data_obj_id2index)	#2008-10-28 for get_data_obj_by_obj_index()
 	is_4th_col_stop_pos = getattr(pdata, 'is_4th_col_stop_pos', is_4th_col_stop_pos)	#2008-10-14
 	chr_pos2index = getattr(pdata, 'chr_pos2index', chr_pos2index)	#2008-10-21
+	db_id2chr_pos = getattr(pdata, 'db_id2chr_pos', None)	#2011-2-24
 	score_for_0_pvalue = getattr(pdata, 'score_for_0_pvalue', 50)
 	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(input_fname))
 	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
 	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
+	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
+	
+	#2011-3-21
+	chromosome_request = getattr(pdata, 'chromosome', None)
+	start_request = getattr(pdata, 'start', None)
+	try:
+		start_request = float(start_request)	#passed from web interface functions is of str type
+	except:
+		pass
+	stop_request = getattr(pdata, 'stop', None)
+	try:
+		stop_request = float(stop_request)	#passed from web interface functions is of str type. int('12384.84') results in failure.
+	except:
+		pass
+	min_MAF_request = getattr(pdata, 'min_MAF', None)
+	min_MAC_request = getattr(pdata, 'min_MAC', None)	#2009-1-29
 	
 	gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=construct_chr_pos2index, \
 						construct_data_obj_id2index=construct_data_obj_id2index)
@@ -1854,14 +2094,31 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			header = row
 			col_name2index = getColName2IndexFromHeader(header) #Returns a dictionary
 			continue
-		chr = int(row[0])
-		start_pos = int(float(row[1]))
+		
+		#2011-3-10 initialize all variables
+		db_id = None
 		column_4th = None	#it's MAF probably
 		column_5th = None	#it's MAC probably
 		column_6 = None	#it's genotype_var_perc probably
 		rest_of_row = []
-		
 		stop_pos = None
+		if row[1] and row[1]!='0':	#2011-2-24 non-zero on 2nd column, it's position
+			chr = row[0]	#2011-4-19 no more integer conversion for chromosome.
+			start_pos = int(float(row[1]))
+		elif db_id2chr_pos:	#2011-2-24
+			db_id = int(row[0])
+			if db_id in db_id2chr_pos:
+				chr_pos = db_id2chr_pos.get(db_id)
+				if len(chr_pos)>=2:
+					chr, start_pos = chr_pos[:2]
+				if len(chr_pos)>=3:
+					stop_pos = chr_pos[2]
+			else:	#ignore this row
+				continue
+		else:
+			sys.stderr.write("db_id2chr_pos is none. but this row %s seems to be using db_id as locus id."%(repr(row)))
+			continue
+		
 		if len(row)>=3:
 			score = float(row[2])
 		
@@ -1881,22 +2138,16 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			sys.stderr.write("only 3 or 4 columns are allowed in input file.\n")
 			return gwr
 		"""
-		if pdata:	#2008-08-03
-			pdata.chromosome = getattr(pdata, 'chromosome', None)
-			pdata.start = getattr(pdata, 'start', None)
-			pdata.stop = getattr(pdata, 'stop', None)
-			pdata.min_MAF = getattr(pdata, 'min_MAF', None)
-			pdata.min_MAC = getattr(pdata, 'min_MAC', None)	#2009-1-29
-			if pdata.chromosome!=None and chr!=pdata.chromosome:
-				continue
-			if pdata.start!=None and start_pos<pdata.start:
-				continue
-			if pdata.stop!=None and start_pos>pdata.stop:
-				continue
-			if pdata.min_MAF!=None and column_4th!=None and column_4th<pdata.min_MAF:	#MAF too small
-				continue
-			if pdata.min_MAC!=None and column_5th!=None and column_5th<pdata.min_MAC:	#2009-1-29 MAC too small
-				continue
+		if chromosome_request!=None and chr!=chromosome_request:
+			continue
+		if start_request!=None and start_pos<start_request:
+			continue
+		if stop_request!=None and start_pos>stop_request:
+			continue
+		if min_MAF_request!=None and column_4th!=None and column_4th<min_MAF_request:	#MAF too small
+			continue
+		if min_MAC_request!=None and column_5th!=None and column_5th<min_MAC_request:	#2009-1-29 MAC too small
+			continue
 		if do_log10_transformation:
 			if score<=0:
 				sys.stderr.write("score <=0. can't do log10. row is %s. assign %s to it.\n"%(repr(row), score_for_0_pvalue))
@@ -1921,12 +2172,20 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 			include_the_data_point = True
 		elif min_value_cutoff is None and max_value_cutoff is None:	# both are not specified.
 			include_the_data_point = True
-		
-		if include_the_data_point:
+		if include_the_data_point and chr_pos_map:	#2010-10-13
 			if stop_pos is not None:
-				data_obj = DataObject(chromosome=chr, position=start_pos, stop_position=stop_pos, value =score)
+				key = (chr, start_pos, stop_pos)
 			else:
-				data_obj = DataObject(chromosome=chr, position=start_pos, value =score)
+				key = (chr, start_pos,)
+			new_chr_start_stop = chr_pos_map.get(key)
+			if new_chr_start_stop is None:
+				include_the_data_point = False	# skip this point
+			else:
+				chr, start_pos = new_chr_start_stop[:2]
+				if len(new_chr_start_stop)>2:
+					stop_pos = new_chr_start_stop[2]
+		if include_the_data_point:
+			data_obj = DataObject(db_id=db_id, chromosome=chr, position=start_pos, stop_position=stop_pos, value =score)
 			if column_4th is not None:
 				data_obj.maf = column_4th
 			if column_5th is not None:

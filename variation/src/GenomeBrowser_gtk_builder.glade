@@ -190,12 +190,13 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkImageMenuItem" id="imagemenuitem9">
-                        <property name="label">gtk-delete</property>
+                      <object class="GtkImageMenuItem" id="imagemenuitem_clear_plot">
+                        <property name="label">clear plot</property>
                         <property name="visible">True</property>
                         <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
-                        <property name="use_underline">True</property>
-                        <property name="use_stock">True</property>
+                        <property name="image">image4</property>
+                        <property name="use_stock">False</property>
+                        <signal name="activate" handler="on_imagemenuitem_clear_plot_activate"/>
                       </object>
                     </child>
                   </object>
@@ -507,6 +508,9 @@
                             <property name="fill">False</property>
                             <property name="position">7</property>
                           </packing>
+                        </child>
+                        <child>
+                          <placeholder/>
                         </child>
                         <child>
                           <placeholder/>
@@ -2571,7 +2575,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkHBox" id="hbox35">
+              <object class="GtkHBox" id="hbox_combox_id_entry">
                 <property name="visible">True</property>
                 <child>
                   <object class="GtkComboBox" id="combobox_id_type_cnv_by_region">
@@ -2598,7 +2602,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkHBox" id="hbox31">
+              <object class="GtkHBox" id="hbox_chr_cnv_by_region">
                 <property name="visible">True</property>
                 <child>
                   <object class="GtkLabel" id="label33">
@@ -2804,7 +2808,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkHBox" id="hbox38">
+              <object class="GtkHBox" id="hbox_entry_min_size_by_region">
                 <property name="visible">True</property>
                 <child>
                   <object class="GtkLabel" id="label40">
@@ -2839,7 +2843,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkHBox" id="hbox39">
+              <object class="GtkHBox" id="hbox_min_no_of_probes_by_region">
                 <property name="visible">True</property>
                 <child>
                   <object class="GtkLabel" id="label41">
@@ -2938,5 +2942,9 @@
   <object class="GtkImage" id="image3">
     <property name="visible">True</property>
     <property name="stock">gtk-missing-image</property>
+  </object>
+  <object class="GtkImage" id="image4">
+    <property name="visible">True</property>
+    <property name="stock">gtk-clear</property>
   </object>
 </interface>

@@ -35,7 +35,7 @@ from MpiTopSNPTest import MpiTopSNPTest
 from sets import Set
 from heapq import heappush, heappop, heapreplace
 from common import get_total_gene_ls
-import rpy, random, numpy
+import random, numpy
 import Stock_250kDB
 
 class PickCandidateGenesIntoResultsGene(MpiTopSNPTest):

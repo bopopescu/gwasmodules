@@ -73,10 +73,11 @@ class MpiAssociation(Association, MPIwrapper):
 		for which_phenotype in data:	#2010-8-8
 			environment_matrix = None
 			gene_environ_interaction = False
-			results = self.run_whole_matrix[param_obj.test_type](initData.snpData.data_matrix, initData.phenData.data_matrix[:, which_phenotype], \
-														min_data_point, PC_matrix=initData.PC_matrix, \
-														which_PC_index_ls=which_PC_index_ls, environment_matrix=environment_matrix, \
-														gene_environ_interaction=gene_environ_interaction)
+			results = self.run_whole_matrix[param_obj.test_type](initData.snpData, initData.phenData.data_matrix[:, which_phenotype], \
+												min_data_point, PC_matrix=initData.PC_matrix, \
+												which_PC_index_ls=which_PC_index_ls, environment_matrix=environment_matrix, \
+												gene_environ_interaction=gene_environ_interaction,\
+												kinshipData=initData.kinshipData)
 			result_ls.append([which_phenotype, results])
 		sys.stderr.write("Node no.%s done with %s results.\n"%(node_rank, len(result_ls)))
 		return result_ls
@@ -111,10 +112,21 @@ class MpiAssociation(Association, MPIwrapper):
 		output_node_rank = self.communicator.size-1
 		
 		if node_rank == 0:
+			if self.test_type in [3,7,8]:
+				needKinship = True
+			else:
+				needKinship = False
+			
+			#2011-4-27 ignore_2nd_column has to be turned on all the time now.
 			initData = self.readInData(self.phenotype_fname, self.input_fname, self.eigen_vector_fname, \
-								phenotype_method_id_ls=self.phenotype_method_id_ls, \
-								test_type=self.test_type, report=self.report, \
-								snpAlleleOrdinalConversion=1-self.noSNPAlleleOrdinalConversion)
+									phenotype_method_id_ls=self.phenotype_method_id_ls, \
+									test_type=self.test_type, report=self.report, \
+									snpAlleleOrdinalConversion=1-self.noSNPAlleleOrdinalConversion,\
+									ignore_2nd_column=True, \
+									kinship_fname=self.kinship_fname, \
+									genotype_fname_to_generate_kinship=self.genotype_fname_to_generate_kinship,\
+									needKinship=needKinship)
+			
 			initDataPickle = cPickle.dumps(initData, -1)
 			which_phenotype_ls = initData.which_phenotype_ls
 			

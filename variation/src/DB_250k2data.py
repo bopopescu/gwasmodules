@@ -14,10 +14,12 @@ Examples:
 	DB_250k2data.py -y 0.85 -w 1 -m1 -x1 -l 3 -t -o 250k_l3_y.85_uniq_ecotype_20080919.tsv -i ~/banyan_fs/Network/Data/250k/db/calls/method_3/
 	
 Description:
-	Simple program to output/filter 250k data based on QC recorded in database in Strain X SNP format.
 	2008-05-06
-
-	1st column is array id. 2nd column is ecotype id.
+		program to output/filter 250k data based on QC recorded in database in Strain X SNP format.
+	
+	2011-2-15
+	Input: 1st column is Snps.id, 2nd column is ATCG call. 1st row is header. Data starts from 2nd row.
+	Output format: 1st column is array id. 2nd column is ecotype id. 1st row is Snps.id. Data starts from 2nd row.
 
 """
 import sys, os, math
@@ -170,6 +172,37 @@ class DB_250k2Data(object):
 	
 	get_snps_name_set_given_criteria= classmethod(get_snps_name_set_given_criteria)
 	
+	
+	@classmethod
+	def getSNPID2index(cls, call_info_fname, db_id2chr_pos):
+		"""
+		2010-10-13
+			based on Snps.id listed in first column of call_info_fname and db_id2chr_pos, return a dictionary of Snps.id:index
+				and the snps are in (chr,pos) order.
+			
+		"""
+		sys.stderr.write("Getting snp_id2index ...")
+		reader = csv.reader(open(call_info_fname), delimiter='\t')
+		header = reader.next()
+		chr_pos_db_id_ls = []
+		for row in reader:
+			db_id = row[0]
+			try:
+				db_id = int(db_id)
+				chr_pos = db_id2chr_pos.get(db_id)
+				if chr_pos is not None:	#sometime this could be missing. ignore this snp then.
+					chr_pos_db_id_ls.append([chr_pos, db_id])
+			except:
+				continue
+		chr_pos_db_id_ls.sort()	#sort in chr, pos order
+		
+		db_id2index = {}
+		for i in xrange(len(chr_pos_db_id_ls)):
+			chr_pos, db_id = chr_pos_db_id_ls[i]
+			db_id2index[db_id] = i
+		sys.stderr.write(" %s entries. Done.\n"%(len(db_id2index)))
+		return db_id2index
+		
 	def run(self):
 		"""
 		2008-05-20 read_call_matrix returns PassingData object
@@ -178,7 +211,7 @@ class DB_250k2Data(object):
 			import pdb
 			pdb.set_trace()
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-				   password=self.passwd, hostname=self.hostname, database=self.dbname)
+				password=self.passwd, hostname=self.hostname, database=self.dbname)
 		db.setup(create_tables=False)
 		session = db.session
 		QC_method_id = 0 	#just for QC_250k.get_call_info_id2fname()
@@ -190,9 +223,13 @@ class DB_250k2Data(object):
 			snps_name_set = self.get_snps_name_set_given_criteria(db, self.call_method_id, self.max_snp_mismatch_rate, self.max_snp_NA_rate)
 		else:
 			snps_name_set = None
-		pdata = QC_250k.read_call_matrix(call_data.call_info_id2fname, self.min_probability, snps_name_set)	#2008-05-20 read_call_matrix returns PassingData object
-		strain_acc_list, category_list = pdata.ecotype_id_ls, pdata.array_id_ls
-		write_data_matrix(pdata.data_matrix, self.output_fname, pdata.header, strain_acc_list, category_list)
+		db_id2chr_pos = db.getSNPID2ChrPos()
+		if len(call_data.call_info_id2fname)>0:
+			db_id2index = self.getSNPID2index(call_data.call_info_id2fname.values()[0][1], db_id2chr_pos)
+			pdata = QC_250k.read_call_matrix(call_data.call_info_id2fname, self.min_probability, snps_name_set, \
+											db_id2chr_pos=db_id2chr_pos, db_id2index=db_id2index)	#2008-05-20 read_call_matrix returns PassingData object
+			strain_acc_list, category_list = pdata.ecotype_id_ls, pdata.array_id_ls
+			write_data_matrix(pdata.data_matrix, self.output_fname, pdata.header, strain_acc_list, category_list)
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

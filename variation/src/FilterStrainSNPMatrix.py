@@ -45,7 +45,7 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/')))
 import getopt, csv, math
-import Numeric as num
+import numpy as num
 from sets import Set
 from variation.src.common import number2nt, nt2number
 from pymodule import dict_map, PassingData, figureOutDelimiter, write_data_matrix, read_data

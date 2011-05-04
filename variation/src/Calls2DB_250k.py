@@ -10,6 +10,7 @@ else:   #32bit
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import sys, getopt, csv
 import Stock_250kDB
+from pymodule import runLocalCommand
 
 class Calls2DB_250k_old:
 	"""
@@ -216,9 +217,10 @@ class Calls2DB_250k(object):
 		input_type 1:
 			Each file in input_dir shall be named like 'array_id'_call.tsv.
 			The file would be ignored if a call with same array_id and same method_id exists in database.
-			The format is 2-column and tab-delimited. example:
+			The format is 2-column and tab-delimited. SNP_ID could be chr_pos or Snps.id. example:
 				SNP_ID	'array_id'
 				1_657_C_T	C
+				3	T
 		output: Apart from entries inserted into db table call_info, files would be created in the output_dir to store
 			actual calls.
 			Format is 2-column and tab-delimited. First column is id in table snps. example:
@@ -310,6 +312,11 @@ class Calls2DB_250k(object):
 	
 	def submit_call_dir2db(self, curs, input_dir, call_info_table, output_dir, method_id, user, chr_pos2db_id=None, db=None):
 		"""
+		2011-2-27
+			input file could use either db_id or chr_pos to identify locus.
+		2011-1-24
+			bugfix
+				Call files to be added into method 3 have the 3rd column, oligo_probability.
 		2010-10-13
 			add argument chr_pos2db_id and db
 			it replaces the old snp ID (chr_pos_...) with id from table Stock_250kDB.Snps
@@ -339,15 +346,14 @@ class Calls2DB_250k(object):
 					sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
 					continue
 				input_fname = os.path.join(input_dir, filename)
-				reader = csv.reader(open(input_fname), delimiter='')
+				reader = csv.reader(open(input_fname), delimiter='\t')
 				writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-				writer.writerow(['SNP_ID', array_id])
+				header_row = reader.next()
+				writer.writerow(header_row)
 				for row in reader:
-					chr_pos = row[0].split('_')[:2]
-					chr_pos = tuple(map(int, chr_pos))
-					db_id = chr_pos2db_id.get(chr_pos)
+					db_id = db.get_db_id_given_chr_pos2db_id(row[0],)
 					if db_id is not None:
-						new_row = [db_id, row[1]]
+						new_row = [db_id] + row[1:]
 						writer.writerow(new_row)
 				del reader, writer
 				call_info = Stock_250kDB.CallInfo(id=new_call_id, filename=output_fname, array_id=array_id,\
@@ -427,6 +433,8 @@ class Calls2DB_250k(object):
 	def submit_StrainxSNP_file2db(self, curs, input_fname, call_info_table, output_dir, method_id, user, chr_pos2db_id=None,
 								**keywords):
 		"""
+		2011-2-27
+			input file could use either db_id or chr_pos to identify locus.
 		2010-10-13
 			add argument chr_pos2db_id and **keywords
 			it replaces the old snp ID (chr_pos_...) with id from table Stock_250kDB.Snps
@@ -458,9 +466,7 @@ class Calls2DB_250k(object):
 				for i in range(2, len(row)):
 					snp_id = header[i]
 					if chr_pos2db_id:	#2010-10-13
-						snp_id = snp_id.split('_')[:2]
-						chr_pos = tuple(map(int, snp_id))
-						db_id = chr_pos2db_id.get(chr_pos)
+						db_id = db.get_db_id_given_chr_pos2db_id(snp_id)
 					else:
 						db_id = snp_id
 					if db_id is not None:

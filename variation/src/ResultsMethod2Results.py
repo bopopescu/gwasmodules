@@ -58,7 +58,7 @@ class ResultsMethod2Results(object):
 		
 	@classmethod
 	def rm2result(cls, session, rm, snp_info, max_rank=1000, commit=False, min_rank=1, results_directory=None, \
-				min_score=None,update=True):
+				min_score=None,update=True,db_id2chr_pos=None):
 		"""
 		2010-3-8
 			add argument min_score to exclude SNPs whose scores are too low. This argument has an AND relationship with max_rank.
@@ -80,7 +80,7 @@ class ResultsMethod2Results(object):
 				
 			
 		
-		param_data = PassingData(min_MAC=0)
+		param_data = PassingData(min_MAC=0, db_id2chr_pos = db_id2chr_pos)
 		genome_wide_result = GeneListRankTest.getResultMethodContent(rm, results_directory=results_directory, min_MAF=0., \
 																pdata=param_data, min_value_cutoff=min_score)
 		
@@ -124,9 +124,10 @@ class ResultsMethod2Results(object):
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
 									password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db.setup(create_tables=False)
+		
 		session = db.session
 		session.begin()
-		
+		db_id2chr_pos = db.snp_id2chr_pos
 		snp_info = DrawSNPRegion.getSNPInfo(db)
 		
 		query = Stock_250kDB.ResultsMethod.query.filter_by(call_method_id=self.call_method_id)
@@ -136,7 +137,7 @@ class ResultsMethod2Results(object):
 			query = query.filter(Stock_250kDB.ResultsMethod.phenotype_method_id.in_(self.phenotype_id_ls))
 		for rm in query:
 			self.rm2result(session, rm, snp_info, max_rank=self.max_rank, commit=self.commit, \
-						results_directory=self.results_directory, min_score=self.min_score)
+						results_directory=self.results_directory, min_score=self.min_score,db_id2chr_pos = db_id2chr_pos)
 		if self.commit:
 			session.commit()
 	

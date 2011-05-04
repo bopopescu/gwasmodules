@@ -220,8 +220,10 @@ class FigureOutTaxID(object):
 				break
 		return tax_id_to_return
 
-def getColName2IndexFromHeader(header):
+def getColName2IndexFromHeader(header, skipEmptyColumn=False):
 	"""
+	2011-2-11
+		add argument skipEmptyColumn
 	2008-09-16
 		convenient function to read input files with flexible column order.
 		One variable doesn't have to be in the same column in different files, as far as the name is same.
@@ -229,6 +231,8 @@ def getColName2IndexFromHeader(header):
 	col_name2index = {}
 	for i in range(len(header)):
 		column_name = header[i]
+		if skipEmptyColumn and not column_name:	#skips empty column
+			continue
 		col_name2index[column_name] = i
 	return col_name2index
 
@@ -359,6 +363,72 @@ def addExtraLsToFilenamePrefix(filename, extra_ls):
 	for extra in extra_ls:
 		filename = addExtraToFilenamePrefix(filename, extra)
 	return filename
+
+def returnAnyValueIfNothing(string, data_type=int, defaultValue=0):
+	"""
+	2010-12-15
+		used in Transfac.src.GeneASNXML2gene_mapping.return_datetime() in case nothing is returned.
+	"""
+	if string:
+		return data_type(string)
+	else:
+		return defaultValue
+
+
+def Denary2Binary(n):
+	'''
+	2011-2-9
+		convert denary integer n to binary string bStr
+		
+		copied from http://www.daniweb.com/code/snippet216539.html
+		
+		# convert a decimal (denary, base 10) integer to a binary string (base 2)
+		# tested with Python24   vegaseat	6/1/2005
+	'''
+	bStr = ''
+	if n < 0:  raise ValueError, "must be a positive integer"
+	if n == 0: return '0'
+	while n > 0:
+		bStr = str(n % 2) + bStr
+		n = n >> 1
+	return bStr
+
+def int2bin(n, count=24):
+	"""
+	2011-2-9
+		opposite of Denary2Binary(), same as int(binaryStr, 2)
+		
+		copied from http://www.daniweb.com/code/snippet216539.html
+	
+	returns the binary of integer n, using count number of digits
+	
+	"""
+	return "".join([str((n >> y) & 1) for y in range(count-1, -1, -1)])
+
+"""
+# this test runs when used as a standalone program, but not as an imported module
+# let's say you save this module as den2bin.py and use it in another program
+# when you import den2bin the __name__ namespace would now be  den2bin  and the
+# test would be ignored
+if __name__ == '__main__':
+    print Denary2Binary(255)  # 11111111
+    
+    # convert back to test it
+    print int(Denary2Binary(255), 2)  # 255
+    
+    print
+    
+    # this version formats the binary
+    print int2bin(255, 12)  # 000011111111
+    # test it
+    print int("000011111111", 2)  # 255
+    
+    print
+
+    # check the exceptions
+    print Denary2Binary(0)
+    print Denary2Binary(-5)  # should give a ValueError
+"""
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()

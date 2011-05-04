@@ -35,7 +35,7 @@ from sqlalchemy import and_, or_, not_
 
 from datetime import datetime
 
-from pymodule import SNPData
+from pymodule import SNPData, PassingData
 from pymodule.db import ElixirDB, TableClass
 import os
 import hashlib 
@@ -170,9 +170,11 @@ class GenomeWideResultMethod(Entity):
 
 class GenomeMarker(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2010-10-10
 	"""
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))	#2011-4-19
 	start = Field(Integer)
 	stop = Field(Integer)
 	description = Field(String(512), deferred=True)
@@ -207,19 +209,23 @@ class GenomeWideResult(Entity):
 
 class Snps(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
+	2011-4-15
+		add column cnv, for linking up
 	2010-10-19
 		add column include_after_qc, Field(Integer):
 			indicating whether this SNP is still included in final dataset after QC.
 	2010-6-17
 		add argument tair8_chromosome, tair8_position
 	"""
-	name = Field(String(200), unique=True, nullable = False, deferred=True)
-	chromosome = Field(Integer)
+	name = Field(String(200), nullable = False, deferred=True)
+	chromosome = Field(String(256))
 	position = Field(Integer)
 	end_position = Field(Integer)
 	allele1 = Field(String(1))
 	allele2 = Field(String(2))
-	tair8_chromosome = Field(Integer)
+	tair8_chromosome = Field(String(256))
 	tair8_position = Field(Integer)
 	include_after_qc = Field(Integer, default=0)
 	created_by = Field(String(200), deferred=True)
@@ -228,6 +234,7 @@ class Snps(Entity):
 	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='snps', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('name', 'chromosome', 'position', 'end_position'))
 
 class SnpsContext(Entity):
 	snp = ManyToOne('Snps', colname='snps_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -414,6 +421,9 @@ class AccessionSet2Ecotype(Entity):
 
 class ResultsMethod(Entity):
 	"""
+	2011-2-6
+		add column cnv_method to hold CNV association results
+		change unique constraint to include cnv_method_id
 	2010-9-21
 		add remove_outliers, pseudo_heritability, transformation_parameters
 	2010-1-22
@@ -430,6 +440,7 @@ class ResultsMethod(Entity):
 	results_method_type = ManyToOne('%s.ResultsMethodType'%__name__, colname='results_method_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_method = ManyToOne("%s.CNVMethod"%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	rm_json = OneToMany('%s.ResultsMethodJson'%__name__)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -441,7 +452,7 @@ class ResultsMethod(Entity):
 	using_options(tablename='results_method', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
-										'results_method_type_id', 'analysis_method_id'))
+										'results_method_type_id', 'analysis_method_id', 'cnv_method_id'))
 
 class ResultsMethodJson(Entity):
 	"""
@@ -459,6 +470,70 @@ class ResultsMethodJson(Entity):
 	using_options(tablename='results_method_json', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('results_id', 'no_of_top_snps', 'min_MAF'))
+
+class ResultLandscape(Entity):
+	"""
+	2011-3-28
+		table to store the landscape of association result
+	"""
+	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
+	start_locus = ManyToOne('Snps', colname='start_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	stop_locus = ManyToOne('Snps', colname='stop_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_loci = Field(Integer)	#number of loci in between start_locus and stop_locus
+	neighbor_distance = Field(Integer)
+	comment = Field(Text)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='result_landscape', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('result_id', 'start_locus_id', 'stop_locus_id', 'neighbor_distance'))
+
+class ResultPeak(Entity):
+	"""
+	2011-4-19
+		table to store the peaks of association result
+	"""
+	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
+	result_peak_type = ManyToOne('ResultPeakType', colname='result_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	chromosome = Field(String(256))
+	start = Field(Integer)
+	stop = Field(Integer)
+	start_locus = ManyToOne('Snps', colname='start_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	stop_locus = ManyToOne('Snps', colname='stop_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_loci = Field(Integer)	#number of loci in between stop_locus of start_bridge and start_locus of stop_bridge,
+	# including the two as well.
+	peak_locus = ManyToOne('Snps', colname='peak_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	peak_score = Field(Float)
+	comment = Field(Text)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='result_peak', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('result_id', 'result_peak_type_id', 'chromosome', 'start', 'stop'))
+
+
+class ResultPeakType(Entity):
+	"""
+	2011-4-19
+		type for ResultPeak
+	"""
+	short_name = Field(String(30), unique=True)
+	description = Field(Text)
+	min_score = Field(Float)
+	neighbor_distance = Field(Integer)
+	max_neighbor_distance = Field(Integer)
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='result_peak_type', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('min_score', 'neighbor_distance', 'max_neighbor_distance'))
+
 
 class Results(Entity):
 	"""
@@ -804,6 +879,8 @@ class CallQC(Entity):
 
 class Probes(Entity, TableClass):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2010-6-17
 		add argument tair8_chromosome, tair8_position
 	2010-5-23
@@ -813,7 +890,7 @@ class Probes(Entity, TableClass):
 	"""
 	snp = ManyToOne('Snps', colname='snps_id', ondelete='CASCADE', onupdate='CASCADE')
 	seq = Field(String(25), deferred=True)
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	position = Field(Integer)
 	allele = Field(String(1))
 	strand = Field(String(20))
@@ -840,7 +917,7 @@ class Probes(Entity, TableClass):
 	intergenic = Field(Boolean)
 	downstream = Field(Boolean)
 	cda = Field(Boolean)
-	tair8_chromosome = Field(Integer)
+	tair8_chromosome = Field(String(256))
 	tair8_position = Field(Integer)
 	created_by = Field(String(200), deferred=True)
 	updated_by = Field(String(200), deferred=True)
@@ -1036,6 +1113,8 @@ class SNPRegionPlotType(Entity):
 
 class SNPRegionPlot(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2009-5-1
 		add column call_method_id
 	2008-10-21
@@ -1045,7 +1124,7 @@ class SNPRegionPlot(Entity):
 	2008-10-06
 		table to store binary SNP region plots
 	"""
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
 	png_data = Field(LargeBinary(134217728), deferred=True)
@@ -1444,10 +1523,12 @@ class DataSource(Entity):
 
 class CNV(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2010-7-28
 		table storing all types of copy number variation
 	"""
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
 	start_probe = ManyToOne("%s.Probes"%__name__, colname='start_probe_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -1492,11 +1573,14 @@ class CNVArrayCall(Entity):
 
 class CNVMethod(Entity):
 	"""
+	2011-2-17
+		add column filename
 	2009-10-26
 		which type of method is used to infer CNVs
 	"""
 	short_name = Field(String(200), unique=True)
 	description = Field(String(8000))
+	filename = Field(Text)
 	comment = Field(String(8000))
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -1553,6 +1637,8 @@ class CNVQCCall(Entity):
 
 class CNVQCProbeCall(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2009-10-26
 		the probe-based CNV QC data, from
 			1. check the probes against the data from CNVQCCall
@@ -1560,7 +1646,7 @@ class CNVQCProbeCall(Entity):
 	"""
 	accession = ManyToOne('CNVQCAccession', colname='accession_id', ondelete='CASCADE', onupdate='CASCADE')
 	probe = ManyToOne("Probes", colname='probe_id', ondelete='CASCADE', onupdate='CASCADE')
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	position = Field(Integer)
 	size_affected = Field(Integer)
 	target_position = Field(Integer)
@@ -1578,6 +1664,8 @@ class CNVQCProbeCall(Entity):
 
 class CNVCall(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2010-7-1
 		add column probability
 	2010-6-29
@@ -1589,7 +1677,7 @@ class CNVCall(Entity):
 		the CNV from the tiling part of the 250k affy array
 	"""
 	array = ManyToOne("%s.ArrayInfo"%__name__, colname='array_id', ondelete='CASCADE', onupdate='CASCADE')
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
 	start_probe = ManyToOne("%s.Probes"%__name__, colname='start_probe_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -1684,6 +1772,10 @@ class SequenceFragment(Entity):
 
 class SequenceFragmentRefPos(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
+	2010-12-6
+		change field copy_number to cnv_type
 	2010-6-14
 		change the unqiue constraint
 		add column version to differentiate between different version of SequenceFragmentRefPos data
@@ -1691,7 +1783,7 @@ class SequenceFragmentRefPos(Entity):
 		the position of sequence fragments mapped onto the reference genome (which is Col)
 	"""
 	sequence_fragment = ManyToOne('%s.SequenceFragment'%__name__, colname='sequence_fragment_id', ondelete='CASCADE', onupdate='CASCADE')
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
 	size_difference = Field(Integer)
@@ -1700,7 +1792,7 @@ class SequenceFragmentRefPos(Entity):
 	no_of_probes_covered = Field(Integer)
 	fragment_start = Field(Integer)
 	fragment_stop = Field(Integer)
-	copy_number = Field(Integer)
+	cnv_type = ManyToOne('CNVType', colname='cnv_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	version = Field(Integer)
 	comment = Field(String(8124))
 	created_by = Field(String(200))
@@ -1714,6 +1806,8 @@ class SequenceFragmentRefPos(Entity):
 
 class SequenceFragment2Probe(Entity):
 	"""
+	2011-4-19
+		change type of chromosome from int to string
 	2010-4-15
 		table recording the matching probes of sequence fragments
 	"""
@@ -1721,7 +1815,7 @@ class SequenceFragment2Probe(Entity):
 	fragment_start = Field(Integer)
 	fragment_stop = Field(Integer)
 	probe = ManyToOne("%s.Probes"%__name__, colname='probe_id', ondelete='CASCADE', onupdate='CASCADE')
-	chromosome = Field(Integer)
+	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
 	no_of_identities = Field(Integer)
@@ -1943,12 +2037,15 @@ class Users(Entity):
 
 class Chromosome(Entity):
 	"""
+	2011-4-25
+		add column rank (integer) to order chromosomes
 	2010-6-24
 		a dedicated table to translate between chromosome names and numbers
 	"""
 	name = Field(String(255))
 	description = Field(String(6000))
 	tax_id = Field(Integer)
+	rank = Field(Integer)	#2011-4-19, within a genome, rank=1 is the first chromosome and so on.
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
@@ -2009,6 +2106,11 @@ class Stock_250kDB(ElixirDB):
 		
 		self.metadata = __metadata__
 		self.session = __session__
+		
+		self._cnv_id2chr_pos = {}	#2011-2-24
+		self._cnv_method_id = None	#2011-2-24
+		self._chr_pos2snp_id = {}	#2011-2-28
+		self._snp_id2chr_pos = {}	#2011-2-28
 	
 	def setup(self, create_tables=True):
 		"""
@@ -2046,6 +2148,24 @@ class Stock_250kDB(ElixirDB):
 		cm = CallMethod.get(call_method_id)
 		snpData = SNPData(input_fname=cm.filename, turn_into_array=1, ignore_2nd_column=ignore_2nd_column)	#use 1st column (ecotype id) as main ID
 		return snpData
+	
+	def getSNP(self, chromosome=None, start=None, stop=None):
+		"""
+		2011-4-22
+			get Snps object based on chromosome, start, stop or else create it if not in db
+		"""
+		query = Snps.query.filter_by(chromosome=chromosome).filter_by(position=start)
+		if stop:
+			query.filter_by(end_position=stop)
+		db_entry = query.first()
+		if not db_entry:
+			name = '%s_%s'%(chromosome, start)
+			if stop:
+				name += '_%s'%(stop)
+			db_entry = Snps(name=name, chromosome=chromosome, position=start, \
+										end_position=stop)
+			self.session.add(db_entry)
+		return db_entry
 	
 	@classmethod
 	def getCNVQCInGWA(cls, accession_id=None, cnv_type_id=None, min_size=None, min_no_of_probes=None,\
@@ -2831,8 +2951,18 @@ class Stock_250kDB(ElixirDB):
 					(TableClass.table.name, CNVTableClass.table.name, " and ".join(where_sql_ls))
 		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
 	
-	def getSNPChrPos2ID(self, keyType=1):
+	def getSNPChrPos2ID(self, keyType=1, priorTAIRVersion=False):
 		"""
+		2011-2-15
+			add argument priorTAIRVersion
+				if =true:
+					(chr,pos) would be from (tair8_chromosome, tair8_position)
+				else:
+					(chr,pos) would be from (chromosome, position)
+		2011-2-15	
+			report how many entries were fetched
+		2011-1-24
+			add status reporting
 		2010-10-13
 			return a dictionary which translates (chr, pos) to snps.id or vice versa.
 			used in Calls2DB_250k.py
@@ -2841,9 +2971,18 @@ class Stock_250kDB(ElixirDB):
 				1: (chr,pos) is key. id is value
 				2: id is key, (chr, pos) is value.
 		"""
+		sys.stderr.write("Getting a map between Snps.id and (chr,pos), keyType %s ..."%(keyType))
 		dict_to_return = {}
-		rows = self.metadata.bind.execute("select id, chromosome, position from %s where chromosome is not null and position is not null"\
-										%Snps.table.name)
+		if priorTAIRVersion==True:
+			chromosome_table_fieldname = 'tair8_chromosome'
+			position_table_fieldname = 'tair8_position'
+		else:
+			chromosome_table_fieldname = 'chromosome'
+			position_table_fieldname = 'position'
+		
+		rows = self.metadata.bind.execute("select id, %s, %s from %s where %s is not null and %s is not null"\
+										%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
+										chromosome_table_fieldname, position_table_fieldname, ))
 		for row in rows:
 			if keyType==1:
 				key = (row.chromosome, row.position)
@@ -2852,6 +2991,7 @@ class Stock_250kDB(ElixirDB):
 				key = row.id
 				value = (row.chromosome, row.position)
 			dict_to_return[key] = value
+		sys.stderr.write("%s entries. Done.\n"%(len(dict_to_return)))
 		return dict_to_return
 	
 	def getSNPID2ChrPos(self,):
@@ -2862,7 +3002,219 @@ class Stock_250kDB(ElixirDB):
 			
 		"""
 		return self.getSNPChrPos2ID(keyType=2)
+	
+	def get_db_id_given_chr_pos2db_id(self, snp_id):
+		"""
+		2011-2-27
+			snp_id could be chr_pos or just Snps.id
+			
+			called by Calls2DB_250k.py and others.
+		"""
+		snp_id = snp_id.split('_')[:2]
+		chr_pos = tuple(map(int, snp_id))
+		if len(chr_pos)==1 or (len(chr_pos)>=2 and chr_pos[1]==0):
+			db_id = chr_pos[0]
+		else:
+			db_id = self.chr_pos2snp_id.get(chr_pos)
+		return db_id
+	
+	def get_chr_pos_given_db_id2chr_pos(self, snp_id=None):
+		"""
+		2011-2-27
+			snp_id could be chr_pos or just Snps.id
+			
+			called by QC_250k.py and Calls2DB_250k.py
+		"""
+		snp_id = snp_id.split('_')[:2]
+		chr_pos = tuple(map(int, snp_id))
+		if len(chr_pos)==1 or (len(chr_pos)>=2 and chr_pos[1]==0):
+			db_id = chr_pos[0]
+			chr_pos = self.snp_id2chr_pos.get(db_id)
+		if chr_pos:
+			snp_id = '%s_%s'%(chr_pos[0], chr_pos[1])
+			return snp_id
+		else:
+			return None
+	
+	@property
+	def snp_id2chr_pos(self,):
+		"""
+		2011-2-24
+			convenient function
+		"""
+		if not self._snp_id2chr_pos:
+			self.snp_id2chr_pos = False
+		return self._snp_id2chr_pos
+	
+	@snp_id2chr_pos.setter
+	def snp_id2chr_pos(self, priorTAIRVersion=False):
+		"""
+		2011-2-28
+			usage:
+				db.snp_id2chr_pos = True	#if you need to set priorTAIRVersion to True.
+				chr_pos = db.snp_id2chr_pos.get(1)
+		"""
+		self._snp_id2chr_pos = self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
+	
+	@property
+	def chr_pos2snp_id(self,):
+		"""
+		2011-2-24
+			convenient function
+		"""
+		if not self._chr_pos2snp_id:	#set it if it's empty
+			self.chr_pos2snp_id = False
+		return self._chr_pos2snp_id
+	
+	@chr_pos2snp_id.setter
+	def chr_pos2snp_id(self, priorTAIRVersion=False):
+		"""
+		2011-2-28
 		
+			usage:
+				db.chr_pos2snp_id = True	# if you need to set priorTAIRVersion to True.
+				snp_id = db.chr_pos2snp_id.get((1,657))
+		"""
+		self._chr_pos2snp_id = self.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion)
+	
+	@property
+	def cnv_id2chr_pos(self):
+		"""
+		2011-2-24
+			get self._cnv_id2chr_pos
+		"""
+		if not self._cnv_id2chr_pos:
+			sys.stderr.write("Warning: cnv_id2chr_pos has not been initialized. Run 'cnvMethodID=20;self.cnv_id2chr_pos=cnvMethodID;'.\n")
+		return self._cnv_id2chr_pos
+	
+	@cnv_id2chr_pos.setter
+	def cnv_id2chr_pos(self, cnv_method_id=None):
+		"""
+		2011-2-24
+			setter of cnv_id2chr_pos
+			
+			usage:
+				if db._cnv_method_id!=20:
+					db.cnv_id2chr_pos = 20
+				chr_pos = db.cnv_id2chr_pos.get(222244)
+		"""
+		sys.stderr.write("Getting a map between CNV.id and (chr,pos), cnv method %s ..."%(cnv_method_id))
+		self._cnv_id2chr_pos = {}
+		self._cnv_method_id = cnv_method_id
+		rows = self.metadata.bind.execute("select id, chromosome, start, stop from %s where cnv_method_id=%s"\
+										%(CNV.table.name, cnv_method_id))
+		for row in rows:
+			key = row.id
+			value = (row.chromosome, row.start, row.stop)
+			self._cnv_id2chr_pos[key] = value
+		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
+	
+	@classmethod
+	def getResultMethodContent(cls, results_method_id, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
+							pdata=None, min_value_cutoff=None,):
+		"""
+		2011-3-10
+			moved from GeneListRankTest
+		2010-3-8
+			add argument min_value_cutoff and pass it to getGenomeWideResultFromFile()
+		2010-2-2
+			add the db object "rm" to genome_wide_result to make other db info accessible
+		2008-10-23
+			if pdata doesn't have construct_chr_pos2index defined. otherwise, pdata overrides the option.
+		2008-10-22
+			before deciding do_log10_transformation based on analysis_method, try to get it from pdata
+		2008-10-21
+			add pdata to conceal the passing of chr_pos2index to getGenomeWideResultFromFile()
+		2008-10-15
+			cache the genome_wide_result under cls.genome_wide_result, if cls.genome_wide_result.results_id==rm.id, directly return that.
+		2008-09-24
+			add option construct_chr_pos2index
+		2008-09-16
+			if result_fname is not a file, return None
+		2008-09-15
+			use field smaller_score_more_significant from ResultsMethod to set do_log10_transformation
+		2008-08-13
+			split from getGeneID2MostSignificantHit()
+		"""
+		#genome_wide_result = getattr(cls, 'genome_wide_result', None)
+		do_log10_transformation = getattr(pdata, 'do_log10_transformation', None)
+		rm = ResultsMethod.get(results_method_id)
+		from pymodule import getGenomeWideResultFromFile
+		# 2011-3-21 no more caching
+		#if genome_wide_result is not None and genome_wide_result.results_id==rm.id:
+		#	return genome_wide_result
+		
+		if rm.analysis_method_id==13: #Huh -Bjarni
+			sys.stderr.write("Analysis method id=%s is not supported.\n"%rm.analysis_method_id)
+			return None
+		
+		if results_directory:	#given a directory where all results are.
+			result_fname = os.path.join(results_directory, os.path.basename(rm.filename))
+		else:
+			result_fname = rm.filename
+		
+		if do_log10_transformation is None:
+			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
+			if hasattr(rm, 'analysis_method'):
+					if rm.analysis_method.smaller_score_more_significant==1:
+						do_log10_transformation = True
+					else:
+						do_log10_transformation = False
+			else:
+				return None
+		if pdata is None:
+			pdata = PassingData()
+		
+		#2011-3-21 assign min_MAF to pdata only when pdata.min_MAF is None or doesn't exist.
+		min_MAF_request = getattr(pdata, 'min_MAF', None)
+		if min_MAF_request is None:
+			pdata.min_MAF = min_MAF
+		if not hasattr(pdata, 'construct_chr_pos2index'):	#if pdata doesn't have construct_chr_pos2index defined. otherwise, pdata overrides the option.
+			pdata.construct_chr_pos2index = construct_chr_pos2index
+		if os.path.isfile(result_fname):
+			genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
+													pdata=pdata, min_value_cutoff=min_value_cutoff)
+			genome_wide_result.results_id = rm.id
+			genome_wide_result.rm = rm	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
+		else:
+			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
+			genome_wide_result = None
+		cls.genome_wide_result = genome_wide_result
+		return genome_wide_result
+	
+	def getGeneList(self, list_type_id):
+		"""
+		2011-3-16
+			moved from GeneListRankTest.py
+		"""
+		sys.stderr.write("Getting gene_list %s ... "%list_type_id)
+		rows = GeneList.query.filter_by(list_type_id=list_type_id)
+		candidate_gene_list = []
+		for row in rows:
+			candidate_gene_list.append(row.gene_id)
+		sys.stderr.write("%s genes. Done.\n"%(len(candidate_gene_list)))
+		return candidate_gene_list
+	
+	list_type_id2candidate_gene_list_info = {}
+	def dealWithCandidateGeneList(self, list_type_id, return_set=False):
+		"""
+		2011-3-16
+			moved from GeneListRankTest.py
+		2008-10-30
+			turn this into a classmethod
+		2008-10-23
+			add option return_set
+		2008-10-15
+			to make caching candidate gene list possible
+		"""
+		if list_type_id not in self.list_type_id2candidate_gene_list_info:	#internal cache
+			candidate_gene_list = self.getGeneList(list_type_id)
+			self.list_type_id2candidate_gene_list_info[list_type_id] = PassingData(candidate_gene_list=candidate_gene_list, \
+																	candidate_gene_set=set(candidate_gene_list))
+		if return_set:
+			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_set
+		else:
+			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_list
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

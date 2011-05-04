@@ -973,37 +973,10 @@ class GenomeBrowser(object):
 		coverage_gwr = self.coverageFname2gwr.get(input_fname)
 		from pymodule.CNV import CNVSegmentBinarySearchTreeKey
 		from pymodule.SNP import GenomeWideResult, DataObject
+		from pymodule.CNV import readQuanLongPECoverageIntoGWR
 		if coverage_gwr is None:
-			import re
-			chrPattern = re.compile(r'.*Chr(\d+).coverage')
-			chrPatternSearchResult = chrPattern.search(input_fname)
-			if chrPatternSearchResult:
-				chr = int(chrPatternSearchResult.group(1))
-			else:
-				sys.stderr.write("Can't parse chromosome out of %s. aborted.\n"%input_fname)
-			import csv
-			reader = csv.reader(open(input_fname), delimiter='\t')
-			gwr_name = 'log10(coverage) %s'%os.path.basename(input_fname)
-			if additionalTitle:
-				gwr_name += " "+ additionalTitle
-			
-			coverage_gwr = GenomeWideResult(name=gwr_name)
-			
-			genome_wide_result_id = id(coverage_gwr)
-			
-			for row in reader:
-				position, coverage = row[:2]
-				position = int(position)*windowSize-windowSize/2	#coverage is caculated in 100-base window.
-				coverage = float(coverage)
-				if coverage<=0.0:
-					coverage = -3
-				else:
-					coverage = math.log10(coverage)
-				data_obj = DataObject(chromosome=chr, position=position, value=coverage)
-				data_obj.comment = ''
-				data_obj.genome_wide_result_name = gwr_name
-				data_obj.genome_wide_result_id = genome_wide_result_id
-				coverage_gwr.add_one_data_obj(data_obj)
+			coverage_gwr = readQuanLongPECoverageIntoGWR(input_fname, additionalTitle=additionalTitle, \
+											windowSize=windowSize)
 			self.coverageFname2gwr[input_fname] = coverage_gwr
 		
 		# restrict the coverage_gwr within rbDict
@@ -1122,6 +1095,9 @@ class GenomeBrowser(object):
 		seq_ref_pos_version = yh_gnome.getDataOutOfTextEntry(self.xml.get_object("comboboxentry_seq_ref_pos_version_by_region"), \
 								data_type=int, filter_func=get1stSplitByAnything, default=1)
 		
+		entry_intensity_fname = self.xml.get_object("entry_intensity_fname")
+		cnv_intensity_fname = yh_gnome.getDataOutOfTextEntry(entry_intensity_fname)
+		
 		drawType = 1	# default is to draw CNV (box)
 		local_genome_wide_result_ls = []
 		if cnv_by_region_data_type==0:	#Probe Intensity
@@ -1138,8 +1114,6 @@ class GenomeBrowser(object):
 			if not array_id_ls:
 				sys.stderr.write("no array id set.\n")
 				return
-			entry_intensity_fname = self.xml.get_object("entry_intensity_fname")
-			cnv_intensity_fname = yh_gnome.getDataOutOfTextEntry(entry_intensity_fname)
 			if not cnv_intensity_fname:
 				sys.stderr.write("Please specify cnv_intensity_fname.\n")
 				return
@@ -1184,7 +1158,15 @@ class GenomeBrowser(object):
 							chr=chr, start=start, stop=stop, version=seq_ref_pos_version))
 			drawType = 2	# draw sequence fragment (arrow)
 		elif cnv_by_region_data_type == 6:	#100bp Coverage by PESolexaData
-			pass
+			from pymodule.CNV import readQuanLongPECoverageIntoGWR
+			if not cnv_intensity_fname:
+				sys.stderr.write("Please specify cnv_intensity_fname.\n")
+				return
+			coverage_fname = cnv_intensity_fname
+			#the coverage data is split into different chromosomes. so no need to specify chromosome here.
+			genome_wide_result = readQuanLongPECoverageIntoGWR(coverage_fname, \
+											additionalTitle=None, windowSize=100, start=start, stop=stop)
+			local_genome_wide_result_ls.append(genome_wide_result)
 		else:
 			sys.stderr.write("Type of CNV data %s unknown.\n"%cnv_by_region_data_type)
 			return
@@ -1447,6 +1429,14 @@ class GenomeBrowser(object):
 		"""
 		self.textbuffer_output.set_text('')
 	
+	def on_imagemenuitem_clear_plot_activate(self, widget):
+		"""
+		2010-11-22
+			clear the axes (not the axe_gene_model)
+		"""
+		self.ax.clear()
+		self.genome_wide_results.clear()
+	
 	def on_checkbutton_debug_toggled(self, widget):
 		"""
 		2008-05-28
@@ -1648,11 +1638,31 @@ class GenomeBrowser(object):
 		"""
 		cnv_by_region_data_type = widget.get_active()
 		comboboxentry_id_cnv_by_region = self.xml.get_object("comboboxentry_id_cnv_by_region")
+		
 		hbox_intensity_fname = self.xml.get_object("hbox_intensity_fname")
-		if cnv_by_region_data_type==0:
+		if cnv_by_region_data_type==0 or cnv_by_region_data_type==6:
 			hbox_intensity_fname.set_sensitive(True)
 		else:
 			hbox_intensity_fname.set_sensitive(False)
+		
+		# 2010-11-23 determine which widgets to turn off when type 6 is chosen
+		hbox_combox_id_entry = self.xml.get_object("hbox_combox_id_entry")
+		hbox_chr_cnv_by_region = self.xml.get_object("hbox_chr_cnv_by_region")
+		hbox_entry_min_size_by_region = self.xml.get_object("hbox_entry_min_size_by_region")
+		hbox_min_no_of_probes_by_region = self.xml.get_object("hbox_min_no_of_probes_by_region")
+		label_intensity_fname = self.xml.get_object("label_intensity_fname")
+		if cnv_by_region_data_type == 6:	#100bp Coverage by PESolexaData
+			hbox_combox_id_entry.set_sensitive(False)
+			hbox_chr_cnv_by_region.set_sensitive(False)
+			hbox_entry_min_size_by_region.set_sensitive(False)
+			hbox_min_no_of_probes_by_region.set_sensitive(False)
+			label_intensity_fname.set_text("coverage file: ")
+		else:
+			hbox_combox_id_entry.set_sensitive(True)
+			hbox_chr_cnv_by_region.set_sensitive(True)
+			hbox_entry_min_size_by_region.set_sensitive(True)
+			hbox_min_no_of_probes_by_region.set_sensitive(True)
+			label_intensity_fname.set_text("intensity file: ")
 		
 		if cnv_by_region_data_type==0:	#Probe Intensity
 			self.combobox_id_type_cnv_by_region.set_active(0)
