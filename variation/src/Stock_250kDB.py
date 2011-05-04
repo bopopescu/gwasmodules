@@ -2953,6 +2953,9 @@ class Stock_250kDB(ElixirDB):
 	
 	def getSNPChrPos2ID(self, keyType=1, priorTAIRVersion=False):
 		"""
+		2011-5-4
+			bugfix: when priorTAIRVersion=True, alias the field names to chromosome and position
+				(instead of tair8_chromosome, tair8_position)
 		2011-2-15
 			add argument priorTAIRVersion
 				if =true:
@@ -2980,7 +2983,7 @@ class Stock_250kDB(ElixirDB):
 			chromosome_table_fieldname = 'chromosome'
 			position_table_fieldname = 'position'
 		
-		rows = self.metadata.bind.execute("select id, %s, %s from %s where %s is not null and %s is not null"\
+		rows = self.metadata.bind.execute("select id, %s as chromosome, %s as position from %s where %s is not null and %s is not null"\
 										%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
 										chromosome_table_fieldname, position_table_fieldname, ))
 		for row in rows:
