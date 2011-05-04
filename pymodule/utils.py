@@ -430,6 +430,19 @@ if __name__ == '__main__':
     print Denary2Binary(-5)  # should give a ValueError
 """
 
+def processRegexpString(p_str):
+	"""
+	2011-4-30
+		copied from a pylons controller. used to process regular expressions passed from web client.
+	2009-4-3
+		if p_str includes '(' or ')', mysql complains: ERROR 1139 (42000): Got error 'parentheses not balanced' from regexp
+	"""
+	p_str = p_str.replace('(', '\(')	#python re module only needs one '\'
+	p_str = p_str.replace(')', '\)')
+	p_str_sql = p_str.replace('(', '\\\(')	#mysql needs more
+	p_str_sql = p_str_sql.replace(')', '\\\)')
+	return PassingData(p_str=p_str, p_str_sql=p_str_sql)
+
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
 	print FigureOutTaxID_ins.returnTaxIDGivenSentence('>gi|172045488|ref|NW_001867254.1| Physcomitrella patens subsp. patens PHYPAscaffold_10696, whole genome shotgun sequence')
