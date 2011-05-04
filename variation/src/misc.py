@@ -8621,6 +8621,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	@classmethod
 	def convertOldFormatResultMethodFileIntoNewFormat(cls, db_250k, call_method_id=None, priorTAIRVersion=False):
 		"""
+		2011-5-4 bugfix: file might not exist at all.
 		2011-5-4
 			use Stock_250kDB.Snps.id to replace chr, pos ... in the files associated with table ResultsMethod.
 			
@@ -8645,7 +8646,11 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		counter = 0
 		no_of_files = query.count()
 		for row in query:
-			sys.stderr.write("%d/%d:\t%s "%(counter+1, no_of_files, row.filename))
+			counter += 1
+			sys.stderr.write("%d/%d:\t%s "%(counter, no_of_files, row.filename))
+			if not os.path.isfile(row.filename):	#2011-5-4 bugfix: file might not exist at all.
+				sys.stderr.write(" file doesn't exist.\n")
+				continue
 			reader = csv.reader(open(row.filename), delimiter='\t')
 			first_data_row = reader.next()
 			hasHeader = False
@@ -8686,7 +8691,6 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				sys.stderr.write("%s lines different after conversion.\n"%(no_of_lines_after_conversion-no_of_lines))
 			else:
 				sys.stderr.write("no conversion. (maybe converted already).\n")
-			counter += 1
 	
 	"""
 		# 2011-5-4
