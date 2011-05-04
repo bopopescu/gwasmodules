@@ -8621,14 +8621,15 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	@classmethod
 	def convertOldFormatResultMethodFileIntoNewFormat(cls, db_250k, call_method_id=None, priorTAIRVersion=False):
 		"""
-		2011-2-24
-			add argument priorTAIRVersion, if true, it means using Snps.tair8_chromosome,Snps.tair8_position
-				rather than Snps.chromosome,Snps.position.
-		2011-1-24
-			use Stock_250kDB.Snps.id to replace chr_pos... in the call file.
+		2011-5-4
+			use Stock_250kDB.Snps.id to replace chr, pos ... in the files associated with table ResultsMethod.
+			
 			i.e.
-				old format: 1_3102_A_G      G       0.985079453549666
-				new format: 2       G       0.985079453549666
+				old format: 1	657	0.985079453549666	...
+				new format: 1		0.985079453549666
+			
+			argument priorTAIRVersion, if true, it means using Snps.tair8_chromosome,Snps.tair8_position
+				rather than Snps.chromosome,Snps.position.
 		"""
 		import Stock_250kDB, os, sys, csv
 		from pymodule import SNP
