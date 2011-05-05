@@ -662,12 +662,12 @@ class LinearMixedModel(LinearModel):
 		"""
 		if verbose:
 			print 'Retrieving %s variance estimates' % method
-		if xs:
+		if xs != None:
 			X = sp.hstack([self.X, xs])
 		else:
 			X = self.X
 
-		if not eig_R and not xs:
+		if not (eig_R and xs != None):
 			eig_R = self._get_eigen_R_(X)
 		q = X.shape[1] #number of columns
 		n = self.n
@@ -732,10 +732,11 @@ class LinearMixedModel(LinearModel):
 					new_opt_delta = optimize.newton(self._dll_, opt_delta, args=(eig_vals, eig_vals_L, sq_etas),
 								tol=esp, maxiter=100)
 			except Exception, err_str:
-				print 'Problems with Newton-Raphson method:', err_str
-				print "Using the maximum grid value instead."
-				print 'opt_i:', opt_i
-				print 'Grid optimal delta:', opt_delta
+				if verbose:
+					print 'Problems with Newton-Raphson method:', err_str
+					print "Using the maximum grid value instead."
+					print 'opt_i:', opt_i
+					print 'Grid optimal delta:', opt_delta
 				new_opt_delta = opt_delta
 			#Validating the delta
 			if opt_i > 1 and deltas[opt_i - 1] - esp < new_opt_delta < deltas[opt_i] + esp:
@@ -750,11 +751,12 @@ class LinearMixedModel(LinearModel):
 				opt_delta = new_opt_delta
 				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			else:
-				print 'Local maximum outside of suggested possible areas?'
-				print 'opt_i:', opt_i
-				print 'Grid optimal delta:', opt_delta
-				print "Newton's optimal delta:", new_opt_delta
-				print 'Using the maximum grid value instead.'
+				if verbose:
+					print 'Local maximum outside of suggested possible areas?'
+					print 'opt_i:', opt_i
+					print 'Grid optimal delta:', opt_delta
+					print "Newton's optimal delta:", new_opt_delta
+					print 'Using the maximum grid value instead.'
 
 			if verbose: print 'Done with Newton-Rahpson'
 			if method == 'REML':
@@ -765,7 +767,7 @@ class LinearMixedModel(LinearModel):
 			if opt_ll < max_ll:
 				opt_delta = deltas[max_ll_i]
 		else:
-			print 'No zero-interval was found, taking the maximum grid value.'
+			if verbose: print 'No zero-interval was found, taking the maximum grid value.'
 			opt_delta = deltas[max_ll_i]
 			opt_ll = max_ll
 
@@ -790,7 +792,7 @@ class LinearMixedModel(LinearModel):
 			    'var_perc':var_perc, 'rss':rss, 'mahalanobis_rss':mahalanobis_rss, 'H_sqrt_inv':H_sqrt_inv,
 			    'pseudo_heritability':1.0 / (1 + opt_delta)}
 
-		if xs and return_f_stat:
+		if xs != None and return_f_stat:
 			h0_X = H_sqrt_inv * self.X
 			(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y_t)
 			f_stat = ((h0_rss - mahalanobis_rss) / (xs.shape[1])) / (h0_rss / p)

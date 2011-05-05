@@ -1798,11 +1798,14 @@ def _get_107_traits_():
 #	sd.writeToFile(env['data_dir'] + '199_genotypes.csv')
 #	print len(sd.accessions)
 
+
 def plot_test():
 	import dataParsers as dp
 	k, k_accessions = dp.load_kinship(return_accessions=True, scaled=False)
 	phed = get_all_phenotypes_from_db() #parse_phenotype_file(env['phen_dir'] + 'phen_raw_112210.csv')
 	phed.plot_phen_relatedness(k, k_accessions, env['tmp_dir'] + 'rel_plots')
+
+
 
 
 

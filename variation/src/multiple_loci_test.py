@@ -417,8 +417,8 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 	am_dot_marker = ['s', '^', 's', '^']
 
 	for w_i, ws in enumerate(window_sizes):
-		pylab.figure(figsize=(8, 6))
-		pylab.axes([0.09, 0.08, 0.85, 0.9])
+		pylab.figure(figsize=(7, 6))
+		pylab.axes([0.09, 0.08, 0.9, 0.85])
 		for am, amc, amls in zip(am_list, am_colors, am_ls):
 			xs = sp.zeros(len(pval_thresholds))
 			ys = sp.zeros(len(pval_thresholds))
