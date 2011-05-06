@@ -408,7 +408,7 @@ def get_total_gene_ls(curs, gene_table='genome.gene', tax_id=3702, debug=False):
 	"""
 	if debug:
 		sys.stderr.write("Getting gene_id_ls ... ")
-	rows = curs.execute("select distinct gene_id from %s where tax_id=%s and chromosome is not null and chromosome!='MT'"%\
+	rows = curs.execute("select distinct id as gene_id from %s where tax_id=%s and chromosome is not null and chromosome!='MT'"%\
 								(gene_table, tax_id))
 	is_elixirdb = 1
 	if hasattr(curs, 'fetchall'):	#2008-10-07 this curs is not elixirdb.metadata.bind
