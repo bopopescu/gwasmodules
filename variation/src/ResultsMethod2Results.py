@@ -57,7 +57,7 @@ class ResultsMethod2Results(object):
 		self.phenotype_id_ls = getListOutOfStr(self.phenotype_id_ls, data_type=int)
 		
 	@classmethod
-	def rm2result(cls, session, rm, snp_info, max_rank=1000, commit=False, min_rank=1, results_directory=None, \
+	def rm2result(cls, session, rm, chr_pos2db_id, max_rank=1000, commit=False, min_rank=1, results_directory=None, \
 				min_score=None,update=True,db_id2chr_pos=None):
 		"""
 		2010-3-8
@@ -93,7 +93,7 @@ class ResultsMethod2Results(object):
 				data_obj = genome_wide_result.get_data_obj_at_given_rank(rank) 
 				if data_obj is not None:
 					counter += 1
-					snps_id = snp_info.getSnpsIDGivenChrPos(data_obj.chromosome, data_obj.position)
+					snps_id = chr_pos2db_id.get((data_obj.chromosome, data_obj.position))
 					if data_obj.extra_col_ls:
 						result_obj = cPickle.dumps(data_obj.extra_col_ls)
 					else:
@@ -127,8 +127,10 @@ class ResultsMethod2Results(object):
 		
 		session = db.session
 		session.begin()
-		db_id2chr_pos = db.snp_id2chr_pos
-		snp_info = DrawSNPRegion.getSNPInfo(db)
+		snp_data = db.getSNPChrPos2IDLs() 
+		db_id2chr_pos = snp_data.get('snp_id2chr_pos')
+		chr_pos2db_id = snp_data.get('chr_pos_2snp_id')
+		
 		
 		query = Stock_250kDB.ResultsMethod.query.filter_by(call_method_id=self.call_method_id)
 		if self.analysis_method_id_ls:
@@ -136,7 +138,7 @@ class ResultsMethod2Results(object):
 		if self.phenotype_id_ls:
 			query = query.filter(Stock_250kDB.ResultsMethod.phenotype_method_id.in_(self.phenotype_id_ls))
 		for rm in query:
-			self.rm2result(session, rm, snp_info, max_rank=self.max_rank, commit=self.commit, \
+			self.rm2result(session, rm, chr_pos2db_id, max_rank=self.max_rank, commit=self.commit, \
 						results_directory=self.results_directory, min_score=self.min_score,db_id2chr_pos = db_id2chr_pos)
 		if self.commit:
 			session.commit()
