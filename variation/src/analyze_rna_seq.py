@@ -24,7 +24,7 @@ import pdb
 import itertools as it
 import math
 
-def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'):
+def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='gmi'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
@@ -78,8 +78,10 @@ def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_thre
 	phed.convert_to_averages()
 	num_traits = phed.num_traits()
 	pids = phed.phen_ids[start_i :stop_i]
-	if use_1001_data:
+	if data_type == 'use_1001_data':
 		sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+	elif data_type == 'quan_seq_data':
+		sd = dp.load_quan_data(debug_filter=debug_filter)
 	else:
 		sd = dp.load_250K_snps(debug_filter=debug_filter)
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
@@ -88,7 +90,9 @@ def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_thre
 	if mapping_method == 'emmax':
 		if data_type == 'imputed_full_seq':
 			k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
-		elif:
+		elif data_type == 'quan_seq_data':
+			k_file = env['data_quan_dir'] + 'data.gwas_012_mac5.kinship.pickled'
+		else:
 			k_file = env['data_dir'] + "kinship_matrix_cm75.pickled"
 		K = lm.load_kinship_from_file(k_file, sd.accessions)
 	sd.filter_mac_snps(mac_threshold)
@@ -199,7 +203,7 @@ def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_thre
 
 
 
-def _load_results_(mapping_method, temperature, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
+def _load_results_(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
 	pickle_file = '%s_%s_%s_mac%d_res.pickled' % (file_prefix, temperature, mapping_method, mac_threshold)
 	if os.path.isfile(pickle_file):
 		with open(pickle_file) as f:
@@ -214,8 +218,10 @@ def _load_results_(mapping_method, temperature, file_prefix='', use_1001_data=Tr
 			phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 			phed.filter_near_const_phens(15)
 			phed.convert_to_averages()
-			if use_1001_data:
+			if data_type == 'use_1001_data':
 				sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+			elif data_type == 'quan_seq_data':
+				sd = dp.load_quan_data(debug_filter=debug_filter)
 			else:
 				sd = dp.load_250K_snps(debug_filter=debug_filter)
 			indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
@@ -354,7 +360,7 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 	alpha = 0.8
 	linewidths = 0
 	vmin = min_score
-	f = pylab.figure(figsize=(50, 45))
+	f = pylab.figure(figsize=(40, 36))
 	chromosomes = [1, 2, 3, 4, 5]
 	plot_file_name = file_prefix + '_%s_%d.png' % (mapping_method, min_score)
 	label = '$-log_{10}$(p-value)'
@@ -413,7 +419,7 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 
 
 
-def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_1001_data=True, mac_threshold=15, debug_filter=1.0):
+def load_and_plot_info_files(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
 	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
 	phen_pickle_file = phen_file + 'sd_overlap.pickled'
 	if os.path.isfile(phen_pickle_file):
@@ -423,8 +429,10 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', use_10
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 		phed.filter_near_const_phens(15)
 		phed.convert_to_averages()
-		if use_1001_data:
+		if data_type == 'use_1001_data':
 			sd = dp.load_1001_full_snps(debug_filter=debug_filter)
+		elif data_type == 'quan_seq_data':
+			sd = dp.load_quan_data(debug_filter=debug_filter)
 		else:
 			sd = dp.load_250K_snps(debug_filter=debug_filter)
 		indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
