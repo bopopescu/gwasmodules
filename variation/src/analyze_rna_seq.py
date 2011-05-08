@@ -372,8 +372,8 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 			l = chrom_dict[(chr1, chr2)]['scores']
 			if len(l) == 0:
 				continue
-			ax = f.add_axes([0.97 * (rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi] - 0.02,
-					0.97 * (rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
+			ax = f.add_axes([0.96 * (rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi] - 0.02,
+					0.96 * (rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
 			ax.spines['right'].set_visible(False)
 			ax.spines['bottom'].set_visible(False)
 			#ax.tick_params(fontsize='x-large')
@@ -407,7 +407,7 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
 				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.975, 0.7, 0.01, 0.2])
+	cax = f.add_axes([0.965, 0.7, 0.01, 0.2])
 	cb = pylab.colorbar(scatter_plot, cax=cax)
 	cb.set_label(label, fontsize='xx-large')
 	#cb.set_tick_params(fontsize='x-large')
