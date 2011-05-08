@@ -542,7 +542,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			if kinship_file:   #Kinship file was somehow supplied..
 				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
 							p_dict['with_replicates'])
-				print 'Loading supplied kinship'
+				print 'Loading supplied kinship file: %s' % kinship_file
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
 				print "No kinship file was found.  Generating kinship file:", k_file
@@ -741,7 +741,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 							neg_log_transform=True)
 					res.plot_qq(file_prefix + '_qq')
 		else:
-			pass
+			raise NotImplementedError
 
 
 
