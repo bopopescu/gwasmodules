@@ -532,7 +532,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			sys.stdout.flush()
 			if p_dict['call_method_id'] == 1001:
 				k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
-			if p_dict['call_method_id'] == 1002:
+			elif p_dict['call_method_id'] == 1002:
 				k_file = env['data_quan_dir'] + 'data.gwas_012_mac5.kinship.pickled'
 			else:
 				k_file = env['data_dir'] + "kinship_matrix_cm" + str(p_dict['call_method_id']) + ".pickled"
