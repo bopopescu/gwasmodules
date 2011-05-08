@@ -1757,7 +1757,6 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 	"""
 	Load snps data..
 	"""
-	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
 	if format == 'binary' and look_for_binary:
 		print 'Looking for binary SNPs'
 		sd_binary_file = data_file + '.binary'
@@ -1778,7 +1777,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 				f = open(pickle_file, 'wb')
 				cPickle.dump(sd, f, protocol=2)
 				f.close()
-	elif format == 'int':
+	elif format in ['int', 'diploid_int']:
 		sd = parse_numerical_snp_data(data_file, delimiter=delimiter, missing_val=missingVal,
 					filter=filter, filter_accessions=filter_accessions,
 					use_pickle=use_pickle, dtype='int8', data_format=format)
@@ -1789,7 +1788,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 	elif format == 'nucleotides':
 		print 'Looking for nucleotide SNPs'
 		(snpsds, chromosomes) = parseCSVData(data_file, deliminator=delimiter, missingVal=missingVal,
-					format=data_format_dict[format], filter=filter, id=id, returnChromosomes=True)
+					format=1, filter=filter, id=id, returnChromosomes=True)
 		sd = SNPsDataSet(snpsds, chromosomes, data_format=format)
 	else:
 		print "Unknown file format!"
@@ -1881,23 +1880,6 @@ def parse_chr_pos_list(datafile, delimiter=",", min_marf=0.0):
 #		snpErrorRate +=snpsds2[chr].compareWith(snpsds1[chr])
 #	print "Average Genome Wide Snp Error:",sum(snpErrorRate)/float(len(snpErrorRate))
 #	"""
-
-
-def parse_full_snp_data(data_file_prefix, chromosome, data_format='nucleotides'):
-	"""
-	Handles large dataset (e.g. full SNPs data) in a managable way... even for a 4GB memory mac.
-	"""
-	data_format_dict = {'binary':0, 'nucleotides':1, 'int':2, 'float':3}
-	data_file = data_file_prefix + '_Chr%i.csv' % chromosome
-	if data_format == 'nucleotides':
-		print 'Looking for nucleotide SNPs'
-		(snpsds, chromosomes) = parseCSVData(data_file, deliminator=',', missingVal='N',
-					format=data_format_dict[data_format], filter=filter, id=id, returnChromosomes=True)
-		sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
-	elif data_format == 'int': #E.g. binary data.
-		pass
-	return sd
-
 
 def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 	"""
@@ -2116,7 +2098,7 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
                 snps = chrom_pos_snp_dict[chrom]['snps']
                 positions = chrom_pos_snp_dict[chrom]['positions']
                 snpsds.append(SNPsData(snps, positions, accessions=individs, chromosome=chrom))
-        sd = SNPsDataSet(snpsds, chromosomes, data_format='int')
+        sd = SNPsDataSet(snpsds, chromosomes, data_format='diploid_int')
         print 'SNPsDataSet constructed!'
 
         print 'Loading the kinship matrix'
@@ -2273,6 +2255,41 @@ def load_kinship(call_method_id=75, accessions=None, return_accessions=False, sc
 	import linear_models as lm
 	kinship_file = get_call_method_kinship_file(call_method_id)
 	return lm.load_kinship_from_file(kinship_file, accessions=accessions, return_accessions=return_accessions, scaled=scaled)
+
+
+def load_quan_data(data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5], debug_filter=1.0):
+	print "Loading Quan's sequence data."
+	pickled_file_name = env['data_quan_dir'] + 'data.gwas_012_mac%d.pickled' % min_mac
+	if os.path.isfile(pickled_file_name):
+		print 'Loading pickled file: %s' % pickled_file_name
+		t = time.time()
+		sd = cPickle.load(open(pickled_file_name))
+		t = time.time() - t
+		print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
+	else:
+
+		t = time.time()
+		snpsds = []
+		num_snps = 0
+		for chrom in chromosomes:
+			file_name = env['data_quan_dir'] + 'data.%d.gwas_012.1.csv' % chrom
+			sd = parse_numerical_snp_data(file_name, data_format='diploid_int')
+			if min_mac > 0:
+				sd.filter_mac_snps(min_mac, type='diploid_ints')
+			if debug_filter < 1.0:
+				sd.sample_snps(debug_filter)
+			num_snps += len(sd.snpsDataList[0].snps)
+			snpsds.append(sd.snpsDataList[0])
+		t = time.time() - t
+		print 'Loaded %d SNPs.' % num_snps
+		print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
+		sd = SNPsDataSet(snpsds, chromosomes, data_format='diploid_int')
+		print "Saving pickled file."
+		cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
+		print "Done."
+	print 'Loaded %d SNPs in total.' % sd.num_snps()
+	sd.data_format = 'diploid_int'
+	return sd
 
 
 if __name__ == "__main__":

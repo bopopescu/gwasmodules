@@ -240,11 +240,12 @@ class phenotype_data:
 		return trans_type, shapiro_pval
 
 
-	def normalize_values(self, pid):
-		a = sp.array(self.phen_dict[pid]['values'])
-		v = sp.var(self.get_avg_values(pid), ddof=1)
-		vals = a / sp.sqrt(v)
-		self.phen_dict[pid]['values'] = vals.tolist()
+	def normalize_values(self, pids):
+		for pid in pids:
+			a = sp.array(self.phen_dict[pid]['values'])
+			v = sp.var(self.get_avg_values(pid), ddof=1)
+			vals = a / sp.sqrt(v)
+			self.phen_dict[pid]['values'] = vals.tolist()
 
 
 	def na_outliers(self, pids, iqr_threshold):
@@ -315,26 +316,29 @@ class phenotype_data:
 			if d['transformation']:
 				self.phen_dict[pid]['raw_values'] = rvl
 
-	def filter_ecotypes_2(self, ecotype_to_keep, pids=None):
+	def filter_ecotypes_2(self, ecotypes_to_keep, pids=None):
 		if not pids:
 			pids = self.phen_ids
+		unique_ets = set()
 		for pid in pids:
 			el = []
 			vl = []
 			d = self.phen_dict[pid]
 			if d['transformation']:
 				rvl = []
-			for et in ecotype_to_keep:
+			for et in ecotypes_to_keep:
 				if et in d['ecotypes']:
 					i = d['ecotypes'].index(et)
 					el.append(d['ecotypes'][i])
 					vl.append(d['values'][i])
 					if d['transformation']:
 						rvl.append(d['raw_values'][i])
+					unique_ets.add(et)
 			self.phen_dict[pid]['ecotypes'] = el
 			self.phen_dict[pid]['values'] = vl
 			if d['transformation']:
 				self.phen_dict[pid]['raw_values'] = rvl
+		return list(unique_ets)
 
 
 	def order_ecotypes(self, ets_map, pids=None):
@@ -1798,11 +1802,14 @@ def _get_107_traits_():
 #	sd.writeToFile(env['data_dir'] + '199_genotypes.csv')
 #	print len(sd.accessions)
 
+
 def plot_test():
 	import dataParsers as dp
 	k, k_accessions = dp.load_kinship(return_accessions=True, scaled=False)
 	phed = get_all_phenotypes_from_db() #parse_phenotype_file(env['phen_dir'] + 'phen_raw_112210.csv')
 	phed.plot_phen_relatedness(k, k_accessions, env['tmp_dir'] + 'rel_plots')
+
+
 
 
 

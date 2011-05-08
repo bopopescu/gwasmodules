@@ -907,6 +907,20 @@ class Result(object):
 		plt.close()
 
 
+	def plot_qq(self, file_prefix, exp_scores=None):
+		import analyze_gwas_results as agr
+		ks_stat = agr.calc_ks_stats(self.snp_results['scores'], exp_scores=exp_scores)
+		exp_median = 0.5
+		if exp_scores:
+			exp_median = exp_scores[len(exp_scores) / 2]
+		p_med = agr.calc_median(self.snp_results['scores'], exp_median=exp_median)
+		stat_text = 'D=%0.8f,  M=%0.8f' % (ks_stat['D'], p_med)
+		quantiles = agr.get_quantiles(self.snp_results['scores'])
+		agr.simple_qqplot([quantiles], file_prefix + '_png', text=stat_text)
+		log_quantiles = agr.get_log_quantiles(self.snp_results['scores'])
+		agr.simple_log_qqplot([log_quantiles], file_prefix + '_log.png', text=stat_text)
+
+
 
 	def get_chromosome_splits(self):
 		"""
@@ -1463,7 +1477,7 @@ class Result(object):
 	def num_scores(self):
 		return len(self.snp_results['scores'])
 
-	def write_to_file(self, filename, additional_columns=None, auto_pickling_on=True, only_pickled=False):
+	def write_to_file(self, filename, additional_columns=None, auto_pickling_on=False, only_pickled=False):
 		columns = ['chromosomes', 'positions', 'scores', 'mafs', 'macs']
 		if additional_columns:
 			for info in additional_columns:

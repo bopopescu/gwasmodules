@@ -9,7 +9,10 @@ Option:
 	-o ...					ID string, used for output files.
 	-i ...					The phenotype IDs, to be run. 
 
-	-t ...					What data set is used.  Default is 75.
+	-t ...					What data set is used.  Default is 75.  
+						1001 is imputed full sequence data.
+						and 1002 is full sequence data (currently Swedish accessions only)
+						
 	-f ...					Load a specific data file, e.g. for heteroplasmy.
 	-r ...					Phenotype file, if left out then phenotypes are retireved from the DB 
 						(transformed values).
@@ -45,7 +48,6 @@ Option:
 
 	--local_gwas=chrom,start,stop		Run local GWAs only..		
 	
-	--use_imputed_full_data			Use the imputed full data, 1.7 million SNPs (memory heavy).
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
 	-p ...					Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
@@ -89,6 +91,7 @@ import cPickle
 
 import scipy as sp
 import linear_models as lm
+import analyze_gwas_results as agr
 from numpy import *
 from env import *
 import copy
@@ -140,7 +143,7 @@ def parse_parameters():
 
 	long_options_list = ["comment=", 'with_db_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
 			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
-			'use_imputed_full_data', 'save_stepw_pvals']
+			'save_stepw_pvals']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -150,13 +153,13 @@ def parse_parameters():
 		sys.exit(2)
 
 
-	p_dict = {'run_id':'donald_duck', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
+	p_dict = {'run_id':'abracadabra', 'parallel':None, 'add_to_db':False, 'comment':'', 'mem_req':'1800mb',
 		'call_method_id':75, 'walltime_req':'12:00:00', 'specific_methods':['kw', 'emmax'],
 		'specific_transformations':['none'], 'remove_outliers':0, 'kinship_file':None, 'analysis_plots':False,
 		'use_existing_results':False, 'region_plots':0, 'cand_genes_file':None, 'debug_filter':1,
 		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
-		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'use_imputed_full_data':False, 'pids':None,
+		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'pids':None,
 		'save_stepw_pvals':False}
 
 
@@ -192,7 +195,6 @@ def parse_parameters():
 		elif opt in ("--with_betas"): p_dict['with_betas'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		elif opt in ("--local_gwas"): p_dict['local_gwas'] = map(int, arg.split(','))
-		elif opt in ("--use_imputed_full_data"): p_dict['use_imputed_full_data'] = True
 		elif opt in ("--save_stepw_pvals"): p_dict['save_stepw_pvals'] = True
 		else:
 			print "Unkown option:", opt
@@ -259,14 +261,22 @@ def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method
 
 
 def _get_genotype_data_(p_dict):
-	if p_dict['use_imputed_full_data']:
+	if p_dict['data_file']:
+		sd = dataParsers.parse_snp_data(p_dict['data_file'] , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+	elif not p_dict['call_method_id'] in [1001, 1002]:
+		sd = dataParsers.load_250K_snps(p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
+	elif p_dict['call_method_id'] == 1001:
 		if p_dict['local_gwas']:
 			chrom = p_dict['local_gwas'][0]
 			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'], chromosomes=[chrom])
 		else:
 			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
-	else:
-		sd = dataParsers.parse_snp_data(p_dict['data_file'] , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+	elif p_dict['call_method_id'] == 1002:
+		if p_dict['local_gwas']:
+			chrom = p_dict['local_gwas'][0]
+			sd = dataParsers.load_quan_data(chromosomes=[chrom], debug_filter=p_dict['debug_filter'])
+		else:
+			sd = dataParsers.load_quan_data(debug_filter=p_dict['debug_filter'])
 	return sd
 
 
@@ -504,6 +514,14 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 		sys.stdout.flush()
 
 
+	#Loading candidate genes
+	cand_genes = None
+	if p_dict['cand_genes_file']:
+		cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
+	else:
+		cand_genes = None
+		tair_ids = None
+
 	if not res: #If results weren't found in a file... then do GWA.
 		#Loading data
 		sd = _get_genotype_data_(p_dict)
@@ -512,8 +530,10 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			#Load genotype file (in binary format)
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
-			if p_dict['use_imputed_full_data']:
+			if p_dict['call_method_id'] == 1001:
 				k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
+			if p_dict['call_method_id'] == 1002:
+				k_file = env['data_quan_dir'] + 'data.gwas_012_mac5.kinship.pickled'
 			else:
 				k_file = env['data_dir'] + "kinship_matrix_cm" + str(p_dict['call_method_id']) + ".pickled"
 			kinship_file = p_dict['kinship_file']
@@ -549,13 +569,6 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 						[p_dict['local_gwas'][0]])
 		snps = sd.getSnps()
 
-		#Loading candidate genes
-		cand_genes = None
-		if p_dict['cand_genes_file']:
-			cand_genes, tair_ids = gwaResults.load_cand_genes_file(p_dict['cand_genes_file'])
-		else:
-			cand_genes = None
-			tair_ids = None
 
 		sys.stdout.write("Finished loading and handling data!\n")
 
@@ -714,20 +727,19 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			png_file = file_prefix + "_gwa_plot.png"
 		#png_file_max30 = file_prefix+"_gwa_plot_max30.png"
 		if mapping_method in ["kw", "ft", "emma", 'lm', "emmax", 'emmax_anova', 'lm_anova']:
-			res.neg_log_trans()
 			if mapping_method in ["kw", "ft"]:# or p_dict['data_format'] != 'binary':
-				#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-				#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)
 				res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",
 						ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
-						cand_genes=cand_genes, threshold=emmax_perm_threshold)
+						cand_genes=cand_genes, threshold=emmax_perm_threshold,
+						neg_log_transform=True)
+				res.plot_qq(file_prefix + '_qq')
 			else:
 				if res.filter_attr("macs", p_dict['mac_threshold']) > 0:
-					#res.plot_manhattan(png_file=png_file_max30,percentile=90,type="pvals",ylab="$-$log$_{10}(p)$", 
-					#	       plot_bonferroni=True,cand_genes=cand_genes,max_score=30)				
 					res.plot_manhattan(png_file=png_file, percentile=90, type="pvals",
 							ylab="$-$log$_{10}(p)$", plot_bonferroni=True,
-							cand_genes=cand_genes, threshold=emmax_perm_threshold)
+							cand_genes=cand_genes, threshold=emmax_perm_threshold,
+							neg_log_transform=True)
+					res.plot_qq(file_prefix + '_qq')
 		else:
 			pass
 
@@ -799,11 +811,6 @@ def _run_():
 					for p_i in pids:
 						run_parallel(p_i, phed, p_dict, mapping_method, trans_method)
 		return #Exiting the program...
-
-
-	#SNPs data file name
-	if not p_dict['data_file']:
-		p_dict['data_file'] = '%s250K_t%d.csv' % (env['data_dir'], p_dict['call_method_id'])
 
 
 	#Plot analysis plots...

@@ -47,64 +47,8 @@ def get_haplotypes(snps, num_accessions, count_haplotypes=False):
 		return new_haplotypes
 
 
-
-#def coordinateSnpsAndPhenotypeData(phed, p_i, sd, onlyBinarySNPs=True, data_format='binary'):
-#	"""
-#	1. Remove accessions which are not represented in either of the two datasets
-#	2. Order the data in same way.
-#	3. Remove monomorphic SNPs
-#	"""
-#	import bisect
-#	print "Coordinating SNP and Phenotype data."
-#	ets = phed.phen_dict[p_i]['ecotypes']
-#	#Checking which accessions to keep and which to remove.
-#	common_ets = list(set(sd.accessions).union(set(ets)))
-#	common_ets.sort()
-#
-#	sd_indices_to_keep = []
-#	for i, acc in enumerate(sd.accessions):
-#		b_i = bisect.bisect_left(common_ets, acc)
-#		if b_i < len(common_ets) and common_ets[b_i] == acc:
-#			sd_indices_to_keep.append(i)
-#	pd_indices_to_keep = []
-#	for i, acc in enumerate(ets):
-#		b_i = bisect.bisect_left(common_ets, acc)
-#		if b_i < len(common_ets) and common_ets[b_i] == acc:
-#			pd_indices_to_keep.append(i)
-#
-#
-#	#Filter accessions which do not have the phenotype value (from the genotype data).
-#	self.filter_accessions_indices()
-#	print ""
-#	print numAcc - len(accIndicesToKeep), "accessions removed from genotype data, leaving", \
-#		len(accIndicesToKeep), "accessions in all."
-#
-#
-#	print "Filtering phenotype data."
-#	phed.removeAccessions(phenAccIndicesToKeep) #Removing accessions that don't have genotypes or phenotype values
-#
-#	#Ordering accessions according to the order of accessions in the genotype file
-#	accessionMapping = []
-#	i = 0
-#	for acc in snpsds[0].accessions:
-#		if acc in phed.accessions:
-#			accessionMapping.append((phed.accessions.index(acc), i))
-#			i += 1
-#	phed.orderAccessions(accessionMapping)
-#
-#
-#	if data_format == 'binary':
-#		total_num = 0
-#		removed_num = 0
-#		for snpsd in snpsds:
-#			total_num += len(snpsd.snps)
-#			removed_num += snpsd.onlyBinarySnps()
-#		print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
-
-
 class _SnpsData_(object):
 	"""
-	05/11/2008 yh. add chromosome
 	An abstract superclass.
 	"""
 	def __init__(self, snps, positions, baseScale=None, accessions=None, arrayIds=None, chromosome=None,
@@ -1143,9 +1087,6 @@ class _SnpsData_(object):
 		f.close()
 
 
-
-
-
 class Marker():
 	"""
 	A class for marker info. 
@@ -1172,8 +1113,6 @@ class Marker():
 			print "The corresponding allele was not found in the marker data."
 
 
-
-
 class MarkerData(_SnpsData_):
 	"""
 	A class to encompass general marker data, as well as handle 
@@ -1185,9 +1124,6 @@ class MarkerData(_SnpsData_):
 		_SnpsData_.__init__(self, *args, **kwargs) #Calling the parent's init fun.
 
 
-
-
-
 class RawDecoder(dict):
 	def __missing__(self, key):
 		return 'NA'
@@ -1196,7 +1132,6 @@ class RawDecoder(dict):
 			self[letter] = letter
 		for letter in initdict:
 			self[letter] = initdict[letter]
-
 
 
 class RawSnpsData(_SnpsData_):
@@ -1882,20 +1817,17 @@ class SNPsData(_SnpsData_):
 			raise Exception('Window size missing')
 
 
-	def get_mafs(self, w_missing=False, binary=True):
+	def get_mafs(self, w_missing=False, type='binary'):
 		"""
 		Returns MAFs and MARFs
 		
 		(Uses numpy.bincount)
+		
+		types supported: classes (e.g. binary data), diploid_ints, ..
 		"""
 
-#		def _get_maf_(snp):
-#			l = sp.bincount(sp.unique(snp, False, True)[1])
-#			maf = min(l)
-#			return maf
 
-
-		def _get_maf_(snp):
+		def _get_maf_(snp): #For missing data coded as -1s
 			l = sp.bincount(snp)
 			maf = max(l)
 			for m in l[1:]:
@@ -1924,17 +1856,21 @@ class SNPsData(_SnpsData_):
 					mafs.append(maf)
 					marfs.append(maf / float(num_nts))
 		else:
-			if binary:
+			if type in ['binary', 'int']:
 				for snp in self.snps:
 					l = sp.bincount(snp)
 					maf = min(l)
 					mafs.append(maf)
 					marfs.append(maf / float(num_nts))
-			else:
+			elif type == 'diploid_int':
 				for snp in self.snps:
-					maf = _get_maf_(snp)
+					bin_counts = sp.bincount(snp)
+					l = sp.array([bin_counts[0], bin_counts[2]]) + bin_counts[1] / 2.0
+					maf = l.min()
 					mafs.append(maf)
 					marfs.append(maf / float(num_nts))
+			else:
+				raise NotImplementedError
 
 		return {"mafs":mafs, "marfs":marfs}
 
@@ -1943,7 +1879,7 @@ class SNPsData(_SnpsData_):
 
 
 
-	def filter_mac(self, min_mac=15, w_missing=False, type='classes'):
+	def filter_mac(self, min_mac=15, w_missing=False, type='binary'):
        		"""
        		Filter minor allele count SNPs.
        		"""
@@ -1963,16 +1899,16 @@ class SNPsData(_SnpsData_):
 #					new_snps.append(snp)
 #					new_positions.append(pos)
 		else:
-			if type == 'classes':
+			if type in ['binary', 'int']:
 				for snp, pos in izip(self.snps, self.positions):
 					if min(sp.bincount(snp)) >= min_mac:
 						new_snps.append(snp)
 						new_positions.append(pos)
-			elif type == 'diploid_ints':
+			elif type == 'diploid_int':
 				for snp, pos in izip(self.snps, self.positions):
 					bin_counts = sp.bincount(snp)
-					l = [bin_counts[0] * 2 + bin_counts[1], bin_counts[2] * 2]
-					if min(l) >= min_mac:
+					l = sp.array([bin_counts[0], bin_counts[2]]) + bin_counts[1] / 2.0
+					if l.min() >= min_mac:
 						new_snps.append(snp)
 						new_positions.append(pos)
 
@@ -2457,7 +2393,7 @@ class SNPsDataSet:
 		self.is_binary = is_binary
 		self.missing_val = snpsds[0].missingVal
 		self.call_method = call_method
-		self.data_format = data_format
+		self.data_format = data_format # binary, diploid_ints, floats, int
 		if not id and snpsds[0].id:
 				self.id = id
 		for i in range(1, len(self.chromosomes)):
@@ -2817,6 +2753,15 @@ class SNPsDataSet:
 				total_num += len(snpsd.snps)
 				removed_num += snpsd.onlyBinarySnps()
 			print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
+		elif self.data_format in ['int', 'diploid_int']:
+			pass
+#			print 'Filtering monomorhpic SNPs'
+#			total_num = 0
+#			removed_num = 0
+#			for snpsd in self.snpsDataList:
+#				total_num += len(snpsd.snps)
+#				removed_num += snpsd.onlyBinarySnps()
+#			print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
 		return pd_indices_to_keep
 
 
@@ -2842,9 +2787,12 @@ class SNPsDataSet:
 		for i in range(num_lines):
 			for j in range(i):
 				comp_i += 1
-				bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
-				k_mat[i, j] = (bin_counts[0] + 0.5 * bin_counts[1]) / num_snps
-				k_mat[j, i] = k_mat[i, j]
+				if self.data_format == 'diploid_int':
+					bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+					k_mat[i, j] = (bin_counts[0] + 0.5 * bin_counts[1]) / num_snps
+					k_mat[j, i] = k_mat[i, j]
+				else:
+					raise NotImplementedError
 				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
 					sys.stdout.write('.')
 					sys.stdout.flush()
@@ -3080,23 +3028,18 @@ class SNPsDataSet:
 	def get_mafs(self):
 		"""
 		Returns the mafs and marfs as a dictionary.
+		
+		types: classes, diploid_ints
 		"""
-		if not self.data_format:
-			binary = True
-		else:
-			if  self.data_format == 'binary':
-				binary = True
-			else:
-				binary = False
-
 		maf_list = []
 		marf_list = []
 		for snpsd in self.snpsDataList:
-			r = snpsd.get_mafs(binary=binary)
+			r = snpsd.get_mafs(type=self.data_format)
 			maf_list.extend(r["mafs"])
 			marf_list.extend(r["marfs"])
 		print "Finished calculating MAFs."
 		return {"mafs":maf_list, "marfs":marf_list}
+
 
 	def getChrPosSNPList(self):
 		chr_pos_snp_list = []
@@ -3245,14 +3188,14 @@ class SNPsDataSet:
 
 
 
-	def filter_maf_snps(self, maf, maf_ub=1, type='classes'):
+	def filter_maf_snps(self, maf, maf_ub=1):
 		for snpsd in self.snpsDataList:
-			snpsd.snpsFilterMAF([maf, maf_ub], type='classes')
+			snpsd.snpsFilterMAF([maf, maf_ub], type=self.data_format)
 
 
-	def filter_mac_snps(self, mac_threshold=15, type='classes'):
+	def filter_mac_snps(self, mac_threshold=15):
 		for snpsd in self.snpsDataList:
-			snpsd.filter_mac(mac_threshold, type=type)
+			snpsd.filter_mac(mac_threshold, type=self.data_format)
 
 
 	def filter_monomorphic_snps(self):
@@ -3261,6 +3204,9 @@ class SNPsDataSet:
 
 
 	def filter_accessions(self, accessions_to_keep, use_accession_names=False):
+		"""
+		Filter accessions, leaving the remaining accession in the given order.
+		"""
 		assert len(accessions_to_keep) != 0, "Can't remove all ecotypes."
 		if use_accession_names:
 			import phenotypeData as pd

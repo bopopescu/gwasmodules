@@ -155,7 +155,7 @@ def _getLogQuantiles_(scores, numDots, maxVal=None):
 	return quantiles
 
 
-def get_log_quantiles(scores, num_dots, max_val=5):
+def get_log_quantiles(scores, num_dots=1000, max_val=5):
 	"""
 	Uses scipy
 	"""
@@ -168,7 +168,7 @@ def get_log_quantiles(scores, num_dots, max_val=5):
 
 
 def simple_log_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=None, num_dots=1000, max_val=5,
-			title=None):
+			title=None, text=None):
 	plt.figure(figsize=(8, 7))
 	plt.axes([0.09, 0.08, 0.89, 0.86])
 	plt.plot([0, max_val], [0, max_val], 'k--', alpha=0.5, linewidth=2.0)
@@ -192,11 +192,14 @@ def simple_log_qqplot(quantiles_list, png_file, quantile_labels=None, line_color
 	if quantile_labels:
 		fontProp = matplotlib.font_manager.FontProperties(size=10)
 		plt.legend(loc=2, numpoints=2, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
+	if text:
+		y_min, y_max = plt.ylim()
+		plt.text(0.05 * max_val, y_max * 0.9, text)
 	plt.savefig(png_file)
 
 
 
-def get_quantiles(scores, num_dots):
+def get_quantiles(scores, num_dots=1000):
 	"""
 	Uses scipy
 	"""
@@ -207,7 +210,8 @@ def get_quantiles(scores, num_dots):
 
 
 
-def simple_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=None, num_dots=1000, title=None):
+def simple_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=None, num_dots=1000, title=None,
+		text=None):
 	plt.figure(figsize=(8, 7))
 	plt.axes([0.09, 0.08, 0.89, 0.86])
 	plt.plot([0, 1], [0, 1], 'k--', alpha=0.5, linewidth=2.0)
@@ -229,6 +233,9 @@ def simple_qqplot(quantiles_list, png_file, quantile_labels=None, line_colors=No
 	if quantile_labels:
 		fontProp = matplotlib.font_manager.FontProperties(size=10)
 		plt.legend(loc=2, numpoints=2, handlelen=0.05, markerscale=1, prop=fontProp, pad=0.018)
+	if text:
+		y_min, y_max = plt.ylim()
+		plt.text(0.05, 0.9, text)
 	plt.savefig(png_file)
 
 

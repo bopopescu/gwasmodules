@@ -33,17 +33,17 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'
 	file_prefix = env['results_dir'] + job_id
 
 	#Cluster specific parameters	
-	if cluster == 'gmi': #GMI cluster.  #Sumit to the memory node
-		shstr = '#!/bin/sh\n'
-		shstr += 'source /etc/modules-env.sh\n'
-		shstr += 'modules load scipy/GotoBLAS2/core2/0.9.0\n'
-		shstr += 'export $GOTO_THREAD_NUM=1\n'
-		shstr += 'export $OMP_THREAD_NUM=1\n'
+	if cluster == 'gmi': #GMI cluster.  
+		shstr = '#!/bin/bash\n'
+		shstr += '#$ -S /bin/bash\n'
 		shstr += '#$ -N %s\n' % job_id
-		shstr += "#$ -q q.norm@blade*\n"
-		shstr += '#$ -o %s.log\n' % job_id
-		#shstr += '#$ -cwd /home/GMI/$HOME\n'
-		#shstr += '#$ -M bjarni.vilhjalmsson@gmi.oeaw.ac.at\n\n'
+		shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
+		shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
+		shstr += 'source /etc/modules-env.sh\n'
+		shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
+		shstr += 'module load matplotlib/1.0.0\n'
+		shstr += 'module load mysqldb/1.2.3\n'
+		shstr += 'export GOTO_NUM_THREADS=1\n'
 
 	elif cluster == 'usc':  #USC cluster.
 		shstr = "#!/bin/csh\n"
@@ -52,20 +52,10 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
-	shstr += "(python %sanalyze_rna_seq.py %s %d %d %s " % \
+	shstr += "python %sanalyze_rna_seq.py %s %d %d %s " % \
 			(env['script_dir'], mapping_method, x_start_i, x_stop_i, temperature)
 
-	"""
-	$JOB_ID
-	8:36 PM
-	-o blah-$JOB_ID.log
-	8:36 PM
-	$JOB_ID will be set by SGE
-	8:36 PM
-	for every job
-	"""
-
-	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
+	#shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
 	script_file_name = run_id + ".sh"
 	f = open(script_file_name, 'w')
@@ -79,7 +69,7 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='usc'
 
 
 def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
-		debug_filter=1.0, use_1001_data=False):
+		debug_filter=1.0, data_type='quan_seq_data'):
 	if mapping_method not in ['emmax', 'kw', 'lm']:
 		raise Exception('Mapping method unknown')
 	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
@@ -96,9 +86,9 @@ def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_thre
 	phed.filter_ecotypes(indices_to_keep, pids=pids)
 	print len(indices_to_keep)
 	if mapping_method == 'emmax':
-		if use_1001_data:
+		if data_type == 'imputed_full_seq':
 			k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
-		else:
+		elif:
 			k_file = env['data_dir'] + "kinship_matrix_cm75.pickled"
 		K = lm.load_kinship_from_file(k_file, sd.accessions)
 	sd.filter_mac_snps(mac_threshold)

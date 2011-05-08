@@ -117,11 +117,10 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 	file_prefix = env.env['results_dir'] + job_id
 
 	#Cluster specific parameters	
-	if cluster == 'gmi': #GMI cluster.  #Sumit to the memory node
+	if cluster == 'gmi': #GMI cluster.  
 		shstr = '#!/bin/bash\n'
 		shstr += '#$ -S /bin/bash\n'
 		shstr += '#$ -N %s\n' % job_id
-		#shstr += "#$ -q q.norm@blade*\n"
 		shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
 		shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
 		shstr += 'source /etc/modules-env.sh\n'
@@ -129,8 +128,6 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 		shstr += 'module load matplotlib/1.0.0\n'
 		shstr += 'module load mysqldb/1.2.3\n'
 		shstr += 'export GOTO_NUM_THREADS=1\n'
-		#shstr += '#$ -cwd /home/GMI/$HOME\n'
-		#shstr += '#$ -M bjarni.vilhjalmsson@gmi.oeaw.ac.at\n\n'
 
 	elif cluster == 'usc':  #USC cluster.
 		shstr = "#!/bin/csh\n"
@@ -140,7 +137,7 @@ def run_parallel(run_id, start_i, stop_i, latent_var, heritability, phen_model,
 		shstr += "#PBS -N p%s \n" % job_id
 
 	shstr += "python %smultiple_loci_test.py -i %s -l %s -h %d -m %s --phen_file=%s -t %d --num_steps=%d " % \
-			(env.env['script_dir'], phen_ids_str, latent_var, heritability, phen_model, phen_file, call_method_id, num_steps)
+		(env.env['script_dir'], phen_ids_str, latent_var, heritability, phen_model, phen_file, call_method_id, num_steps)
 	if summary_run:
 		shstr += '-s '
 
@@ -190,7 +187,7 @@ def __get_latent_snps__(ets):
 	return sp.array(north_south_split_snp, dtype='int8'), sp.array(pc_snp, dtype='int8')
 
 
-def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=1000):
+def simulate_phenotypes(phen_file, sd, mac_threshold=0, debug_filter=1.0, num_phens=100):
 	"""
 	Simulate the phenotypes
 	"""
@@ -838,7 +835,8 @@ def _run_():
 		for pid in p_dict['phen_index']:
 			result_dict = run_analysis(sd, K, file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], pid, load_phenotypes(p_dict['phen_file']),
-						p_dict['call_method_id'], num_steps=p_dict['num_steps'])
+						p_dict['call_method_id'], num_steps=p_dict['num_steps'],
+						save_plots=p_dict['save_plots'])
 			results_list.append(result_dict)
 		#Save as pickled
 	else:
