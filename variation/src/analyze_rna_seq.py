@@ -360,7 +360,7 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 	alpha = 0.8
 	linewidths = 0
 	vmin = min_score
-	f = pylab.figure(figsize=(40, 36))
+	f = pylab.figure(figsize=(40, 35))
 	chromosomes = [1, 2, 3, 4, 5]
 	plot_file_name = file_prefix + '_%s_%d.png' % (mapping_method, min_score)
 	label = '$-log_{10}$(p-value)'
@@ -412,7 +412,7 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 	cb.set_label(label, fontsize='xx-large')
 	#cb.set_tick_params(fontsize='x-large')
 	f.text(0.005, 0.47, 'Associated SNP position', size='xx-large', rotation='vertical')
-	f.text(0.47, 0.99, 'Expressed gene position', size='xx-large')
+	f.text(0.47, 0.988, 'Expressed gene position', size='xx-large')
 	print 'Saving figure:', plot_file_name
 	f.savefig(plot_file_name, format='png')
 
@@ -571,14 +571,16 @@ if __name__ == '__main__':
 	#_load_results_('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
 	#load_and_plot_info_files('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
 	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 5)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 5)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 7)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 7)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 10)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 10)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 12)
-	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 12)
-	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'lm', 12)
+	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 7)
+	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 10)
+	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 11)
+#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 7)
+#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 7)
+#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 10)
+#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 10)
+#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 12)
+#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 12)
+#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'lm', 12)
 	#_load_genes_list_()
 	#_test_()
 	#print sys.argv
