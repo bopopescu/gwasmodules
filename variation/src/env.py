@@ -28,6 +28,7 @@ env['db_results_dir'] = '/Network/Data/250k/db/results/type_1/'
 env['tmp_dir'] = '/tmp/'
 env['phen_dir'] = '/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/'
 
+
 #This should be changed in the .gwa_config file.
 env['db_user'] = "bvilhjal"
 env['db_passwd'] = "*rri_bjarni@usc"
