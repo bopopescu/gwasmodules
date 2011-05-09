@@ -2790,9 +2790,10 @@ class SNPsDataSet:
 				if self.data_format == 'diploid_int':
 					bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
 					k_mat[i, j] = (bin_counts[0] + 0.5 * bin_counts[1]) / num_snps
-					k_mat[j, i] = k_mat[i, j]
-				else:
-					raise NotImplementedError
+				elif self.data_format == 'binary':
+					bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+					k_mat[i, j] = bin_counts[0] / num_snps
+				k_mat[j, i] = k_mat[i, j]
 				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
 					sys.stdout.write('.')
 					sys.stdout.flush()
@@ -2801,13 +2802,13 @@ class SNPsDataSet:
 
 
 
-	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=100, type='haploid', with_correction=True,
+	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=100, with_correction=True,
 				snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBD kinship matrix, as described in (Yang et al., Nat. Genetics, 2010) 
 		(un-scaled)
 		"""
-		if type != 'haploid':
+		if self.data_format != 'binary':
 			raise NotImplementedError
 		print 'Starting IBD kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)

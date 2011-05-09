@@ -1493,7 +1493,8 @@ class MultipleTraitLMM(LinearMixedModel):
 		print 'Done.'
 
 		X = sp.hstack([self.X, self.E])
-		r = self._emmax_f_test_(snps, X, self.E, res['H_sqrt_inv'], with_betas=with_betas)
+		print 'Perfoming GLS scan'
+		r = self._emmax_f_test_(snps, X, res['H_sqrt_inv'], E=self.E, with_betas=with_betas)
 		secs = time.time() - s1
 		if secs > 60:
 			mins = int(secs) / 60
@@ -1517,6 +1518,7 @@ class MultipleTraitLMM(LinearMixedModel):
 		print 'Done.'
 
 		X = sp.hstack([self.X, self.E])
+		print 'Perfoming GLS scan'
 		r = self._emmax_f_test_(snps, X, res['H_sqrt_inv'], with_betas=with_betas)
 		secs = time.time() - s1
 		if secs > 60:
@@ -1553,41 +1555,47 @@ class MultipleTraitLMM(LinearMixedModel):
 		(h0_betas, h0_rss, h0_rank, h0_s) = linalg.lstsq(h0_X, Y)
 		Y = sp.mat(Y - h0_X * h0_betas, dtype=dtype)
 		h0_betas = map(float, list(h0_betas))
-		pdb.set_trace()
 
-		H_sqrt_inv = H_sqrt_inv * self.Z
-		if not with_betas:
-			(Q, R) = qr_decomp(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
-			Q = sp.mat(Q)
-			Q2 = Q * Q.T
-			M = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
-		else:
-			betas_list = [h0_betas] * num_snps
-			M = H_sqrt_inv.T
+		#H_sqrt_inv = H_sqrt_inv * self.Z
+		(Q, R) = qr_decomp(h0_X)  #Do the QR-decomposition for the Gram-Schmidt process.
+		Q = sp.mat(Q)
+		Q2 = Q * Q.T
+		M_0 = sp.mat(H_sqrt_inv.T * (sp.eye(n) - Q2), dtype=dtype)
+		M = self.Z.T * M_0
 
 		if E != None:
+			q_e = q + E.shape[1]
+			p_e = p + E.shape[1]
+			n_p_e = n - p_e
 			M_Es = []  #A list of matrices to genereate each GxE interaction
 			for i in range(E.shape[1]):
-				pass
+				M_Es.append(sp.mat(self.Z * sp.array(E[:, i:i + 1]), dtype=dtype).T * M_0)
+			rss_full_list = sp.repeat(h0_rss, num_snps)
+
 
 		rss_list = sp.repeat(h0_rss, num_snps)
-		if return_transformed_snps:
-			t_snps = []
 		chunk_size = len(Y)
-		for i in range(len(snps), chunk_size): #Do the dot-product in chuncks!
+		for i in range(0, num_snps, chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M
+			if E != None:
+				X_Es = []
+				for M_E in M_Es:
+					X_Es.append(snps_chunk * M_E)
 			for j, X_j in enumerate(Xs):
-				if return_transformed_snps:
-					t_snps.append(sp.array(X_j).flatten())
-				if with_betas:
-					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, X_j.T]), Y, \
-									overwrite_a=True)
-					betas_list[i + j] = map(float, list(betas))
-				else:
-					(betas, rss, p, sigma) = linalg.lstsq(X_j.T, Y, overwrite_a=True)
+				(betas, rss, p, sigma) = linalg.lstsq(X_j.T, Y)
 				if rss:
 					rss_list[i + j] = rss[0]
+					if E != None:
+						l = [X_E[j] for X_E in X_Es]
+						l.append(X_j)
+						X_mat = sp.mat(sp.vstack(l), dtype=dtype).T
+						(betas, rss_full, p, sigma) = linalg.lstsq(X_mat, Y, overwrite_a=True)
+						if rss_full and (rss - rss_full) / h0_rss > -0.0001:
+							rss_full_list[i + j] = rss_full[0] if rss_full < rss else rss[0]
+						elif rss_full and (rss - rss_full) / h0_rss <= -0.0001:
+							print "Funny business"
+							pdb.set_trace()
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					sys.stdout.write('.')
@@ -1599,14 +1607,23 @@ class MultipleTraitLMM(LinearMixedModel):
 		var_perc = 1 - 1 / rss_ratio
 		f_stats = (rss_ratio - 1) * n_p / float(q)
 		p_vals = stats.f.sf(f_stats, q, n_p)
-		pdb.set_trace()
 
 		res_d = {'ps':p_vals, 'f_stats':f_stats, 'rss':rss_list, 'var_perc':var_perc,
 			'h0_rss':h0_rss, 'h0_betas':h0_betas}
-		if with_betas:
-			res_d['betas'] = betas_list
-		if return_transformed_snps:
-			res_d['t_snps'] = t_snps
+
+		if E != None:
+			rss_ratio = h0_rss / rss_full_list
+			res_d['var_perc_full'] = 1 - 1 / rss_ratio
+			f_stats_full = (rss_ratio - 1) * n_p_e / float(q_e)
+			res_d['ps_full'] = stats.f.sf(f_stats_full, q_e, n_p_e)
+			res_d['f_stats_full'] = f_stats_full
+
+
+			rss_ratio = rss_list / rss_full_list
+			res_d['var_perc_ge'] = 1 - 1 / rss_ratio
+			f_stats_ge = (rss_ratio - 1) * (n_p_e + q) / float(q_e - q)
+			res_d['ps_ge'] = stats.f.sf(f_stats_ge, q_e - q, n_p_e + q)
+			res_d['f_stats_ge'] = f_stats_ge
 		return res_d
 
 
@@ -3307,7 +3324,7 @@ def _test_mtmm_():
 	import phenotypeData as pd
 	import env
 	import analyze_gwas_results as agr
-	pids = [6, 7]
+	pids = [314, 315, 316, 317]
 	result_file_prefix = 'mtmm_%s' % ('_'.join(map(str, pids)))
 	trans_types = ['most_normal', 'most_normal', 'most_normal', 'most_normal']
 	sd = dp.load_250K_snps()
@@ -3327,12 +3344,20 @@ def _test_mtmm_():
 	mtmm = MultipleTraitLMM(phenotype_list, ecotype_list, K=k, K_ets=k_ets, unique_ets=unique_ets)
 	sd.filter_accessions(list(unique_ets))
 	snps = sd.getSnps()
-	r = mtmm.emmax_f_test(snps)
+	r = mtmm.emmax_f_test_fm(snps)
 	import gwaResults as gr
 	res = gr.Result(snps_data=sd, scores=r['ps'])
 	res.plot_manhattan(png_file=env.env['tmp_dir'] + result_file_prefix + '_manhattan.png', neg_log_transform=True)
 	log_quantiles = agr.get_log_quantiles(r['ps'])
 	agr.simple_log_qqplot([log_quantiles], png_file=env.env['tmp_dir'] + result_file_prefix + '_qq_plot.png')
+	res_full = gr.Result(snps_data=sd, scores=r['ps_full'])
+	res_full.plot_manhattan(png_file=env.env['tmp_dir'] + result_file_prefix + '_manhattan_full.png', neg_log_transform=True)
+	log_quantiles = agr.get_log_quantiles(r['ps_full'])
+	agr.simple_log_qqplot([log_quantiles], png_file=env.env['tmp_dir'] + result_file_prefix + '_qq_plot_full.png')
+	res_ge = gr.Result(snps_data=sd, scores=r['ps_ge'])
+	res_ge.plot_manhattan(png_file=env.env['tmp_dir'] + result_file_prefix + '_manhattan_ge.png', neg_log_transform=True)
+	log_quantiles = agr.get_log_quantiles(r['ps_ge'])
+	agr.simple_log_qqplot([log_quantiles], png_file=env.env['tmp_dir'] + result_file_prefix + '_qq_plot_ge.png')
 	pdb.set_trace()
 
 
