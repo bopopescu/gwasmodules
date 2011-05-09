@@ -2,19 +2,31 @@
 """
 
 Examples:
-	./src/ConvertYuSNPFormat2Bjarni.py -i data/2010/data_2010_ecotype_id_y0002_n1c1d110_mergedup.tsv -o  data/2010/data_2010_ecotype_id_y0002_n1c1d110_mergedup_bjarni.csv -r
+	./src/ConvertYuSNPFormat2Bjarni.py -i data/2010/data_2010_ecotype_id_y0002_n1c1d110_mergedup.tsv
+		-o data/2010/data_2010_ecotype_id_y0002_n1c1d110_mergedup_bjarni.csv -r
 	
-	./src/ConvertYuSNPFormat2Bjarni.py -i genotyping/149snp/stock_149SNP_y0000110101_mergedup.csv -o genotyping/149snp/stock_149SNP_y0000110101_mergedup_bjarni.csv  -r
+	./src/ConvertYuSNPFormat2Bjarni.py -i genotyping/149snp/stock_149SNP_y0000110101_mergedup.csv
+		-o genotyping/149snp/stock_149SNP_y0000110101_mergedup_bjarni.csv  -r
 	
-	./src/ConvertYuSNPFormat2Bjarni.py  -i genotyping/384-illumina_y0000110101_mergedup.csv -o genotyping/384-illumina_y0000110101_mergedup_bjarni.csv -r
+	./src/ConvertYuSNPFormat2Bjarni.py  -i genotyping/384-illumina_y0000110101_mergedup.csv
+		-o genotyping/384-illumina_y0000110101_mergedup_bjarni.csv -r
 	
-	./src/ConvertYuSNPFormat2Bjarni.py -i /mnt/nfs/NPUTE_data/input/250k_l3_y0.85.tsv -o /mnt/nfs/NPUTE_data/input/250k_l3_y0.85_bjarni.tsv -a -b
+	./src/ConvertYuSNPFormat2Bjarni.py -i /mnt/nfs/NPUTE_data/input/250k_l3_y0.85.tsv
+		-o /mnt/nfs/NPUTE_data/input/250k_l3_y0.85_bjarni.tsv -a -b
+		
+	# 2011-2-28 convert call method 75 into Bjarni format with TAIR9 coordinates.
+	# it doesn't matter if call_method doesn't exist in banyan db. It only needs the Snps table.
+	ConvertYuSNPFormat2Bjarni.py -i /Network/Data/250k/db/dataset/call_method_75.tsv
+		-o /Network/Data/250k/db/dataset/call_method_75_TAIR9.csv -a -z banyan
 
 Description:
 	Convert Yu's SNP format (input) to Bjarni's.
 
 	Input format is strain X snp. 2nd column ignored by default (change by array_id_2nd_column).
-		delimiter (either tab or comma) is automatically detected. 	header is 'chromosome_position'.
+		delimiter (either tab or comma) is automatically detected.
+		Column/SNP ID is 'chromosome_position' or Snps.id.
+			If it's the latter, program uses db to translate it into chr_pos.
+		Different db connection might result in different chr_pos due to different TAIR versions.
 	
 	Output format is snp X strain, bjarni's format. The addition of an extra first row for array id depends
 		on the array_id_2nd_column option. If it's toggled, yes.
@@ -28,14 +40,19 @@ if bit_number>40:       #64bit
 else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/')))
-from pymodule import process_function_arguments, write_data_matrix, figureOutDelimiter, read_data
-from variation.src.QC_250k import SNPData
+from pymodule import process_function_arguments, write_data_matrix, figureOutDelimiter, read_data, SNPData
 from common import SNPData2RawSnpsData_ls
 import snpsdata
+import Stock_250kDB
 
 class ConvertYuSNPFormat2Bjarni(object):
 	__doc__ = __doc__
-	option_default_dict = {('input_fname', 1, ): [None, 'i', 1, ],\
+	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
+						('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
+						('user', 1, ): [None, 'u', 1, 'database username', ],\
+						('passwd', 1, ): [None, 'p', 1, 'database password', ],\
+						('input_fname', 1, ): [None, 'i', 1, ],\
 						('output_fname', 1, ): [None, 'o', 1, 'Output Filename'],\
 						('ecotype_table', 1, ): ['stock.ecotype', 'e', 1, 'ecotype Table to get ecotypeid2nativename'],\
 						('array_id_2nd_column', 0, int): [0, 'a', 0, 'whether 2nd column in input_fname is array id or not'],\
@@ -58,8 +75,31 @@ class ConvertYuSNPFormat2Bjarni(object):
 			import pdb
 			pdb.set_trace()
 		
+		#database connection and etc
+		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
+									password=self.passwd, hostname=self.hostname, database=self.dbname)
+		db.setup(create_tables=False)
+		session = db.session
+		session.begin()
+		
 		delimiter = figureOutDelimiter(self.input_fname, report=self.report)
 		header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname, delimiter=delimiter)
+		
+		#2011-2-27 translate the db_id into chr_pos because the new StrainXSNP dataset uses db_id to identify SNPs.
+		# but if col-id is already chr_pos, it's fine.
+		new_header = header[:2]
+		data_matrix_col_index_to_be_kept = []
+		for i in xrange(2, len(header)):
+			snp_id = header[i]
+			chr_pos = db.get_chr_pos_given_db_id2chr_pos(snp_id,)
+			if chr_pos is not None:
+				data_matrix_col_index_to_be_kept.append(i-2)
+				new_header.append(chr_pos)
+		# to remove no-db_id columns from data matrix
+		import numpy
+		data_matrix = numpy.array(data_matrix)
+		data_matrix = data_matrix[:, data_matrix_col_index_to_be_kept]
+		header = new_header
 		
 		if self.array_id_2nd_column:
 			snpData = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\

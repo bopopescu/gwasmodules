@@ -113,6 +113,67 @@ def restoreMatplotlibRCDefaults():
 	import matplotlib
 	matplotlib.rcdefaults()
 
+def drawHist(data_ls, title=None, xlabel_1D=None, outputFname=None, min_no_of_data_points=50, needLog=False):
+	"""
+	2011-4-18
+		a wrapper for histogram drawing using matplotlib
+	"""
+	sys.stderr.write("Drawing histogram of %s data points to %s..."%(len(data_ls), outputFname))
+	import pylab
+	pylab.clf()
+	no_of_data_points = len(data_ls)
+	if no_of_data_points>=min_no_of_data_points:
+		no_of_bins = max(10, min(20, no_of_data_points/10))
+		pylab.hist(data_ls, no_of_bins, log=needLog)
+		pylab.title(title)
+		pylab.xlabel(xlabel_1D)
+		pylab.savefig(outputFname, dpi=200)
+	
+	sys.stderr.write("Done.\n")
+
+	
+def logSum(ls):
+	"""
+	2011-4-27
+		given a list, take the sum and then log10(sum).
+		an alternative to the reduce_C_function argument in drawHexbin()
+	"""
+	import math
+	return math.log10(sum(ls))
+
+def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabel=None, ylabel=None,\
+			colorBarLabel=None, reduce_C_function=None):
+	"""
+	2011-4-27
+		draw 2D histogram (reduce_C_function=logSum) or any 3D plot (3rd Dimension is determined by reduce_C_function).
+		default of reduce_C_function: numpy.median.
+		moved from variation/src/misc.py
+	2010-7-1
+		add argument reduce_C_function()
+	2010-6-28
+		add argument xlabel & ylabel
+	2010-5-11
+	"""
+	import pylab, numpy
+	import matplotlib.cm as cm
+	if reduce_C_function is None:
+		reduce_C_function = numpy.median
+	pylab.clf()
+	pylab.hexbin(x_ls, y_ls, C=C_ls, gridsize=gridsize, reduce_C_function=reduce_C_function, cmap=cm.jet)
+	pylab.axis([min(x_ls), max(x_ls), min(y_ls), max(y_ls)])
+	if title is None:
+		title = "gridsize %s, %s probes."%(gridsize, len(x_ls))
+	pylab.title(title)
+	if xlabel:
+		pylab.xlabel(xlabel)
+	if ylabel:
+		pylab.ylabel(ylabel)
+	cb = pylab.colorbar()
+	if colorBarLabel:
+		cb.set_label(colorBarLabel)
+	if fig_fname:
+		pylab.savefig(fig_fname, dpi=300)
+
 if __name__ == '__main__':
 	#import pdb
 	#pdb.set_trace()

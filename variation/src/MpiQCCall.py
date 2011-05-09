@@ -166,10 +166,10 @@ class MpiQCCall(MPIwrapper):
 		del twoSNPData
 		
 		newSnpData = SNPData.removeRowsByMismatchRate(snpData, row_id2NA_mismatch_rate, max_call_mismatch_rate)
-		qcdata.no_of_accessions_filtered_by_mismatch = newSnpData.no_of_rows_filtered_by_mismatch
+		qcdata.no_of_accessions_filtered_by_mismatch = newSnpData.no_of_rows_removed
 		
 		newSnpData = SNPData.removeRowsByNARate(newSnpData, max_call_NA_rate)
-		qcdata.no_of_accessions_filtered_by_na = newSnpData.no_of_rows_filtered_by_na
+		qcdata.no_of_accessions_filtered_by_na = newSnpData.no_of_rows_removed
 		
 		twoSNPData = TwoSNPData(SNPData1=newSnpData, SNPData2=snpData_qc_snp, \
 						row_matching_by_which_value=0, debug=self.debug)

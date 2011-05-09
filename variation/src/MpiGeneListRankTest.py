@@ -24,8 +24,8 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import getopt, csv, math, traceback
-import Numeric, cPickle
-from Scientific import MPI
+import cPickle
+#from Scientific import MPI
 from pymodule.MPIwrapper import mpi_synchronize, MPIwrapper
 from pymodule import PassingData, getListOutOfStr
 from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
