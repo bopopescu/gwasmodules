@@ -632,8 +632,8 @@ class CNVMergeAcrossArrays(object):
 			pdb.set_trace()
 		
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				  			password=self.db_passwd, hostname=self.hostname, database=self.dbname, 
-				   			schema=self.schema)
+							password=self.db_passwd, hostname=self.hostname, database=self.dbname, 
+							schema=self.schema)
 		db_250k.setup(create_tables=False)
 		session = db_250k.session
 		session.expire_on_commit = False	#otherwise a flush() would cause:	

@@ -35,7 +35,7 @@ from MpiTopSNPTest import MpiTopSNPTest
 from sets import Set
 from heapq import heappush, heappop, heapreplace
 from common import get_total_gene_ls
-import rpy, random, numpy
+import random, numpy
 import Stock_250kDB
 
 class PickCandidateGenesIntoResultsGene(MpiTopSNPTest):
@@ -108,7 +108,7 @@ class PickCandidateGenesIntoResultsGene(MpiTopSNPTest):
 				row = Stock_250kDB.ResultsGene(snps_id=snps_id, gene_id=gene_id, disp_pos=disp_pos,\
 											results_id=pd.results_id, score=score, rank=rank)
 				row.types.append(pd.type)
-				session.save_or_update(row)
+				session.add(row)
 				counter += 1
 			if pd.commit:
 				try:	#2008-11-12 don't wanna db failure to bog down the whole program
@@ -132,7 +132,7 @@ class PickCandidateGenesIntoResultsGene(MpiTopSNPTest):
 				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db.setup(create_tables=False)
 		session = db.session
-		
+		db_id2chr_pos = db.snp_id2chr_pos
 		hist_type = CheckCandidateGeneRank.getHistType(self.call_method_id, self.min_distance, self.get_closest, self.min_MAF, \
 									self.allow_two_sample_overlapping, self.results_type, self.null_distribution_type_id)
 		
@@ -163,7 +163,8 @@ class PickCandidateGenesIntoResultsGene(MpiTopSNPTest):
 						allow_two_sample_overlapping=self.allow_two_sample_overlapping,
 						min_score=self.min_score,
 						session=session,\
-						commit=self.commit)
+						commit=self.commit,\
+						db_id2chr_pos = db_id2chr_pos)
 		
 		for results_id, list_type_id in params_ls:
 			pd.list_type_id = list_type_id

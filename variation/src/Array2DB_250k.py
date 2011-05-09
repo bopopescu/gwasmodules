@@ -144,9 +144,19 @@ class ArrayInfo(object):
 	
 	get_md5sum = classmethod(get_md5sum)
 	
+	# 6039 in "Q270-A-atSNPtilx520433-01-1 (Hovdala-2_6039).CEL"
 	ecotypeid_in_fname_p = re.compile(r'_(\d+)\).CEL')
+	
+	# 2011-1-24 Files in 06-09Q687-Q822/ and 08-05-09Repeats/ have ecotype id encoded like this:
+	# Q782-A-atSNPtilx520433-01-1 (6007_DraIV 6-37).CEL 
+	ecotypeid_in_fname_p = re.compile(r'\((\d+)_.*?\).CEL')
+	
+	# TDr-22 in P403-A-atSNPtilx520433-01-1 (TDr-22).CEL
 	nativename_in_fname_p = re.compile(r'\((.*)\).CEL')
-	#nativename_in_fname_p = re.compile(r'\((.*?)-?R\).CEL')	# 2009-12-3 just for "CHLA/11-2009Arabidopsis/". first ? means .* is non-greedy. 2nd ? means 0 or 1 "-" before 'R'.
+	
+	# 2009-12-3 just for "CHLA/11-2009Arabidopsis/". first ? means .* is non-greedy. 2nd ? means 0 or 1 "-" before 'R'.
+	# i.e. S161-A-atSNPtilx520433-01-1 (KBS-Mac-73R).CE
+	#nativename_in_fname_p = re.compile(r'\((.*?)-?R\).CEL')
 	def assignNewIdToThisArray(self, array_filename, output_dir, ecotypeid2tg_ecotypeid=None, nativename2ecotypeid_ls=None):
 		"""
 		2009-5-16

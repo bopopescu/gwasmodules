@@ -25,7 +25,7 @@ import sys, getopt, os
 sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
 from codense.common import db_connect
 import xml.etree.cElementTree as ElementTree
-from GenomeDB import GenomeDatabase, Gene, EntrezgeneMapping, SequenceType, EntrezgeneType, \
+from GenomeDB import GenomeDatabase, Gene, SequenceType, EntrezgeneType, \
 	GeneSegment, GeneCommentaryType, GeneCommentary, AnnotAssembly, Gene2go
 from datetime import datetime
 from pymodule import PassingData
@@ -126,7 +126,7 @@ class TAIRGeneXML2GenomeDB:
 			session.flush()
 		return gene_commentary_type
 	
-	def addGeneCommentary(self, element, entrezgene_mapping, session, param_obj=None):
+	def addGeneCommentary(self, element, gene, session, param_obj=None):
 		"""
 		2010-8-12
 		"""
@@ -169,11 +169,11 @@ class TAIRGeneXML2GenomeDB:
 			model_start = EXON_box_ls[0][0]
 			model_stop = EXON_box_ls[-1][1]
 		gene_commentary = GeneCommentary(label=pub_locus, \
-						text=entrezgene_mapping.gene.description, start=model_start, stop=model_stop)
+						text=gene.description, start=model_start, stop=model_stop)
 		# start is always smaller than stop. Strand information is in table EntrezgeneMapping
-		gene_commentary.gene = entrezgene_mapping
+		gene_commentary.gene = gene
 		
-		commentary_type_name = entrezgene_mapping.entrezgene_type.type
+		commentary_type_name = gene.entrezgene_type
 		
 		gene_commentary_type = self.getGeneCommentaryType(session, type_name=commentary_type_name)
 		
@@ -213,7 +213,7 @@ class TAIRGeneXML2GenomeDB:
 			protein_commentary = GeneCommentary(label=pub_locus, \
 						start=whole_CDS_start, stop=whole_CDS_stop)
 			# start is always smaller than stop. Strand information is in table EntrezgeneMapping
-			protein_commentary.gene = entrezgene_mapping
+			protein_commentary.gene = gene
 			protein_commentary.gene_commentary = gene_commentary
 			
 			gene_commentary_type = self.getGeneCommentaryType(session, type_name="peptide")
@@ -233,7 +233,7 @@ class TAIRGeneXML2GenomeDB:
 			if UTR_box_ls:
 				#2010-8-18 add all UTR boxes to this protein_commentary
 				for UTR in UTR_box_ls:
-					if entrezgene_mapping.strand =='+1':
+					if gene.strand =='+1':
 						if UTR[1]<whole_CDS_start:
 							type_name = '5UTR'
 						elif UTR[0]>whole_CDS_stop:
@@ -256,6 +256,8 @@ class TAIRGeneXML2GenomeDB:
 	
 	def addGene(self, session, annot_assembly, element, type_of_gene=None, param_obj=None):
 		"""
+		2011-6-25
+			upgraded to the new GenomeDB schema, but not tested
 		2010-8-11
 		"""
 		if not hasattr(param_obj, 'no_of_total'):
@@ -302,6 +304,13 @@ class TAIRGeneXML2GenomeDB:
 		else:
 			type_of_gene = element.tag	#non-protein-coding genes have their tags as gene types (like rRNA,)
 		
+		entrezgene_type = EntrezgeneType.query.filter_by(type=type_of_gene).first()	#query the db to see if it exists or not
+		if not entrezgene_type:
+			entrezgene_type = EntrezgeneType(type=type_of_gene)
+			session.add(entrezgene_type)
+			session.flush()
+			param_obj.no_of_into_db += 1
+		
 		gene = Gene.query.filter_by(tax_id=annot_assembly.tax_id).filter_by(chromosome=annot_assembly.chromosome).\
 			filter_by(locustag=locustag).filter_by(strand=strand).filter_by(start=start).filter_by(stop=stop).\
 			filter_by(type_of_gene=type_of_gene).first()
@@ -309,17 +318,12 @@ class TAIRGeneXML2GenomeDB:
 			gene = Gene(gene_symbol=gene_symbol, tax_id=annot_assembly.tax_id, locustag=locustag, \
 				chromosome=annot_assembly.chromosome,\
 				description = pub_comment, full_name_from_nomenclature_authority=com_name, type_of_gene=type_of_gene, \
-				modification_date=modification_date, strand=strand, start=start, stop=stop)
+				modification_date=modification_date, strand=strand, start=start, stop=stop,)
+			gene.genomic_annot_assembly = annot_assembly
+			gene.entrezgene_type = entrezgene_type
 			session.add(gene)
 		else:
 			param_obj.no_of_genes_already_in_db += 1
-		
-		entrezgene_type = EntrezgeneType.query.filter_by(type=type_of_gene).first()	#query the db to see if it exists or not
-		if not entrezgene_type:
-			entrezgene_type = EntrezgeneType(type=type_of_gene)
-			session.add(entrezgene_type)
-			session.flush()
-			param_obj.no_of_into_db += 1
 		
 		gene_ontology  = gene_info.find("GENE_ONTOLOGY")
 		if gene_ontology:
@@ -344,9 +348,9 @@ class TAIRGeneXML2GenomeDB:
 				else:
 					gene2go.pubmed_ids += '; %s'%evidence_source
 					param_obj.no_of_gene2go_already_in_db += 1
-		
+		"""
 		if gene.gene_id:
-			entrezgene_mapping = EntrezgeneMapping.query.filter_by(gene_id=gene.gene_id).first()
+			entrezgene_mapping = Gene.query.filter_by(gene_id=gene.gene_id).first()
 		else:
 			entrezgene_mapping = None
 		if not entrezgene_mapping:
@@ -360,9 +364,9 @@ class TAIRGeneXML2GenomeDB:
 			param_obj.no_of_into_db += 1
 		else:
 			param_obj.no_of_entrezgene_mappings_already_in_db += 1
-		
+		"""
 		for model_elem in element.findall("MODEL"):
-			self.addGeneCommentary(model_elem, entrezgene_mapping, session, param_obj=param_obj)
+			self.addGeneCommentary(model_elem, gene, session, param_obj=param_obj)
 		
 		param_obj.no_of_total += 1
 		if param_obj.no_of_total%1000==0:

@@ -4,7 +4,13 @@
 Examples:
 	ConstructSNPAnnotation.py -u yh -c
 	
-	ConstructSNPAnnotation.py -u yh -m 0 -g -s /mnt/panfs/250k/snps_context_g1_m0 -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf_with_cds_mrna_seq
+	ConstructSNPAnnotation.py -u yh -m 0 -g -s /mnt/panfs/250k/snps_context_g1_m0
+		-j /Network/Data/250k/tmp-yh/at_gene_model_pickelf_with_cds_mrna_seq -r
+	
+	
+	# for TAIR9
+	ConstructSNPAnnotation.py -u yh -m 0 -g -s snps_context_tair9_g1_m0 
+		-j ./at_gene_model_pickelf_TAIR9_20100927 -z banyan -c -p xxx -r
 
 Description:
 	2008-1-6 program to construct the annotatioin (intergenic, synonymous, non-synonymous) of a snp.
@@ -45,7 +51,8 @@ class ConstructSNPAnnotation(object):
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('output_fname', 0, ): [None, 'o', 1, 'if given, QC results will be outputed into it.'],\
 							("gene_annotation_picklef", 0, ): [None, 'j', 1, 'given the option, If the file does not exist yet, store a pickled gene_annotation into it. If the file exists, load gene_annotation out of it.'],\
-							("snps_context_picklef", 0, ): [None, 's', 1, 'given the option, if the file does not exist yet, to store a pickled snps_context_wrapper into it, min_distance and flag get_closest will be attached to the filename. If the file exists, load snps_context_wrapper out of it.'],\
+							("snps_context_picklef", 0, ): [None, 's', 1, 'given the option, if the file does not exist yet, to store a pickled snps_context_wrapper into it, \
+								min_distance and flag get_closest will be attached to the filename. If the file exists, load snps_context_wrapper out of it.'],\
 							("min_distance", 1, int): [5000, 'm', 1, 'minimum distance allowed from the SNP to gene'],\
 							("get_closest", 0, int): [1, 'g', 0, 'only get genes closest to the SNP within that distance'],\
 							('tax_id', 0, int): [3702, '', 1, 'Taxonomy ID to get gene position and coordinates.'],\
@@ -175,7 +182,8 @@ class ConstructSNPAnnotation(object):
 											else:
 												gene_allele1 = allele1
 												gene_allele2 = allele2
-											SNP_index_in_CDS = int(SNP_index_in_CDS)	#SNP_index_in_CDS is type long. without int(), cds_seq[SNP_index_in_CDS] returns a Bio.Seq with one nucleotide, rather than a single-char string
+											SNP_index_in_CDS = int(SNP_index_in_CDS)	
+											#SNP_index_in_CDS is type long. without int(), cds_seq[SNP_index_in_CDS] returns a Bio.Seq with one nucleotide, rather than a single-char string
 											SNP_index_in_peptide = SNP_index_in_CDS/3
 											
 											SNP_index_in_peptide = int(SNP_index_in_peptide)	#ditto as int(SNP_index_in_CDS), not necessary
@@ -183,14 +191,16 @@ class ConstructSNPAnnotation(object):
 											pos_within_codon = SNP_index_in_CDS%3+1	#pos_within_codon starts from 1
 											cds_seq = Seq(gene_commentary.cds_sequence, IUPAC.unambiguous_dna)
 											if SNP_index_in_CDS>=len(cds_seq):
-												sys.stderr.write("Warning: SNP (%s, %s), SNP_index_in_CDS=%s, is beyond any of the boxes from gene %s (chr=%s, %s-%s), gene_commentary_id %s (%s-%s), box_ls=%s, cds-length=%s. counted as intergenic.\n"%\
-																(chr, pos, SNP_index_in_CDS, gene_id, gene_model.chromosome, gene_model.start, gene_model.stop, \
-																gene_commentary.gene_commentary_id, gene_commentary.start, gene_commentary.stop, repr(gene_commentary.box_ls), len(cds_seq)))
+												sys.stderr.write("Warning: SNP (%s, %s), SNP_index_in_CDS=%s, is beyond any of the boxes from gene %s (chr=%s, %s-%s), \
+														gene_commentary_id %s (%s-%s), box_ls=%s, cds-length=%s. counted as intergenic.\n"%\
+														(chr, pos, SNP_index_in_CDS, gene_id, gene_model.chromosome, gene_model.start, gene_model.stop, \
+														gene_commentary.gene_commentary_id, gene_commentary.start, gene_commentary.stop, repr(gene_commentary.box_ls), len(cds_seq)))
 												snp_annotation_type_short_name_ls.append(['intergenic'])
 												continue
 											if cds_seq[SNP_index_in_CDS]!=gene_allele1 and cds_seq[SNP_index_in_CDS]!=gene_allele2:
-												sys.stderr.write("Error: Neither allele (%s, %s) from SNP (%s,%s) matches the nucleotide, %s, from the cds seq of gene %s (gene_commentary_id=%s).\n"%\
-																	(gene_allele1, gene_allele2, chr, pos, cds_seq[SNP_index_in_CDS], gene_id, gene_commentary.gene_commentary_id))
+												sys.stderr.write("Error: Neither allele (%s, %s) from SNP (%s,%s) matches the nucleotide, %s, from the cds seq of gene %s \
+													(gene_commentary_id=%s).\n"%\
+													(gene_allele1, gene_allele2, chr, pos, cds_seq[SNP_index_in_CDS], gene_id, gene_commentary.gene_commentary_id))
 												sys.exit(3)
 											cds_mut_ar = cds_seq.tomutable()
 											cds_mut_ar[SNP_index_in_CDS] = gene_allele1
@@ -222,7 +232,8 @@ class ConstructSNPAnnotation(object):
 											sys.stderr.write("Except encountered for SNP (%s, %s), gene %s (chr=%s, %s-%s), gene_commentary_id %s (%s-%s), box_ls=%s.\n"%\
 												(chr, pos, gene_id, gene_model.chromosome, gene_model.start, gene_model.stop, \
 												gene_commentary.gene_commentary_id, gene_commentary.start, gene_commentary.stop, repr(gene_commentary.box_ls)))
-							elif box_type!=None and is_SNP_within_box==0:	#SNP is over the range of the gene. it happens when one gene has multiple alternative splicing forms. snps_context_wrapper uses the largest span to represent the gene.
+							elif box_type!=None and is_SNP_within_box==0:
+								#SNP is over the range of the gene. it happens when one gene has multiple alternative splicing forms. snps_context_wrapper uses the largest span to represent the gene.
 								snp_annotation_type_short_name_ls.append(['intergenic'])
 							else:
 								sys.stderr.write("Warning: SNP (%s, %s) not in any of the boxes from gene %s (chr=%s, %s-%s), gene_commentary_id %s (%s-%s), box_ls=%s.\n"%\
@@ -242,7 +253,7 @@ class ConstructSNPAnnotation(object):
 				snp_annotation_type_short_name = snp_annotation_type_tup[0]
 				if snp_annotation_type_short_name not in snp_annotation_short_name2id:
 					ty = Stock_250kDB.SNPAnnotationType(short_name=snp_annotation_type_short_name)
-					session.save(ty)
+					session.add(ty)
 					session.flush()
 					snp_annotation_short_name2id[snp_annotation_type_short_name] = ty.id
 				if len(snp_annotation_type_tup)>=3:
@@ -267,11 +278,11 @@ class ConstructSNPAnnotation(object):
 												which_exon_or_intron=which_exon_or_intron, pos_within_codon=pos_within_codon,\
 												comment=comment)
 				entry.snp_annotation_type_id = snp_annotation_short_name2id[snp_annotation_type_short_name]
-				session.save(entry)
-				session.flush()
+				session.add(entry)
 				real_counter += 1
 			if self.report and counter%2000==0:
 				sys.stderr.write("%s%s\t%s"%('\x08'*40, counter, real_counter))
+				session.flush()
 		if self.report:
 			sys.stderr.write("%s%s\t%s\n"%('\x08'*40, counter, real_counter))
 		sys.stderr.write("Done.\n")

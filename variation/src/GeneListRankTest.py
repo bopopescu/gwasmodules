@@ -209,8 +209,11 @@ class GeneListRankTest(object):
 		return chrpos2pvalue
 	
 	@classmethod
-	def getResultMethodContent(cls, rm, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, pdata=None, min_value_cutoff=None,):
+	def getResultMethodContent(cls, rm, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
+							pdata=None, min_value_cutoff=None,):
 		"""
+		2011-3-10
+			moved to Stock_250kDB.Stock_250kDB
 		2010-3-8
 			add argument min_value_cutoff and pass it to getGenomeWideResultFromFile()
 		2010-2-2
@@ -232,43 +235,9 @@ class GeneListRankTest(object):
 		2008-08-13
 			split from getGeneID2MostSignificantHit()
 		"""
-		genome_wide_result = getattr(cls, 'genome_wide_result', None)
-		do_log10_transformation = getattr(pdata, 'do_log10_transformation', None)
-		if genome_wide_result is not None and genome_wide_result.results_id==rm.id:
-			return genome_wide_result
-		
-		if rm.analysis_method_id==13: #Huh -Bjarni
-			sys.stderr.write("Analysis method id=%s is not supported.\n"%rm.analysis_method_id)
-			return None
-		
-		if results_directory:	#given a directory where all results are.
-			result_fname = os.path.join(results_directory, os.path.basename(rm.filename))
-		else:
-			result_fname = rm.filename
-		
-		if do_log10_transformation is None:
-			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
-			if hasattr(rm, 'analysis_method'):
-					if rm.analysis_method.smaller_score_more_significant==1:
-						do_log10_transformation = True
-					else:
-						do_log10_transformation = False
-			else:
-				return None
-		if pdata is None:
-			pdata = PassingData()
-		pdata.min_MAF = min_MAF
-		if not hasattr(pdata, 'construct_chr_pos2index'):	#if pdata doesn't have construct_chr_pos2index defined. otherwise, pdata overrides the option.
-			pdata.construct_chr_pos2index = construct_chr_pos2index
-		if os.path.isfile(result_fname):
-			genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
-															pdata=pdata, min_value_cutoff=min_value_cutoff)
-			genome_wide_result.results_id = rm.id
-			genome_wide_result.rm = rm	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
-		else:
-			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
-			genome_wide_result = None
-		cls.genome_wide_result = genome_wide_result
+		genome_wide_result = Stock_250kDB.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=min_MAF, \
+											construct_chr_pos2index=construct_chr_pos2index, \
+											pdata=pdata, min_value_cutoff=min_value_cutoff,)
 		return genome_wide_result
 	
 	def getGeneID2MostSignificantHit(self, rm, snps_context_wrapper, results_directory=None, min_MAF=0.1):
@@ -354,16 +323,7 @@ class GeneListRankTest(object):
 				sys.stderr.write("%s%s"%('\x08'*100, counter))
 		sys.stderr.write("Done.\n")
 		return gene_id2hit
-		
-	def getGeneList(cls, list_type_id):
-		sys.stderr.write("Getting gene_list %s ... "%list_type_id)
-		rows = GeneList.query.filter_by(list_type_id=list_type_id)
-		candidate_gene_list = []
-		for row in rows:
-			candidate_gene_list.append(row.gene_id)
-		sys.stderr.write("%s genes. Done.\n"%(len(candidate_gene_list)))
-		return candidate_gene_list
-	getGeneList = classmethod(getGeneList)
+	
 	
 	def prepareDataForRankTestGivenGeneID2Hit(self, candidate_gene_list, gene_id2hit):
 		sys.stderr.write("Preparing data for rank test ... ")
@@ -621,8 +581,8 @@ class GeneListRankTest(object):
 		non_candidate_gene_sample_set = Set()
 		
 		score_ls = [data_obj.value for data_obj in genome_wide_result.data_obj_ls]
-		import rpy
-		rank_ls = rpy.r.rank(score_ls)	#rpy.rank also exists!!
+		from scipy import stats
+		rank_ls = stats.rankdata(score_ls)	#rpy.rank also exists!!
 		max_rank = max(rank_ls)	#2008-10-28 used to subtract any rank to get the reverse rank. In rank_ls, higher score=higher rank. we want reverse.
 		
 		if min_score is not None:
@@ -885,8 +845,10 @@ class GeneListRankTest(object):
 		del writer
 		sys.stderr.write("Done.\n")
 	
-	def dealWithCandidateGeneList(cls, list_type_id, return_set=False):
+	def dealWithCandidateGeneList(cls, list_type_id, return_set=False, db_250k=None):
 		"""
+		2011-3-16
+			function bulk moved to Stock_250kDB.Stock_250kDB
 		2008-10-30
 			turn this into a classmethod
 		2008-10-23
@@ -894,13 +856,10 @@ class GeneListRankTest(object):
 		2008-10-15
 			to make caching candidate gene list possible
 		"""
-		if list_type_id not in cls.list_type_id2candidate_gene_list_info:	#internal cache
-			candidate_gene_list = cls.getGeneList(list_type_id)
-			cls.list_type_id2candidate_gene_list_info[list_type_id] = PassingData(candidate_gene_list=candidate_gene_list, candidate_gene_set=Set(candidate_gene_list))
-		if return_set:
-			return cls.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_set
-		else:
-			return cls.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_list
+		if db_250k is None:
+			sys.stderr.write("Error: dealWithCandidateGeneList() has been moved from GeneListRankTest to Stock_250kDB.Stock_250kDB.\n")
+			return
+		return db_250k.dealWithCandidateGeneList(list_type_id, return_set=return_set)
 		
 	dealWithCandidateGeneList = classmethod(dealWithCandidateGeneList)
 	list_type_id2candidate_gene_list_info = {}
@@ -1006,7 +965,7 @@ class GeneListRankTest(object):
 			#2009-9-16 now there's a table keeping track of this
 			testType = CandidateGeneRankSumTestResultMethodType.get(pd.test_type_id)
 			import rpy
-			candidate_gene_list = self.dealWithCandidateGeneList(pd.list_type_id)	#internal cache
+			candidate_gene_list = pd.db_250k.dealWithCandidateGeneList(pd.list_type_id)	#internal cache	#2011-3-16 replace "self" with pd.db_250k
 			if testType is not None:
 				allow_two_sample_overlapping = testType.allow_two_sample_overlapping
 			elif pd.test_type_id>3 and pd.test_type_id<7:
@@ -1127,7 +1086,7 @@ class GeneListRankTest(object):
 							min_MAF=self.min_MAF, get_closest=self.get_closest, min_distance=self.min_distance, \
 							min_sample_size=self.min_sample_size, test_type_id=self.test_type_id, \
 							results_type=self.results_type, no_of_permutations=self.no_of_permutations,\
-							no_of_min_breaks=self.no_of_min_breaks)
+							no_of_min_breaks=self.no_of_min_breaks, db_250k=db)
 		for results_id in self.results_id_ls:
 			pd.results_id = results_id
 			candidate_gene_rank_sum_test_result = self.run_wilcox_test(pd)

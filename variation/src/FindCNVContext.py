@@ -42,6 +42,7 @@ class FindCNVContext(object):
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('cnv_method_id', 1, int): [None, 'm', 1, 'construct contexts for CNVs from this cnv_method_id'],\
+							('genomeRBDictPickleFname', 1, ): ['', 'e', 1, 'The file to contain pickled genomeRBDict.'],\
 							('output_fname', 0, ): [None, 'o', 1, 'if given, QC results will be outputed into it.'],\
 							('max_distance', 0, int): [20000, 'x', 1, "maximum distance allowed between a CNV and a gene"],\
 							('tax_id', 0, int): [3702, '', 1, 'Taxonomy ID to get gene position and coordinates.'],\
@@ -54,91 +55,15 @@ class FindCNVContext(object):
 		2008-08-19
 		"""
 		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
+														class_to_have_attr=self)
 	
-	@classmethod
-	def createGenomeRBDict(cls, genome_db, tax_id=3702, max_distance=20000, debug=False):
-		"""
-		2010-10-3
-			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
-		2010-9-23
-			becomes a classmethod
-		2010-8-17
-		"""
-		sys.stderr.write("Creating a RBDict for all genes from organism %s ... \n"%tax_id)
-		genomeRBDict = RBDict()
-		query = GenomeDB.EntrezgeneMapping.query.filter_by(tax_id=tax_id)
-		counter = 0
-		real_counter = 0
-		for row in query:
-			try:	# convert to integer except when "C" or "M"/mitochondria is encountered.
-				chromosome = int(row.chromosome)	#integer chromosomes should be converted as CNV.chromosome is integer.
-			except:
-				chromosome = row.chromosome
-			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, \
-							span_ls=[max(1, row.start - max_distance), row.stop + max_distance], \
-							min_reciprocal_overlap=1,)	#2010-8-17 any overlap short of identity is tolerated.
-			if segmentKey not in genomeRBDict:
-				genomeRBDict[segmentKey] = []
-			oneGeneData = PassingData(strand = row.strand, gene_id = row.gene_id, gene_start = row.start, \
-										gene_stop = row.stop, geneCommentaryRBDictLs=[])
-			counter += 1
-			for gene_commentary in row.gene_commentaries:
-				if not gene_commentary.gene_commentary_id:
-					# ignore gene_commentary that are derived from other gene_commentaries. 
-					# they'll be handled within the parental gene_commentary.
-					geneCommentaryRBDict = RBDict()
-					geneCommentaryRBDict.gene_commentary_id = gene_commentary.id
-					#gene_commentary.construct_annotated_box()
-					box_ls = gene_commentary.constructAnnotatedBox()
-					#box_ls=gene_commentary.box_ls
-					no_of_boxes = len(box_ls)
-					
-					numberPorter = PassingData(cds_number = 0,\
-											intron_number = 0,\
-											utr_number = 0,\
-											exon_number = 0)
-					for i in xrange(no_of_boxes):
-						if row.strand == "-1":	#reverse
-							box = box_ls[-i-1]
-						else:
-							box = box_ls[i]
-						start, stop, box_type, is_translated, gene_segment_id = box[:5]
-						numberVariableName = None
-						if box_type=='3UTR' or box_type=='5UTR':
-							numberPorter.utr_number += 1
-							numberVariableName = 'utr_number'
-						elif box_type=='CDS':
-							numberPorter.cds_number += 1
-							numberVariableName = 'cds_number'
-						elif box_type=='intron':
-							numberPorter.intron_number += 1
-							numberVariableName = 'intron_number'
-						elif box_type=='exon':
-							numberPorter.exon_number += 1
-							numberVariableName = 'exon_number'
-						genePartKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, span_ls=[start, stop], \
-											min_reciprocal_overlap=1, label=box_type, cds_number=None,\
-											intron_number=None, utr_number=None, exon_number=None, \
-											gene_segment_id=gene_segment_id)
-									#2010-8-17 any overlap is tolerated.
-						if numberVariableName is not None:	#set the specific number
-							setattr(genePartKey, numberVariableName, getattr(numberPorter, numberVariableName, None))
-						geneCommentaryRBDict[genePartKey] = None
-						real_counter += 1
-					oneGeneData.geneCommentaryRBDictLs.append(geneCommentaryRBDict)
-			genomeRBDict[segmentKey].append(oneGeneData)
-			if counter%1000==0:
-				sys.stderr.write("%s%s\t%s"%('\x08'*100, counter, real_counter))
-				if debug:
-					break
-		sys.stderr.write("%s%s\t%s\n"%('\x08'*100, counter, real_counter))
-		sys.stderr.write("%s Done.\n"%(str(genomeRBDict)))
-		return genomeRBDict
 	
 	def findCNVcontext(self, db_250k, genomeRBDict, cnv_method_id=None, compareIns=None, max_distance=50000, debug=0,
 					param_obj=None):
 		"""
+		2011-3-25
+			cast row.chromosome (from db) into str type.
 		2010-10-3
 			bug fixed: (chr, start, stop) is not unique. There are genes with the same coordinates.
 		2010-8-18
@@ -148,7 +73,7 @@ class FindCNVContext(object):
 		TableClass = Stock_250kDB.CNV
 		query = TableClass.query.filter_by(cnv_method_id=cnv_method_id)
 		for row in query:
-			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=str(row.chromosome), \
 							span_ls=[row.start, row.stop], \
 							min_reciprocal_overlap=0.0000001, )	#min_reciprocal_overlap doesn't matter here.
 				# it's decided by compareIns.
@@ -253,9 +178,12 @@ class FindCNVContext(object):
 						password=self.db_passwd, hostname=self.hostname, database=self.genome_dbname, )
 		genome_db.setup(create_tables=False)
 		
-		genomeRBDict = self.createGenomeRBDict(genome_db, tax_id=self.tax_id, max_distance=self.max_distance, \
-											debug=self.debug)
-		
+		genomeRBDict = genome_db.dealWithGenomeRBDict(self.genomeRBDictPickleFname, tax_id=self.tax_id, \
+													max_distance=self.max_distance, debug=self.debug)
+		#genome_db.createGenomeRBDict(tax_id=self.tax_id, max_distance=self.max_distance, \
+		#									debug=self.debug)
+		#2011-3-10 temporary: exit early , only for the genomeRBDictPickleFname
+		#sys.exit(3)
 		
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
 									hostname=self.hostname, database=self.dbname)

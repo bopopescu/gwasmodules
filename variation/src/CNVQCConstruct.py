@@ -121,8 +121,8 @@ class CNVQCConstruct(object):
 								4: Ler-contig derived CNVs, 5: Ler-contig span over Col genome (table SequenceFragmentRefPos),\
 								6: MpiBlast.py output into SequenceFragment2Probe, \
 								7: Ler-contig span info derived from nucmer coords output (table SequenceFragmentRefPos),\
-								8: Quan Long BreakDancer output,\
-								9: data derived from Quan Long coverage data']}
+								8: Quan Long BreakDancer output (table CNVQCCall),\
+								9: data derived from Quan Long coverage data (table CNVQCCall)']}
 
 	def __init__(self, **keywords):
 		"""
