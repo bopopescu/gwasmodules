@@ -29,6 +29,39 @@ import analyze_gwas_results as agr
 
 
 
+def cholesky(V):
+	try:
+		H_sqrt = sp.mat(linalg.cholesky(V))
+	except Exception, err_str:
+		import rpy2
+		from rpy2 import robjects
+		robjects.r.library('Matrix')
+		robjects.r("""
+		f <- function(v,len){
+			m <- matrix(v,len,len);
+		  	return(as.matrix(nearPD(m)['mat'][[1]]));
+		}
+		""")
+		import rpy2.robjects.numpy2ri
+		near_V = sp.array(robjects.r.f(sp.array(V), len(V)))
+		rel_change = (near_V - V) / V
+		avg_rel_change = sp.average(sp.absolute(rel_change))
+		max_rel_change = rel_change.max()
+		print 'Average absolute relative change in matrix: %0.6f' % avg_rel_change
+		print 'Maximum relative change in matrix: %0.6f' % max_rel_change
+		H_sqrt = sp.mat(linalg.cholesky(near_V))
+	return H_sqrt
+
+
+def qr_decomp(X):
+	if sp.__version__ >= '0.9':
+		return linalg.qr(X, mode='economic')  #Do the QR-decomposition for the Gram-Schmidt process.			
+	else:
+		return linalg.qr(X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
+
+
+
+
 class LinearModel(object):
 	"""
 	A simple linear model
@@ -500,37 +533,6 @@ class LinearModel(object):
 
 
 
-def cholesky(V):
-	try:
-		H_sqrt = sp.mat(linalg.cholesky(V))
-	except Exception, err_str:
-		import rpy2
-		from rpy2 import robjects
-		robjects.r.library('Matrix')
-		robjects.r("""
-		f <- function(v,len){
-			m <- matrix(v,len,len);
-		  	return(as.matrix(nearPD(m)['mat'][[1]]));
-		}
-		""")
-		import rpy2.robjects.numpy2ri
-		near_V = sp.array(robjects.r.f(sp.array(V), len(V)))
-		rel_change = (near_V - V) / V
-		avg_rel_change = sp.average(sp.absolute(rel_change))
-		max_rel_change = rel_change.max()
-		print 'Average absolute relative change in matrix: %0.6f' % avg_rel_change
-		print 'Maximum relative change in matrix: %0.6f' % max_rel_change
-		H_sqrt = sp.mat(linalg.cholesky(near_V))
-	return H_sqrt
-
-
-def qr_decomp(X):
-	if sp.__version__ >= '0.9':
-		return linalg.qr(X, mode='economic')  #Do the QR-decomposition for the Gram-Schmidt process.			
-	else:
-		return linalg.qr(X, econ=True)  #Do the QR-decomposition for the Gram-Schmidt process.
-
-
 
 class LinearMixedModel(LinearModel):
 	"""
@@ -809,8 +811,7 @@ class LinearMixedModel(LinearModel):
 
 	def expedited_REML_t_test(self, snps, ngrids=50, llim= -4, ulim=10, esp=1e-6, verbose=True):
 		"""
-		Single SNP analysis 
-		Faster than R EMMA.
+		Single SNP analysis, i.e. EMMA, but faster than R EMMA.
 		"""
 		assert len(self.random_effects) == 2, "Expedited REMLE only works when we have exactly two random effects."
 		K = self.random_effects[1][1]
@@ -841,6 +842,7 @@ class LinearMixedModel(LinearModel):
 
 		return {'ps':p_vals, 'f_stats':f_stats, 'vgs':vgs, 'ves':ves, 'var_perc':var_perc,
 			'max_lls':max_lls, 'betas':betas}
+
 
 
 	def emmax_f_test_w_interactions(self, snps, int_af_threshold=15):
@@ -1126,21 +1128,19 @@ class LinearMixedModel(LinearModel):
 		if return_transformed_snps:
 			t_snps = []
 		chunk_size = len(Y)
-		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
+		for i in range(0, num_snps, chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M
-			for j in range(len(Xs)):
+			for j, X_j in enumerate(Xs):
 				if return_transformed_snps:
-					t_snps.append(sp.array(Xs[j]).flatten())
+					t_snps.append(sp.array(X_j).flatten())
 				if with_betas:
-					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, \
+					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, X_j.T]), Y, \
 									overwrite_a=True)
-					if not rss:
-						if verbose: print 'No predictability in the marker, moving on...'
-						continue
-					betas_list[i + j] = map(float, list(betas))
+					if rss:
+						betas_list[i + j] = map(float, list(betas))
 				else:
-					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+					(betas, rss, p, sigma) = linalg.lstsq(X_j.T, Y, overwrite_a=True)
 				if rss:
 					rss_list[i + j] = rss[0]
 
@@ -1481,12 +1481,35 @@ class MultipleTraitLMM(LinearMixedModel):
 
 
 
+	def emmax_f_test_fm(self, snps, with_betas=False, type='common'):
+		"""
+		EMMAX Full model f-test 
+		returns three sets of p-values
+		
+		"""
+		s1 = time.time()
+		print 'Getting variance estimates'
+		res = self.get_variance_matrix()
+		print 'Done.'
+
+		X = sp.hstack([self.X, self.E])
+		r = self._emmax_f_test_(snps, X, self.E, res['H_sqrt_inv'], with_betas=with_betas)
+		secs = time.time() - s1
+		if secs > 60:
+			mins = int(secs) / 60
+			secs = secs - mins * 60
+			print 'Took %d mins and %f seconds to run EMMAX on the traits...' % (mins, secs)
+		else:
+			print 'Took %f seconds to run EMMAX on the traits..' % (secs)
+		return r
+
+
+
 	def emmax_f_test(self, snps, with_betas=False, type='common'):
 		"""
 		EMMAX implementation
 		Single SNPs, multiple traits.
 		
-		Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
 		"""
 		s1 = time.time()
 		print 'Getting variance estimates'
@@ -1506,7 +1529,7 @@ class MultipleTraitLMM(LinearMixedModel):
 
 
 
-	def _emmax_f_test_(self, snps, X, H_sqrt_inv, verbose=True, with_betas=False, return_transformed_snps=False):
+	def _emmax_f_test_(self, snps, X, H_sqrt_inv, E=None, verbose=True, with_betas=False, return_transformed_snps=False):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs, multiple traits
@@ -1514,6 +1537,8 @@ class MultipleTraitLMM(LinearMixedModel):
 		Methods:
 			normal - Normal regression
 			qr - Uses QR decomposition to speed up regression with many co-factors.
+			
+		If E (environment) is provided then GxE factors are considered as well.
 			
 		"""
 		dtype = 'single'
@@ -1540,25 +1565,27 @@ class MultipleTraitLMM(LinearMixedModel):
 			betas_list = [h0_betas] * num_snps
 			M = H_sqrt_inv.T
 
+		if E != None:
+			M_Es = []  #A list of matrices to genereate each GxE interaction
+			for i in range(E.shape[1]):
+				pass
+
 		rss_list = sp.repeat(h0_rss, num_snps)
 		if return_transformed_snps:
 			t_snps = []
 		chunk_size = len(Y)
-		for i in range(0, len(snps), chunk_size): #Do the dot-product in chuncks!
+		for i in range(len(snps), chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M
-			for j in range(len(Xs)):
+			for j, X_j in enumerate(Xs):
 				if return_transformed_snps:
-					t_snps.append(sp.array(Xs[j]).flatten())
+					t_snps.append(sp.array(X_j).flatten())
 				if with_betas:
-					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, Xs[j].T]), Y, \
+					(betas, rss, p, sigma) = linalg.lstsq(sp.hstack([h0_X, X_j.T]), Y, \
 									overwrite_a=True)
-					if not rss:
-						if verbose: print 'No predictability in the marker, moving on...'
-						continue
 					betas_list[i + j] = map(float, list(betas))
 				else:
-					(betas, rss, p, sigma) = linalg.lstsq(Xs[j].T, Y, overwrite_a=True)
+					(betas, rss, p, sigma) = linalg.lstsq(X_j.T, Y, overwrite_a=True)
 				if rss:
 					rss_list[i + j] = rss[0]
 
