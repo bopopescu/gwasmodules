@@ -1481,12 +1481,35 @@ class MultipleTraitLMM(LinearMixedModel):
 
 
 
+	def emmax_f_test_fm(self, snps, with_betas=False, type='common'):
+		"""
+		EMMAX Full model f-test 
+		returns three sets of p-values
+		
+		"""
+		s1 = time.time()
+		print 'Getting variance estimates'
+		res = self.get_variance_matrix()
+		print 'Done.'
+
+		X = sp.hstack([self.X, self.E])
+		r = self._emmax_f_test_(snps, X, res['H_sqrt_inv'], with_betas=with_betas)
+		secs = time.time() - s1
+		if secs > 60:
+			mins = int(secs) / 60
+			secs = secs - mins * 60
+			print 'Took %d mins and %f seconds to run EMMAX on the traits...' % (mins, secs)
+		else:
+			print 'Took %f seconds to run EMMAX on the traits..' % (secs)
+		return r
+
+
+
 	def emmax_f_test(self, snps, with_betas=False, type='common'):
 		"""
 		EMMAX implementation
 		Single SNPs, multiple traits.
 		
-		Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
 		"""
 		s1 = time.time()
 		print 'Getting variance estimates'
