@@ -2095,7 +2095,7 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 				mahalnobis_rss = l_res['rss'][min_pval_i]
 				print 'Min Mahalanobis RSS:', mahalnobis_rss
 			elif type == 'lm':
-				l_res = lm.fast_f_test(snps)
+				l_res = lm.fast_f_test(kwargs['snps'])
 				min_pval_i = l_res['ps'].argmin()
 
 			min_pval = l_res['ps'][min_pval_i]

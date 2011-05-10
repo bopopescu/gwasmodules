@@ -18,6 +18,7 @@ Option:
 	-m ...			How to generate the phenotypes: plus, xor, or
 
 	--save_plots           	Plot Manhattan plots
+	--save_pvals           	Include p-values into the .pickled files.
 	--phen_file=...		File where the phenotypes will be saved, and loaded from.
 	--sim_phen		Simulate phenotype, write to phenotype file.
 	--parallel		Run parallel on the cluster
@@ -61,7 +62,7 @@ def parse_parameters():
 		print __doc__
 		sys.exit(2)
 
-	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel', 'herit_plots=', 'var_plots']
+	long_options_list = ['save_plots', 'phen_file=', 'sim_phen', 'num_steps=', 'parallel', 'herit_plots=', 'var_plots', 'save_pvals']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "i:o:t:k:n:d:l:m:h:s", long_options_list)
 
@@ -75,7 +76,7 @@ def parse_parameters():
 		'mapping_method':'emmax', 'heritability':50, 'save_plots':False, 'call_method_id':75,
 		'phen_file':env.env['data_dir'] + 'multi_locus_phen.pickled', 'num_steps':10,
 		'phen_index':None, 'sim_phen':False, 'parallel':False, 'herit_plots':None,
-		'var_plots':False}
+		'var_plots':False, 'save_pvals':False}
 
 
 	for opt, arg in opts:
@@ -90,6 +91,7 @@ def parse_parameters():
 		elif opt in ('-h'): p_dict['heritability'] = int(arg)
 		elif opt in ("--phen_file"): p_dict['phen_file'] = arg
 		elif opt in ("--save_plots"): p_dict['save_plots'] = True
+		elif opt in ("--save_pvals"): p_dict['save_pvals'] = True
 		elif opt in ("--sim_phen"): p_dict['sim_phen'] = True
 		elif opt in ("--num_steps"): p_dict['num_steps'] = int(arg)
 		elif opt in ("--parallel"): p_dict['parallel'] = True
@@ -702,7 +704,7 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 
 
 def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_index, phen_d,
-		call_method_id, num_steps=10, pickle_results=True, save_plots=False):
+		call_method_id, num_steps=10, pickle_results=True, save_plots=False, save_pvals=False):
 	"""
 	Perform the GWA mapping..
 	using the different methods..
@@ -751,6 +753,8 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 	print 'Updating stats for KW'
 	result_dict['KW'] = _update_stats_(kw_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
+	if save_pvals:
+		result_dict['KW']['ps'] = p_vals
 
 	#Finding the interesting plots hack...
 	if result_dict['KW']['dist_f_w_s_a'] >= 0:
@@ -762,7 +766,7 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 	else:
 		lm_file_prefix = None
 	ret_dict = lm.lm_step_wise(phen_vals, sd, num_steps=num_steps, file_prefix=lm_file_prefix,
-					with_qq_plots=save_plots, highlight_loci=highlight_loci)
+					highlight_loci=highlight_loci, save_pvals=save_pvals)
 	lm_step_info = ret_dict['step_info_list']
 	lm_pvals = ret_dict['first_lm_res']['ps'].tolist()
 	lm_opt_dict = ret_dict['opt_dict']
@@ -770,9 +774,15 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 	print 'Updating stats for LM'
 	result_dict['LM'] = _update_stats_(lm_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
+	if save_pvals:
+		result_dict['LM']['ps'] = lm_pvals
+	#Finding the interesting plots hack...
+	if result_dict['LM']['dist_f_w_s_a'] >= 0:
+		return
 	print 'Updating stats for SW LM'
 	_update_sw_stats_(result_dict['Stepw_LM'], lm_step_info, lm_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
+
 
 	print 'Running SW EX'
 	if save_plots:
@@ -780,7 +790,7 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 	else:
 		emmax_file_prefix = None
 	ret_dict = lm.emmax_step_wise(phen_vals, K, sd, num_steps=num_steps, file_prefix=emmax_file_prefix,
-					with_qq_plots=True, highlight_loci=highlight_loci)
+					highlight_loci=highlight_loci, save_pvals=save_pvals)
 	emmax_step_info = ret_dict['step_info_list']
 	emmax_pvals = ret_dict['first_emmax_res']['ps'].tolist()
 	emmax_opt_dict = ret_dict['opt_dict']
@@ -788,6 +798,8 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 	print 'Updating stats for EX'
 	result_dict['EX'] = _update_stats_(emmax_res, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold)
+	if save_pvals:
+		result_dict['EX']['ps'] = emmax_pvals
 	print 'Updating stats for SW EX'
 	_update_sw_stats_(result_dict['Stepw_EX'], emmax_step_info, emmax_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold, type='EX')
@@ -842,7 +854,7 @@ def _run_():
 			result_dict = run_analysis(sd, K, file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 						p_dict['phenotype_model'], pid, phed,
 						p_dict['call_method_id'], num_steps=p_dict['num_steps'],
-						save_plots=p_dict['save_plots'])
+						save_plots=p_dict['save_plots'], save_pvals=p_dict['save_pvals'])
 			results_list.append(result_dict)
 		#Save as pickled
 	else:
@@ -897,6 +909,13 @@ def _run_():
 #		exec_st = 'qsub -q cmb -l walltime=6:00:00 -l mem=2950mb /home/cmbpanfs-01/bvilhjal/vincent/jobs/' + exec_str + ' -v VARIABLE=' + str(i)
 #		print exec_st
 #		os.system(exec_st)
+
+
+
+def generate_example_figure_1():
+	pickled_file = ''
+	#Load pickle file...
+
 
 
 if __name__ == '__main__':
