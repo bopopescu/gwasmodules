@@ -930,11 +930,13 @@ def generate_example_figure_1():
 	ax3.xaxis.set_label_position('bottom')
 
 	#Fill up the figure..
-	results[0].plot_manhattan2(ax=ax1)
-	results[1].plot_manhattan2(ax=ax2)
-	results[2].plot_manhattan2(ax=ax3)
+	cm = {1:'#11AAFF', 2:'#FF5544', 3:'#11AAFF', 4:'#FF5544', 5:'#11AAFF'}
+	results[0].plot_manhattan2(ax=ax1, neg_log_transform=True, plot_bonferroni=True, chrom_colormap=cm)
+	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True, chrom_colormap=cm)
+	results[2].plot_manhattan2(ax=ax3, neg_log_transform=True, plot_bonferroni=True, chrom_colormap=cm)
 
 	#Save the figure?
+	pylab.savefig(env.env['tmp_dir'] + 'test.png')
 
 
 if __name__ == '__main__':

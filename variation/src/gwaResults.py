@@ -798,7 +798,7 @@ class Result(object):
 				scoreList[s_i] = score
 
 			#Plotting scores
-			ax.plot(newPosList, scoreList, ".", markersize=2, alpha=0.7)
+			ax.plot(newPosList, scoreList, ".", markersize=5, alpha=0.7, color=chrom_colormap[i + 1])
 
 			#Marking candidate genes
 			if cand_genes:
@@ -824,7 +824,7 @@ class Result(object):
 
 
 
-		ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=4)
+		ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=6)
 		if len(starPoints[0]) > 0:
 			i = 0
 			while i < len(starPoints[0]):
@@ -848,7 +848,7 @@ class Result(object):
 					ys.append(max_score)
 				else:
 					ys.append(score)
-			ax.plot(xs, ys, ".", color="#ff9944", markersize=6, alpha=0.8)
+			ax.plot(xs, ys, ".", color="#ff9944", markersize=8, alpha=0.8)
 
 
 		if plot_bonferroni:
@@ -863,18 +863,18 @@ class Result(object):
 				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
 
 		x_range = sum(result.chromosome_ends)
-		if plot_xaxis:
-			ax.xticks(ticksList1, ticksList2, fontsize='x-small')
-		if not ylab:
-			if type == "pvals":
-				ax.ylabel('$ - log(p - $value$)$')
-
-			else:
-				ax.ylabel('score')
-		else:
-			ax.ylabel(ylab)
-		if plot_xaxis:
-			ax.xlabel("Mb")
+		#if plot_xaxis:
+		#	ax.xticks(ticksList1, ticksList2, fontsize='x-small')
+#		if not ylab:
+#			if type == "pvals":
+#				ax.ylabel('$ - log(p - $value$)$')
+#
+#			else:
+#				ax.ylabel('score')
+		#else:
+		#	ax.ylabel(ylab)
+#		if plot_xaxis:
+#			ax.xlabel("Mb")
 
 
 
