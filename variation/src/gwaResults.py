@@ -705,7 +705,7 @@ class Result(object):
 
 
 
-	def plot_manhattan2(self, ax, plot_type='simple', min_score=None, max_score=None, percentile=90,
+	def plot_manhattan2(self, ax, plot_type='simple', min_score=None, max_score=None, percentile=50,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
 			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
 			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, chrom_colormap=None):
@@ -772,9 +772,8 @@ class Result(object):
 
 
 		scoreRange = max_score - min_score
-		offset = 0
 		chromosome_splits = result.get_chromosome_splits()
-
+		offset = 0
 		ticksList1 = []
 		ticksList2 = []
 		textPos = []
@@ -797,9 +796,6 @@ class Result(object):
 					score = max_score
 				scoreList[s_i] = score
 
-			#Plotting scores
-			ax.plot(newPosList, scoreList, ".", markersize=5, alpha=0.7, color=chrom_colormap[i + 1])
-
 			#Marking candidate genes
 			if cand_genes:
 				for cg in chr_cand_genes[chrom]:
@@ -808,7 +804,10 @@ class Result(object):
 			#Highlighting loci
 			if highlight_loci:
 				for p in hl_dict[chrom]:
-					ax.axvline(offset + p, color='#1166FF', alpha=0.6)
+					ax.axvspan(offset + p - 50000, offset + p + 50000, ec='#550000', fc='#550000', alpha=0.5,)
+
+			#Plotting scores
+			ax.plot(newPosList, scoreList, "o", markersize=4, alpha=0.6, color=chrom_colormap[i + 1], ls='', mew=0)
 
 			oldOffset = offset
 #			textPos.append(offset + chromosome_end / 2 - 2000000)
@@ -824,6 +823,20 @@ class Result(object):
 
 
 
+		if highlight_markers:
+			ys = []
+			xs = []
+			for c, p, score in highlight_markers:
+				x = chr_offsets[c - 1] + p
+				xs.append(x)
+				if score > max_score:
+					ax.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
+					ys.append(max_score)
+				else:
+					ys.append(score)
+			ax.plot(xs, ys, "o", color="#ff9944", markersize=6, alpha=0.9, ls='', mew=0)
+
+
 		ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=6)
 		if len(starPoints[0]) > 0:
 			i = 0
@@ -837,18 +850,6 @@ class Result(object):
 				ax.text(starPoints[0][max_point] - 1000000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
 
 
-		if highlight_markers:
-			ys = []
-			xs = []
-			for c, p, score in highlight_markers:
-				x = chr_offsets[c - 1] + p
-				xs.append(x)
-				if score > max_score:
-					ax.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
-					ys.append(max_score)
-				else:
-					ys.append(score)
-			ax.plot(xs, ys, ".", color="#ff9944", markersize=8, alpha=0.8)
 
 
 		if plot_bonferroni:
@@ -857,10 +858,10 @@ class Result(object):
 			if threshold :
 				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], ":")
 				threshold = -math.log10(threshold)
-				ax.plot([0, sum(result.chromosome_ends)], [threshold, threshold], color='#6495ed', linestyle='-.')
+				ax.plot([0, sum(result.chromosome_ends)], [threshold, threshold], color='#6495ed', linestyle='-.',)
 			#Bonferroni threshold
 			else:
-				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
+				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="--")
 
 		x_range = sum(result.chromosome_ends)
 		#if plot_xaxis:

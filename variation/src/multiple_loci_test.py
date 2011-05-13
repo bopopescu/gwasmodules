@@ -912,28 +912,80 @@ def _run_():
 
 def generate_example_figure_1():
 	import gwaResults as gr
-	result_file_prefix = '/Users/bjarni.vilhjalmsson/Projects/mlt_results/bad_examples/mlt_25_random_snp_plus_17_'
+	phed = load_phenotypes(env.env['data_dir'] + 'multi_locus_phen.pickled')
+	file_prefix = '/storage/mlt_results/mlt'
+	pickled_file = '%s_%d_%s_%s_%dresults.pickled' % (file_prefix, 25, 'random_snp', 'plus', 17)
+	if os.path.isfile(pickled_file):
+		with open(pickled_file) as f:
+			r = cPickle.load(f)
+
+	result_file_prefix = env.env['results_dir'] + 'mlt_25_random_snp_plus_17_'
 	result_files = [result_file_prefix + fn for fn in ['lm_step0.pvals', 'emmax_step0.pvals', 'emmax_step1.pvals']]
 	#Load pickle file...
 	results = [gr.Result(result_file=fn) for fn in result_files]
 	#Setting up figure
-	f = pylab.figure(figsize=(8, 8))
-	ax1 = f.add_axes([0.08, 0.05 + (0.667 * 0.96), 0.9, (0.3 * 0.96) ])
+	f = pylab.figure(figsize=(9, 7))
+	ax1 = f.add_axes([0.08, 0.07 + (0.667 * 0.94), 0.9, (0.3 * 0.94) ])
 	ax1.spines['top'].set_visible(False)
 	ax1.xaxis.set_visible(False)
-	ax2 = f.add_axes([0.08, 0.05 + (0.333 * 0.96), 0.9, (0.3 * 0.96) ])
+	ax2 = f.add_axes([0.08, 0.07 + (0.333 * 0.94), 0.9, (0.3 * 0.94) ])
 	ax2.spines['top'].set_visible(False)
 	ax2.xaxis.set_visible(False)
-	ax3 = f.add_axes([0.08, 0.05 , 0.9, (0.3 * 0.96) ])
+	ax2.set_ylabel(r'$-$log$($p-value$)$')
+	ax3 = f.add_axes([0.08, 0.07 , 0.9, (0.3 * 0.94) ])
 	ax3.spines['top'].set_visible(False)
 	ax3.xaxis.set_ticks_position('bottom')
 	ax3.xaxis.set_label_position('bottom')
+	res = results[0]
+	chrom_ends = res.get_chromosome_ends()
+	offset = 0
+	tick_positions = []
+	tick_labels = []
+	for c_end in chrom_ends[:-1]:
+		offset += c_end
+		tick_positions.append(offset)
+		tick_labels.append('')
+	ax3.set_xticks(tick_positions)
+	ax3.set_xticklabels(tick_labels)
 
+	scpm = phed['snp_chr_pos_maf_list'][17]
+	lcpm = phed['random_snp']['latent_chr_pos_maf_list'][17]
+	highlight_loci = [(lcpm[0], lcpm[1]), (scpm[1], scpm[2])]
+	print highlight_loci
 	#Fill up the figure..
-	cm = {1:'#11AAFF', 2:'#FF5544', 3:'#11AAFF', 4:'#FF5544', 5:'#11AAFF'}
-	results[0].plot_manhattan2(ax=ax1, neg_log_transform=True, plot_bonferroni=True, chrom_colormap=cm)
-	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True, chrom_colormap=cm)
-	results[2].plot_manhattan2(ax=ax3, neg_log_transform=True, plot_bonferroni=True, chrom_colormap=cm)
+	cm = {1:'#1199EE', 2:'#11BB00', 3:'#1199EE', 4:'#11BB00', 5:'#1199EE'}
+	results[0].plot_manhattan2(ax=ax1, neg_log_transform=True, plot_bonferroni=True,
+				chrom_colormap=cm, highlight_loci=highlight_loci)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'A')
+
+	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True,
+				chrom_colormap=cm, highlight_loci=highlight_loci)
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'B')
+
+	cofactors = r['Stepw_EX']['step_info_list'][1]['cofactors']
+	print r['Stepw_EX']['step_info_list'][2]['cofactors']
+	results[2].plot_manhattan2(ax=ax3, neg_log_transform=True, plot_bonferroni=True,
+				chrom_colormap=cm, highlight_markers=cofactors, highlight_loci=highlight_loci)
+	x_min, x_max = ax3.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax3.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'C')
+
+	f.text(0.193, 0.04, '1')
+	f.text(0.38, 0.04, '2')
+	f.text(0.542, 0.04, '3')
+	f.text(0.705, 0.04, '4')
+	f.text(0.875, 0.04, '5')
+	f.text(0.43, 0.01, 'Chromosome number')
 
 	#Save the figure?
 	pylab.savefig(env.env['tmp_dir'] + 'test.png')

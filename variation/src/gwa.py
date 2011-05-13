@@ -263,21 +263,33 @@ def _get_file_prefix_(id, p_i, phenotype_name, mapping_method=None, trans_method
 def _get_genotype_data_(p_dict):
 	if p_dict['data_file']:
 		sd = dataParsers.parse_snp_data(p_dict['data_file'] , format=p_dict['data_format'], filter=p_dict['debug_filter'])
-	elif not p_dict['call_method_id'] in [1001, 1002]:
-		sd = dataParsers.load_250K_snps(p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
-	elif p_dict['call_method_id'] == 1001:
-		if p_dict['local_gwas']:
-			chrom = p_dict['local_gwas'][0]
-			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'], chromosomes=[chrom])
-		else:
-			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
-	elif p_dict['call_method_id'] == 1002:
-		if p_dict['local_gwas']:
-			chrom = p_dict['local_gwas'][0]
-			sd = dataParsers.load_quan_data(chromosomes=[chrom], debug_filter=p_dict['debug_filter'])
-		else:
-			sd = dataParsers.load_quan_data(debug_filter=p_dict['debug_filter'])
+	else:
+		cm_id = p_dict['call_method_id']
+		df = p_dict['data_format']
+		df = df if not cm_id in [78, 79] else 'diploid_int'
+		sd = dataParsers.load_snps_call_method(p_dict['call_method_id'], data_format=df, debug_filter=p_dict['debug_filter'])
 	return sd
+
+
+
+#def _get_genotype_data_(p_dict):
+#	if p_dict['data_file']:
+#		sd = dataParsers.parse_snp_data(p_dict['data_file'] , format=p_dict['data_format'], filter=p_dict['debug_filter'])
+#	elif not p_dict['call_method_id'] in [1001, 1002]:
+#		sd = dataParsers.load_250K_snps(p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
+#	elif p_dict['call_method_id'] == 1001:
+#		if p_dict['local_gwas']:
+#			chrom = p_dict['local_gwas'][0]
+#			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'], chromosomes=[chrom])
+#		else:
+#			sd = dataParsers.load_1001_full_snps(debug_filter=p_dict['debug_filter'])
+#	elif p_dict['call_method_id'] == 1002:
+#		if p_dict['local_gwas']:
+#			chrom = p_dict['local_gwas'][0]
+#			sd = dataParsers.load_quan_data(chromosomes=[chrom], debug_filter=p_dict['debug_filter'])
+#		else:
+#			sd = dataParsers.load_quan_data(debug_filter=p_dict['debug_filter'])
+#	return sd
 
 
 
@@ -525,35 +537,22 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 	if not res: #If results weren't found in a file... then do GWA.
 		#Loading data
 		sd = _get_genotype_data_(p_dict)
+		prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
+
 		#Do we need to calculate the K-matrix?
 		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:
 			#Load genotype file (in binary format)
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
-			if p_dict['call_method_id'] == 1001:
-				k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
-			elif p_dict['call_method_id'] == 1002:
-				k_file = env['data_quan_dir'] + 'data.gwas_012_mac5.kinship.pickled'
-			else:
-				k_file = env['data_dir'] + "kinship_matrix_cm" + str(p_dict['call_method_id']) + ".pickled"
-			kinship_file = p_dict['kinship_file']
-			if not kinship_file and os.path.isfile(k_file): #Check if corresponding call_method_file is available
-				kinship_file = k_file
-			if kinship_file:   #Kinship file was somehow supplied..
+			if p_dict['kinship_file']:   #Kinship file was somehow supplied..
 				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
 							p_dict['with_replicates'])
 				print 'Loading supplied kinship file: %s' % kinship_file
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
-				print "No kinship file was found.  Generating kinship file:", k_file
-				k_accessions = sd.accessions[:]
-				k = sd.get_ibs_kinship_matrix(p_dict['debug_filter'])
-				f = open(k_file, 'w')
-				cPickle.dump([k, k_accessions], f)
-				f.close()
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
-							p_dict['with_replicates'])
-				k = lm.filter_k_for_accessions(k, k_accessions, sd.accessions)
+				print 'Loading kinship file.'
+				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'], data_format=p_dict['data_format'],
+						method='ibs', accessions=sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 		else:
