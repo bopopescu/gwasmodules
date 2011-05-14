@@ -2557,7 +2557,7 @@ class SNPsDataSet:
 
 
 
-	def writeToFile(self, filename, delimiter=", ", missingVal="NA", accDecoder=None,
+	def writeToFile(self, filename, delimiter=",", missingVal="NA", accDecoder=None,
 			withArrayIds=False, decoder=None, callProbFile=None, binary_format=False):
 		"""
 		Writes data to a file. 
@@ -2860,20 +2860,23 @@ class SNPsDataSet:
 
 
 
-	def convert_2_binary(self):
+	def convert_data_format(self, target_data_format='binary'):
 		"""
 		Converts the underlying raw data format to a binary one, i.e. A,C,G,T,NA,etc. are converted to 0,1,-1
 		"""
-		if self.data_format == 'binary':
+		if self.data_format == target_data_format:
 			import warnings
-			warnings.warn("Data appears to be already in binary format!")
+			warnings.warn("Data appears to be already in %s format!" % target_data_format)
 		else:
-			snpsd_list = []
-			for snpsd in self.snpsDataList:
-				snpsd_list.append(snpsd.getSnpsData())
-			self.snpsDataList = snpsd_list
-			self.data_format = 'binary'
-		self.missing_val = self.snpsDataList[0].missingVal
+			if self.data_format == 'nucleotides' and target_data_format == 'binary':
+				snpsd_list = []
+				for snpsd in self.snpsDataList:
+					snpsd_list.append(snpsd.getSnpsData())
+				self.snpsDataList = snpsd_list
+				self.data_format = 'binary'
+				self.missing_val = self.snpsDataList[0].missingVal
+			else:
+				raise NotImplementedError
 
 
 	def haplotize(self, snp_window=None, base_window=None):
