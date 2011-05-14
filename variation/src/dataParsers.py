@@ -2360,9 +2360,10 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 			print 'Found data in one file, now attempting to convert to %s format' % data_format
 			for chrom in [1, 2, 3, 4, 5]:
 				nt_data_file = file_prefix + 'chr_%d_nucleotides_mac0.csv' % chrom
-				(snpsds, chromosomes) = parseCSVData(nt_data_file, deliminator=',', missingVal='',
-							format=1, filter=filter, id=id, returnChromosomes=True)
-				sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
+				(snpsds, chromosomes) = parse_raw_snps_data(nt_data_file, deliminator=',',
+									missing_val='N', debug_filter=debug_filter,
+									id=id, return_chromosomes=True)
+				sd = SNPsDataSet(snpsds, chromosomes, data_format='nucleotides')
 				sd.convert_data_format(data_format)
 				sd.writeToFile(data_file)
 
