@@ -2252,10 +2252,10 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 	print 'Looking for raw nucleotide files..'
 	nt_data_file = file_prefix + 'all_chromosomes_nucleotides.csv'
 	if os.path.isfile(nt_data_file):
-		print 'Found data in one file, now attempting to convert to %s format' % data_format
+		print 'Found data file, loading and then attempting to convert to %s format' % data_format
 		(snpsds, chromosomes) = parseCSVData(nt_data_file, deliminator=',', missingVal='',
 					format=1, filter=filter, id=id, returnChromosomes=True)
-		sd = SNPsDataSet(snpsds, chromosomes, data_format=format)
+		sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
 		sd.convert_data_format(data_format)
 		sd.writeToFile(data_file)
 		return load_snps_call_method(call_method_id=call_method_id, data_format=data_format,
@@ -2269,7 +2269,7 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 				nt_data_file = file_prefix + 'chr_%d_nucleotides_mac0.csv' % chrom
 				(snpsds, chromosomes) = parseCSVData(nt_data_file, deliminator=',', missingVal='',
 							format=1, filter=filter, id=id, returnChromosomes=True)
-				sd = SNPsDataSet(snpsds, chromosomes, data_format=format)
+				sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
 				sd.convert_data_format(data_format)
 				sd.writeToFile(data_file)
 
