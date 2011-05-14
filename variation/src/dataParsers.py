@@ -2284,9 +2284,9 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5], debug_filter=1.0):
 	print "Loading sequence data."
 	if min_mac > 0:
-		file_name = env['data_dir'] + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
+		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
 		if not os.path.isfile(file_name):
-			file_name = env['data_dir'] + 'chr_%d_%s_mac%d.csv' % (1, data_format, 0)
+			file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, 0)
 			if os.path.isfile(file_name):
 				file_mac = 0
 			else:
@@ -2298,7 +2298,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 	snpsds = []
 	num_snps = 0
 	for chrom in chromosomes:
-		file_name = env['data_dir'] + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, file_mac)
+		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, file_mac)
 		pickled_file_name = file_name + '.pickled'
 		if os.path.isfile(pickled_file_name):
 			t = time.time()
@@ -2308,7 +2308,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 			if os.path.isfile(file_name):
 				sd = parse_numerical_snp_data(file_name, data_format=data_format)
 			else:
-				file_name = env['data_dir'] + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, 0)
+				file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, 0)
 				if os.path.isfile(file_name):
 					sd = parse_numerical_snp_data(file_name, data_format=data_format)
 					sd.filter_mac_snps(min_mac)
