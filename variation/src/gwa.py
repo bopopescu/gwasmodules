@@ -550,13 +550,15 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
 				print 'Loading kinship file.'
-				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'], data_format=p_dict['data_format'],
-						method='ibs', accessions=sd.accessions)
+				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'],
+							data_format=p_dict['data_format'], method='ibs',
+							accessions=sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 
 		if p_dict['remove_outliers']:
-			assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
+			if num_outliers == 0: print "No outliers were removed!"
+
 		phen_vals = phed.get_values(p_i)
 
 		if p_dict['local_gwas']: #Filter SNPs, etc..
