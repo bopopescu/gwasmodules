@@ -2219,9 +2219,9 @@ def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessio
 	print 'Generating kinship'
 	sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac)
 	if method == 'ibs':
-		K = sd.get_ibs_kinship()
+		K = sd.get_ibs_kinship_matrix()
 	elif method == 'ibd':
-		K = sd.get_ibs_kinship()
+		K = sd.get_ibs_kinship_matrix()
 	else:
 		raise NotImplementedError
 	lm.save_kinship_to_file(kinship_file, K, sd.accessions)
