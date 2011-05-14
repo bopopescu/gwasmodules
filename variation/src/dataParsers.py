@@ -2217,8 +2217,7 @@ def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessio
 			return lm.load_kinship_from_file(kinship_file, accessions=accessions, return_accessions=return_accessions, scaled=scaled)
 
 	print 'Generating kinship'
-	sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format,
-			debug_filter=debug_filter, min_mac=min_mac)
+	sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac)
 	if method == 'ibs':
 		K = sd.get_ibs_kinship()
 	elif method == 'ibd':
