@@ -2301,9 +2301,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, file_mac)
 		pickled_file_name = file_name + '.pickled'
 		if os.path.isfile(pickled_file_name):
-			t = time.time()
 			sd = cPickle.load(open(pickled_file_name))
-			t = time.time() - t
 		else:
 			if os.path.isfile(file_name):
 				sd = parse_numerical_snp_data(file_name, data_format=data_format)
@@ -2330,7 +2328,6 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 	print 'Loaded %d SNPs in total.' % sd.num_snps()
 	if min_mac != file_mac:
 		sd.filter_mac_snps(min_mac)
-	sd.data_format = 'diploid_int'
 	return sd
 
 

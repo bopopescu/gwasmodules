@@ -1789,6 +1789,23 @@ class SNPsData(_SnpsData_):
 		return num_removed
 
 
+	def remove_monomorphic_snps(self):
+		"""
+		Removes all fixed SNPs.  (I.e. monomorphic.)
+		"""
+		new_positions = []
+		new_snps = []
+		for i, (snp, pos) in enumerate(izip(self.snps, self.positions)):
+			if len(sp.unique(snp)) > 1:
+				new_snps.append(snp)
+				new_positions.append(pos)
+		num_removed = len(self.positions) - len(new_positions)
+		self.snps = new_snps
+		self.positions = new_positions
+		#print "Removed %d non-binary SNPs, leaving %d SNPs in total." % (num_removed, len(self.snps))
+		return num_removed
+
+
 	def haplotize(self, snp_window=None, base_window=None):
 
 		if snp_window:
@@ -2754,14 +2771,13 @@ class SNPsDataSet:
 				removed_num += snpsd.onlyBinarySnps()
 			print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
 		elif self.data_format in ['int', 'diploid_int']:
-			pass
-#			print 'Filtering monomorhpic SNPs'
-#			total_num = 0
-#			removed_num = 0
-#			for snpsd in self.snpsDataList:
-#				total_num += len(snpsd.snps)
-#				removed_num += snpsd.onlyBinarySnps()
-#			print 'Removed %d non-binary SNPs out of %d SNPs' % (removed_num, total_num)
+			print 'Filtering monomorhpic SNPs'
+			total_num = 0
+			removed_num = 0
+			for snpsd in self.snpsDataList:
+				total_num += len(snpsd.snps)
+				removed_num += snpsd.remove_monomorphic_snps()
+			print 'Removed %d monomorphic SNPs out of %d SNPs' % (removed_num, total_num)
 		return pd_indices_to_keep
 
 

@@ -537,7 +537,8 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 	if not res: #If results weren't found in a file... then do GWA.
 		#Loading data
 		sd = _get_genotype_data_(p_dict)
-		prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'], p_dict['with_replicates'])
+		num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
+					p_dict['with_replicates'])
 
 		#Do we need to calculate the K-matrix?
 		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:
@@ -545,22 +546,19 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
 			if p_dict['kinship_file']:   #Kinship file was somehow supplied..
-				num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
-							p_dict['with_replicates'])
 				print 'Loading supplied kinship file: %s' % kinship_file
 				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
 			else:
 				print 'Loading kinship file.'
-				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'], data_format=p_dict['data_format'],
-						method='ibs', accessions=sd.accessions)
+				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'],
+							data_format=p_dict['data_format'], method='ibs',
+							accessions=sd.accessions)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
-		else:
-			num_outliers = prepare_data(sd, phed, p_i, trans_method, p_dict['remove_outliers'],
-						p_dict['with_replicates'])
 
 		if p_dict['remove_outliers']:
-			assert num_outliers != 0, "No outliers were removed, so it makes no sense to go on and perform GWA."
+			if num_outliers == 0: print "No outliers were removed!"
+
 		phen_vals = phed.get_values(p_i)
 
 		if p_dict['local_gwas']: #Filter SNPs, etc..
