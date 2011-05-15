@@ -1984,6 +1984,7 @@ class SNPsData(_SnpsData_):
 
 		indices_to_skip = set() #Markers which are merged in the second SNPsData
 		new_snps = []
+		new_positions = []
 		merge_count = 0
 		for i, snp1 in enumerate(self.snps):
 			new_snp = sp.array(sp.repeat(self.missingVal, num_accessions), dtype='int8')
@@ -2031,9 +2032,10 @@ class SNPsData(_SnpsData_):
 					if ai1 != -1:
 						new_snp[ni] = snp1[ai1]
 
+
 			if sp.any(new_snp != missing_val_snp):#Some are not are missing
 				new_snps.append(new_snp)
-		new_positions = self.positions
+				new_positions.append(self.positions[i])
 
 		for j in range(len(sd.snps)):
 			if not j in indices_to_skip:#There were no markers at this position in the other snps data.
