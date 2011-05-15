@@ -2040,6 +2040,7 @@ class SNPsData(_SnpsData_):
 				new_snps.append(new_snp)
 				new_positions.append(self.positions[i])
 
+		print 'Inserting %d non-overlapping SNPs into the self snps data.' % len(sd.snps)
 		for j in range(len(sd.snps)):
 			if not j in indices_to_skip:#There were no markers at this position in the other snps data.
 				snp2 = sd.snps[j]
@@ -3834,10 +3835,10 @@ def test_ibd_kinship():
 
 def _merge_imputed_and_250K_data_():
 	import  dataParsers as dp
-	sd_72 = dp.load_snps_call_method(72, 'binary')
+	sd_54 = dp.load_snps_call_method(54, 'binary')
 	sd_76 = dp.load_snps_call_method(76, 'binary')
-	sd_72.merge_snps_data(sd_76)
-	sd_72.writeToFile('/tmp/test_merged_data.csv')
+	sd_54.merge_snps_data(sd_76)
+	sd_54.writeToFile('/tmp/test_merged_data.csv')
 
 
 if __name__ == "__main__":
