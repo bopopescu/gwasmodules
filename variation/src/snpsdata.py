@@ -1723,9 +1723,8 @@ class RawSnpsData(_SnpsData_):
 
 class SNPsData(_SnpsData_):
 	"""
-	Efficient genotype data, using the numpy class.
-	
 	An alternative to the old SnpsData class, where this uses scipy to speed things up when possible.
+	
 	"""
 	alphabet = [-1, 0, 1, 2, 3]  #Here -1 is thought to be missing data value.
 	def __init__(self, snps, positions, accessions=None, arrayIds=None, chromosome=None,
@@ -1936,7 +1935,7 @@ class SNPsData(_SnpsData_):
 
 
 
-	def merge_data(self, sd, union_accessions=True, error_threshold=0.02, array_dtype='int8'):
+	def merge_data(self, sd, union_accessions=True, error_threshold=0.02):
 		"""
 		Merges data, possibly allowing multiple markers at a position. (E.g. deletions and SNPs.)
 		However it merges markers which overlap to a significant degree (error_threshold).
@@ -1986,7 +1985,7 @@ class SNPsData(_SnpsData_):
 		new_snps = []
 		merge_count = 0
 		for i, snp1 in enumerate(self.snps):
-			new_snp = -sp.repeat(num_accessions)
+			new_snp = -sp.repeat(self.missingVal, num_accessions, dtype='int8')
 			if i in index_dict: #If there are markers at the same position.
 				index_list = index_dict[i]
 				for j in index_list:
@@ -2036,7 +2035,7 @@ class SNPsData(_SnpsData_):
 		for j in range(len(sd.snps)):
 			if not j in indices_to_skip:#There were no markers at this position in the other snps data.
 				snp2 = sd.snps[j]
-				new_snp = []
+				new_snp = -sp.repeat(self.missingVal, num_accessions, dtype='int8')
 				for (ai1, ai2) in acc_map:
 					if ai2 != -1:
 						new_snp.append(snp2[ai2])
