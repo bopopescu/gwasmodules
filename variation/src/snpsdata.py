@@ -467,7 +467,6 @@ class _SnpsData_(object):
 							t_count += 1
 					if t_count > 0 and error_count / float(t_count) < error_threshold:
 						#print "Merge error is %f"%(error_count/float(t_count))
-						new_snp = []
 						for (ai1, ai2) in acc_map:
 							if ai1 != -1 and ai2 != -1:
 								if snp1[ai1] != self.missingVal:
@@ -482,7 +481,6 @@ class _SnpsData_(object):
 						indices_to_skip.add(j)
 					elif t_count > 0:
 						print "Not merging since error is %f." % (error_count / float(t_count))
-						new_snp = []
 						for (ai1, ai2) in acc_map:
 							if ai1 != -1:
 								new_snp.append(snp1[ai1])
@@ -1727,7 +1725,7 @@ class SNPsData(_SnpsData_):
 	"""
 	Efficient genotype data, using the numpy class.
 	
-	An alternative to the old SnpsData class.
+	An alternative to the old SnpsData class, where this uses scipy to speed things up when possible.
 	"""
 	alphabet = [-1, 0, 1, 2, 3]  #Here -1 is thought to be missing data value.
 	def __init__(self, snps, positions, accessions=None, arrayIds=None, chromosome=None,
@@ -1936,6 +1934,131 @@ class SNPsData(_SnpsData_):
 		self.snps = new_snps
 
 
+
+
+	def merge_data(self, sd, union_accessions=True, error_threshold=0.02, array_dtype='int8'):
+		"""
+		Merges data, possibly allowing multiple markers at a position. (E.g. deletions and SNPs.)
+		However it merges markers which overlap to a significant degree (error_threshold).
+		
+		(Uses scipy SNPs)
+		"""
+		if union_accessions:
+			new_accessions = list(set(self.accessions).union(set(sd.accessions)))
+		else:
+			new_accessions = self.accessions
+		acc_map = []
+		for acc in new_accessions:
+			try:
+				ai1 = self.accessions.index(acc)
+			except:
+				ai1 = -1
+			try:
+				ai2 = sd.accessions.index(acc)
+			except:
+				ai2 = -1
+			acc_map.append((ai1, ai2))
+
+		num_accessions = len(new_accessions)
+
+		#To handle multiple markers at the same position
+		index_dict = {}
+		j = 0
+		last_pos = sd.positions[j]
+		for i, pos in enumerate(self.positions):
+			curr_pos = last_pos
+			while j < len(sd.positions) and curr_pos < pos:
+				j += 1
+				if j < len(sd.positions):
+					curr_pos = sd.positions[j]
+			last_pos = curr_pos
+			index_list = []
+			while j < len(sd.positions) and curr_pos == pos:
+				index_list.append(j)
+				j += 1
+				if j < len(sd.positions):
+					curr_pos = sd.positions[j]
+			if index_list:
+				index_dict[i] = index_list
+
+
+		indices_to_skip = set() #Markers which are merged in the second SNPsData
+		new_snps = []
+		merge_count = 0
+		for i, snp1 in enumerate(self.snps):
+			new_snp = -sp.repeat(num_accessions)
+			if i in index_dict: #If there are markers at the same position.
+				index_list = index_dict[i]
+				for j in index_list:
+					error_count = 0
+					t_count = 0 #total count
+					snp2 = sd.snps[j]
+					for (ai1, ai2) in acc_map:
+						if ai1 != -1 and ai2 != -1:
+							if snp1[ai1] != snp2[ai2] and snp1[ai1] != self.missingVal\
+										and snp2[ai2] != self.missingVal:
+								error_count += 1
+							t_count += 1
+					if t_count > 0 and error_count / float(t_count) < error_threshold:
+						print "Merge error is %f" % (error_count / float(t_count))
+						for ni, (ai1, ai2) in enumerate(acc_map):
+							if ai1 != -1 and ai2 != -1:
+								if snp1[ai1] != self.missingVal:
+									new_snp[ni] = snp1[ai1]
+								else:
+									new_snp[ni] = snp2[ai2]
+							elif ai1 == -1:
+								new_snp[ni] = snp2[ai2]
+							else:
+								new_snp[ni] = snp1[ai1]
+						merge_count += 1
+						indices_to_skip.add(j)
+					elif t_count > 0:
+						print "Not merging since error is %f." % (error_count / float(t_count))
+						for ni, (ai1, ai2) in enumerate(acc_map):
+							if ai1 != -1:
+								new_snp[ni] = snp1[ai1]
+							else:
+								new_snp[ni] = self.missingVal
+
+			else: #There were no markers at this position in the other snps data.
+				for ni, (ai1, ai2) in enumerate(acc_map):
+					if ai1 != -1:
+						new_snp[ni] = snp1[ai1]
+					else:
+						new_snp[ni] = self.missingVal
+
+			if sp.all(new_snp == -sp.ones(num_accessions)):#all are missing
+				raise Exception
+			new_snps.append(new_snp)
+		new_positions = self.positions
+
+		for j in range(len(sd.snps)):
+			if not j in indices_to_skip:#There were no markers at this position in the other snps data.
+				snp2 = sd.snps[j]
+				new_snp = []
+				for (ai1, ai2) in acc_map:
+					if ai2 != -1:
+						new_snp.append(snp2[ai2])
+					else:
+						new_snp.append(self.missingVal)
+				if new_snp == []:
+					raise Exception
+				new_snps.append(new_snp)
+				new_positions.append(sd.positions[j])
+
+
+
+		pos_snp_list = zip(new_positions, new_snps)
+		pos_snp_list.sort()
+		r = map(list, zip(*pos_snp_list))
+		self.positions = r[0]
+		self.snps = r[1]
+		self.accessions = new_accessions
+		if len(self.snps) != len(self.positions):
+			raise Exception
+		print "Merged %d SNPs!" % (merge_count)
+		print "Resulting in %d SNPs in total" % len(self.snps)
 
 
 
@@ -3702,6 +3825,15 @@ def test_ibd_kinship():
 	sd = dp.load_250K_snps()
 	ibd_k = sd.get_ibd_kinship_matrix()
 	lm.save_kinship_to_file(env.env['data_dir'] + 'ibd_2_kinship_matrix_cm75.pickled', ibd_k, sd.accessions)
+
+
+def _merge_imputed_and_250K_data_():
+	import  dataParsers as dp
+	sd_75 = dp.load_snps_call_method(75, 'binary')
+	sd_76 = dp.load_snps_call_method(76, 'binary')
+	sd_75.merge_snps_data(sd_76)
+	sd_75.writeToFile('/tmp/test_merged_data.csv')
+
 
 if __name__ == "__main__":
 #	import dataParsers
