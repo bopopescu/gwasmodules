@@ -2053,7 +2053,7 @@ class SNPsData(_SnpsData_):
 				new_positions.append(sd.positions[j])
 
 
-
+		print 'Sorting SNPs by positions..'
 		pos_snp_list = zip(new_positions, range(len(new_positions)))
 		pos_snp_list.sort()
 		r = map(list, zip(*pos_snp_list))
