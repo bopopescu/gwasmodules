@@ -3845,7 +3845,7 @@ if __name__ == "__main__":
 #	d2010_sd.writeToFile("/tmp/test.csv")
 #       get_AW_common_dataset()
 #	write_out_01_dataset()
-	test_ibd_kinship()
+	_merge_imputed_and_250K_data_()
 
 
 
