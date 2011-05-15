@@ -1942,6 +1942,9 @@ class SNPsData(_SnpsData_):
 		
 		(Uses scipy SNPs)
 		"""
+		perc_overlap = len(set(self.accessions).intersection(set(sd.accessions))) \
+				/ float(len(set(self.accessions).union(set(sd.accessions))))
+		print "Percentage of overlapping accessions %s" % perc_overlap
 		if union_accessions:
 			new_accessions = list(set(self.accessions).union(set(sd.accessions)))
 		else:
