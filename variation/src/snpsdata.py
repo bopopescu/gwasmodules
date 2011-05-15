@@ -3838,8 +3838,9 @@ def _merge_imputed_and_250K_data_():
 	import tair_converter as tc
 	sd_54 = dp.load_snps_call_method(54, 'binary')
 	print 'Converting to TAIR 9'
+	t_map = tc.tair8_to_tair9_map()
 	for i, snpsd in enumerate(sd_54.snpsDataList):
-		snpsd.positions = tc.get_tair9_positions(i + 1, snpsd.positions)
+		snpsd.positions = t_map.get_tair9_positions(i + 1, snpsd.positions)
 	sd_76 = dp.load_snps_call_method(76, 'binary')
 	sd_54.merge_snps_data(sd_76)
 	sd_54.writeToFile('/tmp/test_merged_data.csv')

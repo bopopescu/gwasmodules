@@ -57,7 +57,7 @@ class tair8_to_tair9_map():
 		return pos + self.offsets[chrom][i]
 
 
-	def get_tair9_positions(self, pos_list):
+	def get_tair9_positions(self, chrom, pos_list):
 		l = self.offset_positions[chrom]
 		new_pos_list = []
 		for pos in pos_list:
