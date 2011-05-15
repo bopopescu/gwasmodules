@@ -829,7 +829,7 @@ def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA')
 
 
 
-def parse_raw_snps_data(datafile, format=1, deliminator=",", missingVal='N', return_data_format='nucleotides',
+def parse_raw_snps_data(datafile, format=1, deliminator=",", missing_val='N', return_data_format='nucleotides',
 		return_chromosomes=False, use_decoder=True, debug_filter=1, id=None, marker_type=None):
 	"""
 	Parses nucleotide SNPs data files into a RawSnpsData.
@@ -840,7 +840,7 @@ def parse_raw_snps_data(datafile, format=1, deliminator=",", missingVal='N', ret
 
 	sys.stderr.write("Loading file: %s ... \n" % datafile)
 	decoder = nt_decoder
-	decoder[missingVal] = missing_val
+	decoder[missing_val] = missing_val
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
