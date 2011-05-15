@@ -1985,7 +1985,7 @@ class SNPsData(_SnpsData_):
 		new_snps = []
 		merge_count = 0
 		for i, snp1 in enumerate(self.snps):
-			new_snp = -sp.repeat(self.missingVal, num_accessions, dtype='int8')
+			new_snp = sp.array(sp.repeat(self.missingVal, num_accessions), dtype='int8')
 			if i in index_dict: #If there are markers at the same position.
 				index_list = index_dict[i]
 				for j in index_list:
@@ -2035,7 +2035,7 @@ class SNPsData(_SnpsData_):
 		for j in range(len(sd.snps)):
 			if not j in indices_to_skip:#There were no markers at this position in the other snps data.
 				snp2 = sd.snps[j]
-				new_snp = -sp.repeat(self.missingVal, num_accessions, dtype='int8')
+				new_snp = sp.array(sp.repeat(self.missingVal, num_accessions), dtype='int8')
 				for (ai1, ai2) in acc_map:
 					if ai2 != -1:
 						new_snp.append(snp2[ai2])
