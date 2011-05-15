@@ -1942,6 +1942,9 @@ class SNPsData(_SnpsData_):
 		
 		(Uses scipy SNPs)
 		"""
+		perc_overlap = len(set(self.accessions).intersection(set(sd.accessions))) \
+				/ float(len(set(self.accessions).union(set(sd.accessions))))
+		print "Percentage of overlapping accessions %s" % perc_overlap
 		if union_accessions:
 			new_accessions = list(set(self.accessions).union(set(sd.accessions)))
 		else:
@@ -2050,7 +2053,7 @@ class SNPsData(_SnpsData_):
 				new_positions.append(sd.positions[j])
 
 
-
+		print 'Sorting SNPs by positions..'
 		pos_snp_list = zip(new_positions, range(len(new_positions)))
 		pos_snp_list.sort()
 		r = map(list, zip(*pos_snp_list))
