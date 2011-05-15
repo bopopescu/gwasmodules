@@ -2017,15 +2017,11 @@ class SNPsData(_SnpsData_):
 						for ni, (ai1, ai2) in enumerate(acc_map):
 							if ai1 != -1:
 								new_snp[ni] = snp1[ai1]
-							else:
-								new_snp[ni] = self.missingVal
 
 			else: #There were no markers at this position in the other snps data.
 				for ni, (ai1, ai2) in enumerate(acc_map):
 					if ai1 != -1:
 						new_snp[ni] = snp1[ai1]
-					else:
-						new_snp[ni] = self.missingVal
 
 			if sp.all(new_snp == -sp.ones(num_accessions)):#all are missing
 				raise Exception
@@ -2036,11 +2032,9 @@ class SNPsData(_SnpsData_):
 			if not j in indices_to_skip:#There were no markers at this position in the other snps data.
 				snp2 = sd.snps[j]
 				new_snp = sp.array(sp.repeat(self.missingVal, num_accessions), dtype='int8')
-				for (ai1, ai2) in acc_map:
+				for ni, (ai1, ai2) in enumerate(acc_map):
 					if ai2 != -1:
-						new_snp.append(snp2[ai2])
-					else:
-						new_snp.append(self.missingVal)
+						new_snp[ni] = snp2[ai2]
 				if new_snp == []:
 					raise Exception
 				new_snps.append(new_snp)
