@@ -1935,7 +1935,7 @@ class SNPsData(_SnpsData_):
 
 
 
-	def merge_data(self, sd, union_accessions=True, error_threshold=0.02):
+	def merge_data(self, sd, union_accessions=True, error_threshold=0.1, discard_error_threshold=0.1):
 		"""
 		Merges data, possibly allowing multiple markers at a position. (E.g. deletions and SNPs.)
 		However it merges markers which overlap to a significant degree (error_threshold).
@@ -1998,22 +1998,29 @@ class SNPsData(_SnpsData_):
 										and snp2[ai2] != self.missingVal:
 								error_count += 1
 							t_count += 1
-					if t_count > 0 and error_count / float(t_count) < error_threshold:
-						print "Merge error is %f" % (error_count / float(t_count))
-						for ni, (ai1, ai2) in enumerate(acc_map):
-							if ai1 != -1 and ai2 != -1:
-								if snp1[ai1] != self.missingVal:
-									new_snp[ni] = snp1[ai1]
-								else:
-									new_snp[ni] = snp2[ai2]
-							elif ai1 == -1:
-								new_snp[ni] = snp2[ai2]
-							else:
-								new_snp[ni] = snp1[ai1]
-						merge_count += 1
+					merge_error = error_count / float(t_count) if t_count > 0 else 1
+					if merge_error <= error_threshold or merge_error > discard_error_threshold:
 						indices_to_skip.add(j)
+
+						if merge_error <= error_threshold:
+							print "Merge error is %f" % merge_error
+							for ni, (ai1, ai2) in enumerate(acc_map):
+								if ai1 != -1 and ai2 != -1:
+									if snp1[ai1] != self.missingVal:
+										new_snp[ni] = snp1[ai1]
+									else:
+										new_snp[ni] = snp2[ai2]
+								elif ai1 == -1:
+									new_snp[ni] = snp2[ai2]
+								else:
+									new_snp[ni] = snp1[ai1]
+							merge_count += 1
+						else:
+							print 'Removing SNP at position %d since they have an error of %f'\
+								 % (self.positions[i], merge_error)
+
 					elif t_count > 0:
-						print "Not merging since error is %f." % (error_count / float(t_count))
+						print "Not merging since error is %f" % merge_error
 						for ni, (ai1, ai2) in enumerate(acc_map):
 							if ai1 != -1:
 								new_snp[ni] = snp1[ai1]
