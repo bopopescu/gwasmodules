@@ -1935,7 +1935,7 @@ class SNPsData(_SnpsData_):
 
 
 
-	def merge_data(self, sd, union_accessions=True, error_threshold=0.1, discard_error_threshold=0.1):
+	def merge_data(self, sd, acc_merge_type='intersection', error_threshold=0.1, discard_error_threshold=0.1):
 		"""
 		Merges data, possibly allowing multiple markers at a position. (E.g. deletions and SNPs.)
 		However it merges markers which overlap to a significant degree (error_threshold).
@@ -1945,8 +1945,10 @@ class SNPsData(_SnpsData_):
 		perc_overlap = len(set(self.accessions).intersection(set(sd.accessions))) \
 				/ float(len(set(self.accessions).union(set(sd.accessions))))
 		print "Percentage of overlapping accessions %s" % perc_overlap
-		if union_accessions:
+		if acc_merge_type == 'union':
 			new_accessions = list(set(self.accessions).union(set(sd.accessions)))
+		elif acc_merge_type == 'intersection':
+			new_accessions = list(set(self.accessions).intersection(set(sd.accessions)))
 		else:
 			new_accessions = self.accessions
 		acc_map = []
@@ -3836,14 +3838,10 @@ def test_ibd_kinship():
 def _merge_imputed_and_250K_data_():
 	import  dataParsers as dp
 	import tair_converter as tc
-	sd_54 = dp.load_snps_call_method(54, 'binary')
-	print 'Converting to TAIR 9'
-	t_map = tc.tair8_to_tair9_map()
-	for i, snpsd in enumerate(sd_54.snpsDataList):
-		snpsd.positions = t_map.get_tair9_positions(i + 1, snpsd.positions)
+	sd_72 = dp.load_snps_call_method(72, 'binary')
 	sd_76 = dp.load_snps_call_method(76, 'binary')
-	sd_54.merge_snps_data(sd_76)
-	sd_54.writeToFile('/tmp/test_merged_data.csv')
+	sd_72.merge_snps_data(sd_76)
+	sd_72.writeToFile('/tmp/test_merged_data.csv')
 
 
 if __name__ == "__main__":
