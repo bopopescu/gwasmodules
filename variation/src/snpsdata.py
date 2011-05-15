@@ -2031,7 +2031,7 @@ class SNPsData(_SnpsData_):
 					if ai1 != -1:
 						new_snp[ni] = snp1[ai1]
 
-			if sp.any(new_snp != missing_val_snp):#all are missing
+			if sp.any(new_snp != missing_val_snp):#Some are not are missing
 				new_snps.append(new_snp)
 		new_positions = self.positions
 
@@ -2049,11 +2049,11 @@ class SNPsData(_SnpsData_):
 
 
 
-		pos_snp_list = zip(new_positions, new_snps)
+		pos_snp_list = zip(new_positions, range(len(new_positions)))
 		pos_snp_list.sort()
 		r = map(list, zip(*pos_snp_list))
 		self.positions = r[0]
-		self.snps = r[1]
+		self.snps = [new_snps[i] for i in r[1]]
 		self.accessions = new_accessions
 		if len(self.snps) != len(self.positions):
 			raise Exception
@@ -3829,10 +3829,10 @@ def test_ibd_kinship():
 
 def _merge_imputed_and_250K_data_():
 	import  dataParsers as dp
-	sd_75 = dp.load_snps_call_method(75, 'binary')
+	sd_72 = dp.load_snps_call_method(72, 'binary')
 	sd_76 = dp.load_snps_call_method(76, 'binary')
-	sd_75.merge_snps_data(sd_76)
-	sd_75.writeToFile('/tmp/test_merged_data.csv')
+	sd_72.merge_snps_data(sd_76)
+	sd_72.writeToFile('/tmp/test_merged_data.csv')
 
 
 if __name__ == "__main__":
