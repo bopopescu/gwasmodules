@@ -1959,6 +1959,7 @@ class SNPsData(_SnpsData_):
 			acc_map.append((ai1, ai2))
 
 		num_accessions = len(new_accessions)
+		missing_val_snp = sp.array(sp.repeat(self.missingVal, num_accessions), dtype='int8')
 
 		#To handle multiple markers at the same position
 		index_dict = {}
@@ -2030,9 +2031,8 @@ class SNPsData(_SnpsData_):
 					if ai1 != -1:
 						new_snp[ni] = snp1[ai1]
 
-			if sp.all(new_snp == -sp.ones(num_accessions)):#all are missing
-				raise Exception
-			new_snps.append(new_snp)
+			if sp.any(new_snp != missing_val_snp):#all are missing
+				new_snps.append(new_snp)
 		new_positions = self.positions
 
 		for j in range(len(sd.snps)):
