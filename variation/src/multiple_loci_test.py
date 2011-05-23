@@ -75,7 +75,7 @@ def parse_parameters():
 	p_dict = {'number_per_run':20, 'debug_filter':1.0, 'summarize':False,
 		'latent_variable':'random_snp', 'phenotype_model':'plus', 'run_id':'mlt',
 		'mapping_method':'emmax', 'heritability':50, 'save_plots':False, 'call_method_id':75,
-		'phen_file':env.env['data_dir'] + 'multi_locus_phen.pickled', 'num_steps':10,
+		'phen_file':env.env['phen_dir'] + 'multi_locus_phen.pickled', 'num_steps':10,
 		'phen_index':None, 'sim_phen':False, 'parallel':False, 'herit_plots':None,
 		'var_plots':False, 'save_pvals':False}
 
@@ -441,6 +441,54 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 
 		pylab.savefig(png_file)
 		pylab.clf()
+
+
+
+def plot_single_tprs_fdrs(file_prefix, summary_dict, ax, ws, w_legend=False, y_label='Power', x_label='FDR', y_lim=None):
+	"""
+	Plot various things relating to run summaries
+	"""
+	import matplotlib.font_manager
+	prop = matplotlib.font_manager.FontProperties(size=10)
+
+	#Heritabilities..
+	# - histogram of each category
+	# - pseudoheritabilities vs. ks and med pval. of KW and LM
+
+	# TPRs vs. FDRs
+	am_list = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
+	am_colors = ['r', 'g', 'b', 'r', 'b']
+	am_ls = ['--', '--', '--', '-', '-']
+	am_dot_list = ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']
+	am_dot_colors = ['#22DD66', '#22DD66', '#DD2266', '#DD2266']
+	am_dot_marker = ['s', '^', 's', '^']
+
+	w_i = window_sizes.index(ws)
+	for am, amc, amls in zip(am_list, am_colors, am_ls):
+		xs = sp.zeros(len(pval_thresholds))
+		ys = sp.zeros(len(pval_thresholds))
+		for pt_i, pt in enumerate(pval_thresholds):
+			ys[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
+			xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
+		ax.plot(xs, ys, label=am, color=amc, ls=amls, alpha=0.6, marker='.')
+	for am, amc, amm in zip(am_dot_list, am_dot_colors, am_dot_marker):
+		ax.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, marker=amm,
+			ls='', color=amc, alpha=0.6)
+	png_file = '%s_w%d.png' % (file_prefix, ws)
+	ax.set_ylabel(y_label)
+	ax.set_xlabel(x_label)
+	if w_legend:
+		ax.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
+	if y_lim:
+		ax.set_ylim(y_lim)
+	x_min, x_max = ax.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax.get_ylim()
+	y_range = y_max - y_min
+	ax.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range,
+			y_min - 0.025 * y_range, y_max + 0.025 * y_range])
+
+
 
 
 
@@ -855,9 +903,9 @@ def _run_():
 						save_plots=p_dict['save_plots'], save_pvals=p_dict['save_pvals'])
 			results_list.append(result_dict)
 		#Save as pickled
+
 	else:
 		if p_dict['summarize']:
-			results_list = []
 			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
 			phed = load_phenotypes(p_dict['phen_file'])
 			summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
@@ -991,8 +1039,68 @@ def generate_example_figure_1():
 	pylab.savefig(env.env['tmp_dir'] + 'test.png')
 
 
+
+
+def generate_results_figure_2():
+	file_prefix = '/storage/mlt_results/mlt'
+	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
+	f = pylab.figure(figsize=(11, 7))
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), w_legend=True, x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03))
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	f.text(0.168, 0.962, 'Additive')
+	f.text(0.496, 0.962, "'or'")
+	f.text(0.796, 0.962, "'xor'")
+
+
+	f.text(0.072, 0.91, 'A')
+	f.text(0.382, 0.91, "B")
+	f.text(0.688, 0.91, "C")
+	f.text(0.072, 0.46, 'D')
+	f.text(0.382, 0.46, "E")
+	f.text(0.688, 0.46, "F")
+
+	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
+	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
+	f.savefig('/tmp/test.png')
+
 if __name__ == '__main__':
-	generate_example_figure_1()
+	generate_results_figure_2()
 	#_run_()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)

@@ -546,8 +546,8 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
 			if p_dict['kinship_file']:   #Kinship file was somehow supplied..
-				print 'Loading supplied kinship file: %s' % kinship_file
-				k = lm.load_kinship_from_file(kinship_file, sd.accessions)
+				print 'Loading supplied kinship file: %s' % p_dict['kinship_file']
+				k = lm.load_kinship_from_file(p_dict['kinship_file'], sd.accessions)
 			else:
 				print 'Loading kinship file.'
 				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'],
