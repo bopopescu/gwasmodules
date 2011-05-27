@@ -2375,7 +2375,8 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 
 
 
-def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5], debug_filter=1.0):
+def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5],
+				debug_filter=1.0):
 	print "Loading sequence data."
 	if min_mac > 0:
 		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
@@ -2408,6 +2409,11 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 					raise Exception('Data files were not found')
 			print "Saving pickled file."
 			cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
+			if min_mac != file_mac:
+				sd.filter_mac_snps(min_mac)
+				file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, min_mac)
+				pickled_file_name = file_name + '.pickled'
+				cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
 			print "Done."
 
 		if debug_filter < 1.0:
@@ -2420,8 +2426,6 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 	print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
 	sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
 	print 'Loaded %d SNPs in total.' % sd.num_snps()
-	if min_mac != file_mac:
-		sd.filter_mac_snps(min_mac)
 	return sd
 
 
