@@ -2292,34 +2292,29 @@ def _test_full_seq_parser_():
 
 
 
-def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=None, return_accessions=False, scaled=True, min_mac=5):
+def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=None, return_accessions=False,
+		scaled=True, min_mac=0, sd=None):
 	import linear_models as lm
-	snp_data_file = '%s%d/all_chromosomes_%s.csv' % (env['data_dir'], call_method_id, data_format)
 	file_prefix = '%s%d/kinship_%s_%s' % (env['data_dir'], call_method_id, method, data_format)
-	if os.path.isfile(snp_data_file):
-		print 'Found data in one file'
-		kinship_file = file_prefix + '.pickled'
-		if os.path.isfile(kinship_file):
-			print 'Found kinship file: %s' % kinship_file
-			return lm.load_kinship_from_file(kinship_file, accessions=accessions, return_accessions=return_accessions, scaled=scaled)
-	else:
-
-		kinship_file = file_prefix + '_mac%d.pickled' % min_mac
-		if os.path.isfile(kinship_file):
-			print 'Found kinship file: %s' % kinship_file
-			return lm.load_kinship_from_file(kinship_file, accessions=accessions, return_accessions=return_accessions, scaled=scaled)
+	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
+	if os.path.isfile(kinship_file):
+		print 'Found kinship file: %s' % kinship_file
+		return lm.load_kinship_from_file(kinship_file, accessions=accessions, return_accessions=return_accessions, scaled=scaled)
 
 	print 'Generating kinship'
-	sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac)
+	if not sd:
+		sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac)
 	if method == 'ibs':
 		K = sd.get_ibs_kinship_matrix()
 	elif method == 'ibd':
 		K = sd.get_ibs_kinship_matrix()
 	else:
 		raise NotImplementedError
-	lm.save_kinship_to_file(kinship_file, K, sd.accessions)
-	K = lm.prepare_k(K, sd.accessions, accessions)
-	K = lm.scale_k(K)
+	#lm.save_kinship_to_file(kinship_file, K, sd.accessions)
+	if accessions:
+		K = lm.prepare_k(K, sd.accessions, accessions)
+	if scaled:
+		K = lm.scale_k(K)
 	if return_accessions:
 		return K, accessions
 	else:
@@ -2332,14 +2327,17 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 	file_prefix = '%s%d/' % (env['data_dir'], call_method_id)
 	data_file = file_prefix + 'all_chromosomes_%s.csv' % data_format
 	if os.path.isfile(data_file):
-		print 'Found data in one file'
+		print 'Found data in one file: %s' % data_file
 		return parse_snp_data(data_file , format=data_format, filter=debug_filter)
 	else:
 		data_file = file_prefix + 'chr_1_%s_mac%d.csv' % (data_format, min_mac)
 		data_file_mac0 = file_prefix + 'chr_1_%s_mac%d.csv' % (data_format, 0)
 		if os.path.isfile(data_file) or os.path.isfile(data_file_mac0):
+			print 'Found data in 5 files, in data format: %s' % data_format
 			return load_full_sequence_data(file_prefix, data_format=data_format,
 						min_mac=min_mac, debug_filter=debug_filter)
+		else:
+			print 'Files in %s format were not found.' % data_format
 
 
 	print 'Looking for raw nucleotide files..'
@@ -2372,7 +2370,7 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 
 
 	print 'There were problems with loading the genotype data..'
-	print 'Genotype files were not found in the given directory:'
+	print 'Genotype files were not found in the given directory: %s' % file_prefix
 	raise NotImplementedError
 
 
@@ -2387,8 +2385,8 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 				file_mac = 0
 			else:
 				raise Exception('Data file not found')
-		else:
-			file_mac = min_mac
+	else:
+		file_mac = min_mac
 
 	t = time.time()
 	snpsds = []
@@ -2513,9 +2511,16 @@ def _test_plink_tped_parser_():
         lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
 
 
+def generate_kinship(call_method_id=78, data_format='diploid_int', method='ibs', min_mac=0):
+	import linear_models as lm
+	K, acc_list = load_kinship(call_method_id, data_format, method, min_mac=min_mac, return_accessions=True)
+	file_prefix = '%s%d/kinship_%s_%s' % (env['data_dir'], call_method_id, method, data_format)
+	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
+	lm.save_kinship_to_file(kinship_file, K, acc_list)
+
 
 if __name__ == "__main__":
-
+	pass
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
 #	print len(snpsds)
 #	for i in range(0,len(snpsds)):
@@ -2540,8 +2545,7 @@ if __name__ == "__main__":
 
 	#get250KDataFromDb(user="bvilhjal", passwd="bamboo123")
 
-	#pass
 	#_testDBParser_()
 	#load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
-	_test_plink_tped_parser_()
+	#_test_plink_tped_parser_()
 	#pdb.set_trace()

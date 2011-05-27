@@ -552,7 +552,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				print 'Loading kinship file.'
 				k = dataParsers.load_kinship(call_method_id=p_dict['call_method_id'],
 							data_format=p_dict['data_format'], method='ibs',
-							accessions=sd.accessions)
+							accessions=sd.accessions, sd=sd)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 
