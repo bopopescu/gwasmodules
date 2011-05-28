@@ -896,6 +896,8 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 		num_snps = 0
 		d = {'snps':[], 'positions':[]}
 		for snp_i, line in enumerate(f):
+			if verbose and num_snps % 100000 == 0:
+				print '%d SNPs have been read.' % snp_i
 			if random.random() >= debug_filter:
 				continue
 			num_snps += 1
@@ -912,8 +914,6 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 				for i in xrange(num_accessions):
 					snp[i] = l[2 + i]
 
-			if verbose and num_snps % 100000 == 0:
-				print '%d SNPs have been read.' % num_snps
 			try:
 				d = pos_snps_dict[chrom]
 			except KeyError:

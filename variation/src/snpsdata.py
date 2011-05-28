@@ -11,6 +11,7 @@ import pdb
 import env
 from itertools import *
 from bisect import bisect
+from analyze_snps_data import num_snps
 
 try:
 	import scipy as sp
@@ -1426,7 +1427,7 @@ class RawSnpsData(_SnpsData_):
 
 
 
-	def getSnpsData(self, missingVal= -1, reference_ecotype='6909', only_binary=True):
+	def getSnpsData(self, missingVal= -1, reference_ecotype='6909', only_binary=True, verbose=True):
 		"""
 		Returns a SnpsData object correspoding to this RawSnpsData object.
 
@@ -1447,7 +1448,9 @@ class RawSnpsData(_SnpsData_):
 		snps = []
 		positions = []
 		num_lines = len(self.accessions)
-		for snp, pos in izip(self.snps, self.positions):
+		for snp_i, (snp, pos) in enumerate(izip(self.snps, self.positions)):
+			if verbose and snp_i % 100000 == 0:
+				print 'Converted %d SNPs.' % snp_i
 			unique_nts = sp.unique(snp).tolist()
 			if self.missingVal in unique_nts:
 				if len(unique_nts) != 3:
