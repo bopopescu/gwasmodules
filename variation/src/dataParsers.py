@@ -867,7 +867,7 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 	sys.stderr.write("Loading file: %s ... \n" % datafile)
 	decoder = nt_decoder
 	decoder[missing_val] = missing_val
-	code_fun = sp.vectorize(lambda x: decoder[x], otypes=['a1']) #FINISH!!!
+	#code_fun = sp.vectorize(lambda x: decoder[x], otypes=['a1']) #FINISH!!!
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
@@ -904,10 +904,9 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 			chrom = int(l[0])
 			pos = int(l[1])
 			if use_decoder:
-				snp = code_fun(l[2:])
-#				sp.empty(num_accessions, 'a1')
-#				for i in xrange(num_accessions):
-#					snp[i] = decoder[l[2 + i]]
+				snp = sp.empty(num_accessions, 'a1')
+				for i in xrange(num_accessions):
+					snp[i] = decoder[l[2 + i]]
 			else:
 				snp = sp.empty(num_accessions, 'a')
 				for i in xrange(num_accessions):
