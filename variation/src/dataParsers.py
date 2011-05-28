@@ -855,8 +855,8 @@ def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA')
 
 
 
-def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missing_val='N', return_chromosomes=False,
-		use_decoder=True, debug_filter=1, id=None, marker_type=None, verbose=True):
+def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", missing_val='N', return_chromosomes=False,
+		use_decoder=True, debug_filter=1.0, id=None, marker_type=None, verbose=True):
 	"""
 	Parses nucleotide SNPs data files into a RawSnpsData.
 
