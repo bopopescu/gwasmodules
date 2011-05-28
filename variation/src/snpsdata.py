@@ -1450,7 +1450,7 @@ class RawSnpsData(_SnpsData_):
 		num_lines = len(self.accessions)
 		for snp_i, (snp, pos) in enumerate(izip(self.snps, self.positions)):
 			if verbose and snp_i % 100000 == 0:
-				print '%d SNPs have been read.' % snp_i
+				print 'Converted %d SNPs.' % snp_i
 			unique_nts = sp.unique(snp).tolist()
 			if self.missingVal in unique_nts:
 				if len(unique_nts) != 3:
