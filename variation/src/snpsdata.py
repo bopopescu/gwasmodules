@@ -1416,7 +1416,17 @@ class RawSnpsData(_SnpsData_):
 
 		return [commonSnpsPos, snpErrorRate, commonAccessions, accessionErrorRate, accessionCallRates, arrayIds, accessionCounts, snpCallRate, [naCounts1, naCounts2], [totalCounts, totalFails]]
 
-	def getSnpsData(self, missingVal= -1, reference_ecotype='6909', only_non_binary=True):
+
+
+	def convert_to_binary(self):
+		"""
+		An updated and version of the getSnpsData.. uses scipy.  
+		"""
+		pass
+
+
+
+	def getSnpsData(self, missingVal= -1, reference_ecotype='6909', only_binary=True):
 		"""
 		Returns a SnpsData object correspoding to this RawSnpsData object.
 
@@ -1425,68 +1435,45 @@ class RawSnpsData(_SnpsData_):
 		Reference ecotype is set to be the 0 allele. 
 		"""
 		decoder = {self.missingVal:missingVal} #Might cause errors somewhere???!!!
+		coding_fun = sp.vectorize(lambda x: decoder[x], otypes=['int8'])
 
 		if reference_ecotype in self.accessions:
 			ref_i = self.accessions.index(reference_ecotype)
 		else:
 			ref_i = 0
 			import warnings
-			warnings.warn("Given reference ecotype %s wasn't found, using %s as 0-reference." % (reference_ecotype, self.accessions[ref_i]))
+			warnings.warn("Given reference ecotype %s wasn't found, using %s as 0-reference." % \
+					(reference_ecotype, self.accessions[ref_i]))
 		snps = []
 		positions = []
 		num_lines = len(self.accessions)
-		for i, snp in enumerate(self.snps):
-			alphabet = self.alphabet[:]
-
-			if snp[ref_i] != 'NA':
-				decoder[snp[ref_i]] = 0
-				alphabet.remove(snp[ref_i])
-				k = 1
-			else:
-				k = 0
-			for nt in alphabet:
-				if nt in snp:
-					decoder[nt] = k
-					k = k + 1
-			if only_non_binary:
-				if k == 2:
-					positions.append(self.positions[i])
-					new_snp = sp.zeros(num_lines, dtype='int8')
-					for j, nt in enumerate(snp):
-						new_snp[j] = decoder[nt]
-					snps.append(new_snp)
+		for snp, pos in izip(self.snps, self.positions):
+			unique_nts = sp.unique(snp).tolist()
+			if self.missingVal in unique_nts:
+				if len(unique_nts) != 3:
+					continue #Skipping non-binary SNP
 				else:
-					continue
+					unique_nts.remove(self.missingVal)
 			else:
-				if k > 2:
-					max1 = 0
-					maxnt1 = ''
-					max2 = 0
-					maxnt2 = ''
-					for nt in alphabet:
-						c = snp.count(nt)
-						if c > max1:
-							max1 = c
-							maxnt1 = nt
-						elif c > max2:
-							max2 = c
-							maxnt2 = nt
-						decoder[nt] = missingVal
-					decoder[maxnt1] = 0
-					decoder[maxnt2] = 1
-				new_snp = []
-				for nt in snp:
-					new_snp.append(decoder[nt])
-				snps.append(new_snp)
+				if len(unique_nts) != 2:
+					continue #Skipping non-binary SNP
+			if snp[ref_i] != self.missingVal:
+				col0_nt = snp[ref_i]
+				decoder[col0_nt] = 0
+				unique_nts.remove(col0_nt)
+				decoder[unique_nts[0]] = 1
+			else:
+				decoder[unique_nts[0]] = 0
+				decoder[unique_nts[1]] = 1
+			snps.append(coding_fun(snp))
+			positions.append(pos)
 
-		if only_non_binary:
-			print 'Removed %d non-binary SNPs out of %d, when converting to binary SNPs.'\
-				% (len(self.positions) - len(positions), len(self.positions))
-		else:
-			positions = self.positions
+		print 'Removed %d non-binary SNPs out of %d, when converting to binary SNPs.'\
+			% (len(self.positions) - len(positions), len(self.positions))
 
 		assert len(snps) == len(positions), 'Somthing odd with the lengths.'
 		return SNPsData(snps, positions, accessions=self.accessions, marker_types=self.marker_types, missing_val=missingVal)
+
 
 
 	def filterBadSnps(self, snpsd, maxNumError=0):

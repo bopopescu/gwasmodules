@@ -15,8 +15,8 @@ import scipy as sp
 # this should be fixed
 
 
-#Standard missing value is NA
-missing_val = 'NA'
+#Standard missing value is N (Used to be NA)
+missing_val = 'N'
 #Standard nt decoding, is using the IUPAC alphabet
 nt_decoder = {'A':'A',
 	      'C':'C',
@@ -38,11 +38,37 @@ nt_decoder = {'A':'A',
 	      'H':'H',
 	      'V':'V',
 	      'B':'B',
-	      'X':'N', #Unknown base(s)
-	      'N':'N', #Unknown base(s)
+	      'X':'X', #Unknown base(s)
+	      'N':'X', #Unknown base(s)
 	      '-':'-', #Indel 
-	      '|':missing_val}	#05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched)
+	      '|':missing_val}
 
+
+#An int decoder is useful for processing the data efficiently
+nt_int_decoder = {'A':1,
+	      'C':2,
+	      'G':3,
+	      'T':4,
+	      'AG':5,
+	      'AC':6,
+	      'GT':7,
+	      'CT':8,
+	      'AT':9,
+	      'CG':10,
+	      'Y':11,
+	      'R':12,
+	      'W':13,
+	      'S':14,
+	      'K':15,
+	      'M':16,
+	      'D':17,
+	      'H':18,
+	      'V':19,
+	      'B':20,
+	      'X':21, #Unknown base(s)
+	      'N':21, #Unknown base(s)
+	      '-':22, #Indel 
+	      '|':0}
 
 
 # A couple of useful dictionaries:
@@ -876,7 +902,7 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 			chrom = int(l[0])
 			pos = int(l[1])
 			if use_decoder:
-				snp = sp.empty(num_accessions, 'a1')
+				snp = sp.empty(num_accessions, 'u1')
 				for i in xrange(num_accessions):
 					snp[i] = decoder[l[2 + i]]
 			else:
@@ -888,10 +914,11 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 				print '%d SNPs have been read.' % num_snps
 			try:
 				d = pos_snps_dict[chrom]
-				last_chrom = chrom
 			except KeyError:
 				d = {'snps':[], 'positions':[]}
 				pos_snps_dict[chrom] = d
+				if verbose and snp_i:
+					print '%d SNPs have been loaded.' % num_snps
 
 			d['snps'].append(snp)
 			d['positions'].append(pos)
@@ -907,9 +934,9 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 		for i in range(len(chromosomes)):
 			snps_data_list[i] = snps_data_list[i].getSnpsData()
 	if return_chromosomes:
-		return (snpsd_ls, chromosomes)
+		return (snps_data_list, chromosomes)
 	else:
-		return snpsd_ls
+		return snps_data_list
 
 
 
