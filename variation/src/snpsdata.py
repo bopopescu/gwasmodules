@@ -11,7 +11,6 @@ import pdb
 import env
 from itertools import *
 from bisect import bisect
-from analyze_snps_data import num_snps
 
 try:
 	import scipy as sp
