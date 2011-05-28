@@ -830,7 +830,7 @@ def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA')
 
 
 def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missing_val='N', return_chromosomes=False,
-		use_decoder=True, debug_filter=1, id=None, marker_type=None, verbose=False):
+		use_decoder=True, debug_filter=1, id=None, marker_type=None, verbose=True):
 	"""
 	Parses nucleotide SNPs data files into a RawSnpsData.
 
@@ -862,10 +862,10 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 		num_accessions = len(accessions)
 		print "Found", num_accessions, "arrays/strains."
 
+		last_chrom = -1
 		pos_snps_dict = {}
 		snps = []
 		positions = []
-		snps_data_list = []
 		num_snps = 0
 		for snp_i, line in enumerate(f):
 			if random.random() >= debug_filter:
@@ -889,24 +889,19 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 			try:
 				d = pos_snps_dict[chrom]
 				last_chrom = chrom
-				d['snps'].append(snp)
-				d['positions'].append(pos)
 			except KeyError:
-				if len(snps):
-					snps_data_list.append(RawSnpsData(accessions=accessions, positions=positions, \
-							snps=snps, chromosome=last_chrom, arrayIds=array_ids, id=id))
-				pos_snps_dict[chrom] = {'snps':[], 'positions':[]}
-		if len(snps):
-			snps_data_list.append(RawSnpsData(accessions=accessions, positions=positions, \
-					snps=snps, chromosome=last_chrom, arrayIds=array_ids, id=id))
+				d = {'snps':[], 'positions':[]}
+				pos_snps_dict[chrom] = d
 
-#			#Adding marker
-#			if marker_type:
-#				marker_types = [marker_type] * len(rawSnpsData.snps)
-#				rawSnpsData.marker_types = marker_types
-#			snpsd_ls.append(rawSnpsData)
-#			del rawSnpsData
+			d['snps'].append(snp)
+			d['positions'].append(pos)
+
+	snps_data_list = []
 	chromosomes = sorted(pos_snps_dict.keys())
+	for chrom in chromosomes:
+		snps_data_list.append(RawSnpsData(accessions=accessions, positions=pos_snps_dict[chrom]['positions'], \
+				snps=pos_snps_dict[chrom]['snps'], chromosome=chrom, arrayIds=array_ids, id=id))
+
 	if target_format == 'binary':
 		print "Converting raw SNPs data to binary SNPs."
 		for i in range(len(chromosomes)):
