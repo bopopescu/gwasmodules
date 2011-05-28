@@ -904,7 +904,7 @@ def parse_raw_snps_data(datafile, target_format='binary', deliminator=",", missi
 			chrom = int(l[0])
 			pos = int(l[1])
 			if use_decoder:
-				snp = sp.empty(num_accessions, 'u1')
+				snp = sp.empty(num_accessions, 'a1')
 				for i in xrange(num_accessions):
 					snp[i] = decoder[l[2 + i]]
 			else:
