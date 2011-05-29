@@ -3859,12 +3859,6 @@ def _merge_imputed_and_250K_data_():
 	sd_72.writeToFile('/tmp/test_merged_data.csv')
 
 
-def _test_bug_():
-	import phenotypeData as pd
-	import dataParsers as dp
-	phend = pd.get_phenotypes_from_db([1599])
-	sd = dp.load_snps_call_method(78, data_format='diploid_int')
-	sd.coordinate_w_phenotype_data(phend, 1599)
 
 
 if __name__ == "__main__":
@@ -3877,7 +3871,6 @@ if __name__ == "__main__":
 #	d2010_sd.writeToFile("/tmp/test.csv")
 #       get_AW_common_dataset()
 #	write_out_01_dataset()
-	_test_bug_()
 
 
 
