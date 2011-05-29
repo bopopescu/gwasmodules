@@ -2385,6 +2385,7 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 									id=id, return_chromosomes=True)
 				sd = SNPsDataSet(snpsds, chromosomes, data_format='nucleotides')
 				sd.convert_data_format(data_format)
+				data_file = file_prefix + 'chr_%d_%s_mac0.csv' % (chrom, data_format)
 				sd.writeToFile(data_file)
 
 			return load_snps_call_method(call_method_id=call_method_id, data_format=data_format,
