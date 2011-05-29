@@ -2545,9 +2545,9 @@ def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_
 	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
 	lm.save_kinship_to_file(kinship_file, K, acc_list)
 
-def generate_usual_kinships(call_method_id=76, data_format='binary'):
+def generate_usual_kinships(call_method_id=78, data_format='diploid_int'):
 	for min_mac in [0, 5, 10]:
-		for method in ['ibs', 'ibd']:
+		for method in ['ibs']:
 			generate_kinship(call_method_id=call_method_id, data_format=data_format, method=method, min_mac=min_mac)
 
 
