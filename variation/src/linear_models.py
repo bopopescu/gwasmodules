@@ -3289,10 +3289,10 @@ def load_kinship_from_file(kinship_file, accessions=None, dtype='double', return
 	f = open(kinship_file, 'r')
 	l = cPickle.load(f)
 	f.close()
-	k = l[0]
+	k = sp.matrix(l[0], dtype=dtype)
 	k_accessions = l[1]
 	if accessions:
-		k = prepare_k(sp.mat(k, dtype=dtype), k_accessions, accessions)
+		k = prepare_k(k, k_accessions, accessions)
 	if scaled:
 		k = scale_k(k)
 	if return_accessions:
