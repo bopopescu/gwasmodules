@@ -2552,7 +2552,7 @@ def generate_usual_kinships(call_method_id=76, data_format='binary'):
 
 
 if __name__ == "__main__":
-	pass
+	generate_usual_kinships()
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
 #	print len(snpsds)
 #	for i in range(0,len(snpsds)):
