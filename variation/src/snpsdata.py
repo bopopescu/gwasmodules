@@ -3862,6 +3862,7 @@ def _merge_imputed_and_250K_data_():
 
 
 if __name__ == "__main__":
+	pass
 #	import dataParsers
 #	d2010_file = "/Users/bjarnivilhjalmsson/Projects/Data/2010/2010_073009.csv"
 #	d2010_sd = dataParsers.parse_snp_data(d2010_file,id="2010_data")
