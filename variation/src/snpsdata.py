@@ -2914,12 +2914,13 @@ class SNPsDataSet:
 		num_snps = float(len(snps))
 		print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-		num_comp = num_lines * (num_lines - 1) * num_snps / (2 * chunk_size)
+		num_comp = num_lines * (num_lines - 1.0) * num_snps / (2.0 * chunk_size)
 		comp_i = 0
 		print 'Starting calculation'
-		for chunk_i in range(0, num_snps, chunk_size): #FINISH!!!
+		for chunk_i in range(0, int(num_snps), chunk_size): #FINISH!!!
 			snps_array = sp.array(snps[chunk_i:chunk_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
+			print 'chunk_i: %d' % chunk_i
 			for i in range(num_lines):
 				for j in range(i):
 					comp_i += 1
