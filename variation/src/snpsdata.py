@@ -2914,25 +2914,25 @@ class SNPsDataSet:
 		num_snps = float(len(snps))
 		print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-		num_comp = num_lines * (num_lines - 1.0) * num_snps / (2.0 * chunk_size)
-		comp_i = 0
+		num_splits = num_lines * (num_lines - 1.0) * num_snps / (2.0 * chunk_size)
 		print 'Starting calculation'
-		for chunk_i in range(0, int(num_snps), chunk_size): #FINISH!!!
-			snps_array = sp.array(snps[chunk_i:chunk_i + chunk_size], dtype=snp_dtype)
+		chunk_i = 0
+		for snp_i in range(0, int(num_snps), chunk_size): #FINISH!!!
+			chunk_i += 1
+			snps_array = sp.array(snps[snp_i:snp_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
-			print 'chunk_i: %d' % chunk_i
+			print '%d SNPs processed' % snp_i
 			for i in range(num_lines):
 				for j in range(i):
-					comp_i += 1
 					if self.data_format == 'diploid_int':
 						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
 						k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
 					elif self.data_format == 'binary':
 						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
 						k_mat[i, j] += bin_counts[0]
-					if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
-						sys.stdout.write('.')
-						sys.stdout.flush()
+			if num_splits >= num_dots and (chunk_i + 1) % (num_splits / num_dots) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
 		for i in range(num_lines):
 			k_mat[i, i] = num_snps
 			for j in range(i):
