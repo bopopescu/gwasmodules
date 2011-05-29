@@ -2918,7 +2918,7 @@ class SNPsDataSet:
 		comp_i = 0
 		print 'Starting calculation'
 		for chunk_i in range(0, num_snps, chunk_size): #FINISH!!!
-			snps_array = sp.array(snps, dtype=snp_dtype)
+			snps_array = sp.array(snps[chunk_i:chunk_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
 			for i in range(num_lines):
 				for j in range(i):
