@@ -2902,38 +2902,41 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single',
+				chunk_size=10000):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
 		"""
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
-		print 'Constructing a SNP array'
-		snps_array = sp.array(snps, dtype=snp_dtype)
-		print 'Transposing the SNP array'
-		snps_array = snps_array.T
 		num_lines = len(self.accessions)
 		num_snps = float(len(snps))
 		print 'Allocating K matrix'
-		k_mat = sp.ones((num_lines, num_lines), dtype=dtype)
+		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
 		num_comp = num_lines * (num_lines - 1) / 2
 		comp_i = 0
 		print 'Starting calculation'
+		for chunk_i in range(0, num_snps, chunk_size): #FINISH!!!
+			snps_array = sp.array(snps, dtype=snp_dtype)
+			snps_array = snps_array.T
+			for i in range(num_lines):
+				for j in range(i):
+					comp_i += 1
+					if self.data_format == 'diploid_int':
+						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+						k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
+					elif self.data_format == 'binary':
+						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+						k_mat[i, j] += bin_counts[0]
+					if num_comp >= num_dots and (chunk_i + comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
+						sys.stdout.write('.')
+						sys.stdout.flush()
 		for i in range(num_lines):
+			k_mat[i, i] = num_snps
 			for j in range(i):
-				comp_i += 1
-				if self.data_format == 'diploid_int':
-					bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
-					k_mat[i, j] = (bin_counts[0] + 0.5 * bin_counts[1]) / num_snps
-				elif self.data_format == 'binary':
-					bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
-					k_mat[i, j] = bin_counts[0] / num_snps
 				k_mat[j, i] = k_mat[i, j]
-				if num_comp >= num_dots and (comp_i + 1) % (num_comp / num_dots) == 0: #Print dots
-					sys.stdout.write('.')
-					sys.stdout.flush()
-
+		k_mat = k_mat / num_snps
 		return k_mat
 
 
