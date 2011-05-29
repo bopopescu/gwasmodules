@@ -2914,14 +2914,13 @@ class SNPsDataSet:
 		num_snps = len(snps)
 		print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-		num_splits = num_lines * (num_lines - 1.0) * num_snps / (2.0 * chunk_size)
+		num_splits = num_snps / chunk_size
 		print 'Starting calculation'
 		chunk_i = 0
 		for snp_i in range(0, num_snps, chunk_size): #FINISH!!!
 			chunk_i += 1
 			snps_array = sp.array(snps[snp_i:snp_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
-			print '%d SNPs processed' % snp_i
 			for i in range(num_lines):
 				for j in range(i):
 					if self.data_format == 'diploid_int':
