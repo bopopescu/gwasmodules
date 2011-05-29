@@ -896,7 +896,7 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 		num_snps = 0
 		d = {'snps':[], 'positions':[]}
 		for snp_i, line in enumerate(f):
-			if verbose and num_snps % 100000 == 0:
+			if verbose and snp_i % 100000 == 0:
 				print '%d SNPs have been read.' % snp_i
 			if random.random() >= debug_filter:
 				continue
