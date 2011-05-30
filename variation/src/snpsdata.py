@@ -2921,17 +2921,17 @@ class SNPsDataSet:
 			chunk_i += 1
 			snps_array = sp.array(snps[snp_i:snp_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
-			for i in range(num_lines):
-				for j in range(i):
-					if self.data_format == 'diploid_int':
+			if self.data_format == 'diploid_int':
+				for i in range(num_lines):
+					for j in range(i):
 						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
 						if len(bin_counts) > 1:
 							k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
 						else:
 							k_mat[i, j] += bin_counts[0]
-					elif self.data_format == 'binary':
-						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
-						k_mat[i, j] += bin_counts[0]
+			elif self.data_format == 'binary':
+				snps_array = snps_array * 2 - 1
+				k += (sp.dot(snps_array, snps_array) + len(snps_array)) / 2
 			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()

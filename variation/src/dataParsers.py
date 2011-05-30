@@ -2401,14 +2401,13 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5],
 				debug_filter=1.0):
 	print "Loading sequence data."
-	if min_mac > 0:
-		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
-		if not os.path.isfile(file_name):
-			file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, 0)
-			if os.path.isfile(file_name):
-				file_mac = 0
-			else:
-				raise Exception('Data file not found')
+	file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
+	if min_mac > 0 and not os.path.isfile(file_name):
+		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, 0)
+		if os.path.isfile(file_name):
+			file_mac = 0
+		else:
+			raise Exception('Data file not found')
 	else:
 		file_mac = min_mac
 
