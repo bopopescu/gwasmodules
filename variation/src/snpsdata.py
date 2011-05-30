@@ -2910,7 +2910,7 @@ class SNPsDataSet:
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
 		num_lines = len(self.accessions)
-		chunk_size = num_lines
+		chunk_size = 10000 #num_lines
 		num_snps = len(snps)
 		print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
