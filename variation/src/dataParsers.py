@@ -2400,7 +2400,7 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 
 def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5],
 				debug_filter=1.0):
-	print "Loading sequence data in data format: %s, and wit min MAC: %d" % (data_format, min_mac)
+	print "Loading sequence data in data format: %s, and with min MAC: %d" % (data_format, min_mac)
 	file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
 	if min_mac > 0 and not os.path.isfile(file_name):
 		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, 0)
@@ -2416,6 +2416,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 	num_snps = 0
 	for chrom in chromosomes:
 		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, file_mac)
+		print file_name
 		pickled_file_name = file_name + '.pickled'
 		if os.path.isfile(pickled_file_name):
 			sd = cPickle.load(open(pickled_file_name))
@@ -2426,11 +2427,11 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 				file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, 0)
 				if os.path.isfile(file_name):
 					sd = parse_numerical_snp_data(file_name, data_format=data_format)
-					sd.filter_mac_snps(min_mac)
 				else:
 					raise Exception('Data files were not found')
 			print "Saving pickled file."
 			cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
+			print min_mac, file_mac
 			if min_mac != file_mac:
 				sd.filter_mac_snps(min_mac)
 				file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, min_mac)
@@ -2544,7 +2545,7 @@ def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_
 	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
 	lm.save_kinship_to_file(kinship_file, K, acc_list)
 
-def generate_usual_kinships(call_method_id=78, data_format='diploid_int'):
+def generate_usual_kinships(call_method_id=76, data_format='diploid_int'):
 	for min_mac in [0, 5, 10]:
 		for method in ['ibs']:
 			generate_kinship(call_method_id=call_method_id, data_format=data_format, method=method, min_mac=min_mac)
