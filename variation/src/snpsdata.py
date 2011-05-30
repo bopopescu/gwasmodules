@@ -2902,8 +2902,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single',
-				chunk_size=10000):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
@@ -2911,6 +2910,7 @@ class SNPsDataSet:
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
 		num_lines = len(self.accessions)
+		chunk_size = num_lines
 		num_snps = len(snps)
 		print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
@@ -2919,6 +2919,7 @@ class SNPsDataSet:
 		chunk_i = 0
 		for snp_i in range(0, num_snps, chunk_size): #FINISH!!!
 			chunk_i += 1
+			print chunk_i
 			snps_array = sp.array(snps[snp_i:snp_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
 			if self.data_format == 'diploid_int':
