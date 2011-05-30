@@ -2932,7 +2932,7 @@ class SNPsDataSet:
 							k_mat[i, j] += bin_counts[0]
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
-				k_mat += sp.array((sm * sm + len(snps_array)) / 2, dtype=snp_dtype)
+				k_mat += sp.array((sm * sm.T + len(snps_array)) / 2, dtype=snp_dtype)
 			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
