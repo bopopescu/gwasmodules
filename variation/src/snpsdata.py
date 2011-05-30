@@ -2925,7 +2925,10 @@ class SNPsDataSet:
 				for j in range(i):
 					if self.data_format == 'diploid_int':
 						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
-						k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
+						if len(bin_counts) > 1:
+							k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
+						else:
+							k_mat[i, j] += bin_counts[0]
 					elif self.data_format == 'binary':
 						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
 						k_mat[i, j] += bin_counts[0]
