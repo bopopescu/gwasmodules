@@ -2919,7 +2919,6 @@ class SNPsDataSet:
 		chunk_i = 0
 		for snp_i in range(0, num_snps, chunk_size): #FINISH!!!
 			chunk_i += 1
-			print chunk_i
 			snps_array = sp.array(snps[snp_i:snp_i + chunk_size], dtype=snp_dtype)
 			snps_array = snps_array.T
 			if self.data_format == 'diploid_int':
