@@ -2328,6 +2328,7 @@ def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessio
 	if not sd:
 		sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac,
 					debug_filter=debug_filter)
+		accessions = sd.accessions
 	if method == 'ibs':
 		K = sd.get_ibs_kinship_matrix()
 	elif method == 'ibd':
@@ -2533,7 +2534,7 @@ def _test_plink_tped_parser_():
         lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
 
 
-def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_mac=0, debug_filter=0.01):
+def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_mac=0, debug_filter=1):
 	import linear_models as lm
 	K, acc_list = load_kinship(call_method_id, data_format, method, min_mac=min_mac, return_accessions=True,
 				debug_filter=debug_filter)
@@ -2541,9 +2542,9 @@ def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_
 	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
 	lm.save_kinship_to_file(kinship_file, K, acc_list)
 
-def generate_usual_kinships(call_method_id=76, data_format='diploid_int', debug_filter=0.01):
-	for min_mac in [0, 5, 10]:
-		for method in ['ibs']:
+def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filter=1):
+	for method in ['ibs', 'ibd']:
+		for min_mac in [0, 5, 10]:
 			generate_kinship(call_method_id=call_method_id, data_format=data_format, method=method,
 					min_mac=min_mac, debug_filter=debug_filter)
 

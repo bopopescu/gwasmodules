@@ -3267,6 +3267,8 @@ def emmax_snp_pair_plot(snps, positions, phenotypes, K, fm_scatter_plot_file=Non
 
 
 def prepare_k(k, k_accessions, accessions):
+	if k_accessions == accessions:
+		return sp.mat(k)
 	indices_to_keep = []
 	for acc in accessions:
 		try:
