@@ -2404,8 +2404,10 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 				debug_filter=1.0):
 	print "Loading sequence data in data format: %s, and with min MAC: %d" % (data_format, min_mac)
 	file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, min_mac)
+	print 'Looking for file: %s' % file_name
 	if min_mac > 0 and not os.path.isfile(file_name):
 		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (1, data_format, 0)
+		print 'File not found, instead trying: %s' % file_name
 		if os.path.isfile(file_name):
 			file_mac = 0
 		else:
