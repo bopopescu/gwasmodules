@@ -2423,23 +2423,14 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 		if os.path.isfile(pickled_file_name):
 			sd = cPickle.load(open(pickled_file_name))
 		else:
-			if os.path.isfile(file_name):
-				sd = parse_numerical_snp_data(file_name, data_format=data_format)
-			else:
-				file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, 0)
-				if os.path.isfile(file_name):
-					sd = parse_numerical_snp_data(file_name, data_format=data_format)
-				else:
-					raise Exception('Data files were not found')
-			print "Saving pickled file."
+			raise NotImplementedError #(Load raw data etc.)
+		print min_mac, file_mac
+		if min_mac != file_mac:
+			sd.filter_mac_snps(min_mac)
+			file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, min_mac)
+			pickled_file_name = file_name + '.pickled'
 			cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
-			print min_mac, file_mac
-			if min_mac != file_mac:
-				sd.filter_mac_snps(min_mac)
-				file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, min_mac)
-				pickled_file_name = file_name + '.pickled'
-				cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
-			print "Done."
+		print "Done."
 
 		if debug_filter < 1.0:
 			sd.sample_snps(debug_filter)
