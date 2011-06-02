@@ -2903,7 +2903,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
