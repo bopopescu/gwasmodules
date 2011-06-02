@@ -2328,10 +2328,11 @@ def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessio
 	if not sd:
 		sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac,
 					debug_filter=debug_filter)
+		accessions = sd.accessions
 	if method == 'ibs':
 		K = sd.get_ibs_kinship_matrix()
 	elif method == 'ibd':
-		K = sd.get_ibs_kinship_matrix()
+		K = sd.get_ibd_kinship_matrix()
 	else:
 		raise NotImplementedError
 	#lm.save_kinship_to_file(kinship_file, K, sd.accessions)
@@ -2421,15 +2422,15 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 	num_snps = 0
 	for chrom in chromosomes:
 		file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, file_mac)
-		print file_name
 		pickled_file_name = file_name + '.pickled'
+		print 'Attempting to load pickled file: %s ' % pickled_file_name
 		if os.path.isfile(pickled_file_name):
 			sd = cPickle.load(open(pickled_file_name))
 		else:
 			raise NotImplementedError #(Load raw data etc.)
 		if min_mac != file_mac:
 			sd.filter_mac_snps(min_mac)
-			file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, min_mac)
+			file_name = file_prefix + 'chr_ % d_ % s_mac % d.csv' % (chrom, data_format, min_mac)
 			pickled_file_name = file_name + '.pickled'
 			cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
 		print "Done."
@@ -2440,10 +2441,10 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 
 		snpsds.append(sd.snpsDataList[0])
 	t = time.time() - t
-	print 'Loaded %d SNPs.' % num_snps
-	print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
+	print 'Loaded % d SNPs.' % num_snps
+	print 'It took % d minutes and % 0.2f seconds to load the SNPs' % (t / 60, t % 60)
 	sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
-	print 'Loaded %d SNPs in total.' % sd.num_snps()
+	print 'Loaded % d SNPs in total.' % sd.num_snps()
 	return sd
 
 
@@ -2533,7 +2534,7 @@ def _test_plink_tped_parser_():
         lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
 
 
-def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_mac=0, debug_filter=0.01):
+def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_mac=0, debug_filter=1):
 	import linear_models as lm
 	K, acc_list = load_kinship(call_method_id, data_format, method, min_mac=min_mac, return_accessions=True,
 				debug_filter=debug_filter)
@@ -2541,9 +2542,9 @@ def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_
 	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
 	lm.save_kinship_to_file(kinship_file, K, acc_list)
 
-def generate_usual_kinships(call_method_id=76, data_format='diploid_int', debug_filter=0.01):
-	for min_mac in [0, 5, 10]:
-		for method in ['ibs']:
+def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filter=1):
+	for method in ['ibs', 'ibd']:
+		for min_mac in [0]:
 			generate_kinship(call_method_id=call_method_id, data_format=data_format, method=method,
 					min_mac=min_mac, debug_filter=debug_filter)
 

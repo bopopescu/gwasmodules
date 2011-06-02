@@ -1882,10 +1882,11 @@ class SNPsData(_SnpsData_):
 
 
 
-	def filter_mac(self, min_mac=15, w_missing=False, type='binary'):
+	def filter_mac(self, min_mac=15, w_missing=False, data_format='binary'):
        		"""
        		Filter minor allele count SNPs.
        		"""
+       		print 'Filtering SNPs with MAC<%d, assuming %s data format' % (min_mac, data_format)
        		new_snps = []
        		new_positions = []
 		if w_missing and self.missingVal in snp:
@@ -1902,12 +1903,12 @@ class SNPsData(_SnpsData_):
 #					new_snps.append(snp)
 #					new_positions.append(pos)
 		else:
-			if type in ['binary', 'int']:
+			if data_format in ['binary', 'int']:
 				for snp, pos in izip(self.snps, self.positions):
 					if min(sp.bincount(snp)) >= min_mac:
 						new_snps.append(snp)
 						new_positions.append(pos)
-			elif type == 'diploid_int':
+			elif data_format == 'diploid_int':
 				for snp, pos in izip(self.snps, self.positions):
 					bin_counts = sp.bincount(snp)
 					l = sp.array([bin_counts[0], bin_counts[2]]) + bin_counts[1] / 2.0
@@ -3363,7 +3364,7 @@ class SNPsDataSet:
 
 	def filter_mac_snps(self, mac_threshold=15):
 		for snpsd in self.snpsDataList:
-			snpsd.filter_mac(mac_threshold, type=self.data_format)
+			snpsd.filter_mac(mac_threshold, data_format=self.data_format)
 
 
 	def filter_monomorphic_snps(self):
