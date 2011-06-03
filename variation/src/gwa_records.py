@@ -348,18 +348,20 @@ class GWASRecord():
         dict_list = []
         #self.h5file = self._open(mode="r")
         try:
+            if "phenotypes" not in self.h5file.root:
+                return dict_list
             if not phen_name:
                 for phenotype_table in self.h5file.iterNodes("/phenotypes",'Group'):
-                    d = {'name': phenotype_table._v_attrs.name, 'num_values': phenotype_table._v_attrs.num_vals, 'std_dev': phenotype_table._v_attrs.std_dev, 'growth_conditions': phenotype_table._v_attrs.growth_conditions,
+                    d = {'id':phenotype_table._v_attrs.name,'name': phenotype_table._v_attrs.name, 'num_values': phenotype_table._v_attrs.num_vals, 'std_dev': phenotype_table._v_attrs.std_dev, 'growth_conditions': phenotype_table._v_attrs.growth_conditions,
                         'phenotype_scoring': phenotype_table._v_attrs.phenotype_scoring, 'method_description': phenotype_table._v_attrs.method_description, 'measurement_scale': phenotype_table._v_attrs.measurement_scale,
                         'is_binary': False}
-                    d['transformation'] = self._get_phenotype_transformations_(d['name'])
+                    d['transformations'] = self._get_phenotype_transformations_(d['name'])
                     dict_list.append(d)
             else:
                 x = self.h5file.getNode("/phenotypes/%s" % phen_name)
-                dict_list = [{'name': x._v_attrs.name, 'num_values': x._v_attrs.num_vals, 'std_dev': x._v_attrs.std_dev, 'growth_conditions': x._v_attrs.growth_conditions,
+                dict_list = [{'id':x._v_attrs.name,'name': x._v_attrs.name, 'num_values': x._v_attrs.num_vals, 'std_dev': x._v_attrs.std_dev, 'growth_conditions': x._v_attrs.growth_conditions,
                             'phenotype_scoring': x._v_attrs.phenotype_scoring, 'method_description': x._v_attrs.method_description, 'measurement_scale': x._v_attrs.measurement_scale,
-                            'is_binary': False,'transformation':self._get_phenotype_transformations_(x._v_attrs.name)}]
+                            'is_binary': False,'transformations':self._get_phenotype_transformations_(x._v_attrs.name)}]
         except Exception,err:
             raise(err)
         finally:
@@ -373,9 +375,9 @@ class GWASRecord():
         dict_list = []
         #table = self.h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
         for x in self.h5file.iterNodes('/phenotypes/%s' % phen_name,'Group'):
-            d = {'name': x._v_attrs.name, 'description': x._v_attrs.description}
+            d = {'id':x._v_attrs.name,'name': x._v_attrs.name, 'description': x._v_attrs.description}
             d['phenotype'] = phen_name
-            d['analysis_method'] = self._get_analysis_methods_(phen_name, d['name'])
+            d['analysis_methods'] = self._get_analysis_methods_(phen_name, d['name'])
             dict_list.append(d)
         return dict_list
 
@@ -409,7 +411,7 @@ class GWASRecord():
                             if key in cofactor:
                                 stat[key] = cofactor[key]
                         stats.append(stat)
-                    d = {'name':res._v_attrs.name,'resultName':res.name,'comment':res._v_attrs.comment,'type':x._v_attrs.type,'cofactors':stats}
+                    d = {'id':x._v_attrs.name,'name':res._v_attrs.name,'resultName':res.name,'comment':res._v_attrs.comment,'type':x._v_attrs.type,'cofactors':stats}
                     d['phenotype'] = phen_name
                     d['transformation'] = transformation
                     dict_list.append(d)
@@ -614,7 +616,7 @@ class GWASRecord():
 
         
 
-    def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', \
+    def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', call_method_id, \
             snps_data_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv.binary',
             kinship_file='/Users/bjarnivilhjalmsson/Projects/Data/250k/kinship_matrix_cm54.pickled'):
 
