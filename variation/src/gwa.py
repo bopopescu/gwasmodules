@@ -552,7 +552,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			else:
 				print 'Loading kinship file.'
 				cm = 0 if p_dict['data_format'] == 'binary' else p_dict['call_method_id']
-				k = dataParsers.load_kinship(call_method_id=cm, data_format=p_dict['data_format'],
+				k = dataParsers.load_kinship(call_method_id=cm, data_format=p_dict['data_format'], \
 							method='ibs', accessions=sd.accessions, sd=sd)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
