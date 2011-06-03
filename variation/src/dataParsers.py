@@ -2316,12 +2316,13 @@ def _test_full_seq_parser_():
 def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=None, return_accessions=False,
 		scaled=True, min_mac=0, sd=None, debug_filter=1):
 	import linear_models as lm
-	file_prefix = '%s%d/kinship_%s_%s' % (env['data_dir'], call_method_id, method, data_format)
-	kinship_file = file_prefix + '_mac%d.pickled' % min_mac
-	if os.path.isfile(kinship_file):
-		print 'Found kinship file: %s' % kinship_file
-		return lm.load_kinship_from_file(kinship_file, accessions=accessions,
-						return_accessions=return_accessions, scaled=scaled)
+	if call_method_id:
+		file_prefix = '%s%d/kinship_%s_%s' % (env['data_dir'], call_method_id, method, data_format)
+		kinship_file = file_prefix + '_mac%d.pickled' % min_mac
+		if os.path.isfile(kinship_file):
+			print 'Found kinship file: %s' % kinship_file
+			return lm.load_kinship_from_file(kinship_file, accessions=accessions,
+							return_accessions=return_accessions, scaled=scaled)
 
 	print "Didn't find kinship file: %s, now generating one.." % kinship_file
 
