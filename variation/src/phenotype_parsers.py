@@ -337,6 +337,51 @@ def load_phentoype_file_nc_resistance_2():
 
 
 
+def load_phentoype_file_nc_resistance_3():
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/20dd5_330.csv"
+	with open(filename) as f:
+		line = map(str.strip, f.next().split(','))
+		phenotype_names = line[-1:]
+		print phenotype_names
+		phenotypes = []
+		accession_names = []
+		ecotypes = []
+		full_accession_names = []
+		for l in f:
+			line = map(str.strip, l.split(','))
+			accession_names.append(line[1].lower())
+			ecotypes.append(line[0])
+			full_accession_names.append(line[5].lower())
+			phenotypes.append(line[4])
+
+	print accession_names
+	acc_dict = pd.get_accession_to_ecotype_id_dict(accession_names)#+["n13","kno-10","kno-10","shahdara","nd-1"])
+#	acc_dict["cibc-5"] = 6908
+#	acc_dict["wa-1"] = 6978
+#	acc_dict["gu-0"] = 7149
+#	acc_dict['Rubezhnoe-1'] = 7323
+	print len(acc_dict), acc_dict
+	ets = []
+	phen_vals = []
+	for acc1, acc2, et, pt in zip(accession_names, full_accession_names, ecotypes, phenotypes):
+		if acc1 in acc_dict:
+			ecotype = acc_dict[acc1]
+
+			if str(ecotype) != et and et != 'NA':
+				print "Ecotype mismatch.. %s, %s, %s, %s" % (unicode(acc1, "latin-1"),
+									unicode(acc2, "latin-1"), et, ecotype)
+			else:
+				et = ecotype
+			if et != 'NA' and et != '':
+				ets.append(et)
+				if not pt in ['R', 'S']: print pt
+				phen_vals.append(0 if pt == 'R' else 1)
+	print len(phen_vals)
+
+	phen_dict = {1:{'name':'resistance_20dd5', 'ecotypes':ets, 'values':phen_vals}}
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file('resistance_20dd5.csv', ',')
+
 
 
 def load_phentoype_file_bergelsson():
@@ -803,7 +848,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_duszynska_file3()
+	load_phentoype_file_nc_resistance_3()
 	print "Done!"
 
 

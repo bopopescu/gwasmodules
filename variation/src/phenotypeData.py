@@ -1616,7 +1616,7 @@ def get_250K_accession_to_ecotype_dict(call_method=72, dict_key='nativename'):
 
 
 
-def get_accession_to_ecotype_id_dict(accessions, stockParents=None, defaultValue=None, only_250K_accessions=False, lower_cases=True):
+def get_accession_to_ecotype_id_dict(accessions, stockParents=None, defaultValue=None, lower_cases=True):
 	import warnings
 	warnings.warn("This function is possibly outdated, please update SQL statement before use!")
 	import dbutils
@@ -1628,20 +1628,17 @@ def get_accession_to_ecotype_id_dict(accessions, stockParents=None, defaultValue
 	not_found_count = 0
 	for i in range(0, len(accessions)):
 		acc = accessions[i]
-		#acc = unicode(acc,"latin-1")
-		#print acc
+		acc = unicode(acc, "latin-1")
+		#print acc, unicode(acc, "latin-1")
 		if stockParents != None and stockParents[i] != "NA":
 			sp = stockParents[i]
-			if only_250K_accessions:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and ei.nativename like '" + str(acc.lower()) + "' and ei.stockparent like '" + str(sp) + "'"
-			else:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei where ei.nativename like '" + str(acc.lower()) + "' and ei.stockparent like '" + str(sp) + "'"
+			sql_statement = "SELECT DISTINCT ei.tg_ecotypeid, ei.nativename \
+					 FROM stock.ecotypeid2tg_ecotypeid ei \
+					 WHERE ei.nativename like '%s' and ei.stockparent like '%s' " % (acc.lower(), sp)
 		else:
-			if only_250K_accessions:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ai.paternal_ecotype_id=ei.tg_ecotypeid and ai.maternal_ecotype_id=ei.tg_ecotypeid and ei.nativename like '" + str(acc.lower()) + "'"
-			else:
-				sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei where ei.nativename like '" + str(acc.lower()) + "'"
-		#sql_statement = "select distinct ei.tg_ecotypeid, ei.nativename from stock.ecotypeid2tg_ecotypeid ei, stock_250k.array_info ai where ei.nativename like '"+str(acc)+"'"
+			sql_statement = "SELECT DISTINCT ei.tg_ecotypeid, ei.nativename \
+					 FROM stock.ecotypeid2tg_ecotypeid ei \
+					 WHERE ei.nativename like '%s' " % (acc.lower())
 		#print sql_statement
 		numRows = int(cursor.execute(sql_statement))
 		i = 0
@@ -1652,7 +1649,7 @@ def get_accession_to_ecotype_id_dict(accessions, stockParents=None, defaultValue
 			if not row:
 				if i == 0:
 					not_found_count += 1
-					#print "Accession", acc, "wasn't found."
+					print "Accession", acc, "wasn't found."
 				break
 			else:
 				if i == 0:

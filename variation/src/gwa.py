@@ -96,6 +96,7 @@ from numpy import *
 from env import *
 import copy
 import pdb
+import ipdb
 
 #For annoying linux computers, which don't have a display..
 import matplotlib
@@ -563,7 +564,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 
 		if p_dict['local_gwas']: #Filter SNPs, etc..
 			sd = snpsdata.SNPsDataSet([sd.get_region_snpsd(*p_dict['local_gwas'])],
-						[p_dict['local_gwas'][0]])
+						[p_dict['local_gwas'][0]], data_format=sd.data_format)
 		snps = sd.getSnps()
 
 

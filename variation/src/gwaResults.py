@@ -1813,7 +1813,7 @@ def getCandidateGeneList(cgl_id, host="papaya.usc.edu", user="bvilhjal", passwd=
 def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=True, \
 		verbose=True, conn=None):
 	"""
-	Fetch genes within a region or all genes from DB (TAIR 10).
+	Fetch genes (ignores TEs etc.) within a region or all genes from DB (TAIR 10).
 	"""
 	import dbutils
 	if not conn:
@@ -1852,8 +1852,6 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 	if numRows == 0:
 		pass
 
-#	if tair9:
-#		t_map = tc.tair8_to_tair9_map()
 	genes = []
 	while(1):
 		row = cursor.fetchone()
@@ -1861,17 +1859,12 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 			break;
 		if row[1] and  row[2] and row[0] in ['1', '2', '3', '4', '5']:
 			chrom = int(row[0])
-#			if tair9:
-#				start_pos = t_map.get_tair9_pos(chrom, int(row[1]))
-#				end_pos = t_map.get_tair9_pos(chrom, int(row[2]))
-#			else:
 			start_pos = int(row[1])
 			end_pos = int(row[2])
 			db_ref = row[6]
 			if db_ref == None:
-				tair_id = row[4]
-			else:
-				tair_id = db_ref[5:]
+				continue
+			tair_id = db_ref[5:]
 			gene = Gene(int(row[0]), start_pos, end_pos, name=row[4], description=row[5], dbRef=row[6], tairID=tair_id)
 			genes.append(gene)
 
@@ -1883,11 +1876,12 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 #					WHERE g.dbxrefs='%s' AND gm.gene_id = g.gene_id AND \
 #						gs.gene_commentary_id=gc.id AND gc.gene_id=gm.gene_id \
 #					ORDER BY gs.start, gs.stop" % (g.dbRef)
-			sql_stat = "SELECT distinct gs.start, gs.stop, g.name \
-					FROM genome.gene g, genome.gene_segment gs, genome.gene_commentary gc \
-					WHERE g.name='%s' AND gs.gene_commentary_id=gc.id AND gc.gene_id=g.id \
+			sql_stat = "SELECT distinct gs.start, gs.stop, g.gene_symbol \
+					FROM genome_tair10.gene g, genome_tair10.gene_segment gs, \
+						genome_tair10.gene_commentary gc \
+					WHERE g.gene_symbol='%s' AND gs.gene_commentary_id=gc.id AND gc.gene_id=g.id \
 					ORDER BY gs.start, gs.stop" % (g.name)
-			print sql_stat
+			#print sql_stat
 			numRows = int(cursor.execute(sql_stat))
 			segments = []
 			while(1):
@@ -1895,12 +1889,8 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 				if not row:
 					break;
 				try:
-					if tair9:
-						start_pos = t_map.get_tair9_pos(g.chromosome, int(row[0]))
-						end_pos = t_map.get_tair9_pos(g.chromosome, int(row[1]))
-					else:
-						start_pos = int(row[0])
-						end_pos = int(row[1])
+					start_pos = int(row[0])
+					end_pos = int(row[1])
 					segments.append(Region(g.chromosome, start_pos, end_pos))
 				except Exception, err_str:
 					print err_str, ':'

@@ -2522,13 +2522,12 @@ class SNPsDataSet:
 	chromosomes = None
 	accessions = None
 
-	def __init__(self, snpsds, chromosomes, id=None, is_binary=None, call_method=None, data_format=None):
+	def __init__(self, snpsds, chromosomes, id=None, call_method=None, data_format=None):
 		self.snpsDataList = snpsds
 		self.chromosomes = chromosomes
 		self.accessions = self.snpsDataList[0].accessions
 		self.array_ids = self.snpsDataList[0].arrayIds
 		self.id = id
-		self.is_binary = is_binary
 		self.missing_val = snpsds[0].missingVal
 		self.call_method = call_method
 		self.data_format = data_format # binary, diploid_ints, floats, int
@@ -2537,10 +2536,7 @@ class SNPsDataSet:
 		for i in range(1, len(self.chromosomes)):
 			if self.accessions != self.snpsDataList[i].accessions:
 				raise Exception("Accessions (or order) are different between SNPs datas")
-		if not is_binary:
-			self.is_binary = list(snpsds[0].snps[0]).count(0) or list(snpsds[0].snps[0]).count(1)
-		else:
-			self.is_binary = is_binary
+		self.is_binary = list(snpsds[0].snps[0]).count(0) or list(snpsds[0].snps[0]).count(1)
 
 
 
@@ -2903,7 +2899,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
