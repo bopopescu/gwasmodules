@@ -353,7 +353,7 @@ class Result(object):
 
 	def get_quantile(self, quantile):
 		if not self.orders:
-			_rank_scores_()
+			self._rank_scores_()
 		rank = int(self.num_scores()*quantile)
 		return self.snp_results['scores'][self.orders[rank]]
 
