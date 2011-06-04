@@ -1658,7 +1658,7 @@ class Result(object):
 					columns.append(info)
 		score_threshold = None
 		if max_fraction < 1:
-			score_threshold = get_quantile(max_fraction)
+			score_threshold = self.get_quantile(max_fraction)
 		num_scores = self.num_scores()
 #		try:
 		if not only_pickled:
