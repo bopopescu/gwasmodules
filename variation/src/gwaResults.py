@@ -14,7 +14,6 @@ import dbutils
 import csv
 import math
 import itertools as it
-from plotResults import num_scores
 try:
 	import scipy as sp
 	import scipy.stats as st
