@@ -14,6 +14,7 @@ import dbutils
 import csv
 import math
 import itertools as it
+from plotResults import num_scores
 try:
 	import scipy as sp
 	import scipy.stats as st
@@ -349,6 +350,14 @@ class Result(object):
 			for i in orders:
 				snp_results[key].append(self.snp_results[key][i])
 		self.snp_results = snp_results
+
+
+	def get_quantile(self, quantile):
+		if not self.orders:
+			_rank_scores_()
+		rank = int(self.num_scores()*quantile)
+		return self.snp_results['scores'][self.orders[rank]]
+
 
 
 	def candidate_gene_enrichments(self, cgl=None, cgl_file=None, pval_thresholds=[0.01], gene_radius=20000,
@@ -1641,20 +1650,32 @@ class Result(object):
 	def num_scores(self):
 		return len(self.snp_results['scores'])
 
-	def write_to_file(self, filename, additional_columns=None, auto_pickling_on=False, only_pickled=False):
+	def write_to_file(self, filename, additional_columns=None, auto_pickling_on=False, only_pickled=False,
+			max_fraction=1.0):
 		columns = ['chromosomes', 'positions', 'scores', 'mafs', 'macs']
 		if additional_columns:
 			for info in additional_columns:
 				if info in self.snp_results:
 					columns.append(info)
+		score_threshold = None
+		if max_fraction < 1:
+			score_threshold = get_quantile(max_fraction)
+		num_scores = self.num_scores()
 #		try:
 		if not only_pickled:
 			with open(filename, "w") as f:
 				f.write(','.join(columns) + "\n")
-				for i in range(len(self.snp_results[columns[0]])):
-					l = [self.snp_results[c][i] for c in columns]
-					l = map(str, l)
-					f.write(",".join(l) + "\n")
+				if score_threshold:
+					for i in range(num_scores):
+						if self.snp_results['scores'][i] < score_threshold:
+							l = [self.snp_results[c][i] for c in columns]
+							l = map(str, l)
+							f.write(",".join(l) + "\n")
+				else:
+					for i in range(num_scores):
+						l = [self.snp_results[c][i] for c in columns]
+						l = map(str, l)
+						f.write(",".join(l) + "\n")
 		if auto_pickling_on or only_pickled:
 			pickle_file = filename + '.pickled'
 			d = {}
