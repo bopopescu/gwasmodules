@@ -163,7 +163,7 @@ def parse_parameters():
 		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
 		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'pids':None,
-		'save_stepw_pvals':False, 'pvalue_filter':0.1}
+		'save_stepw_pvals':False, 'pvalue_filter':1.0}
 
 
 	for opt, arg in opts:
