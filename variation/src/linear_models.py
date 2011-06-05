@@ -818,25 +818,25 @@ class LinearMixedModel(LinearModel):
 		assert len(self.random_effects) == 2, "Expedited REMLE only works when we have exactly two random effects."
 		K = self.random_effects[1][1]
 		eig_L = self._get_eigen_L_(K)
-		f_stats = []
-		vgs = []
-		ves = []
-		max_lls = []
-		var_perc = []
-		betas = []
-		p_vals = []
 		num_snps = len(snps)
+		f_stats = sp.empty(num_snps)
+		vgs = sp.empty(num_snps)
+		ves = sp.empty(num_snps)
+		max_lls = sp.empty(num_snps)
+		var_perc = sp.empty(num_snps)
+		betas = []
+		p_vals = sp.empty(num_snps)
 
 		for i, snp in enumerate(snps):
 			res = self.get_estimates(eig_L=eig_L, xs=sp.matrix(snp).T, ngrids=ngrids, llim=llim, ulim=ulim,
 						       esp=esp, return_pvalue=True, return_f_stat=True)
-			f_stats.append(res['f_stat'])
-			vgs.append(res['vg'])
-			ves.append(res['ve'])
-			max_lls.append(res['max_ll'])
-			var_perc.append(res['var_perc'])
+			f_stats[i] = res['f_stat']
+			vgs[i] = res['vg']
+			ves[i] = res['ve']
+			max_lls[i] = res['max_ll']
+			var_perc[i] = res['var_perc']
 			betas.append(map(float, list(res['beta'])))
-			p_vals.append(res['p_val'])
+			p_vals[i] = res['p_val']
 			if verbose and num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
@@ -3283,7 +3283,9 @@ def prepare_k(k, k_accessions, accessions):
 
 def scale_k(k):
 	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
-	k = (len(k) - 1) * k / c
+	scalar = (len(k) - 1) / c
+	print 'Kinship scaled by: %0.4f' % scalar
+	k = scalar * k
 	return k
 
 def load_kinship_from_file(kinship_file, accessions=None, dtype='double', return_accessions=False, scaled=True):
@@ -3487,7 +3489,7 @@ def test_bayes_factor_enrichment():
 	import gwaResults as gr
 	import phenotypeData as pd
 	import env
-	for pid in [314, 315, 316, 317]:
+	for pid in [316, 317]:
 		sd = dp.load_snps_call_method(75)
 		phed = pd.get_phenotypes_from_db([pid])
 		phed.convert_to_averages()
@@ -3496,7 +3498,7 @@ def test_bayes_factor_enrichment():
 		sd.filter_mac_snps(15)
 		phen_vals = phed.get_values(pid)
 		phen_name = phed.get_name(pid)
-		K = dp.load_kinship(75, accessions=sd.accessions)
+		K = dp.load_kinship(75, accessions=sd.accessions, sd=sd)
 
 		#Candidate genes (TAIR IDs)
 		cg_tair_ids = ['AT1G04400', 'AT1G65480', 'AT1G77080', 'AT2G26330', 'AT4G00650', 'AT5G10140', 'AT5G65050', \
@@ -3504,7 +3506,7 @@ def test_bayes_factor_enrichment():
 				#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
 		cgs = gr.get_genes_w_tair_id(cg_tair_ids)
 		snp_priors = sd.get_cand_genes_snp_priors(cgs, radius=25000, cg_prior_fold_incr=20)
-		emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_3_%s_%d' % (phen_name, pid),
+		emmax_step_wise(phen_vals, K, sd, 20, env.env['tmp_dir'] + 'bf_25kb_most_norm_%s_%d' % (phen_name, pid),
 				snp_priors=snp_priors, cand_gene_list=cgs)
 
 

@@ -3217,7 +3217,8 @@ class SNPsDataSet:
 
 
 
-	def get_cand_genes_snp_priors(self, cand_genes, radius=25000, num_exp_causal=1.0, cg_prior_fold_incr=10):
+	def get_cand_genes_snp_priors(self, cand_genes, radius=25000, num_exp_causal=1.0, cg_prior_fold_incr=10,
+					method_type='sum_all_priors'):
 		"""
 		Returns SNP priors
 		"""
@@ -3234,8 +3235,14 @@ class SNPsDataSet:
 			cg_snp_indices.extend(range(start_i, stop_i))
 		cg_snp_indices = sorted(list(set(cg_snp_indices)))
 		num_exp_causal
-		pi_0 = num_exp_causal / (num_snps - num_cgs + cg_prior_fold_incr * num_cgs) #Basis prior
-		pi_1 = pi_0 * cg_prior_fold_incr #Cand. gene prior
+		if method_type == 'sum_all_priors':
+			pi_0 = num_exp_causal / num_snps #Basis prior
+			pi_1 = pi_0 * cg_prior_fold_incr #Cand. gene prior
+		elif method_type == 'sum_base_priors':
+			pi_0 = num_exp_causal / (num_snps - num_cgs + cg_prior_fold_incr * num_cgs) #Basis prior
+			pi_1 = pi_0 * cg_prior_fold_incr #Cand. gene prior
+		else:
+			raise NotImplementedError
 		snp_priors = sp.repeat(pi_0, num_snps)
 		for i in cg_snp_indices:
 			snp_priors[i] = pi_1
