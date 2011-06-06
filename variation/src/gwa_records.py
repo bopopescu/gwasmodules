@@ -411,7 +411,7 @@ class GWASRecord():
                             if key in cofactor:
                                 stat[key] = cofactor[key]
                         stats.append(stat)
-                    d = {'id':x._v_attrs.name, 'name':res._v_attrs.name, 'resultName':res.name, 'comment':res._v_attrs.comment, 'type':x._v_attrs.type, 'cofactors':stats}
+                    d = {'id':res._v_attrs.name, 'name':res._v_attrs.name, 'resultName':res.name, 'comment':res._v_attrs.comment, 'type':x._v_attrs.type, 'cofactors':stats}
                     d['phenotype'] = phen_name
                     d['transformation'] = transformation
                     dict_list.append(d)
