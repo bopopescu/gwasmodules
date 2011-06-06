@@ -629,7 +629,7 @@ class GWASRecord():
             raise Exception('analysis method %s not supported' % analysis_method)
 
         phen_dict = self.get_phenotype_values(phen_name, transformation) #Load phenotype
-        phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':phen_dict['ecotype'], 'name':phen_name}})
+        phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':map(str, phen_dict['ecotype']), 'name':phen_name}})
         sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format='binary', min_mac=5) #Load SNPs data
 
         sd.coordinate_w_phenotype_data(phend, 1)
