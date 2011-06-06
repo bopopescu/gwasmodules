@@ -737,10 +737,12 @@ class Result(object):
 				indices = result.get_indices(highlight_markers)
 				pvals = [result.snp_results['scores'][i] for i in indices]
 				for i, (c, p) in enumerate(highlight_markers):
-					new_h_markers.append((c, p, -math.log10(pvals[i])))
+					s = -math.log10(pvals[i]) if neg_log_transform else pvals[i]
+					new_h_markers.append((c, p, s))
 			elif len(highlight_markers[0]) == 3:
 				for c, p, pval in highlight_markers:
-					new_h_markers.append((c, p, -math.log10(pval)))
+					s = -math.log10(pval) if neg_log_transform else pval
+					new_h_markers.append((c, p, s))
 			highlight_markers = new_h_markers
 
 		if not max_score:
@@ -800,7 +802,7 @@ class Result(object):
 			if cand_genes:
 				for cg in chr_cand_genes[chrom]:
 					ax.axvspan(offset + cg.startPos, offset + cg.endPos,
-							facecolor='#FF9900', alpha=0.6)
+							facecolor='#BB0099', edgecolor='#BB0099', alpha=0.6)
 			#Highlighting loci
 			if highlight_loci:
 				for p in hl_dict[chrom]:

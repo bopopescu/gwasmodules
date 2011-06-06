@@ -1099,8 +1099,173 @@ def generate_results_figure_2():
 	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
 	f.savefig('/tmp/test.png')
 
+
+	file_prefix = '/storage/mlt_results/mlt'
+	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
+	f = pylab.figure(figsize=(11, 7))
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), w_legend=True, x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03))
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	f.text(0.168, 0.962, 'Additive')
+	f.text(0.496, 0.962, "'or'")
+	f.text(0.796, 0.962, "'xor'")
+
+
+	f.text(0.072, 0.91, 'A')
+	f.text(0.382, 0.91, "B")
+	f.text(0.688, 0.91, "C")
+	f.text(0.072, 0.46, 'D')
+	f.text(0.382, 0.46, "E")
+	f.text(0.688, 0.46, "F")
+
+	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
+	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
+	f.savefig('/tmp/test.png')
+
+
+
+def generate_example_figure_7():
+	import gwaResults as gr
+
+	result_file_prefix = env.env['results_dir'] + 'bf_most_norm_'
+	cg_tair_ids = ['AT1G04400', 'AT1G65480', 'AT1G77080', 'AT2G26330', 'AT4G00650', 'AT5G10140', 'AT5G65050', \
+			'AT5G65060', 'AT5G65070', 'AT5G65080'] \
+			#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
+	cgs = gr.get_genes_w_tair_id(cg_tair_ids)
+	result_files = [result_file_prefix + fn for fn in ['DTF1stSpAverage2009_314_step1.ppas', \
+							'DTF2ndSpAverage2009_315_opt_min_cof_ppa_step13.ppas', \
+							'DTF1stSwAverage2009_316_step3.ppas', \
+							'DTF2ndSwAverage2009_317_step4.ppas']]
+	#Load pickle file...
+	results = [gr.Result(result_file=fn) for fn in result_files]
+	#Setting up figure
+	f = pylab.figure(figsize=(9, 8))
+	ax1 = f.add_axes([0.08, 0.07 + (0.75 * 0.94), 0.9, (0.225 * 0.94) ])
+	ax1.spines['top'].set_visible(False)
+	ax1.xaxis.set_visible(False)
+	ax2 = f.add_axes([0.08, 0.07 + (0.5 * 0.94), 0.9, (0.225 * 0.94) ])
+	ax2.spines['top'].set_visible(False)
+	ax2.xaxis.set_visible(False)
+	ax3 = f.add_axes([0.08, 0.07 + (0.25 * 0.94), 0.9, (0.225 * 0.94) ])
+	ax3.spines['top'].set_visible(False)
+	ax3.xaxis.set_visible(False)
+	ax4 = f.add_axes([0.08, 0.07 , 0.9, (0.225 * 0.94) ])
+	ax4.spines['top'].set_visible(False)
+	ax4.xaxis.set_ticks_position('bottom')
+	ax4.xaxis.set_label_position('bottom')
+	res = results[0]
+	chrom_ends = res.get_chromosome_ends()
+	offset = 0
+	tick_positions = []
+	tick_labels = []
+	for c_end in chrom_ends[:-1]:
+		offset += c_end
+		tick_positions.append(offset)
+		tick_labels.append('')
+	ax4.set_xticks(tick_positions)
+	ax4.set_xticklabels(tick_labels)
+	y_tick_positions = [0, 0.5, 1.0]
+	y_tick_labels = ['0.0', '0.5', '1.0']
+
+	max_y = offset + chrom_ends[-1]
+
+	for ax in [ax1, ax2, ax3, ax4]:
+		ax.set_ylim((-0.05, 1.05))
+		ax.set_xlim((-0.02 * max_y, 1.02 * max_y))
+		ax.set_yticks(y_tick_positions)
+		ax.set_yticklabels(y_tick_labels)
+
+
+	#Fill up the figure..
+	cm = {1:'#1199EE', 2:'#11BB00', 3:'#1199EE', 4:'#11BB00', 5:'#1199EE'}
+	results[0].plot_manhattan2(ax=ax1, neg_log_transform=False, plot_bonferroni=False,
+				chrom_colormap=cm, highlight_markers=[(5, 3188327, 0.99957464909496818)],
+				cand_genes=cgs)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.95 * x_range + x_min, 0.85 * y_range + y_min, 'A')
+
+	results[1].plot_manhattan2(ax=ax2, neg_log_transform=False, plot_bonferroni=False,
+				chrom_colormap=cm, highlight_markers=[(5, 3188327, 0.99987154081342355), (4, 161496, 0.99792660595760496), (1, 24341345, 0.99816162117265428), (2, 8509438, 0.99185074339847878), (4, 633609, 0.87069974648101967), (4, 7232003, 0.70642884690410201), (1, 1630085, 0.62628047124132957)],
+				cand_genes=cgs)
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax2.text(0.95 * x_range + x_min, 0.85 * y_range + y_min, 'B')
+
+	results[2].plot_manhattan2(ax=ax3, neg_log_transform=False, plot_bonferroni=False,
+				chrom_colormap=cm, highlight_markers=[(4, 1356197, 0.86299217462489453), (4, 493905, 0.95488774939952203), (5, 3188327, 0.5687697089878565)],
+				cand_genes=cgs)
+	x_min, x_max = ax3.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax3.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(0.95 * x_range + x_min, 0.85 * y_range + y_min, 'C')
+
+	results[3].plot_manhattan2(ax=ax4, neg_log_transform=False, plot_bonferroni=False,
+				chrom_colormap=cm, highlight_markers=[(5, 3188327, 0.99975387199431631), (4, 493905, 0.98796470842089601), (5, 7476090, 0.78288774499946212), (1, 24341345, 0.62528073836407139)],
+				cand_genes=cgs)
+	x_min, x_max = ax4.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax4.get_ylim()
+	y_range = y_max - y_min
+	ax4.text(0.95 * x_range + x_min, 0.85 * y_range + y_min, 'D')
+
+	f.text(0.195, 0.04, '1')
+	f.text(0.25, 0.04, 'FT')
+	f.text(0.381, 0.04, '2')
+	f.text(0.542, 0.04, '3')
+	f.text(0.65, 0.04, 'FRI')
+	f.text(0.704, 0.04, '4')
+	f.text(0.82, 0.04, 'FLC')
+	f.text(0.873, 0.04, '5')
+	f.text(0.43, 0.01, 'Chromosome number')
+
+	#Save the figure?
+	pylab.savefig(env.env['tmp_dir'] + 'test.png')
+
+
+
 if __name__ == '__main__':
-	generate_results_figure_2()
+	generate_example_figure_7()
 	#_run_()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)

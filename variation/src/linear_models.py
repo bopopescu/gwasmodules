@@ -1982,6 +1982,9 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict, plot_bon
 					highlight_loci=highlight_loci, ylab='Post. prob. of assoc.',
 					min_score=0.0, max_score=1.0, markersize=3)
 		ret_dict['ppa_manhattan'] = png_file_name
+		if write_pvals:
+			pval_file_name = '%s_step%d.ppas' % (file_prefix, step_i)
+			res.write_to_file(pval_file_name)
 
 	#Plot QQ plot
 	if with_qq_plots:
@@ -2657,6 +2660,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 			 bic, extended_bic, modified_bic, num_snps)
 
 		print 'Cofactors:', _cofactors_to_string_(cofactors)
+		print ppa_cofactors
 		if reml_res['pseudo_heritability'] < 0.01 and num_pher_0 < 1:
 			num_pher_0 += 1
 		elif reml_res['pseudo_heritability'] < 0.01:
@@ -2781,6 +2785,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 				reml_mahalanobis_rss, bic, extended_bic, modified_bic, num_snps)
 
 			print 'Cofactors:', _cofactors_to_string_(cofactors)
+			print ppa_cofactors
 
 			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
@@ -2792,7 +2797,6 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 				step_info['ppa_cofactors'] = map(tuple, ppa_cofactors[:])
 			step_info_list.append(step_info)
 			print step_info['kolmogorov_smirnov'], step_info['pval_median']
-			print cofactors
 
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, chr_pos_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
@@ -3489,7 +3493,7 @@ def test_bayes_factor_enrichment():
 	import gwaResults as gr
 	import phenotypeData as pd
 	import env
-	for pid in [316, 317]:
+	for pid in [315]:
 		sd = dp.load_snps_call_method(75)
 		phed = pd.get_phenotypes_from_db([pid])
 		phed.convert_to_averages()
@@ -3506,8 +3510,8 @@ def test_bayes_factor_enrichment():
 				#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
 		cgs = gr.get_genes_w_tair_id(cg_tair_ids)
 		snp_priors = sd.get_cand_genes_snp_priors(cgs, radius=25000, cg_prior_fold_incr=20)
-		emmax_step_wise(phen_vals, K, sd, 20, env.env['tmp_dir'] + 'bf_25kb_most_norm_%s_%d' % (phen_name, pid),
-				snp_priors=snp_priors, cand_gene_list=cgs)
+		emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_most_norm_%s_%d' % (phen_name, pid),
+				snp_priors=snp_priors, cand_gene_list=cgs, save_pvals=True)
 
 
 

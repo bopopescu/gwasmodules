@@ -628,15 +628,13 @@ class GWASRecord():
         if analysis_method not in ['lm', 'emmax', 'kw']:
             raise Exception('analysis method %s not supported' % analysis_method)
 
-        phen_data = self.get_phenotype_values(phen_name, transformation)
-        sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format='binary', min_mac=5)
+        phen_dict = self.get_phenotype_values(phen_name, transformation) #Load phenotype
+        phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':phen_dict['ecotype'], 'name':phen_name}})
+        sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format='binary', min_mac=5) #Load SNPs data
 
-        sd.filter_accessions(map(str, phen_data['ecotype']))
+        sd.coordinate_w_phenotype_data(phend, 1)
         sd.filter_monomorphic_snps()
-        phen_vals = []
-        for ei in sd.accessions:
-            i = phen_data['ecotype'].index(int(ei))
-            phen_vals.append(phen_data['mean_value'][i])
+        phen_vals = phend.get_values(1)
         snps = sd.getSnps()
         positions = sd.getPositions()
         chromosomes = []
@@ -648,7 +646,8 @@ class GWASRecord():
 
         kwargs = {}
         if analysis_method == 'emmax':
-            k = lm.load_kinship_from_file(kinship_file, sd.accessions)
+            k = dp.load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=sd.accessions,
+			scaled=True, min_mac=5, sd=sd)
             d = lm.emmax_step(phen_vals, sd, k, [])
             res = d['res']
             stats_dict = d['stats']
@@ -685,7 +684,6 @@ class GWASRecord():
         Performs GWAS and updates the datastructure.
         """
 
-
         #if analysis_method not in ['emmax','lm']:
         #    raise Exception("Step-Wise GWAS only possible with emmax or LM")
         snp = ((int(chromosome), int(position)))
@@ -710,17 +708,14 @@ class GWASRecord():
             raise Exception('analysis method %s not supported' % analysis_method)
         if analysis_method == 'kw':
             analysis_method = 'emmax'
-        phen_data = self.get_phenotype_values(phen_name, transformation)
-        #phen_data.convert_to_averages()
 
-        sd = dp.parse_numerical_snp_data(snps_data_file)
-        #sd.coordinate_w_phenotype_data(phen_data,1)
-        sd.filter_accessions(map(str, phen_data['ecotype']))
-        sd.filter_monomorphic_snps()
-        phen_vals = []
-        for ei in sd.accessions:
-            i = phen_data['ecotype'].index(int(ei))
-            phen_vals.append(phen_data['mean_value'][i])
+	phen_dict = self.get_phenotype_values(phen_name, transformation) #Load phenotype
+	phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':phen_dict['ecotype'], 'name':phen_name}})
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format='binary', min_mac=5) #Load SNPs data
+
+	sd.coordinate_w_phenotype_data(phend, 1)
+	sd.filter_monomorphic_snps()
+	phen_vals = phend.get_values(1)
 
         snps = sd.getSnps()
         positions = sd.getPositions()
