@@ -818,25 +818,25 @@ class LinearMixedModel(LinearModel):
 		assert len(self.random_effects) == 2, "Expedited REMLE only works when we have exactly two random effects."
 		K = self.random_effects[1][1]
 		eig_L = self._get_eigen_L_(K)
-		f_stats = []
-		vgs = []
-		ves = []
-		max_lls = []
-		var_perc = []
-		betas = []
-		p_vals = []
 		num_snps = len(snps)
+		f_stats = sp.empty(num_snps)
+		vgs = sp.empty(num_snps)
+		ves = sp.empty(num_snps)
+		max_lls = sp.empty(num_snps)
+		var_perc = sp.empty(num_snps)
+		betas = []
+		p_vals = sp.empty(num_snps)
 
 		for i, snp in enumerate(snps):
 			res = self.get_estimates(eig_L=eig_L, xs=sp.matrix(snp).T, ngrids=ngrids, llim=llim, ulim=ulim,
 						       esp=esp, return_pvalue=True, return_f_stat=True)
-			f_stats.append(res['f_stat'])
-			vgs.append(res['vg'])
-			ves.append(res['ve'])
-			max_lls.append(res['max_ll'])
-			var_perc.append(res['var_perc'])
+			f_stats[i] = res['f_stat']
+			vgs[i] = res['vg']
+			ves[i] = res['ve']
+			max_lls[i] = res['max_ll']
+			var_perc[i] = res['var_perc']
 			betas.append(map(float, list(res['beta'])))
-			p_vals.append(res['p_val'])
+			p_vals[i] = res['p_val']
 			if verbose and num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
@@ -1982,6 +1982,9 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict, plot_bon
 					highlight_loci=highlight_loci, ylab='Post. prob. of assoc.',
 					min_score=0.0, max_score=1.0, markersize=3)
 		ret_dict['ppa_manhattan'] = png_file_name
+		if write_pvals:
+			pval_file_name = '%s_step%d.ppas' % (file_prefix, step_i)
+			res.write_to_file(pval_file_name)
 
 	#Plot QQ plot
 	if with_qq_plots:
@@ -2028,7 +2031,7 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict, plot_bon
 def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
 			chr_pos_list, quantiles_dict, plot_bonferroni=True,
 			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax',
-			highlight_loci=None, write_pvals=False, snp_priors=None, ppa_threshold=0.5, **kwargs):
+			highlight_loci=None, write_pvals=False, snp_priors=None, ppa_threshold=0.95, **kwargs):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -2144,7 +2147,8 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 						log_qq_png_file_name = opt_file_dict[i_opt]['log_qq']
 						opt_log_qq_png_file_name = '%s_step%d_opt_%s_log_qqplot.png' % (file_prefix, i_opt, c)
 						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
-		else:
+
+		elif not i_opt in opt_indices:
 			#Perfom GWAS witht he optimal cofactors
 			cofactor_snps = step_info_list[i_opt]['cofactor_snps']
 			cofactors = step_info_list[i_opt]['cofactors']
@@ -2181,7 +2185,6 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 								simple_qq=True, highlight_loci=highlight_loci,
 								write_pvals=write_pvals, highlight_ppa_markers=ppa_cofactors,
 								ppas=ppas, **kwargs)
-
 
 			opt_indices[i_opt] = {'min_pval':min_pval, 'min_pval_chr_pos':min_pval_chr_pos,
 						'kolmogorov_smirnov':agr.calc_ks_stats(l_pvals),
@@ -2657,10 +2660,12 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 			 bic, extended_bic, modified_bic, num_snps)
 
 		print 'Cofactors:', _cofactors_to_string_(cofactors)
-		if reml_res['pseudo_heritability'] < 0.01 and num_pher_0 < 1:
-			num_pher_0 += 1
-		elif reml_res['pseudo_heritability'] < 0.01:
-			print 'Breaking early, since pseudoheritability is consistantly close to 0.'
+		print ppa_cofactors
+#		if reml_res['pseudo_heritability'] < 0.01 and num_pher_0 < 1:
+#			num_pher_0 += 1
+#		elif reml_res['pseudo_heritability'] < 0.01:
+		if reml_res['pseudo_heritability'] < 0.01:
+			print 'Breaking early, since pseudoheritability is close to 0.'
 			break
 
 	emmax_res = lmm._emmax_f_test_(snps, H_sqrt_inv, snp_priors=snp_priors) #FINISH!!!
@@ -2781,6 +2786,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 				reml_mahalanobis_rss, bic, extended_bic, modified_bic, num_snps)
 
 			print 'Cofactors:', _cofactors_to_string_(cofactors)
+			print ppa_cofactors
 
 			step_info = {'pseudo_heritability':reml_res['pseudo_heritability'], 'rss':rss, \
 				'reml_mahalanobis_rss': reml_res['mahalanobis_rss'], 'll':ll, 'bic':bic,
@@ -2792,7 +2798,6 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 				step_info['ppa_cofactors'] = map(tuple, ppa_cofactors[:])
 			step_info_list.append(step_info)
 			print step_info['kolmogorov_smirnov'], step_info['pval_median']
-			print cofactors
 
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, chr_pos_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
@@ -3283,7 +3288,9 @@ def prepare_k(k, k_accessions, accessions):
 
 def scale_k(k):
 	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
-	k = (len(k) - 1) * k / c
+	scalar = (len(k) - 1) / c
+	print 'Kinship scaled by: %0.4f' % scalar
+	k = scalar * k
 	return k
 
 def load_kinship_from_file(kinship_file, accessions=None, dtype='double', return_accessions=False, scaled=True):
@@ -3487,25 +3494,34 @@ def test_bayes_factor_enrichment():
 	import gwaResults as gr
 	import phenotypeData as pd
 	import env
+	cpp_list = []
+	with open('/Users/bjarni.vilhjalmsson/Projects/Data/DTF1.scan.tsv') as f:
+		print f.next()
+		for l in f:
+			line = l.split()
+			cpp_list.append((int(line[1]), int(line[2]), float(line[4])))
+
 	for pid in [314, 315, 316, 317]:
 		sd = dp.load_snps_call_method(75)
-		phed = pd.get_phenotypes_from_db([pid])
+		phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'phen_raw_112210.csv')
+		#phed = pd.get_phenotypes_from_db([pid])
 		phed.convert_to_averages()
 		phed.transform(pid, 'most_normal')
 		sd.coordinate_w_phenotype_data(phed, pid)
 		sd.filter_mac_snps(15)
 		phen_vals = phed.get_values(pid)
 		phen_name = phed.get_name(pid)
-		K = dp.load_kinship(75, accessions=sd.accessions)
+		K = dp.load_kinship(75, accessions=sd.accessions, sd=sd)
 
 		#Candidate genes (TAIR IDs)
 		cg_tair_ids = ['AT1G04400', 'AT1G65480', 'AT1G77080', 'AT2G26330', 'AT4G00650', 'AT5G10140', 'AT5G65050', \
 				'AT5G65060', 'AT5G65070', 'AT5G65080'] \
 				#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
 		cgs = gr.get_genes_w_tair_id(cg_tair_ids)
-		snp_priors = sd.get_cand_genes_snp_priors(cgs, radius=25000, cg_prior_fold_incr=20)
-		emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_3_%s_%d' % (phen_name, pid),
-				snp_priors=snp_priors, cand_gene_list=cgs)
+		#snp_priors = sd.get_cand_genes_snp_priors(cgs, radius=25000, cg_prior_fold_incr=20)
+		snp_priors = sd.get_snp_priors(cpp_list, cand_genes=cgs)
+		emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_qtl_priors_%s_%d' % (phen_name, pid),
+				snp_priors=snp_priors, cand_gene_list=cgs, save_pvals=True)
 
 
 

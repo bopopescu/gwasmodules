@@ -25,6 +25,7 @@ import os
 import cPickle
 import env
 import tair_converter as tc
+import bisect
 #A dictionary for loaded results.. to avoid reloading. 
 #Use carefully to avoid memory leaks!
 
@@ -737,10 +738,12 @@ class Result(object):
 				indices = result.get_indices(highlight_markers)
 				pvals = [result.snp_results['scores'][i] for i in indices]
 				for i, (c, p) in enumerate(highlight_markers):
-					new_h_markers.append((c, p, -math.log10(pvals[i])))
+					s = -math.log10(pvals[i]) if neg_log_transform else pvals[i]
+					new_h_markers.append((c, p, s))
 			elif len(highlight_markers[0]) == 3:
 				for c, p, pval in highlight_markers:
-					new_h_markers.append((c, p, -math.log10(pval)))
+					s = -math.log10(pval) if neg_log_transform else pval
+					new_h_markers.append((c, p, s))
 			highlight_markers = new_h_markers
 
 		if not max_score:
@@ -800,7 +803,7 @@ class Result(object):
 			if cand_genes:
 				for cg in chr_cand_genes[chrom]:
 					ax.axvspan(offset + cg.startPos, offset + cg.endPos,
-							facecolor='#FF9900', alpha=0.6)
+							facecolor='#BB0099', edgecolor='#BB0099', alpha=0.6)
 			#Highlighting loci
 			if highlight_loci:
 				for p in hl_dict[chrom]:
@@ -883,7 +886,7 @@ class Result(object):
 	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None, percentile=90,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
 			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
-			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, markersize=2):
+			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, markersize=3):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
@@ -1175,7 +1178,7 @@ class Result(object):
 		print "%i scores were removed." % (count - len(self.scores))
 
 
-	def filter_attr(self, attr_name, attr_threshold, reversed=False, verbose=False, return_clone=False):
+	def filter_attr(self, attr_name, attr_threshold, reversed=False, verbose=True, return_clone=False):
 		"""
 		Filter out scores / pvalues etc. which have attr < attr_threshold.
 
@@ -1242,6 +1245,37 @@ class Result(object):
 		cp_array = sp.array(chrom_pos_list)
 		cpl_dists = map(sp.absolute, [sp.array(cpt) - cp_array for cpt in cpl])
 		return cpl_dists
+
+
+	def get_gene_analysis(self, gene, bin_radius=[0, 1000, 5000, 10000, 25000, 50000, 100000],):
+		"""
+		Returns various statistics on a gene...
+		 - Distance from min pval
+		 -  
+		"""
+
+		min_i = self.arg_min_attr()
+		min_chr_pos = sp.array([self.snp_results['chromosomes'][min_i], self.snp_results['positions'][min_i]])
+		gene_chr_pos = sp.array([[gene.chromosome, gene.startPos], [gene.chromosome, gene.endPos]])
+		d = {'dist_to_min_pval': sp.absolute(min_chr_pos - gene_chr_pos).min(0)}
+
+		bin_dict = {}
+		gene.chromosome
+		chrom_pos_list = self.get_chr_pos_list()
+
+		for r in bin_radius:
+			start_pos = gene.startPos - r
+			end_pos = gene.endPos + r
+			start_i = bisect.bisect(chrom_pos_list, (gene.chromosome, start_pos))
+			stop_i = bisect.bisect(chrom_pos_list, (gene.chromosome, end_pos))
+			scores = sp.array(self.snp_results['scores'][start_i:stop_i])
+			if len(scores) > 0:
+				bin_dict[r] = {'min_pval':scores.min(), 'num_snps':len(scores)}
+			else:
+				bin_dict[r] = {'min_pval':1, 'num_snps':len(scores)}
+		d['bin_dict'] = bin_dict
+		return d
+
 
 
 	def get_farthest_w_stronger_association(self, chrom_pos_list, assume_ranked=False):
@@ -1394,21 +1428,7 @@ class Result(object):
 		return zip(self.snp_results['chromosomes'], self.snp_results['positions'])
 
 
-	def get_ranks_of_loci(self, chr_pos_list):
-		"""
-		Returns the ranks of loci.
-		"""
-		pass
 
-
-	def analyse_loci(self,):
-		"""
-		Performs basic analysis on the given loci, such as 
-			- ranks, 
-			- distance from most significant
-			- distances from all significant
-			, of all SNPs with gre
-		"""
 
 	def get_top_regions(self, n, distance_threshold=25000):
 		"""
@@ -1866,6 +1886,7 @@ def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=T
 #			where gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
 		sql_statement = 'SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, \
 						g.description, g.dbxrefs FROM genome_tair10.gene g \
+					WHERE g.start IS NOT NULL AND g.stop IS NOT NULL \
 					ORDER BY g.chromosome, g.start, g.stop'
 		print sql_statement
 		numRows = int(cursor.execute(sql_statement))
@@ -2074,6 +2095,23 @@ def load_result_from_db(pid, aid, cmid=54, host='gmi-ara-devel-be', conn=None):
 		new_conn.close ()
 
 	return r, r_id
+
+
+class TairGO:
+	"""
+	A class to encompass tair genes.
+	
+	This class is based on gff files. (not the DB)
+	"""
+	def __init__(self):
+		#Parse the gff file
+		env.env['data']
+
+	def get_gene_list(self):
+		pass
+
+	def get_genes_w_tair_id(self, tair_ids):
+		pass
 
 
 #def loadResults(phenotypeIndices, resultTypes=None, phed=None, snpsds=None, filterPercentile=None, filterCutoffs=None, phenotypeFile="/Network/Data/250k/dataFreeze_080608/phenotypes_all_raw_111008.tsv", secondRun=False):

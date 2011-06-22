@@ -23,6 +23,8 @@ import pylab
 import pdb
 import itertools as it
 import math
+import analyze_gwas_results as agr
+import ipdb
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='gmi'):
 	"""
@@ -68,33 +70,71 @@ def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='gmi'
 
 
 
-def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
-		debug_filter=1.0, data_type='quan_seq_data'):
-	if mapping_method not in ['emmax', 'kw', 'lm']:
-		raise Exception('Mapping method unknown')
-	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
+
+
+def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
+	#Store results for PPAs, MBONF, EBIC
+	sw_d = {}
+	for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+		i_opt = opt_dict[criteria]
+		step_info = step_info_list[i_opt]
+		cof_list = step_info['cofactors']
+		ppa_cof_list = step_info['ppa_cofactors']
+		cofactors = [(chrom, pos) for chrom, pos, pval in cof_list]
+		cof_pvals = [pval for chrom, pos, pval in cof_list]
+		cof_ppas = [ppa for chrom, pos, ppa in ppa_cof_list]
+
+		# How close to the gene are the selected loci.
+		da = []
+		for chrom, pos in cofactors:
+			if gene.chromosome == chrom:
+				if gene.startPos < pos < gene.endPos:
+					da.append(0)
+				else:
+					da.append(min(abs(pos - gene.startPos), abs(pos - gene.endPos)))
+			else:
+				da.append(-1)
+
+		# Number of selected loci near the gene (bins)
+		bin_distances = [100000, 50000, 25000, 10000, 5000, 1000, 0]
+		bin_counts = [da.count(-1)]
+		bin_count = 0
+		for d in da:
+			if d > bin_distances[0]: bin_count += 1
+		bin_counts.append(bin_count)
+		for bin_dist in bin_distances:
+			bin_count = 0
+			for d in da:
+				if d == -1: continue
+				elif d <= bin_dist: bin_count += 1
+			bin_counts.append(bin_count)
+
+		# Percentage of variance (error and genetic) explained by the selected loci (bin it as well)
+		pass
+
+		d = {'cofactors':cofactors, 'cof_pvals':cof_pvals, 'cof_ppas':cof_ppas, 'cof_gene_dist':da,
+		'bin_counts':bin_counts}
+		print d
+		sw_d[criteria] = d
+
+
+
+
+
+
+def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
+		call_method_id=78, data_format='diploid_int', debug_filter=0.1):
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	phed.filter_near_const_phens(15)
 	phed.convert_to_averages()
 	num_traits = phed.num_traits()
 	pids = phed.phen_ids[start_i :stop_i]
-	if data_type == 'use_1001_data':
-		sd = dp.load_1001_full_snps(debug_filter=debug_filter)
-	elif data_type == 'quan_seq_data':
-		sd = dp.load_quan_data(debug_filter=debug_filter)
-	else:
-		sd = dp.load_250K_snps(debug_filter=debug_filter)
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=debug_filter)
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
 	phed.filter_ecotypes(indices_to_keep, pids=pids)
-	print len(indices_to_keep)
-	if mapping_method == 'emmax':
-		if data_type == 'imputed_full_seq':
-			k_file = env['data_1001_dir'] + 'kinship_matrix.pickled'
-		elif data_type == 'quan_seq_data':
-			k_file = env['data_quan_dir'] + 'data.gwas_012_mac5.kinship.pickled'
-		else:
-			k_file = env['data_dir'] + "kinship_matrix_cm75.pickled"
-		K = lm.load_kinship_from_file(k_file, sd.accessions)
+	print len(sd.accessions)
+	K = dp.load_kinship(call_method_id=call_method_id, data_format=data_format, sd=sd, method='ibs')
+
 	sd.filter_mac_snps(mac_threshold)
 	snps = sd.getSnps()
 	positions = sd.getPositions()
@@ -102,102 +142,73 @@ def run_gwas(file_prefix, mapping_method, start_i, stop_i, temperature, mac_thre
 	r = sd.get_mafs()
 	macs = r['mafs']
 	mafs = r['marfs']
+
 	print 'In total there are %d SNPs to be mapped.' % len(snps)
-	gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
+	gene_dict = _load_genes_list_('rna_seq_031311_%sC' % temperature)
 	for i, pid in enumerate(pids):
 		if not pid in phed.phen_ids: continue
-		cgs = gene_dict[pid]
-		print i
+		gene = gene_dict[pid][0]
+		print i, pid, gene
 		gene_tair_id = phed.get_name(pid)
-		curr_file_prefix = '%s_%s_mac%d_pid%d_%s' % (file_prefix, mapping_method, mac_threshold, pid, gene_tair_id)
+		curr_file_prefix = '%s_mac%d_pid%d_%s' % (file_prefix, mac_threshold, pid, gene_tair_id)
 
-		if mapping_method == 'kw':
-			phen_vals = phed.get_values(pid)
-			kw_res = util.kruskal_wallis(snps, phen_vals)
-			pvals = kw_res['ps'].tolist()
+		trans_type, shapiro_pval = phed.most_normal_transformation(pid)
+		print 'Most normal transformation was: %s' % trans_type
+		summary_dict = {'transformation_type':trans_type, 'transformation_shapiro_pval':shapiro_pval}
 
-		else:
-			#Identify the right transformation
-			trans_type, shapiro_pval = phed.most_normal_transformation(pid)
-			phen_vals = phed.get_values(pid)
-			if mapping_method == 'lm':
-				res = lm.linear_model(snps, phen_vals)
-				pvals = res['ps'].tolist()
-			elif mapping_method == 'emmax':
-				#Get pseudo-heritabilities
-				res = lm.get_emma_reml_estimates(phen_vals, K)
-				res = lm.emmax(snps, phen_vals, K)
-				pvals = res['ps'].tolist()
-				p_her = res['pseudo_heritability']
+		print'Applying Kruskal-Wallis'
+		phen_vals = phed.get_values(pid)
+		res = util.kruskal_wallis(snps, phen_vals)
+		pvals = res['ps'].tolist()
+		kw_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
+		print 'Summarizing KW'
+		summary_dict['KW'] = kw_res.get_gene_analysis(gene)
+		summary_dict['KW']['kolmogorov_smirnov'] = agr.calc_ks_stats(res['ps'])
+		summary_dict['KW']['pval_median'] = agr.calc_median(res['ps'])
 
 
+		print 'Applying LM'
+		res = lm.linear_model(snps, phen_vals)
+		pvals = res['ps'].tolist()
+		lm_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
+		print 'Summarizing LM'
+		summary_dict['LM'] = lm_res.get_gene_analysis(gene)
+		summary_dict['LM']['kolmogorov_smirnov'] = agr.calc_ks_stats(res['ps'])
+		summary_dict['LM']['pval_median'] = agr.calc_median(res['ps'])
 
-		res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
-		num_scores = res.get_num_scores()
 
-		#Record distance to the most significant SNP from the gene.
-		min_i = res.arg_min_attr()
-		min_chr = chromosomes[min_i]
-		min_pos = positions[min_i]
-		min_dist = -1
-		min_pos = 100000000
-		max_pos = 0
-		cur_chrom = cgs[0].chromosome
-		for g in cgs:
-			if min_dist != 0 and g.chromosome == min_chr:
-				if g.startPos <= min_pos <= g.endPos:
-					min_dist = 0
-				else:
-					dist = min(abs(g.startPos - min_pos), abs(g.endPos - min_pos))
-					if min_dist == -1 or min_dist > dist:
-						min_dist = dist
-			min_pos = min(g.startPos, min_pos)
-			max_pos = max(g.endPos, max_pos)
+		print 'Applying EX Stepwise'
+		snp_priors = sd.get_cand_genes_snp_priors([gene])
+		ex_sw_res = lm.emmax_step_wise(phen_vals, K, macs=macs, mafs=mafs, positions=positions,
+					chromosomes=chromosomes, snps=snps, num_steps=5, cand_gene_list=[gene],
+					with_qq_plots=False, log_qq_max_val=6.0, save_pvals=True, snp_priors=snp_priors)
+		print 'Summarizing the step-wise mixed model'
+		pvals = ex_sw_res['first_emmax_res']['ps'].tolist()
+		ex_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
+		summary_dict['EX'] = ex_res.get_gene_analysis(gene)
+		summary_dict['pseudo_heritability'] = ex_sw_res['step_info_list'][0]['pseudo_heritability']
+		summary_dict['EX']['kolmogorov_smirnov'] = agr.calc_ks_stats(ex_sw_res['first_emmax_res']['ps'])
+		summary_dict['EX']['pval_median'] = agr.calc_median(ex_sw_res['first_emmax_res']['ps'])
 
-		#Record most significant p-value within 0kb, 5kb, 10kb, 25kb, 50kb, and 100kb window, and SNP count.
-#		window_sizes = [0, 5000, 10000, 25000, 50000, 100000]
-#		window_dict = {}
-#		for window_size in window_sizes:
-#			reg_res = res.get_region_result(cur_chrom, min_pos, max_pos, buffer=window_size)
-#			num_snps = reg_res.num_scores()
-#			if num_scores:
-#				min_pval = reg_res.min_score()
-#			else:
-#				min_pval = -1
-#			window_dict[window_size] = {'min_pval':min_pval, 'num_snps':num_snps}
-
+		#FINISH summarizing the stepwise!!!
+		summarize_stepwise(summary_dict, gene, ex_sw_res['step_info_list'], ex_sw_res['opt_dict'])
 
 		#Write info to file..
-		with open(curr_file_prefix + '_info.txt', 'w') as f:
-			if mapping_method == 'emmax':
-				f.write('pseudo_heritability: %f \n' % p_her)
-			if mapping_method == 'emmax' or mapping_method == 'lm':
-				f.write('transformation_type: %s \n' % trans_type)
-				f.write('transformation_shapiro_pval: %f \n' % shapiro_pval)
-			f.write('dist_to_cand_gene: %f \n' % min_dist)
-#			for window_size in window_sizes:
-#				min_pval = window_dict[window_size]['min_pval']
-#				num_snps = window_dict[window_size]['num_snps']
-#				f.write('window_size: %d, min_pval: %f \n' % (window_size, min_pval))
-#				f.write('window_size: %d, num_snps: %d \n' % (window_size, num_snps))
+		cPickle.dump(summary_dict, open(curr_file_prefix + '_info.pickled', 'w'), protocol=2)
 
-
-		#filter, top 10%...
-		res.filter_percentile(filter_threshold, reversed=True)
-		res.write_to_file(curr_file_prefix + '.pvals', only_pickled=True)
-
-
+		f_prefix = curr_file_prefix + '_hist'
+		phed.plot_histogram(pid, title='Gene expressions for %s' % gene_tair_id,
+				png_file=f_prefix + '.png', p_her=summary_dict['pseudo_heritability'],
+				x_label='RNA seq expression levels (%s transformed)' % trans_type)
 		#Plot GWAs...
-		if res.min_score() < 10e-11:
-			#print [cg.tairID for cg in cgs]
-			f_prefix = curr_file_prefix + '_hist'
-			phed.plot_histogram(pid, title='Gene expressions for %s' % gene_tair_id,
-					png_file=f_prefix + '.png', p_her=res['pseudo_heritability'],
-					x_label='RNA seq expression levels (%s transformed)' % trans_type)
-			f_prefix = curr_file_prefix + '_manhattan'
-			res.neg_log_trans()
-			res.plot_manhattan(png_file=f_prefix + '.png', percentile=50, cand_genes=cgs, plot_bonferroni=True,
-					b_threshold= -math.log10(1.0 / (num_traits * num_scores * 20.0)))
+		for res, method_name in [(kw_res, 'KW'), (lm_res, 'LM'), (ex_res, 'EX')]:
+			res.filter_percentile(filter_threshold, reversed=True)
+			res.write_to_file(curr_file_prefix + '.pvals', only_pickled=True)
+			if ex_res.min_score() < 10e-10:
+				#print [cg.tairID for cg in cgs]
+				f_prefix = '%s_%s_manhattan' % (curr_file_prefix, method_name)
+				res.plot_manhattan(png_file=f_prefix + '.png', percentile=0, cand_genes=[gene],
+						plot_bonferroni=True, neg_log_transform=True)
 
 
 
@@ -499,9 +510,10 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', data_t
 
 def run_parallel_rna_seq_gwas():
 	if len(sys.argv) > 4:
-		temperature = sys.argv[4]
-		file_prefix = env['results_dir'] + 'rna_seq_%s' % temperature
-		run_gwas(file_prefix, sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), temperature)
+		temperature = int(sys.argv[4])
+		phen_file = env['phen_dir'] + 'rna_seq_031311_%dC.csv' % temperature)
+		file_prefix = env['results_dir'] + 'rna_seq_%d' % temperature
+		run_gwas(file_prefix, int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), temperature)
 	else:
 		temperature = sys.argv[3]
 		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
@@ -514,7 +526,7 @@ def run_parallel_rna_seq_gwas():
 			run_parallel(sys.argv[1], i, i + chunck_size, temperature)
 
 
-def _gene_list_to_file_(file_prefix='rna_seq_031311'):
+def _gene_list_to_file_(file_prefix='rna_seq_031311_16C'):
 	import bisect
 	phen_file = env['phen_dir'] + file_prefix + '.csv'
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
@@ -532,7 +544,7 @@ def _gene_list_to_file_(file_prefix='rna_seq_031311'):
 	for pid, tid in zip(pids, tair_ids):
 		g_i = bisect.bisect_left(g_tair_ids, tid)
 		if tid != g_tair_ids[g_i]:
-			print tid, g_tair_ids[g_i - 1], g_tair_ids[g_i]
+			print 'Missing TAIR ID:', tid, g_tair_ids[g_i - 1], g_tair_ids[g_i]
 			gene_dict[pid] = [gl[g_i - 1], gl[g_i]]
 			pos_l = [gl[g_i - 1].startPos, gl[g_i - 1].endPos, gl[g_i].startPos, gl[g_i].endPos]
 		else:
@@ -559,10 +571,10 @@ def _load_genes_list_(file_prefix):
 
 
 
-
-
 def _test_():
-	run_gwas(env['results_dir'] + 'rna_seq', sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), debug_filter=0.01)
+	phen_file = env['phen_dir'] + 'rna_seq_031311_%sC.csv' % int(sys.argv[3])
+	run_gwas(env['results_dir'] + 'rna_seq', phen_file, int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]),
+		data_format='binary', call_method_id=75)
 
 def _test_parallel_():
 	run_parallel(sys.argv[1], int(sys.argv[2]), int(sys.argv[2]) + 1)
@@ -570,10 +582,10 @@ def _test_parallel_():
 if __name__ == '__main__':
 	#_load_results_('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
 	#load_and_plot_info_files('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
-	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 5)
-	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 7)
-	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 10)
-	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 11)
+	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 5)
+	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 7)
+	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 10)
+	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 11)
 #	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 7)
 #	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 7)
 #	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 10)
@@ -590,7 +602,7 @@ if __name__ == '__main__':
 #	else:
 #		_test_parallel_()
 #	sys.exit(0)
-
+	_test_()
 
 
 

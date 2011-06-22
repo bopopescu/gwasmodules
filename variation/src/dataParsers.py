@@ -1739,6 +1739,7 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 				sd.filter_accessions(filter_accessions)
 			if filter < 1:
 				sd.sample_snps(filter)
+				print 'Filtering random %d%%' % int(filter * 100)
 			print 'Loading genotype data took %.2f s...' % (time.time() - t_)
 			return sd
 		else:
@@ -2331,7 +2332,6 @@ def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessio
 	if not sd:
 		sd = load_snps_call_method(call_method_id=call_method_id, data_format=data_format, min_mac=min_mac,
 					debug_filter=debug_filter)
-		accessions = sd.accessions
 	if method == 'ibs':
 		K = sd.get_ibs_kinship_matrix()
 	elif method == 'ibd':

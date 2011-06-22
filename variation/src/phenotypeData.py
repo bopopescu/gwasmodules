@@ -182,6 +182,7 @@ class phenotype_data:
 		self.phen_dict[pid]['values'] = vals.tolist()
 
 	def transform(self, pid, trans_type, method='standard'):
+		print 'Transforming phenotypes: %s' % trans_type
 		if trans_type == 'sqrt':
 			self.sqrt_transform(pid, method=method)
 		elif trans_type == 'log':

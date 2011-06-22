@@ -23,6 +23,7 @@ env['default_insert_db'] = 'gmi-ara-devel-be.gmi.oeaw.ac.at'
 env['db_results_dir'] = '/Network/Data/250k/db/results/type_1/'
 env['tmp_dir'] = '/tmp/'
 env['phen_dir'] = '/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/'
+env['tair_dir'] = '/Users/bjarni.vilhjalmsson/Projects/Data/TAIR10/'
 
 
 #This should be changed in the .gwa_config file.

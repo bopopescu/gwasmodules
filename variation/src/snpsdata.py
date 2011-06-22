@@ -2983,6 +2983,12 @@ class SNPsDataSet:
 
 
 
+	def get_macs(self):
+		r = self.get_mafs()
+		return r['mafs']
+
+
+
 	def get_normalized_snps(self, debug_filter=1, dtype='single'):
 		print 'Normalizing SNPs'
 		snps = self.getSnps(debug_filter)
@@ -3217,7 +3223,8 @@ class SNPsDataSet:
 
 
 
-	def get_cand_genes_snp_priors(self, cand_genes, radius=25000, num_exp_causal=1.0, cg_prior_fold_incr=10):
+	def get_cand_genes_snp_priors(self, cand_genes, radius=10000, num_exp_causal=1.0, cg_prior_fold_incr=50,
+					method_type='sum_all_priors'):
 		"""
 		Returns SNP priors
 		"""
@@ -3233,13 +3240,98 @@ class SNPsDataSet:
 			stop_i = bisect.bisect(chr_pos_list, (gene_chr, gene_end_pos + radius + 1))
 			cg_snp_indices.extend(range(start_i, stop_i))
 		cg_snp_indices = sorted(list(set(cg_snp_indices)))
-		num_exp_causal
-		pi_0 = num_exp_causal / (num_snps - num_cgs + cg_prior_fold_incr * num_cgs) #Basis prior
-		pi_1 = pi_0 * cg_prior_fold_incr #Cand. gene prior
+		if method_type == 'sum_all_priors':
+			pi_0 = num_exp_causal / num_snps #Basis prior
+			pi_1 = pi_0 * cg_prior_fold_incr #Cand. gene prior
+		elif method_type == 'sum_base_priors':
+			pi_0 = num_exp_causal / (num_snps - num_cgs + cg_prior_fold_incr * num_cgs) #Basis prior
+			pi_1 = pi_0 * cg_prior_fold_incr #Cand. gene prior
+		else:
+			raise NotImplementedError
 		snp_priors = sp.repeat(pi_0, num_snps)
 		for i in cg_snp_indices:
 			snp_priors[i] = pi_1
 		return snp_priors.tolist()
+
+
+
+
+	def get_snp_priors(self, cpp_list, cand_genes=None, radius=25000, num_exp_causal=1.0, cg_prior_fold_incr=5):
+		"""
+		Takes a list of SNPs/markers with some priors, and extrapolates that to the SNPs in the data.
+		"""
+		import bisect
+		import ipdb
+		cpp_list.sort()
+		l = map(list, zip(*cpp_list))
+		priors = l[2]
+		cp_list = self.getChrPosList()
+		snp_priors = []
+		snp_i = 0
+		p_i = 0
+
+
+		#Do chromosome by chromosome..
+		for chrom in [1, 2, 3, 4, 5]:
+			p_i = bisect.bisect(cpp_list, (chrom, 0, 0))
+			snp_i = 0
+			positions = self.snpsDataList[chrom - 1].positions
+			num_snps = len(positions)
+			pos = positions[snp_i]
+			chrom_1, pos_1, prior_1 = cpp_list[p_i]
+			chrom_2, pos_2, prior_2 = cpp_list[p_i + 1]
+			while snp_i < num_snps and p_i < len(cpp_list) - 2 and chrom_2 == chrom:
+				chrom_1, pos_1, prior_1 = cpp_list[p_i]
+				chrom_2, pos_2, prior_2 = cpp_list[p_i + 1]
+				if chrom_2 == chrom:
+					while snp_i < num_snps - 1 and pos <= pos_1:
+						snp_priors.append(prior_1)
+						snp_i += 1
+						pos = positions[snp_i]
+
+					while snp_i < num_snps - 1 and pos_1 < pos <= pos_2:
+						d = pos_2 - pos_1
+						s = (pos - pos_1) / float(d)
+						snp_priors.append(prior_1 * (1 - s) + prior_2 * s)
+						snp_i += 1
+						pos = positions[snp_i]
+
+
+				p_i += 1
+				chrom_1, pos_1, prior_1 = cpp_list[p_i]
+				chrom_2, pos_2, prior_2 = cpp_list[p_i + 1]
+
+			if chrom_2 != chrom: #The chromosome is ending
+				while snp_i < num_snps:
+					snp_priors.append(prior_1)
+					snp_i += 1
+
+			elif p_i >= len(cpp_list) - 2: #It's finishing
+				while snp_i < num_snps:
+					snp_priors.append(prior_2)
+					snp_i += 1
+
+
+		snp_priors = sp.array(snp_priors)
+
+		snp_priors = 20 * (snp_priors - snp_priors.min()) / (snp_priors.max() - snp_priors.min()) + 1
+
+		if cand_genes:
+			chr_pos_list = self.getChrPosList()
+			num_snps = len(chr_pos_list)
+			i = 0
+			gene_chr_pos_list = sorted([(gene.chromosome, gene.startPos, gene.endPos) for gene in cand_genes])
+			num_cgs = len(gene_chr_pos_list)
+			cg_snp_indices = []
+			for gene_chr, gene_start_pos, gene_end_pos in gene_chr_pos_list:
+				start_i = bisect.bisect(chr_pos_list, (gene_chr, gene_start_pos - radius - 1))
+				stop_i = bisect.bisect(chr_pos_list, (gene_chr, gene_end_pos + radius + 1))
+				cg_snp_indices.extend(range(start_i, stop_i))
+			cg_snp_indices = sorted(list(set(cg_snp_indices)))
+			snp_priors[cg_snp_indices] = snp_priors[cg_snp_indices] * cg_prior_fold_incr
+
+		return  (snp_priors / sum(snp_priors)).tolist()
+
 
 
 
@@ -3849,6 +3941,8 @@ def test_ibd_kinship():
 	lm.save_kinship_to_file(env.env['data_dir'] + 'ibd_2_kinship_matrix_cm75.pickled', ibd_k, sd.accessions)
 
 
+
+
 def _merge_imputed_and_250K_data_():
 	import  dataParsers as dp
 	import tair_converter as tc
@@ -3859,9 +3953,19 @@ def _merge_imputed_and_250K_data_():
 
 
 
+def _test_prior_():
+	cpp_list = []
+	with open('/Users/bjarni.vilhjalmsson/Projects/Data/DTF1.scan.tsv') as f:
+		print f.next()
+		for l in f:
+			line = l.split()
+			cpp_list.append((int(line[1]), int(line[2]), float(line[4])))
+	import dataParsers as dp
+	sd = dp.load_snps_call_method()
+	return sd.get_snp_priors(cpp_list)
 
 if __name__ == "__main__":
-	pass
+	_test_prior_()
 #	import dataParsers
 #	d2010_file = "/Users/bjarnivilhjalmsson/Projects/Data/2010/2010_073009.csv"
 #	d2010_sd = dataParsers.parse_snp_data(d2010_file,id="2010_data")
