@@ -736,7 +736,8 @@ def load_gene_expression_traits():
 def load_gene_expression_traits_2():
 	import scipy as sp
 	filename = env['home_dir'] + \
-			'Projects/Data/rna_seq/all_expression_matrix_normalized_3_02_2011_flagged_removed_libID_bioreps_combined.txt'
+			'Projects/Data/expression_matrix_upload_data_5_10_2011/mapping_files/all_expression_matrix_5_09_2011_flagged_removed_libID_bioreps_combined_cov_filter.txt'
+			#'Projects/Data/rna_seq/all_expression_matrix_normalized_3_02_2011_flagged_removed_libID_bioreps_combined.txt'
 	print 'Loading file:', filename
 	ets = {'10C':[], '16C':[]}
 	i_map = {}
@@ -784,10 +785,10 @@ def load_gene_expression_traits_2():
 
 	phed_10C = pd.phenotype_data(phen_dict_10C)
 	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict_10C)
-	phed_10C.write_to_file(env['phen_dir'] + 'rna_seq_031311_10C.csv')
+	phed_10C.write_to_file(env['phen_dir'] + 'rna_seq_061611_10C.csv')
 	phed_16C = pd.phenotype_data(phen_dict_16C)
 	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict_16C)
-	phed_16C.write_to_file(env['phen_dir'] + 'rna_seq_031311_16C.csv')
+	phed_16C.write_to_file(env['phen_dir'] + 'rna_seq_061611_16C.csv')
 
 
 
@@ -828,6 +829,27 @@ def parse_NFBC_traits():
 	phed.write_to_file(env['data_dir'] + 'NFBC_20091001/phenotype.scv')
 	return phed
 
+def load_skin_color_traits():
+	import env
+	filename = env.env['home_dir'] + 'Projects/Data/Skin_color/CV685-skin_eye_color.txt'
+	d = {1:{'name':'skin_color', 'ecotypes':[], 'values':[]}, 2:{'name':'eye_color', 'ecotypes':[], 'values':[]}}
+	sc_vals = []
+	ec_vals = []
+	sc_iids = [] #individual IDs (ecotypes)
+	with open(filename) as f:
+		print f.next()
+		for line in f:
+			l = line.split()
+			if int(float(l[2])) != -9:
+				d[1]['values'].append(float(l[2]))
+				d[1]['ecotypes'].append(l[1])
+			if int(float(l[3])) != -9:
+				d[2]['values'].append(float(l[3]))
+				d[2]['ecotypes'].append(l[1])
+	phed = pd.phenotype_data(d)
+	phed.write_to_file(env.env['home_dir'] + 'Projects/Data/Skin_color/phenotypes.csv')
+	return phed
+
 
 def _run_():
 	pd = load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
@@ -848,7 +870,8 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_nc_resistance_3()
+	load_gene_expression_traits_2()
+	#load_phentoype_file_nc_resistance_3()
 	print "Done!"
 
 

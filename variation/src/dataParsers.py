@@ -2126,7 +2126,7 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 
 
 
-def parse_plink_tped_file(file_prefix, imputation_type='simple'):
+def parse_plink_tped_file(file_prefix, imputation_type='simple', return_kinship=False):
 	"""
 	Requires a .tped file in 12 format.
 	
@@ -2164,8 +2164,8 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
 		with open(tped_filename) as f:
 			cur_chrom = -1
 			for line_i, line in enumerate(f):
-				#if line_i % 10 == 0:
-				print line_i
+				if line_i % 1000 == 0:
+					print line_i
 				l = map(str.strip, line.split())
 				chrom = int(l[0])
 				if chrom != cur_chrom:
@@ -2216,24 +2216,25 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple'):
         sd = SNPsDataSet(snpsds, chromosomes, data_format='diploid_int')
         print 'SNPsDataSet constructed!'
 
-        print 'Loading the kinship matrix'
-        ibs_filename = file_prefix + '.mibs'
-        ibs_pickled_filename = ibs_filename + '.pickled'
-        if os.path.isfile(ibs_pickled_filename):
-                print 'Loading pickled IBS kinship file'
-                l = cPickle.load(open(ibs_pickled_filename))
-                K = l[0]
-                print 'Pickled IBS kinship was loaded.'
-        else:
-                print 'Loading K...'
-                K = sp.zeros((num_individs, num_individs), dtype='double')
-                with open(ibs_filename) as f:
-                        for i, line in enumerate(f):
-                                K[i] = map(float, line.split())
-                cPickle.dump([K, individs], open(ibs_pickled_filename, 'wb'), protocol=2)
-                print 'K was loaded.'
-
-        return sd, K
+        if return_kinship:
+	        print 'Loading the kinship matrix'
+	        ibs_filename = file_prefix + '.mibs'
+	        ibs_pickled_filename = ibs_filename + '.pickled'
+	        if os.path.isfile(ibs_pickled_filename):
+	                print 'Loading pickled IBS kinship file'
+	                l = cPickle.load(open(ibs_pickled_filename))
+	                K = l[0]
+	                print 'Pickled IBS kinship was loaded.'
+	        else:
+	                print 'Loading K...'
+	                K = sp.zeros((num_individs, num_individs), dtype='double')
+	                with open(ibs_filename) as f:
+	                        for i, line in enumerate(f):
+	                                K[i] = map(float, line.split())
+	                cPickle.dump([K, individs], open(ibs_pickled_filename, 'wb'), protocol=2)
+	                print 'K was loaded.'
+	        return sd, K
+	return sd
 
 
 
@@ -2530,7 +2531,7 @@ def _test_plink_ped_parser_():
 	parse_plink_ped_file(plink_prefix)
 
 def _test_plink_tped_parser_():
-	plink_prefix = env['data_dir'] + 'NFBC_20091001/NFBC_20091001'
+	plink_prefix = env['home_dir'] + 'Projects/Data/Skin_color/plink'
 	sd, k = parse_plink_tped_file(plink_prefix)
         K = sd.get_ibs_kinship_matrix()
         import linear_models as lm
@@ -2553,7 +2554,7 @@ def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filte
 
 
 if __name__ == "__main__":
-	generate_usual_kinships()
+	_test_plink_tped_parser_()
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
 #	print len(snpsds)
 #	for i in range(0,len(snpsds)):
