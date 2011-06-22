@@ -3435,13 +3435,13 @@ def test_skin_color():
 	import phenotype_parsers as pp
 	import env
 	import gwaResults as gr
-	for pid in [1, 2]:
+	for pid in [2]:
 		#pid = 2
 		plink_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/plink'
 		sd = dp.parse_plink_tped_file(plink_prefix)
 		phed = pp.load_skin_color_traits()
 		sd.coordinate_w_phenotype_data(phed, pid)
-		K = load_kinship_from_file('/Users/bjarni.vilhjalmsson/Projects/Data/Skin_color/kinship_ibs.pickled',
+		K = load_kinship_from_file('/Users/bjarni.vilhjalmsson/Projects/Data/Skin_color/kinship_ibd.pickled',
 						accessions=sd.accessions)
 		phen_vals = phed.get_values(pid)
 		phen_name = phed.get_name(pid)
