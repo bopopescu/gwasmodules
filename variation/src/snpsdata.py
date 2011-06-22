@@ -2926,6 +2926,7 @@ class SNPsDataSet:
 							k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
 						else:
 							k_mat[i, j] += bin_counts[0]
+						k_mat[j, i] = k_mat[i, j]
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T

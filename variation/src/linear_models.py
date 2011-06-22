@@ -3429,6 +3429,48 @@ def perform_human_emmax():
 
 
 
+def test_skin_color():
+	s1 = time.time()
+	import dataParsers as dp
+	import phenotype_parsers as pp
+	import env
+	import gwaResults as gr
+	for pid in [1, 2]:
+		#pid = 2
+		plink_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/plink'
+		sd = dp.parse_plink_tped_file(plink_prefix)
+		phed = pp.load_skin_color_traits()
+		sd.coordinate_w_phenotype_data(phed, pid)
+		K = load_kinship_from_file('/Users/bjarni.vilhjalmsson/Projects/Data/Skin_color/kinship_ibs.pickled',
+						accessions=sd.accessions)
+		phen_vals = phed.get_values(pid)
+		phen_name = phed.get_name(pid)
+		print 'Working on %s' % phen_name
+		sys.stdout.flush()
+		file_prefix = env.env['results_dir'] + 'CVI_%s_pid%d' % (phen_name, pid)
+		snps = sd.getSnps()
+		secs = time.time() - s1
+		if secs > 60:
+			mins = int(secs) / 60
+			secs = secs - mins * 60
+			print 'Took %d mins and %f seconds to load and preprocess the data.' % (mins, secs)
+		else:
+			print 'Took %f seconds to load and preprocess the data..' % (secs)
+		emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
+		emmax_res = emmax(snps, phen_vals, K)
+		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+		res.write_to_file(env.env['results_dir'] + 'CVI_emmax_%s_pid%d.pvals' % (phen_name, pid))
+		res.neg_log_trans()
+		res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
+		secs = time.time() - s1
+		if secs > 60:
+			mins = int(secs) / 60
+			secs = secs - mins * 60
+			print 'Took %d mins and %f seconds in total.' % (mins, secs)
+		else:
+			print 'Took %f seconds in total.' % (secs)
+
+
 def _test_emmax_step_():
 	import dataParsers as dp
 	import phenotypeData as pd
@@ -3532,6 +3574,6 @@ if __name__ == "__main__":
 #	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
-	test_bayes_factor_enrichment()
+	test_skin_color()
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()
