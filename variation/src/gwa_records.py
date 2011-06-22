@@ -411,7 +411,7 @@ class GWASRecord():
                             if key in cofactor:
                                 stat[key] = cofactor[key]
                         stats.append(stat)
-                    d = {'id':x._v_attrs.name, 'name':res._v_attrs.name, 'resultName':res.name, 'comment':res._v_attrs.comment, 'type':x._v_attrs.type, 'cofactors':stats}
+                    d = {'id':res._v_attrs.name, 'name':res._v_attrs.name, 'resultName':res.name, 'comment':res._v_attrs.comment, 'type':x._v_attrs.type, 'cofactors':stats}
                     d['phenotype'] = phen_name
                     d['transformation'] = transformation
                     dict_list.append(d)
@@ -728,7 +728,8 @@ class GWASRecord():
 
         kwargs = {}
         if analysis_method == 'emmax':
-            k = lm.load_kinship_from_file(kinship_file, sd.accessions)
+            k = dp.load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=sd.accessions,
+            scaled=True, min_mac=5, sd=sd)
             d = lm.emmax_step(phen_vals, sd, k, co_var_snps)
             res = d['res']
             stats_dict = d['stats']
