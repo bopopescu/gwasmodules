@@ -3435,7 +3435,7 @@ def test_skin_color():
 	import phenotype_parsers as pp
 	import env
 	import gwaResults as gr
-	for pid in [2]:
+	for pid in [1]:
 		#pid = 2
 		plink_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/plink'
 		sd = dp.parse_plink_tped_file(plink_prefix)
@@ -3456,8 +3456,9 @@ def test_skin_color():
 			print 'Took %d mins and %f seconds to load and preprocess the data.' % (mins, secs)
 		else:
 			print 'Took %f seconds to load and preprocess the data..' % (secs)
-		emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
+		#emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
 		emmax_res = emmax(snps, phen_vals, K)
+		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
 		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
 		res.write_to_file(env.env['results_dir'] + 'CVI_emmax_%s_pid%d.pvals' % (phen_name, pid))
 		res.neg_log_trans()
