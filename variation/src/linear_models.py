@@ -837,7 +837,7 @@ class LinearMixedModel(LinearModel):
 			var_perc[i] = res['var_perc']
 			betas.append(map(float, list(res['beta'])))
 			p_vals[i] = res['p_val']
-			if verbose and num_snps >= 10 and (i + 1) % (num_snps / 10) == 0: #Print dots
+			if verbose and num_snps >= 1000 and (i + 1) % (num_snps / 1000) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
 
@@ -1060,7 +1060,7 @@ class LinearMixedModel(LinearModel):
 
 
 	def emmax_f_test(self, snps, snp_priors=None, Z=None, with_betas=False, method='REML', return_stepw_stats=False,
-			eig_L=None, eig_R=None):
+			eig_L=None, eig_R=None, emma_num=0):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1086,6 +1086,11 @@ class LinearMixedModel(LinearModel):
 		r['ve'] = res['ve']
 		r['vg'] = res['vg']
 		r['max_ll'] = res['max_ll']
+
+		if emma_num > 0:
+			print 'Updating p-values using EMMA for the smallest %d p-values.' % emma_num
+
+
 		return r
 
 
@@ -3435,13 +3440,14 @@ def test_skin_color():
 	import phenotype_parsers as pp
 	import env
 	import gwaResults as gr
-	for pid in [1]:
+	for pid in [1, 2]:
 		#pid = 2
-		plink_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/plink'
+		dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+		plink_prefix = dir_prefix + 'plink'
 		sd = dp.parse_plink_tped_file(plink_prefix)
 		phed = pp.load_skin_color_traits()
 		sd.coordinate_w_phenotype_data(phed, pid)
-		K = load_kinship_from_file('/Users/bjarni.vilhjalmsson/Projects/Data/Skin_color/kinship_ibd.pickled',
+		K = load_kinship_from_file(dir_prefix + 'kinship_ibd.pickled',
 						accessions=sd.accessions)
 		phen_vals = phed.get_values(pid)
 		phen_name = phed.get_name(pid)
@@ -3457,9 +3463,12 @@ def test_skin_color():
 		else:
 			print 'Took %f seconds to load and preprocess the data..' % (secs)
 		#emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
-		emmax_res = emmax(snps, phen_vals, K)
-		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
-		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+#		emmax_res = emmax(snps, phen_vals, K)
+#		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
+#		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+		emma_res = emma(snps, phen_vals, K)
+		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emma_res['pseudo_heritability'])
+		res = gr.Result(scores=emma_res['ps'].tolist(), snps_data=sd)
 		res.write_to_file(env.env['results_dir'] + 'CVI_emmax_%s_pid%d.pvals' % (phen_name, pid))
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)

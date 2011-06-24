@@ -123,11 +123,7 @@ def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
 
 
 def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
-<<<<<<< TREE
-		call_method_id=78, data_format='diploid_int', debug_filter=0.1):
-== == == =
-		call_method_id = 78, data_format = 'diploid_int', debug_filter = 1.0):
->>>>>>> MERGE - SOURCE
+		call_method_id=78, data_format='diploid_int', debug_filter=1.0):
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	phed.filter_near_const_phens(15)
 	phed.convert_to_averages()
@@ -515,11 +511,7 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', data_t
 def run_parallel_rna_seq_gwas():
 	if len(sys.argv) > 4:
 		temperature = int(sys.argv[4])
-<<<<<<< TREE
-		phen_file = env['phen_dir'] + 'rna_seq_031311_%dC.csv' % temperature)
-== == == =
 		phen_file = env['phen_dir'] + 'rna_seq_061611_%dC.csv' % temperature
->>>>>>> MERGE - SOURCE
 		file_prefix = env['results_dir'] + 'rna_seq_%d' % temperature
 		run_gwas(file_prefix, int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), temperature)
 	else:
@@ -580,11 +572,7 @@ def _load_genes_list_(file_prefix):
 
 
 def _test_():
-<<<<<<< TREE
-	phen_file = env['phen_dir'] + 'rna_seq_031311_%sC.csv' % int(sys.argv[3])
-== == == =
 	phen_file = env['phen_dir'] + 'rna_seq_061611_%sC.csv' % sys.argv[3]
->>>>>>> MERGE - SOURCE
 	run_gwas(env['results_dir'] + 'rna_seq', phen_file, int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]),
 		data_format='binary', call_method_id=75)
 

@@ -829,9 +829,12 @@ def parse_NFBC_traits():
 	phed.write_to_file(env['data_dir'] + 'NFBC_20091001/phenotype.scv')
 	return phed
 
+
+
 def load_skin_color_traits():
 	import env
-	filename = env.env['home_dir'] + 'Projects/Data/Skin_color/CV685-skin_eye_color.txt'
+	dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+	filename = dir_prefix + 'CV685-skin_eye_color.txt'
 	d = {1:{'name':'skin_color', 'ecotypes':[], 'values':[]}, 2:{'name':'eye_color', 'ecotypes':[], 'values':[]}}
 	sc_vals = []
 	ec_vals = []
@@ -847,8 +850,9 @@ def load_skin_color_traits():
 				d[2]['values'].append(float(l[3]))
 				d[2]['ecotypes'].append(l[1])
 	phed = pd.phenotype_data(d)
-	phed.write_to_file(env.env['home_dir'] + 'Projects/Data/Skin_color/phenotypes.csv')
+	phed.write_to_file(dir_prefix + 'phenotypes.csv')
 	return phed
+
 
 
 def _run_():
