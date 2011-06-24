@@ -1060,7 +1060,7 @@ class LinearMixedModel(LinearModel):
 
 
 	def emmax_f_test(self, snps, snp_priors=None, Z=None, with_betas=False, method='REML', return_stepw_stats=False,
-			eig_L=None, eig_R=None):
+			eig_L=None, eig_R=None, emma_num=0):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1086,6 +1086,11 @@ class LinearMixedModel(LinearModel):
 		r['ve'] = res['ve']
 		r['vg'] = res['vg']
 		r['max_ll'] = res['max_ll']
+
+		if emma_num > 0:
+			print 'Updating p-values using EMMA for the smallest %d p-values.' % emma_num
+
+
 		return r
 
 

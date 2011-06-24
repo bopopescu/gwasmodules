@@ -24,7 +24,7 @@ import pdb
 import itertools as it
 import math
 import analyze_gwas_results as agr
-import ipdb
+#import ipdb
 
 def run_parallel(mapping_method, x_start_i, x_stop_i, temperature, cluster='gmi'):
 	"""
@@ -113,17 +113,21 @@ def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
 		pass
 
 		d = {'cofactors':cofactors, 'cof_pvals':cof_pvals, 'cof_ppas':cof_ppas, 'cof_gene_dist':da,
-		'bin_counts':bin_counts}
+		'bin_counts':bin_counts, 'i_opt':i_opt}
 		print d
 		sw_d[criteria] = d
-
+		sw_d['step_info_list'] = step_info_list
+	summary_dict['SW'] = sw_d
 
 
 
 
 
 def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
-		call_method_id=78, data_format='diploid_int', debug_filter=1.0):
+		call_method_id=76, data_format='diploid_int', debug_filter=1.0):
+	"""
+	GWAS
+	"""
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	phed.filter_near_const_phens(15)
 	phed.convert_to_averages()
@@ -133,7 +137,8 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
 	phed.filter_ecotypes(indices_to_keep, pids=pids)
 	print len(sd.accessions)
-	K = dp.load_kinship(call_method_id=call_method_id, data_format=data_format, sd=sd, method='ibs')
+	K = sd.get_ibs_kinship_matrix()
+	#K = dp.load_kinship(call_method_id=call_method_id, data_format=data_format, sd=sd, method='ibs')
 
 	sd.filter_mac_snps(mac_threshold)
 	snps = sd.getSnps()
@@ -574,7 +579,7 @@ def _load_genes_list_(file_prefix):
 def _test_():
 	phen_file = env['phen_dir'] + 'rna_seq_061611_%sC.csv' % sys.argv[3]
 	run_gwas(env['results_dir'] + 'rna_seq', phen_file, int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]),
-		data_format='binary', call_method_id=75)
+		data_format='binary', call_method_id=76)
 
 def _test_parallel_():
 	run_parallel(sys.argv[1], int(sys.argv[2]), int(sys.argv[2]) + 1)

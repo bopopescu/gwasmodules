@@ -2933,7 +2933,10 @@ class SNPsDataSet:
 			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
-		k_mat = k_mat / (2 * float(num_snps)) + 1.0
+		if self.data_format == 'diploid_int':
+			k_mat = k_mat / float(num_snps) + sp.eye(num_lines)
+		elif self.data_format == 'binary':
+			k_mat = k_mat / (2 * float(num_snps)) + 1.0
 		return k_mat
 
 
