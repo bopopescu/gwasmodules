@@ -894,10 +894,12 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 		snps = []
 		positions = []
 		num_snps = 0
+		num_snps_w_3_alleles = 0
 		d = {'snps':[], 'positions':[]}
 		for snp_i, line in enumerate(f):
 			if verbose and snp_i % 100000 == 0:
 				print '%d SNPs have been read.' % snp_i
+				print '%d SNPs with issues (three alleles etc.) have been ignored' % num_snps_w_3_alleles
 			if random.random() >= debug_filter:
 				continue
 			num_snps += 1
@@ -907,6 +909,10 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 			pos = int(l[1])
 			if use_decoder:
 				snp = sp.empty(num_accessions, 'a1')
+#				s = l[2:]
+#				if '0' in s or '' in s:
+#					num_snps_w_3_alleles += 1 #A hack
+#					continue
 				for i in xrange(num_accessions):
 					snp[i] = decoder[l[2 + i]]
 			else:

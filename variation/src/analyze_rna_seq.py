@@ -26,12 +26,11 @@ import math
 import analyze_gwas_results as agr
 #import ipdb
 
-def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi'):
+def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi', run_id='rs'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
-	run_id = 'rs'
-	job_id = '%s_%d_%d_%s_%s' % (run_id, x_start_i, x_stop_i, temperature)
+	job_id = '%s_%d_%d_%s' % (run_id, x_start_i, x_stop_i, temperature)
 	file_prefix = env['results_dir'] + job_id
 
 	#Cluster specific parameters	
@@ -39,8 +38,10 @@ def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi'):
 		shstr = '#!/bin/bash\n'
 		shstr += '#$ -S /bin/bash\n'
 		shstr += '#$ -N %s\n' % job_id
-		shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
-		shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
+		#shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
+		#shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
+		shstr += '#$ -o %s_job.out\n' % file_prefix
+		shstr += '#$ -e %s_job.err\n' % file_prefix
 		shstr += 'source /etc/modules-env.sh\n'
 		shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
 		shstr += 'module load matplotlib/1.0.0\n'
@@ -54,8 +55,8 @@ def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi'):
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
-	shstr += "python %sanalyze_rna_seq.py %d %d %s " % \
-			(env['script_dir'], x_start_i, x_stop_i, temperature)
+	shstr += "python %sanalyze_rna_seq.py %d %d %s %s" % \
+			(env['script_dir'], x_start_i, x_stop_i, temperature, run_id)
 
 	#shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
@@ -65,7 +66,7 @@ def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi'):
 	f.close()
 
 	#Execute qsub script
-	os.system("qsub -q q.norm@mem* " + script_file_name)
+	os.system("qsub " + script_file_name)
 
 
 
@@ -516,26 +517,28 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', data_t
 
 
 def run_parallel_rna_seq_gwas():
-	if len(sys.argv) > 3:
+	if len(sys.argv) > 4:
+		run_id = sys.argv[4]
 		temperature = int(sys.argv[3])
 		phen_file = env['phen_dir'] + 'rna_seq_061611_%dC.csv' % temperature
-		file_prefix = env['results_dir'] + 'rna_seq_%dC' % temperature
+		file_prefix = env['results_dir'] + 'rna_seq_%s_%dC' % (run_id, temperature)
 		run_gwas(file_prefix, phen_file, int(sys.argv[1]), int(sys.argv[2]), temperature,
 			data_format='binary', call_method_id=75)
 	else:
+		run_id = sys.argv[3]
 		temperature = sys.argv[2]
-		phen_file = env['phen_dir'] + 'rna_seq_061611_%s.csv' % temperature
+		phen_file = env['phen_dir'] + 'rna_seq_061611_%sC.csv' % temperature
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 		phed.filter_near_const_phens(15)
 		num_traits = phed.num_traits()
 		print 'Found %d traits' % num_traits
 		chunck_size = int(sys.argv[1])
 		for i in range(0, num_traits, chunck_size):
-			run_parallel(i, i + chunck_size, temperature)
+			run_parallel(i, i + chunck_size, temperature, run_id=run_id)
 
 
 def _test_parallel_():
-	run_parallel(sys.argv[1], int(sys.argv[2]), int(sys.argv[2]) + 1)
+	run_parallel(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3])
 
 
 if __name__ == '__main__':
