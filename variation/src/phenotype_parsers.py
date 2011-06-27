@@ -736,8 +736,8 @@ def load_gene_expression_traits():
 def load_gene_expression_traits_2():
 	import scipy as sp
 	filename = env['home_dir'] + \
-			'Projects/Data/expression_matrix_upload_data_5_10_2011/mapping_files/all_expression_matrix_5_09_2011_flagged_removed_libID_bioreps_combined_cov_filter.txt'
-			#'Projects/Data/rna_seq/all_expression_matrix_normalized_3_02_2011_flagged_removed_libID_bioreps_combined.txt'
+			'Projects/Data/rna_seq/expression_matrix_upload_data_5_10_2011/mapping_files/' + \
+			'all_expression_matrix_5_09_2011_flagged_removed_libID_bioreps_combined_cov_filter_normalized.txt'
 	print 'Loading file:', filename
 	ets = {'10C':[], '16C':[]}
 	i_map = {}
@@ -789,6 +789,54 @@ def load_gene_expression_traits_2():
 	phed_16C = pd.phenotype_data(phen_dict_16C)
 	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict_16C)
 	phed_16C.write_to_file(env['phen_dir'] + 'rna_seq_061611_16C.csv')
+
+
+
+
+def load_total_expressions():
+	import scipy as sp
+	filename = env['home_dir'] + \
+			'Projects/Data/rna_seq/expression_matrix_upload_data_5_10_2011/mapping_files/' + \
+			'all_expression_matrix_5_09_2011_flagged_removed_libID_bioreps_combined_cov_filter.txt'
+	print 'Loading file:', filename
+	ets = {'10C':[], '16C':[]}
+	i_map = {}
+	expressions_dict = {}
+	with open(filename, "r") as f:
+		i = 0
+		line = f.next()
+		l = map(str.strip, line.split())
+		for i in range(2, len(l)):
+			e_t_l = l[i].split('_')
+			et = e_t_l[0][1:]
+			t = e_t_l[1]
+			i_map[i] = t
+			ets[t].append(et)
+
+		line = f.next()
+		l = map(str.strip, line.split())
+		gene_name = l[0]
+		gene_type = l[1]
+		d = {'gene_type':gene_type, '10C':[], '16C':[]}
+		for i in range(2, len(l)):
+			t = i_map[i]
+			val = float(l[i])
+			d[t].append(val)
+		expressions_dict[gene_name] = d
+	print 'File was parsed, now constructing phenotype object'
+	phen_dict = {}
+	phen_i = 1
+	for t in ['10C', '16C']:
+		values = expressions_dict['GENE'][t]
+		phen_dict[phen_i] = {'name':'total_expression_%s' % t, 'ecotypes':ets[t], 'values':values}
+		phen_i += 1
+
+
+	phed = pd.phenotype_data(phen_dict)
+	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'rna_seq_061611_total.csv')
+
+
 
 
 
@@ -874,7 +922,7 @@ if __name__ == "__main__":
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_gene_expression_traits_2()
+	load_total_expressions()
 	#load_phentoype_file_nc_resistance_3()
 	print "Done!"
 

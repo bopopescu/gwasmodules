@@ -894,10 +894,12 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 		snps = []
 		positions = []
 		num_snps = 0
+		num_snps_w_3_alleles = 0
 		d = {'snps':[], 'positions':[]}
 		for snp_i, line in enumerate(f):
 			if verbose and snp_i % 100000 == 0:
 				print '%d SNPs have been read.' % snp_i
+				print '%d SNPs with issues (three alleles etc.) have been ignored' % num_snps_w_3_alleles
 			if random.random() >= debug_filter:
 				continue
 			num_snps += 1
@@ -907,6 +909,10 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 			pos = int(l[1])
 			if use_decoder:
 				snp = sp.empty(num_accessions, 'a1')
+#				s = l[2:]
+#				if '0' in s or '' in s:
+#					num_snps_w_3_alleles += 1 #A hack
+#					continue
 				for i in xrange(num_accessions):
 					snp[i] = decoder[l[2 + i]]
 			else:
@@ -2453,64 +2459,93 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 
 
 
-#def load_quan_data(data_format='diploid_int', min_mac=5, chromosomes=[1, 2, 3, 4, 5], debug_filter=1.0):
-#	print "Loading Quan's sequence data."
-#	pickled_file_name = env['data_quan_dir'] + 'data.gwas_012_mac%d.pickled' % min_mac
-#	if os.path.isfile(pickled_file_name):
-#		print 'Loading pickled file: %s' % pickled_file_name
-#		t = time.time()
-#		sd = cPickle.load(open(pickled_file_name))
-#		t = time.time() - t
-#		print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
-#	else:
-#
-#		t = time.time()
-#		snpsds = []
-#		num_snps = 0
-#		for chrom in chromosomes:
-#			file_name = env['data_quan_dir'] + 'data.%d.gwas_012.1.csv' % chrom
-#			sd = parse_numerical_snp_data(file_name, data_format='diploid_int')
-#			if min_mac > 0:
-#				sd.filter_mac_snps(min_mac, type='diploid_ints')
-#			if debug_filter < 1.0:
-#				sd.sample_snps(debug_filter)
-#			num_snps += len(sd.snpsDataList[0].snps)
-#			snpsds.append(sd.snpsDataList[0])
-#		t = time.time() - t
-#		print 'Loaded %d SNPs.' % num_snps
-#		print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
-#		sd = SNPsDataSet(snpsds, chromosomes, data_format='diploid_int')
-#		print "Saving pickled file."
-#		cPickle.dump(sd, open(pickled_file_name, 'wb'), protocol=2)
-#		print "Done."
-#	print 'Loaded %d SNPs in total.' % sd.num_snps()
-#	sd.data_format = 'diploid_int'
-#	return sd
-#
-#
-#
-#def load_1001_full_snps(mac=0, chromosomes=[1, 2, 3, 4, 5], debug_filter=1):
-#	"""
-#	Parses the binary SNPs
-#	"""
-#	import env
-#	data_1001_dir = env.env['data_1001_dir']
-#	print 'Loading full genotype data.'
-#	t = time.time()
-#	snpsds = []
-#	num_snps = 0
-#	for chrom in chromosomes:
-#		print 'Loading pickled chromosome %d.' % chrom
-#		file_name = data_1001_dir + 'Imputed_2_Chr%d_mac%d.binary.csv.pickled' % (chrom, mac)
-#		with open(file_name) as f:
-#			sd = cPickle.load(f)
-#		sd.sample_snps(debug_filter)
-#		num_snps += len(sd.snpsDataList[0].snps)
-#		snpsds.append(sd.snpsDataList[0])
-#	t = time.time() - t
-#	print 'Loaded %d SNPs.' % num_snps
-#	print 'It took %d minutes and %0.2f seconds to load the SNPs' % (t / 60, t % 60)
-#	return SNPsDataSet(snpsds, chromosomes, data_format='binary')
+
+def parse_tair_gff_file():
+	"""
+	Loads the TAIR GFF file.
+	"""
+	filename = env['tair_dir'] + 'TAIR10_GFF3_genes_transposons.gff.tsv'
+	pickled_filename = filename + '.pickled'
+	if os.path.isfile(pickled_filename):
+		gene_dict = cPickle.load(open(pickled_filename))
+	else:
+		with open(filename) as f:
+			lines = f.readlines()
+		gene_dict = {}
+		transposon_dict = {}
+		others = []
+		i = 0
+		while i < len(lines):
+			l = lines[i].split()
+			annotation_type = l[2]
+			info_list = l[8].split(';')
+			chromosome = l[0][3]
+			start_pos = int(l[3])
+			end_pos = int(l[4])
+			strand = l[6]
+			frame = l[7]
+			if i % 10000 == 0:
+				print i / float(len(lines))
+			if annotation_type in ['gene', 'transposable_element_gene', 'pseudogene']:
+				tair_id = info_list[0][3:].strip()
+				note = info_list[1][5:].strip()
+				name = info_list[2][5:].strip()
+				assert tair_id not in gene_dict, 'Gene is already in the dictionary'
+				gene_dict[tair_id] = {'gene_type':annotation_type, 'name':name, 'note':note, 'strand':strand,
+							'start_pos':start_pos, 'end_pos':end_pos , 'chromosome':chromosome}
+
+			elif annotation_type in ['mRNA', 'tRNA', 'rRNA', 'miRNA', 'ncRNA', 'snoRNA', 'snRNA',
+						'pseudogenic_transcript']:
+				tair_isoform_id = info_list[0][3:].strip()
+				tair_id = tair_isoform_id.split('.')[0]
+				name = info_list[2][5:].strip()
+				assert tair_id  in gene_dict, "Gene isn't in the  dictionary"
+				assert tair_isoform_id not in gene_dict[tair_id], "%s already found?" % annotation_type
+				gene_dict[tair_id][tair_isoform_id] = {'RNA_type':annotation_type, 'name':name, 'strand':strand,
+										'start_pos':start_pos, 'end_pos':end_pos,
+										'exons':[], 'cds':[]}
+			elif annotation_type == 'protein':
+				tair_isoform_id = info_list[1][5:].strip()
+				tair_id = tair_isoform_id.split('.')[0]
+				name = info_list[1][5:].strip()
+				gene_dict[tair_id][tair_isoform_id]['protein'] = {'name':name, 'strand':strand,
+										'start_pos':start_pos, 'end_pos':end_pos}
+
+			elif annotation_type in ['five_prime_UTR', 'three_prime_UTR']:
+				tair_isoform_id = info_list[0][7:].strip()
+				tair_id = tair_isoform_id.split('.')[0]
+				gene_dict[tair_id][tair_isoform_id][annotation_type] = {'start_pos':start_pos, 'end_pos':end_pos}
+
+			elif annotation_type == 'CDS':
+				tair_isoform_id = info_list[0].split(',')[0][7:].strip()
+				tair_id = tair_isoform_id.split('.')[0]
+				gene_dict[tair_id][tair_isoform_id]['cds'].append({'start_pos':start_pos,
+												'end_pos':end_pos,
+												'frame':int(frame)})
+
+			elif annotation_type in ['exon', 'pseudogenic_exon']:
+				tair_isoform_id = info_list[0][7:].strip()
+				tair_id = tair_isoform_id.split('.')[0]
+				d = {'start_pos':start_pos, 'end_pos':end_pos}
+				gene_dict[tair_id][tair_isoform_id]['exons'].append(d)
+
+			elif annotation_type == 'transposable_element':
+				tair_id = info_list[0][3:].strip()
+				name = info_list[1][5:].strip()
+				alias = info_list[2][6:].strip()
+				gene_dict[tair_id] = {'gene_type':annotation_type, 'name':name, 'strand':strand,
+							'start_pos':start_pos, 'end_pos':end_pos , 'chromosome':chromosome,
+							'alias':alias, 'fragments':[]}
+
+			elif annotation_type == 'transposon_fragment':
+				tair_id = info_list[0][7:].strip()
+				assert tair_id in gene_dict, 'We have a fragment but where is the transposon?'
+				gene_dict[tair_id]['fragments'].append({'start_pos':start_pos, 'end_pos':end_pos})
+			i += 1
+		cPickle.dump(gene_dict, open(pickled_filename, 'wb'), protocol=2)
+	print 'Done loading the file'
+	return gene_dict
+
 
 
 def _bug_test_():
@@ -2554,7 +2589,8 @@ def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filte
 
 
 if __name__ == "__main__":
-	_test_plink_tped_parser_()
+	#_test_plink_tped_parser_()
+	parse_tair_gff_file()
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
 #	print len(snpsds)
 #	for i in range(0,len(snpsds)):
