@@ -2437,7 +2437,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 		if os.path.isfile(pickled_file_name):
 			sd = cPickle.load(open(pickled_file_name))
 		else:
-			raise NotImplementedError #(Load raw data etc.)
+			sd = parse_snp_data(file_name, format=data_format, filter=debug_filter, use_pickle=True)
 		if min_mac != file_mac:
 			sd.filter_mac_snps(min_mac)
 			file_name = file_prefix + 'chr_%d_%s_mac%d.csv' % (chrom, data_format, min_mac)
