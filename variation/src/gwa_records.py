@@ -25,6 +25,41 @@ import pdb
 chromosome_ends = [30429953, 19701870, 23467451, 18578708, 26992130]
 
 
+class ProgressFileWriter():
+    """
+    A small object to facilitate a progress bar update.
+    """
+    def __init__(self, file_name, file_mode='w'):
+        self.file_mode = file_mode
+        self.f = open(file_name, file_mode, 0)
+        self.progress = 0.0
+        self.task_status = ''
+
+    def update_progress_bar(self, progress=0.0, task_status=''):
+        assert self.file_mode == 'w', 'This requires file in write mode'
+        self.progress = progress
+        if self.progress > 1.0:
+            self.progress = 1.0
+        self.task_status = task_status
+        self.f.seek(0)
+        self.write('%f\n%s' % (self.progress, self.task_status))
+
+    def get_progress(self, from_file=True):
+        if from_file:
+            assert self.file_mode == 'r', 'This requires file in read mode'
+            lines = self.f.readlines()
+            self.progress = float(lines[0])
+        return self.progress
+
+    def get_task_status(self, from_file=True):
+        if from_file:
+            assert self.file_mode == 'r', 'This requires file in read mode'
+            lines = self.f.readlines()
+            self.task_status = strip(lines[1])
+        return self.task_status
+
+    def close_file(self):
+        self.f.close()
 
 
 class PhenotypeValue(tables.IsDescription):
@@ -561,8 +596,9 @@ class GWASRecord():
         return cd
 
 
-    def get_phenotype_bins(self, phen_name, transformation='raw', bin_number=20):
-        phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
+    def get_phenotype_bins(self, phen_name, transformation='raw', phen_vals = None, bin_number=20):
+        if phen_vals == None:
+            phen_vals = self.get_phenotype_values(phen_name, transformation)['mean_value']
         return self._get_phenotype_bins(phen_vals, bin_number)
 
     def _get_phenotype_bins(self, phen_vals, bin_number=20):
@@ -616,7 +652,8 @@ class GWASRecord():
 
 
 
-    def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', call_method_id=75, kinship_method='ibs'):
+    def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', call_method_id=75,
+                     kinship_method='ibs', progress_file_writer=None):
 
         """
         Performs GWAS and updates the datastructure.
@@ -628,11 +665,14 @@ class GWASRecord():
         if analysis_method not in ['lm', 'emmax', 'kw']:
             raise Exception('analysis method %s not supported' % analysis_method)
 
+        progress_file_writer.update_progress_bar(0.0, 'Loading phenotype data')
         phen_dict = self.get_phenotype_values(phen_name, transformation) #Load phenotype
         phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':map(str, phen_dict['ecotype']), 'name':phen_name}})
+        progress_file_writer.update_progress_bar(0.05, 'Loading genotype data')
         sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format='binary', min_mac=5) #Load SNPs data
-
+        progress_file_writer.update_progress_bar(0.1, 'Coordinating genotype and phenotype data')
         sd.coordinate_w_phenotype_data(phend, 1)
+        progress_file_writer.update_progress_bar(0.2, 'Filtering monomorphic SNPs')
         sd.filter_monomorphic_snps()
         phen_vals = phend.get_values(1)
         snps = sd.getSnps()
@@ -640,21 +680,29 @@ class GWASRecord():
         chromosomes = []
         for s, c in itertools.izip(sd.snpsDataList, sd.chromosomes):
             chromosomes.extend([c] * len(s.snps))
-        maf_dict = sd.get_mafs()
-        correlations = gwa.calc_correlations(snps, phen_vals)
+            progress_file_writer.update_progress_bar(0.25, 'Calculating MAFs and direct correlations')
+            maf_dict = sd.get_mafs()
+            correlations = gwa.calc_correlations(snps, phen_vals)
 
 
         kwargs = {}
         if analysis_method == 'emmax':
+            progress_file_writer.update_progress_bar(0.3, 'Retrieving the kinship matrix')
             k = dp.load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=sd.accessions,
-			scaled=True, min_mac=5, sd=sd)
-            d = lm.emmax_step(phen_vals, sd, k, [])
+                                scaled=True, min_mac=5, sd=sd)
+            progress_file_writer.update_progress_bar(0.35, 'Performing EMMAX')
+            d = lm.emmax_step(phen_vals, sd, k, [], progress_file_writer=progress_file_writer)
+            progress_file_writer.update_progress_bar(0.95, 'Processing and saving results')
             res = d['res']
             stats_dict = d['stats']
         elif analysis_method == 'lm':
+            progress_file_writer.update_progress_bar(0.3, 'Performing LM')
             res = lm.linear_model(snps, phen_vals)
+            progress_file_writer.update_progress_bar(0.95, 'Processing and saving results')
         elif analysis_method == 'kw':
+            progress_file_writer.update_progress_bar(0.3, 'Performing KW')
             kw_res = util.kruskal_wallis(snps, phen_vals)
+            progress_file_writer.update_progress_bar(0.95, 'Processing and saving results')
             scores = map(lambda x:-math.log10(x), kw_res['ps'])
             self.add_results(phen_name, analysis_method, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
                     maf_dict['mafs'], transformation=transformation, statistics=kw_res['ds'],
@@ -671,9 +719,10 @@ class GWASRecord():
             stats_dict['step'] = 0
             cofactors = [stats_dict]
             self.add_results(phen_name, analysis_method, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
-                    maf_dict['mafs'], transformation=transformation,
-                    genotype_var_perc=res['var_perc'], beta0=betas[0], beta1=betas[1],
-                    correlation=correlations, cofactors=cofactors)
+                             maf_dict['mafs'], transformation=transformation,
+                             genotype_var_perc=res['var_perc'], beta0=betas[0], beta1=betas[1],
+                             correlation=correlations, cofactors=cofactors)
+        progress_file_writer.update_progress_bar(1.0, 'Done')
         print 'Done!'
         return 'results'
 
