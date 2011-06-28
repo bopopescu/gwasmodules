@@ -26,6 +26,11 @@ import math
 import analyze_gwas_results as agr
 #import ipdb
 
+#Annoyingly ad hoc constants
+near_const_filter = 20
+phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
+
+
 def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi', run_id='rs'):
 	"""
 	If no mapping_method, then analysis run is set up.
@@ -125,12 +130,12 @@ def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
 
 
 def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
-		call_method_id=79, data_format='diploid_int', debug_filter=1.0):
+		call_method_id=79, data_format='diploid_int', debug_filter=1.0, near_const_filter=20):
 	"""
 	GWAS
 	"""
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-	phed.filter_near_const_phens(20)
+	phed.filter_near_const_phens(near_const_filter)
 	phed.convert_to_averages()
 	num_traits = phed.num_traits()
 	pids = phed.phen_ids[start_i :stop_i]
@@ -223,7 +228,7 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 
 
 
-def _load_results_(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
+def load_results(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
 	pickle_file = '%s_%s_%s_mac%d_res.pickled' % (file_prefix, temperature, mapping_method, mac_threshold)
 	if os.path.isfile(pickle_file):
 		with open(pickle_file) as f:
@@ -439,7 +444,11 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 
 
 
-def load_and_plot_info_files(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
+
+
+
+
+def load_and_plot_info_files(file_prefix='', call_method=75, temperature=10, mac_threshold=15, debug_filter=1.0, near_const_filter=20):
 	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
 	phen_pickle_file = phen_file + 'sd_overlap.pickled'
 	if os.path.isfile(phen_pickle_file):
@@ -447,7 +456,7 @@ def load_and_plot_info_files(mapping_method, temperature, file_prefix='', data_t
 			phed = cPickle.load(f)
 	else:
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-		phed.filter_near_const_phens(15)
+		phed.filter_near_const_phens(near_const_filter)
 		phed.convert_to_averages()
 		if data_type == 'use_1001_data':
 			sd = dp.load_1001_full_snps(debug_filter=debug_filter)
@@ -520,21 +529,21 @@ def run_parallel_rna_seq_gwas():
 	if len(sys.argv) > 4:
 		run_id = sys.argv[4]
 		temperature = int(sys.argv[3])
-		phen_file = env['phen_dir'] + 'rna_seq_061611_%dC.csv' % temperature
+		phen_file = '%s_%dC.csv' % (phen_file_prefix, temperature)
 		file_prefix = env['results_dir'] + 'rna_seq_%s_%dC' % (run_id, temperature)
 		run_gwas(file_prefix, phen_file, int(sys.argv[1]), int(sys.argv[2]), temperature,
-			data_format='binary', call_method_id=79)
+			data_format='binary', call_method_id=79, near_const_filter=near_const_filter)
 	else:
 		run_id = sys.argv[3]
 		temperature = sys.argv[2]
-		phen_file = env['phen_dir'] + 'rna_seq_061611_%sC.csv' % temperature
+		phen_file = '%s_%sC.csv' % (phen_file_prefix, temperature)
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-		phed.filter_near_const_phens(20)
+		phed.filter_near_const_phens(near_const_filter)
 		num_traits = phed.num_traits()
 		print 'Found %d traits' % num_traits
 		chunck_size = int(sys.argv[1])
 		for i in range(0, num_traits, chunck_size):
-			run_parallel(i, i + chunck_size, temperature, run_id=run_id)
+			run_parallel(i, i + chunck_size, temperature, run_id=run_idr)
 
 
 def _test_parallel_():
