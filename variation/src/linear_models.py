@@ -1060,7 +1060,7 @@ class LinearMixedModel(LinearModel):
 
 
 	def emmax_f_test(self, snps, snp_priors=None, Z=None, with_betas=False, method='REML', return_stepw_stats=False,
-			eig_L=None, eig_R=None, emma_num=0):
+			eig_L=None, eig_R=None, emma_num=0, progress_file_writer=None):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1081,7 +1081,8 @@ class LinearMixedModel(LinearModel):
 		print 'Done.'
 		print 'pseudo_heritability:', res['pseudo_heritability']
 
-		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], snp_priors=snp_priors, Z=Z, with_betas=with_betas)
+		r = self._emmax_f_test_(snps, res['H_sqrt_inv'], snp_priors=snp_priors, Z=Z, with_betas=with_betas,
+				progress_file_writer=progress_file_writer)
 		r['pseudo_heritability'] = res['pseudo_heritability']
 		r['ve'] = res['ve']
 		r['vg'] = res['vg']
@@ -1097,7 +1098,7 @@ class LinearMixedModel(LinearModel):
 
 
 	def _emmax_f_test_(self, snps, H_sqrt_inv, snp_priors=None, verbose=True, return_transformed_snps=False,
-			Z=None, with_betas=False):
+			Z=None, with_betas=False, progress_file_writer=None):
 		"""
 		EMMAX implementation (in python)
 		Single SNPs
@@ -1140,6 +1141,8 @@ class LinearMixedModel(LinearModel):
 			log_h0_rss = sp.log(h0_rss)
 			log_bfs = sp.zeros(num_snps) #Bayes factors
 		chunk_size = len(Y)
+		if not progress_file_writer == None:
+			progress_file_writer.update_progress_bar(0.45, 'Performing EMMAX')
 		for i in range(0, num_snps, chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M
@@ -1159,6 +1162,8 @@ class LinearMixedModel(LinearModel):
 						log_bfs[i + j] = log_h0_rss - sp.log(rss)
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
+					if not progress_file_writer == None:
+						progress_file_writer.update_progress_bar(0.45 + 0.05 * int(10 * (i + j + 1) / num_snps), 'Performing EMMAX')
 					sys.stdout.write('.')
 					sys.stdout.flush()
 
@@ -1829,7 +1834,7 @@ def emma(snps, phenotypes, K, cofactors=None):
 
 
 
-def emmax(snps, phenotypes, K, cofactors=None, Z=None, with_betas=False):
+def emmax(snps, phenotypes, K, cofactors=None, Z=None, with_betas=False, progress_file_writer=None):
 	"""
 	Run EMMAX
 	"""
@@ -1845,9 +1850,11 @@ def emmax(snps, phenotypes, K, cofactors=None, Z=None, with_betas=False):
 			for cofactor in cofactors:
 				lmm.add_factor(cofactor)
 
+	if not progress_file_writer == None:
+		progress_file_writer.update_progress_bar(0.4, 'Performing EMMAX')
 	print "Running EMMAX"
 	s1 = time.time()
-	res = lmm.emmax_f_test(snps, Z=Z, with_betas=with_betas)
+	res = lmm.emmax_f_test(snps, Z=Z, with_betas=with_betas, progress_file_writer=progress_file_writer)
 	secs = time.time() - s1
 	if secs > 60:
 		mins = int(secs) / 60
@@ -2381,7 +2388,7 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 
 
 
-def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
+def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progress_file_writer=None):
 	"""
 	EMMAX single SNPs
 	
@@ -2420,7 +2427,10 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None,):
 
 	H_sqrt_inv = res_dict['REML']['H_sqrt_inv']
 
-	r = lmm._emmax_f_test_(snps, H_sqrt_inv)
+	if not progress_file_writer == None:
+		progress_file_writer.update_progress_bar(0.4, 'Performing EMMAX')
+
+	r = lmm._emmax_f_test_(snps, H_sqrt_inv, progress_file_writer=progress_file_writer)
 	min_pval_i = sp.argmin(r['ps'])
 	step_dict = {}
 	step_dict['min_pval_i'] = min_pval_i

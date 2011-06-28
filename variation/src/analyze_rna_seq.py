@@ -125,12 +125,12 @@ def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
 
 
 def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
-		call_method_id=76, data_format='diploid_int', debug_filter=1.0):
+		call_method_id=79, data_format='diploid_int', debug_filter=1.0):
 	"""
 	GWAS
 	"""
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-	phed.filter_near_const_phens(15)
+	phed.filter_near_const_phens(20)
 	phed.convert_to_averages()
 	num_traits = phed.num_traits()
 	pids = phed.phen_ids[start_i :stop_i]
@@ -212,7 +212,7 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 		#Plot GWAs...
 		for res, method_name in [(kw_res, 'KW'), (lm_res, 'LM'), (ex_res, 'EX')]:
 			res.filter_percentile(filter_threshold, reversed=True)
-			res.write_to_file(curr_file_prefix + '.pvals', only_pickled=True)
+			res.write_to_file('%s_%s_.pvals' % (curr_file_prefix, method_name), only_pickled=True)
 			if ex_res.min_score() < 10e-10:
 				#print [cg.tairID for cg in cgs]
 				f_prefix = '%s_%s_manhattan' % (curr_file_prefix, method_name)
@@ -523,13 +523,13 @@ def run_parallel_rna_seq_gwas():
 		phen_file = env['phen_dir'] + 'rna_seq_061611_%dC.csv' % temperature
 		file_prefix = env['results_dir'] + 'rna_seq_%s_%dC' % (run_id, temperature)
 		run_gwas(file_prefix, phen_file, int(sys.argv[1]), int(sys.argv[2]), temperature,
-			data_format='binary', call_method_id=75)
+			data_format='binary', call_method_id=79)
 	else:
 		run_id = sys.argv[3]
 		temperature = sys.argv[2]
 		phen_file = env['phen_dir'] + 'rna_seq_061611_%sC.csv' % temperature
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-		phed.filter_near_const_phens(15)
+		phed.filter_near_const_phens(20)
 		num_traits = phed.num_traits()
 		print 'Found %d traits' % num_traits
 		chunck_size = int(sys.argv[1])
