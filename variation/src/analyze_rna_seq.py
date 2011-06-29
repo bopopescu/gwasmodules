@@ -31,7 +31,7 @@ near_const_filter = 20
 phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
 
 
-def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi', run_id='rs'):
+def run_parallel(x_start_i, x_stop_i, temperature, call_method_id, cluster='gmi', run_id='rs'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
@@ -60,8 +60,8 @@ def run_parallel(x_start_i, x_stop_i, temperature, cluster='gmi', run_id='rs'):
 		shstr += "#PBS -q cmb\n"
 		shstr += "#PBS -N p%s \n" % job_id
 
-	shstr += "python %sanalyze_rna_seq.py %d %d %s %s" % \
-			(env['script_dir'], x_start_i, x_stop_i, temperature, run_id)
+	shstr += "python %sanalyze_rna_seq.py %d %d %s %d %s" % \
+			(env['script_dir'], x_start_i, x_stop_i, temperature, call_method_id, run_id)
 
 	#shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
@@ -124,7 +124,6 @@ def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
 		sw_d[criteria] = d
 		sw_d['step_info_list'] = step_info_list
 	summary_dict['SW'] = sw_d
-
 
 
 
@@ -448,28 +447,42 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 
 
 
-def load_and_plot_info_files(file_prefix='', call_method=75, temperature=10, mac_threshold=15, debug_filter=1.0, near_const_filter=20):
-	phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
-	phen_pickle_file = phen_file + 'sd_overlap.pickled'
-	if os.path.isfile(phen_pickle_file):
-		with file(phen_pickle_file) as f:
-			phed = cPickle.load(f)
-	else:
-		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-		phed.filter_near_const_phens(near_const_filter)
-		phed.convert_to_averages()
-		if data_type == 'use_1001_data':
-			sd = dp.load_1001_full_snps(debug_filter=debug_filter)
-		elif data_type == 'quan_seq_data':
-			sd = dp.load_quan_data(debug_filter=debug_filter)
-		else:
-			sd = dp.load_250K_snps(debug_filter=debug_filter)
-		indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
-		phed.filter_ecotypes(indices_to_keep)
-		with file(phen_pickle_file, 'wb') as f:
-			cPickle.dump(phed, f)
+def load_and_plot_info_files(file_prefix='', call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1.0,
+			near_const_filter=20, data_format='binary', debug_filter=0.01):
+	phen_file = '%s_%dC.csv' % (phen_file_prefix, temperature)
+	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+	phed.filter_near_const_phens(near_const_filter)
+	phed.convert_to_averages()
+	num_traits = phed.num_traits()
+	pids = phed.phen_ids[start_i :stop_i]
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=debug_filter)
+	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
+	phed.filter_ecotypes(indices_to_keep, pids=pids)
 
-	gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
+	gene_dict = dp.parse_tair_gff_file()
+
+	# WHAT TO PLOT?
+	#
+	# - p-value inflation (box plots)
+	#   - ks test
+	#   - pval median
+	#
+	# - heritability (histogram)
+	#
+	# - Number of genes with significant signals, and split up by cis and trans...
+	#   - EBIC, MBIC, MBONF, etc
+	#   - Assuming Bonferroni correction, number of genes with significant p-values according for different bins around gene. (EX, LM, KW)
+	#
+	# - Distances to the most significant SNP from the causal gene, using different min p-value thresholds 
+	#
+	# - Number of causal loci found in total and per gene. (histogram) Split up into cis and trans.
+	#
+	# - Number of significant cofactors near genes for which we have a signal (EBIC,MBIC,MBONF)
+
+
+	for chrom in [1, 2, 3, 4, 5]:
+		pass
+
 	res_dict = {}
 	pids = phed.get_pids()
 	heritabilities = []
@@ -526,8 +539,9 @@ def load_and_plot_info_files(file_prefix='', call_method=75, temperature=10, mac
 
 
 def run_parallel_rna_seq_gwas():
-	if len(sys.argv) > 4:
-		run_id = sys.argv[4]
+	if len(sys.argv) > 5:
+		run_id = sys.argv[5]
+		call_method_id = int(sys.argv[4])
 		temperature = int(sys.argv[3])
 		phen_file = '%s_%dC.csv' % (phen_file_prefix, temperature)
 		file_prefix = env['results_dir'] + 'rna_seq_%s_%dC' % (run_id, temperature)
@@ -535,6 +549,7 @@ def run_parallel_rna_seq_gwas():
 			data_format='binary', call_method_id=79, near_const_filter=near_const_filter)
 	else:
 		run_id = sys.argv[3]
+		call_method_id = int(sys.argv[4])
 		temperature = sys.argv[2]
 		phen_file = '%s_%sC.csv' % (phen_file_prefix, temperature)
 		phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
