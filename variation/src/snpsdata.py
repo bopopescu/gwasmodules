@@ -2941,7 +2941,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=100, with_correction=True,
+	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10000, with_correction=True,
 				snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBD kinship matrix, as described in (Yang et al., Nat. Genetics, 2010) 
