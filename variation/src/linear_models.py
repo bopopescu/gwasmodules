@@ -1142,7 +1142,7 @@ class LinearMixedModel(LinearModel):
 			log_bfs = sp.zeros(num_snps) #Bayes factors
 		chunk_size = len(Y)
 		if not progress_file_writer == None:
-			progress_file_writer.update_progress_bar(0.45, 'Performing EMMAX')
+			progress_file_writer.update_progress_bar(progress=0.45, task_status='Performing EMMAX')
 		for i in range(0, num_snps, chunk_size): #Do the dot-product in chuncks!
 			snps_chunk = sp.matrix(snps[i:i + chunk_size], dtype=dtype)
 			Xs = snps_chunk * M
@@ -1163,7 +1163,7 @@ class LinearMixedModel(LinearModel):
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					if not progress_file_writer == None:
-						progress_file_writer.update_progress_bar(0.45 + 0.05 * int(10 * (i + j + 1) / num_snps), 'Performing EMMAX')
+						progress_file_writer.update_progress_bar(task_status='Performing EMMAX (SNPs completed: %d %%)' % round((float(i+j+1)/num_snps)*100))
 					sys.stdout.write('.')
 					sys.stdout.flush()
 
@@ -2419,6 +2419,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 		eig_R = lmm._get_eigen_R_()
 		print 'Done'
 
+	
 	print 'Getting variance estimates'
 	res_dict = {'REML':lmm.get_estimates(eig_L, method='REML', eig_R=eig_R),
 			'ML':lmm.get_estimates(eig_L, method='ML', eig_R=eig_R)}
@@ -2428,7 +2429,9 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 	H_sqrt_inv = res_dict['REML']['H_sqrt_inv']
 
 	if not progress_file_writer == None:
-		progress_file_writer.update_progress_bar(0.4, 'Performing EMMAX')
+		progress_file_writer.update_progress_bar(progress=0.45,task_status='Performing EMMAX')
+		progress_file_writer.set_step(0.05)
+		
 
 	r = lmm._emmax_f_test_(snps, H_sqrt_inv, progress_file_writer=progress_file_writer)
 	min_pval_i = sp.argmin(r['ps'])
