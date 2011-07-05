@@ -2567,7 +2567,7 @@ def _test_plink_ped_parser_():
 
 def _test_plink_tped_parser_():
 	plink_prefix = env['home_dir'] + 'Projects/Data/Skin_color/plink'
-	sd, k = parse_plink_tped_file(plink_prefix)
+	sd = parse_plink_tped_file(plink_prefix)
         K = sd.get_ibs_kinship_matrix()
         import linear_models as lm
         lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
@@ -2589,8 +2589,8 @@ def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filte
 
 
 if __name__ == "__main__":
-	#_test_plink_tped_parser_()
-	parse_tair_gff_file()
+	_test_plink_tped_parser_()
+	#parse_tair_gff_file()
 #	snpsds = get2010DataFromDb(host="papaya.usc.edu",chromosomes=[1,2,3,4,5], db = "at", dataVersion="3", user = "bvilhjal",passwd = "bamboo123")
 #	print len(snpsds)
 #	for i in range(0,len(snpsds)):
