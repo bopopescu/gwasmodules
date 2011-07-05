@@ -1163,7 +1163,7 @@ class LinearMixedModel(LinearModel):
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					if not progress_file_writer == None:
-						progress_file_writer.update_progress_bar(task_status='Performing EMMAX (SNPs completed: %d %%)' % round((float(i+j+1)/num_snps)*100))
+						progress_file_writer.update_progress_bar(task_status='Performing EMMAX (SNPs completed: %d %%)' % round((float(i + j + 1) / num_snps) * 100))
 					sys.stdout.write('.')
 					sys.stdout.flush()
 
@@ -2419,7 +2419,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 		eig_R = lmm._get_eigen_R_()
 		print 'Done'
 
-	
+
 	print 'Getting variance estimates'
 	res_dict = {'REML':lmm.get_estimates(eig_L, method='REML', eig_R=eig_R),
 			'ML':lmm.get_estimates(eig_L, method='ML', eig_R=eig_R)}
@@ -2429,9 +2429,9 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 	H_sqrt_inv = res_dict['REML']['H_sqrt_inv']
 
 	if not progress_file_writer == None:
-		progress_file_writer.update_progress_bar(progress=0.45,task_status='Performing EMMAX')
+		progress_file_writer.update_progress_bar(progress=0.45, task_status='Performing EMMAX')
 		progress_file_writer.set_step(0.05)
-		
+
 
 	r = lmm._emmax_f_test_(snps, H_sqrt_inv, progress_file_writer=progress_file_writer)
 	min_pval_i = sp.argmin(r['ps'])
@@ -3455,12 +3455,13 @@ def test_skin_color():
 	import gwaResults as gr
 	for pid in [1, 2]:
 		#pid = 2
-		dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+		#dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+		dir_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/'
 		plink_prefix = dir_prefix + 'plink'
 		sd = dp.parse_plink_tped_file(plink_prefix)
 		phed = pp.load_skin_color_traits()
 		sd.coordinate_w_phenotype_data(phed, pid)
-		K = load_kinship_from_file(dir_prefix + 'kinship_ibd.pickled',
+		K = load_kinship_from_file(dir_prefix + 'kinship_ibs.pickled',
 						accessions=sd.accessions)
 		phen_vals = phed.get_values(pid)
 		phen_name = phed.get_name(pid)
@@ -3476,12 +3477,12 @@ def test_skin_color():
 		else:
 			print 'Took %f seconds to load and preprocess the data..' % (secs)
 		#emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
-#		emmax_res = emmax(snps, phen_vals, K)
-#		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
+		emmax_res = emmax(snps, phen_vals, K)
+		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
 #		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
-		emma_res = emma(snps, phen_vals, K)
-		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emma_res['pseudo_heritability'])
-		res = gr.Result(scores=emma_res['ps'].tolist(), snps_data=sd)
+		#emma_res = emma(snps, phen_vals, K)
+		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
+		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
 		res.write_to_file(env.env['results_dir'] + 'CVI_emmax_%s_pid%d.pvals' % (phen_name, pid))
 		res.neg_log_trans()
 		res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
