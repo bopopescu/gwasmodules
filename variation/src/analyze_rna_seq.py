@@ -447,7 +447,7 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 
 
 
-def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=0.01,
+def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1.0,
 			near_const_filter=20, data_format='binary'):
 	import random
 
@@ -808,7 +808,7 @@ if __name__ == '__main__':
 	#_load_genes_list_()
 	#_test_()
 	#print sys.argv
-	load_and_plot_info_files(temperature=16)
+	load_and_plot_info_files(temperature=10)
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:
