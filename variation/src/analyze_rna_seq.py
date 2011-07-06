@@ -461,6 +461,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
 	phed.filter_ecotypes(indices_to_keep, pids=pids)
 
+	print 'Loading the gene annotation dictionary'
 	gene_dict = dp.parse_tair_gff_file()
 	run_id = 'rs_%d' % call_method_id
 
@@ -480,7 +481,6 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	bonf_sign_bin_dict = {}
 	res_dict = {}
 	sign_count = {}
-	causal_count_dict = {}
 	for mm in ['EX', 'LM', 'KW']:
 		pval_infl_dict[mm] = {'kolmogorov_smirnov':[], 'median_pvals':[]}
 		dist_min_pval_dict[mm] = {}
@@ -490,7 +490,17 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 		for bin in radius_bins:
 			bonf_sign_bin_dict[mm][bin] = {'count':0.0, 'total':0.0}
 		sign_count[mm] = 0
-		causal_count_dict[mm] = {}
+
+	cofactor_count_dict = {}
+	for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+		cofactor_count_dict[criteria] = {'num_cofactor_list':[], 'bin_counts':sp.zeros(9),
+						'num_cis_cofactor_list':[], 'num_found':0}
+
+	pickle_file_dict = {}
+	for mm in ['EX', 'LM', 'KW']:
+		pickle_file_dict[mm] = {}
+		pickle_file_dict[mm]['file_name'] = '%sresults_%s_mac%d.pickled' % (file_prefix, mm, mac_threshold)
+		pickle_file_dict[mm]['res_dict'] = {}
 
 	pids = phed.get_pids()
 	for i, pid in enumerate(pids):
@@ -503,7 +513,8 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 			res_dict[mm] = '%s_%s_.pvals' % (curr_file_prefix, mm)
 		if random.random() > debug_filter:
 			continue
-		if os.path.isfile(info_file_name):
+		if os.path.isfile(info_file_name) and os.path.isfile(res_dict['EX'] + ".pickled") \
+				and os.path.isfile(res_dict['LM'] + ".pickled") and os.path.isfile(res_dict['KW'] + ".pickled"):
 			print 'Loading info file: %s' % info_file_name
 			num_genes += 1
 			info_dict = cPickle.load(open(info_file_name))
@@ -513,7 +524,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 			shapiro_wilk_pvals.append(info_dict['transformation_shapiro_pval'])
 			heritabilities.append(info_dict['pseudo_heritability'])
 			tair_ids.append(tair_id)
-			for mm in pval_infl_dict:
+			for mm in ['EX', 'LM', 'KW']:
 				pval_infl_dict[mm]['kolmogorov_smirnov'].append(info_dict[mm]['kolmogorov_smirnov']['D'])
 				pval_infl_dict[mm]['median_pvals'].append(info_dict[mm]['pval_median'])
 				dist_min_pval = tuple(info_dict[mm]['dist_to_min_pval'])
@@ -532,17 +543,62 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 						if pval < 1.0 / (20 * num_snps):
 							bonf_sign_bin_dict[mm][bin]['count'] += 1
 
+			#Stepwise stuff 
+			for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+				num_cofactors = len(info_dict['SW'][criteria]['cofactors'])
+				cofactor_count_dict[criteria]['num_cofactor_list'].append(num_cofactors)
+				if num_cofactors > 0:
+					cofactor_count_dict[criteria]['num_found'] += 1
+					cofactor_count_dict[criteria]['bin_counts'] += sp.array(info_dict['SW'][criteria]['bin_counts'])
+					cofactor_count_dict[criteria]['num_cis_cofactor_list'].append(info_dict['SW'][criteria]['bin_counts'][2])
 
-#		d = {'cofactors':cofactors, 'cof_pvals':cof_pvals, 'cof_ppas':cof_ppas, 'cof_gene_dist':da,
-#		'bin_counts':bin_counts, 'i_opt':i_opt}
-#		#print d
-#		sw_d[criteria] = d
-#		sw_d['step_info_list'] = step_info_list
+
+			#Pre-process the results..
+			for mm in ['EX', 'LM', 'KW']:
+				res = res_dict[mm]
+				#Trim results
+				res.neg_log_trans()
+				res.filter_attr('scores', 5) #Filter everything below 10^-5
+				if res.num_scores() == 0:
+					print "Skipping file since nothing is below 10^-5"
+					continue
+
+				gene_d = gene_dict[tair_id]
+				avg_g_pos = (gene_d['start_pos'] + gene_d['end_pos']) / 2.0
+				chrom = int(gene_d['chromosome']) #Current gene chromosome
 
 
+				#Prepare for plotting results.. x,y style, where gene is x, and y is p-values
+				chrom_pos_score_dict = res.get_chrom_score_pos_dict()
+
+				dist_dict = {}
+				for score_threshold in [5, 6, 7]: #negative log10 thresholds.
+					if len(res.snp_results['scores']) == 0:
+						dist_dict[score_threshold] = -2 #No results
+					else:
+						res.filter_attr('scores', score_threshold)
+						if len(res.snp_results['scores']) == 0:
+							dist_dict[score_threshold] = -2 #No results
+						else:
+							cps_dict = res.get_chrom_score_pos_dict()
+							pos_list = cps_dict[chrom]['positions']
+							if len(pos_list) > 0:
+								distances = sp.absolute(sp.array(pos_list) - avg_g_pos)
+								d_i = sp.argmin(distances)
+								dist_dict[score_threshold] = distances[d_i] #Min distance.
+							else:
+								dist_dict[score_threshold] = -1 #Different chromosome
+
+				pickle_file_dict[mm]['res_dict'][(chrom, avg_g_pos)] = {'tair_id':tair_id,
+							'chrom_pos_score':chrom_pos_score_dict, 'dist_dict':dist_dict,
+							'pid':pid}
+				print dist_dict
+
+	for mm in ['EX', 'LM', 'KW']:
+		cPickle.dump(pickle_file_dict[mm]['res_dict'], open(pickle_file_dict[mm]['file_name'], 'wb'), protocol=2)
 
 
-	results_prefix = env['results_dir'] + 'RNAseq_summary'
+	results_prefix = env['results_dir'] + 'RNAseq_summary_%dC_cm%d' % (temperature, call_method_id)
 	pylab.figure()
 	pylab.hist(heritabilities, bins=20, alpha=0.7)
 	pylab.xlabel('Pseudo-heritability')
@@ -574,50 +630,89 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.savefig(png_file_name)
 	pylab.clf()
 
-	x_positions = sp.arange(len(distance_bins))
-	width = 0.8
-	for mm in ['EX', 'LM', 'KW']:
-		png_file_name = results_prefix + '_dist_min_pval_hist_%s.png' % mm
+	x_positions = sp.arange(len(distance_bins), dtype='d64')
+	width = 0.25
+	png_file_name = results_prefix + '_dist_min_pval_hist.png'
+	pylab.axes([0.08, 0.2, 0.91, 0.75])
+	for mm, color in zip(['EX', 'LM', 'KW'], ['b', 'c', 'g']):
 		l = [dist_min_pval_dict[mm][bin] for bin in distance_bins]
 		tot_sum = sum(l)
 		l = map(lambda x: x / float(tot_sum), l)
-		pylab.bar(x_positions, l, width, color='r', alpha=0.8)
-		pylab.ylabel('Frequency')
-		#pylab.xticks(x_positions + width / 2.0, (r'$d=0$', r'$0<d\le 1$', r'$1< d \le 5$', r'$5< d \le 25$', r'$25< d \le 100$', r'$d>100$', 'Other chrom.'))
-		pylab.xticks(x_positions + width / 2.0, ('d<=5', '5<d<=10', '10<d<=25', '25<d<=50', '50<d<=100', '100<d', 'Other chrom.'))
-		pylab.savefig(png_file_name)
-		pylab.clf()
+		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=mm)
+		x_positions += width
+
+	pylab.ylabel('Frequency')
+	pylab.xticks(x_positions - 3 * width / 2.0, (r'$d \leq 5$', r'$5< d \leq 10$', r'$10< d \leq 25$', \
+						r'$25< d \leq 50$', r'$50< d \leq 100$', r'$d>100$', \
+						'Other chrom.'), rotation='45')
+	pylab.xlabel('Distance $d$ (kb) to the smallest p-value from the gene.')
+	pylab.xlim((-0.25, len(distance_bins)))
+	pylab.legend(loc=2)
+	pylab.savefig(png_file_name)
+	pylab.clf()
 
 
-	x_positions = sp.arange(len(radius_bins) + 1)
-	width = 0.8
-	for mm in ['EX', 'LM', 'KW']:
-		png_file_name = results_prefix + 'bonf_sign_bin_hist%s.png' % mm
+	x_positions = sp.arange(len(radius_bins) + 1, dtype='d64')
+	width = 0.25
+	png_file_name = results_prefix + 'bonf_sign_bin_hist.png'
+	pylab.axes([0.08, 0.2, 0.91, 0.75])
+	for mm, color in zip(['EX', 'LM', 'KW'], ['b', 'c', 'g']):
 		l = [bonf_sign_bin_dict[mm][bin]['count'] / bonf_sign_bin_dict[mm][bin]['total'] for bin in radius_bins]
 		l.append(sign_count[mm] / float(num_genes))
-		pylab.bar(x_positions, l, width, color='r', alpha=0.8)
-		pylab.ylabel('Significant fraction')
-		#pylab.xticks(x_positions + width / 2.0, (r'$d=0$', r'$0<d\le 1$', r'$1< d \le 5$', r'$5< d \le 25$', r'$25< d \le 100$', r'$d>100$', 'Other chrom.'))
-		#[0, 1000, 5000, 10000, 25000, 50000, 100000]
-		pylab.xticks(x_positions + width / 2.0, ('d=0', 'd<1', 'd<5', 'd<10', 'd<25', 'd<50', 'd<100', 'total'))
+		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=mm)
+		x_positions += width
+
+	pylab.ylabel('Fraction of sign. results')
+	pylab.xticks(x_positions - 3 * width / 2.0, (r'$d=0$', r'$d \leq 1$', r'$d \leq 5$', \
+						r'$d \leq 10$', r'$d \leq 25$', r'$d \leq 50$', \
+						r'$d \leq 100$', 'Other chrom.'), rotation='45')
+	pylab.xlabel(r'Among SNPs with distance $d$ (kb) from gene.')
+	pylab.xlim((-0.25, len(radius_bins) + 1))
+	pylab.legend(loc=2)
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+
+	for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+		png_file_name = results_prefix + 'cofactor_count_hist_%s.png' % criteria
+		pylab.hist(cofactor_count_dict[criteria]['num_cofactor_list'], bins=[-0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5], alpha=0.6)
+		pylab.xlim((-0.75, 5.75))
+		pylab.xlabel('Number of cofactor SNPs')
+		pylab.savefig(png_file_name)
+		pylab.clf()
+
+		png_file_name = results_prefix + 'cis_cofactor_count_hist_%s.png' % criteria
+		pylab.hist(cofactor_count_dict[criteria]['num_cis_cofactor_list'], bins=[-0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5], alpha=0.6)
+		pylab.xlabel('Number of cis cofactor SNPs')
+		pylab.xlim((-0.75, 5.75))
 		pylab.savefig(png_file_name)
 		pylab.clf()
 
 
-	#for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+
+	png_file_name = results_prefix + 'cofactor_bin_count_hist.png'
+	x_positions = sp.arange(9, dtype='d64')
+	width = 0.25
+	pylab.axes([0.08, 0.2, 0.91, 0.75])
+	for criteria, color in zip(['ebics', 'mbonf', 'min_cof_ppa'], ['b', 'c', 'g']):
+		cofactor_count_dict[criteria]['bin_counts'] = \
+			cofactor_count_dict[criteria]['bin_counts'] / cofactor_count_dict[criteria]['num_found']
+		l = list(cofactor_count_dict[criteria]['bin_counts'])
+		l.reverse()
+		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=criteria)
+		x_positions += width
+	pylab.ylabel('Fraction all genes with cofactors.')
+	pylab.xlabel(r'Distance $d$ (kb) to cofactor from gene.')
+	pylab.xticks(x_positions - 3 * width / 2.0, (r'$d=0$', r'$1\geq d$', r'$5\geq d$', r'$10\geq d$', \
+						r'$25\geq d$', r'$50\geq d$', r'$100\geq d$', \
+						'Other chrom.'), rotation='45')
+	pylab.xlim((-0.2, 9))
+	pylab.legend(loc=2)
+	pylab.savefig(png_file_name)
+	pylab.clf()
 
 
 
-
-	# WHAT TO PLOT?
-	#
-	# - Number of genes with significant signals, and split up by cis and trans...
-	#   - EBIC, MBIC, MBONF, etc
-	#   - Assuming Bonferroni correction, number of genes with significant p-values according for different bins around gene. (EX, LM, KW)
-	#
-	# - Number of causal loci found in total and per gene. (histogram) Split up into cis and trans.
-	#
-	# - Number of significant cofactors near genes for which we have a signal (EBIC,MBIC,MBONF)
 
 
 
@@ -713,7 +808,7 @@ if __name__ == '__main__':
 	#_load_genes_list_()
 	#_test_()
 	#print sys.argv
-	load_and_plot_info_files()
+	load_and_plot_info_files(temperature=16)
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:
