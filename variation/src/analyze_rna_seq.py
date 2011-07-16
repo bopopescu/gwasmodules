@@ -226,105 +226,6 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 
 
 
-#
-#def load_results(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
-#	pickle_file = '%s_%s_%s_mac%d_res.pickled' % (file_prefix, temperature, mapping_method, mac_threshold)
-#	if os.path.isfile(pickle_file):
-#		with open(pickle_file) as f:
-#			d = cPickle.load(f)
-#	else:
-#		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
-#		phen_pickle_file = phen_file + 'sd_overlap.pickled'
-#		if os.path.isfile(phen_pickle_file):
-#			with file(phen_pickle_file) as f:
-#				phed = cPickle.load(f)
-#		else:
-#			phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-#			phed.filter_near_const_phens(15)
-#			phed.convert_to_averages()
-#			if data_type == 'use_1001_data':
-#				sd = dp.load_1001_full_snps(debug_filter=debug_filter)
-#			elif data_type == 'quan_seq_data':
-#				sd = dp.load_quan_data(debug_filter=debug_filter)
-#			else:
-#				sd = dp.load_250K_snps(debug_filter=debug_filter)
-#			indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
-#			phed.filter_ecotypes(indices_to_keep)
-#			with file(phen_pickle_file, 'wb') as f:
-#				cPickle.dump(phed, f)
-#		#sd.filter_mac_snps(mac_threshold)
-#
-#		gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
-#		res_dict = {}
-#		pids = phed.get_pids()
-#		for pid in pids:
-#			print 'pid: %d' % pid
-#			if not pid in phed.phen_ids: continue
-#			gene_tair_id = phed.get_name(pid)
-#			curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
-#				(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
-#			if phed.is_constant(pid):
-#				print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
-#				continue
-#			if phed.is_near_constant(pid, 15):
-#				print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
-#				continue
-#			print 'Loading file'
-#			if os.path.isfile(curr_file_prefix + '.pvals') or os.path.isfile(curr_file_prefix + '.pvals.pickled'):
-#				res = gwaResults.Result(curr_file_prefix + '.pvals')
-#				#Trim results..
-#				res.neg_log_trans()
-#
-#				res.filter_attr('scores', 5) #Filter everything below 10^-5
-#				if res.num_scores() == 0:
-#					print "Skipping file since nothing is below 10^-5"
-#					continue
-#				cgs = gene_dict[pid]
-#				avg_g_pos = sp.mean([(cg.startPos + cg.endPos) / 2.0 for cg in cgs])
-#				chrom = cgs[0].chromosome #Current gene chromosome
-#				print 'Working on gene: %s, chrom=%d, pos=%0.1f' % (gene_tair_id, chrom, avg_g_pos)
-#
-#
-#				#Prepare for plotting results.. x,y style, where gene is x, and y is p-values
-#				chrom_pos_score_dict = res.get_chrom_score_pos_dict()
-#				dist_dict = {}
-#				for score_threshold in [5, 6, 7]: #negative log10 thresholds.
-#					if len(res.snp_results['scores']) == 0:
-#						dist_dict[score_threshold] = -2 #No results
-#					else:
-#						res.filter_attr('scores', score_threshold)
-#						if len(res.snp_results['scores']) == 0:
-#							dist_dict[score_threshold] = -2 #No results
-#						else:
-#							cps_dict = res.get_chrom_score_pos_dict()
-#							pos_list = cps_dict[chrom]['positions']
-#							if len(pos_list) > 0:
-#								distances = sp.absolute(sp.array(pos_list) - avg_g_pos)
-#								d_i = sp.argmin(distances)
-#								dist_dict[score_threshold] = distances[d_i] #Min distance.
-#							else:
-#								dist_dict[score_threshold] = -1 #Different chromosome
-#
-#				res_dict[(chrom, avg_g_pos)] = {'tair_id':gene_tair_id, 'genes':cgs,
-#							'chrom_pos_score':chrom_pos_score_dict, 'dist_dict':dist_dict}
-#				print dist_dict
-#				if 0 < dist_dict[5] < 50000:
-#					res = gwaResults.Result(curr_file_prefix + '.pvals')
-#					#Trim results..
-#					res.neg_log_trans()
-#					res.plot_manhattan(png_file=curr_file_prefix + '.png', percentile=50,
-#							cand_genes=cgs, plot_bonferroni=True)
-#
-#				#print res_dict
-#			else:
-#				print 'File not found:', curr_file_prefix + '.pvals'
-#
-#		#Now pickle everything...
-#		d = {'res_dict':res_dict, 'phed':phed}
-#		with open(pickle_file, 'wb') as f:
-#			cPickle.dump(d, f)
-#	return d
-
 
 def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=15, min_score=5,
 		near_const_filter=20, data_format='binary', plot_data=True):
@@ -394,8 +295,8 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 	print rel_chrom_sizes, rel_cum_chrom_sizes
 
 	#Filter data..
-	#Now plot data!!
 
+	#Now plot data!!
 	if plot_data:
 		alpha = 0.8
 		linewidths = 0
@@ -784,20 +685,6 @@ def _test_parallel_():
 
 
 if __name__ == '__main__':
-#	_load_results_('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
-#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 5)
-#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 7)
-#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 10)
-#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 11)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 7)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 7)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 10)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 10)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 12)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 12)
-#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'lm', 12)
-#	_load_genes_list_()
-#	_test_()
 #	print sys.argv
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
@@ -814,6 +701,7 @@ if __name__ == '__main__':
 #	plot(min_score=7, temperature=16, mapping_method='LM')
 #	plot(min_score=10, temperature=16, mapping_method='LM')
 #	plot(min_score=11, temperature=16, mapping_method='LM')
+#	plot(min_score=3, temperature=10, mapping_method='EX', plot_data=False)
 	plot(min_score=3, temperature=16, mapping_method='EX', call_method_id=79, plot_data=False)
-
+	print  'Done'
 
