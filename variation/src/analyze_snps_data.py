@@ -196,7 +196,7 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 				ys = sp.array(y_snp)
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
-				if r2 > save_threshold:
+				if r2 > save_threshold and pearson_pval < 0.01:
 					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
 					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
 					t_r2 = t_r * t_r
