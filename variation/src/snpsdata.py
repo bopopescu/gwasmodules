@@ -3014,6 +3014,7 @@ class SNPsDataSet:
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 			accession_sums += sp.sum(norm_snps_array, 1)
 		accession_means = accession_sums / num_snps
+		print accession_means
 
 		print 'Starting covariance calculation'
 		for chunk_i, i in enumerate(range(0, self.num_snps(), chunk_size)):
