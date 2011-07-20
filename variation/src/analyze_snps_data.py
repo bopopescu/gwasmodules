@@ -335,7 +335,7 @@ def run_parallel(call_method_id, x_start_i, x_stop_i, cluster='gmi'):
 
 
 def run_r2_calc():
-	cm_num_snps_dict = {75:214051, 76:4988387, 78:1656501}
+	cm_num_snps_dict = {75:214051, 76:4988387, 78:1031827} #After MAC filtering
 	cm_data_format_dict = {75:'binary', 76:'binary', 78:'diploid_int'}
 
 	call_method_id = int(sys.argv[1])
