@@ -203,7 +203,7 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
 					(t_r, t_pearson_pval) = t_r[0], t_pearson_pval[0]
 					t_r2 = t_r * t_r
-					if t_pearson_pval[0] < 0.1:
+					if t_pearson_pval < 0.05:
 						result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, \
 								t_r2, t_pearson_pval])
 	pickled_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".pickled"
