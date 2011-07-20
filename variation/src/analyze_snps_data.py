@@ -190,17 +190,20 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
 		#Normalize SNP..
 		xs = sp.array(x_snp)
-		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv).T
+		#t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv).T
+		t_x_snp = sp.dot(xs, H_sqrt_inv).flatten()
 		for (y_c, y_p, y_snp) in y_cps:
 			if (x_c, x_p) < (y_c, y_p):
 				ys = sp.array(y_snp)
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
 				if r2 > save_threshold and pearson_pval < 0.01:
-					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
+					#t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
+					t_y_snp = sp.dot(ys, H_sqrt_inv).flatten()
 					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
 					t_r2 = t_r * t_r
-					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, \
+					if t_pearson_pval < 0.1:
+						result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, \
 								t_r2, t_pearson_pval])
 	pickled_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".pickled"
 	cPickle.dump(result_list, open(pickled_file_name, 'wb'), protocol=2)
