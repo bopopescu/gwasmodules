@@ -159,7 +159,7 @@ def test_correlation(sample_num=4000, mac_filter=15, debug_filter=0.05):
 
 
 def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_format='diploid_int',
-		mac_filter=15, save_threshold=0.1, debug_filter=1):
+		mac_filter=15, save_threshold=0.2, debug_filter=1):
 	"""
 	Returns statistics on LD levels, and plot them.
 	"""
@@ -190,14 +190,14 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
 		#Normalize SNP..
 		xs = sp.array(x_snp)
-		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv)
+		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv).T
 		for (y_c, y_p, y_snp) in y_cps:
 			if (x_c, x_p) < (y_c, y_p):
 				ys = sp.array(y_snp)
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
 				if r2 > save_threshold:
-					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv)
+					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
 					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
 					t_r2 = t_r * t_r
 					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, \
@@ -285,26 +285,40 @@ def calc_r2_levels_w_mixed_model(file_prefix, x_start_i, x_stop_i, mac_filter=10
 
 
 
-def run_parallel(x_start_i, x_stop_i):
+def run_parallel(call_method_id, x_start_i, x_stop_i):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
 
-	#Cluster specific parameters
-	run_id = 'r2_250k'
+	job_id = 'ld_%d_%d_%d' % (call_method_id, x_start_i, x_stop_i)
+	file_prefix = '/projects/long_range_LD/raw_results/long_range_ld_min02_mac15'
+	job_output_file_prefix = file_prefix + job_id
 
+	#Cluster specific parameters	
+	if cluster == 'gmi': #GMI cluster.  
+		shstr = '#!/bin/bash\n'
+		shstr += '#$ -S /bin/bash\n'
+		shstr += '#$ -N %s\n' % job_id
+		#shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
+		#shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
+		shstr += '#$ -o %s_job.out\n' % job_output_file_prefix
+		shstr += '#$ -e %s_job.err\n' % job_output_file_prefix
+		shstr += 'source /etc/modules-env.sh\n'
+		shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
+		shstr += 'module load matplotlib/1.0.0\n'
+		shstr += 'module load mysqldb/1.2.3\n'
+		shstr += 'export GOTO_NUM_THREADS=1\n'
 
-	shstr = "#!/bin/csh\n"
-	shstr += "#PBS -l walltime=%s \n" % '72:00:00'
-	shstr += "#PBS -l mem=%s \n" % '1950mb'
-	shstr += "#PBS -q cmb\n"
+	elif cluster == 'usc':  #USC cluster.
+		shstr = "#!/bin/csh\n"
+		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
+		shstr += "#PBS -l mem=%s \n" % '2950mb'
+		shstr += "#PBS -q cmb\n"
+		shstr += "#PBS -N p%s \n" % job_id
 
-	job_id = '%s_%d_%d' % (run_id, x_start_i, x_stop_i)
-	shstr += "#PBS -N p%s \n" % job_id
-	shstr += "(python %sanalyze_snps_data.py %d %d" % (env['script_dir'], x_start_i, x_stop_i)
+	shstr += "python %sanalyze_snps_data.py %d %d %d %s" % \
+			(env['script_dir'], call_method_id, x_start_i, x_stop_i, file_prefix)
 
-	file_prefix = env['results_dir'] + run_id + '_' + str(x_start_i) + '_' + str(x_stop_i)
-	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
 	script_file_name = run_id + ".sh"
 	f = open(script_file_name, 'w')
@@ -315,20 +329,27 @@ def run_parallel(x_start_i, x_stop_i):
 	os.system("qsub " + script_file_name)
 
 
+
 def run_r2_calc():
 	cm_num_snps_dict = {75:214051, 76:4988387, 78:1656501}
+	cm_data_format_dict = {75:'binary', 76:'binary', 78:'diploid_int'}
 
 	call_method_id = int(sys.argv[1])
 	if len(sys.argv) > 3:
 		x_start_i = int(sys.argv[2])
 		x_stop_i = int(sys.argv[3])
-		calc_r2_levels(env['results_dir'] + '250K_r2_min01_mac15', x_start_i, x_stop_i,
-			call_method_id=call_method_id)
+		if len(sys.argv) > 4:
+			file_prefix = sys.argv[4]
+		else:
+			file_prefix = env['results_dir'] + 'long_range_ld_min02_mac15'
+		data_format = cm_data_format_dict[call_method_id]
+		calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=call_method_id,
+				data_format=data_format,)
 	else:
 		num_snps = cm_num_snps_dict[call_method_id]
 		chunck_size = int(sys.argv[2])
 		for i in range(0, num_snps, chunck_size):
-			run_parallel(i, i + chunck_size)
+			run_parallel(call_method_id, i, i + chunck_size)
 
 
 #def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
