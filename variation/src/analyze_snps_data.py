@@ -324,7 +324,7 @@ def run_parallel(call_method_id, x_start_i, x_stop_i, cluster='gmi'):
 			(env['script_dir'], call_method_id, x_start_i, x_stop_i, file_prefix)
 
 	print '\n', shstr, '\n'
-	script_file_name = run_id + ".sh"
+	script_file_name = run_id + "long_range_ld.sh"
 	f = open(script_file_name, 'w')
 	f.write(shstr)
 	f.close()
