@@ -203,16 +203,13 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 				mac = ys.sum()
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
-				if r2 > save_threshold and pearson_pval < 0.01:
+				if r2 > save_threshold:
 					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
 					#t_y_snp = sp.dot(ys, H_sqrt_inv).T
 					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
 					t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
 					t_r2 = t_r * t_r
-					if t_pearson_pval < 0.05:
-						result_list.append([y_c, y_p, r2, pearson_pval, t_r2, t_pearson_pval])
-#						if t_pearson_pval < 1e-14:
-#							print x_c, x_p, y_c, y_p, r2, pearson_pval, t_r2, t_pearson_pval
+					result_list.append([y_c, y_p, r2, pearson_pval, t_r2, t_pearson_pval])
 			else:
 				break
 		result_dict[(x_c, x_p)] = result_list
@@ -222,12 +219,6 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 		sys.stdout.flush()
 	pickled_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".pickled"
 	cPickle.dump(result_dict, open(pickled_file_name, 'wb'), protocol=2)
-#	file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".csv"
-#	with open(file_name, 'w') as f:
-#		for r in result_list:
-#			out_string = ','.join(map(str, r))
-#			f.write(out_string + '\n')
-
 
 
 
