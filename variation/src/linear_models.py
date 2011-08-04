@@ -657,7 +657,7 @@ class LinearMixedModel(LinearModel):
 					eig_R=eig_R)
 
 
-	def get_es
+#	def get_es
 
 
 
