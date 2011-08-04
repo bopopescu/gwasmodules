@@ -50,7 +50,9 @@ Option:
 
 	--save_stepw_pvals			Write  p-values for each step to a file.
 
-	--pvalue_filter=...			Save only the smallest x fraction of the p-values, default is set to 0.1			
+	--pvalue_filter=...			Save only the smallest x fraction of the p-values, default is set to 0.1
+	
+	--kinship_type=...			Type of kinship calculated. Possible types are ibs (default) or ibd			
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
 	-p ...					Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
@@ -98,7 +100,7 @@ from numpy import *
 from env import *
 import copy
 import pdb
-import ipdb
+#import ipdb
 
 #For annoying linux computers, which don't have a display..
 import matplotlib
@@ -146,7 +148,7 @@ def parse_parameters():
 
 	long_options_list = ["comment=", 'with_db_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
 			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
-			'save_stepw_pvals', 'pvalue_filter=']
+			'save_stepw_pvals', 'pvalue_filter=', 'kinship_type=']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -163,7 +165,7 @@ def parse_parameters():
 		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
 		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'pids':None,
-		'save_stepw_pvals':False, 'pvalue_filter':1.0}
+		'save_stepw_pvals':False, 'pvalue_filter':1.0, 'kinship_type':'ibs'}
 
 
 	for opt, arg in opts:
@@ -200,6 +202,7 @@ def parse_parameters():
 		elif opt in ("--local_gwas"): p_dict['local_gwas'] = map(int, arg.split(','))
 		elif opt in ("--save_stepw_pvals"): p_dict['save_stepw_pvals'] = True
 		elif opt in ("--pvalue_filter"): p_dict['pvalue_filter'] = float(arg)
+		elif opt in ("--kinship_type"): p_dict['kinship_type'] = arg
 		else:
 			print "Unkown option:", opt
 			print __doc__
@@ -556,7 +559,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 				print 'Loading kinship file.'
 				cm = 0 if p_dict['data_format'] == 'binary' else p_dict['call_method_id'] #Calculate on the fly if binary..
 				k = dataParsers.load_kinship(call_method_id=cm, data_format=p_dict['data_format'], \
-							method='ibs', accessions=sd.accessions, sd=sd)
+							method=p_dict['kinship_type'], accessions=sd.accessions, sd=sd)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 

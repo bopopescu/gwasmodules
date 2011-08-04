@@ -80,6 +80,7 @@ class LinearModel(object):
 		self.cofactors = []
 
 
+
 	def add_factor(self, x, lin_depend_thres=1e-8):
 		"""
 		Adds an explanatory variable to the X matrix.
