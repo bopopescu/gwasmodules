@@ -54,7 +54,7 @@ def parse_parameters():
 		sys.exit(2)
 
 	long_options_list = ["comment=", 'phenotype_scoring', 'method_description=', 'growth_condition=', 'citations=',
-			'data_description', 'transformation_description=', 'data_type=', 'biology_category_id']
+			'data_description', 'transformation_description=', 'data_type=', 'biology_category_id=']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "f:z:u:p:i:m:hd", long_options_list)
 

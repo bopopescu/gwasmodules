@@ -1060,7 +1060,8 @@ def get_phenotypes_from_db(pids):
 				phen_dict[pid]['values'].append(float(row[1]))
 				phen_dict[pid]['ecotypes'].append(str(row[0]))
 				num_values += 1
-		print 'Loaded %d values for phenotype: %s' % (num_values, phen_name)
+		if pid in phen_dict:
+			print 'Loaded %d values for phenotype: %s' % (num_values, phen_name)
 
 	conn.close()
 	return phenotype_data(phen_dict)
