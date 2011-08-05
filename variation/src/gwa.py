@@ -714,10 +714,13 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 							mapping_method, trans_method, p_dict['remove_outliers'],
 							str(p_dict['with_replicates']))
 		tm_id = transformation_method_dict[trans_method]
-		rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid,
-					analysis_methods_dict[mapping_method],
-					tm_id, remove_outliers=p_dict['remove_outliers'])
-
+		try:
+			rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid,
+						analysis_methods_dict[mapping_method],
+						tm_id, remove_outliers=p_dict['remove_outliers'])
+		except Exception, err_str:
+			print 'Failed inserting results into DB!'
+			print err_str
 
 
 	if p_dict['data_format'] != 'float':
