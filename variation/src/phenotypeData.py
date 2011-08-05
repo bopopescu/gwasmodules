@@ -140,6 +140,7 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'log(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
 
 	def sqrt_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
@@ -153,7 +154,7 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'sqrt(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
-
+		return True
 
 	def sqr_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
@@ -167,6 +168,7 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'sqr(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
 
 	def exp_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
@@ -180,6 +182,23 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'exp(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
+
+	def arcsin_sqrt_transform(self, pid):
+		a = sp.array(self.phen_dict[pid]['values'])
+		if min(a) < 0 or max(a) > 1:
+			print 'Some values are outside of range [0,1], hence skipping transformation!'
+			return False
+		else:
+			vals = sp.arcsin(sp.sqrt(a))
+		if not self.phen_dict[pid]['transformation']:
+			self.phen_dict[pid]['raw_values'] = self.phen_dict[pid]['values']
+			self.phen_dict[pid]['transformation'] = 'arcsin_sqrt'
+		else:
+			self.phen_dict[pid]['transformation'] = 'arcsin_sqrt(' + self.phen_dict[pid]['transformation'] + ')'
+		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
+
 
 	def transform(self, pid, trans_type, method='standard'):
 		print 'Transforming phenotypes: %s' % trans_type
@@ -191,6 +210,8 @@ class phenotype_data:
 			self.sqr_transform(pid, method=method)
 		elif trans_type == 'exp':
 			self.exp_transform(pid, method=method)
+		elif trans_type == 'arcsin_sqrt':
+			self.arcsin_sqrt_transform(pid)
 		elif trans_type == 'most_normal':
 			trans_type, shapiro_pval = self.most_normal_transformation(pid)
 		elif trans_type == 'none':
