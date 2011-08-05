@@ -229,7 +229,7 @@ class phenotype_data:
 			self.phen_dict[pid]['values'] = self.phen_dict[pid]['raw_values']
 
 
-	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp'], perform_trans=True):
+	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp', 'arcsin_sqrt'], perform_trans=True):
 		"""
 		Performs the transformation which results in most normal looking data, according to Shapiro-Wilk's test
 		"""
@@ -237,7 +237,8 @@ class phenotype_data:
 		shapiro_pvals = []
 		for trans_type in trans_types:
 			if trans_type != 'none':
-				self.transform(pid, trans_type=trans_type)
+				if not self.transform(pid, trans_type=trans_type):
+					continue
 			phen_vals = self.get_values(pid)
 			#print 'sp.inf in phen_vals:', sp.inf in phen_vals
 			if sp.inf in phen_vals:
