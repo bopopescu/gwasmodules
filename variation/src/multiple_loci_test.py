@@ -321,6 +321,7 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 	analysis_methods = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC',
 				'Stepw_EX_Bonf', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC']
 
+	#Initializing stuff
 	for am in analysis_methods:
 		if am in ['LM', 'EX', 'KW']:
 			d = {'fdrs':sp.zeros((num_pthres, num_winsizes), dtype='double'),
@@ -390,9 +391,11 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 					summary_dict[am]['medp'].append(r[am]['med_pval'])
 	print 'Found %d results' % num_files_found
 	for am in analysis_methods:
+		summary_dict[am]['bonf'] = {}
 		for k in ['fdrs', 'tprs']:
 			summary_dict[am][k] = summary_dict[am][k] / float(num_files_found)
-
+			if not am in ['Stepw_LM_EBIC', 'Stepw_LM_MBIC', 'Stepw_EX_EBIC', 'Stepw_EX_MBIC']:
+				summary_dict[am]['bonf'][k] = summary_dict[am][k][11] * 0.74 + summary_dict[am][k][12] * 0.26
 	return summary_dict
 
 
@@ -444,7 +447,7 @@ def plot_tprs_fdrs(file_prefix, summary_dict):
 
 
 
-def plot_single_tprs_fdrs(file_prefix, summary_dict, ax, ws, w_legend=False, y_label='Power', x_label='FDR', y_lim=None):
+def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power', x_label='FDR', y_lim=None):
 	"""
 	Plot various things relating to run summaries
 	"""
@@ -456,35 +459,86 @@ def plot_single_tprs_fdrs(file_prefix, summary_dict, ax, ws, w_legend=False, y_l
 	# - pseudoheritabilities vs. ks and med pval. of KW and LM
 
 	# TPRs vs. FDRs
-	am_list = ['LM', 'KW', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
-	am_colors = ['r', 'g', 'b', 'r', 'b']
-	am_ls = ['--', '--', '--', '-', '-']
-	am_dot_list = ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']
-	am_dot_colors = ['#22DD66', '#22DD66', '#DD2266', '#DD2266']
-	am_dot_marker = ['s', '^', 's', '^']
+	am_list = ['LM', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
+	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
+	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
+	am_ls = ['-', '-', '-', '-']
+	#am_dot_list = ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']
+	#am_dot_colors = ['#22DD66', '#22DD66', '#DD2266', '#DD2266']
+	#am_dot_marker = ['s', '^', 's', '^']
+	am_dot_list = ['Stepw_LM_EBIC', 'Stepw_EX_EBIC']
+	am_dot_colors = ['#FF0022', '#0022FF']
+	#am_dot_labels = ['MLML EBIC', 'SWLM EBIC']
 
 	w_i = window_sizes.index(ws)
-	for am, amc, amls in zip(am_list, am_colors, am_ls):
+	for am, amc, amls, am_label in zip(am_list, am_colors, am_ls, am_labels):
 		xs = sp.zeros(len(pval_thresholds))
 		ys = sp.zeros(len(pval_thresholds))
 		for pt_i, pt in enumerate(pval_thresholds):
 			ys[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
 			xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
-		ax.plot(xs, ys, label=am, color=amc, ls=amls, alpha=0.6, marker='.')
-	for am, amc, amm in zip(am_dot_list, am_dot_colors, am_dot_marker):
-		ax.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], label=am, marker=amm,
-			ls='', color=amc, alpha=0.6)
-	png_file = '%s_w%d.png' % (file_prefix, ws)
+		ax.plot(xs, ys, label=am_label, color=amc, ls=amls, alpha=0.4, lw=2)
+		ax.plot(summary_dict[am]['bonf']['fdrs'][w_i], summary_dict[am]['bonf']['tprs'][w_i], marker='o',
+			ls='', color=amc, alpha=0.45)
+	for am, amc in zip(am_dot_list, am_dot_colors):
+		ax.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], marker='v',
+			ls='', color=amc, alpha=0.45)
 	ax.set_ylabel(y_label)
 	ax.set_xlabel(x_label)
-	if w_legend:
-		ax.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
 	if y_lim:
 		ax.set_ylim(y_lim)
 	x_min, x_max = ax.get_xlim()
 	x_range = x_max - x_min
 	y_min, y_max = ax.get_ylim()
 	y_range = y_max - y_min
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='v', label='EBIC', alpha=0.45)
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='o', label='Bonferroni', alpha=0.45)
+	if w_legend:
+		ax.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
+	ax.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range,
+			y_min - 0.025 * y_range, y_max + 0.025 * y_range])
+
+
+
+def plot_single_tprs_fdrs_2(summary_dict, ax, ws, w_legend=False, y_label='Power', x_label='FDR', y_lim=None):
+	"""
+	Plot various things relating to run summaries
+	"""
+	import matplotlib.font_manager
+	prop = matplotlib.font_manager.FontProperties(size=10)
+
+	#Heritabilities..
+	# - histogram of each category
+	# - pseudoheritabilities vs. ks and med pval. of KW and LM
+
+	# TPRs vs. FDRs
+	am_list = ['SLR', 'EMMAX', 'FBLR-bwd', 'MLMM-bwd']
+	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
+	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
+	am_ls = ['-', '-', '-', '-']
+	am_dot_list = ['FBLR-bwd', 'MLMM-bwd']
+	am_dot_colors = ['#FF0022', '#0022FF']
+
+	for am, amc, amls, am_label in zip(am_list, am_colors, am_ls, am_labels):
+		ax.plot(summary_dict[ws][am]['fdr'], summary_dict[ws][am]['power'], label=am_label, color=amc,
+			ls=amls, alpha=0.4, lw=2)
+		ax.plot(summary_dict[ws][am]['BONF']['fdr'], summary_dict[ws][am]['BONF']['power'], marker='o',
+			ls='', color=amc, alpha=0.45)
+	for am, amc in zip(am_dot_list, am_dot_colors):
+		ax.plot(summary_dict[ws][am]['EBIC']['fdr'], summary_dict[ws][am]['EBIC']['power'], marker='v',
+			ls='', color=amc, alpha=0.45)
+	ax.set_ylabel(y_label)
+	ax.set_xlabel(x_label)
+	if y_lim:
+		ax.set_ylim(y_lim)
+	x_min, x_max = ax.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax.get_ylim()
+	y_range = y_max - y_min
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='v', label='EBIC', alpha=0.45)
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='o', label='Bonferroni', alpha=0.45)
+	if w_legend:
+		ax.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
 	ax.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range,
 			y_min - 0.025 * y_range, y_max + 0.025 * y_range])
 
@@ -614,6 +668,7 @@ def plot_var(file_prefix, d, latent_variable, heritability, phen_models):
 
 
 
+#def __get_thresholds(min_thres=16, max_thres=1, num_thres=60):
 def __get_thresholds(min_thres=10, max_thres=1, num_thres=18):
 	thres_step = (min_thres - max_thres) / float(num_thres)
 	pval_thresholds = []
@@ -906,7 +961,7 @@ def _run_():
 
 	else:
 		if p_dict['summarize']:
-			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+			file_prefix = '/srv/lab/data/mlt_results/' + p_dict['run_id']
 			phed = load_phenotypes(p_dict['phen_file'])
 			summary_dict = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'],
 							p_dict['phenotype_model'], phed,
@@ -917,7 +972,7 @@ def _run_():
 
 		if p_dict['herit_plots'] != None:
 			d = {}
-			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+			file_prefix = '/srv/lab/data/mlt_results/' + p_dict['run_id']
 			pd = load_phenotypes(p_dict['phen_file'])
 			for her in p_dict['herit_plots']:
 				d[her] = summarize_runs(file_prefix, p_dict['latent_variable'], her,
@@ -927,7 +982,7 @@ def _run_():
 
 		if p_dict['var_plots']:
 			d = {}
-			file_prefix = '/storage/mlt_results/' + p_dict['run_id']
+			file_prefix = '/srv/lab/data/mlt_results/' + p_dict['run_id']
 			pd = load_phenotypes(p_dict['phen_file'])
 			for mod in ['plus', 'or', 'xor']:
 				d[mod] = summarize_runs(file_prefix, p_dict['latent_variable'], p_dict['heritability'], mod, pd, index_list=p_dict['phen_index'])
@@ -961,7 +1016,7 @@ def _run_():
 def generate_example_figure_1():
 	import gwaResults as gr
 	phed = load_phenotypes(env.env['data_dir'] + 'multi_locus_phen.pickled')
-	file_prefix = '/storage/mlt_results/mlt'
+	file_prefix = '/srv/lab/data/mlt_results/mlt'
 	pickled_file = '%s_%d_%s_%s_%dresults.pickled' % (file_prefix, 25, 'random_snp', 'plus', 17)
 	if os.path.isfile(pickled_file):
 		with open(pickled_file) as f:
@@ -1041,47 +1096,41 @@ def generate_example_figure_1():
 
 
 
-def generate_results_figure_2():
-	file_prefix = '/storage/mlt_results/mlt'
+def generate_results_figure_2(file_name='/tmp/test.png', herit=10, window_size=25000):
+	file_prefix = '/srv/lab/data/mlt_results/mlt'
 	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
 	f = pylab.figure(figsize=(11, 7))
 
-	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'plus', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	summary_dict = summarize_runs(file_prefix, 'random_snp', herit, 'plus', phed, index_list=range(1000))
 	ax = f.add_axes([0.06, 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_xticklabels(['']*len(ax.get_xticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), w_legend=True, x_label='')
+	plot_single_tprs_fdrs(summary_dict, ax, window_size, y_lim=(0.3, 1.03), w_legend=True, x_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'or', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	summary_dict = summarize_runs(file_prefix, 'random_snp', herit, 'or', phed, index_list=range(1000))
 	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
 	ax.set_xticklabels(['']*len(ax.get_xticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+	plot_single_tprs_fdrs(summary_dict, ax, window_size, y_lim=(0.3, 1.03), y_label='', x_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'xor', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	summary_dict = summarize_runs(file_prefix, 'random_snp', herit, 'xor', phed, index_list=range(1000))
 	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
 	ax.set_xticklabels(['']*len(ax.get_xticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+	plot_single_tprs_fdrs(summary_dict, ax, window_size, y_lim=(0.3, 1.03), y_label='', x_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'plus', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', herit, 'plus', phed, index_list=range(1000))
 	ax = f.add_axes([0.06, 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03))
+	plot_single_tprs_fdrs(summary_dict, ax, window_size, y_lim=(0.0, 1.03))
 
-	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'or', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', herit, 'or', phed, index_list=range(1000))
 	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+	plot_single_tprs_fdrs( summary_dict, ax, window_size, y_lim=(0.0, 1.03), y_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'xor', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', herit, 'xor', phed, index_list=range(1000))
 	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+	plot_single_tprs_fdrs( summary_dict, ax, window_size, y_lim=(0.0, 1.03), y_label='')
 
 	f.text(0.168, 0.962, 'Additive')
 	f.text(0.496, 0.962, "'or'")
@@ -1097,53 +1146,105 @@ def generate_results_figure_2():
 
 	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
 	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
-	f.savefig('/tmp/test.png')
+	f.savefig(file_name)
 
 
-	file_prefix = '/storage/mlt_results/mlt'
-	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
+
+
+def generate_results_figure_3():
+	file_prefix = '/home/GMI/bjarni.vilhjalmsson/Projects/vincent_plots/plots_sim100loci/'
+	caus_in_file = file_prefix + 'ROC_CAUS_IN.csv'
+	caus_dropped_file = file_prefix + 'ROC_CAUS_DROP.csv'
+
+	hertis = [25, 50, 75]
+	analysis_methods = ['MLMM-fwd', 'MLMM-bwd', 'FBLR-fwd', 'FBLR-bwd', 'SLR', 'EMMAX']
+	window_sizes = [0, 5000, 10000, 25000, 50000, 100000]
+
+	caus_in_dict = {25:{}, 50:{}, 75:{}}
+	caus_drop_dict = {25:{}, 50:{}, 75:{}}
+	for h in hertis:
+		for ws in window_sizes:
+			caus_in_dict[h][ws] = {}
+			caus_drop_dict[h][ws] = {}
+			for am in analysis_methods:
+				caus_in_dict[h][ws][am] = {'fdr':[], 'power':[]}
+				caus_drop_dict[h][ws][am] = {'fdr':[], 'power':[]}
+
+	with open(caus_in_file) as f:
+		print f.next()
+		for line in f:
+			l = line.split(',')
+			h = int(float(l[0]) * 100)
+			am = l[1][1:-1]
+			ws = int(l[2]) * 1000
+			thres = l[3][1:-1]
+			if thres == 'ebic':
+				if am in ['MLMM-fwd', 'MLMM-bwd', 'FBLR-fwd', 'FBLR-bwd']:
+					fdr = float(l[4])
+					power = float(l[5])
+					caus_in_dict[h][ws][am]['EBIC'] = {'fdr':fdr, 'power':power}
+       				continue
+			fdr = float(l[4])
+                        power = float(l[5])
+			if thres == 'bonf':
+				caus_in_dict[h][ws][am]['BONF'] = {'fdr':fdr, 'power':power}
+			else:
+				caus_in_dict[h][ws][am]['fdr'].append(fdr)
+				caus_in_dict[h][ws][am]['power'].append(power)
+
+	with open(caus_dropped_file) as f:
+		print f.next()
+		for line in f:
+			l = line.split(',')
+			h = int(float(l[0]) * 100)
+			am = l[1][1:-1]
+			ws = int(l[2]) * 1000
+			thres = l[3][1:-1]
+			if thres == 'ebic':
+				if am in ['MLMM-fwd', 'MLMM-bwd', 'FBLR-fwd', 'FBLR-bwd']:
+					fdr = float(l[4])
+					power = float(l[5])				
+					caus_drop_dict[h][ws][am]['EBIC'] = {'fdr':fdr, 'power':power}
+				continue
+			fdr = float(l[4])
+			power = float(l[5])
+			if thres == 'bonf':
+				caus_drop_dict[h][ws][am]['BONF'] = {'fdr':fdr, 'power':power}
+			else:
+				caus_drop_dict[h][ws][am]['fdr'].append(fdr)
+				caus_drop_dict[h][ws][am]['power'].append(power)
+
+
 	f = pylab.figure(figsize=(11, 7))
 
-	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'plus', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
 	ax = f.add_axes([0.06, 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_xticklabels(['']*len(ax.get_xticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), w_legend=True, x_label='')
+	plot_single_tprs_fdrs_2(caus_in_dict[25], ax, 25000, y_lim=(0.16, 1.03), w_legend=True, x_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'or', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
 	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
 	ax.set_xticklabels(['']*len(ax.get_xticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+	plot_single_tprs_fdrs_2(caus_in_dict[50], ax, 25000, y_lim=(0.16, 1.03), y_label='', x_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'xor', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
 	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
 	ax.set_xticklabels(['']*len(ax.get_xticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+	plot_single_tprs_fdrs_2(caus_in_dict[75], ax, 25000, y_lim=(0.16, 1.03), y_label='', x_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'plus', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
 	ax = f.add_axes([0.06, 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03))
+	plot_single_tprs_fdrs_2(caus_drop_dict[25], ax, 25000, y_lim=(0.06, 1.03))
 
-	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'or', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
 	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+	plot_single_tprs_fdrs_2(caus_drop_dict[50], ax, 25000, y_lim=(0.06, 1.03), y_label='')
 
-	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'xor', phed, index_list=range(1000))
-	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
 	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
 	ax.set_yticklabels(['']*len(ax.get_yticks()))
-	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+	plot_single_tprs_fdrs_2(caus_drop_dict[75], ax, 25000, y_lim=(0.06, 1.03), y_label='')
 
-	f.text(0.168, 0.962, 'Additive')
-	f.text(0.496, 0.962, "'or'")
-	f.text(0.796, 0.962, "'xor'")
+	f.text(0.168, 0.962, r'$h^2 = 0.25 $')
+	f.text(0.485, 0.962, r'$h^2 = 0.5 $')
+	f.text(0.785, 0.962, r'$h^2 = 0.75 $')
 
 
 	f.text(0.072, 0.91, 'A')
@@ -1153,8 +1254,8 @@ def generate_results_figure_2():
 	f.text(0.382, 0.46, "E")
 	f.text(0.688, 0.46, "F")
 
-	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
-	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
+	f.text(0.97, 0.105, 'Causatives dropped from data', rotation=90)
+	f.text(0.97, 0.627, 'Causatives in data', rotation=90)
 	f.savefig('/tmp/test.png')
 
 
@@ -1265,7 +1366,11 @@ def generate_example_figure_7():
 
 
 if __name__ == '__main__':
-	generate_example_figure_7()
+#	for herit in [5, 10, 20, 25]:
+#		for ws in [0, 1000, 5000, 10000, 25000]:
+#			file_name = '/tmp/fig2_h%d_ws%d.png' % (herit, ws)
+#			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
+	generate_results_figure_3()
 	#_run_()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)

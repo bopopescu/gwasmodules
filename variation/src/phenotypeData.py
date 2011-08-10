@@ -286,6 +286,18 @@ class phenotype_data:
 		self.phen_dict = d
 
 
+	def filter_phenotypes_w_few_values(self, min_num_vals=50):
+		"""
+		Removes phenotypes.
+		"""
+		d = {}
+		for pid in self.phen_dict:
+			if len(self.get_ecotypes(pid)) >= min_num_vals:
+				d[pid] = self.phen_dict[pid]
+		self.phen_dict = d
+		self.phen_ids = sorted(d.keys())
+
+
 	def filter_near_const_phens(self, min_num_diff=15):
 		"""
 		"""
@@ -300,16 +312,16 @@ class phenotype_data:
 
 
 
-	def filter_unique_ecotypes(self, ets, pids):
-		"""
-		Removes ecotypes which are not in the given list of ecotypes.
-		"""
-		if not pids:
-			pids = self.phen_ids
-		for pid in pids:
-			ecotypes = self.get_ecotypes(pid)
-			indices_to_keep = [i for i, et in enumerate(ecotypes) if et in ets ]
-			self.filter_ecotypes(indices_to_keep, pids=[pid])
+#	def filter_unique_ecotypes(self, ets, pids):
+#		"""
+#		Removes ecotypes which are not in the given list of ecotypes.
+#		"""
+#		if not pids:
+#			pids = self.phen_ids
+#		for pid in pids:
+#			ecotypes = self.get_ecotypes(pid)
+#			indices_to_keep = [i for i, et in enumerate(ecotypes) if et in ets ]
+#			self.filter_ecotypes(indices_to_keep, pids=[pid])
 
 
 
