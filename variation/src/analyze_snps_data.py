@@ -403,26 +403,25 @@ def run_r2_calc():
 #		f.close()
 #	return res_dict
 
-def _load_r2_res_file_(file_name, res_dict, headers):
-	delim = ','
-	try:
-		with open(file_name) as f:
-			for line in f:
-				l = map(str.strip, line.split(delim))
-				for j, st in enumerate(l):
-					h = headers[j]
-					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
-						res_dict[h].append(int(st))
-					elif h in ['pval', 't_pval']:
-						v = float(st)
-						res_dict[h].append(v if v != 0.0 else min_float)
-					elif h in ['r2', 't_r2']:
-						res_dict[h].append(float(st))
-					else:
-						raise Exception('Unknown value')
-	except Exception, err_str:
-		print "Problems with file %s: %s" % (file_name, err_str)
-
+#def _load_r2_res_file_(file_name, res_dict, headers):
+#	delim = ','
+#	try:
+#		with open(file_name) as f:
+#			for line in f:
+#				l = map(str.strip, line.split(delim))
+#				for j, st in enumerate(l):
+#					h = headers[j]
+#					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
+#						res_dict[h].append(int(st))
+#					elif h in ['pval', 't_pval']:
+#						v = float(st)
+#						res_dict[h].append(v if v != 0.0 else min_float)
+#					elif h in ['r2', 't_r2']:
+#						res_dict[h].append(float(st))
+#					else:
+#						raise Exception('Unknown value')
+#	except Exception, err_str:
+#		print "Problems with file %s: %s" % (file_name, err_str)
 
 
 def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
@@ -450,8 +449,64 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 	return res_dict
 
 
+#
+#def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), (0.1, 400000), (0.1, 1000000)], final_r2_thres=0.1):
+#	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
+#	res_dict = _load_r2_results_()
+#	num_res = len(res_dict['x_chr'])
+#	chromosomes = [1, 2, 3, 4, 5]
+#	chr_res_dict = {}
+#	for chr2 in chromosomes:
+#		for chr1 in chromosomes[:chr2]:
+#			d = {}
+#			for h in headers:
+#				d[h] = []
+#			chr_res_dict[(chr1, chr2)] = d
+#	num_retained = 0
+#	chr_pos_set = set()
+#	for i in range(num_res):
+#		x_chr = res_dict['x_chr'][i]
+#		y_chr = res_dict['y_chr'][i]
+#		x_pos = res_dict['x_pos'][i]
+#		y_pos = res_dict['y_pos'][i]
+#		r2 = res_dict['t_r2'][i]
+#		x_chr_pos = (x_chr, x_pos)
+#		y_chr_pos = (y_chr, y_pos)
+#		if x_chr <= y_chr:
+#			if x_chr == y_chr and x_pos < y_pos:
+#				for r2_thres, window in r2_thresholds:
+#					if y_pos - x_pos < window:
+#						if r2 > r2_thres:
+#							for h in headers:
+#								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#							num_retained += 1
+#							chr_pos_set.add((x_chr, x_pos))
+#							chr_pos_set.add((y_chr, y_pos))
+#						break
+#				else:
+#					if r2 > final_r2_thres:
+#						for h in headers:
+#								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#						num_retained += 1
+#						chr_pos_set.add((x_chr, x_pos))
+#						chr_pos_set.add((y_chr, y_pos))
+#			elif x_chr < y_chr:
+#				if r2 > final_r2_thres:
+#					for h in headers:
+#							chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#					num_retained += 1
+#					chr_pos_set.add((x_chr, x_pos))
+#					chr_pos_set.add((y_chr, y_pos))
+#
+#	print 'Number of results which were retained:', num_retained
+#	print len(chr_pos_set)
+#	return chr_res_dict
+
 
 def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), (0.1, 400000), (0.1, 1000000)], final_r2_thres=0.1):
+
+	#FINISH 
+	#Load one pickled file at a time, filter it, and move on!
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -502,6 +557,7 @@ def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), 
 	print 'Number of results which were retained:', num_retained
 	print len(chr_pos_set)
 	return chr_res_dict
+
 
 
 def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/250K_r2_min015'):
