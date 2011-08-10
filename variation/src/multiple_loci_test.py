@@ -1159,6 +1159,125 @@ def generate_results_figure_2():
 
 
 
+
+def generate_results_figure_3():
+	file_prefix = '/storage/mlt_results/mlt'
+	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
+	f = pylab.figure(figsize=(11, 7))
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), w_legend=True, x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03))
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	f.text(0.168, 0.962, 'Additive')
+	f.text(0.496, 0.962, "'or'")
+	f.text(0.796, 0.962, "'xor'")
+
+
+	f.text(0.072, 0.91, 'A')
+	f.text(0.382, 0.91, "B")
+	f.text(0.688, 0.91, "C")
+	f.text(0.072, 0.46, 'D')
+	f.text(0.382, 0.46, "E")
+	f.text(0.688, 0.46, "F")
+
+	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
+	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
+	f.savefig('/tmp/test.png')
+
+
+	file_prefix = '/storage/mlt_results/mlt'
+	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
+	f = pylab.figure(figsize=(11, 7))
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), w_legend=True, x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'random_snp', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08 + (0.5 * 0.9), (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	ax.set_xticklabels(['']*len(ax.get_xticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.3, 1.03), y_label='', x_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'plus', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'plus')
+	ax = f.add_axes([0.06, 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03))
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'or', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'or')
+	ax = f.add_axes([0.06 + (0.33 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	summary_dict = summarize_runs(file_prefix, 'north_south_split', 10, 'xor', phed, index_list=range(1000))
+	plot_file_prefix = '%s_%d_%s_%s' % (file_prefix, 10, 'random_snp', 'xor')
+	ax = f.add_axes([0.054 + (0.667 * 0.93), 0.08, (0.3 * 0.93), (0.46 * 0.9) ])
+	ax.set_yticklabels(['']*len(ax.get_yticks()))
+	plot_single_tprs_fdrs(plot_file_prefix, summary_dict, ax, 25000, y_lim=(0.0, 1.03), y_label='')
+
+	f.text(0.168, 0.962, 'Additive')
+	f.text(0.496, 0.962, "'or'")
+	f.text(0.796, 0.962, "'xor'")
+
+
+	f.text(0.072, 0.91, 'A')
+	f.text(0.382, 0.91, "B")
+	f.text(0.688, 0.91, "C")
+	f.text(0.072, 0.46, 'D')
+	f.text(0.382, 0.46, "E")
+	f.text(0.688, 0.46, "F")
+
+	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
+	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
+	f.savefig('/tmp/test.png')
+
+
+
 def generate_example_figure_7():
 	import gwaResults as gr
 

@@ -22,7 +22,7 @@ Option:
 	-a ...					Apply specific methods, otherwise all available are applied:
 						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step, lm_step etc.
 	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
-						log, sqrt, exp, sqr, most_normal (picks a most Gaussian looking transformation).
+						log, sqrt, exp, sqr, arcsin_sqrt, most_normal (picks a most Gaussian looking transformation).
 	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
 						else the outlier fence is given in IQRs. (An int is required).
 												 
@@ -50,7 +50,9 @@ Option:
 
 	--save_stepw_pvals			Write  p-values for each step to a file.
 
-	--pvalue_filter=...			Save only the smallest x fraction of the p-values, default is set to 0.1			
+	--pvalue_filter=...			Save only the smallest x fraction of the p-values, default is set to 0.1
+	
+	--kinship_type=...			Type of kinship calculated. Possible types are ibs (default) or ibd			
 	
 	#ONLY APPLICABLE FOR CLUSTER RUNS
 	-p ...					Run mapping methods on the cluster with standard parameters.  The argument is used for runid 
@@ -98,7 +100,7 @@ from numpy import *
 from env import *
 import copy
 import pdb
-import ipdb
+#import ipdb
 
 #For annoying linux computers, which don't have a display..
 import matplotlib
@@ -146,7 +148,7 @@ def parse_parameters():
 
 	long_options_list = ["comment=", 'with_db_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
 			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
-			'save_stepw_pvals', 'pvalue_filter=']
+			'save_stepw_pvals', 'pvalue_filter=', 'kinship_type=']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -163,7 +165,7 @@ def parse_parameters():
 		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
 		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'pids':None,
-		'save_stepw_pvals':False, 'pvalue_filter':1.0}
+		'save_stepw_pvals':False, 'pvalue_filter':1.0, 'kinship_type':'ibs'}
 
 
 	for opt, arg in opts:
@@ -200,6 +202,7 @@ def parse_parameters():
 		elif opt in ("--local_gwas"): p_dict['local_gwas'] = map(int, arg.split(','))
 		elif opt in ("--save_stepw_pvals"): p_dict['save_stepw_pvals'] = True
 		elif opt in ("--pvalue_filter"): p_dict['pvalue_filter'] = float(arg)
+		elif opt in ("--kinship_type"): p_dict['kinship_type'] = arg
 		else:
 			print "Unkown option:", opt
 			print __doc__
@@ -549,14 +552,14 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 			#Load genotype file (in binary format)
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
-			if p_dict['kinship_file']:   #Kinship file was somehow supplied..
+			if p_dict['kinship_file']:   #Kinship file was supplied..
 				print 'Loading supplied kinship file: %s' % p_dict['kinship_file']
 				k = lm.load_kinship_from_file(p_dict['kinship_file'], sd.accessions)
 			else:
 				print 'Loading kinship file.'
-				cm = 0 if p_dict['data_format'] == 'binary' else p_dict['call_method_id']
+				cm = 0 if p_dict['data_format'] == 'binary' else p_dict['call_method_id'] #Calculate on the fly if binary..
 				k = dataParsers.load_kinship(call_method_id=cm, data_format=p_dict['data_format'], \
-							method='ibs', accessions=sd.accessions, sd=sd)
+							method=p_dict['kinship_type'], accessions=sd.accessions, sd=sd)
 			sys.stdout.flush()
 			sys.stdout.write("Done!\n")
 
@@ -711,10 +714,13 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 							mapping_method, trans_method, p_dict['remove_outliers'],
 							str(p_dict['with_replicates']))
 		tm_id = transformation_method_dict[trans_method]
-		rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid,
-					analysis_methods_dict[mapping_method],
-					tm_id, remove_outliers=p_dict['remove_outliers'])
-
+		try:
+			rdb.add_results_to_db(result_file, short_name, p_dict['call_method_id'], db_pid,
+						analysis_methods_dict[mapping_method],
+						tm_id, remove_outliers=p_dict['remove_outliers'])
+		except Exception, err_str:
+			print 'Failed inserting results into DB!'
+			print err_str
 
 
 	if p_dict['data_format'] != 'float':
@@ -795,6 +801,10 @@ def _run_():
 	else:
 		print 'Retrieving the phenotypes from the DB.'
 		phed = phenotypeData.get_phenotypes_from_db(p_dict['pids'])
+
+	updated_pids = list(set(p_dict['pids']).intersection(set(phed.get_pids())))
+	updated_pids.sort()
+	p_dict['pids'] = updated_pids
 
 	if not p_dict['pids']:  #phenotype index arguement is missing, hence all phenotypes are run/analyzed.
 		if not p_dict['phen_file']:

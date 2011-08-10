@@ -882,6 +882,7 @@ def parse_NFBC_traits():
 def load_skin_color_traits():
 	import env
 	dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+	#dir_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/'
 	filename = dir_prefix + 'CV685-skin_eye_color.txt'
 	d = {1:{'name':'skin_color', 'ecotypes':[], 'values':[]}, 2:{'name':'eye_color', 'ecotypes':[], 'values':[]}}
 	sc_vals = []

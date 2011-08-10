@@ -2899,7 +2899,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
@@ -2909,9 +2909,9 @@ class SNPsDataSet:
 		num_lines = len(self.accessions)
 		chunk_size = num_lines
 		num_snps = len(snps)
+		num_splits = num_snps / chunk_size
 		print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-		num_splits = num_snps / chunk_size
 		print 'Starting calculation'
 		chunk_i = 0
 		for snp_i in range(0, num_snps, chunk_size): #FINISH!!!
@@ -2941,7 +2941,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10000, with_correction=True,
+	def get_ibd_kinship_matrix_old(self, debug_filter=1, num_dots=10000, with_correction=True,
 				snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBD kinship matrix, as described in (Yang et al., Nat. Genetics, 2010) 
@@ -2975,13 +2975,58 @@ class SNPsDataSet:
 		return k_mat
 
 
-	def get_snp_cov_matrix(self, debug_filter=1, num_dots=100, dtype='single'):
+	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
+		print 'Starting IBD calculation'
+		num_lines = len(self.accessions)
+		chunk_size = num_lines
+		num_snps = self.num_snps()
+		num_splits = num_snps / chunk_size
+		cov_mat = sp.zeros((num_lines, num_lines))
+		snps = self.getSnps(debug_filter)
+		for chunk_i, i in enumerate(range(0, self.num_snps(), chunk_size)):
+			snps_array = sp.array(snps[i:i + chunk_size])
+			snps_array = snps_array.T
+			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+			x = sp.mat(norm_snps_array.T)
+			cov_mat += x.T * x
+			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+		cov_mat = cov_mat / self.num_snps()
+		print 'Finished calculating IBD kinship matrix'
+		return cov_mat
+
+
+	def get_snp_cov_matrix(self, debug_filter=1, num_dots=10, dtype='single'):
+		print 'Initializing'
+		num_lines = len(self.accessions)
+		chunk_size = num_lines
+		num_snps = self.num_snps()
+		num_splits = num_snps / chunk_size
+		cov_mat = sp.zeros((num_lines, num_lines))
+		snps = self.getSnps(debug_filter)
+
+		print 'Estimating the accession means'
+		accession_sums = sp.zeros(num_lines)
+		for chunk_i, i in enumerate(range(0, self.num_snps(), chunk_size)):
+			snps_array = sp.array(snps[i:i + chunk_size])
+			snps_array = snps_array.T
+			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+			accession_sums += sp.sum(norm_snps_array, 1)
+		accession_means = accession_sums / num_snps
+		print accession_means
+
 		print 'Starting covariance calculation'
-		#Normalizing
-		norm_snps_array = self.get_normalized_snps(debug_filter=debug_filter, dtype=dtype)
-		accession_means = sp.mean(norm_snps_array, 1)
-		x = sp.mat(norm_snps_array.T - accession_means)
-		cov_mat = x.T * x / (len(snps) - 1)
+		for chunk_i, i in enumerate(range(0, self.num_snps(), chunk_size)):
+			snps_array = sp.array(snps[i:i + chunk_size])
+			snps_array = snps_array.T
+			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+			x = sp.mat(norm_snps_array.T - accession_means) #The only difference from the IBD matrix is that we subtract the accession means.
+			cov_mat += x.T * x
+			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+		cov_mat = cov_mat / self.num_snps()
 		print 'Finished calculating covariance matrix'
 		return cov_mat
 
@@ -2998,7 +3043,7 @@ class SNPsDataSet:
 		snps = self.getSnps(debug_filter)
 		snps_array = sp.array(snps)
 		snps_array = snps_array.T
-		#Normalizing
+		#Normalizing (subtracting by)
 		norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 		print 'Finished normalizing them'
 		return norm_snps_array

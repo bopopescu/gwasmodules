@@ -140,6 +140,7 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'log(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
 
 	def sqrt_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
@@ -153,7 +154,7 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'sqrt(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
-
+		return True
 
 	def sqr_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
@@ -167,6 +168,7 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'sqr(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
 
 	def exp_transform(self, pid, method='standard'):
 		a = sp.array(self.phen_dict[pid]['values'])
@@ -180,6 +182,23 @@ class phenotype_data:
 		else:
 			self.phen_dict[pid]['transformation'] = 'exp(' + self.phen_dict[pid]['transformation'] + ')'
 		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
+
+	def arcsin_sqrt_transform(self, pid):
+		a = sp.array(self.phen_dict[pid]['values'])
+		if min(a) < 0 or max(a) > 1:
+			print 'Some values are outside of range [0,1], hence skipping transformation!'
+			return False
+		else:
+			vals = sp.arcsin(sp.sqrt(a))
+		if not self.phen_dict[pid]['transformation']:
+			self.phen_dict[pid]['raw_values'] = self.phen_dict[pid]['values']
+			self.phen_dict[pid]['transformation'] = 'arcsin_sqrt'
+		else:
+			self.phen_dict[pid]['transformation'] = 'arcsin_sqrt(' + self.phen_dict[pid]['transformation'] + ')'
+		self.phen_dict[pid]['values'] = vals.tolist()
+		return True
+
 
 	def transform(self, pid, trans_type, method='standard'):
 		print 'Transforming phenotypes: %s' % trans_type
@@ -191,6 +210,8 @@ class phenotype_data:
 			self.sqr_transform(pid, method=method)
 		elif trans_type == 'exp':
 			self.exp_transform(pid, method=method)
+		elif trans_type == 'arcsin_sqrt':
+			self.arcsin_sqrt_transform(pid)
 		elif trans_type == 'most_normal':
 			trans_type, shapiro_pval = self.most_normal_transformation(pid)
 		elif trans_type == 'none':
@@ -208,7 +229,7 @@ class phenotype_data:
 			self.phen_dict[pid]['values'] = self.phen_dict[pid]['raw_values']
 
 
-	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp'], perform_trans=True):
+	def most_normal_transformation(self, pid, trans_types=['none', 'sqrt', 'log', 'sqr', 'exp', 'arcsin_sqrt'], perform_trans=True):
 		"""
 		Performs the transformation which results in most normal looking data, according to Shapiro-Wilk's test
 		"""
@@ -216,7 +237,8 @@ class phenotype_data:
 		shapiro_pvals = []
 		for trans_type in trans_types:
 			if trans_type != 'none':
-				self.transform(pid, trans_type=trans_type)
+				if not self.transform(pid, trans_type=trans_type):
+					continue
 			phen_vals = self.get_values(pid)
 			#print 'sp.inf in phen_vals:', sp.inf in phen_vals
 			if sp.inf in phen_vals:
@@ -1060,7 +1082,8 @@ def get_phenotypes_from_db(pids):
 				phen_dict[pid]['values'].append(float(row[1]))
 				phen_dict[pid]['ecotypes'].append(str(row[0]))
 				num_values += 1
-		print 'Loaded %d values for phenotype: %s' % (num_values, phen_name)
+		if pid in phen_dict:
+			print 'Loaded %d values for phenotype: %s' % (num_values, phen_name)
 
 	conn.close()
 	return phenotype_data(phen_dict)

@@ -128,7 +128,7 @@ def summarize_stepwise(summary_dict, gene, step_info_list, opt_dict):
 
 
 
-def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.05,
+def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold=15, filter_threshold=0.02,
 		call_method_id=79, data_format='diploid_int', debug_filter=1.0, near_const_filter=20):
 	"""
 	GWAS
@@ -227,115 +227,29 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 
 
 
-def load_results(mapping_method, temperature, file_prefix='', data_type='quan_seq_data', mac_threshold=15, debug_filter=1.0):
-	pickle_file = '%s_%s_%s_mac%d_res.pickled' % (file_prefix, temperature, mapping_method, mac_threshold)
-	if os.path.isfile(pickle_file):
-		with open(pickle_file) as f:
-			d = cPickle.load(f)
-	else:
-		phen_file = env['phen_dir'] + 'rna_seq_031311_%s.csv' % temperature
-		phen_pickle_file = phen_file + 'sd_overlap.pickled'
-		if os.path.isfile(phen_pickle_file):
-			with file(phen_pickle_file) as f:
-				phed = cPickle.load(f)
-		else:
-			phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
-			phed.filter_near_const_phens(15)
-			phed.convert_to_averages()
-			if data_type == 'use_1001_data':
-				sd = dp.load_1001_full_snps(debug_filter=debug_filter)
-			elif data_type == 'quan_seq_data':
-				sd = dp.load_quan_data(debug_filter=debug_filter)
-			else:
-				sd = dp.load_250K_snps(debug_filter=debug_filter)
-			indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
-			phed.filter_ecotypes(indices_to_keep)
-			with file(phen_pickle_file, 'wb') as f:
-				cPickle.dump(phed, f)
-		#sd.filter_mac_snps(mac_threshold)
-
-		gene_dict = _load_genes_list_('rna_seq_031311_%s' % temperature)
-		res_dict = {}
-		pids = phed.get_pids()
-		for pid in pids:
-			print 'pid: %d' % pid
-			if not pid in phed.phen_ids: continue
-			gene_tair_id = phed.get_name(pid)
-			curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
-				(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
-			if phed.is_constant(pid):
-				print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
-				continue
-			if phed.is_near_constant(pid, 15):
-				print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
-				continue
-			print 'Loading file'
-			if os.path.isfile(curr_file_prefix + '.pvals') or os.path.isfile(curr_file_prefix + '.pvals.pickled'):
-				res = gwaResults.Result(curr_file_prefix + '.pvals')
-				#Trim results..
-				res.neg_log_trans()
-
-				res.filter_attr('scores', 5) #Filter everything below 10^-5
-				if res.num_scores() == 0:
-					print "Skipping file since nothing is below 10^-5"
-					continue
-				cgs = gene_dict[pid]
-				avg_g_pos = sp.mean([(cg.startPos + cg.endPos) / 2.0 for cg in cgs])
-				chrom = cgs[0].chromosome #Current gene chromosome
-				print 'Working on gene: %s, chrom=%d, pos=%0.1f' % (gene_tair_id, chrom, avg_g_pos)
-
-
-				#Prepare for plotting results.. x,y style, where gene is x, and y is p-values
-				chrom_pos_score_dict = res.get_chrom_score_pos_dict()
-				dist_dict = {}
-				for score_threshold in [5, 6, 7]: #negative log10 thresholds.
-					if len(res.snp_results['scores']) == 0:
-						dist_dict[score_threshold] = -2 #No results
-					else:
-						res.filter_attr('scores', score_threshold)
-						if len(res.snp_results['scores']) == 0:
-							dist_dict[score_threshold] = -2 #No results
-						else:
-							cps_dict = res.get_chrom_score_pos_dict()
-							pos_list = cps_dict[chrom]['positions']
-							if len(pos_list) > 0:
-								distances = sp.absolute(sp.array(pos_list) - avg_g_pos)
-								d_i = sp.argmin(distances)
-								dist_dict[score_threshold] = distances[d_i] #Min distance.
-							else:
-								dist_dict[score_threshold] = -1 #Different chromosome
-
-				res_dict[(chrom, avg_g_pos)] = {'tair_id':gene_tair_id, 'genes':cgs,
-							'chrom_pos_score':chrom_pos_score_dict, 'dist_dict':dist_dict}
-				print dist_dict
-				if 0 < dist_dict[5] < 50000:
-					res = gwaResults.Result(curr_file_prefix + '.pvals')
-					#Trim results..
-					res.neg_log_trans()
-					res.plot_manhattan(png_file=curr_file_prefix + '.png', percentile=50,
-							cand_genes=cgs, plot_bonferroni=True)
-
-				#print res_dict
-			else:
-				print 'File not found:', curr_file_prefix + '.pvals'
-
-		#Now pickle everything...
-		d = {'res_dict':res_dict, 'phed':phed}
-		with open(pickle_file, 'wb') as f:
-			cPickle.dump(d, f)
-	return d
-
-
-
-def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_score=5):
+def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=15, min_score=5,
+		near_const_filter=20, data_format='binary', plot_data=True):
 	#Load in chromosome dict..
+
+	file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+
+	results_dict_file = '%sresults_%s_mac%d.pickled' % (file_prefix, mapping_method, mac_threshold)
+	res_dict = cPickle.load(open(results_dict_file))
+
+	phen_file = '%s_%dC.csv' % (phen_file_prefix, temperature)
+	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
+	phed.filter_near_const_phens(near_const_filter)
+	phed.convert_to_averages()
+	num_traits = phed.num_traits()
+	pids = phed.phen_ids
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=0.01)
+	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
+	phed.filter_ecotypes(indices_to_keep, pids=pids)
+
 	chrom_dict = {}
 	for x_chrom in [1, 2, 3, 4, 5]:
 		for y_chrom in [1, 2, 3, 4, 5]:
 			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[], 'tair_ids':[]}
-	d = _load_results_(mapping_method, temperature, file_prefix=results_file_prefix)
-	res_dict = d['res_dict']
-	phed = d['phed']
 	scores = []
 	for x_chrom, x_pos in res_dict:
 		d = res_dict[(x_chrom, x_pos)]
@@ -354,17 +268,18 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 					chrom_dict[(x_chrom, y_chrom)]['y_positions'].append(cps_d['positions'][i])
 
 	#Write chrom_dict to file..
-	for x_chrom in [1, 2, 3, 4, 5]:
-		for y_chrom in [1, 2, 3, 4, 5]:
-			file_name = file_prefix + '_chrom%d_chrom%d_%s_%d.txt' % (x_chrom, y_chrom, mapping_method, min_score)
-			print 'Writing to file:', file_name
-			with open(file_name, 'w') as f:
-				d = chrom_dict[(x_chrom, y_chrom)]
-				f.write('x_position, y_position, score, tair_id\n')
-				l = zip(d['x_positions'], d['y_positions'], d['scores'], d['tair_ids'])
-				l.sort()
-				for t in l:
-					f.write('%d,%d,%f,%s\n' % t)
+	if not plot_data:
+		for x_chrom in [1, 2, 3, 4, 5]:
+			for y_chrom in [1, 2, 3, 4, 5]:
+				file_name = file_prefix + 'result_plots/pvalues_chrom%d_chrom%d_%s_min%d.txt' % (x_chrom, y_chrom, mapping_method, min_score)
+				print 'Writing to file:', file_name
+				with open(file_name, 'w') as f:
+					d = chrom_dict[(x_chrom, y_chrom)]
+					f.write('x_position, y_position, score, tair_id\n')
+					l = zip(d['x_positions'], d['y_positions'], d['scores'], d['tair_ids'])
+					l.sort()
+					for t in l:
+						f.write('%d,%d,%f,%s\n' % t)
 
 
 
@@ -380,159 +295,363 @@ def plot(file_prefix, results_file_prefix, temperature, mapping_method, min_scor
 	print rel_chrom_sizes, rel_cum_chrom_sizes
 
 	#Filter data..
+
 	#Now plot data!!
-	alpha = 0.8
-	linewidths = 0
-	vmin = min_score
-	f = pylab.figure(figsize=(40, 35))
-	chromosomes = [1, 2, 3, 4, 5]
-	plot_file_name = file_prefix + '_%s_%d.png' % (mapping_method, min_score)
-	label = '$-log_{10}$(p-value)'
-	vmax = max(scores)
+	if plot_data:
+		alpha = 0.8
+		linewidths = 0
+		vmin = min_score
+		f = pylab.figure(figsize=(40, 35))
+		chromosomes = [1, 2, 3, 4, 5]
+		plot_file_name = file_prefix + 'result_plots/pvalues_%s_min%d.png' % (mapping_method, min_score)
+		label = '$-log_{10}$(p-value)'
+		vmax = max(scores)
 
-	for yi, chr2 in enumerate(chromosomes):
-		for xi, chr1 in enumerate(chromosomes):
+		for yi, chr2 in enumerate(chromosomes):
+			for xi, chr1 in enumerate(chromosomes):
 
-			l = chrom_dict[(chr1, chr2)]['scores']
-			if len(l) == 0:
-				continue
-			ax = f.add_axes([0.96 * (rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi] - 0.02,
-					0.96 * (rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
-			ax.spines['right'].set_visible(False)
-			ax.spines['bottom'].set_visible(False)
-			#ax.tick_params(fontsize='x-large')
-			if xi > 0:
-				ax.spines['left'].set_visible(False)
-				ax.yaxis.set_visible(False)
-			else:
-				ax.yaxis.set_ticks_position('left')
-				ax.set_ylabel('Chromosome %d (Mb)' % chr2, fontsize='x-large')
-			if yi < 4:
-				ax.spines['top'].set_visible(False)
-				ax.xaxis.set_visible(False)
-			else:
-				ax.xaxis.set_ticks_position('top')
-				ax.xaxis.set_label_position('top')
-				ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
-				#ax.set_xlabel('Chromosome %d' % chr1)
+				l = chrom_dict[(chr1, chr2)]['scores']
+				if len(l) == 0:
+					continue
+				ax = f.add_axes([0.96 * (rel_cum_chrom_sizes[xi] + 0.01), rel_cum_chrom_sizes[yi] - 0.02,
+						0.96 * (rel_chrom_sizes[xi]), rel_chrom_sizes[yi] ])
+				ax.spines['right'].set_visible(False)
+				ax.spines['bottom'].set_visible(False)
+				#ax.tick_params(fontsize='x-large')
+				if xi > 0:
+					ax.spines['left'].set_visible(False)
+					ax.yaxis.set_visible(False)
+				else:
+					ax.yaxis.set_ticks_position('left')
+					ax.set_ylabel('Chromosome %d (Mb)' % chr2, fontsize='x-large')
+				if yi < 4:
+					ax.spines['top'].set_visible(False)
+					ax.xaxis.set_visible(False)
+				else:
+					ax.xaxis.set_ticks_position('top')
+					ax.xaxis.set_label_position('top')
+					ax.set_xlabel('Chromosome %d (Mb)' % chr1, fontsize='x-large')
+					#ax.set_xlabel('Chromosome %d' % chr1)
 
-			#l = -sp.log10(l)
-			#l = l.tolist()
-			l_zxy = zip(l, chrom_dict[(chr1, chr2)]['x_positions'],
-				chrom_dict[(chr1, chr2)]['y_positions'])
-			l_zxy.sort()
-			l = map(list, zip(*l_zxy))
-			zs = l[0]
-			xs = map(lambda x: x / 1000000.0, l[1])
-			ys = map(lambda x: x / 1000000.0, l[2])
+				#l = -sp.log10(l)
+				#l = l.tolist()
+				l_zxy = zip(l, chrom_dict[(chr1, chr2)]['x_positions'],
+					chrom_dict[(chr1, chr2)]['y_positions'])
+				l_zxy.sort()
+				l = map(list, zip(*l_zxy))
+				zs = l[0]
+				xs = map(lambda x: x / 1000000.0, l[1])
+				ys = map(lambda x: x / 1000000.0, l[2])
 
-			scatter_plot = ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin,
-						vmax=vmax)
-			ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
-				- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
+				scatter_plot = ax.scatter(xs, ys, c=zs, alpha=alpha, linewidths=linewidths, vmin=vmin,
+							vmax=vmax)
+				ax.axis([-0.025 * chromosome_ends[chr1], 1.025 * chromosome_ends[chr1],
+					- 0.025 * chromosome_ends[chr2], 1.025 * chromosome_ends[chr2]])
 
-	cax = f.add_axes([0.965, 0.7, 0.01, 0.2])
-	cb = pylab.colorbar(scatter_plot, cax=cax)
-	cb.set_label(label, fontsize='xx-large')
-	#cb.set_tick_params(fontsize='x-large')
-	f.text(0.005, 0.47, 'Associated SNP position', size='xx-large', rotation='vertical')
-	f.text(0.47, 0.988, 'Expressed gene position', size='xx-large')
-	print 'Saving figure:', plot_file_name
-	f.savefig(plot_file_name, format='png')
-
-
-
+		cax = f.add_axes([0.965, 0.7, 0.01, 0.2])
+		cb = pylab.colorbar(scatter_plot, cax=cax)
+		cb.set_label(label, fontsize='xx-large')
+		#cb.set_tick_params(fontsize='x-large')
+		f.text(0.005, 0.47, 'Associated SNP position', size='xx-large', rotation='vertical')
+		f.text(0.47, 0.988, 'Expressed gene position', size='xx-large')
+		print 'Saving figure:', plot_file_name
+		f.savefig(plot_file_name, format='png')
 
 
 
 
 
-def load_and_plot_info_files(file_prefix='', call_method_id=75, temperature=10, mac_threshold=15, debug_filter=0.01,
+
+
+
+def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1.00,
 			near_const_filter=20, data_format='binary'):
+	import random
+
 	phen_file = '%s_%dC.csv' % (phen_file_prefix, temperature)
 	phed = pd.parse_phenotype_file(phen_file, with_db_ids=False)  #load phenotype file
 	phed.filter_near_const_phens(near_const_filter)
 	phed.convert_to_averages()
 	num_traits = phed.num_traits()
-	pids = phed.phen_ids[start_i :stop_i]
-	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=debug_filter)
+	pids = phed.phen_ids
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=0.01)
 	indices_to_keep = sd.coordinate_w_phenotype_data(phed, 1, coord_phen=False)  #All phenotypes are ordered the same way, so we pick the first one.
 	phed.filter_ecotypes(indices_to_keep, pids=pids)
 
+	print 'Loading the gene annotation dictionary'
 	gene_dict = dp.parse_tair_gff_file()
+	run_id = 'rs_%d' % call_method_id
 
-	# WHAT TO PLOT?
-	#
-	# - p-value inflation (box plots)
-	#   - ks test
-	#   - pval median
-	#
-	# - heritability (histogram)
-	#
-	# - Number of genes with significant signals, and split up by cis and trans...
-	#   - EBIC, MBIC, MBONF, etc
-	#   - Assuming Bonferroni correction, number of genes with significant p-values according for different bins around gene. (EX, LM, KW)
-	#
-	# - Distances to the most significant SNP from the causal gene, using different min p-value thresholds 
-	#
-	# - Number of causal loci found in total and per gene. (histogram) Split up into cis and trans.
-	#
-	# - Number of significant cofactors near genes for which we have a signal (EBIC,MBIC,MBONF)
+	file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
 
 
-	for chrom in [1, 2, 3, 4, 5]:
-		pass
+	num_genes = 0
 
-	res_dict = {}
-	pids = phed.get_pids()
 	heritabilities = []
 	transformations = []
 	shapiro_wilk_pvals = []
 	tair_ids = []
+	pval_infl_dict = {}
+	dist_min_pval_dict = {}
+	distance_bins = [(0, 5000), (0, 10000), (0, 25000), (0, 50000), (0, 100000), (1, -1), (6, -1)]
+	radius_bins = [0, 1000, 5000, 10000, 25000, 50000, 100000]
+	bonf_sign_bin_dict = {}
+	res_dict = {}
+	sign_count = {}
+	for mm in ['EX', 'LM', 'KW']:
+		pval_infl_dict[mm] = {'kolmogorov_smirnov':[], 'median_pvals':[]}
+		dist_min_pval_dict[mm] = {}
+		for bin in distance_bins:
+			dist_min_pval_dict[mm][bin] = 0
+		bonf_sign_bin_dict[mm] = {}
+		for bin in radius_bins:
+			bonf_sign_bin_dict[mm][bin] = {'count':0.0, 'total':0.0}
+		sign_count[mm] = 0
+
+	cofactor_count_dict = {}
+	for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+		cofactor_count_dict[criteria] = {'num_cofactor_list':[], 'bin_counts':sp.zeros(9),
+						'num_cis_cofactor_list':[], 'num_found':0}
+
+	pickle_file_dict = {}
+	for mm in ['EX', 'LM', 'KW']:
+		pickle_file_dict[mm] = {}
+		pickle_file_dict[mm]['file_name'] = '%sresults_%s_mac%d.pickled' % (file_prefix, mm, mac_threshold)
+		pickle_file_dict[mm]['res_dict'] = {}
+
+	pids = phed.get_pids()
 	for i, pid in enumerate(pids):
-		if not pid in phed.phen_ids: continue
-
-		gene_tair_id = phed.get_name(pid)
-		tair_ids.append(gene_tair_id)
-		curr_file_prefix = '%s_%s_%s_mac%d_pid%d_%s' % \
-			(file_prefix, temperature, mapping_method, mac_threshold, pid, gene_tair_id)
-#		if phed.is_constant(pid):
-#			print "Skipping RNA expressions for %s since it's constant." % gene_tair_id
-#			continue
-		if phed.is_near_constant(pid, 15):
-#			print "Skipping RNA expressions for %s since it's almost constant." % gene_tair_id
+		tair_id = phed.get_name(pid)
+		chrom = int(tair_id[2])
+		curr_file_prefix = '%schr_%d/rna_seq_%s_%dC_mac%d_pid%d_%s' % \
+					(file_prefix, chrom, run_id, temperature, mac_threshold, pid, tair_id)
+		info_file_name = '%s_info.pickled' % curr_file_prefix
+		for mm in ['EX', 'LM', 'KW']:
+			res_dict[mm] = '%s_%s_.pvals' % (curr_file_prefix, mm)
+		if random.random() > debug_filter:
 			continue
-		if (i + 1) % (len(pids) / 100) == 0:
-			sys.stdout.write('.')
-			sys.stdout.flush()
-		info_filename = curr_file_prefix + '_info.txt'
-		if os.path.isfile(curr_file_prefix + '_info.txt'):
-			with open(info_filename) as f:
-				line = f.next()
-				l = map(str.strip, line.split())
-				heritabilities.append(float(l[1]))
-				line = f.next()
-				l = map(str.strip, line.split())
-				transformations.append(l[1])
-				line = f.next()
-				l = map(str.strip, line.split())
-				shapiro_wilk_pvals.append(float(l[1]))
-	print ''
-	print len(heritabilities), sp.mean(heritabilities)
-	pylab.hist(heritabilities, alpha=0.6, bins=20)
-	ymin, ymax = pylab.ylim()
-	y_range = ymax - 0
-	pylab.axis([-.025, 1.025, -.025 * y_range, y_range])
-	fig_file = env['tmp_dir'] + 'rna_seq_031311_%s_herits.png' % temperature
-	pylab.xlabel('Expression heritability')
-	pylab.ylabel('Frequency')
-	pylab.savefig(fig_file)
+		if os.path.isfile(info_file_name) and os.path.isfile(res_dict['EX'] + ".pickled") \
+				and os.path.isfile(res_dict['LM'] + ".pickled") and os.path.isfile(res_dict['KW'] + ".pickled"):
+			print 'Loading info file: %s' % info_file_name
+			num_genes += 1
+			info_dict = cPickle.load(open(info_file_name))
+			for mm in ['EX', 'LM', 'KW']:
+				res_dict[mm] = gr.Result(res_dict[mm]) #Loading the result
+			transformations.append(info_dict['transformation_type'])
+			shapiro_wilk_pvals.append(info_dict['transformation_shapiro_pval'])
+			heritabilities.append(info_dict['pseudo_heritability'])
+			tair_ids.append(tair_id)
+			for mm in ['EX', 'LM', 'KW']:
+				pval_infl_dict[mm]['kolmogorov_smirnov'].append(info_dict[mm]['kolmogorov_smirnov']['D'])
+				pval_infl_dict[mm]['median_pvals'].append(info_dict[mm]['pval_median'])
+				dist_min_pval = tuple(info_dict[mm]['dist_to_min_pval'])
+				if res_dict[mm].min_score() < 1 / (20.0 * res_dict[mm].num_scores()):
+					sign_count[mm] += 1
+					for bin in distance_bins:
+						if dist_min_pval <= bin:
+							dist_min_pval_dict[mm][bin] += 1
+							break
 
-	info_file_name = env['tmp_dir'] + 'rna_seq_info%s.csv' % temperature
-	with open(info_file_name, 'w') as f:
-		f.write('tair_id, heritability, shapiro_wilks_pval, transformation')
-		for tair_id, h, swp, trans in it.izip(tair_ids, heritabilities, shapiro_wilk_pvals, transformations):
-			f.write('%s,%f,%f,%s\n' % (tair_id, h, swp, trans))
+				for bin in radius_bins:
+					pval = info_dict[mm]['bin_dict'][bin]['min_pval']
+					num_snps = info_dict[mm]['bin_dict'][bin]['num_snps']
+					if num_snps > 0:
+						bonf_sign_bin_dict[mm][bin]['total'] += 1
+						if pval < 1.0 / (20 * num_snps):
+							bonf_sign_bin_dict[mm][bin]['count'] += 1
+
+			#Stepwise stuff 
+			for criteria in ['ebics', 'mbonf', 'min_cof_ppa']:
+				num_cofactors = len(info_dict['SW'][criteria]['cofactors'])
+				cofactor_count_dict[criteria]['num_cofactor_list'].append(num_cofactors)
+				if num_cofactors > 0:
+					cofactor_count_dict[criteria]['num_found'] += 1
+					cofactor_count_dict[criteria]['bin_counts'] += sp.array(info_dict['SW'][criteria]['bin_counts'])
+					cofactor_count_dict[criteria]['num_cis_cofactor_list'].append(info_dict['SW'][criteria]['bin_counts'][2])
+
+
+			#Pre-process the results..
+			for mm in ['EX', 'LM', 'KW']:
+				res = res_dict[mm]
+				#Trim results
+				res.neg_log_trans()
+				if mm == 'EX':
+					res.filter_attr('scores', 3) #Filter everything below 10^-3
+				else:
+					res.filter_attr('scores', 4) #Filter everything below 10^-4
+				if res.num_scores() == 0:
+					print "Skipping file since nothing is below 10^-5"
+					continue
+
+				gene_d = gene_dict[tair_id]
+				avg_g_pos = (gene_d['start_pos'] + gene_d['end_pos']) / 2.0
+				chrom = int(gene_d['chromosome']) #Current gene chromosome
+
+
+				#Prepare for plotting results.. x,y style, where gene is x, and y is p-values
+				chrom_pos_score_dict = res.get_chrom_score_pos_dict()
+
+				dist_dict = {}
+				for score_threshold in [5, 6, 7]: #negative log10 thresholds.
+					if len(res.snp_results['scores']) == 0:
+						dist_dict[score_threshold] = -2 #No results
+					else:
+						res.filter_attr('scores', score_threshold)
+						if len(res.snp_results['scores']) == 0:
+							dist_dict[score_threshold] = -2 #No results
+						else:
+							cps_dict = res.get_chrom_score_pos_dict()
+							pos_list = cps_dict[chrom]['positions']
+							if len(pos_list) > 0:
+								distances = sp.absolute(sp.array(pos_list) - avg_g_pos)
+								d_i = sp.argmin(distances)
+								dist_dict[score_threshold] = distances[d_i] #Min distance.
+							else:
+								dist_dict[score_threshold] = -1 #Different chromosome
+
+				pickle_file_dict[mm]['res_dict'][(chrom, avg_g_pos)] = {'tair_id':tair_id,
+							'chrom_pos_score':chrom_pos_score_dict, 'dist_dict':dist_dict,
+							'pid':pid}
+				print dist_dict
+
+	for mm in ['EX', 'LM', 'KW']:
+		cPickle.dump(pickle_file_dict[mm]['res_dict'], open(pickle_file_dict[mm]['file_name'], 'wb'), protocol=2)
+
+
+	results_prefix = env['results_dir'] + 'RNAseq_summary_%dC_cm%d' % (temperature, call_method_id)
+	pylab.figure()
+	pylab.hist(heritabilities, bins=20, alpha=0.7)
+	pylab.xlabel('Pseudo-heritability')
+	pylab.xlim((-0.025, 1.025))
+	pylab.savefig(results_prefix + '_herits_hist.png')
+	pylab.clf()
+
+	ks_list = []
+	pm_list = []
+	for mm in ['EX', 'LM', 'KW']:
+		ks_list.append(pval_infl_dict[mm]['kolmogorov_smirnov'])
+		pm_list.append(pval_infl_dict[mm]['median_pvals'])
+
+	png_file_name = results_prefix + '_kolmogorov_smirnov_boxplot.png'
+	pylab.figure()
+	pylab.boxplot(ks_list)
+	pylab.axhline(0, color='k', alpha=0.6, ls='-.')
+	pylab.xticks(range(1, 4), ['EX', 'LM', 'KW'])
+	pylab.ylabel('Kolmogorov-Smirnov statistic D.')
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+	png_file_name = results_prefix + '_median_pvals_boxplot.png'
+	pylab.figure()
+	pylab.boxplot(pm_list)
+	pylab.axhline(0, color='k', alpha=0.6, ls='-.')
+	pylab.xticks(range(1, 4), ['EX', 'LM', 'KW'])
+	pylab.ylabel('Median p-value bias')
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+	x_positions = sp.arange(len(distance_bins), dtype='d64')
+	width = 0.25
+	png_file_name = results_prefix + '_dist_min_pval_hist.png'
+	pylab.axes([0.08, 0.2, 0.91, 0.75])
+	for mm, color in zip(['EX', 'LM', 'KW'], ['b', 'c', 'g']):
+		l = [dist_min_pval_dict[mm][bin] for bin in distance_bins]
+		tot_sum = sum(l)
+		l = map(lambda x: x / float(tot_sum), l)
+		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=mm)
+		x_positions += width
+
+	pylab.ylabel('Frequency')
+	pylab.xticks(x_positions - 3 * width / 2.0, (r'$d \leq 5$', r'$5< d \leq 10$', r'$10< d \leq 25$', \
+						r'$25< d \leq 50$', r'$50< d \leq 100$', r'$d>100$', \
+						'Other chrom.'), rotation='45')
+	pylab.xlabel('Distance $d$ (kb) to the smallest p-value from the gene.')
+	pylab.xlim((-0.25, len(distance_bins)))
+	pylab.legend(loc=2)
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+
+	x_positions = sp.arange(len(radius_bins) + 1, dtype='d64')
+	width = 0.25
+	png_file_name = results_prefix + 'bonf_sign_bin_hist.png'
+	pylab.axes([0.08, 0.22, 0.91, 0.73])
+	for mm, color in zip(['EX', 'LM', 'KW'], ['b', 'c', 'g']):
+		l = [bonf_sign_bin_dict[mm][bin]['count'] / bonf_sign_bin_dict[mm][bin]['total'] for bin in radius_bins]
+		l.append(sign_count[mm] / float(num_genes))
+		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=mm)
+		x_positions += width
+
+	pylab.ylabel('Fraction of sign. results')
+	pylab.xticks(x_positions - 3 * width / 2.0, ('Within gene', r'$d \leq 1$', r'$d \leq 5$', \
+						r'$d \leq 10$', r'$d \leq 25$', r'$d \leq 50$', \
+						r'$d \leq 100$', 'Whole genome'), rotation='45')
+	pylab.xlabel(r'Among SNPs with distance $d$ (kb) from gene.')
+	pylab.xlim((-0.25, len(radius_bins) + 1))
+	pylab.legend(loc=2)
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+
+
+	png_file_name = results_prefix + 'cofactor_count_hist.png'
+	x_positions = sp.arange(6, dtype='d64')
+	width = 0.25
+	for criteria, color in zip(['ebics', 'mbonf', 'min_cof_ppa'], ['b', 'c', 'g']):
+		bin_counts = list(sp.bincount(cofactor_count_dict[criteria]['num_cofactor_list']))
+		while len(bin_counts) < 6:
+			bin_counts.append(0)
+		pylab.bar(x_positions, bin_counts, width, color=color, alpha=0.7, label=criteria)
+		x_positions += width
+	pylab.xlabel('Number of cofactor SNPs')
+	pylab.ylabel('Number of genes')
+	pylab.xticks(x_positions - 3 * width / 2.0, ('0', '1', '2', '3', '4', '5'))
+	pylab.legend(loc=1)
+	pylab.xlim((-0.2, 6))
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+	png_file_name = results_prefix + 'cis_cofactor_count_hist.png'
+	x_positions = sp.arange(6, dtype='d64')
+	for criteria, color in zip(['ebics', 'mbonf', 'min_cof_ppa'], ['b', 'c', 'g']):
+		bin_counts = list(sp.bincount(cofactor_count_dict[criteria]['num_cis_cofactor_list']))
+		while len(bin_counts) < 6:
+			bin_counts.append(0)
+		pylab.bar(x_positions, bin_counts, width, color=color, alpha=0.7, label=criteria)
+		x_positions += width
+	pylab.xlabel('Number of cis cofactor SNPs')
+	pylab.ylabel('Number of genes')
+	pylab.xticks(x_positions - 3 * width / 2.0, ('0', '1', '2', '3', '4', '5'))
+	pylab.legend(loc=1)
+	pylab.xlim((-0.2, 6))
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+
+
+	png_file_name = results_prefix + 'cofactor_bin_count_hist.png'
+	x_positions = sp.arange(9, dtype='d64')
+	width = 0.25
+	pylab.axes([0.08, 0.2, 0.91, 0.75])
+	for criteria, color in zip(['ebics', 'mbonf', 'min_cof_ppa'], ['b', 'c', 'g']):
+		cofactor_count_dict[criteria]['bin_counts'] = \
+			cofactor_count_dict[criteria]['bin_counts'] / cofactor_count_dict[criteria]['num_found']
+		l = list(cofactor_count_dict[criteria]['bin_counts'])
+		l.reverse()
+		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=criteria)
+		x_positions += width
+	pylab.ylabel('Fraction all genes with cofactors.')
+	pylab.xlabel(r'Distance $d$ (kb) to cofactor from gene.')
+	pylab.xticks(x_positions - 3 * width / 2.0, ('Within gene', r'$1\geq d$', r'$5\geq d$', r'$10\geq d$', \
+						r'$25\geq d$', r'$50\geq d$', r'$100\geq d$', \
+						r'$d>100$', 'Other chrom.'), rotation='45')
+	pylab.xlim((-0.2, 9))
+	pylab.legend(loc=2)
+	pylab.savefig(png_file_name)
+	pylab.clf()
+
+
+
 
 
 
@@ -566,29 +685,23 @@ def _test_parallel_():
 
 
 if __name__ == '__main__':
-	#_load_results_('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
-	#load_and_plot_info_files('lm', '16C', file_prefix='/storage/rna_seq_results_032011/rna_seq')
-	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 5)
-	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 7)
-	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 10)
-	#plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'emmax', 11)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 7)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 7)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 10)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 10)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'lm', 12)
-#	plot('/tmp/rna_seq_16C', '/storage/rna_seq_results_032011/rna_seq', '16C', 'emmax', 12)
-#	plot('/tmp/rna_seq_10C', '/storage/rna_seq_results_032011/rna_seq', '10C', 'lm', 12)
-	#_load_genes_list_()
-	#_test_()
-	#print sys.argv
-	run_parallel_rna_seq_gwas()
+#	print sys.argv
 #	if  len(sys.argv) > 3:
 #		run_parallel_rna_seq_gwas()
 #	else:
 #		_test_parallel_()
 #	sys.exit(0)
-	#_test_()
-
-
+#	_test_()
+#	load_and_plot_info_files(temperature=16, call_method_id=79, debug_filter=1.0)
+#	plot(min_score=4, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
+#	plot(min_score=7, temperature=16, mapping_method='KW')
+	#plot(min_score=10, temperature=16, mapping_method='KW')
+	#plot(min_score=11, temperature=16, mapping_method='KW')
+	plot(min_score=4, temperature=16, mapping_method='LM', call_method_id=79, plot_data=False)
+#	plot(min_score=7, temperature=16, mapping_method='LM')
+#	plot(min_score=10, temperature=16, mapping_method='LM')
+#	plot(min_score=11, temperature=16, mapping_method='LM')
+#	plot(min_score=3, temperature=10, mapping_method='EX', plot_data=False)
+	plot(min_score=3, temperature=16, mapping_method='EX', call_method_id=79, plot_data=False)
+	print  'Done'
 

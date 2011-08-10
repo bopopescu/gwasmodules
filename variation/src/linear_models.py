@@ -80,6 +80,7 @@ class LinearModel(object):
 		self.cofactors = []
 
 
+
 	def add_factor(self, x, lin_depend_thres=1e-8):
 		"""
 		Adds an explanatory variable to the X matrix.
@@ -656,13 +657,16 @@ class LinearMixedModel(LinearModel):
 					eig_R=eig_R)
 
 
+#	def get_es
+
+
 
 	def get_estimates(self, eig_L, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
 				dtype='single', eig_R=None):
 		"""
 		Get ML/REML estimates for the effect sizes, as well as the random effect contributions.
-		Using the EMMA algorithm.
+		Using the EMMA algorithm (Kang et al., Genetics, 2008).
 		
 		Methods available are 'REML', and 'ML'		
 		"""
@@ -1090,6 +1094,8 @@ class LinearMixedModel(LinearModel):
 
 		if emma_num > 0:
 			print 'Updating p-values using EMMA for the smallest %d p-values.' % emma_num
+			pvals = sorted(r['ps'])
+			emma_r = self.expedited_REML_t_test(snps, ngrids=50, llim= -4, ulim=10, esp=1e-6, verbose=False)
 
 
 		return r
@@ -1159,11 +1165,11 @@ class LinearMixedModel(LinearModel):
 				if rss:
 					rss_list[i + j] = rss[0]
 					if snp_priors != None:
-						log_bfs[i + j] = log_h0_rss - sp.log(rss)
+						log_bfs[i + j] = log_h0_rss - sp.log(rss) #-(1/2)*log(n)
 
 				if verbose and num_snps >= 10 and (i + j + 1) % (num_snps / 10) == 0: #Print dots
 					if not progress_file_writer == None:
-						progress_file_writer.update_progress_bar(task_status='Performing EMMAX (SNPs completed: %d %%)' % round((float(i+j+1)/num_snps)*100))
+						progress_file_writer.update_progress_bar(task_status='Performing EMMAX (SNPs completed: %d %%)' % round((float(i + j + 1) / num_snps) * 100))
 					sys.stdout.write('.')
 					sys.stdout.flush()
 
@@ -1183,7 +1189,7 @@ class LinearMixedModel(LinearModel):
 		if return_transformed_snps:
 			res_d['t_snps'] = t_snps
 		if snp_priors != None:
-			bfs = sp.exp(log_bfs * (n / 2)) #Bayes factors
+			bfs = sp.exp((log_bfs * n - sp.log(n)) * 1 / 2) #Bayes factors
 			res_d['bfs'] = bfs
 			pos = bfs * snp_priors / (1 - snp_priors) #Posterior odds
 			res_d['pos'] = pos
@@ -1964,7 +1970,7 @@ def _calc_bic_(ll, num_snps, num_par, n):
 	return (bic, extended_bic, modified_bic)
 
 
-def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict, plot_bonferroni=True,
+def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict=None, plot_bonferroni=True,
 			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, with_qq_plots=True,
 			num_dots=1000, simple_qq=False, highlight_loci=None, write_pvals=False,
 			highlight_ppa_markers=None, ppas=None, **kwargs):
@@ -1999,7 +2005,7 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict, plot_bon
 			res.write_to_file(pval_file_name)
 
 	#Plot QQ plot
-	if with_qq_plots:
+	if with_qq_plots and quantiles_dict != None:
 		#calculate qq-plot line..
 		log_quantiles = agr.get_log_quantiles(pvals, num_dots=num_dots, max_val=log_qq_max_val)
 		quantiles = agr.get_quantiles(pvals, num_dots=num_dots)
@@ -2388,13 +2394,14 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 
 
 
-def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progress_file_writer=None):
+def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progress_file_writer=None, plot_prefix=None):
 	"""
 	EMMAX single SNPs
 	
 	Returns various stats useful for stepwise regression if return_stepw_stats flag is set to True.
 	"""
 	import bisect
+	import gwaResults as gr
 	s1 = time.time()
        	lmm = LinearMixedModel(phen_vals)
 	lmm.add_random_effect(K)
@@ -2419,7 +2426,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 		eig_R = lmm._get_eigen_R_()
 		print 'Done'
 
-	
+
 	print 'Getting variance estimates'
 	res_dict = {'REML':lmm.get_estimates(eig_L, method='REML', eig_R=eig_R),
 			'ML':lmm.get_estimates(eig_L, method='ML', eig_R=eig_R)}
@@ -2429,9 +2436,9 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 	H_sqrt_inv = res_dict['REML']['H_sqrt_inv']
 
 	if not progress_file_writer == None:
-		progress_file_writer.update_progress_bar(progress=0.45,task_status='Performing EMMAX')
+		progress_file_writer.update_progress_bar(progress=0.45, task_status='Performing EMMAX')
 		progress_file_writer.set_step(0.05)
-		
+
 
 	r = lmm._emmax_f_test_(snps, H_sqrt_inv, progress_file_writer=progress_file_writer)
 	min_pval_i = sp.argmin(r['ps'])
@@ -2460,13 +2467,16 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 
 	#Calculate maximum cofactor p-value
 	cof_pvals = []
+	cof_chrom_pos_pval_list = []
 	for i, snp in enumerate(cof_snps):
 		t_cofactors = sp.matrix(cof_snps) * H_sqrt_inv.T
 		t_cofactors = t_cofactors.tolist()
 		del t_cofactors[i]
 		lmm.set_factors(t_cofactors)
 		res = lmm._emmax_f_test_([snp], H_sqrt_inv)
-		cof_pvals.append(res['ps'][0])
+		cof_pval = res['ps'][0]
+		cof_pvals.append(cof_pval)
+		cof_chrom_pos_pval_list.append((cof_chr_pos_list[i][0], cof_chr_pos_list[i][1], -math.log10(cof_pval)))
 	for i, pval in zip(cof_indices, cof_pvals):
 		print r['ps'][i], pval
 		r['ps'][i] = pval
@@ -2482,6 +2492,13 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 		print 'Took %d mins and %f seconds.' % (mins, secs)
 	else:
 		print 'Took %f seconds.' % (secs)
+
+	if plot_prefix != None:
+		res = gr.Result(scores=list(r['ps']), snps_data=sd)
+		png_file_name = '%s_%s_manhattan.png' % (plot_prefix, _cofactors_to_string_(cof_chrom_pos_pval_list))
+		res.neg_log_trans()
+		res.filter_percentile(0.1)
+		res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=cof_chrom_pos_pval_list)
 
 	return {'stats':step_dict, 'res':r}
 
@@ -3456,17 +3473,19 @@ def test_skin_color():
 	for pid in [1, 2]:
 		#pid = 2
 		dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+		#dir_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/'
 		plink_prefix = dir_prefix + 'plink'
 		sd = dp.parse_plink_tped_file(plink_prefix)
 		phed = pp.load_skin_color_traits()
 		sd.coordinate_w_phenotype_data(phed, pid)
+		sd.filter_mac_snps(30)
 		K = load_kinship_from_file(dir_prefix + 'kinship_ibd.pickled',
 						accessions=sd.accessions)
 		phen_vals = phed.get_values(pid)
 		phen_name = phed.get_name(pid)
 		print 'Working on %s' % phen_name
 		sys.stdout.flush()
-		file_prefix = env.env['results_dir'] + 'CVI_%s_pid%d' % (phen_name, pid)
+		file_prefix = env.env['results_dir'] + 'CVI_ibd_%s_pid%d' % (phen_name, pid)
 		snps = sd.getSnps()
 		secs = time.time() - s1
 		if secs > 60:
@@ -3475,16 +3494,16 @@ def test_skin_color():
 			print 'Took %d mins and %f seconds to load and preprocess the data.' % (mins, secs)
 		else:
 			print 'Took %f seconds to load and preprocess the data..' % (secs)
-		#emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
-#		emmax_res = emmax(snps, phen_vals, K)
+		emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
+		#emmax_res = emmax(snps, phen_vals, K)
+		#phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
+#		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+		#emma_res = emma(snps, phen_vals, K)
 #		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emmax_res['pseudo_heritability'])
 #		res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
-		emma_res = emma(snps, phen_vals, K)
-		phed.plot_histogram(pid, png_file=file_prefix + '_hist.png', p_her=emma_res['pseudo_heritability'])
-		res = gr.Result(scores=emma_res['ps'].tolist(), snps_data=sd)
-		res.write_to_file(env.env['results_dir'] + 'CVI_emmax_%s_pid%d.pvals' % (phen_name, pid))
-		res.neg_log_trans()
-		res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
+#		res.write_to_file(env.env['results_dir'] + 'CVI_emmax_%s_pid%d.pvals' % (phen_name, pid))
+#		res.neg_log_trans()
+#		res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
 		secs = time.time() - s1
 		if secs > 60:
 			mins = int(secs) / 60

@@ -14,6 +14,7 @@ import cPickle
 import math
 import random
 import pdb
+import time
 min_float = 5e-324
 
 def test_correlation(sample_num=4000, mac_filter=15, debug_filter=0.05):
@@ -158,27 +159,22 @@ def test_correlation(sample_num=4000, mac_filter=15, debug_filter=0.05):
 
 
 
-def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=15, save_threshold=0.1, debug_filter=1):
+def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_format='diploid_int',
+		mac_filter=15, save_threshold=0.2, debug_filter=1):
 	"""
 	Returns statistics on LD levels, and plot them.
 	"""
 
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
-	sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary',
-					filter=debug_filter)
-	sd.filter_mac_snps(mac_filter)
-	h_inverse_matrix_file = env['data_dir'] + 'snp_corr_kinship_h_inv_cm72.pickled'
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=debug_filter, min_mac=mac_filter)
+	#sd.filter_mac_snps(mac_filter)
+	h_inverse_matrix_file = env['data_dir'] + 'snp_cov_mat_h_inv_cm%d.pickled' % (call_method_id)
 	if not os.path.isfile(h_inverse_matrix_file):
-		kinship_matrix_file = env['data_dir'] + 'snp_corr_kinship_cm72.pickled'
-		if not os.path.isfile(kinship_matrix_file):
-			K = sd.get_snp_cov_matrix()
-			lm.save_kinship_to_file(kinship_matrix_file, K, sd.accessions)
-		else:
-			K = lm.load_kinship_from_file(kinship_matrix_file, dtype='single')
+		K = sd.get_snp_cov_matrix()
 		H_sqrt = lm.cholesky(K)
 		H_sqrt_inv = (H_sqrt).I
 		with file(h_inverse_matrix_file, 'wb') as f:
-			cPickle.dump(H_sqrt_inv, f)
+			cPickle.dump(H_sqrt_inv, f, protocol=2)
 	else:
 		with file(h_inverse_matrix_file) as f:
 			H_sqrt_inv = cPickle.load(f)
@@ -186,34 +182,41 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, mac_filter=15, save_thresho
 	cps_list = sd.getChrPosSNPList()
 	x_cps = cps_list[x_start_i:x_stop_i]
 	y_cps = cps_list
-	result_list = []
+	result_dict = {}
 	q = 1  # Single SNP is being tested
 	p = 2
 	n = len(sd.accessions)
 	n_p = n - p
+	print 'Starting calculation'
+	sys.stdout.flush()
 	for i, (x_c, x_p, x_snp) in enumerate(x_cps):
 		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
 		#Normalize SNP..
 		xs = sp.array(x_snp)
-		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv)
-		for (y_c, y_p, y_snp) in y_cps:
+		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv).T
+		s1 = time.time()
+		result_list = []
+		for (y_c, y_p, y_snp) in reversed(y_cps):
 			if (x_c, x_p) < (y_c, y_p):
 				ys = sp.array(y_snp)
+				mac = ys.sum()
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
 				if r2 > save_threshold:
-					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv)
+					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
 					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
+					t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
 					t_r2 = t_r * t_r
-					result_list.append([x_c, x_p, y_c, y_p, r2, pearson_pval, \
-								t_r2, t_pearson_pval])
-	file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".csv"
-	with open(file_name, 'w') as f:
-		for r in result_list:
-			out_string = ','.join(map(str, r))
-			f.write(out_string + '\n')
-	return result_list
-
+					result_list.append([y_c, y_p, r2, pearson_pval, t_r2, t_pearson_pval])
+			else:
+				break
+		result_dict[(x_c, x_p)] = result_list
+		time_secs = time.time() - s1
+		print 'It took %d minutes and %d seconds to finish.' % (time_secs / 60, time_secs % 60)
+		print '%d values were saved.' % len(result_list)
+		sys.stdout.flush()
+	pickled_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".pickled"
+	cPickle.dump(result_dict, open(pickled_file_name, 'wb'), protocol=2)
 
 
 
@@ -289,28 +292,42 @@ def calc_r2_levels_w_mixed_model(file_prefix, x_start_i, x_stop_i, mac_filter=10
 
 
 
-def run_parallel(x_start_i, x_stop_i):
+def run_parallel(call_method_id, x_start_i, x_stop_i, cluster='gmi'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
 
-	#Cluster specific parameters
-	run_id = 'r2_250k'
+	job_id = 'ld_%d_%d_%d' % (call_method_id, x_start_i, x_stop_i)
+	file_prefix = '/projects/long_range_LD/raw_results/long_range_ld_min02_mac15'
+	job_output_file_prefix = file_prefix + job_id
 
+	#Cluster specific parameters	
+	if cluster == 'gmi': #GMI cluster.  
+		shstr = '#!/bin/bash\n'
+		shstr += '#$ -S /bin/bash\n'
+		shstr += '#$ -N %s\n' % job_id
+		#shstr += '#$ -o %s_job_$JOB_ID.out\n' % file_prefix
+		#shstr += '#$ -e %s_job_$JOB_ID.err\n' % file_prefix
+		shstr += '#$ -o %s_job.out\n' % job_output_file_prefix
+		shstr += '#$ -e %s_job.err\n' % job_output_file_prefix
+		shstr += 'source /etc/modules-env.sh\n'
+		shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
+		shstr += 'module load matplotlib/1.0.0\n'
+		shstr += 'module load mysqldb/1.2.3\n'
+		shstr += 'export GOTO_NUM_THREADS=1\n'
 
-	shstr = "#!/bin/csh\n"
-	shstr += "#PBS -l walltime=%s \n" % '72:00:00'
-	shstr += "#PBS -l mem=%s \n" % '1950mb'
-	shstr += "#PBS -q cmb\n"
+	elif cluster == 'usc':  #USC cluster.
+		shstr = "#!/bin/csh\n"
+		shstr += "#PBS -l walltime=%s \n" % '72:00:00'
+		shstr += "#PBS -l mem=%s \n" % '2950mb'
+		shstr += "#PBS -q cmb\n"
+		shstr += "#PBS -N p%s \n" % job_id
 
-	job_id = '%s_%d_%d' % (run_id, x_start_i, x_stop_i)
-	shstr += "#PBS -N p%s \n" % job_id
-	shstr += "(python %sanalyze_snps_data.py %d %d" % (env['script_dir'], x_start_i, x_stop_i)
+	shstr += "python %sanalyze_snps_data.py %d %d %d %s" % \
+			(env['script_dir'], call_method_id, x_start_i, x_stop_i, file_prefix)
 
-	file_prefix = env['results_dir'] + run_id + '_' + str(x_start_i) + '_' + str(x_stop_i)
-	shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
 	print '\n', shstr, '\n'
-	script_file_name = run_id + ".sh"
+	script_file_name = "long_range_ld.sh"
 	f = open(script_file_name, 'w')
 	f.write(shstr)
 	f.close()
@@ -319,15 +336,27 @@ def run_parallel(x_start_i, x_stop_i):
 	os.system("qsub " + script_file_name)
 
 
+
 def run_r2_calc():
-	if len(sys.argv) > 2:
-		calc_r2_levels(env['results_dir'] + '250K_r2_min01_mac15', int(sys.argv[1]), int(sys.argv[2]))
+	cm_num_snps_dict = {75:214051, 76:4988387, 78:1031827} #After MAC filtering
+	cm_data_format_dict = {75:'binary', 76:'binary', 78:'diploid_int'}
+
+	call_method_id = int(sys.argv[1])
+	if len(sys.argv) > 3:
+		x_start_i = int(sys.argv[2])
+		x_stop_i = int(sys.argv[3])
+		if len(sys.argv) > 4:
+			file_prefix = sys.argv[4]
+		else:
+			file_prefix = env['results_dir'] + 'long_range_ld_min02_mac15'
+		data_format = cm_data_format_dict[call_method_id]
+		calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=call_method_id,
+				data_format=data_format,)
 	else:
-		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
-		num_snps = len(sd.getSnps())
-		chunck_size = int(sys.argv[1])
+		num_snps = cm_num_snps_dict[call_method_id]
+		chunck_size = int(sys.argv[2])
 		for i in range(0, num_snps, chunck_size):
-			run_parallel(i, i + chunck_size)
+			run_parallel(call_method_id, i, i + chunck_size)
 
 
 #def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min015'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
@@ -374,26 +403,25 @@ def run_r2_calc():
 #		f.close()
 #	return res_dict
 
-def _load_r2_res_file_(file_name, res_dict, headers):
-	delim = ','
-	try:
-		with open(file_name) as f:
-			for line in f:
-				l = map(str.strip, line.split(delim))
-				for j, st in enumerate(l):
-					h = headers[j]
-					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
-						res_dict[h].append(int(st))
-					elif h in ['pval', 't_pval']:
-						v = float(st)
-						res_dict[h].append(v if v != 0.0 else min_float)
-					elif h in ['r2', 't_r2']:
-						res_dict[h].append(float(st))
-					else:
-						raise Exception('Unknown value')
-	except Exception, err_str:
-		print "Problems with file %s: %s" % (file_name, err_str)
-
+#def _load_r2_res_file_(file_name, res_dict, headers):
+#	delim = ','
+#	try:
+#		with open(file_name) as f:
+#			for line in f:
+#				l = map(str.strip, line.split(delim))
+#				for j, st in enumerate(l):
+#					h = headers[j]
+#					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
+#						res_dict[h].append(int(st))
+#					elif h in ['pval', 't_pval']:
+#						v = float(st)
+#						res_dict[h].append(v if v != 0.0 else min_float)
+#					elif h in ['r2', 't_r2']:
+#						res_dict[h].append(float(st))
+#					else:
+#						raise Exception('Unknown value')
+#	except Exception, err_str:
+#		print "Problems with file %s: %s" % (file_name, err_str)
 
 
 def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
@@ -421,8 +449,64 @@ def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_m
 	return res_dict
 
 
+#
+#def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), (0.1, 400000), (0.1, 1000000)], final_r2_thres=0.1):
+#	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
+#	res_dict = _load_r2_results_()
+#	num_res = len(res_dict['x_chr'])
+#	chromosomes = [1, 2, 3, 4, 5]
+#	chr_res_dict = {}
+#	for chr2 in chromosomes:
+#		for chr1 in chromosomes[:chr2]:
+#			d = {}
+#			for h in headers:
+#				d[h] = []
+#			chr_res_dict[(chr1, chr2)] = d
+#	num_retained = 0
+#	chr_pos_set = set()
+#	for i in range(num_res):
+#		x_chr = res_dict['x_chr'][i]
+#		y_chr = res_dict['y_chr'][i]
+#		x_pos = res_dict['x_pos'][i]
+#		y_pos = res_dict['y_pos'][i]
+#		r2 = res_dict['t_r2'][i]
+#		x_chr_pos = (x_chr, x_pos)
+#		y_chr_pos = (y_chr, y_pos)
+#		if x_chr <= y_chr:
+#			if x_chr == y_chr and x_pos < y_pos:
+#				for r2_thres, window in r2_thresholds:
+#					if y_pos - x_pos < window:
+#						if r2 > r2_thres:
+#							for h in headers:
+#								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#							num_retained += 1
+#							chr_pos_set.add((x_chr, x_pos))
+#							chr_pos_set.add((y_chr, y_pos))
+#						break
+#				else:
+#					if r2 > final_r2_thres:
+#						for h in headers:
+#								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#						num_retained += 1
+#						chr_pos_set.add((x_chr, x_pos))
+#						chr_pos_set.add((y_chr, y_pos))
+#			elif x_chr < y_chr:
+#				if r2 > final_r2_thres:
+#					for h in headers:
+#							chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#					num_retained += 1
+#					chr_pos_set.add((x_chr, x_pos))
+#					chr_pos_set.add((y_chr, y_pos))
+#
+#	print 'Number of results which were retained:', num_retained
+#	print len(chr_pos_set)
+#	return chr_res_dict
+
 
 def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), (0.1, 400000), (0.1, 1000000)], final_r2_thres=0.1):
+
+	#FINISH 
+	#Load one pickled file at a time, filter it, and move on!
 	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	res_dict = _load_r2_results_()
 	num_res = len(res_dict['x_chr'])
@@ -473,6 +557,7 @@ def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), 
 	print 'Number of results which were retained:', num_retained
 	print len(chr_pos_set)
 	return chr_res_dict
+
 
 
 def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/250K_r2_min015'):
@@ -763,8 +848,8 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 
 
 if __name__ == "__main__":
-	#run_r2_calc()
+	run_r2_calc()
 	#load_and_plot_r2_results()
-	plot_r2_results()
+	#plot_r2_results()
 	#plot_pval_emmax_correlations()
 	#test_correlation()

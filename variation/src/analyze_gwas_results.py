@@ -461,14 +461,20 @@ def identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, sn
 
 
 
+def identify_interesting_crosses(sd, phed, pid, foc_snp_i, dep_snps_indices):
+	sd.coordinate_w_phenotype_data(phed, pid)
+	snps = sd.getSnps()
+
+	focal_snp = snps[foc_snp_i]
+
+
 
 
 def identify_interesting_haplotypes(chrom_pos_list, phenotype_file, pid):
 	import dataParsers as dp
 	import bisect
-	#sd = dp.load_250K_snps()
-	sd = dp.load_1001_full_snps()
-	phed = pd.parse_phenotype_file(phenotype_file)
+	sd = dp.load_snps_call_method(76) #Full sequence data.
+	phed = pd.get_phenotypes_from_db([pid])
 	phed.convert_to_averages()
 	sd.coordinate_w_phenotype_data(phed, pid)
 	cpl = sd.getChrPosList()
@@ -483,8 +489,7 @@ def identify_interesting_haplotypes(chrom_pos_list, phenotype_file, pid):
 		snps.append(all_snps[i])
 		snp_chromosomes.append(chrom_pos[0])
 		snp_positions.append(chrom_pos[1])
-	#sd = dp.load_250K_snps()
-	sd = dp.load_1001_full_snps()
+	sd = dp.load_snps_call_method(76)
 	identify_interesting_accessions(sd, snps, snp_chromosomes, snp_positions, phed.get_ecotypes(pid))
 
 
@@ -496,5 +501,5 @@ if __name__ == '__main__':
 	#		(1, 25296405), (4, 453759), (5, 24053984), (5, 25458236)]#Both
 	chrom_pos_list = [(1, 5133217), (3, 20581778), (4, 5458010), (4, 5727758), (5, 1001970), (1, 1427391), (1, 22360158), (1, 29293376), (5, 21020181), (5, 24054819)]
 	pid = 1
-	identify_interesting_haplotypes(chrom_pos_list, env.env['phen_dir'] + 'telomere_lengths_all.csv', pid)
+	identify_interesting_haplotypes(chrom_pos_list, 1624)
 

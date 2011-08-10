@@ -149,6 +149,7 @@ def getRegions(regionSet, window=[25000, 25000]):
 	return regionList
 
 
+
 class Result(object):
 	"""
 	Contains information on the result.  (The old object is renamed Result_old, for now..)  Poised to cause problems?
@@ -191,9 +192,14 @@ class Result(object):
 						d = cPickle.load(f)
 					for attr in self.pickle_attributes:
 						setattr(self, attr, d[attr])
+					all_keys = self.snp_results.keys()[:]
+					for k in all_keys:
+						if not k in ['chromosomes', 'positions', 'scores', 'mafs', 'macs']:
+							del self.snp_results[k]
 					pickle_failed = False
 				except Exception, err_str:
 					print 'Loading pickle file failed:', pickle_file
+					print err_str
 					self._load_result_(result_file)
 					pickle_failed = True
 
@@ -216,7 +222,6 @@ class Result(object):
 			if macs != None:
 				self.keys.append('macs')
 				self.snp_results['macs'] = macs
-
 		if snps_data:
 			self._load_snps_(snps_data)
 			if 'mafs' not in self.snp_results:
@@ -225,7 +230,6 @@ class Result(object):
 			if snps:
 				self.keys.append('snps')
 				self.snp_results['snps'] = snps
-
 
 
 		#Adding various info...
@@ -288,8 +292,8 @@ class Result(object):
 			for si in chrom_splits[1:]:
 				self.chromosome_ends.append(self.snp_results['positions'][si - 1])
 			self.chromosome_ends.append(self.snp_results['positions'][-1])
-
 			self._rank_scores_()
+
 
 
 	def _load_snps_(self, snps_data):
@@ -895,6 +899,7 @@ class Result(object):
 		import matplotlib
 		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
+		import ipdb
 
 		num_scores = len(self.snp_results['scores'])
 
@@ -974,6 +979,7 @@ class Result(object):
 		chr_offsets = []
 		for i, chromosome_end in enumerate(chromosome_ends):
 			chr_offsets.append(offset)
+			print i, chromosome_splits
 			index1 = chromosome_splits[i]
 			index2 = chromosome_splits[i + 1]
 			scoreList = result.snp_results['scores'][index1:index2]
@@ -1614,6 +1620,7 @@ class Result(object):
 	def simple_clone(self):
 		snp_results = {}
 		for k in self.keys:
+			print k
 			snp_results[k] = self.snp_results[k][:]
 		if self.accessions:
 			accessions = self.accessions[:]
@@ -1701,11 +1708,11 @@ class Result(object):
 			for attr in self.pickle_attributes:
 				if attr == 'snp_results':
 					snp_results = getattr(self, attr)
-					d = {}
+					srd = {}
 					for k in snp_results:
-						if k != 'snps':
-							d[k] = snp_results[k]
-					d[attr] = d
+						if k != 'snps': #Avoid stroing SNPs
+							srd[k] = snp_results[k]
+					d[attr] = srd
 				else:
 					d[attr] = getattr(self, attr)
 			with open(pickle_file, 'wb') as f:
