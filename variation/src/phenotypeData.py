@@ -1545,6 +1545,32 @@ WHERE e.siteid = s.id AND s.addressid = a.id AND a.countryid = c.id
 	return ecotypeDict
 
 
+def get_tg_ecotype_map():
+	"""
+	Returns a dict containing tuples of (nativename, stockparent, latitude, longitude, country)
+	"""
+	import dbutils
+	conn = dbutils.connect_to_default_lookup(db='stock')
+	cursor = conn.cursor ()
+	#Retrieve the filenames
+	print "Fetching data"
+	tg_ets_map = {}
+
+	sql_statment = """
+SELECT DISTINCT e2e.ecotypeid, e2e.tg_ecotypeid, e2e.name, e2e.nativename, e2e.stockparent
+FROM stock.ecotypeid2tg_ecotypeid e2e
+"""
+	numRows = int(cursor.execute(sql_statment))
+	while(1):
+		row = cursor.fetchone()
+		if not row:
+			break;
+		ecotypeDict[int(row[0])] = (row[1], row[2], row[3], row[4])
+	cursor.close()
+	conn.close()
+	return tg_ets_map
+
+
 
 #def _get_stock_parent_info_dict_(host="papaya.usc.edu", user="bvilhjal", passwd="*rri_bjarni@usc", defaultValue=None):
 #	import MySQLdb

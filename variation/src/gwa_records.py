@@ -125,6 +125,9 @@ class ResultRecordFT(tables.IsDescription):
     maf = tables.Float32Col()
     mac = tables.Int32Col()
     odds_ratio = tables.Float32Col()
+    
+
+
 
 _file_counter = {}
 
@@ -212,7 +215,11 @@ class GWASRecord():
         group._v_attrs.bs_herits = bs_herits
         group._v_attrs.bs_avg_herits = bs_avg_herits
         group._v_attrs.bs_herit_pvals = bs_herit_pvals
-
+        group._v_attrs.current_dataset_id = 1
+        fullset_group = self.h5file.createGroup(group,'Fullset','Fullset phenotype values')
+        fullset_group._v_attrs.name = 'Fullset'
+        fullset_group._v_attrs.id = 'Fullset';
+        fullset_group._v_attrs.description = 'Fullset of all phenotypes'
         """info['name'] = phen_name
         info['num_values'] = num_vals
         info['std_dev'] = std_dev
@@ -232,12 +239,13 @@ class GWASRecord():
         return False
 
 
-    def add_phenotype_file(self, phen_file_name=None, file_object=None, transformation='raw', transformation_description=None):
+    def add_phenotype_file(self, ecotype_ids, phen_file_name=None, file_object=None, transformation='raw', transformation_description=None):
         """
         Adds phenotype values, to an existing phenotype, e.g. when applying different transformations.
         """
         retval = {'status':'OK', 'statustext':''}
         phed = pd.parse_phenotype_file(phen_file_name, file_object, with_db_ids=False)
+        phed.filter_ecotypes_2(ecotype_ids)
         #phed.convert_to_averages()
         #self.h5file = self._open(mode="r+")
         growth_conditions = None
@@ -327,30 +335,62 @@ class GWASRecord():
     def _delete_result(self, phen_name, transformation, analysis, result_name):
         self.h5file.removeNode('/phenotypes/%s/%s/%s' % (phen_name, transformation, analysis), result_name, True)
 
-    def delete_transformation(self, phen_name, transformation='raw'):
+    def delete_transformation(self, phen_name,dataset, transformation='raw'):
         """
         Deletes transformation from an existing phenotype.
         """
         #self.h5file = self._open(mode="r+")
         try:
             try:
-                self._delete_transformation_(phen_name, transformation)
+                self._delete_transformation_(phen_name,dataset, transformation)
             except Exception, err:
                 raise err
         finally:
             self.h5file.flush()
             #self._close()
 
-    def _delete_transformation_(self, phen_name, transformation='raw'):
-        self.h5file.removeNode('/phenotypes/%s' % phen_name, transformation, True)
+    def delete_dataset(self,phen_name,dataset):
+        try:
+            try:
+                self._delete_dataset_(phen_name,dataset)
+            except Exception, err:
+                raise err
+        finally:
+            self.h5file.flush()
 
+    def _delete_transformation_(self, phen_name, dataset,transformation='raw'):
+        if dataset == 'Fullset':
+            if not self._is_delete_transformation_allowed_(phen_name,transformation):
+                raise Exception('Some Subsets depend on the transformation. First delete the subsets')
+        self.h5file.removeNode('/phenotypes/%s/%s' % (phen_name,dataset), transformation, True)
+
+    def _is_delete_transformation_allowed_(self,phen_name,transformation):
+        for dataset_group in self.h5file.iterNodes("/phenotypes/%s" % phen_name, 'Group'):
+            if dataset_group._v_attrs.id != 'Fullset' and transformation in dataset_group:
+                return False
+        return True
+
+    def _delete_dataset_(self,phen_name,dataset):
+        self.h5file.removeNode("/phenotypes/%s" % phen_name, dataset, True)
+
+    def _add_dataset_(self,phen_name):
+        phen_group = self.h5file.getNode("/phenotypes", phen_name)
+        phen_group._v_attrs.current_dataset_id  = phen_group._v_attrs.current_dataset_id  +1
+        dataset_id = 'S%s' % phen_group._v_attrs.current_dataset_id
+        dataset_group =  self.h5file.createGroup(phen_group,str(dataset_id))
+        dataset_group._v_attrs.id = dataset_id
+        trans_group = self.h5file.createGroup(dataset_group,"raw");
+        trans_group._v_attrs.description = None
+        trans_group._v_attrs.name = "raw"
+        return dataset_group
+    
 
     def _add_phenotype_values_(self, phen_name, ecotypes, values, transformation='raw', transformation_description=None,
                 accessions=None, std_dev_values=None, value_comments=None):
         """
         """
 
-        phen_group = self.h5file.getNode('/phenotypes/%s' % phen_name)
+        phen_group = self.h5file.getNode('/phenotypes/%s/Fullset' % phen_name)
         #table = self.h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
         #info = table.row
         #info['name'] = transformation
@@ -362,29 +402,43 @@ class GWASRecord():
         trans_group._v_attrs.name = transformation
         trans_group._v_attrs.description = transformation_description
         table = self.h5file.createTable(trans_group, 'values', PhenotypeValue, "Phenotype values")
+        acc_values = zip(ecotypes, values)
+        acc_values.sort()
         value = table.row
-        for i, (ei, v) in enumerate(itertools.izip(ecotypes, values)):
+        for i, (ei, v) in enumerate(acc_values):
             value['ecotype'] = ei
+            ecotypes[i] = int(ei)
             value['mean_value'] = v
             if accessions: value['accession_name'] = accessions[i]
             if std_dev_values: value['std_dev'] = std_dev_values[i]
             if value_comments: value['comment'] = value_comments[i]
             value.append()
+        phen_group._v_attrs.ecotypes = ecotypes
         table.flush()
 
 
 
 
-    def get_phenotype_values(self, phen_name, transformation='raw'):
+    def get_phenotype_values(self, phen_name,dataset, transformation='raw'):
+        import bisect
         """
         Returns the phenotype values
         """
         #self.h5file = self._open(mode="r")
-        table = self.h5file.getNode('/phenotypes/%s/%s/values' % (phen_name, transformation))
+        
+        table = self.h5file.getNode('/phenotypes/%s/Fullset/%s/values' % (phen_name, transformation))
         d = {'ecotype' : [], 'mean_value' : [], 'accession_name': [], 'std_dev': [], 'comment':[]}
-        for x in table.iterrows():
-            for k in d:
-                d[k].append(x[k])
+        if dataset == "Fullset":
+            for x in table.iterrows():
+                for k in d:
+                    d[k].append(x[k])
+        else:
+            group = self.h5file.getNode("/phenotypes/%s/%s" % (phen_name,dataset))
+            ids = table.read(field='ecotype')
+            indices = [bisect.bisect(ids,val)-1 for val in group._v_attrs.ecotypes]
+            for x in table.itersequence(indices):
+                for k in d:
+                    d[k].append(x[k])
         #self._close()
         return d
 
@@ -404,13 +458,13 @@ class GWASRecord():
                     d = {'id':phenotype_table._v_attrs.name, 'name': phenotype_table._v_attrs.name, 'num_values': phenotype_table._v_attrs.num_vals, 'std_dev': phenotype_table._v_attrs.std_dev, 'growth_conditions': phenotype_table._v_attrs.growth_conditions,
                         'phenotype_scoring': phenotype_table._v_attrs.phenotype_scoring, 'method_description': phenotype_table._v_attrs.method_description, 'measurement_scale': phenotype_table._v_attrs.measurement_scale,
                         'is_binary': False}
-                    d['transformations'] = self._get_phenotype_transformations_(d['name'])
+                    d['datasets'] = self._get_phenotype_datasets_(d['name'])
                     dict_list.append(d)
             else:
                 x = self.h5file.getNode("/phenotypes/%s" % phen_name)
                 dict_list = [{'id':x._v_attrs.name, 'name': x._v_attrs.name, 'num_values': x._v_attrs.num_vals, 'std_dev': x._v_attrs.std_dev, 'growth_conditions': x._v_attrs.growth_conditions,
                             'phenotype_scoring': x._v_attrs.phenotype_scoring, 'method_description': x._v_attrs.method_description, 'measurement_scale': x._v_attrs.measurement_scale,
-                            'is_binary': False, 'transformations':self._get_phenotype_transformations_(x._v_attrs.name)}]
+                            'is_binary': False, 'datasets':self._get_phenotype_datasets_(x._v_attrs.name)}]
         except Exception, err:
             raise(err)
         finally:
@@ -419,36 +473,52 @@ class GWASRecord():
         return dict_list
 
 
+    def _get_phenotype_datasets_(self,phen_name):
+        dict_list = []
+        #self.h5file.flush()
+        for dataset in self.h5file.iterNodes("/phenotypes/%s" % phen_name, 'Group'):
+            s =  {'id':str(dataset._v_attrs.id),'name':dataset._v_attrs.name,'accessionCount':len(dataset._v_attrs.ecotypes),'phenotype':phen_name,'accession_ids':dataset._v_attrs.ecotypes,'description':dataset._v_attrs.description,'transformations':self._get_dataset_transformations_(phen_name,dataset._v_attrs.id)}
+            dict_list.append(s)
+        return dict_list
 
-    def _get_phenotype_transformations_(self, phen_name):
+    def _get_dataset_transformations_(self, phen_name,dataset_name):
         dict_list = []
         #table = self.h5file.getNode('/phenotypes/%s/transformation_info' % phen_name)
-        for x in self.h5file.iterNodes('/phenotypes/%s' % phen_name, 'Group'):
+        for x in self.h5file.iterNodes('/phenotypes/%s/%s' % (phen_name,dataset_name), 'Group'):
             d = {'id':x._v_attrs.name, 'name': x._v_attrs.name, 'description': x._v_attrs.description}
             d['phenotype'] = phen_name
-            d['analysis_methods'] = self._get_analysis_methods_(phen_name, d['name'])
+            d['dataset'] = str(dataset_name)
+            d['analysis_methods'] = self._get_analysis_methods_(phen_name,dataset_name,d['name'])
             dict_list.append(d)
         return dict_list
 
 
 
-    def get_phenotype_transformations(self, phen_name):
+    def get_dataset_transformations(self, phen_name,dataset):
         """
         Returns the phenotype values
         """
         #self.h5file = self._open(mode="r")
-        d = self._get_phenotype_transformations_(phen_name)
+        d = self._get_dataset_transformations_(phen_name,dataset)
         #self._close()
         return d
 
+    def get_dataset_accession_ids(self,phen_name,dataset=None):
+        
+        accession_ids = {}
+        if dataset is not None:
+            accession_ids[dataset] = self.h5file.getNode("/phenotypes/%s/%s" %(phen_name,dataset))._v_attrs.ecotypes
+        else:
+            for x in self.h5file.iterNodes('/phenotypes/%s' % (phen_name), 'Group'):
+                accession_ids[x._v_attrs.id] = x._v_attrs.ecotypes
+        return accession_ids
 
-
-    def _get_analysis_methods_(self, phen_name, transformation):
+    def _get_analysis_methods_(self, phen_name,dataset,transformation):
         dict_list = []
         stats_to_return = ['chr', 'pos', 'bic', 'ebic', 'mbic', 'step', 'pseudo_heritability', 'max_cof_pval']
         try:
             #table = self.h5file.getNode('/phenotypes/%s/%s/result_info' % (phen_name, transformation))
-            for x in self.h5file.iterNodes('/phenotypes/%s/%s' % (phen_name, transformation), 'Group'):
+            for x in self.h5file.iterNodes('/phenotypes/%s/%s/%s' % (phen_name, dataset,transformation), 'Group'):
                 for res in x._f_iterNodes('Table'):
                     #if res.name == 'results':
                     #    d = {'name': x._v_attrs.name, 'comment': x._v_attrs.comment,'snps':[]}
@@ -458,10 +528,14 @@ class GWASRecord():
                         stat = {}
                         for key in stats_to_return:
                             if key in cofactor:
-                                stat[key] = cofactor[key]
+                                val = cofactor[key]
+                                if key in ['bic','ebic','mbic','pseudo_heritability']:
+                                    val = round(val,4)
+                                stat[key] = val 
                         stats.append(stat)
                     d = {'id':res._v_attrs.name, 'name':res._v_attrs.name, 'resultName':res.name, 'comment':res._v_attrs.comment, 'type':x._v_attrs.type, 'cofactors':stats}
                     d['phenotype'] = phen_name
+                    d['dataset'] = str(dataset)
                     d['transformation'] = transformation
                     dict_list.append(d)
         except Exception, err_str:
@@ -481,7 +555,7 @@ class GWASRecord():
 
 
 
-    def add_results(self, phen_name, analysis_method, name, chromosomes, positions, scores, mafs, macs,
+    def add_results(self, phen_name, dataset,analysis_method, name, chromosomes, positions, scores, mafs, macs,
             result_name='results', cofactors=[], analysis_comment='', transformation='raw', **kwargs):
         """
         Add a result to the hdf5 file.
@@ -489,7 +563,7 @@ class GWASRecord():
         #h5file = self._open(mode="r+")
         try:
 
-            trans_group = self.h5file.getNode('/phenotypes/%s/%s' % (phen_name, transformation))
+            trans_group = self.h5file.getNode('/phenotypes/%s/%s/%s' % (phen_name, dataset,transformation))
             if analysis_method not in trans_group:
                 analysis_group = self.h5file.createGroup(trans_group, analysis_method, 'Analysis method: ' + analysis_method)
                 analysis_group._v_attrs.type = analysis_method
@@ -568,7 +642,7 @@ class GWASRecord():
 
 
 
-    def get_results_by_chromosome(self, phen_name, analysis_method, result_name, transformation='raw', min_mac=15, min_score=0.0, \
+    def get_results_by_chromosome(self, phen_name,dataset, analysis_method, result_name, transformation='raw', min_mac=15, min_score=0.0, \
                 top_fraction=0.05, chromosomes=[1, 2, 3, 4, 5], log_transform=True):
         """
         Return results..
@@ -576,7 +650,7 @@ class GWASRecord():
         cd = {}
         #h5file = self._open(mode="r")
         try:
-            info_group = self.h5file.getNode('/phenotypes/%s/%s/%s' % (phen_name, transformation, analysis_method))
+            info_group = self.h5file.getNode('/phenotypes/%s/%s/%s/%s' % (phen_name, dataset,transformation, analysis_method))
             table = info_group._f_getChild(result_name)
 
             max_score = table._v_attrs.max_score
@@ -637,15 +711,24 @@ class GWASRecord():
         return bin_list
 
 
-    def preview_transform_phenotype(self, phen_name, transformation, original_transformation='raw'):
-        new_phen_vals = self.transform_phenotype(phen_name, transformation, original_transformation)
+    def preview_transform_phenotype(self, phen_name,dataset, transformation, original_transformation='raw'):
+        new_phen_vals = self.transform_phenotype(phen_name, dataset, transformation, original_transformation)
         return self._get_phenotype_bins(new_phen_vals)
 
-    def transform_phenotype(self, phen_name, transformation, original_transformation='raw', store=False):
+    def transform_phenotype(self, phen_name,dataset, transformation, original_transformation='raw', store=False):
         """
         Apply a transformation to a phenotype.
         """
-        phen_data = self.get_phenotype_values(phen_name, original_transformation)
+        if store:
+            if dataset != 'Fullset':
+                phen_group = self.h5file.getNode('/phenotypes/%s/%s' % (phen_name,dataset))
+                trans_group = self.h5file.createGroup(phen_group, transformation, 'Transformation: ' + transformation)
+                trans_group._v_attrs.name = transformation
+                trans_group._v_attrs.description = ''
+                self.h5file.flush()
+            phen_data = self.get_phenotype_values(phen_name, "Fullset",original_transformation)
+        else:
+            phen_data = self.get_phenotype_values(phen_name, dataset,original_transformation)
         phen_vals = sp.array(phen_data['mean_value'])
         if transformation == 'raw':
             return
@@ -654,11 +737,35 @@ class GWASRecord():
         elif transformation == 'sqrt':
             new_phen_vals = sp.sqrt(phen_vals - min(phen_vals) + sp.var(phen_vals) * 0.1)
         if store:
-            self.add_phenotype_values(phen_name, phen_data['ecotype'], new_phen_vals, transformation)
+            dataset_node = self.h5file.getNode("/phenotypes/%s/Fullset" %phen_name)
+            if (dataset == 'Fullset' or (dataset != 'Fullset' and  transformation not in dataset_node)):
+                self.add_phenotype_values(phen_name, phen_data['ecotype'], new_phen_vals, transformation)
         return new_phen_vals
+    
+    def save_dataset(self,dataset):
+        try:
+            retval = {'status':'OK','statustext':''}
+            
+            if dataset['id'] is None or dataset['id'] == '' or dataset['id'] == '_NEW_SUBSET_':
+                dataset_group = self._add_dataset_(dataset['phenotype'])
+            else:
+                dataset_group = self.h5file.getNode("/phenotypes/%s/%s" % (dataset['phenotype'],dataset['id']))
+            dataset_group._v_attrs.name = dataset['name']
+            dataset_group._v_attrs.description = dataset['description']
+            ecotypes = dataset['accession_ids']
+            ecotypes = sorted(ecotypes)
+            dataset_group._v_attrs.ecotypes =ecotypes
+            dataset_group.title = dataset['description']
+            self.h5file.flush()
+            retval['statustext'] = str(dataset_group._v_attrs.id)
+        except Exception, err:
+            retval['status'] = 'ERROR'
+            retval['statustext'] = str(err)
+        return retval
+        
 
-    def exists_transformation(self, phen_name, transformation):
-        transformations = self.get_phenotype_transformations(phen_name)
+    def exists_transformation(self, phen_name,dataset, transformation):
+        transformations = self.get_dataset_transformations(phen_name,dataset)
         for trans in transformations:
             if trans['name'] == transformation:
                 return True
@@ -667,7 +774,7 @@ class GWASRecord():
 
 
 
-    def perform_gwas(self, phen_name, transformation='raw', analysis_method='kw', call_method_id=75,
+    def perform_gwas(self, phen_name, dataset,transformation='raw', analysis_method='kw', call_method_id=75,
                      kinship_method='ibs', progress_file_writer=None):
 
         """
@@ -681,7 +788,7 @@ class GWASRecord():
             raise Exception('analysis method %s not supported' % analysis_method)
 
         progress_file_writer.update_progress_bar(progress=0.0, task_status='Loading phenotype data')
-        phen_dict = self.get_phenotype_values(phen_name, transformation) #Load phenotype
+        phen_dict = self.get_phenotype_values(phen_name,dataset, transformation) #Load phenotype
         phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':map(str, phen_dict['ecotype']), 'name':phen_name}})
         phend.convert_to_averages()
         progress_file_writer.update_progress_bar(task_status='Loading genotype data')
@@ -720,7 +827,7 @@ class GWASRecord():
             kw_res = util.kruskal_wallis(snps, phen_vals)
             progress_file_writer.update_progress_bar(progress=0.95, task_status='Processing and saving results')
             scores = map(lambda x:-math.log10(x), kw_res['ps'])
-            self.add_results(phen_name, analysis_method, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
+            self.add_results(phen_name, dataset,analysis_method, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
                     maf_dict['mafs'], transformation=transformation, statistics=kw_res['ds'])
         else:
             raise Exception('analysis method %s not supported' % analysis_method)
@@ -733,7 +840,7 @@ class GWASRecord():
             scores = map(lambda x:-math.log10(x), res['ps'])
             stats_dict['step'] = 0
             cofactors = [stats_dict]
-            self.add_results(phen_name, analysis_method, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
+            self.add_results(phen_name, dataset, analysis_method, analysis_method, chromosomes, positions, scores, maf_dict['marfs'],
                              maf_dict['mafs'], transformation=transformation,
                              genotype_var_perc=res['var_perc'], beta0=betas[0], beta1=betas[1],
                               cofactors=cofactors)
@@ -741,7 +848,7 @@ class GWASRecord():
         print 'Done!'
         return analysis_method
 
-    def perform_stepwise_gwas(self, phen_name, transformation, analysis_method, result_name, chromosome, position,
+    def perform_stepwise_gwas(self, phen_name, dataset, transformation, analysis_method, result_name, chromosome, position,
                               call_method_id=75, kinship_method='ibs',progress_file_writer=None):
 
         """
@@ -751,7 +858,7 @@ class GWASRecord():
         #if analysis_method not in ['emmax','lm']:
         #    raise Exception("Step-Wise GWAS only possible with emmax or LM")
         snp = ((int(chromosome), int(position)))
-        result_group = self.h5file.getNode('/phenotypes/%s/%s/%s' % (phen_name, transformation, analysis_method))
+        result_group = self.h5file.getNode('/phenotypes/%s/%s/%s/%s' % (phen_name, dataset, transformation, analysis_method))
         result = result_group._f_getChild(result_name)
         cofactors = result._v_attrs.cofactors[:]
         co_var_snps = [(int(factors['chr']), int(factors['pos'])) for factors in cofactors if 'chr' in factors and 'pos' in factors]
@@ -773,7 +880,7 @@ class GWASRecord():
         if analysis_method == 'kw':
             analysis_method = 'emmax'
         progress_file_writer.update_progress_bar(progress=0.0, task_status='Loading phenotype data')
-        phen_dict = self.get_phenotype_values(phen_name, transformation) #Load phenotype
+        phen_dict = self.get_phenotype_values(phen_name,dataset, transformation) #Load phenotype
         phend = pd.phenotype_data({1:{'values':phen_dict['mean_value'], 'ecotypes':map(str, phen_dict['ecotype']), 'name':phen_name}})
         phend.convert_to_averages()
         progress_file_writer.update_progress_bar(task_status='Loading genotype data')
@@ -820,7 +927,7 @@ class GWASRecord():
             stats_dict['step'] = len(cofactors)
             cofactors.append(stats_dict)
 
-            self.add_results(phen_name, analysis_method, name, chromosomes, positions, scores, maf_dict['marfs'],
+            self.add_results(phen_name,dataset, analysis_method, name, chromosomes, positions, scores, maf_dict['marfs'],
                     maf_dict['mafs'], transformation=transformation,
                     genotype_var_perc=res['var_perc'], beta0=betas[0], beta1=betas[1],
                      cofactors=cofactors, result_name=new_result_name)
