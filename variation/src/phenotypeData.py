@@ -512,7 +512,7 @@ class phenotype_data:
 		tg_ets_map = get_tg_ecotype_map()
 		if not pids:
 			pids = self.phen_dict.keys()
-		f = lambda x: str(int(tg_ets_map[int(et)][0])) if int(et) in tg_ets_map else 'NA'
+		f = lambda et: str(int(tg_ets_map[int(et)][0])) if int(et) in tg_ets_map else 'NA'
 		for pid in pids:
 			map(f, self.phen_dict[pid]['ecotypes'])
 
