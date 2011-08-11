@@ -15,7 +15,12 @@ import math
 import random
 import pdb
 import time
+import h5py
 min_float = 5e-324
+
+
+cm_num_snps_dict = {75:214051, 76:4988387, 78:1031827} #After MAC filtering
+cm_data_format_dict = {75:'binary', 76:'binary', 78:'diploid_int'}
 
 def test_correlation(sample_num=4000, mac_filter=15, debug_filter=0.05):
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
@@ -160,7 +165,7 @@ def test_correlation(sample_num=4000, mac_filter=15, debug_filter=0.05):
 
 
 def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_format='diploid_int',
-		mac_filter=15, save_threshold=0.2, debug_filter=1):
+		mac_filter=15, save_threshold=0.2, save_threshold2=0.3, debug_filter=1):
 	"""
 	Returns statistics on LD levels, and plot them.
 	"""
@@ -183,40 +188,75 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 	x_cps = cps_list[x_start_i:x_stop_i]
 	y_cps = cps_list
 	result_dict = {}
-	q = 1  # Single SNP is being tested
-	p = 2
 	n = len(sd.accessions)
-	n_p = n - p
 	print 'Starting calculation'
 	sys.stdout.flush()
+        hdf5_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".hdf5"
+        h5_file = h5py.File(hdf5_file_name, 'w')
 	for i, (x_c, x_p, x_snp) in enumerate(x_cps):
-		print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
-		#Normalize SNP..
+                print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
+ 		#Normalize SNP..
 		xs = sp.array(x_snp)
 		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv).T
 		s1 = time.time()
-		result_list = []
-		for (y_c, y_p, y_snp) in reversed(y_cps):
+                y_cs = []
+                y_ps = []
+                r2s = []
+                t_r2s = []
+                ps = []
+                t_ps = []
+		n_saved = 0
+                for (y_c, y_p, y_snp) in reversed(y_cps):
 			if (x_c, x_p) < (y_c, y_p):
 				ys = sp.array(y_snp)
 				mac = ys.sum()
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
-				if r2 > save_threshold:
-					t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
-					(t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
-					t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
-					t_r2 = t_r * t_r
-					result_list.append([y_c, y_p, r2, pearson_pval, t_r2, t_pearson_pval])
-			else:
+				if x_c == y_c and y_p - x_p < 50000 and r2 > save_threshold2:
+                                        t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
+                                        (t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
+                                        t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
+                                        t_r2 = t_r * t_r
+                                        y_cs.append(y_c)
+                                        y_ps.append(y_p)
+                                        r2s.append(r2)
+                                        t_r2s.append(t_r2)
+                                        ps.append(pearson_pval)
+                                        t_ps.append(t_pearson_pval)
+                                        n_saved += 1
+
+                                elif r2 > save_threshold:
+                                        t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
+                                        (t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
+                                        t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
+                                        t_r2 = t_r * t_r
+                                        y_cs.append(y_c)
+                                        y_ps.append(y_p)
+                                        r2s.append(r2)
+                                        t_r2s.append(t_r2)
+                                        ps.append(pearson_pval)
+                                        t_ps.append(t_pearson_pval)
+                                        n_saved += 1
+ 			else:
 				break
-		result_dict[(x_c, x_p)] = result_list
+                if n_saved > 0:
+                        grp = h5_file.create_group('x%d' % i)
+                        grp.create_dataset("x_c", (1,), dtype='i')[0] = x_c
+                        grp.create_dataset("x_p", (1,), dtype='i')[0] = x_p
+                        grp.create_dataset("x_snp", (n,), dtype='i')[...] = x_snp
+                        grp.create_dataset("y_c", (n_saved,), dtype='i', compression='gzip')[...] = y_c
+                        grp.create_dataset("y_p", (n_saved,), dtype='i', compression='gzip')[...] = y_p
+                        grp.create_dataset("r2s", (n_saved,), dtype='i', compression='gzip')[...] = r2s
+                        grp.create_dataset("t_r2s", (n_saved,), dtype='i', compression='gzip')[...] = t_r2s
+                        grp.create_dataset("ps", (n_saved,), dtype='i', compression='gzip')[...] = ps
+                        grp.create_dataset("t_ps", (n_saved,), dtype='i', compression='gzip')[...] = t_ps
+
 		time_secs = time.time() - s1
 		print 'It took %d minutes and %d seconds to finish.' % (time_secs / 60, time_secs % 60)
-		print '%d values were saved.' % len(result_list)
+		print '%d values were saved.' % n_saved
 		sys.stdout.flush()
-	pickled_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".pickled"
-	cPickle.dump(result_dict, open(pickled_file_name, 'wb'), protocol=2)
+
+	h5_file.close()
 
 
 
@@ -338,8 +378,6 @@ def run_parallel(call_method_id, x_start_i, x_stop_i, cluster='gmi'):
 
 
 def run_r2_calc():
-	cm_num_snps_dict = {75:214051, 76:4988387, 78:1031827} #After MAC filtering
-	cm_data_format_dict = {75:'binary', 76:'binary', 78:'diploid_int'}
 
 	call_method_id = int(sys.argv[1])
 	if len(sys.argv) > 3:
@@ -403,58 +441,120 @@ def run_r2_calc():
 #		f.close()
 #	return res_dict
 
-def _load_r2_res_file_(file_name, res_dict, headers):
-	delim = ','
-	try:
-		with open(file_name) as f:
-			for line in f:
-				l = map(str.strip, line.split(delim))
-				for j, st in enumerate(l):
-					h = headers[j]
-					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
-						res_dict[h].append(int(st))
-					elif h in ['pval', 't_pval']:
-						v = float(st)
-						res_dict[h].append(v if v != 0.0 else min_float)
-					elif h in ['r2', 't_r2']:
-						res_dict[h].append(float(st))
-					else:
-						raise Exception('Unknown value')
-	except Exception, err_str:
-		print "Problems with file %s: %s" % (file_name, err_str)
+#def _load_r2_res_file_(file_name, res_dict, headers):
+#	delim = ','
+#	try:
+#		with open(file_name) as f:
+#			for line in f:
+#				l = map(str.strip, line.split(delim))
+#				for j, st in enumerate(l):
+#					h = headers[j]
+#					if h in ['x_chr', 'x_pos', 'y_chr', 'y_pos']:
+#						res_dict[h].append(int(st))
+#					elif h in ['pval', 't_pval']:
+#						v = float(st)
+#						res_dict[h].append(v if v != 0.0 else min_float)
+#					elif h in ['r2', 't_r2']:
+#						res_dict[h].append(float(st))
+#					else:
+#						raise Exception('Unknown value')
+#	except Exception, err_str:
+#		print "Problems with file %s: %s" % (file_name, err_str)
 
 
-
-def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
-	if os.path.isfile(file_prefix + '.pickled'):
-		print 'Loading pickled data..'
-		f = open(file_prefix + '.pickled', 'rb')
-		res_dict = cPickle.load(f)
-		f.close()
-		print 'Done'
-	else:
-		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
-		num_snps = len(sd.getSnps())
-		chunck_size = int(sys.argv[1])
-		res_dict = {}
-		for h in headers:
-			res_dict[h] = []
-		for i in range(0, num_snps, chunck_size):
-			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
-			_load_r2_res_file_(file_name, res_dict, headers)
-			print i
-		f = open(file_prefix + '.pickled', 'wb')
-		cPickle.dump(res_dict, f, 2)
-		f.close()
-	return res_dict
-
+#def _load_r2_results_(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):#_mac15'): #/Users/bjarni.vilhjalmsson/Projects/250K_r2/results/
+#	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
+#	if os.path.isfile(file_prefix + '.pickled'):
+#		print 'Loading pickled data..'
+#		f = open(file_prefix + '.pickled', 'rb')
+#		res_dict = cPickle.load(f)
+#		f.close()
+#		print 'Done'
+#	else:
+#		sd = dp.parse_numerical_snp_data(env['data_dir'] + '250K_t72.csv.binary')
+#		num_snps = len(sd.getSnps())
+#		chunck_size = int(sys.argv[1])
+#		res_dict = {}
+#		for h in headers:
+#			res_dict[h] = []
+#		for i in range(0, num_snps, chunck_size):
+#			file_name = file_prefix + '_x_' + str(i) + '_' + str(i + chunck_size) + ".csv"
+#			_load_r2_res_file_(file_name, res_dict, headers)
+#			print i
+#		f = open(file_prefix + '.pickled', 'wb')
+#		cPickle.dump(res_dict, f, 2)
+#		f.close()
+#	return res_dict
 
 
-def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), (0.1, 400000), (0.1, 1000000)], final_r2_thres=0.1):
-	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
-	res_dict = _load_r2_results_()
-	num_res = len(res_dict['x_chr'])
+#
+#def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), (0.1, 400000), (0.1, 1000000)], final_r2_thres=0.1):
+#	headers = ['x_chr', 'x_pos', 'y_chr', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
+#	res_dict = _load_r2_results_()
+#	num_res = len(res_dict['x_chr'])
+#	chromosomes = [1, 2, 3, 4, 5]
+#	chr_res_dict = {}
+#	for chr2 in chromosomes:
+#		for chr1 in chromosomes[:chr2]:
+#			d = {}
+#			for h in headers:
+#				d[h] = []
+#			chr_res_dict[(chr1, chr2)] = d
+#	num_retained = 0
+#	chr_pos_set = set()
+#	for i in range(num_res):
+#		x_chr = res_dict['x_chr'][i]
+#		y_chr = res_dict['y_chr'][i]
+#		x_pos = res_dict['x_pos'][i]
+#		y_pos = res_dict['y_pos'][i]
+#		r2 = res_dict['t_r2'][i]
+#		x_chr_pos = (x_chr, x_pos)
+#		y_chr_pos = (y_chr, y_pos)
+#		if x_chr <= y_chr:
+#			if x_chr == y_chr and x_pos < y_pos:
+#				for r2_thres, window in r2_thresholds:
+#					if y_pos - x_pos < window:
+#						if r2 > r2_thres:
+#							for h in headers:
+#								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#							num_retained += 1
+#							chr_pos_set.add((x_chr, x_pos))
+#							chr_pos_set.add((y_chr, y_pos))
+#						break
+#				else:
+#					if r2 > final_r2_thres:
+#						for h in headers:
+#								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#						num_retained += 1
+#						chr_pos_set.add((x_chr, x_pos))
+#						chr_pos_set.add((y_chr, y_pos))
+#			elif x_chr < y_chr:
+#				if r2 > final_r2_thres:
+#					for h in headers:
+#							chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
+#					num_retained += 1
+#					chr_pos_set.add((x_chr, x_pos))
+#					chr_pos_set.add((y_chr, y_pos))
+#
+#	print 'Number of results which were retained:', num_retained
+#	print len(chr_pos_set)
+#	return chr_res_dict
+
+
+def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/long_range_ld_min02_mac15_',
+		      final_r2_thres=0.1, chunk_size=500, call_method_id=78):
+
+        r2_thresholds = [(0.5, 25000), (0.3, 50000), (0.2, 100000), (0.1, 400000), (0.1, 1000000)]
+        chrom_res_dict_pickled_file = '%sfr2%0.2f_chunk%d_cm_%d.pickled' % \
+                                                (results_prefix, final_r2_thres, chunk_size, call_method_id)
+
+        if os.path.isfile(chrom_res_dict_pickled_file):
+                print 'Found pickled chr_res_dict, now loading it from file: %s' % chrom_res_dict_pickled_file
+                chr_res_dict = cPickle.load(open(chrom_res_dict_pickled_file))
+                print 'Pickled chr_res_dict loaded'
+                return chr_res_dict
+
+	headers = ['x_pos', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	chromosomes = [1, 2, 3, 4, 5]
 	chr_res_dict = {}
 	for chr2 in chromosomes:
@@ -465,43 +565,64 @@ def load_chr_res_dict(r2_thresholds=[(0.4, 25000), (0.2, 50000), (0.1, 100000), 
 			chr_res_dict[(chr1, chr2)] = d
 	num_retained = 0
 	chr_pos_set = set()
-	for i in range(num_res):
-		x_chr = res_dict['x_chr'][i]
-		y_chr = res_dict['y_chr'][i]
-		x_pos = res_dict['x_pos'][i]
-		y_pos = res_dict['y_pos'][i]
-		r2 = res_dict['t_r2'][i]
-		x_chr_pos = (x_chr, x_pos)
-		y_chr_pos = (y_chr, y_pos)
-		if x_chr <= y_chr:
-			if x_chr == y_chr and x_pos < y_pos:
-				for r2_thres, window in r2_thresholds:
-					if y_pos - x_pos < window:
-						if r2 > r2_thres:
-							for h in headers:
-								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-							num_retained += 1
-							chr_pos_set.add((x_chr, x_pos))
-							chr_pos_set.add((y_chr, y_pos))
-						break
-				else:
-					if r2 > final_r2_thres:
-						for h in headers:
-								chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-						num_retained += 1
-						chr_pos_set.add((x_chr, x_pos))
-						chr_pos_set.add((y_chr, y_pos))
-			elif x_chr < y_chr:
-				if r2 > final_r2_thres:
-					for h in headers:
-							chr_res_dict[(x_chr, y_chr)][h].append(res_dict[h][i])
-					num_retained += 1
-					chr_pos_set.add((x_chr, x_pos))
-					chr_pos_set.add((y_chr, y_pos))
+        num_snps = cm_num_snps_dict[call_method_id]
+        for i in range(0, num_snps, chunk_size):
+                result_file = '%sx_%d_%d.pickled' % (results_prefix, i, i + chunk_size)
+                if os.path.isfile(result_file):
+                        print 'Plowing through pickled file:', result_file
+                        res_dict = cPickle.load(open(result_file))
+                else:
+                        print 'Could not find pickled file:', result_file
+                        continue
+                l = res_dict.keys()
+		for x_chr, x_pos in sorted(l):
+                        print x_chr, x_pos
+                        res_list = res_dict[(x_chr, x_pos)]
+                        for (y_chr, y_pos, r2, pval, t_r2, t_pval) in res_list:
+                                if x_chr == y_chr:
+                                        for r2_thres, window in r2_thresholds:
+        					if y_pos - x_pos < window:
+        						if r2 > r2_thres:
+                                                                chr_res_dict[(x_chr, y_chr)]['x_pos'].append(x_pos)
+                                                                chr_res_dict[(x_chr, y_chr)]['y_pos'].append(y_pos)
+                                                                chr_res_dict[(x_chr, y_chr)]['r2'].append(r2)
+                                                                chr_res_dict[(x_chr, y_chr)]['pval'].append(pval)
+                                                                chr_res_dict[(x_chr, y_chr)]['t_r2'].append(t_r2)
+                                                                chr_res_dict[(x_chr, y_chr)]['t_pval'].append(t_pval)
+        							num_retained += 1
+        							chr_pos_set.add((x_chr, x_pos))
+        							chr_pos_set.add((y_chr, y_pos))
+        						break
+        				else:
+        					if r2 > final_r2_thres:
+                                                        chr_res_dict[(x_chr, y_chr)]['x_pos'].append(x_pos)
+                                                        chr_res_dict[(x_chr, y_chr)]['y_pos'].append(y_pos)
+                                                        chr_res_dict[(x_chr, y_chr)]['r2'].append(r2)
+                                                        chr_res_dict[(x_chr, y_chr)]['pval'].append(pval)
+                                                        chr_res_dict[(x_chr, y_chr)]['t_r2'].append(t_r2)
+                                                        chr_res_dict[(x_chr, y_chr)]['t_pval'].append(t_pval)
+        						num_retained += 1
+        						chr_pos_set.add((x_chr, x_pos))
+        						chr_pos_set.add((y_chr, y_pos))
+                                elif x_chr < y_chr:
+        				if r2 > final_r2_thres:
+                                                chr_res_dict[(x_chr, y_chr)]['x_pos'].append(x_pos)
+                                                chr_res_dict[(x_chr, y_chr)]['y_pos'].append(y_pos)
+                                                chr_res_dict[(x_chr, y_chr)]['r2'].append(r2)
+                                                chr_res_dict[(x_chr, y_chr)]['pval'].append(pval)
+                                                chr_res_dict[(x_chr, y_chr)]['t_r2'].append(t_r2)
+                                                chr_res_dict[(x_chr, y_chr)]['t_pval'].append(t_pval)
+        					num_retained += 1
+        					chr_pos_set.add((x_chr, x_pos))
+        					chr_pos_set.add((y_chr, y_pos))
 
 	print 'Number of results which were retained:', num_retained
-	print len(chr_pos_set)
+	print 'Number of positions involved: %d' % len(chr_pos_set)
+        print 'Pickling chr_res_dict'
+        cPickle.dump(chr_res_dict, open(chrom_res_dict_pickled_file, 'wb'), protocol=2)
+        print 'Done pickling'
 	return chr_res_dict
+
 
 
 def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/250K_r2_min015'):
@@ -606,7 +727,7 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 
-def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
+def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_mac15'):
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
@@ -681,7 +802,6 @@ def plot_r2_results(file_prefix='/storage/r2_results/250K_r2_min01_mac15'):
 		cb.set_label(label, fontsize='x-large')
 		#cb.set_tick_params(fontsize='x-large')
 		f.savefig(plot_file_name + '.png', format='png')
-
 
 
 
