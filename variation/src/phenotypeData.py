@@ -1565,7 +1565,7 @@ FROM stock.ecotypeid2tg_ecotypeid e2e
 		row = cursor.fetchone()
 		if not row:
 			break;
-		ecotypeDict[int(row[0])] = (row[1], row[2], row[3], row[4])
+		tg_ets_map[int(row[0])] = (row[1], row[2], row[3], row[4])
 	cursor.close()
 	conn.close()
 	return tg_ets_map
