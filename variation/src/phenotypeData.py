@@ -502,7 +502,7 @@ class phenotype_data:
 			pids = self.phen_dict.keys()
 		f = lambda et: str(int(tg_ets_map[int(et)][0])) if int(et) in tg_ets_map else 'NA'
 		for pid in pids:
-			map(f, self.phen_dict[pid]['ecotypes'])
+			self.phen_dict[pid]['ecotypes'] = map(f, self.phen_dict[pid]['ecotypes'])
 
 
 	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None, p_her=None):
