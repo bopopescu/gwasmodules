@@ -493,6 +493,18 @@ class phenotype_data:
 			self.phen_dict[pid]['transformation'] = trans
 
 
+	def convert_to_tg_ets(self, pids=None):
+		"""
+		Convert the ecotypes to target-ecotypes.
+		"""
+		tg_ets_map = get_tg_ecotype_map()
+		if not pids:
+			pids = self.phen_dict.keys()
+		f = lambda x: str(int(tg_ets_map[int(et)][0])) if int(et) in tg_ets_map else 'NA'
+		for pid in pids:
+			map(f, self.phen_dict[pid]['ecotypes'])
+
+
 	def plot_histogram(self, pid, title=None , pdf_file=None, png_file=None, x_label=None, p_her=None):
 
 		if title:
