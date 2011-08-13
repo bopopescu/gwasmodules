@@ -2899,7 +2899,7 @@ class SNPsDataSet:
 
 
 
-	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=100, snp_dtype='int8', dtype='single'):
+	def get_ibs_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
 		"""
 		Calculate the IBS kinship matrix. 
 		(un-scaled)
@@ -2940,50 +2940,84 @@ class SNPsDataSet:
 		return k_mat
 
 
-
-	def get_ibd_kinship_matrix_old(self, debug_filter=1, num_dots=10000, with_correction=True,
-				snp_dtype='int8', dtype='single'):
+	def get_local_n_global_kinships(self, focal_chrom_pos, window_size=25000, kinship_method='ibd'):
 		"""
-		Calculate the IBD kinship matrix, as described in (Yang et al., Nat. Genetics, 2010) 
-		(un-scaled)
+		Returns local and global kinship matrices.
 		"""
-		if self.data_format != 'binary':
+		chrom = focal_chrom_pos[0]
+		pos = focal_chrom_pos[1]
+		chrom, pos = focal_chrom_pos
+		local_snps, global_snps = self.get_region_split_snps(chrom, pos - window_size, pos + window_size)
+		print 'Found %d local SNPs' % len(local_snps)
+		print 'and %d global SNPs' % len(global_snps)
+		if kinship_method == 'ibd':
+			local_k = self._calc_ibd_kinship_(local_snps) if len(local_snps) else []
+			print ''
+			global_k = self._calc_ibd_kinship_(global_snps) if len(global_snps) else []
+			print ''
+		else:
 			raise NotImplementedError
-		print 'Starting IBD kinship calculation, it prints %d dots.' % num_dots
-		snps = self.getSnps(debug_filter)
-		num_snps = len(snps)
-		num_lines = len(self.accessions)
-		print 'Allocating K matrix'
-		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-
-		print 'Calculating IBD kinship... one SNP at a time'
-		#Do one SNP at a time to save memory...
-		for snp_i, snp in enumerate(snps):
-			p = sp.mean(snp)
-			norm_snp = sp.mat((snp - p) / sp.std(snp))
-			M = norm_snp.T * norm_snp
-			if with_correction:
-				c = p * (1 - p * (4 - 6 * p + 3 * p * p))
-				cor_norm_snp = (snp - p) / sp.sqrt(c)
-				for i in range(0, num_lines):
-					M[i, i] = cor_norm_snp[i] ** 2
-			k_mat += M#norm_snp.T * norm_snp
-			if num_snps >= num_dots and (snp_i + 1) % (num_snps / num_dots) == 0: #Print dots
-				sys.stdout.write('.')
-				sys.stdout.flush()
-		k_mat = k_mat / len(snps)
-		return k_mat
+		return local_k, global_k
 
 
-	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
-		print 'Starting IBD calculation'
+	def get_region_split_snps(self, chrom, start_pos, end_pos):
+		"""
+		Returns two SNP sets, one with the SNPs within the given region, 
+		and the other with the remaining SNPs.
+		"""
+		import bisect
+		global_snps = []
+		local_snps = []
+		chr_pos_l = self.get_chr_pos_list()
+		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
+		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
+		snps = self.get_snps()
+		local_snps = snps[start_i:stop_i]
+		global_snps = snps[:start_i] + snps[stop_i:]
+		return local_snps, global_snps
+
+
+#	def get_ibd_kinship_matrix_old(self, debug_filter=1, num_dots=10000, with_correction=True,
+#				snp_dtype='int8', dtype='single'):
+#		"""
+#		Calculate the IBD kinship matrix, as described in (Yang et al., Nat. Genetics, 2010) 
+#		(un-scaled)
+#		"""
+#		if self.data_format != 'binary':
+#			raise NotImplementedError
+#		print 'Starting IBD kinship calculation, it prints %d dots.' % num_dots
+#		snps = self.getSnps(debug_filter)
+#		num_snps = len(snps)
+#		num_lines = len(self.accessions)
+#		print 'Allocating K matrix'
+#		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
+#
+#		print 'Calculating IBD kinship... one SNP at a time'
+#		#Do one SNP at a time to save memory...
+#		for snp_i, snp in enumerate(snps):
+#			p = sp.mean(snp)
+#			norm_snp = sp.mat((snp - p) / sp.std(snp))
+#			M = norm_snp.T * norm_snp
+#			if with_correction:
+#				c = p * (1 - p * (4 - 6 * p + 3 * p * p))
+#				cor_norm_snp = (snp - p) / sp.sqrt(c)
+#				for i in range(0, num_lines):
+#					M[i, i] = cor_norm_snp[i] ** 2
+#			k_mat += M#norm_snp.T * norm_snp
+#			if num_snps >= num_dots and (snp_i + 1) % (num_snps / num_dots) == 0: #Print dots
+#				sys.stdout.write('.')
+#				sys.stdout.flush()
+#		k_mat = k_mat / len(snps)
+#		return k_mat
+
+
+	def _calc_ibd_kinship_(self, snps, num_dots=10):
 		num_lines = len(self.accessions)
 		chunk_size = num_lines
-		num_snps = self.num_snps()
-		num_splits = num_snps / chunk_size
 		cov_mat = sp.zeros((num_lines, num_lines))
-		snps = self.getSnps(debug_filter)
-		for chunk_i, i in enumerate(range(0, self.num_snps(), chunk_size)):
+		num_snps = len(snps)
+		num_splits = num_snps / chunk_size
+		for chunk_i, i in enumerate(range(0, num_snps, chunk_size)):
 			snps_array = sp.array(snps[i:i + chunk_size])
 			snps_array = snps_array.T
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
@@ -2992,7 +3026,14 @@ class SNPsDataSet:
 			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
-		cov_mat = cov_mat / self.num_snps()
+		cov_mat = cov_mat / float(num_snps)
+		return cov_mat
+
+
+	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
+		print 'Starting IBD calculation'
+		snps = self.getSnps(debug_filter)
+		cov_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
 		print 'Finished calculating IBD kinship matrix'
 		return cov_mat
 
@@ -3090,7 +3131,7 @@ class SNPsDataSet:
 
 
 
-	def getSnps(self, random_fraction=None):
+	def get_snps(self, random_fraction=None):
 		snplist = []
 		if random_fraction:
 			import random
@@ -3102,6 +3143,9 @@ class SNPsDataSet:
 			for snpsd in self.snpsDataList:
 				snplist.extend(snpsd.snps)
 		return snplist
+
+	def getSnps(self, random_fraction=None):
+		return self.get_snps(random_fraction=None)
 
 
 	def num_snps(self):
@@ -3155,13 +3199,15 @@ class SNPsDataSet:
 			return None
 
 
-	def getPositions(self):
+	def get_positions(self):
 		poslist = []
 		for snpsd in self.snpsDataList:
 			for pos in snpsd.positions:
 				poslist.append(pos)
 		return poslist
 
+	def getPositions(self):
+		return self.get_positions()
 
 	def get_top_correlated_snp(self, snp, r2_threshold=0.5):
 		sample_snp_chr_pos_marf = []
@@ -3196,7 +3242,7 @@ class SNPsDataSet:
 		return sample_snp_chr_pos_marf
 
 
-	def getChrPosList(self):
+	def get_chr_pos_list(self):
 		chr_pos_list = []
 		for i in range(0, len(self.snpsDataList)):
 			snpsd = self.snpsDataList[i]
@@ -3204,6 +3250,9 @@ class SNPsDataSet:
 			for pos in snpsd.positions:
 				chr_pos_list.append((chr, pos))
 		return chr_pos_list
+
+	def getChrPosList(self):
+		return self.get_chr_pos_list()
 
 	def get_chr_list(self):
 		chr_list = []
@@ -3235,7 +3284,7 @@ class SNPsDataSet:
 		return {"mafs":maf_list, "marfs":marf_list}
 
 
-	def getChrPosSNPList(self):
+	def get_chr_pos_snp_list(self):
 		chr_pos_snp_list = []
 		for i in range(0, len(self.snpsDataList)):
 			snpsd = self.snpsDataList[i]
@@ -3245,6 +3294,10 @@ class SNPsDataSet:
 				snp = snpsd.snps[j]
 				chr_pos_snp_list.append((chr, pos, snp))
 		return chr_pos_snp_list
+
+	def getChrPosSNPList(self):
+		return self.get_chr_pos_snp_list()
+
 
 
 	def get_region_pos_snp_dict(self, chromosome, start_pos=None, end_pos=None):
@@ -3752,7 +3805,7 @@ def r2(freqs):
 	if divisor != 0:
 		return D * D / divisor
 	else:
-		return - 1
+		return -1
 
 
 
