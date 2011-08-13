@@ -871,18 +871,6 @@ class Result(object):
 				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000', linestyle="--")
 
 		x_range = sum(result.chromosome_ends)
-		#if plot_xaxis:
-		#	ax.xticks(ticksList1, ticksList2, fontsize='x-small')
-#		if not ylab:
-#			if type == "pvals":
-#				ax.ylabel('$ - log(p - $value$)$')
-#
-#			else:
-#				ax.ylabel('score')
-		#else:
-		#	ax.ylabel(ylab)
-#		if plot_xaxis:
-#			ax.xlabel("Mb")
 
 
 
@@ -1124,7 +1112,7 @@ class Result(object):
 		Apply - log(x) to the pvalues (scores)
 		"""
 		import math
-		f = lambda x: 323.0 if x == 0.0 else - math.log10(x)
+		f = lambda x: 323.0 if x == 0.0 else -math.log10(x)
 		self.snp_results['scores'] = map(f, self.snp_results['scores'])
 
 

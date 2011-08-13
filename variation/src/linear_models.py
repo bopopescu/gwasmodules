@@ -660,8 +660,9 @@ class LinearMixedModel(LinearModel):
 					eig_R=eig_R)
 
 
-	def get_estimates_3(self, xs=None, ngrids=[20, 20, 20], llim= -10, ulim=10, method='REML',
-				verbose=False, dtype='single'):
+	def get_estimates_3(self, xs=None, ngrids=[10, 10, 10, 20], ngrids2=[10, 10, 10, 10],
+				 llim= -8, ulim=8, method='REML', verbose=False, dtype='single',
+				 debug=False):
 		"""
 		Handles two K matrices, and one I matrix.
 		
@@ -674,55 +675,63 @@ class LinearMixedModel(LinearModel):
 			X = sp.hstack([self.X, xs])
 		else:
 			X = self.X
-		n = self.n
-		xs = []
-		ys1 = []
-		ys2 = []
+#		xs1 = [[] for i in range(len(ngrids))]
+#		ys1 = [[] for i in range(len(ngrids))]
+#		xs2 = []
+#		ys2 = []
 		for it_i in range(len(ngrids)):
 			delta = float(ulim - llim) / ngrids[it_i]
-			print llim, ulim
-			print delta
+			#print llim, ulim
+			#print delta
 			log_k_ratio = llim
 			lls = []
 			res_list = []
 			for i in range(ngrids[it_i] + 1):
-				log_k_ratio += delta
-				xs.append(log_k_ratio)
+				#xs1[it_i].append(log_k_ratio)
+				#xs2.append(log_k_ratio)
 				k_ratio = sp.exp(log_k_ratio)
 				a = k_ratio / (k_ratio + 1.0)
 				K = a * self.random_effects[1][1] + (1 - a) * self.random_effects[2][1]
-				eig_L = self._get_eigen_L_(K)
+				eig_L = self._get_eigen_L_(K=K)
 				#Now perform EMMA
-				res_dict = self.get_estimates(eig_L, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-3,
-							method=method)
+				res_dict = self.get_estimates(eig_L, K=K, xs=xs, ngrids=ngrids2[it_i], method=method)
 				res_list.append(res_dict)
 				lls.append(res_dict['max_ll'])
-				ys1.append(res_dict['max_ll'])
-				ys2.append(res_dict['pseudo_heritability'])
+				#ys1[it_i].append(res_dict['max_ll'])
+				#ys2.append(res_dict['pseudo_heritability'])
+				log_k_ratio += delta
 			max_ll_i = sp.argmax(lls)
-			print 'max_ll_i:', max_ll_i
+			#print 'max_ll_i:', max_ll_i
+			#print 'delta:', delta
 			#Update the ulim and llim
-			llim = llim + delta * max_ll_i - 1 if max_ll_i > 0 else llim
-			ulim = llim + delta * max_ll_i + 1 if max_ll_i < ngrids[it_i] else llim + delta * ngrids[it_i]
+			ulim = llim + delta * (max_ll_i + 0.99)
+			llim = llim + delta * (max_ll_i - 0.99)
 		opt_log_k_ratio = llim + delta * max_ll_i
 		res_dict = res_list[max_ll_i]
 		opt_k_ratio = sp.exp(log_k_ratio)
 		a = opt_k_ratio / (opt_k_ratio + 1)
-		res_dict['opt_k'] = a * self.random_effects[1][1] + (1 - a) * self.random_effects[2][1]
+		res_dict['opt_k'] = scale_k(a * self.random_effects[1][1] + (1 - a) * self.random_effects[2][1])
 		res_dict['opt_k_ratio'] = opt_k_ratio
-
-		import pylab
-		pylab.figure()
-		pylab.plot(xs, ys1)
-		pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/test1.png')
-		pylab.figure()
-		pylab.plot(xs, ys2)
-		pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/test2.png')
+		res_dict['perc_var1'] = a * res_dict['pseudo_heritability']
+		res_dict['perc_var2'] = (1 - a) * res_dict['pseudo_heritability']
+#		if debug:
+#			import pylab
+#			pylab.figure()
+#			for i in range(3):
+#				pylab.plot(xs1[i], ys1[i], marker='o', ls='None', alpha=0.4)
+#			pylab.xlabel('log(K ratio)')
+#			pylab.ylabel('log-likelihood')
+#			pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/%s.png' % str(debug))
+#			pylab.figure()
+#			pylab.plot(xs2, ys2, marker='o', ls='None', alpha=0.5)
+#			pylab.xlabel('log(K ratio)')
+#			pylab.ylabel('pseudo_heritability')
+#			pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/%s.png' % str(debug))
 		return res_dict
 
 
 
-	def get_estimates(self, eig_L, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-6,
+	def get_estimates(self, eig_L, K=None, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-6,
 				return_pvalue=False, return_f_stat=False, method='REML', verbose=False,
 				dtype='single', eig_R=None):
 		"""
@@ -739,7 +748,7 @@ class LinearMixedModel(LinearModel):
 			X = self.X
 
 		if not (eig_R and xs != None):
-			eig_R = self._get_eigen_R_(X)
+			eig_R = self._get_eigen_R_(X=X, K=K)
 		q = X.shape[1] #number of columns
 		n = self.n
 		p = n - q
@@ -1138,7 +1147,7 @@ class LinearMixedModel(LinearModel):
 			print 'Done.'
 		if not eig_R:
 			print "Calculating the eigenvalues of S(K+I)S where S = I-X(X'X)^-1X'"
-			eig_R = self._get_eigen_R_(self.X)
+			eig_R = self._get_eigen_R_(X=self.X)
 			print 'Done'
 
 		print 'Getting variance estimates'
@@ -2234,7 +2243,7 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 			print cofactors
 			lm.set_factors(cofactor_snps)
 			if type == 'emmax':
-				eig_R = lm._get_eigen_R_(lm.X)
+				eig_R = lm._get_eigen_R_(X=lm.X)
 				reml_res = lm.get_REML(eig_L=eig_L, eig_R=eig_R)
 				H_sqrt_inv = reml_res['H_sqrt_inv']
 				l_res = lm._emmax_f_test_(kwargs['snps'], H_sqrt_inv, snp_priors=snp_priors)
@@ -2569,7 +2578,7 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
 def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
 		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5,
-		highlight_loci=None, save_pvals=False, snp_priors=None, **kwargs):
+		highlight_loci=None, save_pvals=False, snp_priors=None, K2=None, **kwargs):
 	"""
 	Run step-wise EMMAX forward-backward.
 	"""
@@ -2597,6 +2606,8 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 	chr_pos_list = zip(chromosomes, positions)
        	lmm = LinearMixedModel(phenotypes)
 	lmm.add_random_effect(K)
+	if K2 != None:
+		lmm.add_random_effect(K2)
 	num_snps = len(snps)
 
 	if snp_priors == None:
@@ -2615,8 +2626,11 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
  	num_par = 2 #mean and variance scalar
  	num_pher_0 = 0
 
-	eig_L = lmm._get_eigen_L_()
-	eig_R = lmm._get_eigen_R_()
+	if K2 != None: #Then first estimate K
+		res = lmm.get_estimates_3()
+		K = res['opt_k']
+	eig_L = lmm._get_eigen_L_(K=K)
+	eig_R = lmm._get_eigen_R_(K=K)
 
 	reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
 	ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
@@ -2697,7 +2711,14 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 		#Adding the new SNP as a cofactor
 		lmm.add_factor(snps[snp_i])
 		cofactor_snps.append(snps[snp_i])
-		eig_R = lmm._get_eigen_R_(lmm.X)
+
+		if K2 != None: #Again first estimate K
+			res = lmm.get_estimates_3()
+			K = res['opt_k']
+			eig_L = lmm._get_eigen_L_(K=K)
+
+
+		eig_R = lmm._get_eigen_R_(X=lmm.X, K=K)
 		reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
 		ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
 		H_sqrt_inv = reml_res['H_sqrt_inv']
@@ -2840,7 +2861,11 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 
 
 			#Re-estimating the REML and ML.
-			eig_R = lmm._get_eigen_R_(lmm.X)
+			if K2 != None: #Again first estimate K
+				res = lmm.get_estimates_3()
+				K = res['opt_k']
+				eig_L = lmm._get_eigen_L_(K=K)
+			eig_R = lmm._get_eigen_R_(X=lmm.X, K=K)
 			reml_res = lmm.get_REML(eig_L=eig_L, eig_R=eig_R)
 			ml_res = lmm.get_ML(eig_L=eig_L, eig_R=eig_R)
 			ll = ml_res['max_ll']
@@ -3460,9 +3485,66 @@ def local_vs_global_mm(y, local_k, global_k,):
 	lmm = LinearMixedModel(Y=y)
 	lmm.add_random_effect(global_k)
 	lmm.add_random_effect(local_k)
-	print lmm.get_estimates_3()
 	eig_L = lmm._get_eigen_L_()
-	print lmm.get_estimates(eig_L)['pseudo_heritability']
+	h0_res = lmm.get_estimates(eig_L)
+	h1_res = lmm.get_estimates_3()
+	lrt_stat = 2 * (h1_res['max_ll'] - h0_res['max_ll'])
+	pval = stats.chi2.sf(lrt_stat, 1)
+	print 'p-value:', pval
+	res_dict = {'h0_res':h0_res, 'h1_res':h1_res, 'pval':pval}
+	return res_dict
+
+
+def local_vs_global_mm_scan(y, sd, window_size=1000000, jump_size=500000, kinship_method='ibd'):
+	"""
+	Local vs. global kinship mixed model.
+	"""
+	import gwaResults as gr
+	if kinship_method == 'ibd':
+		K = sd.get_ibd_kinship_matrix()
+	else:
+		raise NotImplementedError
+
+	chromosomes = []
+	positions = []
+	pvals = []
+	perc_variances1 = []
+	perc_variances2 = []
+	h1_heritabilities = []
+	h0_heritabilities = []
+	for sdl, chrom in zip(sd.snpsDataList, sd.chromosomes):
+		max_pos = sdl.positions[-1]
+		pos = sdl.positions[0]
+		for focal_pos in range(sdl.positions[0], sdl.positions[-1], jump_size):
+			d = sd.get_local_n_global_kinships((chrom, focal_pos), window_size,
+										global_kinship=K)
+			local_k = scale_k(d['local_k'])
+			global_k = scale_k(d['global_k'])
+			if local_k != None and global_k != None:
+				print "Chromosome=%d, position=%d" % (chrom, focal_pos)
+				res_dict = local_vs_global_mm(y, local_k, global_k)
+				chromosomes.append(chrom)
+				positions.append(focal_pos)
+				perc_variances1.append(res_dict['h1_res']['perc_var1'])
+				perc_variances2.append(res_dict['h1_res']['perc_var2'])
+				h0_heritabilities.append(res_dict['h0_res']['pseudo_heritability'])
+				h1_heritabilities.append(res_dict['h1_res']['pseudo_heritability'])
+				pvals.append(res_dict['pval'])
+
+				#print 'H0: pseudo_heritability=%0.2f' % (res_dict['h0_res']['pseudo_heritability'])
+				#print 'H1: pseudo_heritability=%0.2f, perc_var1=%0.2f, perc_var2=%0.2f' % \
+				#		(res_dict['h1_res']['pseudo_heritability'],
+				#		res_dict['h1_res']['perc_var1'],
+				#		res_dict['h1_res']['perc_var2'])
+	pval_res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
+	pval_res.neg_log_trans()
+	pval_res.plot_manhattan(png_file='/Users/bjarni.vilhjalmsson/tmp/man_pval.png', percentile=0)
+	perc_var_res = gr.Result(scores=perc_variances2, positions=positions, chromosomes=chromosomes)
+	perc_var_res.plot_manhattan(png_file='/Users/bjarni.vilhjalmsson/tmp/man_perc_var.png', percentile=0,
+				ylab='% of variance explained')
+
+
+
 
 
 
@@ -3475,14 +3557,14 @@ def _emmax_local_global_kinship_test_(pid):
 	phed.convert_to_averages()
 	print phed.get_name(pid)
 	sd.coordinate_w_phenotype_data(phed, pid)
-	local_k, global_k = sd.get_local_n_global_kinships((4, 269000), 1000000)
-	local_k = scale_k(local_k)
-	global_k = scale_k(global_k)
-	print 'Local kinship matrix:', local_k
-	print 'Global kinship matrix:', global_k
+#	local_k, global_k = sd.get_local_n_global_kinships((4, 269000), 1000000)
+#	local_k = scale_k(local_k)
+#	global_k = scale_k(global_k)
+#	print 'Local kinship matrix:', local_k
+#	print 'Global kinship matrix:', global_k
 	Y = phed.get_values(pid)
-	print Y
-	local_vs_global_mm(Y, local_k, global_k,)
+	local_vs_global_mm_scan(Y, sd)
+	#local_vs_global_mm(Y, local_k, global_k,)
 
 
 
@@ -3685,6 +3767,6 @@ if __name__ == "__main__":
 #	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
-	_emmax_local_global_kinship_test_(1)
+	_emmax_local_global_kinship_test_(264)
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()
