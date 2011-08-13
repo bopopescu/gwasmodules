@@ -396,6 +396,7 @@ def summarize_runs(file_prefix, latent_var, heritability, phen_model, phen_d, in
 	return summary_dict
 
 
+
 def plot_tprs_fdrs(file_prefix, summary_dict):
 	"""
 	Plot various things relating to run summaries
@@ -554,6 +555,7 @@ def plot_herit_hist(file_prefix, her_dict, latent_var, phen_model):
 	pylab.savefig(png_file_name)
 
 
+
 def plot_var(file_prefix, d, latent_variable, heritability, phen_models):
 	"""
 	Plots variance explained by the model for plus,  xor, and or.
@@ -625,6 +627,8 @@ pval_thresholds = __get_thresholds()
 
 window_sizes = [0, 1000, 5000, 10000, 25000, 50000, 100000]
 
+
+
 def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_threshold=None, sign_res=None):
 	"""
 	Update result dictionary.
@@ -672,6 +676,7 @@ def _update_stats_(gwa_res, c_chr, c_pos, l_chr=None, l_pos=None, significance_t
 	res_dict['tprs'] = tprs_list #[p_valthreshold][window_size]
 	res_dict['fdrs'] = fdrs_list #[p_valthreshold][window_size]
 	return res_dict
+
 
 
 def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=None, l_pos=None,

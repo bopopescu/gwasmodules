@@ -25,6 +25,7 @@ import math
 import platform
 import os
 import analyze_gwas_results as agr
+import ipdb
 
 os.putenv('OMP_NUM_THREADS', '4')
 
@@ -573,15 +574,17 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def _get_eigen_R_(self, X=None, hat_matrix=None, dtype='single'):
+	def _get_eigen_R_(self, K=None, X=None, hat_matrix=None, dtype='single'):
 		if X == None:
 			X = self.X
 		q = X.shape[1]
 		if not hat_matrix:
 			X_squared_inverse = linalg.pinv(X.T * X) #(X.T*X).I
 			hat_matrix = X * X_squared_inverse * X.T
+		if K == None:
+			K = self.random_effects[1][1]
 		S = sp.mat(sp.identity(self.n)) - hat_matrix	#S=I-X(X'X)^{-1}X'
-		M = sp.mat(S * (self.random_effects[1][1] + self.random_effects[0][1]) * S, dtype='double')
+		M = sp.mat(S * (K + self.random_effects[0][1]) * S, dtype='double')
 		if sp.__version__ < '0.8':
 			M = sp.mat(M, dtype=dtype)
 		evals, evecs = linalg.eigh(M, overwrite_a=True) #eigen of S(K+I)S
@@ -657,7 +660,65 @@ class LinearMixedModel(LinearModel):
 					eig_R=eig_R)
 
 
-#	def get_es
+	def get_estimates_3(self, xs=None, ngrids=[20, 20, 20], llim= -10, ulim=10, method='REML',
+				verbose=False, dtype='single'):
+		"""
+		Handles two K matrices, and one I matrix.
+		
+		Methods available are 'REML', and 'ML'		
+		"""
+
+		if verbose:
+			print 'Retrieving %s variance estimates' % method
+		if xs != None:
+			X = sp.hstack([self.X, xs])
+		else:
+			X = self.X
+		n = self.n
+		xs = []
+		ys1 = []
+		ys2 = []
+		for it_i in range(len(ngrids)):
+			delta = float(ulim - llim) / ngrids[it_i]
+			print llim, ulim
+			print delta
+			log_k_ratio = llim
+			lls = []
+			res_list = []
+			for i in range(ngrids[it_i] + 1):
+				log_k_ratio += delta
+				xs.append(log_k_ratio)
+				k_ratio = sp.exp(log_k_ratio)
+				a = k_ratio / (k_ratio + 1.0)
+				K = a * self.random_effects[1][1] + (1 - a) * self.random_effects[2][1]
+				eig_L = self._get_eigen_L_(K)
+				#Now perform EMMA
+				res_dict = self.get_estimates(eig_L, xs=None, ngrids=50, llim= -10, ulim=10, esp=1e-3,
+							method=method)
+				res_list.append(res_dict)
+				lls.append(res_dict['max_ll'])
+				ys1.append(res_dict['max_ll'])
+				ys2.append(res_dict['pseudo_heritability'])
+			max_ll_i = sp.argmax(lls)
+			print 'max_ll_i:', max_ll_i
+			#Update the ulim and llim
+			llim = llim + delta * max_ll_i - 1 if max_ll_i > 0 else llim
+			ulim = llim + delta * max_ll_i + 1 if max_ll_i < ngrids[it_i] else llim + delta * ngrids[it_i]
+		opt_log_k_ratio = llim + delta * max_ll_i
+		res_dict = res_list[max_ll_i]
+		opt_k_ratio = sp.exp(log_k_ratio)
+		a = opt_k_ratio / (opt_k_ratio + 1)
+		res_dict['opt_k'] = a * self.random_effects[1][1] + (1 - a) * self.random_effects[2][1]
+		res_dict['opt_k_ratio'] = opt_k_ratio
+
+		import pylab
+		pylab.figure()
+		pylab.plot(xs, ys1)
+		pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/test1.png')
+		pylab.figure()
+		pylab.plot(xs, ys2)
+		pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/test2.png')
+		return res_dict
 
 
 
@@ -3392,28 +3453,36 @@ def save_kinship_in_text_format(filename, k, accessions):
 #	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/lls.png', format='png')
 
 
+def local_vs_global_mm(y, local_k, global_k,):
+	"""
+	Local vs. global kinship mixed model.
+	"""
+	lmm = LinearMixedModel(Y=y)
+	lmm.add_random_effect(global_k)
+	lmm.add_random_effect(local_k)
+	print lmm.get_estimates_3()
+	eig_L = lmm._get_eigen_L_()
+	print lmm.get_estimates(eig_L)['pseudo_heritability']
 
-def _emmax_test_():
+
+
+def _emmax_local_global_kinship_test_(pid):
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
-	sd = dp.load_250K_snps()
-	phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'phen_raw_112210.csv')
+	sd = dp.load_snps_call_method(75)
+	phed = pd.get_phenotypes_from_db([pid])
 	phed.convert_to_averages()
-	print phed.get_name(2)
-	sd.coordinate_w_phenotype_data(phed, 2)
-	K = load_kinship_from_file(env.env['data_dir'] + 'kinship_matrix_cm72.pickled', accessions=sd.accessions)
-	print 'Kinship matrix:'
-	for i, col in enumerate(K):
-		print '%s: %s' % (sd.accessions[i], ','.join(map(str, col[0].tolist())))
-	Y = phed.get_values(2)
+	print phed.get_name(pid)
+	sd.coordinate_w_phenotype_data(phed, pid)
+	local_k, global_k = sd.get_local_n_global_kinships((4, 269000), 1000000)
+	local_k = scale_k(local_k)
+	global_k = scale_k(global_k)
+	print 'Local kinship matrix:', local_k
+	print 'Global kinship matrix:', global_k
+	Y = phed.get_values(pid)
 	print Y
-	res = get_emma_reml_estimates(Y, K)
-	print sd.accessions
-	print res['eig_L']
-	res = emmax(sd.getSnps(), phed.get_values(2), K)
-
-	pdb.set_trace()
+	local_vs_global_mm(Y, local_k, global_k,)
 
 
 
@@ -3616,6 +3685,6 @@ if __name__ == "__main__":
 #	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
-	test_skin_color()
+	_emmax_local_global_kinship_test_(1)
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()
