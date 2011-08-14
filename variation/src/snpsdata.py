@@ -2940,7 +2940,8 @@ class SNPsDataSet:
 		return k_mat
 
 
-	def get_local_n_global_kinships(self, focal_chrom_pos, window_size=25000, kinship_method='ibd'):
+	def get_local_n_global_kinships(self, focal_chrom_pos, window_size=25000, kinship_method='ibd',
+					global_kinship=None):
 		"""
 		Returns local and global kinship matrices.
 		"""
@@ -2951,13 +2952,15 @@ class SNPsDataSet:
 		print 'Found %d local SNPs' % len(local_snps)
 		print 'and %d global SNPs' % len(global_snps)
 		if kinship_method == 'ibd':
-			local_k = self._calc_ibd_kinship_(local_snps) if len(local_snps) else []
-			print ''
-			global_k = self._calc_ibd_kinship_(global_snps) if len(global_snps) else []
-			print ''
+			local_k = self._calc_ibd_kinship_(local_snps) if len(local_snps) else None
+			if global_kinship == None:
+				global_k = self._calc_ibd_kinship_(global_snps) if len(global_snps) else None
 		else:
 			raise NotImplementedError
-		return local_k, global_k
+		if global_kinship != None:
+			global_k = (global_kinship * self.num_snps() - local_k * len(local_snps)) / len(global_snps)
+		return {'local_k':local_k, 'global_k':global_k, 'num_local_snps':len(local_snps),
+			'num_global_snps':len(global_snps)}
 
 
 	def get_region_split_snps(self, chrom, start_pos, end_pos):
