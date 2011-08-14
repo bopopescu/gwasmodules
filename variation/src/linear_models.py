@@ -805,12 +805,16 @@ class LinearMixedModel(LinearModel):
 			opt_delta = 0.5 * (deltas[opt_i - 1] + deltas[opt_i])
 			#Newton-Raphson
 			try:
-				if method == 'REML':
-					new_opt_delta = optimize.newton(self._redll_, opt_delta, args=(eig_vals, sq_etas),
-								tol=esp, maxiter=100)
-				elif method == 'ML':
-					new_opt_delta = optimize.newton(self._dll_, opt_delta, args=(eig_vals, eig_vals_L, sq_etas),
-								tol=esp, maxiter=100)
+				with warnings.catch_warnings():
+	    				warnings.simplefilter("ignore")
+	    	   			if method == 'REML':
+						new_opt_delta = optimize.newton(self._redll_, opt_delta,
+										args=(eig_vals, sq_etas),
+										tol=esp, maxiter=100)
+					elif method == 'ML':
+						new_opt_delta = optimize.newton(self._dll_, opt_delta,
+										args=(eig_vals, eig_vals_L, sq_etas),
+										tol=esp, maxiter=100)
 			except Exception, err_str:
 				if verbose:
 					print 'Problems with Newton-Raphson method:', err_str
@@ -827,7 +831,8 @@ class LinearMixedModel(LinearModel):
 				opt_delta = new_opt_delta
 				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			#Cheking upper boundary
-			elif opt_i == len(deltas) - 1 and new_opt_delta > deltas[opt_i - 1] - esp and not sp.isinf(new_opt_delta):
+			elif opt_i == len(deltas) - 1 and new_opt_delta > deltas[opt_i - 1] - esp \
+						and not sp.isinf(new_opt_delta):
 				opt_delta = new_opt_delta
 				opt_ll = self._rell_(opt_delta, eig_vals, sq_etas)
 			else:
@@ -3407,10 +3412,11 @@ def prepare_k(k, k_accessions, accessions):
 	k = k[indices_to_keep, :][:, indices_to_keep]
 	return sp.mat(k)
 
-def scale_k(k):
+def scale_k(k, verbose=False):
 	c = sp.sum((sp.eye(len(k)) - (1.0 / len(k)) * sp.ones(k.shape)) * sp.array(k))
 	scalar = (len(k) - 1) / c
-	print 'Kinship scaled by: %0.4f' % scalar
+	if verbose:
+		print 'Kinship scaled by: %0.4f' % scalar
 	k = scalar * k
 	return k
 
@@ -3490,21 +3496,29 @@ def local_vs_global_mm(y, local_k, global_k,):
 	h1_res = lmm.get_estimates_3()
 	lrt_stat = 2 * (h1_res['max_ll'] - h0_res['max_ll'])
 	pval = stats.chi2.sf(lrt_stat, 1)
-	print 'p-value:', pval
+	#print 'p-value:', pval
 	res_dict = {'h0_res':h0_res, 'h1_res':h1_res, 'pval':pval}
 	return res_dict
 
 
-def local_vs_global_mm_scan(y, sd, window_size=1000000, jump_size=500000, kinship_method='ibd'):
+def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000, jump_size=500000, kinship_method='ibd', global_k=None):
 	"""
 	Local vs. global kinship mixed model.
 	"""
+	print 'Starting Mixed model, local vs. global kinship scan...'
+	print 'window size is %d, and jump size is %d' % (window_size, jump_size)
 	import gwaResults as gr
-	if kinship_method == 'ibd':
-		K = sd.get_ibd_kinship_matrix()
+	if global_k == None:
+		if kinship_method == 'ibd':
+			K = sd.get_ibd_kinship_matrix()
+		elif kinship_method == 'ibs':
+			K = sd.get_ibs_kinship_matrix()
+		else:
+			raise NotImplementedError
 	else:
-		raise NotImplementedError
-
+		K = global_k
+	genome_length = sd.get_genome_length()
+	est_num_chunks = genome_length / jump_size
 	chromosomes = []
 	positions = []
 	pvals = []
@@ -3512,16 +3526,19 @@ def local_vs_global_mm_scan(y, sd, window_size=1000000, jump_size=500000, kinshi
 	perc_variances2 = []
 	h1_heritabilities = []
 	h0_heritabilities = []
+	chunk_i = 0
 	for sdl, chrom in zip(sd.snpsDataList, sd.chromosomes):
 		max_pos = sdl.positions[-1]
 		pos = sdl.positions[0]
 		for focal_pos in range(sdl.positions[0], sdl.positions[-1], jump_size):
+			chunk_i += 1
 			d = sd.get_local_n_global_kinships((chrom, focal_pos), window_size,
-										global_kinship=K)
+										global_kinship=K,
+										kinship_method=kinship_method)
 			local_k = scale_k(d['local_k'])
 			global_k = scale_k(d['global_k'])
 			if local_k != None and global_k != None:
-				print "Chromosome=%d, position=%d" % (chrom, focal_pos)
+				#print "Chromosome=%d, position=%d" % (chrom, focal_pos)
 				res_dict = local_vs_global_mm(y, local_k, global_k)
 				chromosomes.append(chrom)
 				positions.append(focal_pos)
@@ -3536,11 +3553,15 @@ def local_vs_global_mm_scan(y, sd, window_size=1000000, jump_size=500000, kinshi
 				#		(res_dict['h1_res']['pseudo_heritability'],
 				#		res_dict['h1_res']['perc_var1'],
 				#		res_dict['h1_res']['perc_var2'])
+			if est_num_chunks >= 100 and (chunk_i + 1) % int(est_num_chunks / 100) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+
 	pval_res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
 	pval_res.neg_log_trans()
-	pval_res.plot_manhattan(png_file='/Users/bjarni.vilhjalmsson/tmp/man_pval.png', percentile=0)
+	pval_res.plot_manhattan(png_file=file_prefix + '_lrt_pvals.png', percentile=0, plot_bonferroni=True)
 	perc_var_res = gr.Result(scores=perc_variances2, positions=positions, chromosomes=chromosomes)
-	perc_var_res.plot_manhattan(png_file='/Users/bjarni.vilhjalmsson/tmp/man_perc_var.png', percentile=0,
+	perc_var_res.plot_manhattan(png_file=file_prefix + '_perc_var_explained.png', percentile=0,
 				ylab='% of variance explained')
 
 
@@ -3565,6 +3586,25 @@ def _emmax_local_global_kinship_test_(pid):
 	Y = phed.get_values(pid)
 	local_vs_global_mm_scan(Y, sd)
 	#local_vs_global_mm(Y, local_k, global_k,)
+
+
+
+def _emmax_rna_3_matrices_test_(pid):
+	import dataParsers as dp
+	import phenotypeData as pd
+	import env
+	sd = dp.load_snps_call_method(75)
+	phed = pd.parse_phenotype_file('/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/rna_seq_031311_10C.genes')
+	print phed.get_name(pid)
+	sd.coordinate_w_phenotype_data(phed, pid)
+	Y = phed.get_values(pid)
+
+	#load kinship matrix
+
+	#Load expression matrix
+
+	#Run stepwise EMMAX!!!
+	# FINISH!!
 
 
 
@@ -3767,6 +3807,6 @@ if __name__ == "__main__":
 #	kinship_file_name = env.env['data_dir'] + 'kinship_matrix_cm75.pickled'
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
-	_emmax_local_global_kinship_test_(264)
+	_emmax_local_global_kinship_test_(5)
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()

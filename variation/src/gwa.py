@@ -20,7 +20,8 @@ Option:
 						(otherwise default file is used or it's generated.)
 
 	-a ...					Apply specific methods, otherwise all available are applied:
-						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step, lm_step etc.
+						lm, emma, emmax, kw, ft, emmax_anova, lm_anova, emmax_step, lm_step,
+						loc_glob_mm, etc.
 	-b ...				 	Apply a transformation to the data, default is none, other possibilities are 
 						log, sqrt, exp, sqr, arcsin_sqrt, most_normal (picks a most Gaussian looking transformation).
 	-c ...					Should phenotype outliers be removed.  0 (no fence) is the default, 
@@ -45,6 +46,8 @@ Option:
 	--with_replicates			Run EMMAX with replicates (if any, otherwise it uses the mean)
 	--with_betas				Output betas (effect sizes), this is a tad slower
 	--num_steps=...				Max number of steps, for EMMAX stepwise
+	
+	--loc_glob_ws=...			Local-global window size, default is 1000000, the smaller the slower...
 
 	--local_gwas=chrom,start,stop		Run local GWAs only..		
 
@@ -124,6 +127,7 @@ analysis_methods_dict = {"kw":1,
 			 'emmax_anova':None,
 			 'emmax_step':None,
 			 'lm_anova':None,
+			 'loc_glob_mm':None,
 			 }
 
 
@@ -148,7 +152,7 @@ def parse_parameters():
 
 	long_options_list = ["comment=", 'with_db_ids', 'region_plots=', 'cand_genes_file=', 'only_add_2_db',
 			'data_format=', 'emmax_perm=', 'with_replicates', 'with_betas', 'num_steps=', 'local_gwas=',
-			'save_stepw_pvals', 'pvalue_filter=', 'kinship_type=']
+			'save_stepw_pvals', 'pvalue_filter=', 'kinship_type=', 'loc_glob_ws=']
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "o:i:p:a:b:c:d:ef:t:r:k:nm:q:l:hu", long_options_list)
 
@@ -164,8 +168,8 @@ def parse_parameters():
 		'use_existing_results':False, 'region_plots':0, 'cand_genes_file':None, 'debug_filter':1,
 		'phen_file':None, 'with_db_ids':False, 'only_add_2_db':False, 'mac_threshold':15,
 		'data_file':None, 'data_format':'binary', 'emmax_perm':None, 'with_replicates':False,
-		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'pids':None,
-		'save_stepw_pvals':False, 'pvalue_filter':1.0, 'kinship_type':'ibs'}
+		'with_betas':False, 'num_steps':10, 'local_gwas':None, 'pids':None, 'save_stepw_pvals':False,
+		'pvalue_filter':1.0, 'kinship_type':'ibs', 'loc_glob_ws':1000000}
 
 
 	for opt, arg in opts:
@@ -203,6 +207,7 @@ def parse_parameters():
 		elif opt in ("--save_stepw_pvals"): p_dict['save_stepw_pvals'] = True
 		elif opt in ("--pvalue_filter"): p_dict['pvalue_filter'] = float(arg)
 		elif opt in ("--kinship_type"): p_dict['kinship_type'] = arg
+		elif opt in ("--loc_glob_ws"): p_dict['loc_glob_ws'] = int(arg)
 		else:
 			print "Unkown option:", opt
 			print __doc__
@@ -548,7 +553,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 					p_dict['with_replicates'])
 
 		#Do we need to calculate the K-matrix?
-		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step']:
+		if mapping_method in ['emma', 'emmax', 'emmax_anova', 'emmax_step', 'loc_glob_mm']:
 			#Load genotype file (in binary format)
 			sys.stdout.write("Retrieving the Kinship matrix K.\n")
 			sys.stdout.flush()
@@ -608,7 +613,13 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 
 		else:  #Parametric tests below:		
 
-			if mapping_method in ['emma']:
+			if mapping_method in ['loc_glob_mm']:
+				lm.local_vs_global_mm_scan(phen_vals, sd, file_prefix=file_prefix,
+							global_k=k, window_size=p_dict['loc_glob_ws'],
+							jump_size=p_dict['loc_glob_ws'] / 2,
+							kinship_method=p_dict['kinship_type'])
+				return
+			elif mapping_method in ['emma']:
 				res = lm.emma(snps, phen_vals, k)
 			elif mapping_method in ['emmax']:
 				if p_dict['emmax_perm']:
