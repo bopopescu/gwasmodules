@@ -574,7 +574,7 @@ class LinearMixedModel(LinearModel):
 
 
 
-	def _get_eigen_R_(self, K=None, X=None, hat_matrix=None, dtype='single'):
+	def _get_eigen_R_(self, X=None, K=None, hat_matrix=None, dtype='single'):
 		if X == None:
 			X = self.X
 		q = X.shape[1]

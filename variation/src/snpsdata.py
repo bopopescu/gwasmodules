@@ -2997,7 +2997,9 @@ class SNPsDataSet:
 		Returns the SNP sets, wherethe SNPs are in multiple regions, 
 		and the other is the remaining set. 
 		"""
+		chr_pos_l = self.get_chr_pos_list()
 		for chrom, start_pos, end_pos in chrom_pos_list:
+
 			pass
 
 
