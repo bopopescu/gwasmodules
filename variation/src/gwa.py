@@ -618,6 +618,7 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 							global_k=k, window_size=p_dict['loc_glob_ws'],
 							jump_size=p_dict['loc_glob_ws'] / 2,
 							kinship_method=p_dict['kinship_type'])
+				return
 			elif mapping_method in ['emma']:
 				res = lm.emma(snps, phen_vals, k)
 			elif mapping_method in ['emmax']:
