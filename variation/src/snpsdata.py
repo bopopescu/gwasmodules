@@ -2906,13 +2906,17 @@ class SNPsDataSet:
 		"""
 		print 'Starting kinship calculation, it prints %d dots.' % num_dots
 		snps = self.getSnps(debug_filter)
+		return self._calc_ibs_kinship_(snps, num_dots=num_dots, snp_dtype=snp_dtype, dtype=dtype)
+
+
+	def _calc_ibs_kinship_(self, snps, num_dots=10, snp_dtype='int8', dtype='single'):
 		num_lines = len(self.accessions)
 		chunk_size = num_lines
 		num_snps = len(snps)
 		num_splits = num_snps / chunk_size
-		print 'Allocating K matrix'
+		#print 'Allocating K matrix'
 		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-		print 'Starting calculation'
+		#print 'Starting calculation'
 		chunk_i = 0
 		for snp_i in range(0, num_snps, chunk_size): #FINISH!!!
 			chunk_i += 1
@@ -2930,7 +2934,7 @@ class SNPsDataSet:
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T
-			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
+			if num_dots and num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
 		if self.data_format == 'diploid_int':
@@ -2940,8 +2944,9 @@ class SNPsDataSet:
 		return k_mat
 
 
+
 	def get_local_n_global_kinships(self, focal_chrom_pos, window_size=25000, kinship_method='ibd',
-					global_kinship=None):
+					global_kinship=None, verbose=False):
 		"""
 		Returns local and global kinship matrices.
 		"""
@@ -2949,12 +2954,17 @@ class SNPsDataSet:
 		pos = focal_chrom_pos[1]
 		chrom, pos = focal_chrom_pos
 		local_snps, global_snps = self.get_region_split_snps(chrom, pos - window_size, pos + window_size)
-		print 'Found %d local SNPs' % len(local_snps)
-		print 'and %d global SNPs' % len(global_snps)
+		if verbose:
+			print 'Found %d local SNPs' % len(local_snps)
+			print 'and %d global SNPs' % len(global_snps)
 		if kinship_method == 'ibd':
-			local_k = self._calc_ibd_kinship_(local_snps) if len(local_snps) else None
+			local_k = self._calc_ibd_kinship_(local_snps, num_dots=0) if len(local_snps) else None
 			if global_kinship == None:
-				global_k = self._calc_ibd_kinship_(global_snps) if len(global_snps) else None
+				global_k = self._calc_ibd_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+		elif kinship_method == 'ibs':
+			local_k = self._calc_ibs_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			if global_kinship == None:
+				global_k = self._calc_ibs_kinship_(global_snps, num_dots=0) if len(global_snps) else None
 		else:
 			raise NotImplementedError
 		if global_kinship != None:
@@ -3026,7 +3036,7 @@ class SNPsDataSet:
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 			x = sp.mat(norm_snps_array.T)
 			cov_mat += x.T * x
-			if num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
+			if num_dots and num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
 		cov_mat = cov_mat / float(num_snps)
@@ -3270,6 +3280,9 @@ class SNPsDataSet:
 			chr_ends.append(snpsd.positions[-1])
 		return chr_ends
 
+
+	def get_genome_length(self):
+		return sum(self.get_chromosome_ends())
 
 	def get_mafs(self):
 		"""
