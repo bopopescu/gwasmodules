@@ -212,7 +212,7 @@ def calc_r2_levels(file_prefix, x_start_i, x_stop_i, call_method_id=78, data_for
 				mac = ys.sum()
 				(r, pearson_pval) = st.pearsonr(xs, ys)
 				r2 = r * r
-				if (x_c == y_c and y_p - x_p <= 50000 and r2 > save_threshold2) or :
+				if x_c == y_c and y_p - x_p <= 50000 and r2 > save_threshold2 :
                                         t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
                                         (t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
                                         t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
