@@ -2569,7 +2569,8 @@ def _test_plink_ped_parser_():
 	parse_plink_ped_file(plink_prefix)
 
 def _test_plink_tped_parser_():
-	plink_prefix = env['home_dir'] + 'Projects/Data/Skin_color/plink'
+	#plink_prefix = env['home_dir'] + 'Projects/Data/Skin_color/plink'
+	plink_prefix = env['home_dir'] + 'Projects/data/NFBC_20091001/NFBC_20091001'
 	sd = parse_plink_tped_file(plink_prefix)
         K = sd.get_ibs_kinship_matrix()
         import linear_models as lm
@@ -2620,5 +2621,4 @@ if __name__ == "__main__":
 
 	#_testDBParser_()
 	#load_1001_full_snps(chromosomes=[1, 2, 3, 4, 5])
-	#_test_plink_tped_parser_()
 	#pdb.set_trace()
