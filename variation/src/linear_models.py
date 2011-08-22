@@ -3611,8 +3611,7 @@ def _emmax_rna_3_matrices_test_(pid):
 
 
 
-def perform_human_emmax():
-	pid = 1
+def perform_human_emmax(pid=1):
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
@@ -3622,7 +3621,7 @@ def perform_human_emmax():
 	s1 = time.time()
 	plink_prefix = env.env['phen_dir'] + 'NFBC_20091001/NFBC_20091001'
 	sd = dp.parse_plink_tped_file(plink_prefix)
-	sd.sample_snps(0.05)
+	#sd.sample_snps(0.05)
 	individs = sd.accessions[:]
 	phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'NFBC_20091001/phenotype.csv')
 	#phed.filter_ecotypes(pid, random_fraction=0.2)
@@ -3642,13 +3641,13 @@ def perform_human_emmax():
 		print 'Took %d mins and %f seconds to load and preprocess the data.' % (mins, secs)
 	else:
 		print 'Took %f seconds to load and preprocess the data..' % (secs)
-#	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
-	snps = sd.getSnps()
-	emmax_res = emmax(snps, phen_vals, K)
-	res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
-	res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
-	res.neg_log_trans()
-	res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
+	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
+	#snps = sd.getSnps()
+	#emmax_res = emmax(snps, phen_vals, K)
+	#res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
+	#res.write_to_file(env.env['results_dir'] + 'NFBC_emmax_pid%d.pvals' % pid)
+	#res.neg_log_trans()
+	#res.plot_manhattan(png_file=file_prefix + '.png', plot_xaxis=False, plot_bonferroni=True)
 	secs = time.time() - s1
 	if secs > 60:
 		mins = int(secs) / 60
