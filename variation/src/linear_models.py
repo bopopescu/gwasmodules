@@ -660,7 +660,7 @@ class LinearMixedModel(LinearModel):
 					eig_R=eig_R)
 
 
-	def get_estimates_3(self, xs=None, ngrids=[5, 5, 5, 5, 5, 5], llim= -5, ulim=5, method='REML',
+	def get_estimates_3(self, xs=None, ngrids=[5, 5, 5, 5, 5], llim= -3, ulim=3, method='REML',
 				verbose=False, dtype='single', debug=False):
 		"""
 		Handles two K matrices, and one I matrix.
