@@ -2572,9 +2572,9 @@ def _test_plink_tped_parser_():
 	#plink_prefix = env['home_dir'] + 'Projects/Data/Skin_color/plink'
 	plink_prefix = env['home_dir'] + 'Projects/data/NFBC_20091001/NFBC_20091001'
 	sd = parse_plink_tped_file(plink_prefix)
-        K = sd.get_ibs_kinship_matrix()
+        K = sd.get_ibd_kinship_matrix()
         import linear_models as lm
-        lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibs.pickled', K, sd.accessions)
+        lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibd.pickled', K, sd.accessions)
 
 
 def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_mac=0, debug_filter=1):
