@@ -172,6 +172,7 @@ class ProcessOptions(object):
 			self.program_name = argv_list[0]
 		else:
 			self.program_name = ''
+		self.args = []	#2011-7-13	to store all the remaining arguments
 	
 	def prepare_for_getopt(self, option_default_dict):
 		"""
@@ -353,7 +354,12 @@ class ProcessOptions(object):
 	
 	#@property
 	def long_option2value(self):
+		"""
+		2011-7-14
+			add self.args=args
+		2009
 		#handle options
+		"""
 		if self.getopt_ready==0:
 			self.prepare_for_getopt(self.option_default_dict)
 		
@@ -366,6 +372,7 @@ class ProcessOptions(object):
 		
 		import getopt, traceback
 		opts, args = getopt.getopt(self.argv_list[1:], self.short_options_str, self.long_options_list)
+		self.args = args
 		opts_dict = {}	#a dictionary 
 		for opt, arg in opts:
 			if opt[1]=='-':	#it's long option
@@ -389,7 +396,16 @@ class ProcessOptions(object):
 		"""
 		return opts_dict
 	long_option2value = property(long_option2value)
-
+	
+	def arguments(self):
+		"""
+		2011-7-14
+			to return all the remaining un-parsed arguments
+		"""
+		self.opts_dict = self.long_option2value
+		return self.args
+	arguments = property(arguments)
+	
 	def process_function_arguments(cls, keywords, argument_default_dict, error_doc='', class_to_have_attr=None, howto_deal_with_required_none=1):
 		"""
 		2009-10-07
