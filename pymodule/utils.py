@@ -443,6 +443,55 @@ def processRegexpString(p_str):
 	p_str_sql = p_str_sql.replace(')', '\\\)')
 	return PassingData(p_str=p_str, p_str_sql=p_str_sql)
 
+
+def sortCMPBySecondTupleValue(a, b):
+	"""
+	2011-3-29
+		a and b are list or tuple
+	"""
+	return cmp(a[1], b[1])
+
+def sshTunnel(serverHostname="dl324b-1.cmb.usc.edu", port="5432", middleManCredential="polyacti@login3"):
+	"""
+	2011-8-15
+		through middleManCredential, run a ssh tunnel to allow access to serverHostname:port as localhost:port
+		
+		example:
+			# forward postgresql db on dl324b-1 to localhost
+			sshTunnel("dl324b-1.cmb.usc.edu", 5432, "polyacti@login3")
+		
+	"""
+	commandline = "ssh -N -f -L %s:%s:%s %s"%(port, serverHostname, port, middleManCredential)
+	runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+
+def getPhredScoreOutOfSolexaScore(solexaChar):
+	"""
+	2011-8-15
+		main doc: http://en.wikipedia.org/wiki/FASTQ_format
+		
+		simple & approximate formula would just be ord(solexaChar)-64.
+		
+		full formula is at the last line of http://maq.sourceforge.net/fastq.shtml, which is used here.
+			a slight modification: here uses log10, rather than natural log.
+	"""
+	import math
+	return 10*math.log10(1 + math.pow(10, (ord(solexaChar) - 64) / 10.0))
+
+def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname):
+	"""
+	2011-2-7
+		purpose of this function is to get the prefix, suffix of a filename regardless of whether it
+			has two suffices (gzipped) or one. 
+		
+		fname is either sequence_628BWAAXX_4_1.fastq.gz or sequence_628BWAAXX_4_1.fastq (without gz).
+		Prefix is always sequence_628BWAAXX_4_1
+	"""
+	fname_prefix, fname_suffix = os.path.splitext(fname)
+	if fname_suffix=='.gz':	#the input file is gzipped. get the new prefix
+		fname_prefix, fname_suffix = os.path.splitext(fname_prefix)
+	return fname_prefix, fname_suffix
+	
+
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
 	print FigureOutTaxID_ins.returnTaxIDGivenSentence('>gi|172045488|ref|NW_001867254.1| Physcomitrella patens subsp. patens PHYPAscaffold_10696, whole genome shotgun sequence')
