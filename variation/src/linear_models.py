@@ -2064,7 +2064,7 @@ def _calc_bic_(ll, num_snps, num_par, n):
 def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict=None, plot_bonferroni=True,
 			highlight_markers=None, cand_genes=None, plot_xaxis=True, log_qq_max_val=5, with_qq_plots=True,
 			num_dots=1000, simple_qq=False, highlight_loci=None, write_pvals=False,
-			highlight_ppa_markers=None, ppas=None, **kwargs):
+			highlight_ppa_markers=None, ppas=None, markersize=3, chrom_col_map=None, **kwargs):
 	import pylab
 	import gwaResults as gr
 	cm = pylab.get_cmap('hsv')
@@ -2078,7 +2078,8 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict=None, plo
 
 	res.neg_log_trans()
 	res.plot_manhattan(png_file=png_file_name, plot_bonferroni=True, highlight_markers=highlight_markers,
-				cand_genes=cand_genes, plot_xaxis=plot_xaxis, highlight_loci=highlight_loci)
+				cand_genes=cand_genes, plot_xaxis=plot_xaxis, highlight_loci=highlight_loci,
+				markersize=markersize, chrom_col_map=chrom_col_map)
 	ret_dict = {'manhattan':png_file_name}
 
 
@@ -2600,7 +2601,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
 		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5,
 		highlight_loci=None, save_pvals=False, snp_priors=None, K2=None, snp_choose_criteria='pval',
-		emma_num=0, **kwargs):
+		emma_num=0, markersize=3, chrom_col_map=None, **kwargs):
 	"""
 	Run step-wise EMMAX forward-backward.
 	"""
@@ -2717,7 +2718,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 					quantiles_dict, positions=positions, chromosomes=chromosomes, mafs=mafs, macs=macs, plot_bonferroni=True,
 					highlight_markers=cofactors, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
 					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci, write_pvals=save_pvals,
-					ppas=ppas, highlight_ppa_markers=ppa_cofactors)
+					ppas=ppas, highlight_ppa_markers=ppa_cofactors, markersize=markersize, chrom_col_map=chrom_col_map)
 
 
 
@@ -2829,7 +2830,8 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 					highlight_markers=cofactors, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
 					log_qq_max_val=log_qq_max_val, with_qq_plots=with_qq_plots,
 					highlight_loci=highlight_loci, write_pvals=save_pvals, ppas=ppas,
-					highlight_ppa_markers=ppa_cofactors)
+					highlight_ppa_markers=ppa_cofactors, markersize=markersize,
+					chrom_col_map=chrom_col_map)
 		#Plot posterior probabilities of association
 
 
@@ -2924,7 +2926,8 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
 				step_info_list, chr_pos_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
 				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax',
-				highlight_loci=highlight_loci, write_pvals=save_pvals, ** kwargs)
+				highlight_loci=highlight_loci, write_pvals=save_pvals, markersize=markersize,
+				chrom_col_map=chrom_col_map, **kwargs)
 
 	for step_i in opt_indices:
 		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
@@ -3641,7 +3644,14 @@ def perform_human_emmax(pid=1):
 		print 'Took %d mins and %f seconds to load and preprocess the data.' % (mins, secs)
 	else:
 		print 'Took %f seconds to load and preprocess the data..' % (secs)
-	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, plot_xaxis=False)
+	chrom_col_map = {}
+	for i in range(1, 24):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+	emmax_res = emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, markersize=5,
+				chrom_col_map=chrom_col_map)
 	#snps = sd.getSnps()
 	#emmax_res = emmax(snps, phen_vals, K)
 	#res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
@@ -3742,7 +3752,7 @@ def _test_mtmm_():
 	unique_ets = phed.filter_ecotypes_2(sd.accessions, pids)
 	phed.normalize_values(pids)
 	phenotype_list = []
-	ecotype_list = []
+	datalist = []
 	for pid in pids:
 		print phed.get_name(pid)
 		phenotype_list.append(phed.get_values(pid))
@@ -3811,6 +3821,7 @@ if __name__ == "__main__":
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
 	#_emmax_local_global_kinship_test_(5)
-	perform_human_emmax()
+	for i in range(1, 11):
+		perform_human_emmax(i)
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()

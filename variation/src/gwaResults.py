@@ -875,10 +875,11 @@ class Result(object):
 
 
 
-	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None, percentile=90,
+	def plot_manhattan(self, pdf_file=None, png_file=None, min_score=None, max_score=None, percentile=80,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
 			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
-			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, markersize=3):
+			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, markersize=3,
+			chrom_col_map=None):
 
 		"""
 		Plots a 'Manhattan' style GWAs plot.
@@ -961,7 +962,7 @@ class Result(object):
 		ticksList1 = []
 		ticksList2 = []
 		textPos = []
-		plt.figure(figsize=(12, 2.8))
+		plt.figure(figsize=(11, 2.8))
 		plt.axes([0.045, 0.15, 0.95, 0.71])
 		starPoints = [[], [], []]
 		chr_offsets = []
@@ -983,7 +984,11 @@ class Result(object):
 					score = max_score
 				scoreList[s_i] = score
 
-			plt.plot(newPosList, scoreList, ".", markersize=markersize, alpha=0.7)
+			if not chrom_col_map:
+				plt.plot(newPosList, scoreList, ".", markersize=markersize, alpha=0.7)
+			else:
+				color = chrom_col_map[chrom]
+				plt.plot(newPosList, scoreList, ".", markersize=markersize, alpha=0.7, color=color)
 
 			if cand_genes:
 				for cg in chr_cand_genes[chrom]:
@@ -998,14 +1003,20 @@ class Result(object):
 #			textPos.append(offset + chromosome_end / 2 - 2000000)
 			offset += chromosome_end
 			if plot_xaxis:
-				for j in range(oldOffset, offset, 2000000):
-					ticksList1.append(j)
-				for j in range(0, chromosome_end, 2000000):
-					if j % 4000000 == 0 and j < chromosome_end - 2000000 :
-						ticksList2.append(j / 1000000)
+				if len(chromosome_ends) == 23: #This is probably Human!
+					ticksList1.append(oldOffset + chromosome_end / 2)
+					if chrom == 23:
+						ticksList2.append('X')
 					else:
-						ticksList2.append("")
-
+						ticksList2.append(chrom)
+				else:
+					for j in range(oldOffset, offset, 2000000):
+						ticksList1.append(j)
+					for j in range(0, chromosome_end, 2000000):
+						if j % 4000000 == 0 and j < chromosome_end - 2000000 :
+							ticksList2.append(j / 1000000)
+						else:
+							ticksList2.append("")
 
 
 		plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=markersize + 2)
@@ -1060,7 +1071,10 @@ class Result(object):
 		else:
 			plt.ylabel(ylab)
 		if plot_xaxis:
-			plt.xlabel("Mb")
+			if len(chromosome_ends) == 23: #This is probably Human!
+				plt.xlabel("Chromosome")
+			else:
+				plt.xlabel("Mb")
 		else:
 			plt.xlabel("bases")
 
