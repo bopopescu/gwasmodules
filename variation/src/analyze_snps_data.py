@@ -564,14 +564,17 @@ def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/lo
 		      save_types=['r2s', 't_r2']):
 
         r2_thresholds = [(0.9, 100000), (0.7, 200000), (0.5, 500000)]
-        chrom_res_dict_pickled_file = '%sfr2%0.2f_chunk%d_cm_%d.pickled' % \
-                                                (results_prefix, final_r2_thres, chunk_size, call_method_id)
+#        chrom_res_dict_pickled_file = '%sfr2%0.2f_chunk%d_cm_%d.pickled' % \
+#                                                (results_prefix, final_r2_thres, chunk_size, call_method_id)
+#	if os.path.isfile(chrom_res_dict_pickled_file):
+#                print 'Found pickled chr_res_dict, now loading it from file: %s' % chrom_res_dict_pickled_file
+#                chr_res_dict = cPickle.load(open(chrom_res_dict_pickled_file))
+#                print 'Pickled chr_res_dict loaded'
+#                return chr_res_dict
 
-        if os.path.isfile(chrom_res_dict_pickled_file):
-                print 'Found pickled chr_res_dict, now loading it from file: %s' % chrom_res_dict_pickled_file
-                chr_res_dict = cPickle.load(open(chrom_res_dict_pickled_file))
-                print 'Pickled chr_res_dict loaded'
-                return chr_res_dict
+	chrom_res_hdf5_file = '%sfr2%0.2f_chunk%d_cm_%d.hdf5' % \
+					(results_prefix, final_r2_thres, chunk_size, call_method_id)
+
 
 	headers = ['x_pos', 'y_pos', 'r2', 'pval', 't_r2', 't_pval']
 	chromosomes = [1, 2, 3, 4, 5]
@@ -582,10 +585,29 @@ def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/lo
 			for h in headers:
 				d[h] = []
 			chr_res_dict[(chr1, chr2)] = d
+
+	if os.path.isfile(chrom_res_hdf5_file):
+		print 'Found hdf5 file now loading it from file: %s' % chrom_res_hdf5_file
+		res_h5f = h5py.File(chrom_res_hdf5_file, 'r')
+
+		for chr2 in chromosomes:
+			for chr1 in chromosomes[:chr2]:
+				h5d = res_h5f['c%d_c%d' % (chr1, chr2)]
+				tup = (chr1, chr2)
+                                chr_res_dict[tup]['x_pos'] = h5d['x_pos'][...]
+                                chr_res_dict[tup]['y_pos'] = h5d['y_pos'][...]
+                                chr_res_dict[tup]['r2'] = h5d['r2'][...]
+				chr_res_dict[tup]['t_r2'] = h5d['t_r2'][...]
+                                chr_res_dict[tup]['pval'] = h5d['pval'][...]
+                                chr_res_dict[tup]['t_pval'] = h5d['t_pval'][...]
+		res_h5f.close()
+		return chr_res_dict
+
+
 	num_retained = 0
 	chr_pos_set = set()
         num_snps = cm_num_snps_dict[call_method_id]
-        for i in range(0, num_snps, chunk_size):
+        for i in range(0, 10000, chunk_size):
 		result_file = '%sx_%d_%d.hdf5' % (results_prefix, i, i + chunk_size)
                 if os.path.isfile(result_file):
                         print 'Plowing through hdf5 file:', result_file
@@ -657,9 +679,23 @@ def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/lo
 		print 'Number of results which have been retained:', num_retained
 	print 'Number of results which were retained:', num_retained
 	print 'Number of positions involved: %d' % len(chr_pos_set)
-        print 'Pickling chr_res_dict'
-        cPickle.dump(chr_res_dict, open(chrom_res_dict_pickled_file, 'wb'), protocol=2)
-        print 'Done pickling'
+#        print 'Pickling chr_res_dict'
+#        cPickle.dump(chr_res_dict, open(chrom_res_dict_pickled_file, 'wb'), protocol=2)
+#        print 'Done pickling'
+	print 'Saving chr_res_dict to a HDF5 file'
+	res_h5f = h5py.File(chrom_res_hdf5_file)
+	for chr2 in chromosomes:
+		for chr1 in chromosomes[:chr2]:
+			h5d = res_h5f.create_group('c%d_c%d' % (chr1, chr2))
+			tup = (chr1, chr2)
+			h5d.create_dataset('x_pos', chr_res_dict[tup]['x_pos'])
+			h5d.create_dataset('y_pos', chr_res_dict[tup]['y_pos'])
+			h5d.create_dataset('r2', chr_res_dict[tup]['r2'])
+			h5d.create_dataset('t_r2', chr_res_dict[tup]['t_r2'])
+			h5d.create_dataset('pval', chr_res_dict[tup]['pval'])
+			h5d.create_dataset('t_pval', chr_res_dict[tup]['t_pval'])
+	res_h5f.close()
+	print 'Done saving as HDF5 file'
 	return chr_res_dict
 
 

@@ -612,7 +612,7 @@ class GWASRecord():
 
 
 
-    def get_results(self, phen_name, analysis_method, transformation='raw', min_mac=0, max_pval=1.0):
+    def get_results(self, phen_name, dataset,transformation,analysis_method,result_name, min_mac=0, max_pval=1.0):
         """
         Return results..
         """
@@ -627,10 +627,11 @@ class GWASRecord():
 
         #h5file = self.open(mode="r")
         try:
-            table = self.h5file.getNode('/phenotypes/%s/%s/%s/results' % (phen_name, transformation, analysis_method))
+            info_group = self.h5file.getNode('/phenotypes/%s/%s/%s/%s' % (phen_name, dataset,transformation, analysis_method))
+            table = info_group._f_getChild(result_name)
             #for x in table.where('(score<=%f) & (mac>=%d)' % (max_pval, min_mac)):
             for x in table.iterrows():
-                if x['score'] <= max_pval and x['max'] >= min_mac:
+                if x['score'] <= max_pval and x['mac'] >= min_mac:
                     for k in d:
                         d[k].append(x[k])
         except Exception, err:
@@ -640,7 +641,33 @@ class GWASRecord():
             #self._close(h5file)
         return d
 
-
+    def get_results_for_csv(self, phen_name, dataset,transformation,analysis_method,result_name, min_mac=0, max_pval=1.0):
+        """
+        Return results..
+        """
+        header = ['chromosome','position','score','maf','mac']
+        if analysis_method == 'kw':
+            header.append('statistic')
+        else:
+            header.extend(['beta0','beta1','correlation','genotype_var_perc'])
+        result = [header[:]]
+        #h5file = self.open(mode="r")
+        try:
+            info_group = self.h5file.getNode('/phenotypes/%s/%s/%s/%s' % (phen_name, dataset,transformation, analysis_method))
+            table = info_group._f_getChild(result_name)
+            #for x in table.where('(score<=%f) & (mac>=%d)' % (max_pval, min_mac)):
+            for x in table.iterrows():
+                row =[]
+                if x['score'] <= max_pval and x['mac'] >= min_mac:
+                    for col in header:
+                        row.append(x[col])
+                    result.append(row)
+        except Exception, err:
+            raise(err)
+        finally:
+            test = ''
+            #self._close(h5file)
+        return result
 
     def get_results_by_chromosome(self, phen_name,dataset, analysis_method, result_name, transformation='raw', min_mac=15, min_score=0.0, \
                 top_fraction=0.05, chromosomes=[1, 2, 3, 4, 5], log_transform=True):
