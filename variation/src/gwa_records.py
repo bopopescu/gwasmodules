@@ -641,7 +641,7 @@ class GWASRecord():
             #self._close(h5file)
         return d
 
-    def get_results_for_csv(self, phen_name, dataset,transformation,analysis_method,result_name, min_mac=0, max_pval=1.0):
+    def get_results_for_csv(self, phen_name, dataset,transformation,analysis_method,result_name, min_mac=0):
         """
         Return results..
         """
@@ -658,7 +658,7 @@ class GWASRecord():
             #for x in table.where('(score<=%f) & (mac>=%d)' % (max_pval, min_mac)):
             for x in table.iterrows():
                 row =[]
-                if x['score'] <= max_pval and x['mac'] >= min_mac:
+                if x['mac'] >= min_mac:
                     for col in header:
                         row.append(x[col])
                     result.append(row)
