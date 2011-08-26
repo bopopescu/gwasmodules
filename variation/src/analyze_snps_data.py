@@ -560,10 +560,10 @@ def run_r2_calc():
 
 
 def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/long_range_ld_min02_mac15_',
-		      final_r2_thres=0.3, final_t_r2_thres=0.3, chunk_size=500, call_method_id=78,
+		      final_r2_thres=0.8, final_t_r2_thres=0.8, chunk_size=500, call_method_id=78,
 		      save_types=['r2s', 't_r2']):
 
-        r2_thresholds = [(0.9, 100000), (0.7, 200000), (0.5, 500000)]
+        r2_thresholds = [(1.1, 1000000)]
 #        chrom_res_dict_pickled_file = '%sfr2%0.2f_chunk%d_cm_%d.pickled' % \
 #                                                (results_prefix, final_r2_thres, chunk_size, call_method_id)
 #	if os.path.isfile(chrom_res_dict_pickled_file):
@@ -607,7 +607,7 @@ def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/lo
 	num_retained = 0
 	chr_pos_set = set()
         num_snps = cm_num_snps_dict[call_method_id]
-        for i in range(0, 10000, chunk_size):
+        for i in range(0, num_snps, chunk_size):
 		result_file = '%sx_%d_%d.hdf5' % (results_prefix, i, i + chunk_size)
                 if os.path.isfile(result_file):
                         print 'Plowing through hdf5 file:', result_file
@@ -688,13 +688,14 @@ def load_chr_res_dict(results_prefix='/srv/lab/data/long_range_r2/swedish_seq/lo
 		for chr1 in chromosomes[:chr2]:
 			h5d = res_h5f.create_group('c%d_c%d' % (chr1, chr2))
 			tup = (chr1, chr2)
+			print tup
 			if len(chr_res_dict[tup]['x_pos']) > 0:
-				h5d.create_dataset('x_pos', chr_res_dict[tup]['x_pos'])
-				h5d.create_dataset('y_pos', chr_res_dict[tup]['y_pos'])
-				h5d.create_dataset('r2', chr_res_dict[tup]['r2'])
-				h5d.create_dataset('t_r2', chr_res_dict[tup]['t_r2'])
-				h5d.create_dataset('pval', chr_res_dict[tup]['pval'])
-				h5d.create_dataset('t_pval', chr_res_dict[tup]['t_pval'])
+				h5d.create_dataset('x_pos', data=chr_res_dict[tup]['x_pos'])
+				h5d.create_dataset('y_pos', data=chr_res_dict[tup]['y_pos'])
+				h5d.create_dataset('r2', data=chr_res_dict[tup]['r2'])
+				h5d.create_dataset('t_r2', data=chr_res_dict[tup]['t_r2'])
+				h5d.create_dataset('pval', data=chr_res_dict[tup]['pval'])
+				h5d.create_dataset('t_pval', data=chr_res_dict[tup]['t_pval'])
 	res_h5f.close()
 	print 'Done saving as HDF5 file'
 	return chr_res_dict
@@ -803,7 +804,7 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 
-def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_mac15'):
+def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_mac15_filtered'):
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
