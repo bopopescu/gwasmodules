@@ -11,6 +11,7 @@ import pdb
 import env
 from itertools import *
 from bisect import bisect
+import h5py
 
 try:
 	import scipy as sp
@@ -2510,6 +2511,23 @@ class SnpsData(_SnpsData_):
 				break
 		return [ehh, ehhcount]
 
+
+
+class snps_data_set:
+	"""
+	A class which uses HDF5 to store SNPs, but otherwise implements a 
+	similar interface as the the older SNPsDataSet.
+	"""
+	def __init__(self, hdf5_file_name=None, snpsds=None, chromosomes=None, id=None, call_method=None, data_format=None):
+		if hdf5_file_name != None:
+			self.h5file = h5py.File(hdf5_file_name)
+			self.hdf5_file_name = hdf5_file_name
+		elif snpsds != None:
+			#Fill file
+			pass
+
+	def coordinate_with_phenotype(self):
+		pass
 
 
 class SNPsDataSet:

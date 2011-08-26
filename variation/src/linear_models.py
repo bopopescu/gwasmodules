@@ -3630,13 +3630,14 @@ def perform_human_emmax(pid=1):
 	#phed.filter_ecotypes(pid, random_fraction=0.2)
 	sd.coordinate_w_phenotype_data(phed, pid)
 	sd.filter_mac_snps(50)
-	K = sd.get_ibd_kinship_matrix(num_dots=10)
+	#K = sd.get_ibd_kinship_matrix(num_dots=10)
+	K = load_kinship_from_file('/home/GMI/bjarni.vilhjalmsson/Projects/data/NFBC_20091001/NFBC_20091001_kinship_diploid.ibs.pickled', sd.accessions)
 	#K = prepare_k(K, individs, sd.accessions)
 	phen_vals = phed.get_values(pid)
 	phen_name = phed.get_name(pid)
 	print 'Working on %s' % phen_name
 	sys.stdout.flush()
-	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_%s_pid%d' % (phen_name, pid)
+	file_prefix = env.env['results_dir'] + 'NFBC_emmax_step_ibs_%s_pid%d' % (phen_name, pid)
 	secs = time.time() - s1
 	if secs > 60:
 		mins = int(secs) / 60
@@ -3821,7 +3822,7 @@ if __name__ == "__main__":
 #	k, k_accessions = cPickle.load(open(kinship_file_name))
 #	save_kinship_in_text_format(env.env['data_dir'] + 'kinship_matrix_cm75.csv', k, k_accessions)
 	#_emmax_local_global_kinship_test_(5)
-	for i in range(1, 11):
+	for i in range(1, 12):
 		perform_human_emmax(i)
 	#_test_joint_analysis_()
 	#_test_phyB_snps_()
