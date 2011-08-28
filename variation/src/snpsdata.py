@@ -2519,7 +2519,7 @@ class snps_data_set:
 	similar interface as the the older SNPsDataSet.
 	
 	"""
-	def __init__(self, hdf5_file_name, sd=None):
+	def __init__(self, hdf5_file_name, sd=None, chunk_size=1000):
 		self.hdf5_file_name = hdf5_file_name
 		self.h5file = h5py.File(hdf5_file_name)
 		if len(self.h5file.items()) == 0:
@@ -2539,7 +2539,12 @@ class snps_data_set:
 					for snpsd in sd.snpsDataList:
 						print offset
 						n_snps = len(snpsd.snps)
-						self.h5file['snps'][offset, offset + n_snps ] = snpsd.snps
+
+						for i in range(0, n_snps, chunk_size):
+							print i
+							stop_i = min(i + chunk_size, n_snps)
+							snps_chunk = sp.array(snpsd.snps[i:stop_i], dtype='int8')
+							self.h5file['snps'][offset + i: offset + stop_i ] = snps_chunk
 						offset += n_snps
 				self.h5file.create_group('filters')
 			else:
