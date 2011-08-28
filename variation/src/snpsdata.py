@@ -11,7 +11,8 @@ import pdb
 import env
 from itertools import *
 from bisect import bisect
-
+import h5py
+import os
 try:
 	import scipy as sp
 except Exception, err_str:
@@ -2509,6 +2510,202 @@ class SnpsData(_SnpsData_):
 			else:
 				break
 		return [ehh, ehhcount]
+
+
+
+class snps_data_set:
+	"""
+	A class which uses HDF5 to store SNPs, but otherwise implements a 
+	similar interface as the the older SNPsDataSet.
+	
+	"""
+	def __init__(self, hdf5_file_name, sd=None):
+		self.hdf5_file_name = hdf5_file_name
+		self.h5file = h5py.File(hdf5_file_name)
+		if len(self.h5file.items()) == 0:
+			if sd != None:
+				#Fill file
+				print 'Filling file'
+				self.h5file.create_dataset('indiv_ids', data=sd.accessions) #i.e. ecotypes
+				self.h5file.create_dataset('num_indivs', data=len(sd.accessions))
+				self.h5file.create_dataset('chromosomes', data=sd.get_chr_list(), compression='gzip')
+				self.h5file.create_dataset('positions', data=sd.get_positions(), compression='gzip')
+				d = sd.get_mafs()
+				self.h5file.create_dataset('macs', data=d['mafs'], compression='gzip')
+				self.h5file.create_dataset('mafs', data=d['marfs'], compression='gzip')
+				self.h5file.create_dataset('num_snps', data=sd.num_snps())
+				self.h5file.create_dataset('data_format', data=sp.array(sd.data_format))
+				if sd.data_format in ['binary', 'diploid_int']:
+					self.h5file.create_dataset('snps', data=sp.array(sd.get_snps(), dtype='int8'),
+							compression='gzip')
+				self.h5file.create_group('filters')
+			else:
+				raise NotImplementedError
+		self.data_format = str(self.h5file['data_format'][...])
+		self.num_snps = int(self.h5file['num_snps'][...])
+		self.num_indivs = int(self.h5file['num_indivs'][...])
+		self.indiv_filter = None
+		self.snps_filter = None
+
+
+
+	def _update_macs_(self, g, chunk_size=1000):
+		g.create_dataset('macs', shape=(self.num_snps,), compression='gzip')
+		print 'Calculating MACs'
+		if self.data_format == 'binary':
+			for i in range(0, self.num_snps, chunk_size):
+				stop_i = min(i + chunk_size, self.num_snps)
+				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
+				n_snps = len(snps)
+				a = sp.empty(n_snps)
+				for j, snp in enumerate(snps):
+					bc = sp.bincount(snp)
+					a[j] = 0 if len(bc) < 2 else bc.min()
+				g['macs'][i:i + len(snps)] = a
+		elif self.data_format == 'diploid_int':
+			for i in range(0, self.num_snps, chunk_size):
+				stop_i = min(i + chunk_size, self.num_snps)
+				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
+				n_snps = len(snps)
+				a = sp.empty(n_snps)
+				for j, snp in enumerate(snps):
+					bc = sp.bincount(snp)
+					if len(bc) < 2:
+						a[j] = 0
+					else:
+						l = sp.array([bc[0], bc[2]]) + bc[1] / 2.0
+						a[j] = l.min()
+				g['macs'][i:i + len(snps)] = a
+		print 'Finished calculating MACs'
+
+	def filter_mac(self, min_mac=15):
+		"""
+		Sets a mac filter which is applied at runtime.
+		"""
+		#Check wether cached! otherwise..
+		cache_tuple = str(tuple(self.h5file['indiv_ids'][self.indiv_filter]))
+		if cache_tuple in self.h5file['filters'].keys():
+			g = self.h5file['filters'][cache_tuple]
+		else:
+			g = self.h5file['filters'].create_group(cache_tuple)
+			self._update_macs_(g)
+		if self.snps_filter != None:
+			self.snps_filter = self.snps_filter * (g['macs'][...] >= min_mac)
+		else:
+			self.snps_filter = g['macs'][...] >= min_mac
+
+
+
+	def coordinate_w_phenotype_data(self, phend, pid, coord_phen=True):
+
+		"""
+		Deletes accessions which are not common, and sorts the accessions, removes monomorphic SNPs, etc.
+		"""
+#		import bisect
+		print "Coordinating SNP and Phenotype data."
+		ets = phend.phen_dict[pid]['ecotypes']
+
+		#Checking which accessions to keep and which to remove.
+		sd_indices_to_keep = set()#[]
+		pd_indices_to_keep = []
+
+		for i, iid in enumerate(self.h5file['indiv_ids']):
+			for j, et in enumerate(ets):
+				if et == iid:
+					sd_indices_to_keep.add(i)
+					pd_indices_to_keep.append(j)
+
+		sd_indices_to_keep = list(sd_indices_to_keep)
+		sd_indices_to_keep.sort()
+
+
+		#Filter accessions which do not have phenotype values (from the genotype data).
+		print "Filtering genotype data"
+		#if len(sd_indices_to_keep) != len(self.accessions):
+		self.indiv_filter = sd_indices_to_keep
+		if coord_phen:
+			num_values = len(phend.phen_dict[pid]['ecotypes'])
+			print "Filtering phenotype data."
+			phend.filter_ecotypes(pd_indices_to_keep, pids=[pid]) #Removing accessions that don't have genotypes or phenotype values
+			ets = phend.phen_dict[pid]['ecotypes']
+			print "Out of %d, leaving %d values." % (num_values, len(ets))
+
+		self.filter_mac(1)
+
+
+	def get_snps(self, chunk_size=1000):
+		if self.snps_filter == None:
+			if self.indiv_filter == None:
+				snps = self.h5file['snps'][...]
+			else:
+				if self.data_format in ['binary', 'diploid_int']:
+					snps = sp.empty((self.num_snps, int(sum(self.indiv_filter))), \
+							dtype='int8')
+				else:
+					raise NotImplementedError
+				for i in range(0, self.num_snps, chunk_size):
+					stop_i = min(i + chunk_size, self.num_snps)
+					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
+					snps[i:i + len(snps_chunk)] = snps_chunk
+		else:
+			if self.indiv_filter == None:
+				snps = self.h5file['snps'][self.snps_filter]
+			else:
+				if self.data_format in ['binary', 'diploid_int']:
+					snps = sp.empty((int(sum(self.snps_filter)),
+							len(self.indiv_filter)), dtype='int8')
+				else:
+					raise NotImplementedError
+				offset = 0
+				for i in range(0, self.num_snps, chunk_size):
+					filter_chunk = self.snps_filter[i:i + chunk_size]
+					stop_i = min(i + chunk_size, self.num_snps)
+					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
+					snps_chunk = snps_chunk[filter_chunk]
+					snps[offset:offset + len(snps_chunk)] = snps_chunk
+					offset += len(snps_chunk)
+		return snps
+
+
+
+	def get_positions(self):
+		if self.snps_filter == None:
+			return self.h5file['positions'][...]
+		else:
+			return self.h5file['positions'][self.snps_filter]
+
+
+	def get_chromosomes(self):
+		if self.snps_filter == None:
+			return self.h5file['chromosomes'][...]
+		else:
+			return self.h5file['chromosomes'][self.snps_filter]
+
+
+	def get_macs(self):
+		cache_tuple = str(tuple(self.h5file['indiv_ids'][self.indiv_filter]))
+		if cache_tuple in self.h5file['filters'].keys():
+			g = self.h5file['filters'][cache_tuple]
+		else:
+			g = self.h5file['filters'].create_group(cache_tuple)
+			self._update_macs_(g)
+		return g['macs'][...]
+
+
+	def get_mafs(self):
+		if self.indiv_filter != None:
+			return self.get_macs() / len(self.indiv_filter)
+		else:
+			return self.get_macs() / len(self.num_indivs)
+
+	def get_old_snps_data_set(self):
+		"""
+		Returns 
+		"""
+		raise NotImplementedError
+
+	def close(self):
+		self.h5file.close()
 
 
 

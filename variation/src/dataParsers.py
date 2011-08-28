@@ -2592,6 +2592,8 @@ def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filte
 					min_mac=min_mac, debug_filter=debug_filter)
 
 
+
+
 if __name__ == "__main__":
 	_test_plink_tped_parser_()
 	#parse_tair_gff_file()
