@@ -2519,7 +2519,7 @@ class snps_data_set:
 	similar interface as the the older SNPsDataSet.
 	
 	"""
-	def __init__(self, hdf5_file_name, sd=None, chunk_size=1000):
+	def __init__(self, hdf5_file_name, sd=None, chunk_size=10000):
 		self.hdf5_file_name = hdf5_file_name
 		self.h5file = h5py.File(hdf5_file_name)
 		if len(self.h5file.items()) == 0:
