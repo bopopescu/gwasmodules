@@ -2533,7 +2533,7 @@ class snps_data_set:
 				self.h5file.create_dataset('num_snps', data=sd.num_snps())
 				self.h5file.create_dataset('data_format', data=sp.array(sd.data_format))
 				if sd.data_format in ['binary', 'diploid_int']:
-					self.h5file.create_dataset('snps', shape=(sd.num_snps, len(sd.accessions)),
+					self.h5file.create_dataset('snps', shape=(sd.num_snps(), len(sd.accessions)),
 									dtype='int8')
 					offset = 0
 					for snpsd in sd.snpsDataList:
