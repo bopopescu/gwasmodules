@@ -2537,8 +2537,10 @@ class snps_data_set:
 									dtype='int8')
 					offset = 0
 					for snpsd in sd.snpsDataList:
+						print offset
 						n_snps = len(snpsd.snps)
 						self.h5file['snps'][offset, offset + n_snps ] = snpsd.snps
+						offset += n_snps
 				self.h5file.create_group('filters')
 			else:
 				raise NotImplementedError
