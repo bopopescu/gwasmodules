@@ -2530,9 +2530,6 @@ class snps_data_set:
 				self.h5file.create_dataset('num_indivs', data=len(sd.accessions))
 				self.h5file.create_dataset('chromosomes', data=sd.get_chr_list(), compression='gzip')
 				self.h5file.create_dataset('positions', data=sd.get_positions(), compression='gzip')
-				d = sd.get_mafs()
-				self.h5file.create_dataset('macs', data=d['mafs'], compression='gzip')
-				self.h5file.create_dataset('mafs', data=d['marfs'], compression='gzip')
 				self.h5file.create_dataset('num_snps', data=sd.num_snps())
 				self.h5file.create_dataset('data_format', data=sp.array(sd.data_format))
 				if sd.data_format in ['binary', 'diploid_int']:
