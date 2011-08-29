@@ -2572,6 +2572,7 @@ class snps_data_set:
 				g['macs'][i:i + len(snps)] = a
 		elif self.data_format == 'diploid_int':
 			for i in range(0, self.num_snps, chunk_size):
+				sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / self.num_snps))
 				stop_i = min(i + chunk_size, self.num_snps)
 				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
 				n_snps = len(snps)
@@ -2584,6 +2585,7 @@ class snps_data_set:
 						l = sp.array([bc[0], bc[2]]) + bc[1] / 2.0
 						a[j] = l.min()
 				g['macs'][i:i + len(snps)] = a
+			sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / self.num_snps))
 		print 'Finished calculating MACs'
 
 	def filter_mac(self, min_mac=15):
@@ -2641,7 +2643,7 @@ class snps_data_set:
 		self.filter_mac(1)
 
 
-	def get_snps(self, chunk_size=1000):
+	def get_snps(self, chunk_size=100000):
 		if self.snps_filter == None:
 			if self.indiv_filter == None:
 				snps = self.h5file['snps'][...]
@@ -2660,18 +2662,25 @@ class snps_data_set:
 				snps = self.h5file['snps'][self.snps_filter]
 			else:
 				if self.data_format in ['binary', 'diploid_int']:
+					print 'Allocating memory'
 					snps = sp.empty((int(sum(self.snps_filter)),
 							len(self.indiv_filter)), dtype='int8')
+					print 'done allocating.'
 				else:
 					raise NotImplementedError
 				offset = 0
+				print 'Extracting the SNPs'
 				for i in range(0, self.num_snps, chunk_size):
+					sys.stdout.write('\b\b\b\b\b\b%.2f%%' % (100 * (float(i) / self.num_snps)))
+					sys.stdout.flush()
 					filter_chunk = self.snps_filter[i:i + chunk_size]
 					stop_i = min(i + chunk_size, self.num_snps)
 					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
 					snps_chunk = snps_chunk[filter_chunk]
 					snps[offset:offset + len(snps_chunk)] = snps_chunk
 					offset += len(snps_chunk)
+				sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / self.num_snps))
+				print 'Done extracting the SNPs.'
 		return snps
 
 
@@ -2715,6 +2724,12 @@ class snps_data_set:
 	def close(self):
 		self.h5file.close()
 
+
+
+	def get_kinship(method='ibs'):
+		"""
+		Returns kinship
+		"""
 
 
 class SNPsDataSet:

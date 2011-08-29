@@ -804,7 +804,7 @@ def plot_pval_emmax_correlations(filter=1.0, file_prefix='/storage/r2_results/25
 
 
 
-def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_mac15_filtered'):
+def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_mac15_filtered', save_to_file=False):
 
 	chrom_sizes = [30425061, 19694800, 23456476, 18578714, 26974904]
 	cum_chrom_sizes = [sum(chrom_sizes[:i]) for i in range(5)]
@@ -879,6 +879,20 @@ def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_ma
 		cb.set_label(label, fontsize='x-large')
 		#cb.set_tick_params(fontsize='x-large')
 		f.savefig(plot_file_name + '.png', format='png')
+
+	if save_to_file:
+		chromosomes = [1, 2, 3, 4, 5]
+		for y_chrom in chromosomes:
+			for x_chrom in chromosomes[0:y_chrom]:
+				file_name = file_prefix + '_chrom%d_chrom%d_values.csv' % (x_chrom, y_chrom)
+				print 'Writing to file:', file_name
+				with open(file_name, 'w') as f:
+					d = chr_res_dict[(x_chrom, y_chrom)]
+					f.write('x_position, y_position, r2, t_r2\n')
+					l = zip(d['x_pos'], d['y_pos'], d['r2'], d['t_r2'])
+					l.sort()
+					for t in l:
+						f.write('%d,%d,%f,%f\n' % t)
 
 
 
@@ -990,6 +1004,6 @@ def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_ma
 
 if __name__ == "__main__":
 	#run_r2_calc()
-	plot_r2_results()
+	plot_r2_results(save_to_file=True)
 	#plot_pval_emmax_correlations()
 	#test_correlation()
