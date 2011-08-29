@@ -44,8 +44,14 @@ def run_parallel(pid, call_method_id, run_id='gwas'):
 
 
 def run_gwas(pid, call_method_id):
+        #LOAD DATA
+
         #Set up GWAS
-        pass
+	for ws in [3000000, 1000000, 500000, 200000, 100000, 50000]:
+		#PERFORM LOCAL vs GLOBAL KINSHIP GWAS
+
+
+
 
 def run():
         call_method_id = int(sys.argv[1])

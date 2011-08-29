@@ -1423,7 +1423,7 @@ class RawSnpsData(_SnpsData_):
 		"""
 		An updated and version of the getSnpsData.. uses scipy.  
 		"""
-		pass
+		raise NotImplementedError
 
 
 
@@ -3924,7 +3924,7 @@ class SNPsDataSet:
 			snpsd.snps = new_snps
 		return snpsd
 
-	def merge_snps_data(self, sd):
+	def merge_snps_data(self, sd, acc_merge_type='intersection', error_threshold=0.1, discard_error_threshold=0.1):
 		"""
 		Merges data using _SnpsData_.merge_data
 		"""
@@ -3934,7 +3934,8 @@ class SNPsDataSet:
 			self.new_snps_data_list = []
 			for sd1, sd2, chromosome in zip(self.snpsDataList, sd.snpsDataList, self.chromosomes):
 				print "Merging data on chromosome %s." % (str(chromosome))
-				sd1.merge_data(sd2)
+				sd1.merge_data(sd2, acc_merge_type=acc_merge_type, error_threshold=error_threshold,
+						discard_error_threshold=discard_error_threshold)
 				self.new_snps_data_list.append(sd1)
 			self.accessions = self.new_snps_data_list[0].accessions
 			self.snpsDataList = self.new_snps_data_list
