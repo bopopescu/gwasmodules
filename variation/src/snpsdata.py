@@ -2519,7 +2519,7 @@ class snps_data_set:
 	similar interface as the the older SNPsDataSet.
 	
 	"""
-	def __init__(self, hdf5_file_name, sd=None, chunk_size=1000):
+	def __init__(self, hdf5_file_name, sd=None, chunk_size=10000):
 		self.hdf5_file_name = hdf5_file_name
 		self.h5file = h5py.File(hdf5_file_name)
 		if len(self.h5file.items()) == 0:
@@ -2534,7 +2534,7 @@ class snps_data_set:
 				self.h5file.create_dataset('data_format', data=sp.array(sd.data_format))
 				if sd.data_format in ['binary', 'diploid_int']:
 					self.h5file.create_dataset('snps', shape=(sd.num_snps(), len(sd.accessions)),
-									dtype='int8')
+									dtype='int8', compression='gzip')
 					offset = 0
 					for snpsd in sd.snpsDataList:
 						print offset
