@@ -2641,7 +2641,7 @@ class snps_data_set:
 		self.filter_mac(1)
 
 
-	def get_snps(self, chunk_size=1000):
+	def get_snps(self, chunk_size=10000):
 		if self.snps_filter == None:
 			if self.indiv_filter == None:
 				snps = self.h5file['snps'][...]
