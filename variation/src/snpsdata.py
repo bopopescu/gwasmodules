@@ -2761,24 +2761,24 @@ class snps_data_set:
 					yield snps_chunk[filter_chunk]
 
 
-	def _calc_ibd_kinship_(self, num_dots=10):
+	def _calc_ibd_kinship_(self, num_dots=10, dtype='single'):
 		num_lines = len(self.accessions)
 		chunk_size = num_lines
-		cov_mat = sp.zeros((num_lines, num_lines))
+		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
 		num_snps = len(snps)
 		num_splits = num_snps / float(chunk_size)
 		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
 			snps_array = snps_chunk.T
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 			x = sp.mat(norm_snps_array.T)
-			cov_mat += x.T * x
+			k_mat += x.T * x
 			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / num_snps))
 			sys.stdout.flush()
-		cov_mat = cov_mat / float(num_snps)
-		return cov_mat
+		k_mat = k_mat / float(num_snps)
+		return k_mat
 
 
-	def _calc_ibs_kinship_(self, snps, num_dots=10, snp_dtype='int8', dtype='single'):
+	def _calc_ibs_kinship_(self, num_dots=10, dtype='single'):
 		num_lines = len(self.accessions)
 		chunk_size = num_lines
 		num_snps = len(snps)
@@ -2813,16 +2813,17 @@ class snps_data_set:
 		"""
 		Returns kinship
 		"""
+		print method
 		if method == 'ibd':
 			print 'Starting IBD calculation'
 			snps = self.getSnps(debug_filter)
-			k_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
+			k_mat = self._calc_ibd_kinship_(num_dots=num_dots, dtype=dtype)
 			print 'Finished calculating IBD kinship matrix'
 			return k_mat
 		elif method == 'ibs':
 			print 'Starting IBS calculation'
 			snps = self.getSnps(debug_filter)
-			k_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
+			k_mat = self._calc_ibd_kinship_(num_dots=num_dots, dtype=dtype)
 			print 'Finished calculating IBS kinship matrix'
 			return k_mat
 
