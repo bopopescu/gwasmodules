@@ -47,11 +47,13 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
 
 
 
-def run_gwas(pid, call_method_id, run_id, kinship_method):
+def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.02):
         #import snpsdata
 
         #LOAD DATA
 	sd = dp.load_snps_call_method(call_method_id)
+	if debug_filter < 1:
+		sd.sample_snps(debug_filter)
 	phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
 	phed = pd.parse_phenotype_file(phenotype_file)
 	phed.convert_to_averages()
