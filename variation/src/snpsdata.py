@@ -695,10 +695,14 @@ class _SnpsData_(object):
 		"""
 		Discards SNPs, leaving a random fraction of them untouched.
 		"""
-		import random
-		snp_pos_list = random.sample(zip(self.positions, self.snps), int(random_fraction * len(self.snps)))
-		snp_pos_list.sort()
-		(self.positions, self.snps) = map(list, zip(*snp_pos_list))
+		rs = sp.random.random(len(self.snps))
+		new_positions = []
+		new_snps = []
+		for i in range(len(self.snps)):
+			if rs[i] < random_fraction:
+				new_positions.append(self.positions[i])
+				new_snps.append(self.snps[i])
+		self.positions, self.snps = new_positions, new_snps
 
 
 	def scalePositions(self, baseScale):
