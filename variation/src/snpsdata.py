@@ -2588,39 +2588,28 @@ class snps_data_set:
 		n_snps = self.num_snps()
 		g.create_dataset('macs', shape=(n_snps,), compression='gzip')
 		print 'Calculating MACs'
-		if self.data_format == 'binary':
-			for i in range(0, n_snps, chunk_size):
-				sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / n_snps))
-				sys.stdout.flush()
-				stop_i = min(i + chunk_size, n_snps)
-				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
-				n_snps = len(snps)
-				a = sp.empty(n_snps)
-				for j, snp in enumerate(snps):
+		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
+			a = sp.empty(len(snps_chunk))
+			if self.data_format == 'binary':
+				for j, snp in enumerate(snps_chunk):
 					bc = sp.bincount(snp)
 					a[j] = 0 if len(bc) < 2 else bc.min()
-				g['macs'][i:i + len(snps)] = a
-			sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / n_snps))
-			sys.stdout.flush()
-		elif self.data_format == 'diploid_int':
-			for i in range(0, n_snps, chunk_size):
-				sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / n_snps))
-				sys.stdout.flush()
-				stop_i = min(i + chunk_size, n_snps)
-				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
-				n_snps = len(snps)
-				a = sp.empty(n_snps)
-				for j, snp in enumerate(snps):
+			else:
+				for j, snp in enumerate(snps_chunk):
 					bc = sp.bincount(snp)
 					if len(bc) < 2:
 						a[j] = 0
 					else:
 						l = sp.array([bc[0], bc[2]]) + bc[1] / 2.0
 						a[j] = l.min()
-				g['macs'][i:i + len(snps)] = a
-			sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / n_snps))
+
+			g['macs'][i:i + len(snps_chunk)] = a
+			sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
+									((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
 		print 'Finished calculating MACs'
+
+
 
 	def filter_mac(self, min_mac=15):
 		"""
@@ -2682,13 +2671,16 @@ class snps_data_set:
 				snps = self.h5file['snps'][...]
 			else:
 				if self.data_format in ['binary', 'diploid_int']:
+					print 'Allocating memory'
 					snps = sp.empty((n_snps, n_snps), dtype='int8')
+					print 'done allocating.'
 				else:
 					raise NotImplementedError
-				for i in range(0, n_snps, chunk_size):
-					stop_i = min(i + chunk_size, n_snps)
-					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
+				for chunk_i, snps_chunk in enumerate(snps_chunks(chunk_size)):
 					snps[i:i + len(snps_chunk)] = snps_chunk
+					sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
+										((chunk_i + 1.0) * chunk_size) / n_snps))))
+					sys.stdout.flush()
 		else:
 			if self.indiv_filter == None:
 				snps = self.h5file['snps'][self.snps_filter]
@@ -2701,17 +2693,12 @@ class snps_data_set:
 					raise NotImplementedError
 				offset = 0
 				print 'Extracting the SNPs'
-				for i in range(0, n_snps, chunk_size):
-					sys.stdout.write('\b\b\b\b\b\b%.2f%%' % (100 * (float(i) / n_snps)))
-					sys.stdout.flush()
-					filter_chunk = self.snps_filter[i:i + chunk_size]
-					stop_i = min(i + chunk_size, n_snps)
-					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
-					snps_chunk = snps_chunk[filter_chunk]
+				for chunk_i, snps_chunk in enumerate(snps_chunks(chunk_size)):
 					snps[offset:offset + len(snps_chunk)] = snps_chunk
 					offset += len(snps_chunk)
-				sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / n_snps))
-				sys.stdout.flush()
+					sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
+										((chunk_i + 1.0) * chunk_size) / n_snps))))
+					sys.stdout.flush()
 				print 'Done extracting the SNPs.'
 		return snps
 
@@ -2754,6 +2741,9 @@ class snps_data_set:
 
 
 	def snps_chunks(self, chunk_size=10000):
+		"""
+		An generator/iterator for SNP chunks.
+		"""
 		n_snps = self.num_snps()
 		if self.snps_filter == None:
 			if self.indiv_filter == None:
@@ -2777,6 +2767,15 @@ class snps_data_set:
 					filter_chunk = self.snps_filter[i:stop_i]
 					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
 					yield snps_chunk[filter_chunk]
+
+
+	def snps(self, chunk_size=10000):
+		"""
+		An generator/iterator for the SNPs.
+		"""
+		for snps_chunk in self.snps_chunks(chunk_size):
+			for snp in snps_chunk:
+				yield snp
 
 
 	def _calc_ibd_kinship_(self, num_dots=10, dtype='single', chunk_size=None):
