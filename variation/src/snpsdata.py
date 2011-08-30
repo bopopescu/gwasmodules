@@ -2736,7 +2736,7 @@ class snps_data_set:
 		An generator/iterator for SNP chunks.
 		"""
 		n_snps = self.num_snps()
-		if self.snps_filter == None or use_all_snps:
+		if self.snps_filter == None:
 			if self.indiv_filter == None:
 				for i in range(0, n_snps, chunk_size):
 					stop_i = min(i + chunk_size, n_snps)
