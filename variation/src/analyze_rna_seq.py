@@ -300,7 +300,8 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 	chrom_dict = {}
 	for x_chrom in [1, 2, 3, 4, 5]:
 		for y_chrom in [1, 2, 3, 4, 5]:
-			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[], 'tair_ids':[]}
+			chrom_dict[(x_chrom, y_chrom)] = {'scores':[], 'x_positions':[], 'y_positions':[],
+								'tair_ids':[], 'r2':[], 'mac':[]}
 	scores = []
 	for x_chrom, x_pos in res_dict:
 		d = res_dict[(x_chrom, x_pos)]

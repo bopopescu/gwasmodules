@@ -44,7 +44,10 @@ def run_parallel(pid, call_method_id, run_id='gwas'):
 
 
 def run_gwas(pid, call_method_id):
+        import snpsdata
         #LOAD DATA
+        genotype_hdf5_file = '/net/gmi.oeaw.ac.at/gwasapp/gwas-frontend/dataset/80/snps_indels_svs_binary.hdf5'
+	sd = snpsdata.snps_data_set(genotype_hdf5_file)
 
         #Set up GWAS
 	for ws in [3000000, 1000000, 500000, 200000, 100000, 50000]:
