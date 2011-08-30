@@ -3401,7 +3401,6 @@ class SNPsDataSet:
 			if global_kinship == None:
 				global_k = self._calc_ibd_kinship_(global_snps, num_dots=0) if len(global_snps) else None
 		elif kinship_method == 'ibs':
-			print len(local_snps), self.data_format
 			local_k = self._calc_ibs_kinship_(local_snps, num_dots=10) if len(local_snps) else None
 			if global_kinship == None:
 				global_k = self._calc_ibs_kinship_(global_snps, num_dots=10) if len(global_snps) else None
@@ -3460,14 +3459,11 @@ class SNPsDataSet:
 		global_snps = []
 		local_snps = []
 		chr_pos_l = self.get_chr_pos_list(cache_list=True)
-		ipdb.set_trace()
 		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
 		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
-		print start_i, stop_i, chr_pos_l[start_i:stop_i]
 		snps = self.get_snps()
 		local_snps = snps[start_i:stop_i]
 		global_snps = snps[:start_i] + snps[stop_i:]
-		print len(snps)
 		return local_snps, global_snps
 
 	def get_chrom_split_snps(self, chrom):
