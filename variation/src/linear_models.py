@@ -3483,14 +3483,15 @@ def save_kinship_in_text_format(filename, k, accessions):
 #	pylab.savefig('/Users/bjarni.vilhjalmsson/tmp/lls.png', format='png')
 
 
-def local_vs_global_mm(y, local_k, global_k, K):
+def local_vs_global_mm(y, local_k, global_k, K, h0_res=None):
 	"""
 	Local vs. global kinship mixed model.
 	"""
-	lmm0 = LinearMixedModel(Y=y)
-	lmm0.add_random_effect(K)
-	eig_L = lmm0._get_eigen_L_()
-	h0_res = lmm0.get_estimates(eig_L)
+	if h0_res == None:
+		lmm0 = LinearMixedModel(Y=y)
+		lmm0.add_random_effect(K)
+		eig_L = lmm0._get_eigen_L_()
+		h0_res = lmm0.get_estimates(eig_L)
 
 	lmm = LinearMixedModel(Y=y)
 	lmm.add_random_effect(global_k)
@@ -3503,6 +3504,44 @@ def local_vs_global_mm(y, local_k, global_k, K):
 			'pseudo_heritability0':h0_res['pseudo_heritability'],
 			'pseudo_heritability1':h1_res['pseudo_heritability']}
 	return res_dict
+
+
+def chrom_vs_rest_mm(y, sd, kinship_method='ibd', global_k=None):
+	if global_k == None:
+		if kinship_method == 'ibd':
+			K = sd.get_ibd_kinship_matrix()
+		elif kinship_method == 'ibs':
+			K = sd.get_ibs_kinship_matrix()
+		else:
+			raise NotImplementedError
+	else:
+		K = global_k
+	lmm0 = LinearMixedModel(Y=y)
+	lmm0.add_random_effect(K)
+	eig_L = lmm0._get_eigen_L_()
+	h0_res = lmm0.get_estimates(eig_L)
+
+	genome_length = sd.get_genome_length()
+	est_num_chunks = genome_length / jump_size
+	chromosomes = []
+	pvals = []
+	perc_variances1 = []
+	perc_variances2 = []
+	h1_heritabilities = []
+	for chrom in sd.chromosomes:
+		d = sd.get_local_n_global_kinships(chrom, global_kinship=K, kinship_method=kinship_method)
+		local_k = scale_k(d['local_k'])
+		global_k = scale_k(d['global_k'])
+		if local_k != None and global_k != None:
+			res_dict = local_vs_global_mm(y, local_k, global_k, K, h0_res=h0_res)
+			chromosomes.append(chrom)
+			perc_variances1.append(res_dict['perc_var1'])
+			perc_variances2.append(res_dict['perc_var2'])
+			h1_heritabilities.append(res_dict['pseudo_heritability1'])
+			pvals.append(res_dict['pval'])
+	return {'pvals':pvals, 'perc_variances2':perc_variances2, 'perc_variances1':perc_variances1,
+		'h0_heritability':h0_res['pseudo_heritability'], 'h1_heritabilities':h1_heritabilities,
+		'chromosomes':chromosomes}
 
 
 def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000, jump_size=500000, kinship_method='ibd', global_k=None):
@@ -3521,6 +3560,11 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 			raise NotImplementedError
 	else:
 		K = global_k
+	lmm0 = LinearMixedModel(Y=y)
+	lmm0.add_random_effect(K)
+	eig_L = lmm0._get_eigen_L_()
+	h0_res = lmm0.get_estimates(eig_L)
+
 	genome_length = sd.get_genome_length()
 	est_num_chunks = genome_length / jump_size
 	chromosomes = []
@@ -3529,11 +3573,8 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 	perc_variances1 = []
 	perc_variances2 = []
 	h1_heritabilities = []
-	h0_heritabilities = []
 	chunk_i = 0
 	for sdl, chrom in zip(sd.snpsDataList, sd.chromosomes):
-		max_pos = sdl.positions[-1]
-		pos = sdl.positions[0]
 		for focal_pos in range(sdl.positions[0], sdl.positions[-1], jump_size):
 			chunk_i += 1
 			d = sd.get_local_n_global_kinships((chrom, focal_pos), window_size,
@@ -3543,12 +3584,11 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 			global_k = scale_k(d['global_k'])
 			if local_k != None and global_k != None:
 				#print "Chromosome=%d, position=%d" % (chrom, focal_pos)
-				res_dict = local_vs_global_mm(y, local_k, global_k, K)
+				res_dict = local_vs_global_mm(y, local_k, global_k, K, h0_res=h0_res)
 				chromosomes.append(chrom)
 				positions.append(focal_pos)
 				perc_variances1.append(res_dict['perc_var1'])
 				perc_variances2.append(res_dict['perc_var2'])
-				h0_heritabilities.append(res_dict['pseudo_heritability0'])
 				h1_heritabilities.append(res_dict['pseudo_heritability1'])
 				pvals.append(res_dict['pval'])
 
@@ -3567,7 +3607,83 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 	perc_var_res = gr.Result(scores=perc_variances2, positions=positions, chromosomes=chromosomes)
 	perc_var_res.plot_manhattan(png_file=file_prefix + '_perc_var_explained.png', percentile=0,
 				ylab='% of variance explained')
+	return {'pvals':pvals, 'perc_variances2':perc_variances2, 'perc_variances1':perc_variances1,
+		'h0_heritability':h0_res['pseudo_heritability'], 'h1_heritabilities':h1_heritabilities,
+		'chromosomes':chromosomes, 'positions':positions}
 
+
+
+def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, kinship_method='ibd', global_k=None):
+	"""
+	Local vs. global kinship mixed model.
+	"""
+	print 'Starting Mixed model, local vs. global kinship scan...'
+	import gwaResults as gr
+	import dataParsers as dp
+	if global_k == None:
+		if kinship_method == 'ibd':
+			K = sd.get_ibd_kinship_matrix()
+		elif kinship_method == 'ibs':
+			K = sd.get_ibs_kinship_matrix()
+		else:
+			raise NotImplementedError
+	else:
+		K = global_k
+	lmm0 = LinearMixedModel(Y=y)
+	lmm0.add_random_effect(K)
+	eig_L = lmm0._get_eigen_L_()
+	h0_res = lmm0.get_estimates(eig_L)
+
+	gene_dict = dp.parse_tair_gff_file()
+	tair_ids = gene_dict.keys()
+	tair_ids.sort()
+	chromosomes = []
+	positions = []
+	pvals = []
+	perc_variances1 = []
+	perc_variances2 = []
+	h1_heritabilities = []
+	mapped_tair_ids = []
+	chunk_i = 0
+	for i, tair_id in enumerate(tair_ids):
+		gd = gene_dict[tair_id]
+		chrom = gd['chromosome']
+		start_pos = gd['start_pos'] - radius
+		stop_pos = gd['end_pos'] + radius
+		mean_pos = (start_pos + stop_pos) / 2
+		d = sd.get_local_n_global_kinships(chrom=chrom, start_pos=start_pos, stop_pos=stop_pos,
+							global_kinship=K, kinship_method=kinship_method)
+		local_k = scale_k(d['local_k'])
+		global_k = scale_k(d['global_k'])
+		if local_k != None and global_k != None:
+			#print "Chromosome=%d, position=%d" % (chrom, focal_pos)
+			res_dict = local_vs_global_mm(y, local_k, global_k, K, h0_res=h0_res)
+			chromosomes.append(chrom)
+			positions.append(mean_pos)
+			perc_variances1.append(res_dict['perc_var1'])
+			perc_variances2.append(res_dict['perc_var2'])
+			h1_heritabilities.append(res_dict['pseudo_heritability1'])
+			pvals.append(res_dict['pval'])
+			mapped_tair_ids.append(tair_id)
+
+			#print 'H0: pseudo_heritability=%0.2f' % (res_dict['h0_res']['pseudo_heritability'])
+			#print 'H1: pseudo_heritability=%0.2f, perc_var1=%0.2f, perc_var2=%0.2f' % \
+			#		(res_dict['h1_res']['pseudo_heritability'],
+			#		res_dict['h1_res']['perc_var1'],
+			#		res_dict['h1_res']['perc_var2'])
+		if (i + 1) % int(len(tair_ids) / 100) == 0: #Print dots
+			sys.stdout.write('.')
+			sys.stdout.flush()
+
+	pval_res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
+	pval_res.neg_log_trans()
+	pval_res.plot_manhattan(png_file=file_prefix + '_lrt_pvals.png', percentile=0, plot_bonferroni=True)
+	perc_var_res = gr.Result(scores=perc_variances2, positions=positions, chromosomes=chromosomes)
+	perc_var_res.plot_manhattan(png_file=file_prefix + '_perc_var_explained.png', percentile=0,
+				ylab='% of variance explained')
+	return {'pvals':pvals, 'perc_variances2':perc_variances2, 'perc_variances1':perc_variances1,
+		'h0_heritability':h0_res['pseudo_heritability'], 'h1_heritabilities':h1_heritabilities,
+		'chromosomes':chromosomes, 'positions':positions, 'tair_ids':mapped_tair_ids}
 
 
 

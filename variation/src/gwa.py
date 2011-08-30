@@ -284,7 +284,7 @@ def _get_genotype_data_(p_dict):
 	else:
 		cm_id = p_dict['call_method_id']
 		df = p_dict['data_format']
-		df = df if not cm_id in [78, 79] else 'diploid_int'
+		#df = df if not cm_id in [78, 79] else 'diploid_int'
 		sd = dataParsers.load_snps_call_method(p_dict['call_method_id'], data_format=df, debug_filter=p_dict['debug_filter'])
 	return sd
 
