@@ -6,11 +6,11 @@ Quan, Bjarni, Dazhe, et al.
 import sys
 
 
-def run_parallel(pid, call_method_id, run_id='gwas'):
+def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
         """
         If no mapping_method, then analysis run is set up.
         """
-        job_id = '%s_%d_%d_%s' % (run_id, x_start_i, x_stop_i, temperature)
+        job_id = '%s_%s_%d_%d' % (run_id, kinship_method, call_method_id, pid)
         file_prefix = env['results_dir'] + job_id
 
         #Cluster specific parameters        
@@ -28,8 +28,8 @@ def run_parallel(pid, call_method_id, run_id='gwas'):
         shstr += 'export GOTO_NUM_THREADS=1\n'
 
 
-        shstr += "python %gwas_project.py %d %d %s %d %s" % \
-                        (env['script_dir'], x_start_i, x_stop_i, temperature, call_method_id, run_id)
+        shstr += "python %sfullseq_gwas_project.py %s %s %d %d" % \
+                        (env['script_dir'], run_id, kinship_method, call_method_id, pid)
 
         #shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
         print '\n', shstr, '\n'
@@ -43,23 +43,95 @@ def run_parallel(pid, call_method_id, run_id='gwas'):
 
 
 
-def run_gwas(pid, call_method_id):
-        import snpsdata
+def run_gwas(pid, call_method_id, run_id, kinship_method):
+        #import snpsdata
+        import dataParsers as dp
+        import phenotypeData as pd
+        import linear_models as lm
+
         #LOAD DATA
-        genotype_hdf5_file = '/net/gmi.oeaw.ac.at/gwasapp/gwas-frontend/dataset/80/snps_indels_svs_binary.hdf5'
-	sd = snpsdata.snps_data_set(genotype_hdf5_file)
+	sd = dp.load_snps_call_method(call_method_id)
+	phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
+	phed = pd.parse_phenotype_file(phenotype_file)
+	phed.convert_to_averages()
+	phed.transform(pid, 'most_normal')
+	phen_name = phed.get_name(pid)
+	sd.coordinate_w_phenotype_data(phed, pid, coord_phen)
+	phen_vals = phed.get_values()
+
+	if kinship_method == 'ibd':
+		global_k = sd.get_ibd_kinship_matrix()
+	elif kinship_method == 'ibs':
+		global_k = sd.get_ibs_kinship_matrix()
 
         #Set up GWAS
 	for ws in [3000000, 1000000, 500000, 200000, 100000, 50000]:
-		#PERFORM LOCAL vs GLOBAL KINSHIP GWAS
+		file_prefix = env.env['results_dir'] + '%s_loc_v_glob_%s_%d_%d_%s' % \
+							(run_id, kinship_method, ws, pid, phen_name)
+		res_dict = lm.local_vs_global_mm_scan(phen_vals, sd, file_prefix, ws, ws / 2, kinship_method, global_k)
+		res_file_name = file_prefix + '.csv'
+		_write_res_dict_to_file_(res_file_name, res_dict)
+
+	#Now chromosomes.
+	res_dict = lm.chrom_vs_rest_mm(phen_vals, sd, kinship_method, global_k)
+	print res_dict
+	file_prefix = env.env['results_dir'] + '%s_loc_v_glob_chrom_%s_%d_%s' % \
+						(run_id, kinship_method, pid, phen_name)
+	res_file_name = file_prefix + '.csv'
+	_write_res_dict_to_file_(res_file_name, res_dict)
+
+	#Now gene-centralized.
+	for radius in [20000, 10000]:
+		file_prefix = env.env['results_dir'] + '%s_loc_v_glob_gene_%s_%d_%d_%s' % \
+							(run_id, kinship_method, radius, pid, phen_name)
+		res_dict = lm.local_vs_global_gene_mm_scan(phen_vals, sd, file_prefix, radius, kinship_method, global_k)
+		res_file_name = file_prefix + '.csv'
+		_write_res_dict_to_file_3_(res_file_name, res_dict)
 
 
+def _write_res_dict_to_file_(filename, rd):
+	with open(res_file_name, 'w') as f:
+		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
+		f.write('chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
+		num_res = len(rd['chromosomes'])
+		for i in range(num_res):
+			f.write('%d, %d, %f, %f, %f, %f\n' % (rd['chromosomes'], rd['positions'], rd['pvals'],
+						rd['perc_variances2'], rd['perc_variances1'], rd['h1_heritabilities']))
 
+def _write_res_dict_to_file_2_(filename, rd):
+	with open(res_file_name, 'w') as f:
+		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
+		f.write('chromosomes, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
+		num_res = len(rd['chromosomes'])
+		for i in range(num_res):
+			f.write('%d, %f, %f, %f, %f\n' % (rd['chromosomes'], rd['pvals'], rd['perc_variances2'],
+							rd['perc_variances1'], rd['h1_heritabilities']))
+
+def _write_res_dict_to_file_(filename, rd):
+	with open(res_file_name, 'w') as f:
+		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
+		f.write('tair_ids, chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
+		num_res = len(rd['chromosomes'])
+		for i in range(num_res):
+			f.write('%s, %d, %d, %f, %f, %f, %f\n' % (rd['tair_ids'], rd['chromosomes'], rd['positions'],
+								rd['pvals'], rd['perc_variances2'],
+								rd['perc_variances1'], rd['h1_heritabilities']))
 
 def run():
-        call_method_id = int(sys.argv[1])
-        if len(sys.argv) < 3:
-                pid = int(sys.argv[2])
+	phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
+	run_id = sys.argv[1]
+        kinship_method = sys.argv[2]
+	call_method_id = int(sys.argv[3])
+        if len(sys.argv) < 5:
+        	phed = pd.parse_phenotype_file(phenotype_file)
+		pids = phed.phen_ids
+		for pid in pids:
+			run_parallel(pid, call_method_id, run_id, kinship_method)
+
+
+	else:
+		pid = int(sys.argv[4])
+		run_gwas(pid, call_method_id, run_id, kinship_method)
 
 
 

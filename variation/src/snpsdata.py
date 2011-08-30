@@ -2554,6 +2554,7 @@ class snps_data_set:
 		self.data_format = str(self.h5file['data_format'][...])
 		self.indiv_filter = None
 		self.snps_filter = None
+		self.cached_snps == None
 
 
 	def num_individs(self):
@@ -2672,8 +2673,6 @@ class snps_data_set:
 		n_indivs = self.num_individs()
 		if self.snps_filter == None and self.indiv_filter == None:
 			snps = self.h5file['snps'][...]
-		elif self.indiv_filter == None:
-			snps = self.h5file['snps'][self.snps_filter, :]
 		else:
 			if self.data_format in ['binary', 'diploid_int']:
 				print 'Allocating memory'
@@ -2708,6 +2707,9 @@ class snps_data_set:
 		else:
 			return self.h5file['chromosomes'][self.snps_filter]
 
+
+	def get_chr_pos_list(self):
+	 	return zip(self.get_chromosomes(), self.get_positions())
 
 	def get_macs(self):
 		g, already_exists = self._get_cached_group_()
@@ -2787,6 +2789,25 @@ class snps_data_set:
 		return k_mat
 
 
+	def _calc_ibd_kinship_2_(self, snps, num_dots=10, dtype='single'):
+		n_indivs = self.num_individs()
+		chunk_size = n_indivs
+		k_mat = sp.zeros((n_indivs, n_indivs), dtype=dtype)
+		num_snps = len(snps)
+		num_splits = num_snps / chunk_size
+		for chunk_i, i in enumerate(range(0, num_snps, chunk_size)):
+			snps_array = sp.array(snps[i:i + chunk_size])
+			snps_array = snps_array.T
+			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+			x = sp.mat(norm_snps_array.T)
+			k_mat += x.T * x
+			if num_dots and num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+		k_mat = k_mat / float(num_snps)
+		return k_mat
+
+
 	def _calc_ibs_kinship_(self, num_dots=10, dtype='single', chunk_size=None):
 		n_snps = self.num_snps()
 		n_indivs = self.num_individs()
@@ -2819,6 +2840,42 @@ class snps_data_set:
 		return k_mat
 
 
+
+	def _calc_ibs_kinship_2_(self, snps, num_dots=10, snp_dtype='int8', dtype='single'):
+		n_indivs = self.num_individs()
+		chunk_size = n_indivs
+		num_snps = len(snps)
+		num_splits = num_snps / chunk_size
+		#print 'Allocating K matrix'
+		k_mat = sp.zeros((n_indivs, n_indivs), dtype=dtype)
+		#print 'Starting calculation'
+		chunk_i = 0
+		for snp_i in range(0, num_snps, chunk_size): #FINISH!!!
+			chunk_i += 1
+			snps_array = sp.array(snps[snp_i:snp_i + chunk_size], dtype=snp_dtype)
+			snps_array = snps_array.T
+			if self.data_format == 'diploid_int':
+				for i in range(n_indivs):
+					for j in range(i):
+						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+						if len(bin_counts) > 1:
+							k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
+						else:
+							k_mat[i, j] += bin_counts[0]
+						k_mat[j, i] = k_mat[i, j]
+			elif self.data_format == 'binary':
+				sm = sp.mat(snps_array * 2.0 - 1.0)
+				k_mat = k_mat + sm * sm.T
+			if num_dots and num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
+				sys.stdout.write('.')
+				sys.stdout.flush()
+		if self.data_format == 'diploid_int':
+			k_mat = k_mat / float(num_snps) + sp.eye(num_lines)
+		elif self.data_format == 'binary':
+			k_mat = k_mat / (2 * float(num_snps)) + 0.5
+		return k_mat
+
+
 	def get_kinship(self, method='ibs', num_dots=10, dtype='single', chunk_size=1024):
 		"""
 		Returns kinship
@@ -2839,7 +2896,21 @@ class snps_data_set:
 
 
 	def get_region_split_snps(self, chrom, start_pos, stop_pos):
-		pass
+		"""
+		Returns two SNP sets, one with the SNPs within the given region, 
+		and the other with the remaining SNPs.
+		"""
+		import bisect
+		chr_pos_l = self.get_chr_pos_list()
+		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
+		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
+		if self.cached_snps == None:
+			self.cached_snps = self.get_snps()
+		snps = self.cached_snps
+		local_snps = snps[start_i:stop_i]
+		global_snps = snps[:start_i] + snps[stop_i:]
+		return local_snps, global_snps
+
 
 	def get_local_n_global_kinships(self, focal_chrom_pos=None, window_size=25000, chrom=None, start_pos=None,
 					stop_pos=None, kinship_method='ibd', global_kinship=None, verbose=False):
@@ -2856,13 +2927,13 @@ class snps_data_set:
 			print 'Found %d local SNPs' % len(local_snps)
 			print 'and %d global SNPs' % len(global_snps)
 		if kinship_method == 'ibd':
-			local_k = self._calc_ibd_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			local_k = self._calc_ibd_kinship_2_(local_snps, num_dots=0) if len(local_snps) else None
 			if global_kinship == None:
-				global_k = self._calc_ibd_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+				global_k = self._calc_ibd_kinship_2_(global_snps, num_dots=0) if len(global_snps) else None
 		elif kinship_method == 'ibs':
-			local_k = self._calc_ibs_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			local_k = self._calc_ibs_kinship_2_(local_snps, num_dots=0) if len(local_snps) else None
 			if global_kinship == None:
-				global_k = self._calc_ibs_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+				global_k = self._calc_ibs_kinship_2_(global_snps, num_dots=0) if len(global_snps) else None
 		else:
 			raise NotImplementedError
 		if global_kinship != None:
@@ -3338,6 +3409,33 @@ class SNPsDataSet:
 
 
 
+	def get_chrom_vs_rest_kinships(self, chrom=None, kinship_method='ibd', global_kinship=None, verbose=False):
+		"""
+		Returns local and global kinship matrices.
+		"""
+		local_snps, global_snps = self.get_chrom_split_snps(chrom)
+		if verbose:
+			print 'Found %d SNPs on chromosome %d' % (len(local_snps), chrom)
+			print 'and %d SNPs on other chromosomes' % len(global_snps)
+		if kinship_method == 'ibd':
+			local_k = self._calc_ibd_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			if global_kinship == None:
+				global_k = self._calc_ibd_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+		elif kinship_method == 'ibs':
+			local_k = self._calc_ibs_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			if global_kinship == None:
+				global_k = self._calc_ibs_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+		else:
+			raise NotImplementedError
+		if global_kinship != None:
+			global_k = (global_kinship * self.num_snps() - local_k * len(local_snps)) / len(global_snps)
+		return {'local_k':local_k, 'global_k':global_k, 'num_local_snps':len(local_snps),
+			'num_global_snps':len(global_snps)}
+
+
+
+
+
 
 	def get_region_split_snps(self, chrom, start_pos, end_pos):
 		"""
@@ -3354,6 +3452,11 @@ class SNPsDataSet:
 		local_snps = snps[start_i:stop_i]
 		global_snps = snps[:start_i] + snps[stop_i:]
 		return local_snps, global_snps
+
+	def get_chrom_split_snps(self, chrom):
+		c_ends = self.get_chromosome_ends()
+		ci = self.chromosomes.index(chrom)
+		return get_region_split_snps(chrom, 0, c_ends[ci] + 1)
 
 
 	def get_region_split_kinships(self, chrom_pos_list, kinship_method='ibd', global_kinship=None, verbose=False):
