@@ -2759,7 +2759,6 @@ class snps_data_set:
 					filter_chunk = self.snps_filter[i:stop_i]
 					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
 					yield snps_chunk[filter_chunk]
-		return snps
 
 
 	def _calc_ibd_kinship_(self, num_dots=10):
