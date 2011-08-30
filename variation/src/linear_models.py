@@ -3654,6 +3654,7 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 		d = sd.get_local_n_global_kinships(chrom=chrom, start_pos=start_pos, stop_pos=stop_pos,
 							global_kinship=K, kinship_method=kinship_method)
 		if d['local_k'] != None and d['global_k'] != None:
+			print tair_id
 			local_k = scale_k(d['local_k'])
 			global_k = scale_k(d['global_k'])
 			#print "Chromosome=%d, position=%d" % (chrom, focal_pos)
