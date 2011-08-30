@@ -2813,6 +2813,7 @@ class snps_data_set:
 		"""
 		Returns kinship
 		"""
+		print method
 		if method == 'ibd':
 			print 'Starting IBD calculation'
 			snps = self.getSnps(debug_filter)
