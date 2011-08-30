@@ -101,8 +101,8 @@ def _write_res_dict_to_file_(filename, rd):
 		f.write('chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
 		for i in range(num_res):
-			f.write('%d, %d, %f, %f, %f, %f\n' % (rd['chromosomes'], rd['positions'], rd['pvals'],
-						rd['perc_variances2'], rd['perc_variances1'], rd['h1_heritabilities']))
+			f.write('%d, %d, %f, %f, %f, %f\n' % (rd['chromosomes'][i], rd['positions'][i], rd['pvals'][i],
+						rd['perc_variances2'][i], rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 def _write_res_dict_to_file_2_(filename, rd):
 	with open(filename, 'w') as f:
@@ -110,8 +110,8 @@ def _write_res_dict_to_file_2_(filename, rd):
 		f.write('chromosomes, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
 		for i in range(num_res):
-			f.write('%d, %f, %f, %f, %f\n' % (rd['chromosomes'], rd['pvals'], rd['perc_variances2'],
-							rd['perc_variances1'], rd['h1_heritabilities']))
+			f.write('%d, %f, %f, %f, %f\n' % (rd['chromosomes'][i], rd['pvals'][i], rd['perc_variances2'][i],
+							rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 def _write_res_dict_to_file_3_(filename, rd):
 	with open(filename, 'w') as f:
@@ -119,9 +119,9 @@ def _write_res_dict_to_file_3_(filename, rd):
 		f.write('tair_ids, chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
 		for i in range(num_res):
-			f.write('%s, %d, %d, %f, %f, %f, %f\n' % (rd['tair_ids'], rd['chromosomes'], rd['positions'],
-								rd['pvals'], rd['perc_variances2'],
-								rd['perc_variances1'], rd['h1_heritabilities']))
+			f.write('%s, %d, %d, %f, %f, %f, %f\n' % (rd['tair_ids'][i], rd['chromosomes'][i], rd['positions'][i],
+								rd['pvals'][i], rd['perc_variances2'][i],
+								rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 def run():
 	phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
