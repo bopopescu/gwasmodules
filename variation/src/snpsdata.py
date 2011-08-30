@@ -3459,7 +3459,7 @@ class SNPsDataSet:
 		import bisect
 		global_snps = []
 		local_snps = []
-		chr_pos_l = self.get_chr_pos_list()
+		chr_pos_l = self.get_chr_pos_list(cache_list=True)
 		ipdb.set_trace()
 		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
 		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
@@ -3780,7 +3780,6 @@ class SNPsDataSet:
 
 
 	def get_chr_pos_list(self, cache_list=False):
-		ipdb.set_trace()
 		if cache_list:
 			try:
 				print 'here'
@@ -3793,7 +3792,7 @@ class SNPsDataSet:
 				pass
 		chr_pos_list = []
 		for chrom, snpsd in izip(self.chromosomes, self.snpsDataList):
-			chr_pos_list = zip([chrom] * len(snpsd.positions), snpsd.positions)
+			chr_pos_list += zip([chrom] * len(snpsd.positions), snpsd.positions)
 		if cache_list:
 			self.chr_pos_list = chr_pos_list
 		return chr_pos_list
