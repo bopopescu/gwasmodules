@@ -2584,12 +2584,12 @@ class snps_data_set:
 
 
 
-	def _update_macs_(self, g, chunk_size=1000):
+	def _update_macs_(self, g, chunk_size=1024):
 		n_snps = self.num_snps()
 		g.create_dataset('macs', shape=(n_snps,), compression='gzip')
 		print 'Calculating MACs'
 		offset = 0
-		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
+		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size, use_all_snps=True)):
 			a = sp.empty(len(snps_chunk))
 			if self.data_format == 'binary':
 				for j, snp in enumerate(snps_chunk):
@@ -2728,12 +2728,12 @@ class snps_data_set:
 		self.h5file.close()
 
 
-	def snps_chunks(self, chunk_size=10000):
+	def snps_chunks(self, chunk_size=10000, use_all_snps=False):
 		"""
 		An generator/iterator for SNP chunks.
 		"""
 		n_snps = self.num_snps()
-		if self.snps_filter == None:
+		if self.snps_filter == None or use_all_snps:
 			if self.indiv_filter == None:
 				for i in range(0, n_snps, chunk_size):
 					stop_i = min(i + chunk_size, n_snps)
