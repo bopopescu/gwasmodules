@@ -47,7 +47,7 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
 
 
 
-def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.02):
+def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.05):
         #import snpsdata
 
         #LOAD DATA
