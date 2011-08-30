@@ -3527,7 +3527,7 @@ def chrom_vs_rest_mm(y, sd, kinship_method='ibd', global_k=None):
 	perc_variances2 = []
 	h1_heritabilities = []
 	for chrom in sd.chromosomes:
-		d = sd.get_local_n_global_kinships(chrom, global_kinship=K, kinship_method=kinship_method)
+		d = sd.get_chrom_vs_rest_kinships(chrom, global_kinship=K, kinship_method=kinship_method)
 		local_k = scale_k(d['local_k'])
 		global_k = scale_k(d['global_k'])
 		if local_k != None and global_k != None:
