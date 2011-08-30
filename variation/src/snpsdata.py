@@ -3460,7 +3460,7 @@ class SNPsDataSet:
 	def get_chrom_split_snps(self, chrom):
 		c_ends = self.get_chromosome_ends()
 		ci = self.chromosomes.index(chrom)
-		return get_region_split_snps(chrom, 0, c_ends[ci] + 1)
+		return self.get_region_split_snps(chrom, 0, c_ends[ci] + 1)
 
 
 	def get_region_split_kinships(self, chrom_pos_list, kinship_method='ibd', global_kinship=None, verbose=False):
