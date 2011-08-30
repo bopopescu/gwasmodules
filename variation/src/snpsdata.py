@@ -3401,9 +3401,9 @@ class SNPsDataSet:
 			if global_kinship == None:
 				global_k = self._calc_ibd_kinship_(global_snps, num_dots=0) if len(global_snps) else None
 		elif kinship_method == 'ibs':
-			local_k = self._calc_ibs_kinship_(local_snps, num_dots=10) if len(local_snps) else None
+			local_k = self._calc_ibs_kinship_(local_snps, num_dots=0) if len(local_snps) else None
 			if global_kinship == None:
-				global_k = self._calc_ibs_kinship_(global_snps, num_dots=10) if len(global_snps) else None
+				global_k = self._calc_ibs_kinship_(global_snps, num_dots=0) if len(global_snps) else None
 		else:
 			raise NotImplementedError
 		if global_kinship != None:
