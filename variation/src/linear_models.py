@@ -3521,8 +3521,6 @@ def chrom_vs_rest_mm(y, sd, kinship_method='ibd', global_k=None):
 	eig_L = lmm0._get_eigen_L_()
 	h0_res = lmm0.get_estimates(eig_L)
 
-	genome_length = sd.get_genome_length()
-	est_num_chunks = genome_length / jump_size
 	chromosomes = []
 	pvals = []
 	perc_variances1 = []
