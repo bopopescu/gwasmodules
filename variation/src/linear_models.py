@@ -3600,6 +3600,8 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 			if est_num_chunks >= 100 and (chunk_i + 1) % int(est_num_chunks / 100) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
+			elif est_num_chunks < 100:
+				print chunk_i
 
 	pval_res = gr.Result(scores=pvals, positions=positions, chromosomes=chromosomes)
 	pval_res.neg_log_trans()

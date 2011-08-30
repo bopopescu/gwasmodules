@@ -66,14 +66,8 @@ def run_gwas(pid, call_method_id, run_id, kinship_method):
 		global_k = sd.get_ibs_kinship_matrix()
 
         #Set up GWAS
-	for ws in [3000000, 1000000, 500000, 200000, 100000, 50000]:
-		file_prefix = env.env['results_dir'] + '%s_loc_v_glob_%s_%d_%d_%s' % \
-							(run_id, kinship_method, ws, pid, phen_name)
-		res_dict = lm.local_vs_global_mm_scan(phen_vals, sd, file_prefix, ws, ws / 2, kinship_method, global_k)
-		res_file_name = file_prefix + '.csv'
-		_write_res_dict_to_file_(res_file_name, res_dict)
 
-	#Now chromosomes.
+	#Chromosomes.
 	res_dict = lm.chrom_vs_rest_mm(phen_vals, sd, kinship_method, global_k)
 	print res_dict
 	file_prefix = env.env['results_dir'] + '%s_loc_v_glob_chrom_%s_%d_%s' % \
@@ -88,6 +82,15 @@ def run_gwas(pid, call_method_id, run_id, kinship_method):
 		res_dict = lm.local_vs_global_gene_mm_scan(phen_vals, sd, file_prefix, radius, kinship_method, global_k)
 		res_file_name = file_prefix + '.csv'
 		_write_res_dict_to_file_3_(res_file_name, res_dict)
+
+	#Now 'normal' window sizes
+	for ws in [3000000, 1000000, 500000, 200000, 100000, 50000]:
+		file_prefix = env.env['results_dir'] + '%s_loc_v_glob_%s_%d_%d_%s' % \
+							(run_id, kinship_method, ws, pid, phen_name)
+		res_dict = lm.local_vs_global_mm_scan(phen_vals, sd, file_prefix, ws, ws / 2, kinship_method, global_k)
+		res_file_name = file_prefix + '.csv'
+		_write_res_dict_to_file_(res_file_name, res_dict)
+
 
 
 def _write_res_dict_to_file_(filename, rd):
