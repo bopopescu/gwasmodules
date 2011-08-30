@@ -2536,12 +2536,13 @@ class snps_data_set:
 					self.h5file.create_dataset('snps', shape=(sd.num_snps(), len(sd.accessions)),
 									dtype='int8', compression='gzip')
 					offset = 0
-					for snpsd in sd.snpsDataList:
+					for j, snpsd in enumerate(sd.snpsDataList):
 						print offset
 						n_snps = len(snpsd.snps)
 
 						for i in range(0, n_snps, chunk_size):
-							print i
+							sys.stdout.write('\b\b\b\b\b%.2f' % ((float(i * (1 + j))) / \
+										(n_snps * len(sd.snpsDataList))))
 							stop_i = min(i + chunk_size, n_snps)
 							snps_chunk = sp.array(snpsd.snps[i:stop_i], dtype='int8')
 							self.h5file['snps'][offset + i: offset + stop_i ] = snps_chunk
@@ -2554,6 +2555,20 @@ class snps_data_set:
 		self.num_indivs = int(self.h5file['num_indivs'][...])
 		self.indiv_filter = None
 		self.snps_filter = None
+
+
+	def _get_cached_group_(self):
+
+		if self.indiv_filter == None:
+			cache_tuple = 'full_data'
+		else:
+			cache_tuple = str(tuple(self.h5file['indiv_ids'][self.indiv_filter]))
+		if cache_tuple in self.h5file['filters'].keys():
+			g = self.h5file['filters'][cache_tuple]
+			return g, True
+		else:
+			g = self.h5file['filters'].create_group(cache_tuple)
+			return g, False
 
 
 
@@ -2593,11 +2608,8 @@ class snps_data_set:
 		Sets a mac filter which is applied at runtime.
 		"""
 		#Check wether cached! otherwise..
-		cache_tuple = str(tuple(self.h5file['indiv_ids'][self.indiv_filter]))
-		if cache_tuple in self.h5file['filters'].keys():
-			g = self.h5file['filters'][cache_tuple]
-		else:
-			g = self.h5file['filters'].create_group(cache_tuple)
+		g, already_exists = _get_cached_group_()
+		if not already_exists:
 			self._update_macs_(g)
 		if self.snps_filter != None:
 			self.snps_filter = self.snps_filter * (g['macs'][...] >= min_mac)
@@ -2700,24 +2712,23 @@ class snps_data_set:
 
 
 	def get_macs(self):
-		cache_tuple = str(tuple(self.h5file['indiv_ids'][self.indiv_filter]))
-		if cache_tuple in self.h5file['filters'].keys():
-			g = self.h5file['filters'][cache_tuple]
-		else:
-			g = self.h5file['filters'].create_group(cache_tuple)
+		g, already_exists = self._get_cached_group_()
+		if not already_exists:
 			self._update_macs_(g)
-		return g['macs'][...]
+		if self.snps_filter == None:
+			return g['macs'][...]
+		else:
+			return g['macs'][self.snps_filter]
 
 
 	def get_mafs(self):
 		if self.indiv_filter != None:
 			return self.get_macs() / len(self.indiv_filter)
 		else:
-			return self.get_macs() / len(self.num_indivs)
+			return self.get_macs() / self.num_indivs
 
 	def get_old_snps_data_set(self):
 		"""
-		Returns 
 		"""
 		raise NotImplementedError
 
@@ -2725,11 +2736,132 @@ class snps_data_set:
 		self.h5file.close()
 
 
+	def snps_chunks(self, chunk_size=10000):
+		if self.snps_filter == None:
+			if self.indiv_filter == None:
+				for i in range(0, self.num_snps, chunk_size):
+					stop_i = min(i + chunk_size, self.num_snps)
+					yield self.h5file['snps'][i:stop_i]
+			else:
+				for i in range(0, self.num_snps, chunk_size):
+					stop_i = min(i + chunk_size, self.num_snps)
+					yield self.h5file['snps'][i:stop_i, self.indiv_filter]
+		else:
+			if self.indiv_filter == None:
+				for i in range(0, self.num_snps, chunk_size):
+					stop_i = min(i + chunk_size, self.num_snps)
+					filter_chunk = self.snps_filter[i:stop_i]
+					snps_chunk = self.h5file['snps'][i:stop_i]
+					yield snps_chunk[filter_chunk]
+			else:
+				for i in range(0, self.num_snps, chunk_size):
+					stop_i = min(i + chunk_size, self.num_snps)
+					filter_chunk = self.snps_filter[i:stop_i]
+					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
+					yield snps_chunk[filter_chunk]
+		return snps
 
-	def get_kinship(method='ibs'):
+
+	def _calc_ibd_kinship_(self, num_dots=10):
+		num_lines = len(self.accessions)
+		chunk_size = num_lines
+		cov_mat = sp.zeros((num_lines, num_lines))
+		num_snps = len(snps)
+		num_splits = num_snps / float(chunk_size)
+		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
+			snps_array = snps_chunk.T
+			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
+			x = sp.mat(norm_snps_array.T)
+			cov_mat += x.T * x
+			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / num_snps))
+			sys.stdout.flush()
+		cov_mat = cov_mat / float(num_snps)
+		return cov_mat
+
+
+	def _calc_ibs_kinship_(self, snps, num_dots=10, snp_dtype='int8', dtype='single'):
+		num_lines = len(self.accessions)
+		chunk_size = num_lines
+		num_snps = len(snps)
+		num_splits = num_snps / chunk_size
+		#print 'Allocating K matrix'
+		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
+		#print 'Starting calculation'
+		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)): #FINISH!!!
+			snps_array = snps_chunk.T
+			if self.data_format == 'diploid_int':
+				for i in range(num_lines):
+					for j in range(i):
+						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
+						if len(bin_counts) > 1:
+							k_mat[i, j] += (bin_counts[0] + 0.5 * bin_counts[1])
+						else:
+							k_mat[i, j] += bin_counts[0]
+						k_mat[j, i] = k_mat[i, j]
+			elif self.data_format == 'binary':
+				sm = sp.mat(snps_array * 2.0 - 1.0)
+				k_mat = k_mat + sm * sm.T
+			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / num_snps))
+			sys.stdout.flush()
+		if self.data_format == 'diploid_int':
+			k_mat = k_mat / float(num_snps) + sp.eye(num_lines)
+		elif self.data_format == 'binary':
+			k_mat = k_mat / (2 * float(num_snps)) + 0.5
+		return k_mat
+
+
+	def get_kinship(method='ibs', num_dots=10, dtype='single'):
 		"""
 		Returns kinship
 		"""
+		if method == 'ibd':
+			print 'Starting IBD calculation'
+			snps = self.getSnps(debug_filter)
+			k_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
+			print 'Finished calculating IBD kinship matrix'
+			return k_mat
+		elif method == 'ibs':
+			print 'Starting IBS calculation'
+			snps = self.getSnps(debug_filter)
+			k_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
+			print 'Finished calculating IBS kinship matrix'
+			return k_mat
+
+
+
+
+
+	def get_local_n_global_kinships(self, focal_chrom_pos=None, window_size=25000, chrom=None, start_pos=None,
+					stop_pos=None, kinship_method='ibd', global_kinship=None, verbose=False):
+		"""
+		Returns local and global kinship matrices.
+		"""
+		if focal_chrom_pos != None:
+			chrom, pos = focal_chrom_pos
+			start_pos = pos - window_size
+			stop_pos = pos + window_size
+
+		local_snps, global_snps = self.get_region_split_snps(chrom, start_pos, stop_pos)
+		if verbose:
+			print 'Found %d local SNPs' % len(local_snps)
+			print 'and %d global SNPs' % len(global_snps)
+		if kinship_method == 'ibd':
+			local_k = self._calc_ibd_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			if global_kinship == None:
+				global_k = self._calc_ibd_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+		elif kinship_method == 'ibs':
+			local_k = self._calc_ibs_kinship_(local_snps, num_dots=0) if len(local_snps) else None
+			if global_kinship == None:
+				global_k = self._calc_ibs_kinship_(global_snps, num_dots=0) if len(global_snps) else None
+		else:
+			raise NotImplementedError
+		if global_kinship != None:
+			global_k = (global_kinship * self.num_snps() - local_k * len(local_snps)) / len(global_snps)
+		return {'local_k':local_k, 'global_k':global_k, 'num_local_snps':len(local_snps),
+			'num_global_snps':len(global_snps)}
+
+
+
 
 
 class SNPsDataSet:
