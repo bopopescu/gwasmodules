@@ -2560,14 +2560,14 @@ class snps_data_set:
 		if self.indiv_filter == None:
 			return int(self.h5file['num_indivs'][...])
 		else:
-			return sp.sum(self.snps_filter)
+			return len(self.indiv_filter)
 
 
 	def num_snps(self):
 		if self.snps_filter == None:
 			return int(self.h5file['num_snps'][...])
 		else:
-			return len(self.indiv_filter)
+			return sp.sum(self.snps_filter)
 
 	def _get_cached_group_(self):
 
