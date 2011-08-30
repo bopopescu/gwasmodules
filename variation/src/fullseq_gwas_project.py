@@ -30,6 +30,7 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
         shstr += 'module load scipy/GotoBLAS2/0.9.0\n'
         shstr += 'module load matplotlib/1.0.0\n'
         shstr += 'module load mysqldb/1.2.3\n'
+	shstr += 'module load h5py/2.0.0\n'
         shstr += 'export GOTO_NUM_THREADS=1\n'
 
 
