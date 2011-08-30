@@ -2835,7 +2835,8 @@ class snps_data_set:
 
 
 
-	local_snps, global_snps = self.get_region_split_snps(chrom, start_pos, stop_pos)
+	def get_region_split_snps(self, chrom, start_pos, stop_pos):
+		pass
 
 	def get_local_n_global_kinships(self, focal_chrom_pos=None, window_size=25000, chrom=None, start_pos=None,
 					stop_pos=None, kinship_method='ibd', global_kinship=None, verbose=False):
