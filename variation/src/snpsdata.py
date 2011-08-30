@@ -3454,7 +3454,6 @@ class SNPsDataSet:
 		Returns two SNP sets, one with the SNPs within the given region, 
 		and the other with the remaining SNPs.
 		"""
-		print chrom, start_pos, end_pos
 		import bisect
 		global_snps = []
 		local_snps = []
@@ -3778,7 +3777,6 @@ class SNPsDataSet:
 	def get_chr_pos_list(self, cache_list=False):
 		if cache_list:
 			try:
-				print 'here'
 				chr_pos_list = self.chr_pos_list
 				if len(chr_pos_list) > 0:
 					return chr_pos_list
