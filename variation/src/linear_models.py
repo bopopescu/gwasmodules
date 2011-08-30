@@ -3648,6 +3648,9 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 	for i, tair_id in enumerate(tair_ids):
 		gd = gene_dict[tair_id]
 		chrom = gd['chromosome']
+		if chrom not in ['1', '2', '3', '4', '5']:
+			continue
+		chrom = int(chrom)
 		start_pos = gd['start_pos'] - radius
 		stop_pos = gd['end_pos'] + radius
 		mean_pos = (start_pos + stop_pos) / 2
