@@ -4,6 +4,7 @@ GWA project using full sequence data.
 Quan, Bjarni, Dazhe, et al.
 """
 import sys
+import os
 import env
 import dataParsers as dp
 import phenotypeData as pd
