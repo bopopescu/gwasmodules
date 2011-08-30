@@ -3462,6 +3462,7 @@ class SNPsDataSet:
 		chr_pos_l = self.get_chr_pos_list()
 		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
 		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
+		print start_i, stop_i, chr_pos_l[start_i:stop_i]
 		snps = self.get_snps()
 		local_snps = snps[start_i:stop_i]
 		global_snps = snps[:start_i] + snps[stop_i:]
@@ -3788,11 +3789,8 @@ class SNPsDataSet:
 			except Exception:
 				pass
 		chr_pos_list = []
-		for i in range(0, len(self.snpsDataList)):
-			snpsd = self.snpsDataList[i]
-			chr = i + 1
-			for pos in snpsd.positions:
-				chr_pos_list.append((chr, pos))
+		for chrom, snpsd in izip(self.chromosomes, self.snpsDataList):
+			chr_pos_list = zip([chrom] * len(snpsd.positions), snpsd.positions)
 		if cache_list:
 			self.chr_pos_list = chr_pos_list
 		return chr_pos_list
