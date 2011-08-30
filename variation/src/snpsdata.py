@@ -2809,7 +2809,7 @@ class snps_data_set:
 		return k_mat
 
 
-	def get_kinship(method='ibs', num_dots=10, dtype='single'):
+	def get_kinship(self, method='ibs', num_dots=10, dtype='single'):
 		"""
 		Returns kinship
 		"""
