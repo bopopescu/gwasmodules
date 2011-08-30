@@ -75,7 +75,7 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.02):
 	file_prefix = env.env['results_dir'] + '%s_loc_v_glob_chrom_%s_%d_%s' % \
 						(run_id, kinship_method, pid, phen_name)
 	res_file_name = file_prefix + '.csv'
-	_write_res_dict_to_file_(res_file_name, res_dict)
+	_write_res_dict_to_file_2_(res_file_name, res_dict)
 
 	#Now gene-centralized.
 	for radius in [20000, 10000]:
@@ -96,7 +96,7 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.02):
 
 
 def _write_res_dict_to_file_(filename, rd):
-	with open(res_file_name, 'w') as f:
+	with open(filename, 'w') as f:
 		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
 		f.write('chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
@@ -105,7 +105,7 @@ def _write_res_dict_to_file_(filename, rd):
 						rd['perc_variances2'], rd['perc_variances1'], rd['h1_heritabilities']))
 
 def _write_res_dict_to_file_2_(filename, rd):
-	with open(res_file_name, 'w') as f:
+	with open(filename, 'w') as f:
 		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
 		f.write('chromosomes, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
@@ -113,8 +113,8 @@ def _write_res_dict_to_file_2_(filename, rd):
 			f.write('%d, %f, %f, %f, %f\n' % (rd['chromosomes'], rd['pvals'], rd['perc_variances2'],
 							rd['perc_variances1'], rd['h1_heritabilities']))
 
-def _write_res_dict_to_file_(filename, rd):
-	with open(res_file_name, 'w') as f:
+def _write_res_dict_to_file_3_(filename, rd):
+	with open(filename, 'w') as f:
 		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
 		f.write('tair_ids, chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
