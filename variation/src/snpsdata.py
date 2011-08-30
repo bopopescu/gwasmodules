@@ -2588,6 +2588,7 @@ class snps_data_set:
 		n_snps = self.num_snps()
 		g.create_dataset('macs', shape=(n_snps,), compression='gzip')
 		print 'Calculating MACs'
+		offset = 0
 		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
 			a = sp.empty(len(snps_chunk))
 			if self.data_format == 'binary':
@@ -2602,8 +2603,8 @@ class snps_data_set:
 					else:
 						l = sp.array([bc[0], bc[2]]) + bc[1] / 2.0
 						a[j] = l.min()
-
-			g['macs'][i:i + len(snps_chunk)] = a
+			g['macs'][offset:offset + len(snps_chunk)] = a
+			offset += len(snps_chunk)
 			sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
 									((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
@@ -2666,40 +2667,26 @@ class snps_data_set:
 	def get_snps(self, chunk_size=1000):
 		n_snps = self.num_snps()
 		n_indivs = self.num_individs()
-		if self.snps_filter == None:
-			if self.indiv_filter == None:
-				snps = self.h5file['snps'][...]
-			else:
-				if self.data_format in ['binary', 'diploid_int']:
-					print 'Allocating memory'
-					snps = sp.empty((n_snps, n_snps), dtype='int8')
-					print 'done allocating.'
-				else:
-					raise NotImplementedError
-				for chunk_i, snps_chunk in enumerate(snps_chunks(chunk_size)):
-					snps[i:i + len(snps_chunk)] = snps_chunk
-					sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
-										((chunk_i + 1.0) * chunk_size) / n_snps))))
-					sys.stdout.flush()
+		if self.snps_filter == None and self.indiv_filter == None:
+			snps = self.h5file['snps'][...]
+		elif self.indiv_filter == None:
+			snps = self.h5file['snps'][self.snps_filter]
 		else:
-			if self.indiv_filter == None:
-				snps = self.h5file['snps'][self.snps_filter]
+			if self.data_format in ['binary', 'diploid_int']:
+				print 'Allocating memory'
+				snps = sp.empty((n_snps, n_indivs), dtype='int8')
+				print 'done allocating.'
 			else:
-				if self.data_format in ['binary', 'diploid_int']:
-					print 'Allocating memory'
-					snps = sp.empty((n_snps, n_indivs), dtype='int8')
-					print 'done allocating.'
-				else:
-					raise NotImplementedError
-				offset = 0
-				print 'Extracting the SNPs'
-				for chunk_i, snps_chunk in enumerate(snps_chunks(chunk_size)):
-					snps[offset:offset + len(snps_chunk)] = snps_chunk
-					offset += len(snps_chunk)
-					sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
-										((chunk_i + 1.0) * chunk_size) / n_snps))))
-					sys.stdout.flush()
-				print 'Done extracting the SNPs.'
+				raise NotImplementedError
+			offset = 0
+			print 'Extracting the SNPs'
+			for chunk_i, snps_chunk in enumerate(snps_chunks(chunk_size)):
+				snps[offset:offset + len(snps_chunk)] = snps_chunk
+				offset += len(snps_chunk)
+				sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
+									((chunk_i + 1.0) * chunk_size) / n_snps))))
+				sys.stdout.flush()
+			print 'Done extracting the SNPs.'
 		return snps
 
 
