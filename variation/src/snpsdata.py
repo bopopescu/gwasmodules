@@ -3407,7 +3407,10 @@ class SNPsDataSet:
 		else:
 			raise NotImplementedError
 		if global_kinship != None:
-			global_k = (global_kinship * self.num_snps() - local_k * len(local_snps)) / len(global_snps)
+			if len(local_snps):
+				global_k = (global_kinship * self.num_snps() - local_k * len(local_snps)) / len(global_snps)
+			else:
+				global_k = global_kinship
 		return {'local_k':local_k, 'global_k':global_k, 'num_local_snps':len(local_snps),
 			'num_global_snps':len(global_snps)}
 
