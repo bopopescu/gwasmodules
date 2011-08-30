@@ -3777,13 +3777,24 @@ class SNPsDataSet:
 		return sample_snp_chr_pos_marf
 
 
-	def get_chr_pos_list(self):
+	def get_chr_pos_list(self, cache_list=False):
+		if cache_list:
+			try:
+				chr_pos_list = self.chr_pos_list
+				if len(chr_pos_list) > 0:
+					return chr_pos_list
+				else:
+					raise Exception
+			except Exception:
+				pass
 		chr_pos_list = []
 		for i in range(0, len(self.snpsDataList)):
 			snpsd = self.snpsDataList[i]
 			chr = i + 1
 			for pos in snpsd.positions:
 				chr_pos_list.append((chr, pos))
+		if cache_list:
+			self.chr_pos_list = chr_pos_list
 		return chr_pos_list
 
 	def getChrPosList(self):
