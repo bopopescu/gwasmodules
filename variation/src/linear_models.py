@@ -3528,9 +3528,9 @@ def chrom_vs_rest_mm(y, sd, kinship_method='ibd', global_k=None):
 	h1_heritabilities = []
 	for chrom in sd.chromosomes:
 		d = sd.get_chrom_vs_rest_kinships(chrom, global_kinship=K, kinship_method=kinship_method)
-		local_k = scale_k(d['local_k'])
-		global_k = scale_k(d['global_k'])
 		if local_k != None and global_k != None:
+			local_k = scale_k(d['local_k'])
+			global_k = scale_k(d['global_k'])
 			res_dict = local_vs_global_mm(y, local_k, global_k, K, h0_res=h0_res)
 			chromosomes.append(chrom)
 			perc_variances1.append(res_dict['perc_var1'])
@@ -3578,9 +3578,9 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 			d = sd.get_local_n_global_kinships((chrom, focal_pos), window_size,
 										global_kinship=K,
 										kinship_method=kinship_method)
-			local_k = scale_k(d['local_k'])
-			global_k = scale_k(d['global_k'])
 			if local_k != None and global_k != None:
+				local_k = scale_k(d['local_k'])
+				global_k = scale_k(d['global_k'])
 				#print "Chromosome=%d, position=%d" % (chrom, focal_pos)
 				res_dict = local_vs_global_mm(y, local_k, global_k, K, h0_res=h0_res)
 				chromosomes.append(chrom)
@@ -3653,9 +3653,9 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 		mean_pos = (start_pos + stop_pos) / 2
 		d = sd.get_local_n_global_kinships(chrom=chrom, start_pos=start_pos, stop_pos=stop_pos,
 							global_kinship=K, kinship_method=kinship_method)
-		local_k = scale_k(d['local_k'])
-		global_k = scale_k(d['global_k'])
 		if local_k != None and global_k != None:
+			local_k = scale_k(d['local_k'])
+			global_k = scale_k(d['global_k'])
 			#print "Chromosome=%d, position=%d" % (chrom, focal_pos)
 			res_dict = local_vs_global_mm(y, local_k, global_k, K, h0_res=h0_res)
 			chromosomes.append(chrom)
