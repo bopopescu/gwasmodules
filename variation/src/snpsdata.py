@@ -3780,8 +3780,10 @@ class SNPsDataSet:
 
 
 	def get_chr_pos_list(self, cache_list=False):
+		ipdb.set_trace()
 		if cache_list:
 			try:
+				print 'here'
 				chr_pos_list = self.chr_pos_list
 				if len(chr_pos_list) > 0:
 					return chr_pos_list
