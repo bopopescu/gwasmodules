@@ -2781,7 +2781,7 @@ class snps_data_set:
 	def _calc_ibd_kinship_(self, num_dots=10, dtype='single', chunk_size=None):
 		n_snps = self.num_snps()
 		n_indivs = self.num_individs()
-		if chunk_size != None:
+		if chunk_size == None:
 			chunk_size = n_indivs
 		k_mat = sp.zeros((n_indivs, n_indivs), dtype=dtype)
 		num_splits = n_snps / float(chunk_size)
@@ -2790,7 +2790,7 @@ class snps_data_set:
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 			x = sp.mat(norm_snps_array.T)
 			k_mat += x.T * x
-			sys.stdout.write('\b\b\b\b\b%0.2f%%' % 100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps)))
+			sys.stdout.write('\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
 		k_mat = k_mat / float(n_snps)
 		return k_mat
@@ -2799,7 +2799,7 @@ class snps_data_set:
 	def _calc_ibs_kinship_(self, num_dots=10, dtype='single', chunk_size=None):
 		n_snps = self.num_snps()
 		n_indivs = self.num_individs()
-		if chunk_size != None:
+		if chunk_size == None:
 			chunk_size = n_indivs
 		num_splits = n_snps / chunk_size
 		#print 'Allocating K matrix'
@@ -2819,7 +2819,7 @@ class snps_data_set:
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T
-			sys.stdout.write('\b\b\b\b\b%0.2f%%' % 100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps)))
+			sys.stdout.write('\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
 		if self.data_format == 'diploid_int':
 			k_mat = k_mat / float(n_snps) + sp.eye(n_indivs)
