@@ -69,13 +69,6 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.05):
 
         #Set up GWAS
 
-	#Chromosomes.
-	res_dict = lm.chrom_vs_rest_mm(phen_vals, sd, kinship_method, global_k)
-	print res_dict
-	file_prefix = env.env['results_dir'] + '%s_loc_v_glob_chrom_%s_%d_%s' % \
-						(run_id, kinship_method, pid, phen_name)
-	res_file_name = file_prefix + '.csv'
-	_write_res_dict_to_file_2_(res_file_name, res_dict)
 
 	#Now gene-centralized.
 	for radius in [20000, 10000]:
@@ -84,6 +77,14 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.05):
 		res_dict = lm.local_vs_global_gene_mm_scan(phen_vals, sd, file_prefix, radius, kinship_method, global_k)
 		res_file_name = file_prefix + '.csv'
 		_write_res_dict_to_file_3_(res_file_name, res_dict)
+
+	#Chromosomes.
+	res_dict = lm.chrom_vs_rest_mm(phen_vals, sd, kinship_method, global_k)
+	print res_dict
+	file_prefix = env.env['results_dir'] + '%s_loc_v_glob_chrom_%s_%d_%s' % \
+						(run_id, kinship_method, pid, phen_name)
+	res_file_name = file_prefix + '.csv'
+	_write_res_dict_to_file_2_(res_file_name, res_dict)
 
 	#Now 'normal' window sizes
 	for ws in [3000000, 1000000, 500000, 200000, 100000, 50000]:
