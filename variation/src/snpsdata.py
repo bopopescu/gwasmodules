@@ -2551,11 +2551,22 @@ class snps_data_set:
 			else:
 				raise NotImplementedError
 		self.data_format = str(self.h5file['data_format'][...])
-		self.num_snps = int(self.h5file['num_snps'][...])
-		self.num_indivs = int(self.h5file['num_indivs'][...])
 		self.indiv_filter = None
 		self.snps_filter = None
 
+
+	def num_individs(self):
+		if self.indiv_filter == None:
+			return int(self.h5file['num_indivs'][...])
+		else:
+			return sp.sum(self.snps_filter)
+
+
+	def num_snps(self):
+		if self.snps_filter == None:
+			return int(self.h5file['num_snps'][...])
+		else:
+			return len(self.indiv_filter)
 
 	def _get_cached_group_(self):
 
@@ -2573,11 +2584,14 @@ class snps_data_set:
 
 
 	def _update_macs_(self, g, chunk_size=1000):
-		g.create_dataset('macs', shape=(self.num_snps,), compression='gzip')
+		n_snps = self.num_snps()
+		g.create_dataset('macs', shape=(n_snps,), compression='gzip')
 		print 'Calculating MACs'
 		if self.data_format == 'binary':
-			for i in range(0, self.num_snps, chunk_size):
-				stop_i = min(i + chunk_size, self.num_snps)
+			for i in range(0, n_snps, chunk_size):
+				sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / n_snps))
+				sys.stdout.flush()
+				stop_i = min(i + chunk_size, n_snps)
 				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
 				n_snps = len(snps)
 				a = sp.empty(n_snps)
@@ -2585,10 +2599,13 @@ class snps_data_set:
 					bc = sp.bincount(snp)
 					a[j] = 0 if len(bc) < 2 else bc.min()
 				g['macs'][i:i + len(snps)] = a
+			sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / n_snps))
+			sys.stdout.flush()
 		elif self.data_format == 'diploid_int':
-			for i in range(0, self.num_snps, chunk_size):
-				sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / self.num_snps))
-				stop_i = min(i + chunk_size, self.num_snps)
+			for i in range(0, n_snps, chunk_size):
+				sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / n_snps))
+				sys.stdout.flush()
+				stop_i = min(i + chunk_size, n_snps)
 				snps = self.h5file['snps'][i:stop_i, self.indiv_filter]
 				n_snps = len(snps)
 				a = sp.empty(n_snps)
@@ -2600,7 +2617,8 @@ class snps_data_set:
 						l = sp.array([bc[0], bc[2]]) + bc[1] / 2.0
 						a[j] = l.min()
 				g['macs'][i:i + len(snps)] = a
-			sys.stdout.write('\b\b\b\b\b%.2f' % (float(i) / self.num_snps))
+			sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / n_snps))
+			sys.stdout.flush()
 		print 'Finished calculating MACs'
 
 	def filter_mac(self, min_mac=15):
@@ -2655,18 +2673,19 @@ class snps_data_set:
 		self.filter_mac(1)
 
 
-	def get_snps(self, chunk_size=100000):
+	def get_snps(self, chunk_size=1000):
+		n_snps = self.num_snps()
+		n_indivs = self.num_individs()
 		if self.snps_filter == None:
 			if self.indiv_filter == None:
 				snps = self.h5file['snps'][...]
 			else:
 				if self.data_format in ['binary', 'diploid_int']:
-					snps = sp.empty((self.num_snps, int(sum(self.indiv_filter))), \
-							dtype='int8')
+					snps = sp.empty((n_snps, n_snps), dtype='int8')
 				else:
 					raise NotImplementedError
-				for i in range(0, self.num_snps, chunk_size):
-					stop_i = min(i + chunk_size, self.num_snps)
+				for i in range(0, n_snps, chunk_size):
+					stop_i = min(i + chunk_size, n_snps)
 					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
 					snps[i:i + len(snps_chunk)] = snps_chunk
 		else:
@@ -2675,23 +2694,23 @@ class snps_data_set:
 			else:
 				if self.data_format in ['binary', 'diploid_int']:
 					print 'Allocating memory'
-					snps = sp.empty((int(sum(self.snps_filter)),
-							len(self.indiv_filter)), dtype='int8')
+					snps = sp.empty((n_snps, n_indivs), dtype='int8')
 					print 'done allocating.'
 				else:
 					raise NotImplementedError
 				offset = 0
 				print 'Extracting the SNPs'
-				for i in range(0, self.num_snps, chunk_size):
-					sys.stdout.write('\b\b\b\b\b\b%.2f%%' % (100 * (float(i) / self.num_snps)))
+				for i in range(0, n_snps, chunk_size):
+					sys.stdout.write('\b\b\b\b\b\b%.2f%%' % (100 * (float(i) / n_snps)))
 					sys.stdout.flush()
 					filter_chunk = self.snps_filter[i:i + chunk_size]
-					stop_i = min(i + chunk_size, self.num_snps)
+					stop_i = min(i + chunk_size, n_snps)
 					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
 					snps_chunk = snps_chunk[filter_chunk]
 					snps[offset:offset + len(snps_chunk)] = snps_chunk
 					offset += len(snps_chunk)
-				sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / self.num_snps))
+				sys.stdout.write('\b\b\b\b\b\b%.2f' % (float(i) / n_snps))
+				sys.stdout.flush()
 				print 'Done extracting the SNPs.'
 		return snps
 
@@ -2722,10 +2741,7 @@ class snps_data_set:
 
 
 	def get_mafs(self):
-		if self.indiv_filter != None:
-			return self.get_macs() / len(self.indiv_filter)
-		else:
-			return self.get_macs() / self.num_indivs
+		return self.get_macs() / self.num_individs()
 
 	def get_old_snps_data_set(self):
 		"""
@@ -2737,59 +2753,60 @@ class snps_data_set:
 
 
 	def snps_chunks(self, chunk_size=10000):
+		n_snps = self.num_snps()
 		if self.snps_filter == None:
 			if self.indiv_filter == None:
-				for i in range(0, self.num_snps, chunk_size):
-					stop_i = min(i + chunk_size, self.num_snps)
+				for i in range(0, n_snps, chunk_size):
+					stop_i = min(i + chunk_size, n_snps)
 					yield self.h5file['snps'][i:stop_i]
 			else:
-				for i in range(0, self.num_snps, chunk_size):
-					stop_i = min(i + chunk_size, self.num_snps)
+				for i in range(0, n_snps, chunk_size):
+					stop_i = min(i + chunk_size, n_snps)
 					yield self.h5file['snps'][i:stop_i, self.indiv_filter]
 		else:
 			if self.indiv_filter == None:
-				for i in range(0, self.num_snps, chunk_size):
-					stop_i = min(i + chunk_size, self.num_snps)
+				for i in range(0, n_snps, chunk_size):
+					stop_i = min(i + chunk_size, n_snps)
 					filter_chunk = self.snps_filter[i:stop_i]
 					snps_chunk = self.h5file['snps'][i:stop_i]
 					yield snps_chunk[filter_chunk]
 			else:
-				for i in range(0, self.num_snps, chunk_size):
-					stop_i = min(i + chunk_size, self.num_snps)
+				for i in range(0, n_snps, chunk_size):
+					stop_i = min(i + chunk_size, n_snps)
 					filter_chunk = self.snps_filter[i:stop_i]
 					snps_chunk = self.h5file['snps'][i:stop_i, self.indiv_filter]
 					yield snps_chunk[filter_chunk]
 
 
 	def _calc_ibd_kinship_(self, num_dots=10, dtype='single'):
-		num_lines = len(self.accessions)
-		chunk_size = num_lines
-		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
-		num_snps = len(snps)
-		num_splits = num_snps / float(chunk_size)
+		n_snps = self.num_snps()
+		n_indivs = self.num_individs()
+		chunk_size = n_indivs
+		k_mat = sp.zeros((n_indivs, n_indivs), dtype=dtype)
+		num_splits = n_snps / float(chunk_size)
 		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
 			snps_array = snps_chunk.T
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 			x = sp.mat(norm_snps_array.T)
 			k_mat += x.T * x
-			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / num_snps))
+			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / n_snps))
 			sys.stdout.flush()
-		k_mat = k_mat / float(num_snps)
+		k_mat = k_mat / float(n_snps)
 		return k_mat
 
 
 	def _calc_ibs_kinship_(self, num_dots=10, dtype='single'):
-		num_lines = len(self.accessions)
-		chunk_size = num_lines
-		num_snps = len(snps)
-		num_splits = num_snps / chunk_size
+		n_snps = self.num_snps()
+		n_indivs = self.num_individs()
+		chunk_size = n_indivs
+		num_splits = n_snps / chunk_size
 		#print 'Allocating K matrix'
-		k_mat = sp.zeros((num_lines, num_lines), dtype=dtype)
+		k_mat = sp.zeros((n_indivs, n_indivs), dtype=dtype)
 		#print 'Starting calculation'
 		for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)): #FINISH!!!
 			snps_array = snps_chunk.T
 			if self.data_format == 'diploid_int':
-				for i in range(num_lines):
+				for i in range(n_indivs):
 					for j in range(i):
 						bin_counts = sp.bincount(sp.absolute(snps_array[j] - snps_array[i]))
 						if len(bin_counts) > 1:
@@ -2800,12 +2817,12 @@ class snps_data_set:
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T
-			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / num_snps))
+			sys.stdout.write('\b\b\b\b\b%0.2f' % min(100.0, 100.0 * ((chunk_i + 1.0) * chunk_size) / n_snps))
 			sys.stdout.flush()
 		if self.data_format == 'diploid_int':
-			k_mat = k_mat / float(num_snps) + sp.eye(num_lines)
+			k_mat = k_mat / float(n_snps) + sp.eye(n_indivs)
 		elif self.data_format == 'binary':
-			k_mat = k_mat / (2 * float(num_snps)) + 0.5
+			k_mat = k_mat / (2 * float(n_snps)) + 0.5
 		return k_mat
 
 
