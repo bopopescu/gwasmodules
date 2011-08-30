@@ -57,7 +57,7 @@ def run_gwas(pid, call_method_id, run_id, kinship_method):
 	phed.convert_to_averages()
 	phed.transform(pid, 'most_normal')
 	phen_name = phed.get_name(pid)
-	sd.coordinate_w_phenotype_data(phed, pid, coord_phen)
+	sd.coordinate_w_phenotype_data(phed, pid)
 	phen_vals = phed.get_values()
 
 	if kinship_method == 'ibd':
