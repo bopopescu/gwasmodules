@@ -15,6 +15,7 @@ import h5py
 import os
 try:
 	import scipy as sp
+	sp.seterr(divide='raise')
 except Exception, err_str:
 	print 'scipy is missing:', err_str
 
@@ -2626,7 +2627,7 @@ class snps_data_set:
 		Sets a mac filter which is applied at runtime.
 		"""
 		#Check wether cached! otherwise..
-		g, already_exists = _get_cached_group_()
+		g, already_exists = self._get_cached_group_()
 		if not already_exists:
 			self._update_macs_(g)
 		if self.snps_filter != None:
@@ -2790,7 +2791,7 @@ class snps_data_set:
 			norm_snps_array = (snps_array - sp.mean(snps_array, 0)) / sp.std(snps_array, 0)
 			x = sp.mat(norm_snps_array.T)
 			k_mat += x.T * x
-			sys.stdout.write('\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps))))
+			sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
 		k_mat = k_mat / float(n_snps)
 		return k_mat
@@ -2819,7 +2820,7 @@ class snps_data_set:
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T
-			sys.stdout.write('\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps))))
+			sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, ((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
 		if self.data_format == 'diploid_int':
 			k_mat = k_mat / float(n_snps) + sp.eye(n_indivs)
