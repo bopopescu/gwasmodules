@@ -3456,7 +3456,6 @@ class SNPsDataSet:
 		and the other with the remaining SNPs.
 		"""
 		print chrom, start_pos, end_pos
-		print len(self.snps)
 		import bisect
 		global_snps = []
 		local_snps = []
@@ -3466,6 +3465,7 @@ class SNPsDataSet:
 		snps = self.get_snps()
 		local_snps = snps[start_i:stop_i]
 		global_snps = snps[:start_i] + snps[stop_i:]
+		print len(snps)
 		return local_snps, global_snps
 
 	def get_chrom_split_snps(self, chrom):
