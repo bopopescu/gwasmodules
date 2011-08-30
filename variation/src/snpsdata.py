@@ -7,7 +7,7 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
 
 import sys, warnings
-import pdb
+import ipdb
 import env
 from itertools import *
 from bisect import bisect
@@ -3460,6 +3460,7 @@ class SNPsDataSet:
 		global_snps = []
 		local_snps = []
 		chr_pos_l = self.get_chr_pos_list()
+		ipdb.set_trace()
 		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
 		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
 		print start_i, stop_i, chr_pos_l[start_i:stop_i]
