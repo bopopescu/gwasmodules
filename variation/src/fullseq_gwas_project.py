@@ -15,7 +15,7 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
         If no mapping_method, then analysis run is set up.
         """
         job_id = '%s_%s_%d_%d' % (run_id, kinship_method, call_method_id, pid)
-        file_prefix = env['results_dir'] + job_id
+        file_prefix = env.env['results_dir'] + job_id
 
         #Cluster specific parameters        
         shstr = '#!/bin/bash\n'
@@ -33,7 +33,7 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
 
 
         shstr += "python %sfullseq_gwas_project.py %s %s %d %d" % \
-                        (env['script_dir'], run_id, kinship_method, call_method_id, pid)
+                        (env.env['script_dir'], run_id, kinship_method, call_method_id, pid)
 
         #shstr += "> " + file_prefix + "_job.out) >& " + file_prefix + "_job.err\n"
         print '\n', shstr, '\n'
