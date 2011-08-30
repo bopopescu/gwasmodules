@@ -1425,7 +1425,8 @@ class Result(object):
 		d = {}
 		for chrom in [1, 2, 3, 4, 5]:
 			d[chrom] = {'scores':[], 'positions':[]}
-		for chrom, pos, score in cps_list:
+		for i, (chrom, pos, score) in enumerate(cps_list):
+			d[chrom]['scores'].append(score)
 			d[chrom]['scores'].append(score)
 			d[chrom]['positions'].append(pos)
 		return d
