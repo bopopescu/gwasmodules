@@ -2608,7 +2608,7 @@ class snps_data_set:
 			sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
 									((chunk_i + 1.0) * chunk_size) / n_snps))))
 			sys.stdout.flush()
-		print 'Finished calculating MACs'
+		print '\nFinished calculating MACs'
 
 
 
@@ -2670,7 +2670,7 @@ class snps_data_set:
 		if self.snps_filter == None and self.indiv_filter == None:
 			snps = self.h5file['snps'][...]
 		elif self.indiv_filter == None:
-			snps = self.h5file['snps'][self.snps_filter]
+			snps = self.h5file['snps'][self.snps_filter, :]
 		else:
 			if self.data_format in ['binary', 'diploid_int']:
 				print 'Allocating memory'
@@ -2680,13 +2680,14 @@ class snps_data_set:
 				raise NotImplementedError
 			offset = 0
 			print 'Extracting the SNPs'
-			for chunk_i, snps_chunk in enumerate(snps_chunks(chunk_size)):
+			for chunk_i, snps_chunk in enumerate(self.snps_chunks(chunk_size)):
 				snps[offset:offset + len(snps_chunk)] = snps_chunk
 				offset += len(snps_chunk)
 				sys.stdout.write('\b\b\b\b\b\b%0.2f%%' % (100.0 * (min(1, \
 									((chunk_i + 1.0) * chunk_size) / n_snps))))
 				sys.stdout.flush()
-			print 'Done extracting the SNPs.'
+
+			print '\nDone extracting the SNPs.'
 		return snps
 
 
@@ -2815,7 +2816,7 @@ class snps_data_set:
 		return k_mat
 
 
-	def get_kinship(self, method='ibs', num_dots=10, dtype='single', chunk_size=None):
+	def get_kinship(self, method='ibs', num_dots=10, dtype='single', chunk_size=1024):
 		"""
 		Returns kinship
 		"""
@@ -2823,17 +2824,18 @@ class snps_data_set:
 		if method == 'ibd':
 			print 'Starting IBD calculation'
 			k_mat = self._calc_ibd_kinship_(num_dots=num_dots, dtype=dtype, chunk_size=chunk_size)
-			print 'Finished calculating IBD kinship matrix'
+			print '\nFinished calculating IBD kinship matrix'
 			return k_mat
 		elif method == 'ibs':
 			print 'Starting IBS calculation'
 			k_mat = self._calc_ibd_kinship_(num_dots=num_dots, dtype=dtype, chunk_size=chunk_size)
-			print 'Finished calculating IBS kinship matrix'
+			print '\nFinished calculating IBS kinship matrix'
 			return k_mat
 
 
 
 
+	local_snps, global_snps = self.get_region_split_snps(chrom, start_pos, stop_pos)
 
 	def get_local_n_global_kinships(self, focal_chrom_pos=None, window_size=25000, chrom=None, start_pos=None,
 					stop_pos=None, kinship_method='ibd', global_kinship=None, verbose=False):
