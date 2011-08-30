@@ -2816,13 +2816,11 @@ class snps_data_set:
 		print method
 		if method == 'ibd':
 			print 'Starting IBD calculation'
-			snps = self.getSnps(debug_filter)
 			k_mat = self._calc_ibd_kinship_(num_dots=num_dots, dtype=dtype)
 			print 'Finished calculating IBD kinship matrix'
 			return k_mat
 		elif method == 'ibs':
 			print 'Starting IBS calculation'
-			snps = self.getSnps(debug_filter)
 			k_mat = self._calc_ibd_kinship_(num_dots=num_dots, dtype=dtype)
 			print 'Finished calculating IBS kinship matrix'
 			return k_mat
