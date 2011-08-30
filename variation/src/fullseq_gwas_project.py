@@ -4,6 +4,7 @@ GWA project using full sequence data.
 Quan, Bjarni, Dazhe, et al.
 """
 import sys
+import env
 
 
 def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
