@@ -5,6 +5,9 @@ Quan, Bjarni, Dazhe, et al.
 """
 import sys
 import env
+import dataParsers as dp
+import phenotypeData as pd
+import linear_models as lm
 
 
 def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
@@ -46,9 +49,6 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
 
 def run_gwas(pid, call_method_id, run_id, kinship_method):
         #import snpsdata
-        import dataParsers as dp
-        import phenotypeData as pd
-        import linear_models as lm
 
         #LOAD DATA
 	sd = dp.load_snps_call_method(call_method_id)
