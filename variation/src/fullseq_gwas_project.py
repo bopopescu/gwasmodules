@@ -47,7 +47,7 @@ def run_parallel(pid, call_method_id, run_id='gwas', kinship_method='ibd'):
 
 
 
-def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.05):
+def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=1):
         #import snpsdata
 
         #LOAD DATA
@@ -70,14 +70,6 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.05):
         #Set up GWAS
 
 
-	#Now gene-centralized.
-	for radius in [20000, 10000]:
-		file_prefix = env.env['results_dir'] + '%s_loc_v_glob_gene_%s_%d_%d_%s' % \
-							(run_id, kinship_method, radius, pid, phen_name)
-		res_dict = lm.local_vs_global_gene_mm_scan(phen_vals, sd, file_prefix, radius, kinship_method, global_k)
-		res_file_name = file_prefix + '.csv'
-		_write_res_dict_to_file_3_(res_file_name, res_dict)
-
 	#Chromosomes.
 	res_dict = lm.chrom_vs_rest_mm(phen_vals, sd, kinship_method, global_k)
 	print res_dict
@@ -93,6 +85,15 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=0.05):
 		res_dict = lm.local_vs_global_mm_scan(phen_vals, sd, file_prefix, ws, ws / 2, kinship_method, global_k)
 		res_file_name = file_prefix + '.csv'
 		_write_res_dict_to_file_(res_file_name, res_dict)
+
+	#Now gene-centralized.
+	for radius in [20000, 10000]:
+		file_prefix = env.env['results_dir'] + '%s_loc_v_glob_gene_%s_%d_%d_%s' % \
+							(run_id, kinship_method, radius, pid, phen_name)
+		res_dict = lm.local_vs_global_gene_mm_scan(phen_vals, sd, file_prefix, radius, kinship_method, global_k)
+		res_file_name = file_prefix + '.csv'
+		_write_res_dict_to_file_3_(res_file_name, res_dict)
+
 
 
 
