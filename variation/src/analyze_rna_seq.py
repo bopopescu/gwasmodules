@@ -606,6 +606,8 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 							'chrom_pos_score':chrom_pos_score_dict, 'dist_dict':dist_dict,
 							'pid':pid}
 				print dist_dict
+		else:
+			print "Didn't find file: %s or %s" % (info_file_name, res_dict['EX'] + ".pickled")
 
 	for mm in ['EX', 'LM', 'KW']:
 		cPickle.dump(pickle_file_dict[mm]['res_dict'], open(pickle_file_dict[mm]['file_name'], 'wb'), protocol=2)
