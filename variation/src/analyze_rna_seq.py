@@ -197,7 +197,9 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 		print 'Applying LM'
 		res = lm.linear_model(snps, phen_vals)
 		pvals = res['ps'].tolist()
-		lm_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
+		perc_var_expl = res['var_perc'].tolist()
+		lm_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes,
+				perc_var_expl=perc_var_expl)
 		print 'Summarizing LM'
 		summary_dict['LM'] = lm_res.get_gene_analysis(gene)
 		summary_dict['LM']['kolmogorov_smirnov'] = agr.calc_ks_stats(res['ps'])
@@ -211,7 +213,9 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 					with_qq_plots=False, log_qq_max_val=6.0, save_pvals=True, snp_priors=snp_priors)
 		print 'Summarizing the step-wise mixed model'
 		pvals = ex_sw_res['first_emmax_res']['ps'].tolist()
-		ex_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes)
+		perc_var_expl = ex_sw_res['first_emmax_res']['var_perc'].tolist()
+		ex_res = gr.Result(scores=pvals, macs=macs, mafs=mafs, positions=positions, chromosomes=chromosomes,
+				perc_var_expl=perc_var_expl)
 		summary_dict['EX'] = ex_res.get_gene_analysis(gene)
 		summary_dict['pseudo_heritability'] = ex_sw_res['step_info_list'][0]['pseudo_heritability']
 		summary_dict['EX']['kolmogorov_smirnov'] = agr.calc_ks_stats(ex_sw_res['first_emmax_res']['ps'])
@@ -439,6 +443,16 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 
 	num_genes = 0
 
+	radii = [500000, 100000, 50000, 25000, 10000, 5000, 1000, 0]
+	tss_dists = [200000, 100000, 50000, 25000, 10000, 5000, 1000]
+	cvt_summary_dict = {'radius':{'avg_cis_trans_var_ratio':[0.0 for r in radii],
+					'avg_cis_herit':[0.0 for r in radii],
+					'avg_trans_herit':[0.0 for r in radii],
+					'counts':0.0},
+			'tss_dist':{'avg_cis_trans_var_ratio':[0.0 for td in tss_dists],
+					'avg_cis_herit':[0.0 for td in tss_dists],
+					'avg_trans_herit':[0.0 for td in tss_dists]},
+					'counts':0.0}
 	heritabilities = []
 	transformations = []
 	shapiro_wilk_pvals = []
@@ -486,12 +500,39 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 				and os.path.isfile(res_dict['LM'] + ".pickled") and os.path.isfile(res_dict['KW'] + ".pickled"):
 			print 'Loading info file: %s' % info_file_name
 			num_genes += 1
-			info_dict = cPickle.load(open(info_file_name))
+			info_dict = cPickle.load(open(info_file_name)) #Loading the info dict
 			for mm in ['EX', 'LM', 'KW']:
 				res_dict[mm] = gr.Result(res_dict[mm]) #Loading the result
+
+			#Saving some basic statistics
 			transformations.append(info_dict['transformation_type'])
 			shapiro_wilk_pvals.append(info_dict['transformation_shapiro_pval'])
 			heritabilities.append(info_dict['pseudo_heritability'])
+
+			#cis vs. trans stuff
+			cvt_dict = info_dict['CVT']
+			for r_i, r in enumerate(radii):
+				if cvt_dict['radius'][r] != None:
+					pvg = cvt_dict['radius'][r]['perc_var1']
+					pvl = cvt_dict['radius'][r]['perc_var2']
+					herit = cvt_dict['radius'][r]['pseudo_heritability1']
+					cvt_summary_dict['radius']['avg_cis_trans_var_ratio'][r_i] += pvl / (pvl + pvg)
+					cvt_summary_dict['radius']['avg_cis_herit'][r_i] += pvl * herit
+					cvt_summary_dict['radius']['avg_trans_herit'][r_i] += pvg * herit
+					cvt_summary_dict['radius']['counts'] += 1.0
+
+			for td_i, td in enumerate(tss_dists):
+				if cvt_dict['tss_dist'][td] != None:
+					pvg = cvt_dict['tss_dist'][td]['perc_var1']
+					pvl = cvt_dict['tss_dist'][td]['perc_var2']
+					herit = cvt_dict['tss_dist'][td]['pseudo_heritability1']
+					cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] += pvl / (pvl + pvg)
+					cvt_summary_dict['tss_dist']['avg_cis_herit'][td_i] += pvl * herit
+					cvt_summary_dict['tss_dist']['avg_trans_herit'][td_i] += pvg * herit
+					cvt_summary_dict['tss_dist']['counts'] += 1.0
+
+
+
 			tair_ids.append(tair_id)
 			for mm in ['EX', 'LM', 'KW']:
 				pval_infl_dict[mm]['kolmogorov_smirnov'].append(info_dict[mm]['kolmogorov_smirnov']['D'])
@@ -570,7 +611,38 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 		cPickle.dump(pickle_file_dict[mm]['res_dict'], open(pickle_file_dict[mm]['file_name'], 'wb'), protocol=2)
 
 
+	r_counts = cvt_summary_dict['radius']['counts']
+	for r_i, r in enumerate(radii):
+		cvt_summary_dict['radius']['avg_cis_trans_var_ratio'][r_i] = \
+			cvt_summary_dict['radius']['avg_cis_trans_var_ratio'][r_i] / r_counts
+		cvt_summary_dict['radius']['avg_cis_herit'][r_i] = \
+			cvt_summary_dict['radius']['avg_cis_herit'][r_i] / r_counts
+		cvt_summary_dict['radius']['avg_trans_herit'][r_i] = \
+			cvt_summary_dict['radius']['avg_trans_herit'][r_i] / r_counts
+
+
+	pylab
+
+	td_counts = cvt_summary_dict['tss_dist']['counts']
+	for td_i, td in enumerate(tss_dists):
+		cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] = \
+			cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] / td_counts
+		cvt_summary_dict['tss_dist']['avg_cis_herit'][td_i] = \
+			cvt_summary_dict['tss_dist']['avg_cis_herit'][td_i] / td_counts
+		cvt_summary_dict['tss_dist']['avg_trans_herit'][td_i] = \
+			cvt_summary_dict['tss_dist']['avg_trans_herit'][td_i] / td_counts
+
+
+
 	results_prefix = env['results_dir'] + 'RNAseq_summary_%dC_cm%d' % (temperature, call_method_id)
+
+	pylab.figure()
+	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'])
+	pylab.ylabel('Avg. perc. of cis genetic var.')
+	pylab.xticks(range(1, 4), ['EX', 'LM', 'KW'])
+	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var.png')
+	pylab.clf()
+
 	pylab.figure()
 	pylab.hist(heritabilities, bins=20, alpha=0.7)
 	pylab.xlabel('Pseudo-heritability')
@@ -593,6 +665,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.savefig(png_file_name)
 	pylab.clf()
 
+
 	png_file_name = results_prefix + '_median_pvals_boxplot.png'
 	pylab.figure()
 	pylab.boxplot(pm_list)
@@ -601,6 +674,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.ylabel('Median p-value bias')
 	pylab.savefig(png_file_name)
 	pylab.clf()
+
 
 	x_positions = sp.arange(len(distance_bins), dtype='d64')
 	width = 0.25
@@ -612,6 +686,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 		l = map(lambda x: x / float(tot_sum), l)
 		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=mm)
 		x_positions += width
+
 
 	pylab.ylabel('Frequency')
 	pylab.xticks(x_positions - 3 * width / 2.0, (r'$d \leq 5$', r'$5< d \leq 10$', r'$10< d \leq 25$', \
@@ -634,6 +709,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 		pylab.bar(x_positions, l, width, color=color, alpha=0.7, label=mm)
 		x_positions += width
 
+
 	pylab.ylabel('Fraction of sign. results')
 	pylab.xticks(x_positions - 3 * width / 2.0, ('Within gene', r'$d \leq 1$', r'$d \leq 5$', \
 						r'$d \leq 10$', r'$d \leq 25$', r'$d \leq 50$', \
@@ -643,7 +719,6 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.legend(loc=2)
 	pylab.savefig(png_file_name)
 	pylab.clf()
-
 
 
 	png_file_name = results_prefix + 'cofactor_count_hist.png'
@@ -663,6 +738,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.savefig(png_file_name)
 	pylab.clf()
 
+
 	png_file_name = results_prefix + 'cis_cofactor_count_hist.png'
 	x_positions = sp.arange(6, dtype='d64')
 	for criteria, color in zip(['ebics', 'mbonf', 'min_cof_ppa'], ['b', 'c', 'g']):
@@ -678,7 +754,6 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.xlim((-0.2, 6))
 	pylab.savefig(png_file_name)
 	pylab.clf()
-
 
 
 	png_file_name = results_prefix + 'cofactor_bin_count_hist.png'
@@ -744,10 +819,10 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-#	load_and_plot_info_files(temperature=16, call_method_id=79, debug_filter=1.0)
+	load_and_plot_info_files(temperature=16, call_method_id=79, debug_filter=0.01)
 #	plot(min_score=4, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
-	plot(min_score=10, temperature=16, mapping_method='KW')
+#	plot(min_score=10, temperature=16, mapping_method='KW')
 	#plot(min_score=11, temperature=16, mapping_method='KW')
 	#plot(min_score=4, temperature=16, mapping_method='LM', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=16, mapping_method='LM')

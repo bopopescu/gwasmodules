@@ -1394,7 +1394,6 @@ class Result(object):
 		return indices
 
 
-
 	def get_top_genes(self, n, window_size=5000, conn=None):
 		"""
 		Returns a set of (chromosome, start_pos, end_pos), for genes found.
@@ -1421,22 +1420,20 @@ class Result(object):
 
 
 	def get_chrom_score_pos_dict(self):
-		cps_list = self.get_chr_pos_score_list()
 		d = {}
 		for chrom in [1, 2, 3, 4, 5]:
 			d[chrom] = {'scores':[], 'positions':[]}
-		for i, (chrom, pos, score) in enumerate(cps_list):
+		iterator = it.izip(self.snp_results['chromosomes'], self.snp_results['positions'], \
+				self.snp_results['scores'])#, self.snp_results['perc_var'], self.snp_results['macs'])
+		for chrom, pos, score in iterator:
 			d[chrom]['scores'].append(score)
 			d[chrom]['scores'].append(score)
 			d[chrom]['positions'].append(pos)
 		return d
 
 
-
 	def get_chr_pos_list(self):
 		return zip(self.snp_results['chromosomes'], self.snp_results['positions'])
-
-
 
 
 	def get_top_regions(self, n, distance_threshold=25000):
