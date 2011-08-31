@@ -522,10 +522,10 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					cvt_summary_dict['radius']['counts'] += 1.0
 
 			for td_i, td in enumerate(tss_dists):
-				if cvt_dict['tss_dist'][td] != None:
-					pvg = cvt_dict['tss_dist'][td]['perc_var1']
-					pvl = cvt_dict['tss_dist'][td]['perc_var2']
-					herit = cvt_dict['tss_dist'][td]['pseudo_heritability1']
+				if cvt_dict['tss_upstream'][td] != None:
+					pvg = cvt_dict['tss_upstream'][td]['perc_var1']
+					pvl = cvt_dict['tss_upstream'][td]['perc_var2']
+					herit = cvt_dict['tss_upstream'][td]['pseudo_heritability1']
 					cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] += pvl / (pvl + pvg)
 					cvt_summary_dict['tss_dist']['avg_cis_herit'][td_i] += pvl * herit
 					cvt_summary_dict['tss_dist']['avg_trans_herit'][td_i] += pvg * herit
