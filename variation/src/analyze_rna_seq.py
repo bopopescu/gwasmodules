@@ -286,7 +286,7 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 		near_const_filter=20, data_format='binary', plot_data=True):
 	#Load in chromosome dict..
 
-	file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+	file_prefix = '/srv/lab/data/rna_seq_083011/%dC/cm_%d/' % (temperature, call_method_id)
 
 	results_dict_file = '%sresults_%s_mac%d.pickled' % (file_prefix, mapping_method, mac_threshold)
 	res_dict = cPickle.load(open(results_dict_file))
@@ -438,7 +438,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	gene_dict = dp.parse_tair_gff_file()
 	run_id = 'rs_%d' % call_method_id
 
-	file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+	file_prefix = '/srv/lab/data/rna_seq_083011/%dC/cm_%d/' % (temperature, call_method_id)
 
 
 	num_genes = 0
