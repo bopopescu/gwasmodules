@@ -623,7 +623,6 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 			cvt_summary_dict['radius']['avg_trans_herit'][r_i] / r_counts
 
 
-	pylab
 
 	td_counts = cvt_summary_dict['tss_dist']['counts']
 	for td_i, td in enumerate(tss_dists):
@@ -639,11 +638,53 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	results_prefix = env['results_dir'] + 'RNAseq_summary_%dC_cm%d' % (temperature, call_method_id)
 
 	pylab.figure()
+	pylab.plot(cvt_summary_dict['radius']['avg_cis_trans_var_ratio'])
+	pylab.ylabel('Avg. perc. of cis genetic var.')
+	pylab.xlabel('Dist. from gene (kb)')
+	pylab.xticks(range(1, 9), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var_rad.png')
+	pylab.clf()
+
+	pylab.figure()
 	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'])
 	pylab.ylabel('Avg. perc. of cis genetic var.')
-	pylab.xticks(range(1, 4), ['EX', 'LM', 'KW'])
-	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var.png')
+	pylab.xlabel('Dist. upstream from gene TSS (kb)')
+	pylab.xticks(range(1, 8), [200, 100, 50, 25, 10, 5, 1])
+	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var_td.png')
 	pylab.clf()
+
+	pylab.figure()
+	pylab.plot(cvt_summary_dict['radius']['avg_cis_herit'])
+	pylab.ylabel('Avg. cis heritability')
+	pylab.xlabel('Dist. from gene (kb)')
+	pylab.xticks(range(1, 9), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.savefig(results_prefix + 'avg_cis_herit_rad.png')
+	pylab.clf()
+
+	pylab.figure()
+	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_herit'])
+	pylab.ylabel('Avg. local heritability')
+	pylab.xlabel('Dist. upstream from gene TSS (kb)')
+	pylab.xticks(range(1, 8), [200, 100, 50, 25, 10, 5, 1])
+	pylab.savefig(results_prefix + 'avg_cis_herit_td.png')
+	pylab.clf()
+
+	pylab.figure()
+	pylab.plot(cvt_summary_dict['radius']['avg_trans_herit'])
+	pylab.ylabel('Avg. remaining heritability')
+	pylab.xlabel('Dist. from gene (kb)')
+	pylab.xticks(range(1, 9), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.savefig(results_prefix + 'avg_trans_herit_rad.png')
+	pylab.clf()
+
+	pylab.figure()
+	pylab.plot(cvt_summary_dict['tss_dist']['avg_trans_herit'])
+	pylab.ylabel('Avg. remaining heritability')
+	pylab.xlabel('Dist. upstream from gene TSS (kb)')
+	pylab.xticks(range(1, 8), [200, 100, 50, 25, 10, 5, 1])
+	pylab.savefig(results_prefix + 'avg_trans_herit_td.png')
+	pylab.clf()
+
 
 	pylab.figure()
 	pylab.hist(heritabilities, bins=20, alpha=0.7)
