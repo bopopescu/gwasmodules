@@ -10,7 +10,7 @@ import os
 user = os.getenv("USER")
 home_dir = os.getenv("HOME") + "/"
 config_file = home_dir + '.gwa_config'
-results_dir = '/projects/cegs/rna_seq_results/raw_results/'
+results_dir = '/home/GMI/bjarni.vilhjalmsson/results/' #'/projects/cegs/rna_seq_results/raw_results/'
 data_dir = '/projects/genotype-callmethods/'
 rf_dir = None
 env = dict()
