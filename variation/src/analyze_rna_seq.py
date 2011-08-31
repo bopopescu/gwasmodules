@@ -489,7 +489,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	for i, pid in enumerate(pids):
 		tair_id = phed.get_name(pid)
 		chrom = int(tair_id[2])
-		curr_file_prefix = '%schr_%d/rna_seq_%s_%dC_mac%d_pid%d_%s' % \
+		curr_file_prefix = '%schr_%d/rna_seq_d081511_%s_%dC_mac%d_pid%d_%s' % \
 					(file_prefix, chrom, run_id, temperature, mac_threshold, pid, tair_id)
 		info_file_name = '%s_info.pickled' % curr_file_prefix
 		for mm in ['EX', 'LM', 'KW']:
