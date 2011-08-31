@@ -451,8 +451,8 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					'counts':0.0},
 			'tss_dist':{'avg_cis_trans_var_ratio':[0.0 for td in tss_dists],
 					'avg_cis_herit':[0.0 for td in tss_dists],
-					'avg_trans_herit':[0.0 for td in tss_dists]},
-					'counts':0.0}
+					'avg_trans_herit':[0.0 for td in tss_dists],
+					'counts':0.0}}
 	heritabilities = []
 	transformations = []
 	shapiro_wilk_pvals = []
