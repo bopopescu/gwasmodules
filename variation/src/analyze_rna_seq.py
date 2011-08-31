@@ -448,11 +448,11 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	cvt_summary_dict = {'radius':{'avg_cis_trans_var_ratio':[0.0 for r in radii],
 					'avg_cis_herit':[0.0 for r in radii],
 					'avg_trans_herit':[0.0 for r in radii],
-					'counts':0.0},
+					'counts':[0.0 for td in tss_dists]},
 			'tss_dist':{'avg_cis_trans_var_ratio':[0.0 for td in tss_dists],
 					'avg_cis_herit':[0.0 for td in tss_dists],
 					'avg_trans_herit':[0.0 for td in tss_dists],
-					'counts':0.0}}
+					'counts':[0.0 for td in tss_dists]}}
 	heritabilities = []
 	transformations = []
 	shapiro_wilk_pvals = []
@@ -519,7 +519,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					cvt_summary_dict['radius']['avg_cis_trans_var_ratio'][r_i] += pvl / (pvl + pvg)
 					cvt_summary_dict['radius']['avg_cis_herit'][r_i] += pvl * herit
 					cvt_summary_dict['radius']['avg_trans_herit'][r_i] += pvg * herit
-					cvt_summary_dict['radius']['counts'] += 1.0
+					cvt_summary_dict['radius']['counts'][r_i] += 1.0
 
 			for td_i, td in enumerate(tss_dists):
 				if cvt_dict['tss_upstream'][td] != None:
@@ -529,7 +529,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] += pvl / (pvl + pvg)
 					cvt_summary_dict['tss_dist']['avg_cis_herit'][td_i] += pvl * herit
 					cvt_summary_dict['tss_dist']['avg_trans_herit'][td_i] += pvg * herit
-					cvt_summary_dict['tss_dist']['counts'] += 1.0
+					cvt_summary_dict['tss_dist']['counts'][td_i] += 1.0
 
 
 
@@ -613,8 +613,8 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 		cPickle.dump(pickle_file_dict[mm]['res_dict'], open(pickle_file_dict[mm]['file_name'], 'wb'), protocol=2)
 
 
-	r_counts = cvt_summary_dict['radius']['counts']
 	for r_i, r in enumerate(radii):
+		r_counts = cvt_summary_dict['radius']['counts'][r_i]
 		cvt_summary_dict['radius']['avg_cis_trans_var_ratio'][r_i] = \
 			cvt_summary_dict['radius']['avg_cis_trans_var_ratio'][r_i] / r_counts
 		cvt_summary_dict['radius']['avg_cis_herit'][r_i] = \
@@ -624,8 +624,8 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 
 
 
-	td_counts = cvt_summary_dict['tss_dist']['counts']
 	for td_i, td in enumerate(tss_dists):
+		td_counts = cvt_summary_dict['tss_dist']['counts'][td_i]
 		cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] = \
 			cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'][td_i] / td_counts
 		cvt_summary_dict['tss_dist']['avg_cis_herit'][td_i] = \
