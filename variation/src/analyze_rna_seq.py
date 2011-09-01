@@ -28,8 +28,8 @@ import analyze_gwas_results as agr
 
 #Annoyingly ad hoc constants
 near_const_filter = 20
-#phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
-phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
+phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
+#phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
 
 
 def run_parallel(x_start_i, x_stop_i, temperature, call_method_id, cluster='gmi', run_id='rs'):
@@ -287,7 +287,8 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 		near_const_filter=20, data_format='binary', plot_data=True):
 	#Load in chromosome dict..
 
-	file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+	#file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+	file_prefix = '/srv/lab/data/rna_seq_083011/%dC/cm_%d/' % (temperature, call_method_id)
 
 	results_dict_file = '%sresults_%s_mac%d.pickled' % (file_prefix, mapping_method, mac_threshold)
 	res_dict = cPickle.load(open(results_dict_file))
@@ -901,16 +902,16 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-#	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=0.005)
-	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1.0)
+#	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
 	#plot(min_score=11, temperature=16, mapping_method='KW')
-	plot(min_score=1, temperature=16, mapping_method='LM', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=16, mapping_method='LM', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=16, mapping_method='LM')
 #	plot(min_score=10, temperature=16, mapping_method='LM')
 #	plot(min_score=11, temperature=16, mapping_method='LM')
 #	plot(min_score=3, temperature=10, mapping_method='EX', plot_data=False)
-	plot(min_score=1, temperature=16, mapping_method='EX', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=16, mapping_method='EX', call_method_id=79, plot_data=False)
 	print  'Done'
 
