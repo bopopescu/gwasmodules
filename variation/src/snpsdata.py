@@ -3687,6 +3687,42 @@ class SNPsDataSet:
 		return num_snps
 
 
+	def plot_tree(self, tree_file, verbose=True, kinship_method='ibs'):
+		import scipy.cluster.hierarchy as hc
+		import pylab
+		import phenotypeData
+		e_dict = phenotypeData.get_ecotype_id_info_dict()
+		#print e_dict
+		labels = []
+		for acc in snpsd.accessions:
+			try:
+				s = unicode(e_dict[int(acc)][0], 'iso-8859-1')
+			except Exception, err_s:
+				print err_s
+				print int(acc)
+				s = str(acc)
+			labels.append(s)
+		if verbose:
+			print "Plotting tree for SNPs:"
+			print "Calculating kinship matrix"
+		if kinship_method == 'ibs':
+			K = self.get_ibs_kinship_matrix()
+		if kinship_method == 'ibd':
+			K = self.get_ibd_kinship_matrix()
+		Z = hc.average(K)
+		pylab.figure(figsize=(24, 15))
+		pylab.axes([0.03, 0.08, 0.96, 0.91])
+		dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=labels)
+		xmin, xmax = pylab.xlim()
+		xrange = xmax - xmin
+		ymin, ymax = pylab.ylim()
+		yrange = ymax - ymin
+		pylab.axis([xmin - 0.01 * xrange, xmax + 0.01 * xrange, ymin - 0.02 * yrange, ymax + 0.02 * yrange])
+		pylab.savefig(tree_file, format='pdf')
+		pylab.clf()
+		if verbose:
+			print "Done plotting tree, saved in file:", tree_file, "\n"
+
 #	def get_snps(self, random_fraction=None, region=None):
 #		snplist = []
 #		if random_fraction:
@@ -4611,6 +4647,9 @@ def _test_prior_():
 	return sd.get_snp_priors(cpp_list)
 
 if __name__ == "__main__":
+	import dataParsers as dp
+	sd = dp.load_snps_call_method(78)
+	sd.plot_tree('/Users/bjarni.vilhjalmsson/tmp/tree.pdf')
 	_test_prior_()
 #	import dataParsers
 #	d2010_file = "/Users/bjarnivilhjalmsson/Projects/Data/2010/2010_073009.csv"
