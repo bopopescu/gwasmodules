@@ -1424,10 +1424,10 @@ class Result(object):
 		for chrom in [1, 2, 3, 4, 5]:
 			d[chrom] = {'scores':[], 'positions':[]}
 		iterator = it.izip(self.snp_results['chromosomes'], self.snp_results['positions'], \
-				self.snp_results['scores'])#, self.snp_results['perc_var'], self.snp_results['macs'])
+				self.snp_results['scores'], self.snp_results['macs'])#, self.snp_results['perc_var'])
 		for chrom, pos, score in iterator:
 			d[chrom]['scores'].append(score)
-			d[chrom]['scores'].append(score)
+			d[chrom]['macs'].append(macs)
 			d[chrom]['positions'].append(pos)
 		return d
 

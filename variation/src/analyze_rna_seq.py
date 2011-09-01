@@ -420,7 +420,7 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 
 
 
-def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1.00,
+def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1,
 			near_const_filter=20, data_format='binary'):
 	import random
 
@@ -569,7 +569,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 				#Trim results
 				res.neg_log_trans()
 				if mm == 'EX':
-					res.filter_attr('scores', 3) #Filter everything below 10^-3
+					res.filter_attr('scores', 2.5) #Filter everything below 10^-2.5
 				else:
 					res.filter_attr('scores', 4) #Filter everything below 10^-4
 				if res.num_scores() == 0:
@@ -641,7 +641,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.plot(cvt_summary_dict['radius']['avg_cis_trans_var_ratio'])
 	pylab.ylabel('Avg. perc. of cis genetic var.')
 	pylab.xlabel('Dist. from gene (kb)')
-	pylab.xticks(range(1, 9), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
 	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var_rad.png')
 	pylab.clf()
 
@@ -653,37 +653,73 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var_td.png')
 	pylab.clf()
 
-	pylab.figure()
-	pylab.plot(cvt_summary_dict['radius']['avg_cis_herit'])
-	pylab.ylabel('Avg. cis heritability')
+#	pylab.figure()
+#	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_herit'])
+#	pylab.ylabel('Avg. cis heritability')
+#	pylab.xlabel('Dist. upstream from gene TSS (kb)')
+#	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
+#	pylab.savefig(results_prefix + 'avg_cis_herit_td.png')
+#	pylab.clf()
+#
+#
+#	pylab.figure()
+#	pylab.plot(cvt_summary_dict['tss_dist']['avg_trans_herit'])
+#	pylab.ylabel('Avg. remaining heritability')
+#	pylab.xlabel('Dist. upstream from gene TSS (kb)')
+#	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
+#	pylab.savefig(results_prefix + 'avg_trans_herit_td.png')
+#	pylab.clf()
+
+
+#	pylab.figure()
+#	pylab.plot(cvt_summary_dict['radius']['avg_trans_herit'])
+#	pylab.ylabel('Avg. remaining heritability')
+#	pylab.xlabel('Dist. from gene (kb)')
+#	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
+#	pylab.savefig(results_prefix + 'avg_trans_herit_rad.png')
+#	pylab.clf()
+#
+#	pylab.figure()
+#	pylab.plot(cvt_summary_dict['radius']['avg_cis_herit'])
+#	pylab.ylabel('Avg. cis heritability')
+#	pylab.xlabel('Dist. from gene (kb)')
+#	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
+#	pylab.savefig(results_prefix + 'avg_cis_herit_rad.png')
+#	pylab.clf()
+
+	tot_herit = sp.array(cvt_summary_dict['radius']['avg_cis_herit']) + \
+		sp.array(cvt_summary_dict['radius']['avg_trans_herit'])
+	cis_herit = sp.array(cvt_summary_dict['radius']['avg_cis_herit'])
+	pylab.figure(figsize=(10, 6))
+	pylab.axes([0.06, 0.08, 0.92, 0.90])
+	pylab.fill_between([0, 7], 0, 1, color='#DD3333', alpha=0.8, label='Error')
+	pylab.fill_between(sp.arange(8), 0, tot_herit, color='#22CC44', alpha=0.8, label='Heritable variance')
+	pylab.fill_between(sp.arange(8), 0, cis_herit, color='#2255AA', \
+				alpha=0.8, label='Heritable variance (cis)')
+	pylab.ylabel('Average partition of variance')
 	pylab.xlabel('Dist. from gene (kb)')
 	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
-	pylab.savefig(results_prefix + 'avg_cis_herit_rad.png')
-	pylab.clf()
+	pylab.legend(loc=1, ncol=3, shadow=True)
+	pylab.axis([0, 7, 0, 1])
+	pylab.savefig(results_prefix + 'avg_herit_rad.png')
 
-	pylab.figure()
-	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_herit'])
-	pylab.ylabel('Avg. local heritability')
+
+	tot_herit = sp.array(cvt_summary_dict['tss_dist']['avg_cis_herit']) + \
+		sp.array(cvt_summary_dict['tss_dist']['avg_trans_herit'])
+	cis_herit = sp.array(cvt_summary_dict['tss_dist']['avg_cis_herit'])
+	pylab.figure(figsize=(10, 6))
+	pylab.axes([0.06, 0.08, 0.92, 0.90])
+	pylab.fill_between([0, 6], 0, 1, color='#DD3333', alpha=0.8, label='Error')
+	pylab.fill_between(sp.arange(7), 0, tot_herit, color='#22CC44', alpha=0.8, label='Heritable variance')
+	pylab.fill_between(sp.arange(7), 0, cis_herit, color='#2255AA', \
+				alpha=0.8, label='Heritable variance (cis)')
+	pylab.ylabel('Average partition of variance')
 	pylab.xlabel('Dist. upstream from gene TSS (kb)')
 	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
-	pylab.savefig(results_prefix + 'avg_cis_herit_td.png')
-	pylab.clf()
+	pylab.legend(loc=1, ncol=3, shadow=True)
+	pylab.axis([0, 6, 0, 1])
+	pylab.savefig(results_prefix + 'avg_herit_td.png')
 
-	pylab.figure()
-	pylab.plot(cvt_summary_dict['radius']['avg_trans_herit'])
-	pylab.ylabel('Avg. remaining heritability')
-	pylab.xlabel('Dist. from gene (kb)')
-	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
-	pylab.savefig(results_prefix + 'avg_trans_herit_rad.png')
-	pylab.clf()
-
-	pylab.figure()
-	pylab.plot(cvt_summary_dict['tss_dist']['avg_trans_herit'])
-	pylab.ylabel('Avg. remaining heritability')
-	pylab.xlabel('Dist. upstream from gene TSS (kb)')
-	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
-	pylab.savefig(results_prefix + 'avg_trans_herit_td.png')
-	pylab.clf()
 
 
 	pylab.figure()
@@ -862,16 +898,16 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-#	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
-	plot(min_score=1, temperature=10, mapping_method='KW', call_method_id=79, plot_data=False)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=0.005)
+#	plot(min_score=1, temperature=10, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
 	#plot(min_score=11, temperature=16, mapping_method='KW')
-	plot(min_score=1, temperature=10, mapping_method='LM', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=10, mapping_method='LM', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=16, mapping_method='LM')
 #	plot(min_score=10, temperature=16, mapping_method='LM')
 #	plot(min_score=11, temperature=16, mapping_method='LM')
 #	plot(min_score=3, temperature=10, mapping_method='EX', plot_data=False)
-	plot(min_score=1, temperature=10, mapping_method='EX', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=10, mapping_method='EX', call_method_id=79, plot_data=False)
 	print  'Done'
 
