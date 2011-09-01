@@ -649,7 +649,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_trans_var_ratio'])
 	pylab.ylabel('Avg. perc. of cis genetic var.')
 	pylab.xlabel('Dist. upstream from gene TSS (kb)')
-	pylab.xticks(range(1, 8), [200, 100, 50, 25, 10, 5, 1])
+	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
 	pylab.savefig(results_prefix + '_avg_perc_cis_gen_var_td.png')
 	pylab.clf()
 
@@ -657,7 +657,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.plot(cvt_summary_dict['radius']['avg_cis_herit'])
 	pylab.ylabel('Avg. cis heritability')
 	pylab.xlabel('Dist. from gene (kb)')
-	pylab.xticks(range(1, 9), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
 	pylab.savefig(results_prefix + 'avg_cis_herit_rad.png')
 	pylab.clf()
 
@@ -665,7 +665,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.plot(cvt_summary_dict['tss_dist']['avg_cis_herit'])
 	pylab.ylabel('Avg. local heritability')
 	pylab.xlabel('Dist. upstream from gene TSS (kb)')
-	pylab.xticks(range(1, 8), [200, 100, 50, 25, 10, 5, 1])
+	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
 	pylab.savefig(results_prefix + 'avg_cis_herit_td.png')
 	pylab.clf()
 
@@ -673,7 +673,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.plot(cvt_summary_dict['radius']['avg_trans_herit'])
 	pylab.ylabel('Avg. remaining heritability')
 	pylab.xlabel('Dist. from gene (kb)')
-	pylab.xticks(range(1, 9), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
 	pylab.savefig(results_prefix + 'avg_trans_herit_rad.png')
 	pylab.clf()
 
@@ -681,7 +681,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.plot(cvt_summary_dict['tss_dist']['avg_trans_herit'])
 	pylab.ylabel('Avg. remaining heritability')
 	pylab.xlabel('Dist. upstream from gene TSS (kb)')
-	pylab.xticks(range(1, 8), [200, 100, 50, 25, 10, 5, 1])
+	pylab.xticks(range(7), [200, 100, 50, 25, 10, 5, 1])
 	pylab.savefig(results_prefix + 'avg_trans_herit_td.png')
 	pylab.clf()
 
@@ -862,7 +862,7 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=0.002)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
 #	plot(min_score=4, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
