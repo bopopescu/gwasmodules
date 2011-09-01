@@ -28,8 +28,8 @@ import analyze_gwas_results as agr
 
 #Annoyingly ad hoc constants
 near_const_filter = 20
-#phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
-phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
+phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
+#phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
 
 
 def run_parallel(x_start_i, x_stop_i, temperature, call_method_id, cluster='gmi', run_id='rs'):
@@ -287,7 +287,8 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 		near_const_filter=20, data_format='binary', plot_data=True):
 	#Load in chromosome dict..
 
-	file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+	#file_prefix = '/srv/lab/data/rna_seq_062911/%dC/cm_%d/' % (temperature, call_method_id)
+	file_prefix = '/srv/lab/data/rna_seq_083011/%dC/cm_%d/' % (temperature, call_method_id)
 
 	results_dict_file = '%sresults_%s_mac%d.pickled' % (file_prefix, mapping_method, mac_threshold)
 	res_dict = cPickle.load(open(results_dict_file))
@@ -452,7 +453,11 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					'avg_cis_herit':[0.0 for r in radii],
 					'avg_trans_herit':[0.0 for r in radii],
 					'counts':[0.0 for td in radii]},
-			'tss_dist':{'avg_cis_trans_var_ratio':[0.0 for td in tss_dists],
+				'radius_herit':{'avg_cis_trans_var_ratio':[0.0 for r in radii],
+					'avg_cis_herit':[0.0 for r in radii],
+					'avg_trans_herit':[0.0 for r in radii],
+					'counts':[0.0 for td in radii]},
+				'tss_dist':{'avg_cis_trans_var_ratio':[0.0 for td in tss_dists],
 					'avg_cis_herit':[0.0 for td in tss_dists],
 					'avg_trans_herit':[0.0 for td in tss_dists],
 					'counts':[0.0 for td in tss_dists]}}
@@ -523,6 +528,17 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					cvt_summary_dict['radius']['avg_cis_herit'][r_i] += pvl * herit
 					cvt_summary_dict['radius']['avg_trans_herit'][r_i] += pvg * herit
 					cvt_summary_dict['radius']['counts'][r_i] += 1.0
+
+			for r_i, r in enumerate(radii):
+				if cvt_dict['radius'][r] != None:
+					herit = cvt_dict['radius'][r]['pseudo_heritability1']
+					if herit > 0.05:
+						pvg = cvt_dict['radius'][r]['perc_var1']
+						pvl = cvt_dict['radius'][r]['perc_var2']
+						cvt_summary_dict['radius_herit']['avg_cis_trans_var_ratio'][r_i] += pvl / (pvl + pvg)
+						cvt_summary_dict['radius_herit']['avg_cis_herit'][r_i] += pvl * herit
+						cvt_summary_dict['radius_herit']['avg_trans_herit'][r_i] += pvg * herit
+						cvt_summary_dict['radius_herit']['counts'][r_i] += 1.0
 
 			for td_i, td in enumerate(tss_dists):
 				if cvt_dict['tss_upstream'][td] != None:
@@ -626,6 +642,15 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 			cvt_summary_dict['radius']['avg_trans_herit'][r_i] / r_counts
 
 
+	for r_i, r in enumerate(radii):
+		r_counts = cvt_summary_dict['radius_herit']['counts'][r_i]
+		cvt_summary_dict['radius_herit']['avg_cis_trans_var_ratio'][r_i] = \
+			cvt_summary_dict['radius_herit']['avg_cis_trans_var_ratio'][r_i] / r_counts
+		cvt_summary_dict['radius_herit']['avg_cis_herit'][r_i] = \
+			cvt_summary_dict['radius_herit']['avg_cis_herit'][r_i] / r_counts
+		cvt_summary_dict['radius_herit']['avg_trans_herit'][r_i] = \
+			cvt_summary_dict['radius_herit']['avg_trans_herit'][r_i] / r_counts
+
 
 	for td_i, td in enumerate(tss_dists):
 		td_counts = cvt_summary_dict['tss_dist']['counts'][td_i]
@@ -705,6 +730,23 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 	pylab.legend(loc=1, ncol=3, shadow=True)
 	pylab.axis([0, 7, 0, 1])
 	pylab.savefig(results_prefix + 'avg_herit_rad.png')
+
+	tot_herit = sp.array(cvt_summary_dict['radius_herit']['avg_cis_herit']) + \
+		sp.array(cvt_summary_dict['radius_herit']['avg_trans_herit'])
+	cis_herit = sp.array(cvt_summary_dict['radius_herit']['avg_cis_herit'])
+	pylab.figure(figsize=(10, 6))
+	pylab.axes([0.06, 0.08, 0.92, 0.90])
+	pylab.fill_between([0, 7], 0, 1, color='#DD3333', alpha=0.8, label='Error')
+	pylab.fill_between(sp.arange(8), 0, tot_herit, color='#22CC44', alpha=0.8, label='Heritable variance')
+	pylab.fill_between(sp.arange(8), 0, cis_herit, color='#2255AA', \
+				alpha=0.8, label='Heritable variance (cis)')
+	pylab.ylabel('Average partition of variance')
+	pylab.xlabel('Dist. from gene (kb)')
+	pylab.xticks(range(8), [500, 100, 50, 25, 10, 5, 1, 0])
+	pylab.legend(loc=1, ncol=3, shadow=True)
+	pylab.axis([0, 7, 0, 1])
+	pylab.savefig(results_prefix + 'avg_herit_2_rad.png')
+
 
 
 	tot_herit = sp.array(cvt_summary_dict['tss_dist']['avg_cis_herit']) + \
@@ -901,16 +943,16 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-#	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=0.005)
-	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1.0)
+#	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
 	#plot(min_score=11, temperature=16, mapping_method='KW')
-	plot(min_score=1, temperature=16, mapping_method='LM', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=16, mapping_method='LM', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=16, mapping_method='LM')
 #	plot(min_score=10, temperature=16, mapping_method='LM')
 #	plot(min_score=11, temperature=16, mapping_method='LM')
 #	plot(min_score=3, temperature=10, mapping_method='EX', plot_data=False)
-	plot(min_score=1, temperature=16, mapping_method='EX', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=16, mapping_method='EX', call_method_id=79, plot_data=False)
 	print  'Done'
 
