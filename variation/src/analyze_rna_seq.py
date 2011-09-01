@@ -420,7 +420,7 @@ def plot(temperature=10, call_method_id=75, mapping_method='EX', mac_threshold=1
 
 
 
-def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1.00,
+def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15, debug_filter=1,
 			near_const_filter=20, data_format='binary'):
 	import random
 
@@ -898,16 +898,16 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-#	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
-	plot(min_score=1, temperature=10, mapping_method='KW', call_method_id=79, plot_data=False)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=0.005)
+#	plot(min_score=1, temperature=10, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
 	#plot(min_score=11, temperature=16, mapping_method='KW')
-	plot(min_score=1, temperature=10, mapping_method='LM', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=10, mapping_method='LM', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=16, mapping_method='LM')
 #	plot(min_score=10, temperature=16, mapping_method='LM')
 #	plot(min_score=11, temperature=16, mapping_method='LM')
 #	plot(min_score=3, temperature=10, mapping_method='EX', plot_data=False)
-	plot(min_score=1, temperature=10, mapping_method='EX', call_method_id=79, plot_data=False)
+#	plot(min_score=1, temperature=10, mapping_method='EX', call_method_id=79, plot_data=False)
 	print  'Done'
 
