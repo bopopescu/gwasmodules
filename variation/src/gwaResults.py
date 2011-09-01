@@ -1422,7 +1422,7 @@ class Result(object):
 	def get_chrom_score_pos_dict(self):
 		d = {}
 		for chrom in [1, 2, 3, 4, 5]:
-			d[chrom] = {'scores':[], 'positions':[]}
+			d[chrom] = {'scores':[], 'positions':[], 'macs':[]}
 		iterator = it.izip(self.snp_results['chromosomes'], self.snp_results['positions'], \
 				self.snp_results['scores'], self.snp_results['macs'])#, self.snp_results['perc_var'])
 		for chrom, pos, score, mac in iterator:
