@@ -3694,7 +3694,7 @@ class SNPsDataSet:
 		e_dict = phenotypeData.get_ecotype_id_info_dict()
 		#print e_dict
 		labels = []
-		for acc in snpsd.accessions:
+		for acc in self.accessions:
 			try:
 				s = unicode(e_dict[int(acc)][0], 'iso-8859-1')
 			except Exception, err_s:
