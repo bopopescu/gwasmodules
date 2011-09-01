@@ -991,13 +991,12 @@ def plot_flc_haplotypes(snps, accessions=None, positions=None, dist_measure="ide
 		pylab.clf()
 
 
-def plot_tree(snpsd, tree_file, use_emma_kinship=False, verbose=True):
+def plot_tree(sd, tree_file, use_emma_kinship=False, verbose=True, kinship_method='ibs'):
 	import scipy as sp
 	import scipy.cluster.hierarchy as hc
-	import Emma
 	import pylab
 	import phenotypeData
-	e_dict = phenotypeData._getEcotypeIdInfoDict_()
+	e_dict = phenotypeData.get_ecotype_id_info_dict()
 	#print e_dict
 	labels = []
 	for acc in snpsd.accessions:
@@ -1010,28 +1009,21 @@ def plot_tree(snpsd, tree_file, use_emma_kinship=False, verbose=True):
 		labels.append(s)
 	if verbose:
 		print "Plotting tree for SNPs:"
-		print snpsd
 		print "Calculating kinship matrix"
-	if use_emma_kinship:
-		K = Emma.calcKinship(snpsd.snps)
-	else:
-		K = snpsd.kinship_matrix()
-	#print len(K)
-	#print "K:",K
+	if kinship_method == 'ibs':
+		K = sd.get_ibs_kinship_matrix()
+	if kinship_method == 'ibd':
+		K = sd.get_ibd_kinship_matrix()
 	Z = hc.average(K)
-	#print "Z:",Z
-	#hc.leaders(Z)
 	pylab.figure(figsize=(24, 15))
 	pylab.axes([0.03, 0.08, 0.96, 0.91])
 	dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=labels)
-	#print dend_dict
 	xmin, xmax = pylab.xlim()
 	xrange = xmax - xmin
 	ymin, ymax = pylab.ylim()
 	yrange = ymax - ymin
 	pylab.axis([xmin - 0.01 * xrange, xmax + 0.01 * xrange, ymin - 0.02 * yrange, ymax + 0.02 * yrange])
 	pylab.savefig(tree_file, format='pdf')
-	#cluster to get ordering??
 	pylab.clf()
 	if verbose:
 		print "Done plotting tree, saved in file:", tree_file, "\n"
