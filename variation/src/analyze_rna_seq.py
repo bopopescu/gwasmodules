@@ -943,7 +943,7 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1.0)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=0.002)
 #	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
