@@ -2963,6 +2963,7 @@ class SNPsDataSet:
 		self.snpsDataList = snpsds
 		self.chromosomes = chromosomes
 		self.accessions = self.snpsDataList[0].accessions
+                print self.accessions
 		self.array_ids = self.snpsDataList[0].arrayIds
 		self.id = id
 		self.missing_val = snpsds[0].missingVal
@@ -3371,6 +3372,8 @@ class SNPsDataSet:
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T
+                        else:
+                                raise NotImplementedError
 			if num_dots and num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
@@ -3460,7 +3463,7 @@ class SNPsDataSet:
 		chr_pos_l = self.get_chr_pos_list(cache_list=True)
 		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
 		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
-		snps = self.get_snps()
+		snps = self.get_snps(cache=True)
 		local_snps = snps[start_i:stop_i]
 		global_snps = snps[:start_i] + snps[stop_i:]
 		return local_snps, global_snps
@@ -3565,6 +3568,7 @@ class SNPsDataSet:
 	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
 		print 'Starting IBD calculation'
 		snps = self.getSnps(debug_filter)
+                ipdb.set_trace()
 		cov_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
 		print 'Finished calculating IBD kinship matrix'
 		return cov_mat
@@ -3663,8 +3667,13 @@ class SNPsDataSet:
 
 
 
-	def get_snps(self, random_fraction=None):
-		snplist = []
+	def get_snps(self, random_fraction=None, cache=False):
+		if cache:
+                        try:
+                                return self.snps
+                        except Exception:
+                                pass
+                snplist = []
 		if random_fraction:
 			import random
 			for snpsd in self.snpsDataList:
@@ -3674,7 +3683,10 @@ class SNPsDataSet:
 		else:
 			for snpsd in self.snpsDataList:
 				snplist.extend(snpsd.snps)
+                if cache:
+                        self.snps = snplist
 		return snplist
+
 
 	def getSnps(self, random_fraction=None):
 		return self.get_snps(random_fraction=None)
@@ -3694,12 +3706,13 @@ class SNPsDataSet:
 		e_dict = phenotypeData.get_ecotype_id_info_dict()
 		#print e_dict
 		labels = []
-		for acc in snpsd.accessions:
+		for acc in self.accessions:
 			try:
-				s = unicode(e_dict[int(acc)][0], 'iso-8859-1')
+				s1 = unicode(e_dict[int(acc)][0], 'iso-8859-1')
+                                s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(acc)][2], e_dict[int(acc)][3]))
+                                s = s1 + s2
 			except Exception, err_s:
 				print err_s
-				print int(acc)
 				s = str(acc)
 			labels.append(s)
 		if verbose:
@@ -4649,8 +4662,28 @@ def _test_prior_():
 if __name__ == "__main__":
 	import dataParsers as dp
 	sd = dp.load_snps_call_method(78)
-	sd.plot_tree('/Users/bjarni.vilhjalmsson/tmp/tree.pdf')
-	_test_prior_()
+        sd.plot_tree(env.env['results_dir'] + 'tree_full.pdf')
+        sd_chr1 = SNPsDataSet(snpsds=[sd.snpsDataList[0]], chromosomes=[1], data_format='binary')
+        sd_chr1.plot_tree(env.env['results_dir'] + 'tree_chr1.pdf')
+        sd_0_19 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=0, end_pos=19000000)], chromosomes=[1], data_format='binary')
+        sd_0_19.plot_tree(env.env['results_dir'] + 'tree_chr1_0_19.pdf')
+        sd = dp.load_snps_call_method(78)
+        sd_19_20 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=19000000, end_pos=20000000)], chromosomes=[1], data_format='binary')
+        sd_19_20.plot_tree(env.env['results_dir'] + 'tree_chr1_19_20.pdf')
+        sd = dp.load_snps_call_method(78)
+        sd_20_21 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=20000000, end_pos=21000000)], chromosomes=[1], data_format='binary')
+        sd_20_21.plot_tree(env.env['results_dir'] + 'tree_chr1_20_21.pdf')
+        sd = dp.load_snps_call_method(78)
+        sd_21_22 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=21000000, end_pos=22000000)], chromosomes=[1], data_format='binary')
+        sd_21_22.plot_tree(env.env['results_dir'] + 'tree_chr1_21_22.pdf')
+        sd = dp.load_snps_call_method(78)
+        sd_22_23 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=22000000, end_pos=23000000)], chromosomes=[1], data_format='binary')
+        sd_22_23.plot_tree(env.env['results_dir'] + 'tree_chr1_22_23.pdf')
+        sd = dp.load_snps_call_method(78)
+        sd_21_31 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=21000000, end_pos=31000000)], chromosomes=[1], data_format='binary')
+        sd_21_31.plot_tree(env.env['results_dir'] + 'tree_chr1_21_31.pdf')
+
+	#_test_prior_()
 #	import dataParsers
 #	d2010_file = "/Users/bjarnivilhjalmsson/Projects/Data/2010/2010_073009.csv"
 #	d2010_sd = dataParsers.parse_snp_data(d2010_file,id="2010_data")

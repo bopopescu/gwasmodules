@@ -59,9 +59,9 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=1):
 	phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
 	phed = pd.parse_phenotype_file(phenotype_file)
 	phed.convert_to_averages()
-	phed.transform(pid, 'most_normal')
 	phen_name = phed.get_name(pid)
 	sd.coordinate_w_phenotype_data(phed, pid)
+        phed.transform(pid, 'most_normal')
 	phen_vals = phed.get_values(pid)
 
 	if kinship_method == 'ibd':
@@ -69,8 +69,13 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=1):
 	elif kinship_method == 'ibs':
 		global_k = sd.get_ibs_kinship_matrix()
 
-        #Set up GWAS
+        p_her = phed.get_pseudo_heritability(pid, global_k)
+        hist_file = env.env['results_dir'] + '%s_%s_%d_%d_%s_hist.png' % \
+                                                (run_id, kinship_method, call_method_id, pid, phen_name)
 
+        phed.plot_histogram(pid, p_her=p_her, png_file=hist_file)
+
+        #Set up GWAS
 
 	#Chromosomes.
 	res_dict = lm.chrom_vs_rest_mm(phen_vals, sd, kinship_method, global_k)
@@ -96,7 +101,10 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=1):
 		res_file_name = file_prefix + '.csv'
 		_write_res_dict_to_file_3_(res_file_name, res_dict)
 
-
+        sd.filter_mac_snps(15)
+        file_prefix = env.env['results_dir'] + '%s_emmax_stepwise_%s_%d_%d_%s' % \
+                                                (run_id, kinship_method, call_method_id, pid, phen_name)
+        lm.emmax_step_wise(phen_vals, global_k, sd=sd, num_steps=10, file_prefix=file_prefix, save_pvals=True)
 
 
 def _write_res_dict_to_file_(filename, rd):
