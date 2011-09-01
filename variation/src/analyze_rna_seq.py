@@ -28,7 +28,8 @@ import analyze_gwas_results as agr
 
 #Annoyingly ad hoc constants
 near_const_filter = 20
-phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
+#phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
+phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
 
 
 def run_parallel(x_start_i, x_stop_i, temperature, call_method_id, cluster='gmi', run_id='rs'):
