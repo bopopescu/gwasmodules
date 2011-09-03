@@ -107,6 +107,7 @@ def run_gwas(pid, call_method_id, run_id, kinship_method, debug_filter=1):
         lm.emmax_step_wise(phen_vals, global_k, sd=sd, num_steps=10, file_prefix=file_prefix, save_pvals=True)
 
 
+
 def _write_res_dict_to_file_(filename, rd):
 	with open(filename, 'w') as f:
 		f.write('h0_heritability: %f\n' % rd['h0_heritability'])
