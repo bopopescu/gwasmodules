@@ -966,9 +966,9 @@ class LinearMixedModel(LinearModel):
 		low_int_af_count = 0
 		for snp in snps:
 			snp_a = sp.array(snp)
-			if sum(snp_a) > int_af_threshold:
+			if sp.sum(snp_a) > int_af_threshold:
 				interactions = cofactors * snp_a
-				interactions = interactions[sum(interactions, axis=1) > int_af_threshold]
+				interactions = interactions[sp.sum(interactions, axis=1) > int_af_threshold]
 				low_int_af_count += num_cof - len(interactions)
 				X = sp.hstack([h0_X, H_sqrt_inv * sp.matrix(snp_a).T, H_sqrt_inv * sp.matrix(interactions).T])
 			else:
@@ -1905,6 +1905,20 @@ def get_emma_reml_estimates(y, K, cofactors=None, include_intercept=True):
 	return res
 
 
+def mm_lrt_test(y, K):
+	"""
+	Likelihood ratio test for whether the data (y) fits a mixed model with 
+	two random terms fits significantly better.
+	"""
+	lm = LinearModel(y)
+	lmm = LinearMixedModel(y)
+	lmm.add_random_effect(K)
+	lmm_res = lmm.get_ML()
+	ll0 = lm.get_ll()
+	ll1 = lmm_res['max_ll']
+	D = 2 * (ll1 - ll0)
+	pval = stats.chi2.sf(D, 1)
+	return {'pval':pval, 'lrt_stat':D}
 
 def emma(snps, phenotypes, K, cofactors=None):
 	"""
@@ -2049,7 +2063,7 @@ def _log_choose_(n, k):
 		return 0
 	if n < k:
 		raise Exception('Out of range.')
-	return sum(map(sp.log, range(n, n - k, -1))) - sum(map(sp.log, range(k, 0, -1)))
+	return sp.sum(map(sp.log, range(n, n - k, -1))) - sp.sum(map(sp.log, range(k, 0, -1)))
 
 
 def _calc_bic_(ll, num_snps, num_par, n):
@@ -2498,14 +2512,14 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
        	lmm = LinearMixedModel(phen_vals)
 	lmm.add_random_effect(K)
 	h0_rss = lmm.get_rss()[0]
-	chrom_pos_list = sd.getChrPosList()
+	chrom_pos_list = sd.get_chr_pos_list()
 	print 'Looking up cofactors'
 	cof_indices = []
 	for chrom_pos in cof_chr_pos_list:
 		i = bisect.bisect(chrom_pos_list, chrom_pos) - 1
 		assert chrom_pos_list[i] == chrom_pos, 'Cofactor missing??'
 		cof_indices.append(i)
-	snps = sd.getSnps()
+	snps = sd.get_snps()
 	cof_snps = [snps[i] for i in cof_indices]
 	lmm.set_factors(cof_snps)
 
