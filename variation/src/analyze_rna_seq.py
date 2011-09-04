@@ -32,7 +32,7 @@ phen_file_prefix = env['phen_dir'] + 'rna_seq_081411'
 #phen_file_prefix = env['phen_dir'] + 'rna_seq_061611'
 
 
-def run_parallel(x_start_i, x_stop_i, temperature, call_method_id, cluster='gmi', run_id='rs'):
+def run_parallel(x_start_i, x_stop_i, temperature, call_method_id, cluster='gmi', run_id='rna_seq'):
 	"""
 	If no mapping_method, then analysis run is set up.
 	"""
@@ -222,6 +222,9 @@ def run_gwas(file_prefix, phen_file, start_i, stop_i, temperature, mac_threshold
 		summary_dict['pseudo_heritability'] = ex_sw_res['step_info_list'][0]['pseudo_heritability']
 		summary_dict['EX']['kolmogorov_smirnov'] = agr.calc_ks_stats(ex_sw_res['first_emmax_res']['ps'])
 		summary_dict['EX']['pval_median'] = agr.calc_median(ex_sw_res['first_emmax_res']['ps'])
+
+		#Does the linear mixed model fit the data better?
+		summary_dict['MM_LRT'] = lm.mm_lrt_test(phen_vals, K)
 
 		#FINISH summarizing the stepwise!!!
 		summarize_stepwise(summary_dict, gene, ex_sw_res['step_info_list'], ex_sw_res['opt_dict'])
@@ -439,7 +442,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 
 	print 'Loading the gene annotation dictionary'
 	gene_dict = dp.parse_tair_gff_file()
-	run_id = 'd081511'
+	run_id = 'rna_seq'
 	#run_id = 'rs_%d' % call_method_id
 
 
@@ -910,7 +913,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 
 
 def run_parallel_rna_seq_gwas():
-	if len(sys.argv) > 5:
+	if len(sys.argv) > 4:
 		run_id = sys.argv[5]
 		call_method_id = int(sys.argv[4])
 		temperature = int(sys.argv[3])
@@ -919,7 +922,6 @@ def run_parallel_rna_seq_gwas():
 		run_gwas(file_prefix, phen_file, int(sys.argv[1]), int(sys.argv[2]), temperature,
 			data_format='binary', call_method_id=call_method_id, near_const_filter=near_const_filter)
 	else:
-		run_id = sys.argv[4]
 		call_method_id = int(sys.argv[3])
 		temperature = sys.argv[2]
 		phen_file = '%s_%sC.csv' % (phen_file_prefix, temperature)
@@ -929,7 +931,7 @@ def run_parallel_rna_seq_gwas():
 		print 'Found %d traits' % num_traits
 		chunck_size = int(sys.argv[1])
 		for i in range(0, num_traits, chunck_size):
-			run_parallel(i, i + chunck_size, temperature, call_method_id, run_id=run_id)
+			run_parallel(i, i + chunck_size, temperature, call_method_id)
 
 
 def _test_parallel_():
@@ -944,7 +946,7 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
+	#load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
 #	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')
