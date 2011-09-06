@@ -116,7 +116,8 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ','],
 		import sys
 		sys.stderr.write("Error: %s is neither a file name nor a file object. But try 'open' anyway.\n"%input_fname)
 		return None
-	if getattr(inf, 'readline', None) is not None and use_sniff:	#2008-01-08 don't use cs.sniff unless the user specifies it. sniff gives you unexpected delimiter when it's a single-column.
+	if getattr(inf, 'readline', None) is not None and use_sniff:	#2008-01-08 don't use cs.sniff unless the user specifies it. 
+		#	sniff gives you unexpected delimiter when it's a single-column.
 		line = inf.readline()
 		delimiter_chosen = cs.sniff(line).delimiter
 	else:
@@ -168,7 +169,8 @@ def get_gene_id2gene_symbol(curs, tax_id, table='genome.gene', upper_case_gene_s
 		if gene_id not in gene_id2gene_symbol:
 			gene_id2gene_symbol[gene_id] = gene_symbol
 		else:
-			sys.stderr.write("Warning: gene_id %s(%s) already in gene_id2gene_symbol with symbol=%s.\n"%(gene_id, gene_symbol, gene_id2gene_symbol[gene_id]))
+			sys.stderr.write("Warning: gene_id %s(%s) already in gene_id2gene_symbol with symbol=%s.\n"%(gene_id, \
+																				gene_symbol, gene_id2gene_symbol[gene_id]))
 	sys.stderr.write(" %s entries. Done.\n"%len(gene_id2gene_symbol))
 	return gene_id2gene_symbol
 
@@ -185,7 +187,8 @@ class FigureOutTaxID(object):
 		2008-07-29
 		"""
 		from ProcessOptions import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)		
+		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
+														class_to_have_attr=self)		
 	
 	def curs(self):
 		from db import db_connect
@@ -197,7 +200,8 @@ class FigureOutTaxID(object):
 	def scientific_name2tax_id(self):
 		scientific_name2tax_id = {}
 		curs = self.curs
-		curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.names n, taxonomy.nodes o where n.name_class='scientific name' and n.tax_id=o.tax_id and o.rank='species'")
+		curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.names n, taxonomy.nodes o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species'")
 		rows = curs.fetchall()
 		for row in rows:
 			scientific_name, tax_id = row
@@ -282,7 +286,8 @@ def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
 		import StringIO
 		command_handler = subprocess.Popen(commandline, shell=True, \
 										stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-		#command_handler.wait() #Warning: This will deadlock if the child process generates enough output to a stdout or stderr pipe such that it blocks waiting for the OS pipe buffer to accept more data. Use communicate() to avoid that.
+		#command_handler.wait() #Warning: This will deadlock if the child process generates enough output to a stdout or stderr pipe
+		#	 such that it blocks waiting for the OS pipe buffer to accept more data. Use communicate() to avoid that.
 		
 		#command_handler.stderr.read() command_handler.stdout.read() also constantly deadlock the whole process.
 		
@@ -341,7 +346,9 @@ def calGreatCircleDistance(lat1, lon1, lat2, lon2, earth_radius=6372.795):
 	cos_lat1 = math.cos(lat1_rad)
 	sin_lat2 = math.sin(lat2_rad)
 	cos_lat2 = math.cos(lat2_rad)
-	spheric_angular_diff = math.atan2(math.sqrt(math.pow(cos_lat2*math.sin(long_diff),2) + math.pow(cos_lat1*sin_lat2-sin_lat1*cos_lat2*math.cos(long_diff),2)), sin_lat1*sin_lat2+cos_lat1*cos_lat2*math.cos(long_diff))
+	spheric_angular_diff = math.atan2(math.sqrt(math.pow(cos_lat2*math.sin(long_diff),2) + 
+									math.pow(cos_lat1*sin_lat2-sin_lat1*cos_lat2*math.cos(long_diff),2)),
+									sin_lat1*sin_lat2+cos_lat1*cos_lat2*math.cos(long_diff))
 	return earth_radius*spheric_angular_diff
 	
 def addExtraToFilenamePrefix(filename, extra):
@@ -453,6 +460,16 @@ def sortCMPBySecondTupleValue(a, b):
 
 def sshTunnel(serverHostname="dl324b-1.cmb.usc.edu", port="5432", middleManCredential="polyacti@login3"):
 	"""
+	2011-9-5
+		replace runLocalCommand() with os.system()
+		runLocalCommand() calls command_handler.communicate() which causes the program to get stuck
+			might be caused by "ssh -f" daemon behavior.
+		Correct way of replacing os.system() through Popen():
+			sts = os.system("mycmd" + " myarg")
+			==>
+			p = Popen("mycmd" + " myarg", shell=True)
+			sts = os.waitpid(p.pid, 0)[1]
+		
 	2011-8-15
 		through middleManCredential, run a ssh tunnel to allow access to serverHostname:port as localhost:port
 		
@@ -462,7 +479,9 @@ def sshTunnel(serverHostname="dl324b-1.cmb.usc.edu", port="5432", middleManCrede
 		
 	"""
 	commandline = "ssh -N -f -L %s:%s:%s %s"%(port, serverHostname, port, middleManCredential)
-	runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+	#2011-9-5 uncomment following. program will get stuck. might be caused by "ssh -f" daemon behavior
+	#runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+	return os.system(commandline)
 
 def getPhredScoreOutOfSolexaScore(solexaChar):
 	"""
