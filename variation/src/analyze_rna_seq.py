@@ -442,7 +442,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 
 	print 'Loading the gene annotation dictionary'
 	gene_dict = dp.parse_tair_gff_file()
-	run_id = 'rna_seq'
+	run_id = 'd081511'
 	#run_id = 'rs_%d' % call_method_id
 
 
@@ -465,6 +465,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 					'avg_cis_herit':[0.0 for td in tss_dists],
 					'avg_trans_herit':[0.0 for td in tss_dists],
 					'counts':[0.0 for td in tss_dists]}}
+
 	heritabilities = []
 	transformations = []
 	shapiro_wilk_pvals = []
@@ -592,7 +593,7 @@ def load_and_plot_info_files(call_method_id=75, temperature=10, mac_threshold=15
 				#Trim results
 				res.neg_log_trans()
 				if mm == 'EX':
-					res.filter_attr('scores', 2.5) #Filter everything below 10^-2.5
+					res.filter_attr('scores', 3) #Filter everything below 10^-2.5
 				else:
 					res.filter_attr('scores', 4) #Filter everything below 10^-4
 				if res.num_scores() == 0:
@@ -946,7 +947,7 @@ if __name__ == '__main__':
 #		_test_parallel_()
 #	sys.exit(0)
 #	_test_()
-	#load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
+	load_and_plot_info_files(temperature=10, call_method_id=79, debug_filter=1)
 #	plot(min_score=1, temperature=16, mapping_method='KW', call_method_id=79, plot_data=False)
 #	plot(min_score=7, temperature=10, mapping_method='KW')
 #	plot(min_score=10, temperature=16, mapping_method='KW')

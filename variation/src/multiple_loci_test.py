@@ -1433,7 +1433,7 @@ def perform_a_thal_emmax(pid=226):
 	import random
 	import sys
 	s1 = time.time()
-	sd = dp.load_snps_call_method()
+	sd = dp.load_snps_call_method(76)
 	#sd.sample_snps(0.05)
 	individs = sd.accessions[:]
 	phed = pd.get_phenotypes_from_db([pid])
@@ -1447,7 +1447,7 @@ def perform_a_thal_emmax(pid=226):
 	phen_name = phed.get_name(pid)
 	print 'Working on %s' % phen_name
 	sys.stdout.flush()
-	file_prefix = env.env['results_dir'] + 'MLMM_ibs_%s_pid%d' % (phen_name, pid)
+	file_prefix = env.env['results_dir'] + 'MLMM_t76_ibs_%s_pid%d' % (phen_name, pid)
 	secs = time.time() - s1
 	if secs > 60:
 		mins = int(secs) / 60
@@ -1506,7 +1506,7 @@ if __name__ == '__main__':
 #		for ws in [0, 1000, 5000, 10000, 25000]:
 #			file_name = '/tmp/fig2_h%d_ws%d.png' % (herit, ws)
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
-	generate_example_figure_7()
+	#generate_example_figure_7()
 	perform_a_thal_emmax()
 	#_run_()
 #	sd = dp.load_250K_snps()
