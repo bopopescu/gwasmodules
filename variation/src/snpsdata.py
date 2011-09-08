@@ -3700,41 +3700,14 @@ class SNPsDataSet:
 
 
 	def plot_tree(self, tree_file, verbose=True, kinship_method='ibs'):
-		import scipy.cluster.hierarchy as hc
-		import pylab
-		import phenotypeData
-		e_dict = phenotypeData.get_ecotype_id_info_dict()
-		#print e_dict
-		labels = []
-		for acc in self.accessions:
-			try:
-				s1 = unicode(e_dict[int(acc)][0], 'iso-8859-1')
-                                s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(acc)][2], e_dict[int(acc)][3]))
-                                s = s1 + s2
-			except Exception, err_s:
-				print err_s
-				s = str(acc)
-			labels.append(s)
+
 		if verbose:
-			print "Plotting tree for SNPs:"
 			print "Calculating kinship matrix"
 		if kinship_method == 'ibs':
 			K = self.get_ibs_kinship_matrix()
 		if kinship_method == 'ibd':
 			K = self.get_ibd_kinship_matrix()
-		Z = hc.average(K)
-		pylab.figure(figsize=(24, 15))
-		pylab.axes([0.03, 0.08, 0.96, 0.91])
-		dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=labels)
-		xmin, xmax = pylab.xlim()
-		xrange = xmax - xmin
-		ymin, ymax = pylab.ylim()
-		yrange = ymax - ymin
-		pylab.axis([xmin - 0.01 * xrange, xmax + 0.01 * xrange, ymin - 0.02 * yrange, ymax + 0.02 * yrange])
-		pylab.savefig(tree_file, format='pdf')
-		pylab.clf()
-		if verbose:
-			print "Done plotting tree, saved in file:", tree_file, "\n"
+                plot_tree(K, tree_file, self.accessions, verbose=verbose)
 
 #	def get_snps(self, random_fraction=None, region=None):
 #		snplist = []
@@ -4658,6 +4631,44 @@ def _test_prior_():
 	import dataParsers as dp
 	sd = dp.load_snps_call_method()
 	return sd.get_snp_priors(cpp_list)
+
+
+def plot_tree(K, tree_file, ets, verbose=True, label_values=None):
+        import scipy.cluster.hierarchy as hc
+        import pylab
+        import phenotypeData
+        e_dict = phenotypeData.get_ecotype_id_info_dict()
+        #print e_dict
+        labels = []
+        for et_i, et in enumerate(ets):
+                try:
+                        s1 = unicode(e_dict[int(et)][0], 'iso-8859-1')
+                        if label_values != None:
+                              s2 = unicode(' %s' % str(label_values[et_i])
+                        else:
+                                s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(et)][2], e_dict[int(et)][3]))
+                        s = s1 + s2
+                except Exception, err_s:
+                        print err_s
+                        s = str(et)
+                labels.append(s)
+        if verbose:
+                print "Plotting tree for SNPs:"
+        Z = hc.average(K)
+        pylab.figure(figsize=(24, 15))
+        pylab.axes([0.03, 0.08, 0.96, 0.91])
+        dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=labels)
+        xmin, xmax = pylab.xlim()
+        xrange = xmax - xmin
+        ymin, ymax = pylab.ylim()
+        yrange = ymax - ymin
+        pylab.axis([xmin - 0.01 * xrange, xmax + 0.01 * xrange, ymin - 0.02 * yrange, ymax + 0.02 * yrange])
+        pylab.savefig(tree_file, format='pdf')
+        pylab.clf()
+        if verbose:
+                print "Done plotting tree, saved in file:", tree_file, "\n"
+
+
 
 if __name__ == "__main__":
 	import dataParsers as dp

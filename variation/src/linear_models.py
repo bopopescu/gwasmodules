@@ -966,9 +966,9 @@ class LinearMixedModel(LinearModel):
 		low_int_af_count = 0
 		for snp in snps:
 			snp_a = sp.array(snp)
-			if sum(snp_a) > int_af_threshold:
+			if sp.sum(snp_a) > int_af_threshold:
 				interactions = cofactors * snp_a
-				interactions = interactions[sum(interactions, axis=1) > int_af_threshold]
+				interactions = interactions[sp.sum(interactions, axis=1) > int_af_threshold]
 				low_int_af_count += num_cof - len(interactions)
 				X = sp.hstack([h0_X, H_sqrt_inv * sp.matrix(snp_a).T, H_sqrt_inv * sp.matrix(interactions).T])
 			else:
@@ -1905,6 +1905,20 @@ def get_emma_reml_estimates(y, K, cofactors=None, include_intercept=True):
 	return res
 
 
+def mm_lrt_test(y, K):
+	"""
+	Likelihood ratio test for whether the data (y) fits a mixed model with 
+	two random terms fits significantly better.
+	"""
+	lm = LinearModel(y)
+	lmm = LinearMixedModel(y)
+	lmm.add_random_effect(K)
+	lmm_res = lmm.get_ML()
+	ll0 = lm.get_ll()
+	ll1 = lmm_res['max_ll']
+	D = 2 * (ll1 - ll0)
+	pval = stats.chi2.sf(D, 1)
+	return {'pval':pval, 'lrt_stat':D}
 
 def emma(snps, phenotypes, K, cofactors=None):
 	"""
@@ -2049,7 +2063,7 @@ def _log_choose_(n, k):
 		return 0
 	if n < k:
 		raise Exception('Out of range.')
-	return sum(map(sp.log, range(n, n - k, -1))) - sum(map(sp.log, range(k, 0, -1)))
+	return sp.sum(map(sp.log, range(n, n - k, -1))) - sp.sum(map(sp.log, range(k, 0, -1)))
 
 
 def _calc_bic_(ll, num_snps, num_par, n):
@@ -2139,9 +2153,9 @@ def _plot_manhattan_and_qq_(file_prefix, step_i, pvals, quantiles_dict=None, plo
 
 
 def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm, step_info_list,
-			chr_pos_list, quantiles_dict, plot_bonferroni=True,
-			cand_genes=None, plot_xaxis=True, log_qq_max_val=5, eig_L=None, type='emmax',
-			highlight_loci=None, write_pvals=False, snp_priors=None, ppa_threshold=0.5, **kwargs):
+			quantiles_dict, plot_bonferroni=True, cand_genes=None, plot_xaxis=True, log_qq_max_val=5,
+			eig_L=None, type='emmax', highlight_loci=None, write_pvals=False, snp_priors=None,
+			ppa_threshold=0.5, emma_num=None, **kwargs):
 	"""
 	Copies or plots optimal criterias
 	"""
@@ -2269,7 +2283,7 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 				reml_res = lm.get_REML(eig_L=eig_L, eig_R=eig_R)
 				H_sqrt_inv = reml_res['H_sqrt_inv']
 				l_res = lm._emmax_f_test_(kwargs['snps'], H_sqrt_inv, snp_priors=snp_priors,
-								emma_num=kwargs['emma_num'])
+								emma_num=emma_num)
 				min_pval_i = l_res['ps'].argmin()
 				mahalnobis_rss = l_res['rss'][min_pval_i]
 				print 'Min Mahalanobis RSS:', mahalnobis_rss
@@ -2278,7 +2292,8 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 				min_pval_i = l_res['ps'].argmin()
 
 			min_pval = l_res['ps'][min_pval_i]
-			min_pval_chr_pos = chr_pos_list[min_pval_i]
+
+			min_pval_chr_pos = (kwargs['chromosomes'][min_pval_i], kwargs['positions'][min_pval_i])
 			print 'Min p-value:', min_pval
 			l_pvals = l_res['ps'].tolist()
 			if file_prefix:
@@ -2499,14 +2514,14 @@ def emmax_step(phen_vals, sd, K, cof_chr_pos_list, eig_L=None, eig_R=None, progr
        	lmm = LinearMixedModel(phen_vals)
 	lmm.add_random_effect(K)
 	h0_rss = lmm.get_rss()[0]
-	chrom_pos_list = sd.getChrPosList()
+	chrom_pos_list = sd.get_chr_pos_list()
 	print 'Looking up cofactors'
 	cof_indices = []
 	for chrom_pos in cof_chr_pos_list:
 		i = bisect.bisect(chrom_pos_list, chrom_pos) - 1
 		assert chrom_pos_list[i] == chrom_pos, 'Cofactor missing??'
 		cof_indices.append(i)
-	snps = sd.getSnps()
+	snps = sd.get_snps()
 	cof_snps = [snps[i] for i in cof_indices]
 	lmm.set_factors(cof_snps)
 
@@ -2635,6 +2650,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 	num_snps = len(snps)
 
 	if snp_priors == None:
+		print "Using default SNP priors"
 		snp_priors = [1.0 / num_snps] * num_snps
 
 	if not sign_threshold: #Then use Bonferroni threshold
@@ -2925,10 +2941,10 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 			print step_info['kolmogorov_smirnov'], step_info['pval_median']
 
 	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
-				step_info_list, chr_pos_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
+				step_info_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
 				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax',
 				highlight_loci=highlight_loci, write_pvals=save_pvals, markersize=markersize,
-				chrom_col_map=chrom_col_map, **kwargs)
+				chrom_col_map=chrom_col_map, emma_num=emma_num, **kwargs)
 
 	for step_i in opt_indices:
 		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
@@ -3614,7 +3630,8 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 
 
 
-def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, kinship_method='ibd', global_k=None):
+def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, kinship_method='ibd',
+				global_k=None, tair_ids=None, plot_gene_trees=False):
 	"""
 	Local vs. global kinship mixed model.
 	"""
@@ -3636,7 +3653,8 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 	h0_res = lmm0.get_estimates(eig_L)
 
 	gene_dict = dp.parse_tair_gff_file()
-	tair_ids = gene_dict.keys()
+	if tair_ids == None:
+		tair_ids = gene_dict.keys()
 	tair_ids.sort()
 	chromosomes = []
 	positions = []
@@ -3669,6 +3687,9 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 			h1_heritabilities.append(res_dict['pseudo_heritability1'])
 			pvals.append(res_dict['pval'])
 			mapped_tair_ids.append(tair_id)
+			if plot_gene_trees:
+				tree_file = file_prefix + '_%s_%d_tree.png' % (tair_id, radius)
+				snpsdata.plot_tree(local_k, tree_file, verbose=True, label_values=y)
 
 			#print 'H0: pseudo_heritability=%0.2f' % (res_dict['h0_res']['pseudo_heritability'])
 			#print 'H1: pseudo_heritability=%0.2f, perc_var1=%0.2f, perc_var2=%0.2f' % \
@@ -3857,7 +3878,7 @@ def test_bayes_factor_enrichment():
 			line = l.split()
 			cpp_list.append((int(line[1]), int(line[2]), float(line[4])))
 
-	for pid in [314, 315, 316, 317]:
+	for pid in [ 316, 317]:
 		sd = dp.load_snps_call_method(75)
 		phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'phen_raw_112210.csv')
 		#phed = pd.get_phenotypes_from_db([pid])
