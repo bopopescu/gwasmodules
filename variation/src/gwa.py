@@ -621,6 +621,15 @@ def map_phenotype(p_i, phed, mapping_method, trans_method, p_dict):
 
 		else:  #Parametric tests below:		
 
+			if mapping_method in ['emma', 'emmax', 'emmax_perm', 'emmax_step', 'emmax_anova', 'loc_glob_mm']:
+				r = lm.mm_lrt_test(phen_vals, k)
+				if r['pval'] > 0.05:
+					print "Performing EMMA, even though a mixed model does not fit the data significantly better"
+					print 'p-value: %0.3f' % r['pval']
+				else:
+					print 'The mixed model fits the data significantly better than the simple linear model.'
+					print 'p-value: %f' % r['pval']
+
 			if mapping_method in ['loc_glob_mm']:
 				lm.local_vs_global_mm_scan(phen_vals, sd, file_prefix=file_prefix,
 							global_k=k, window_size=p_dict['loc_glob_ws'],
