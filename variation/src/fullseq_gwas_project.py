@@ -137,9 +137,10 @@ def _write_res_dict_to_file_3_(filename, rd):
 								rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 
-def telomere_example_plots():
-        genes_of_interest = ['AT1G21400', 'AT1G21410', 'AT1G21430', 'AT1G21440', 'AT1G21450', 'AT1G21460', 'AT1G21470', 'AT1G21480']
-        sd = dp.load_snps_call_method(78)
+def telomere_example_plots(debug_filter=1.0, pid=1365, call_method_id=78, radius=20000, kinship_method='ibs'):
+        genes_of_interest = ['AT1G21390', 'AT1G21400', 'AT1G21410', 'AT1G21420', 'AT1G21430', 'AT1G21440', 'AT1G21450',
+                             'AT1G21460', 'AT1G21470', 'AT1G21480', 'AT1G21490']
+        sd = dp.load_snps_call_method(call_method_id)
         if debug_filter < 1:
                 sd.sample_snps(debug_filter)
         phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
@@ -148,11 +149,13 @@ def telomere_example_plots():
         phen_name = phed.get_name(pid)
         sd.coordinate_w_phenotype_data(phed, pid)
         phed.transform(pid, 'most_normal')
+        png_file = env.env['results_dir'] + 'histogram_%s_hist.png' % phed.get_name(pid)
+        phed.plot_histogram(pid, png_file=png_file)
         phen_vals = phed.get_values(pid)
         file_prefix = env.env['results_dir'] + 'loc_v_glob_gene_%d_%d_%d_%s' % \
                                                 (call_method_id, radius, pid, phen_name)
         res_dict = lm.local_vs_global_gene_mm_scan(phen_vals, sd, file_prefix, radius, kinship_method,
-                                                   tair_ids=genes_of_interest, plot_gene_trees=True)
+                                                   tair_ids=genes_of_interest, plot_gene_trees=True, ets=sd.accessions)
 
 def run():
 	phenotype_file = env.env['phen_dir'] + 'phen_with_swedish_082211.csv'
@@ -173,4 +176,5 @@ def run():
 
 
 if __name__ == '__main__':
-        run()
+        telomere_example_plots()
+        #run()

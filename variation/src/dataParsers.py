@@ -2545,8 +2545,25 @@ def parse_tair_gff_file():
 				assert tair_id in gene_dict, 'We have a fragment but where is the transposon?'
 				gene_dict[tair_id]['fragments'].append({'start_pos':start_pos, 'end_pos':end_pos})
 			i += 1
+
+		print 'Done loading the GFF file'
+		print 'Now adding functional description'
+		with open(env['tair_dir'] + 'TAIR10_functional_descriptions.tsv') as f:
+			print f.next()
+			for line in f:
+				l = map(str.strip, line.split('\t'))
+				tair_isoform_id = l[0]
+				tair_id = tair_isoform_id.split('.')[0]
+				gene_type = l[1]
+				short_description = l[2]
+				curator_summary = l[3]
+				computational_description = l[4]
+				gene_dict[tair_id][tair_isoform_id]['functional_description'] = \
+					{'type':gene_type, 'short_description':short_description,
+					'curator_summary':curator_summary,
+					'computational_description':computational_description}
 		cPickle.dump(gene_dict, open(pickled_filename, 'wb'), protocol=2)
-	print 'Done loading the file'
+
 	return gene_dict
 
 

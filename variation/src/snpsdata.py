@@ -4644,7 +4644,7 @@ def plot_tree(K, tree_file, ets, verbose=True, label_values=None):
                 try:
                         s1 = unicode(e_dict[int(et)][0], 'iso-8859-1')
                         if label_values != None:
-                              s2 = unicode(' %s' % str(label_values[et_i])
+                                s2 = unicode(' %s' % str(label_values[et_i]))
                         else:
                                 s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(et)][2], e_dict[int(et)][3]))
                         s = s1 + s2

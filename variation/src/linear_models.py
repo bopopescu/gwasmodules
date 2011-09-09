@@ -3631,7 +3631,7 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 
 
 def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, kinship_method='ibd',
-				global_k=None, tair_ids=None, plot_gene_trees=False):
+				global_k=None, tair_ids=None, plot_gene_trees=False, ets=None):
 	"""
 	Local vs. global kinship mixed model.
 	"""
@@ -3687,9 +3687,11 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 			h1_heritabilities.append(res_dict['pseudo_heritability1'])
 			pvals.append(res_dict['pval'])
 			mapped_tair_ids.append(tair_id)
-			if plot_gene_trees:
-				tree_file = file_prefix + '_%s_%d_tree.png' % (tair_id, radius)
-				snpsdata.plot_tree(local_k, tree_file, verbose=True, label_values=y)
+			if plot_gene_trees and ets != None:
+				tree_file = file_prefix + '_%s_%d_tree.pdf' % (tair_id, radius)
+				y_strs = map(lambda x: '%0.2f' % x, y)
+				snpsdata.plot_tree(local_k, tree_file, ets, verbose=True, label_values=y_strs)
+				continue
 
 			#print 'H0: pseudo_heritability=%0.2f' % (res_dict['h0_res']['pseudo_heritability'])
 			#print 'H1: pseudo_heritability=%0.2f, perc_var1=%0.2f, perc_var2=%0.2f' % \
