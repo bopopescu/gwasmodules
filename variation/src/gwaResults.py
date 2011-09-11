@@ -591,8 +591,8 @@ class Result(object):
 		scoreRange = max_score - min_score
 		f = plt.figure(figsize=fig_size)
 		if plot_genes:
-			ax = f.add_axes([0.05, 0.45, 0.94, 0.48])
-			tair_ax = f.add_axes([0.05, 0, 0.94, 0.37])
+			ax = f.add_axes([0.05, 0.4, 0.94, 0.53])
+			tair_ax = f.add_axes([0.05, 0, 0.94, 0.32])
 		else:
 			ax = f.add_axes([0.05, 0.07, 0.94, 0.84])
 		starPoints = [[], [], []]
@@ -627,7 +627,7 @@ class Result(object):
 				g = gene_dict[tid]
 				y_value = -gene_line_map[tid]
 				if len(tair_ids) < 50:
-					tair_ax.text((g['start_pos'] - 0.005 * x_range) / displayed_unit, y_value + 0.2, tid, size=5)
+					tair_ax.text((g['start_pos'] - 0.01 * x_range) / displayed_unit, y_value + 0.2, tid, size=5)
 #				if len(g.exons) > 0:
 #
 #					for i in g.introns:
