@@ -2460,7 +2460,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 
 
 
-def parse_tair_gff_file(chrom=None, reg_start_pos=None, reg_end_pos=None):
+def parse_tair_gff_file(chrom=None, reg_start_pos=None, reg_end_pos=None, only_genes=False):
 	"""
 	Loads the TAIR GFF file.
 	"""
@@ -2571,6 +2571,11 @@ def parse_tair_gff_file(chrom=None, reg_start_pos=None, reg_end_pos=None):
 						gene_dict[tair_id]['end_pos'] >= reg_start_pos):
 					del gene_dict[tair_id]
 
+	if only_genes:
+		tids = gene_dict.keys()
+		for tid in tids:
+			if gene_dict[tid]['gene_type'] != 'gene':
+				del gene_dict[tid]
 
 
 	return gene_dict
