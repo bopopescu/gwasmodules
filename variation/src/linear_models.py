@@ -25,7 +25,6 @@ import math
 import platform
 import os
 import analyze_gwas_results as agr
-import ipdb
 
 os.putenv('OMP_NUM_THREADS', '4')
 
@@ -2476,8 +2475,8 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		p_her_array = rss_array * sp.array(p_her_list)
 		genetic_variance = p_her_array + (1 - rss_array)
 		variance_explained = (1 - rss_array)
-		pylab.figure(figsize=(10, 4))
-		pylab.axes([0.07, 0.12, 0.92, 0.85])
+		pylab.figure(figsize=(10, 2.8))
+		pylab.axes([0.07, 0.16, 0.92, 0.79])
 		pylab.fill_between([0, num_steps], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
 		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
 		pylab.fill_between(sp.arange(num_steps + 1), 0, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
@@ -2488,8 +2487,8 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		pylab.axis([0, num_steps, 0, 1])
 		pylab.savefig(file_prefix + '_stats_variances.png', format='png')
 
-		pylab.figure(figsize=(8, 4))
-		pylab.axes([0.07, 0.12, 0.92, 0.85])
+		pylab.figure(figsize=(6, 2.8))
+		pylab.axes([0.12, 0.16, 0.86, 0.79])
 		num_steps = num_steps / 2
 		pylab.fill_between([0, num_steps ], 0, 1, color='#DD3333', alpha=0.8, label='Variance explained')
 		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance[:num_steps + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
@@ -3631,7 +3630,7 @@ def local_vs_global_mm_scan(y, sd, file_prefix='/tmp/temp', window_size=1000000,
 
 
 def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, kinship_method='ibd',
-				global_k=None, tair_ids=None, plot_gene_trees=False):
+				global_k=None, tair_ids=None, plot_gene_trees=False, ets=None):
 	"""
 	Local vs. global kinship mixed model.
 	"""
@@ -3687,9 +3686,11 @@ def local_vs_global_gene_mm_scan(y, sd, file_prefix='/tmp/temp', radius=20000, k
 			h1_heritabilities.append(res_dict['pseudo_heritability1'])
 			pvals.append(res_dict['pval'])
 			mapped_tair_ids.append(tair_id)
-			if plot_gene_trees:
-				tree_file = file_prefix + '_%s_%d_tree.png' % (tair_id, radius)
-				snpsdata.plot_tree(local_k, tree_file, verbose=True, label_values=y)
+			if plot_gene_trees and ets != None:
+				tree_file = file_prefix + '_%s_%d_tree.pdf' % (tair_id, radius)
+				y_strs = map(lambda x: '%0.2f' % x, y)
+				snpsdata.plot_tree(local_k, tree_file, ets, verbose=True, label_values=y_strs)
+				continue
 
 			#print 'H0: pseudo_heritability=%0.2f' % (res_dict['h0_res']['pseudo_heritability'])
 			#print 'H1: pseudo_heritability=%0.2f, perc_var1=%0.2f, perc_var2=%0.2f' % \

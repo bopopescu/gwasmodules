@@ -535,33 +535,36 @@ class Result(object):
 	def _plot_small_manhattan_(self, pdf_file=None, png_file=None, min_score=0, max_score=None,
 				type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False,
 				cand_genes=None, threshold=0, highlight_markers=None, chromosome=None,
-				tair_file=None, plot_genes=True, color_map=None, markersize=3):
+				tair_file=None, plot_genes=True, color_map=None, markersize=3, fig_size=(5, 3)):
 		import matplotlib
 		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
 
-		tair_genes = None
+		tair_ids = None
 		min_x = min(self.snp_results['positions'])
 		max_x = max(self.snp_results['positions'])
 		if plot_genes:
 			print 'Retrieving genes from DB.'
 			gene_buffer = int((max_x - min_x) / 16) #bp
-			tair_genes = get_gene_list(min_x, max_x, chromosome)
-			print "Found", len(tair_genes), "genes in region:", min_x, "to", max_x
-			g = tair_genes[0]
-			gene_line_list = [g]
-			gene_line_map = {g:1}
+			gene_dict = get_gene_dict(chromosome, min_x, max_x)
+			tair_ids = sorted(gene_dict.keys())
+			print "Found", len(tair_ids), "genes in region:", min_x, "to", max_x
+			tid = tair_ids[0]
+			gene_line_list = [tid]
+			gene_line_map = {tid:1}
 			used_lines = set([1])
 			free_lines = set()#[2, 3, 4, 5, 6, 7, 8, 9, 10])
-			for next_g in tair_genes[1:]:
-				s_pos = next_g.startPos
-				new_gene_line_list = [next_g]
-				for g in gene_line_list:
-					if next_g.startPos - gene_buffer <= g.endPos:
-						new_gene_line_list.append(g)
+			for next_tid in tair_ids[1:]:
+				next_g = gene_dict[next_tid]
+				s_pos = next_g['start_pos']
+				new_gene_line_list = [next_tid]
+				for tid in gene_line_list:
+					g = gene_dict[tid]
+					if next_g['start_pos'] - gene_buffer <= g['end_pos']:
+						new_gene_line_list.append(tid)
 					else:
 
-						gl = gene_line_map[g]
+						gl = gene_line_map[tid]
 						used_lines.remove(gl)
 						free_lines.add(gl)
 				#pdb.set_trace()
@@ -573,27 +576,27 @@ class Result(object):
 				else:
 					gl = 1
 				used_lines.add(gl)
-				gene_line_map[next_g] = gl
+				gene_line_map[next_tid] = gl
 				#pdb.set_trace()
 				gene_line_list = new_gene_line_list
-			max_lines = max([gene_line_map[g] for g in tair_genes])
-			min_score = -0.2 - 0.4 * max_lines
+			max_lines = max([gene_line_map[tid] for tid in gene_line_map])
+			tair_ax_min_score = -0.5 - max_lines
 
 
-		if tair_file:
-			with open(tair_file, 'w') as f:
-				for gene in tair_genes:
-					f.write(str(gene) + "\n")
-
+#		if tair_file:
+#			with open(tair_file, 'w') as f:
+#				for gene in tair_genes:
+#					f.write(str(gene) + "\n")
 
 
 		displayed_unit = 1000.0 #kbs
 		scoreRange = max_score - min_score
+		f = plt.figure(figsize=fig_size)
 		if plot_genes:
-			plt.figure(figsize=(7.5, 3 + 0.4 * max_lines))
+			ax = f.add_axes([0.05, 0.45, 0.94, 0.48])
+			tair_ax = f.add_axes([0.05, 0, 0.94, 0.32])
 		else:
-			plt.figure(figsize=(7, 3.5))
-		plt.axes([0.045, 0.12, 0.95, 0.7])
+			ax = f.add_axes([0.05, 0.08, 0.94, 0.84])
 		starPoints = [[], [], []]
 		color = 'b'
 		if chromosome:
@@ -612,31 +615,49 @@ class Result(object):
 				score = max_score
 			scores[s_i] = score
 
-		plt.plot(positions, scores, ".", markersize=markersize + 1, alpha=0.7, color=color)
+		ax.plot(positions, scores, ".", markersize=markersize + 1, alpha=0.7, color=color)
 
+		max_pos = max(positions)
+		min_pos = min(positions)
+		x_range = max_pos - min_pos
+		ax.axis([min_pos - 0.05 * x_range, max_pos + 0.05 * x_range,
+			min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 
-		if tair_genes:
+		if tair_ids:
 			print "Drawing TAIR genes"
-			for g in tair_genes:
-				y_value = -0.1 - 0.5 * gene_line_map[g]
-				plt.text(g.startPos / displayed_unit, y_value + 0.08, g.tairID, size=5)
-				if len(g.exons) > 0:
-
-					for i in g.introns:
-						plt.plot([i.startPos / displayed_unit, i.endPos / displayed_unit],
-							[y_value, y_value], color=(0.6, 0.6, 0.6), linewidth=1)
-					for e in g.exons:
-						plt.plot([e.startPos / displayed_unit, e.endPos / displayed_unit],
-							[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
-				else:
-					plt.plot([g.startPos / displayed_unit, g.endPos / displayed_unit],
-						[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
+			for tid in tair_ids:
+				g = gene_dict[tid]
+				y_value = -0.5 - gene_line_map[tid]
+				if len(tair_ids) < 50:
+					tair_ax.text(g['start_pos'] / displayed_unit, y_value + 0.5, tid, size=4)
+#				if len(g.exons) > 0:
+#
+#					for i in g.introns:
+#						tair_ax.plot([i.startPos / displayed_unit, i.endPos / displayed_unit],
+#							[y_value, y_value], color=(0.6, 0.6, 0.6), linewidth=1)
+#					for e in g.exons:
+#						tair_ax.plot([e.startPos / displayed_unit, e.endPos / displayed_unit],
+#							[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
+#				else:
+				tair_ax.plot([g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit],
+					[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
+			tair_ax.spines['top'].set_visible(False)
+			tair_ax.spines['bottom'].set_visible(False)
+			tair_ax.spines['right'].set_visible(False)
+			tair_ax.spines['left'].set_visible(False)
+			tair_ax.xaxis.set_visible(False)
+			tair_ax.yaxis.set_visible(False)
+			max_y = 0
+			min_y = tair_ax_min_score
+			range_y = max_y - min_y
+			tair_ax.axis([min_pos - 0.05 * x_range, max_pos + 0.05 * x_range,
+				min_y - 0.05 * range_y, max_y + 0.05 * range_y])
 
 
 
 		if cand_genes:
 			for cg in cand_genes:
-				plt.axvspan(cg.startPos / displayed_unit, cg.endPos / displayed_unit, facecolor='#aa11bb',
+				ax.axvspan(cg.startPos / displayed_unit, cg.endPos / displayed_unit, facecolor='#aa11bb',
 						alpha=0.5, linewidth=0)
 
 
@@ -646,14 +667,14 @@ class Result(object):
 			for c, p, score in highlight_markers:
 				xs.append(p / displayed_unit)
 				if score > max_score:
-					plt.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
+					ax.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
 					ys.append(max_score)
 				else:
 					ys.append(score)
-			plt.plot(xs, ys, ".", color="#ff9944", markersize=markersize + 3, alpha=0.7)
+			ax.plot(xs, ys, ".", color="#ff9944", markersize=markersize + 3, alpha=0.7)
 
 		if len(starPoints[0]) > 0:
-			plt.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=markersize + 1)
+			ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=markersize + 1)
 			i = 0
 			while i < len(starPoints[0]):
 				max_point = i
@@ -662,7 +683,7 @@ class Result(object):
 					if starPoints[2][i] > starPoints[2][max_point]:
 						max_point = i
 					i += 1
-				plt.text(starPoints[0][max_point] - 200000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
+				ax.text(starPoints[0][max_point] - 200000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
 
 
 
@@ -670,25 +691,23 @@ class Result(object):
 		if plot_bonferroni:
 			b_threshold = -math.log10(1.0 / (len(scores) * 20.0))
 			if threshold :
-				plt.plot([0, max(positions)], [b_threshold, b_threshold], ":")
+				ax.plot([min_pos, max_pos], [b_threshold, b_threshold], ":")
 				threshold = -math.log10(threshold)
-				plt.plot([0, max(positions)], [threshold, threshold], color='#6495ed', linestyle='-.')
+				ax.plot([min_pos, max_pos], [threshold, threshold], color='#6495ed', linestyle='-.')
 			#Bonferroni threshold
 			else:
-				plt.plot([0, max(positions)], [b_threshold, b_threshold], color='#000000', linestyle="-.")
+				ax.plot([min_pos, max_pos], [b_threshold, b_threshold], color='#000000', linestyle="-.")
 
-		x_range = max(positions) - min(positions)
-		plt.axis([min(positions) - 0.05 * x_range, max(positions) + 0.05 * x_range, min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 		if not ylab:
 			if type == "pvals":
-				plt.ylabel('$ - log(p - $value$)$')
+				ax.set_ylabel('$ - log(p - $value$)$')
 
 			else:
-				plt.ylabel('score')
+				ax.set_ylabel('score')
 		else:
-			plt.ylabel(ylab)
-		plt.xlabel("kilobases")
-		plt.title('Chromsome %d' % chrom)
+			ax.set_ylabel(ylab)
+		ax.set_xlabel("kilobases")
+		ax.set_title('Chromsome %d' % chrom)
 
 		if pdf_file:
 			plt.savefig(pdf_file, format="pdf")
@@ -889,7 +908,6 @@ class Result(object):
 		import matplotlib
 		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
-		import ipdb
 
 		num_scores = len(self.snp_results['scores'])
 
@@ -1860,120 +1878,125 @@ def getCandidateGeneList(cgl_id, host="papaya.usc.edu", user="bvilhjal", passwd=
 
 
 
+def get_gene_dict(chrom=None, start_pos=None, end_pos=None):
+	import dataParsers as dp
+	return dp.parse_tair_gff_file(chrom, start_pos, end_pos)
 
 
-def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=True, \
-		verbose=True, conn=None):
-	"""
-	Fetch genes (ignores TEs etc.) within a region or all genes from DB (TAIR 10).
-	"""
-	import dbutils
-	if not conn:
-		new_conn = dbutils.connect_to_default_lookup('genome_tair10')
-		cursor = new_conn.cursor()
-	else:
-		cursor = conn.cursor()
-	#Retrieve the filenames
-	#if verbose:
-	#	print "Fetching data"  
-	#print "Fetching data"  
-
-	#select c.locustag, b.start, b.stop, a.comment from genome.gene_commentary a, genome.entrezgene_mapping b, genome.gene c where b.start > 25000 and b.stop < 75000 and b.chromosome=1 and b.gene_id = c.gene_id and c.gene_id = a.gene_id and a.gene_commentary_type_id = 8
-	#select distinct t8_fd.tair_id, t8.chromosome, t8.start, t8.end, t8_fd.type, t8_fd.short_description from T8_annotation_TH.t8_063008 t8, T8_annotation_TH.t8_func_desc t8_fd, stock_250k.candidate_gene_list cgl where t8.pub_locus+'.1' = t8_fd.tair_id and cgl.list_type_id=129  and cgl.original_name=t8.pub_locus and t8.chromosome =1 order by t8.chromosome, t8.start
-	#select distinct gm.chromosome, gm.start, gm.stop, g.locustag from genome.entrezgene_mapping gm, genome.gene g, stock_250k.candidate_gene_list cgl where cgl.list_type_id=129 and gm.gene_id = g.gene_id and cgl.gene_id=g.gene_id order by gm.chromosome, gm.start, gm.stop
-	if chr and start_pos != None and end_pos != None:
-#		sql_statement = "SELECT DISTINCT gm.chromosome, gm.start, gm.stop, g.locustag, \
-#			g.gene_symbol, g.description, g.dbxrefs FROM genome.entrezgene_mapping gm, genome.gene g WHERE \
-#			gm.gene_id = g.gene_id AND gm.chromosome=%d AND gm.stop>%d AND \
-#			gm.start<%d ORDER BY gm.chromosome, gm.start, gm.stop" % (chr, start_pos, end_pos)
-		sql_statement = 'SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, \
-						g.description, g.dbxrefs FROM genome_tair10.gene g \
-					WHERE g.chromosome=%d AND g.stop>%d AND g.start<%d \
-					ORDER BY g.chromosome, g.start, g.stop' % (chr, start_pos, end_pos)
-		print sql_statement
-		numRows = int(cursor.execute(sql_statement))
-	else:
-#		sql_statement = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, \
-#			g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g \
-#			where gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
-		sql_statement = 'SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, \
-						g.description, g.dbxrefs FROM genome_tair10.gene g \
-					WHERE g.start IS NOT NULL AND g.stop IS NOT NULL \
-					ORDER BY g.chromosome, g.start, g.stop'
-		print sql_statement
-		numRows = int(cursor.execute(sql_statement))
-	if numRows == 0:
-		pass
-
-	genes = []
-	while(1):
-		row = cursor.fetchone()
-		if not row:
-			break;
-		if row[1] and  row[2] and row[0] in ['1', '2', '3', '4', '5']:
-			chrom = int(row[0])
-			start_pos = int(row[1])
-			end_pos = int(row[2])
-			db_ref = row[6]
-			if db_ref == None:
-				continue
-			tair_id = db_ref[5:]
-			gene = Gene(int(row[0]), start_pos, end_pos, name=row[4], description=row[5], dbRef=row[6], tairID=tair_id)
-			genes.append(gene)
-
-	if include_intron_exons:
-		for g in genes:
-#			sql_stat = "SELECT distinct gs.start, gs.stop, g.dbxrefs \
-#					FROM genome.entrezgene_mapping gm, genome.gene g, genome.gene_segment gs, \
-#						genome.gene_commentary gc \
-#					WHERE g.dbxrefs='%s' AND gm.gene_id = g.gene_id AND \
-#						gs.gene_commentary_id=gc.id AND gc.gene_id=gm.gene_id \
-#					ORDER BY gs.start, gs.stop" % (g.dbRef)
-			sql_stat = "SELECT distinct gs.start, gs.stop, g.gene_symbol \
-					FROM genome_tair10.gene g, genome_tair10.gene_segment gs, \
-						genome_tair10.gene_commentary gc \
-					WHERE g.gene_symbol='%s' AND gs.gene_commentary_id=gc.id AND gc.gene_id=g.id \
-					ORDER BY gs.start, gs.stop" % (g.name)
-			#print sql_stat
-			numRows = int(cursor.execute(sql_stat))
-			segments = []
-			while(1):
-				row = cursor.fetchone()
-				if not row:
-					break;
-				try:
-					start_pos = int(row[0])
-					end_pos = int(row[1])
-					segments.append(Region(g.chromosome, start_pos, end_pos))
-				except Exception, err_str:
-					print err_str, ':'
-					print row
-			exons = []
-			i = 1
-			#print "len(segments):",len(segments)
-			while i < len(segments):
-				curr_exon = segments[i - 1]
-				while i < len(segments) and curr_exon.overlapping(segments[i]):
-					curr_exon.merge(segments[i])
-					i += 1
-				exons.append(curr_exon)
-				i += 1
-			g.exons = exons
-			g._update_introns_()
-			#print "len(exons):",len(exons)
-			#for e in g.exons:
-			#	print e.startPos, e.endPos
-			#print "len(g.introns):",len(g.introns)
-			#for e in g.introns:
-			#	print e.startPos, e.endPos
-	cursor.close()
-	if not conn:
-		new_conn.close ()
-	if verbose:
-		print "Gene-lists fetched"
-	return genes
 
 
+
+#def get_gene_list(start_pos=None, end_pos=None, chr=None, include_intron_exons=True, \
+#		verbose=True, conn=None):
+#	"""
+#	Fetch genes (ignores TEs etc.) within a region or all genes from DB (TAIR 10).
+#	"""
+#	import dbutils
+#	if not conn:
+#		new_conn = dbutils.connect_to_default_lookup('genome_tair10')
+#		cursor = new_conn.cursor()
+#	else:
+#		cursor = conn.cursor()
+#	#Retrieve the filenames
+#	#if verbose:
+#	#	print "Fetching data"  
+#	#print "Fetching data"  
+#
+#	#select c.locustag, b.start, b.stop, a.comment from genome.gene_commentary a, genome.entrezgene_mapping b, genome.gene c where b.start > 25000 and b.stop < 75000 and b.chromosome=1 and b.gene_id = c.gene_id and c.gene_id = a.gene_id and a.gene_commentary_type_id = 8
+#	#select distinct t8_fd.tair_id, t8.chromosome, t8.start, t8.end, t8_fd.type, t8_fd.short_description from T8_annotation_TH.t8_063008 t8, T8_annotation_TH.t8_func_desc t8_fd, stock_250k.candidate_gene_list cgl where t8.pub_locus+'.1' = t8_fd.tair_id and cgl.list_type_id=129  and cgl.original_name=t8.pub_locus and t8.chromosome =1 order by t8.chromosome, t8.start
+#	#select distinct gm.chromosome, gm.start, gm.stop, g.locustag from genome.entrezgene_mapping gm, genome.gene g, stock_250k.candidate_gene_list cgl where cgl.list_type_id=129 and gm.gene_id = g.gene_id and cgl.gene_id=g.gene_id order by gm.chromosome, gm.start, gm.stop
+#	if chr and start_pos != None and end_pos != None:
+##		sql_statement = "SELECT DISTINCT gm.chromosome, gm.start, gm.stop, g.locustag, \
+##			g.gene_symbol, g.description, g.dbxrefs FROM genome.entrezgene_mapping gm, genome.gene g WHERE \
+##			gm.gene_id = g.gene_id AND gm.chromosome=%d AND gm.stop>%d AND \
+##			gm.start<%d ORDER BY gm.chromosome, gm.start, gm.stop" % (chr, start_pos, end_pos)
+#		sql_statement = 'SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, \
+#						g.description, g.dbxrefs FROM genome_tair10.gene g \
+#					WHERE g.chromosome=%d AND g.stop>%d AND g.start<%d \
+#					ORDER BY g.chromosome, g.start, g.stop' % (chr, start_pos, end_pos)
+#		print sql_statement
+#		numRows = int(cursor.execute(sql_statement))
+#	else:
+##		sql_statement = "select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, \
+##			g.description, g.dbxrefs from genome.entrezgene_mapping gm, genome.gene g \
+##			where gm.gene_id = g.gene_id order by gm.chromosome, gm.start, gm.stop"
+#		sql_statement = 'SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, \
+#						g.description, g.dbxrefs FROM genome_tair10.gene g \
+#					WHERE g.start IS NOT NULL AND g.stop IS NOT NULL \
+#					ORDER BY g.chromosome, g.start, g.stop'
+#		print sql_statement
+#		numRows = int(cursor.execute(sql_statement))
+#	if numRows == 0:
+#		pass
+#
+#	genes = []
+#	while(1):
+#		row = cursor.fetchone()
+#		if not row:
+#			break;
+#		if row[1] and  row[2] and row[0] in ['1', '2', '3', '4', '5']:
+#			chrom = int(row[0])
+#			start_pos = int(row[1])
+#			end_pos = int(row[2])
+#			db_ref = row[6]
+#			if db_ref == None:
+#				continue
+#			tair_id = db_ref[5:]
+#			gene = Gene(int(row[0]), start_pos, end_pos, name=row[4], description=row[5], dbRef=row[6], tairID=tair_id)
+#			genes.append(gene)
+#
+#	if include_intron_exons:
+#		for g in genes:
+##			sql_stat = "SELECT distinct gs.start, gs.stop, g.dbxrefs \
+##					FROM genome.entrezgene_mapping gm, genome.gene g, genome.gene_segment gs, \
+##						genome.gene_commentary gc \
+##					WHERE g.dbxrefs='%s' AND gm.gene_id = g.gene_id AND \
+##						gs.gene_commentary_id=gc.id AND gc.gene_id=gm.gene_id \
+##					ORDER BY gs.start, gs.stop" % (g.dbRef)
+#			sql_stat = "SELECT distinct gs.start, gs.stop, g.gene_symbol \
+#					FROM genome_tair10.gene g, genome_tair10.gene_segment gs, \
+#						genome_tair10.gene_commentary gc \
+#					WHERE g.gene_symbol='%s' AND gs.gene_commentary_id=gc.id AND gc.gene_id=g.id \
+#					ORDER BY gs.start, gs.stop" % (g.name)
+#			#print sql_stat
+#			numRows = int(cursor.execute(sql_stat))
+#			segments = []
+#			while(1):
+#				row = cursor.fetchone()
+#				if not row:
+#					break;
+#				try:
+#					start_pos = int(row[0])
+#					end_pos = int(row[1])
+#					segments.append(Region(g.chromosome, start_pos, end_pos))
+#				except Exception, err_str:
+#					print err_str, ':'
+#					print row
+#			exons = []
+#			i = 1
+#			#print "len(segments):",len(segments)
+#			while i < len(segments):
+#				curr_exon = segments[i - 1]
+#				while i < len(segments) and curr_exon.overlapping(segments[i]):
+#					curr_exon.merge(segments[i])
+#					i += 1
+#				exons.append(curr_exon)
+#				i += 1
+#			g.exons = exons
+#			g._update_introns_()
+#			#print "len(exons):",len(exons)
+#			#for e in g.exons:
+#			#	print e.startPos, e.endPos
+#			#print "len(g.introns):",len(g.introns)
+#			#for e in g.introns:
+#			#	print e.startPos, e.endPos
+#	cursor.close()
+#	if not conn:
+#		new_conn.close ()
+#	if verbose:
+#		print "Gene-lists fetched"
+#	return genes
+#
 #"""
 #select distinct gm.chromosome, gm.start, gm.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs, gs.start, gs.stop
 #from genome.entrezgene_mapping gm, genome.gene g, gene_segment gs, gene_commentary gc

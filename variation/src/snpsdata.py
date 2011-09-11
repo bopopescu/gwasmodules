@@ -7,7 +7,6 @@ Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
 
 import sys, warnings
-import ipdb
 import env
 from itertools import *
 from bisect import bisect
@@ -2963,7 +2962,6 @@ class SNPsDataSet:
 		self.snpsDataList = snpsds
 		self.chromosomes = chromosomes
 		self.accessions = self.snpsDataList[0].accessions
-                print self.accessions
 		self.array_ids = self.snpsDataList[0].arrayIds
 		self.id = id
 		self.missing_val = snpsds[0].missingVal
@@ -3568,7 +3566,6 @@ class SNPsDataSet:
 	def get_ibd_kinship_matrix(self, debug_filter=1, num_dots=10, snp_dtype='int8', dtype='single'):
 		print 'Starting IBD calculation'
 		snps = self.getSnps(debug_filter)
-                ipdb.set_trace()
 		cov_mat = self._calc_ibd_kinship_(snps, num_dots=num_dots)
 		print 'Finished calculating IBD kinship matrix'
 		return cov_mat
@@ -3928,7 +3925,6 @@ class SNPsDataSet:
 		Takes a list of SNPs/markers with some priors, and extrapolates that to the SNPs in the data.
 		"""
 		import bisect
-		import ipdb
 		cpp_list.sort()
 		l = map(list, zip(*cpp_list))
 		priors = l[2]
@@ -4644,7 +4640,7 @@ def plot_tree(K, tree_file, ets, verbose=True, label_values=None):
                 try:
                         s1 = unicode(e_dict[int(et)][0], 'iso-8859-1')
                         if label_values != None:
-                              s2 = unicode(' %s' % str(label_values[et_i])
+                                s2 = unicode(' %s' % str(label_values[et_i]))
                         else:
                                 s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(et)][2], e_dict[int(et)][3]))
                         s = s1 + s2

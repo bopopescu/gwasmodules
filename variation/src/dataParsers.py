@@ -2460,32 +2460,32 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 
 
 
-def parse_tair_gff_file():
+def parse_tair_gff_file(chrom=None, reg_start_pos=None, reg_end_pos=None):
 	"""
 	Loads the TAIR GFF file.
 	"""
 	filename = env['tair_dir'] + 'TAIR10_GFF3_genes_transposons.gff.tsv'
 	pickled_filename = filename + '.pickled'
-	if os.path.isfile(pickled_filename):
+	if os.path.isfile(pickled_filename) and chrom == None:
 		gene_dict = cPickle.load(open(pickled_filename))
 	else:
+		print 'Plowing through the tsv files.'
 		with open(filename) as f:
 			lines = f.readlines()
 		gene_dict = {}
 		transposon_dict = {}
 		others = []
-		i = 0
-		while i < len(lines):
-			l = lines[i].split()
+		for line in lines:
+			l = line.split()
 			annotation_type = l[2]
 			info_list = l[8].split(';')
 			chromosome = l[0][3]
+			if chrom != None and str(chrom) != chromosome:
+				continue
 			start_pos = int(l[3])
 			end_pos = int(l[4])
 			strand = l[6]
 			frame = l[7]
-			if i % 10000 == 0:
-				print i / float(len(lines))
 			if annotation_type in ['gene', 'transposable_element_gene', 'pseudogene']:
 				tair_id = info_list[0][3:].strip()
 				note = info_list[1][5:].strip()
@@ -2544,9 +2544,35 @@ def parse_tair_gff_file():
 				tair_id = info_list[0][7:].strip()
 				assert tair_id in gene_dict, 'We have a fragment but where is the transposon?'
 				gene_dict[tair_id]['fragments'].append({'start_pos':start_pos, 'end_pos':end_pos})
-			i += 1
-		cPickle.dump(gene_dict, open(pickled_filename, 'wb'), protocol=2)
-	print 'Done loading the file'
+
+		print 'Done loading the GFF file'
+		print 'Now adding functional description'
+		with open(env['tair_dir'] + 'TAIR10_functional_descriptions.tsv') as f:
+			f.next()
+			for line in f:
+				l = map(str.strip, line.split('\t'))
+				tair_isoform_id = l[0]
+				tair_id = tair_isoform_id.split('.')[0]
+				gene_type = l[1]
+				short_description = l[2]
+				curator_summary = l[3]
+				computational_description = l[4]
+				if tair_id in gene_dict:
+					gene_dict[tair_id][tair_isoform_id]['functional_description'] = \
+						{'type':gene_type, 'short_description':short_description,
+						'curator_summary':curator_summary,
+						'computational_description':computational_description}
+		if chrom == None:
+			cPickle.dump(gene_dict, open(pickled_filename, 'wb'), protocol=2)
+		elif reg_start_pos != None and reg_end_pos != None:
+			tair_ids = gene_dict.keys()
+			for tair_id in tair_ids:
+				if not (gene_dict[tair_id]['start_pos'] <= reg_end_pos and \
+						gene_dict[tair_id]['end_pos'] >= reg_start_pos):
+					del gene_dict[tair_id]
+
+
+
 	return gene_dict
 
 
