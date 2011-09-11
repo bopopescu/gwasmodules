@@ -1878,9 +1878,9 @@ def getCandidateGeneList(cgl_id, host="papaya.usc.edu", user="bvilhjal", passwd=
 
 
 
-def get_gene_dict(chrom=None, start_pos=None, end_pos=None):
+def get_gene_dict(chrom=None, start_pos=None, end_pos=None, only_genes=False):
 	import dataParsers as dp
-	return dp.parse_tair_gff_file(chrom, start_pos, end_pos)
+	return dp.parse_tair_gff_file(chrom, start_pos, end_pos, only_genes)
 
 
 
