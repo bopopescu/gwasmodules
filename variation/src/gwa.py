@@ -106,7 +106,6 @@ from numpy import *
 from env import *
 import copy
 import pdb
-#import ipdb
 
 #For annoying linux computers, which don't have a display..
 import matplotlib
