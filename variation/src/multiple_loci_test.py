@@ -1507,8 +1507,9 @@ if __name__ == '__main__':
 #			file_name = '/tmp/fig2_h%d_ws%d.png' % (herit, ws)
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
-	perform_a_thal_emmax()
+	#perform_a_thal_emmax()
 	#_run_()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
+	perform_human_emmax(4)
 	print "Done!!\n"

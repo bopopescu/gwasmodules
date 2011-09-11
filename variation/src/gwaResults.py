@@ -579,8 +579,6 @@ class Result(object):
 				gene_line_map[next_tid] = gl
 				#pdb.set_trace()
 				gene_line_list = new_gene_line_list
-			max_lines = max([gene_line_map[tid] for tid in gene_line_map])
-			tair_ax_min_score = -0.5 - max_lines
 
 
 #		if tair_file:
@@ -594,9 +592,9 @@ class Result(object):
 		f = plt.figure(figsize=fig_size)
 		if plot_genes:
 			ax = f.add_axes([0.05, 0.45, 0.94, 0.48])
-			tair_ax = f.add_axes([0.05, 0, 0.94, 0.32])
+			tair_ax = f.add_axes([0.05, 0, 0.94, 0.37])
 		else:
-			ax = f.add_axes([0.05, 0.08, 0.94, 0.84])
+			ax = f.add_axes([0.05, 0.07, 0.94, 0.84])
 		starPoints = [[], [], []]
 		color = 'b'
 		if chromosome:
@@ -627,9 +625,9 @@ class Result(object):
 			print "Drawing TAIR genes"
 			for tid in tair_ids:
 				g = gene_dict[tid]
-				y_value = -0.5 - gene_line_map[tid]
+				y_value = -gene_line_map[tid]
 				if len(tair_ids) < 50:
-					tair_ax.text(g['start_pos'] / displayed_unit, y_value + 0.5, tid, size=4)
+					tair_ax.text((g['start_pos'] - 0.005 * x_range) / displayed_unit, y_value + 0.2, tid, size=5)
 #				if len(g.exons) > 0:
 #
 #					for i in g.introns:
@@ -647,8 +645,8 @@ class Result(object):
 			tair_ax.spines['left'].set_visible(False)
 			tair_ax.xaxis.set_visible(False)
 			tair_ax.yaxis.set_visible(False)
+			min_y = -max([gene_line_map[tid] for tid in gene_line_map])
 			max_y = 0
-			min_y = tair_ax_min_score
 			range_y = max_y - min_y
 			tair_ax.axis([min_pos - 0.05 * x_range, max_pos + 0.05 * x_range,
 				min_y - 0.05 * range_y, max_y + 0.05 * range_y])
