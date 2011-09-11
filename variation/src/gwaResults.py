@@ -655,7 +655,10 @@ class Result(object):
 
 		if cand_genes:
 			for cg in cand_genes:
-				ax.axvspan(cg.startPos / displayed_unit, cg.endPos / displayed_unit, facecolor='#aa11bb',
+				g = gene_dict[cg.tairID]
+				ax.axvspan(g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit, facecolor='#aa11bb',
+						alpha=0.5, linewidth=0)
+				tair_ax.axvspan(g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit, facecolor='#aa11bb',
 						alpha=0.5, linewidth=0)
 
 
