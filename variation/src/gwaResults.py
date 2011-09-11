@@ -535,7 +535,7 @@ class Result(object):
 	def _plot_small_manhattan_(self, pdf_file=None, png_file=None, min_score=0, max_score=None,
 				type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False,
 				cand_genes=None, threshold=0, highlight_markers=None, chromosome=None,
-				tair_file=None, plot_genes=True, color_map=None, markersize=3, fig_size=(5, 3)):
+				tair_file=None, plot_genes=True, color_map=None, markersize=3, fig_size=(8, 5)):
 		import matplotlib
 		matplotlib.use('Agg')
 		import matplotlib.pyplot as plt
@@ -546,7 +546,7 @@ class Result(object):
 		if plot_genes:
 			print 'Retrieving genes from DB.'
 			gene_buffer = int((max_x - min_x) / 16) #bp
-			gene_dict = get_gene_dict(chromosome, min_x, max_x)
+			gene_dict = get_gene_dict(chromosome, min_x, max_x, only_genes=True)
 			tair_ids = sorted(gene_dict.keys())
 			print "Found", len(tair_ids), "genes in region:", min_x, "to", max_x
 			tid = tair_ids[0]
@@ -640,7 +640,7 @@ class Result(object):
 #							[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
 #				else:
 				tair_ax.plot([g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit],
-					[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
+						[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
 			tair_ax.spines['top'].set_visible(False)
 			tair_ax.spines['bottom'].set_visible(False)
 			tair_ax.spines['right'].set_visible(False)
