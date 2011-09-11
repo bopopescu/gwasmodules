@@ -2479,7 +2479,7 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		pylab.axes([0.07, 0.18, 0.92, 0.78])
 		pylab.fill_between([0, num_steps], 0, 1.1, color='#DD3333', alpha=0.8, label='Error')
 		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(num_steps + 1), 0.1, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), -0.1, variance_explained, color='#2255AA', alpha=0.8, label='Variance explained')
 		pylab.ylabel('Partition of variance')
 		pylab.xlabel('Step number')
 		pylab.axvline(x=num_steps / 2, c='k', linestyle=':')
@@ -2492,7 +2492,7 @@ def _plot_stepwise_stats_(file_prefix, step_info_list, sign_threshold, type='emm
 		num_steps = num_steps / 2
 		pylab.fill_between([0, num_steps ], 0, 1.1, color='#DD3333', alpha=0.8, label='Error')
 		pylab.fill_between(sp.arange(num_steps + 1), 0, genetic_variance[:num_steps + 1], color='#22CC44', alpha=0.8, label='Genetic variance')
-		pylab.fill_between(sp.arange(num_steps + 1), 0.1, variance_explained[:num_steps + 1], color='#2255AA', alpha=0.8, label='Variance explained')
+		pylab.fill_between(sp.arange(num_steps + 1), -0.1, variance_explained[:num_steps + 1], color='#2255AA', alpha=0.8, label='Variance explained')
 		pylab.ylabel('Partition of variance')
 		pylab.xlabel('Step number')
 		pylab.legend(loc=1, ncol=3, shadow=True)
