@@ -613,13 +613,13 @@ class Result(object):
 				score = max_score
 			scores[s_i] = score
 
-		ax.plot(positions, scores, ".", markersize=markersize + 1, alpha=0.7, color=color)
 
 		max_pos = max(positions)
 		min_pos = min(positions)
 		x_range = max_pos - min_pos
-		ax.axis([min_pos - 0.05 * x_range, max_pos + 0.05 * x_range,
+		ax.axis([min_pos - 0.02 * x_range, max_pos + 0.02 * x_range,
 			min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
+		ax.plot(positions, scores, ".", markersize=markersize + 1, alpha=0.7, color=color)
 
 		if tair_ids:
 			print "Drawing TAIR genes"
@@ -648,7 +648,7 @@ class Result(object):
 			min_y = -max([gene_line_map[tid] for tid in gene_line_map])
 			max_y = 0
 			range_y = max_y - min_y
-			tair_ax.axis([min_pos - 0.05 * x_range, max_pos + 0.05 * x_range,
+			tair_ax.axis([ax.get_xlim()[0], ax.get_xlim()[1],
 				min_y - 0.05 * range_y, max_y + 0.05 * range_y])
 
 
@@ -692,12 +692,12 @@ class Result(object):
 		if plot_bonferroni:
 			b_threshold = -math.log10(1.0 / (len(scores) * 20.0))
 			if threshold :
-				ax.plot([min_pos, max_pos], [b_threshold, b_threshold], ":")
+				ax.plot(list(ax.get_xlim()), [b_threshold, b_threshold], ":")
 				threshold = -math.log10(threshold)
-				ax.plot([min_pos, max_pos], [threshold, threshold], color='#6495ed', linestyle='-.')
+				ax.plot(list(ax.get_xlim()), [threshold, threshold], color='#6495ed', linestyle='-.')
 			#Bonferroni threshold
 			else:
-				ax.plot([min_pos, max_pos], [b_threshold, b_threshold], color='#000000', linestyle="-.")
+				ax.plot(list(ax.get_xlim()), [b_threshold, b_threshold], color='#000000', linestyle="-.")
 
 		if not ylab:
 			if type == "pvals":
