@@ -1022,7 +1022,7 @@ def generate_example_figure_1():
 	import gwaResults as gr
 	phed = load_phenotypes(env.env['data_dir'] + 'multi_locus_phen.pickled')
 	file_prefix = '/srv/lab/data/mlt_results/mlt'
-	pickled_file = '%s_%d_%s_%s_%dresults.pickled' % (file_prefix, 25, 'random_snp', 'plus', 17)
+	pickled_file = '%s_%d_%s_%s_%dresults.pickled' % (file_prefix, 15, 'random_snp', 'plus', 1)
 	if os.path.isfile(pickled_file):
 		with open(pickled_file) as f:
 			r = cPickle.load(f)
@@ -1068,7 +1068,7 @@ def generate_example_figure_1():
 	x_range = x_max - x_min
 	y_min, y_max = ax1.get_ylim()
 	y_range = y_max - y_min
-	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'A')
+	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'a')
 
 	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True,
 				chrom_colormap=cm, highlight_loci=highlight_loci)
@@ -1076,7 +1076,7 @@ def generate_example_figure_1():
 	x_range = x_max - x_min
 	y_min, y_max = ax2.get_ylim()
 	y_range = y_max - y_min
-	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'B')
+	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'b')
 
 	cofactors = r['Stepw_EX']['step_info_list'][1]['cofactors']
 	print r['Stepw_EX']['step_info_list'][2]['cofactors']
@@ -1086,7 +1086,7 @@ def generate_example_figure_1():
 	x_range = x_max - x_min
 	y_min, y_max = ax3.get_ylim()
 	y_range = y_max - y_min
-	ax3.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'C')
+	ax3.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'c')
 
 	f.text(0.193, 0.04, '1')
 	f.text(0.38, 0.04, '2')
@@ -1507,7 +1507,7 @@ if __name__ == '__main__':
 #			file_name = '/tmp/fig2_h%d_ws%d.png' % (herit, ws)
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
-	perform_a_thal_emmax()
+	generate_example_figure_1()
 	#_run_()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
