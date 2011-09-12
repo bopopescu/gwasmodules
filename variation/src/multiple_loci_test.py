@@ -931,7 +931,7 @@ def _run_():
 
 	if p_dict['sim_phen'] and p_dict['phen_file']: 	#Simulate phenotypes
 		print 'Setting up phenotype simulations'
-		sd = dp.load_250K_snps(p_dict['call_method_id'])
+		sd = dp.load_snps_call_method(75)
 		simulate_phenotypes(p_dict['phen_file'], sd, debug_filter=p_dict['debug_filter'])
 
 	elif p_dict['parallel']:
