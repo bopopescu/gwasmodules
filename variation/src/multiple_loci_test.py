@@ -753,17 +753,17 @@ def _update_sw_stats_(res_dict, step_info_list, opt_dict, c_chr, c_pos, l_chr=No
 			fdrs_list = []
 			t_opt_i_list = []
 			num_steps = len(step_info_list) / 2
-			max_cof_pvals = -sp.log10([step_info_list[i]['mbonf'] for i in range(2 * num_steps)])
+			max_cof_pvals = -sp.log10([step_info_list[i]['mbonf'] for i in range(1, 2 * num_steps)])
 			for pval_thres in pval_thresholds:
 				t_opt_i = 0
-				for i in range(num_steps + 1):
+				for i in range(num_steps):
 					if max_cof_pvals[i] >= pval_thres:
-						t_opt_i = i
+						t_opt_i = i + 1
 				for j in range(1, num_steps):
-					i = 2 * num_steps - j
+					i = 2 * num_steps - j - 1
 					if max_cof_pvals[i] >= pval_thres:
 						if j > t_opt_i:
-							t_opt_i = i
+							t_opt_i = i + 1
 				if t_opt_i == 0:
 					tprs = [-1 for ws in window_sizes]
 					fdrs = [-1 for ws in window_sizes]
@@ -931,7 +931,7 @@ def _run_():
 
 	if p_dict['sim_phen'] and p_dict['phen_file']: 	#Simulate phenotypes
 		print 'Setting up phenotype simulations'
-		sd = dp.load_snps_call_method(75)
+		sd = dp.load_snps_call_method(75, debug_filter=p_dict['debug_filter'])
 		simulate_phenotypes(p_dict['phen_file'], sd, debug_filter=p_dict['debug_filter'])
 
 	elif p_dict['parallel']:
@@ -952,7 +952,7 @@ def _run_():
 					cluster='gmi')
 
 	elif p_dict['phen_index']: #Run things..
-		sd = dp.load_250K_snps(p_dict['call_method_id'], debug_filter=p_dict['debug_filter'])
+		sd = dp.load_snps_call_method(75, debug_filter=p_dict['debug_filter'])
 		K = dp.load_kinship(p_dict['call_method_id'])
 		phed = load_phenotypes(p_dict['phen_file'])
 		results_list = []
@@ -1020,14 +1020,16 @@ def _run_():
 
 def generate_example_figure_1():
 	import gwaResults as gr
-	phed = load_phenotypes(env.env['data_dir'] + 'multi_locus_phen.pickled')
-	file_prefix = '/srv/lab/data/mlt_results/mlt'
-	pickled_file = '%s_%d_%s_%s_%dresults.pickled' % (file_prefix, 15, 'random_snp', 'plus', 1)
+	herit = 15
+	pid = 13
+	i_model = 'or'
+	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
+	pickled_file = '%smlt_%d_random_snp_%s_%dresults.pickled' % (env.env['tmp_dir'], herit, i_model, pid)
 	if os.path.isfile(pickled_file):
 		with open(pickled_file) as f:
 			r = cPickle.load(f)
 
-	result_file_prefix = env.env['results_dir'] + 'mlt_25_random_snp_plus_17_'
+	result_file_prefix = '%smlt_%d_random_snp_%s_%d_' % (env.env['tmp_dir'], herit, i_model, pid)
 	result_files = [result_file_prefix + fn for fn in ['lm_step0.pvals', 'emmax_step0.pvals', 'emmax_step1.pvals']]
 	#Load pickle file...
 	results = [gr.Result(result_file=fn) for fn in result_files]
@@ -1063,7 +1065,7 @@ def generate_example_figure_1():
 	#Fill up the figure..
 	cm = {1:'#1199EE', 2:'#11BB00', 3:'#1199EE', 4:'#11BB00', 5:'#1199EE'}
 	results[0].plot_manhattan2(ax=ax1, neg_log_transform=True, plot_bonferroni=True,
-				chrom_colormap=cm, highlight_loci=highlight_loci)
+				chrom_colormap=cm, highlight_loci=highlight_loci, sign_color='#DD1122')
 	x_min, x_max = ax1.get_xlim()
 	x_range = x_max - x_min
 	y_min, y_max = ax1.get_ylim()
@@ -1071,7 +1073,7 @@ def generate_example_figure_1():
 	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'a')
 
 	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True,
-				chrom_colormap=cm, highlight_loci=highlight_loci)
+				chrom_colormap=cm, highlight_loci=highlight_loci, sign_color='#DD1122')
 	x_min, x_max = ax2.get_xlim()
 	x_range = x_max - x_min
 	y_min, y_max = ax2.get_ylim()
@@ -1081,7 +1083,8 @@ def generate_example_figure_1():
 	cofactors = r['Stepw_EX']['step_info_list'][1]['cofactors']
 	print r['Stepw_EX']['step_info_list'][2]['cofactors']
 	results[2].plot_manhattan2(ax=ax3, neg_log_transform=True, plot_bonferroni=True,
-				chrom_colormap=cm, highlight_markers=cofactors, highlight_loci=highlight_loci)
+				chrom_colormap=cm, highlight_markers=cofactors, highlight_loci=highlight_loci,
+				sign_color='#DD1122')
 	x_min, x_max = ax3.get_xlim()
 	x_range = x_max - x_min
 	y_min, y_max = ax3.get_ylim()
@@ -1507,7 +1510,7 @@ if __name__ == '__main__':
 #			file_name = '/tmp/fig2_h%d_ws%d.png' % (herit, ws)
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
-	_run_()
+	#_run_()
 	generate_example_figure_1()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
