@@ -2240,36 +2240,36 @@ def _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_p
 				png_file_name = '%s_step%d.png' % (file_prefix, i_opt)
 				opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
 				if platform.system() == 'Linux' or platform.system() == 'Darwin':
-					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+					#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
 					if snp_priors != None:
 						png_file_name = '%s_ppa_step%d.png' % (file_prefix, i_opt)
 						opt_png_file_name = '%s_ppa_step%d_opt_%s.png' % (file_prefix, i_opt, c)
-						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+						#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
 					if with_qq_plots:
 						qq_png_file_name = '%s_step%d_qqplot.png' % (file_prefix, i_opt)
 						opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
-						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+						#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
 						log_qq_png_file_name = '%s_step%d_log_qqplot.png' % (file_prefix, i_opt)
 						opt_log_qq_png_file_name = '%s_step%d_opt_%s_log_qqplot.png' % (file_prefix, i_opt, c)
-						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
+						#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
 		elif i_opt in opt_file_dict:
 			if file_prefix:
 				png_file_name = opt_file_dict[i_opt]['manhattan']
 				opt_png_file_name = '%s_step%d_opt_%s.png' % (file_prefix, i_opt, c)
 				if platform.system() == 'Linux' or platform.system() == 'Darwin':
-					os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+					#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
 					if snp_priors != None:
 						png_file_name = opt_file_dict[i_opt]['ppa_manhattan']
 						opt_png_file_name = '%s_ppa_step%d_opt_%s.png' % (file_prefix, i_opt, c)
-						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
+						#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', png_file_name, opt_png_file_name)
 
 					if with_qq_plots:
 						qq_png_file_name = opt_file_dict[i_opt]['qq']
 						opt_qq_png_file_name = '%s_step%d_opt_%s_qqplot.png' % (file_prefix, i_opt, c)
-						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
+						#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', qq_png_file_name, opt_qq_png_file_name)
 						log_qq_png_file_name = opt_file_dict[i_opt]['log_qq']
 						opt_log_qq_png_file_name = '%s_step%d_opt_%s_log_qqplot.png' % (file_prefix, i_opt, c)
-						os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
+						#os.spawnlp(os.P_NOWAIT, 'cp', 'cp', log_qq_png_file_name, opt_log_qq_png_file_name)
 
 		elif not i_opt in opt_indices:
 			#Perfom GWAS witht he optimal cofactors
@@ -2681,7 +2681,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 	(bic, extended_bic, modified_bic) = _calc_bic_(ll, num_snps, num_par, lmm.n) #Calculate the BICs
 	criterias['ebics'].append(extended_bic)
 	criterias['mbics'].append(modified_bic)
-	max_cofactor_pval = 0
+	max_cofactor_pval = 0 #5e-324 #min float, a hack to fix an annoying bug
 	criterias['mbonf'].append(max_cofactor_pval)
 	criterias['bonf'].append(0)
 
@@ -2730,11 +2730,13 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 
 		#Plot gwas results per step 
 		if file_prefix:
-			_plot_manhattan_and_qq_(file_prefix, step_i - 1, ex_pvals,
-					quantiles_dict, positions=positions, chromosomes=chromosomes, mafs=mafs, macs=macs, plot_bonferroni=True,
-					highlight_markers=cofactors, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci, write_pvals=save_pvals,
-					ppas=ppas, highlight_ppa_markers=ppa_cofactors, markersize=markersize, chrom_col_map=chrom_col_map)
+			_plot_manhattan_and_qq_(file_prefix, step_i - 1, ex_pvals, quantiles_dict, positions=positions,
+					chromosomes=chromosomes, mafs=mafs, macs=macs, plot_bonferroni=True,
+					highlight_markers=cofactors, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+					log_qq_max_val=log_qq_max_val, with_qq_plots=with_qq_plots,
+					highlight_loci=highlight_loci, write_pvals=save_pvals, ppas=ppas,
+					highlight_ppa_markers=ppa_cofactors, markersize=markersize,
+					chrom_col_map=chrom_col_map)
 
 
 
@@ -2939,11 +2941,13 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 			step_info_list.append(step_info)
 			print step_info['kolmogorov_smirnov'], step_info['pval_median']
 
-	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lmm,
-				step_info_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
-				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax',
-				highlight_loci=highlight_loci, write_pvals=save_pvals, markersize=markersize,
-				chrom_col_map=chrom_col_map, emma_num=emma_num, **kwargs)
+	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix,
+						with_qq_plots, lmm, step_info_list, quantiles_dict,
+						plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+						log_qq_max_val=log_qq_max_val, eig_L=eig_L, type='emmax',
+						highlight_loci=highlight_loci, write_pvals=save_pvals,
+						markersize=markersize, chrom_col_map=chrom_col_map, emma_num=emma_num,
+						**kwargs)
 
 	for step_i in opt_indices:
 		for h in ['mahalanobis_rss', 'min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:
@@ -2968,11 +2972,10 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 
 
 
-def lm_step_wise(phenotypes, sd=None, num_steps=10,
-		file_prefix=None, allow_interactions=False,
+def lm_step_wise(phenotypes, sd=None, num_steps=10, file_prefix=None, allow_interactions=False,
 		interaction_pval_thres=0.01, forward_backwards=True, local=False, cand_gene_list=None,
-		plot_xaxis=True, with_qq_plots=True, sign_threshold=None,
-		log_qq_max_val=5, highlight_loci=None, save_pvals=False, **kwargs):
+		plot_xaxis=True, with_qq_plots=True, sign_threshold=None, log_qq_max_val=5, highlight_loci=None,
+		save_pvals=False, markersize=3, chrom_col_map=None, **kwargs):
 	"""
 	Run simple step-wise linear model forward-backward.
 	"""
@@ -3043,9 +3046,10 @@ def lm_step_wise(phenotypes, sd=None, num_steps=10,
 		#Plot gwas results per step 
 		if file_prefix:
 			_plot_manhattan_and_qq_(file_prefix, step_i - 1, lm_pvals, quantiles_dict, positions=positions,
-					chromosomes=chromosomes, mafs=mafs, macs=macs, plot_bonferroni=True, highlight_markers=cofactors,
-					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci, write_pvals=save_pvals)
+				chromosomes=chromosomes, mafs=mafs, macs=macs, plot_bonferroni=True, highlight_markers=cofactors,
+				cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
+				with_qq_plots=with_qq_plots, highlight_loci=highlight_loci, write_pvals=save_pvals,
+				markersize=markersize, chrom_col_map=chrom_col_map)
 		if save_pvals:
 			step_info['ps'] = lm_pvals
 
@@ -3078,7 +3082,7 @@ def lm_step_wise(phenotypes, sd=None, num_steps=10,
 			lm.set_factors(t_cofactors)
 			pval = lm.fast_f_test([snp])['ps'][0]
 			cofactor_pvals.append(pval)
-			cofactors[i][2] = pval
+			cofactors[i][2] = -math.log10(pval)
 		lm.set_factors(cofactor_snps)
 		max_cofactor_pval = max(cofactor_pvals)
 		criterias['mbonf'].append(max_cofactor_pval)
@@ -3120,7 +3124,8 @@ def lm_step_wise(phenotypes, sd=None, num_steps=10,
 		_plot_manhattan_and_qq_(file_prefix, step_i, lm_pvals, quantiles_dict, positions=positions,
 					chromosomes=chromosomes, mafs=mafs, macs=macs, plot_bonferroni=True, highlight_markers=cofactors,
 					cand_genes=cand_gene_list, plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val,
-					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci, write_pvals=save_pvals)
+					with_qq_plots=with_qq_plots, highlight_loci=highlight_loci, write_pvals=save_pvals,
+					markersize=markersize, chrom_col_map=chrom_col_map)
 
 	max_num_cofactors = len(cofactors)
 	step_info['kolmogorov_smirnov'] = agr.calc_ks_stats(lm_pvals)
@@ -3139,7 +3144,7 @@ def lm_step_wise(phenotypes, sd=None, num_steps=10,
 				del t_cofactors[i]
 				lm.set_factors(t_cofactors)
 				res = lm.fast_f_test([snp])
-				cofactors[i][2] = res['ps'][0]
+				cofactors[i][2] = -math.log10(res['ps'][0])
 				f_stats[i] = res['f_stats'][0]
 			i_to_remove = f_stats.argmin()
 			del cofactor_snps[i_to_remove]
@@ -3162,7 +3167,7 @@ def lm_step_wise(phenotypes, sd=None, num_steps=10,
 				res = lm.fast_f_test([snp])
 				pval = res['ps'][0]
 				cofactor_pvals.append(pval)
-				cofactors[i][2] = pval
+				cofactors[i][2] = -math.log10(pval)
 			max_cofactor_pval = max(cofactor_pvals)
 			criterias['mbonf'].append(max_cofactor_pval)
 
@@ -3181,10 +3186,13 @@ def lm_step_wise(phenotypes, sd=None, num_steps=10,
 			step_info_list.append(step_info)
 			print cofactors
 
-	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix, with_qq_plots, lm,
-				step_info_list, chr_pos_list, quantiles_dict, plot_bonferroni=True, cand_genes=cand_gene_list,
-				plot_xaxis=plot_xaxis, log_qq_max_val=log_qq_max_val, type='lm', highlight_loci=highlight_loci,
-				write_pvals=save_pvals, emma_num=emma_num, **kwargs)
+	opt_dict, opt_indices = _analyze_opt_criterias_(criterias, sign_threshold, max_num_cofactors, file_prefix,
+						with_qq_plots, lm, step_info_list, quantiles_dict,
+						plot_bonferroni=True, cand_genes=cand_gene_list, plot_xaxis=plot_xaxis,
+						log_qq_max_val=log_qq_max_val, type='lm', highlight_loci=highlight_loci,
+						write_pvals=save_pvals, markersize=markersize,
+						chrom_col_map=chrom_col_map, **kwargs)
+
 
 	for step_i in opt_indices:
 		for h in ['min_pval', 'min_pval_chr_pos', 'kolmogorov_smirnov', 'pval_median']:

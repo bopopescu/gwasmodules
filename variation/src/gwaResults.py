@@ -734,7 +734,8 @@ class Result(object):
 	def plot_manhattan2(self, ax, plot_type='simple', min_score=None, max_score=None, percentile=50,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
 			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
-			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, chrom_colormap=None):
+			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, chrom_colormap=None,
+			sign_color=None):
 		"""
 		Generates a manhattan using the given axis (ax)...
 		"""
