@@ -114,7 +114,7 @@ def _write_res_dict_to_file_(filename, rd):
 		f.write('chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
 		for i in range(num_res):
-			f.write('%d, %d, %f, %f, %f, %f\n' % (rd['chromosomes'][i], rd['positions'][i], rd['pvals'][i],
+			f.write('%d, %d, %s, %f, %f, %f\n' % (rd['chromosomes'][i], rd['positions'][i], str(rd['pvals'][i]),
 						rd['perc_variances2'][i], rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 def _write_res_dict_to_file_2_(filename, rd):
@@ -123,7 +123,7 @@ def _write_res_dict_to_file_2_(filename, rd):
 		f.write('chromosomes, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
 		for i in range(num_res):
-			f.write('%d, %f, %f, %f, %f\n' % (rd['chromosomes'][i], rd['pvals'][i], rd['perc_variances2'][i],
+			f.write('%d, %s, %f, %f, %f\n' % (rd['chromosomes'][i], str(rd['pvals'][i]), rd['perc_variances2'][i],
 							rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 def _write_res_dict_to_file_3_(filename, rd):
@@ -132,8 +132,8 @@ def _write_res_dict_to_file_3_(filename, rd):
 		f.write('tair_ids, chromosomes, positions, pvalues, perc_variance_local, perc_variance_global, h1_heritabilities\n')
 		num_res = len(rd['chromosomes'])
 		for i in range(num_res):
-			f.write('%s, %d, %d, %f, %f, %f, %f\n' % (rd['tair_ids'][i], rd['chromosomes'][i], rd['positions'][i],
-								rd['pvals'][i], rd['perc_variances2'][i],
+			f.write('%s, %d, %d, %s, %f, %f, %f\n' % (rd['tair_ids'][i], rd['chromosomes'][i], rd['positions'][i],
+								str(rd['pvals'][i]), rd['perc_variances2'][i],
 								rd['perc_variances1'][i], rd['h1_heritabilities'][i]))
 
 
@@ -163,6 +163,7 @@ def run():
         kinship_method = sys.argv[2]
 	call_method_id = int(sys.argv[3])
         if len(sys.argv) < 5:
+                print 'Setting up a cluster run'
         	phed = pd.parse_phenotype_file(phenotype_file)
 		pids = phed.phen_ids
 		for pid in pids:
@@ -170,11 +171,12 @@ def run():
 
 
 	else:
+                print 'Setting up a test run'
 		pid = int(sys.argv[4])
 		run_gwas(pid, call_method_id, run_id, kinship_method)
 
 
 
 if __name__ == '__main__':
-        telomere_example_plots()
-        #run()
+        #telomere_example_plots()
+        run()
