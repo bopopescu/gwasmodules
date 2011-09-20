@@ -896,14 +896,13 @@ def plot_r2_results(file_prefix='/srv/lab/data/long_range_r2/swedish_r2_min01_ma
 
 
 
-def plot_gw_r2_decay(file_prefix, num_random_pairs=10000, max_dist=500000, call_method_id=78, mac_filter=15,
-			save_threshold=0.2, save_threshold2=0.3, debug_filter=1):
+def plot_gw_r2_decay(file_prefix, num_random_xs=200, max_dist=1000000, call_method_id=78, mac_filter=15, debug_filter=1):
 	"""
 	Plots r2 decay on the genome-wide scale
 	"""
-
+	from itertools import *
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
-	sd = dp.load_snps_call_method(call_method_id=call_method_id, data_format=data_format, debug_filter=debug_filter, min_mac=mac_filter)
+	sd = dp.load_snps_call_method(call_method_id=call_method_id, debug_filter=debug_filter, min_mac=mac_filter)
 	#sd.filter_mac_snps(mac_filter)
 	h_inverse_matrix_file = env['data_dir'] + 'snp_cov_mat_h_inv_cm%d.pickled' % (call_method_id)
 	if not os.path.isfile(h_inverse_matrix_file):
@@ -917,79 +916,101 @@ def plot_gw_r2_decay(file_prefix, num_random_pairs=10000, max_dist=500000, call_
 			H_sqrt_inv = cPickle.load(f)
 
 	cps_list = sd.getChrPosSNPList()
-	x_cps = cps_list[x_start_i:x_stop_i]
+	x_cps = random.sample(cps_list, num_random_xs)
 	y_cps = cps_list
 	result_dict = {}
 	n = len(sd.accessions)
 	print 'Starting calculation'
 	sys.stdout.flush()
-        hdf5_file_name = file_prefix + '_x_' + str(x_start_i) + '_' + str(x_stop_i) + ".hdf5"
-        h5_file = h5py.File(hdf5_file_name, 'w')
+	dists = []
+	r2s = []
+	t_r2s = []
+	x_macs = []
+	y_macs = []
+	n_saved = 0
+	s1 = time.time()
 	for i, (x_c, x_p, x_snp) in enumerate(x_cps):
                 print '%d: chromosome=%d, position=%d' % (i, x_c, x_p)
  		#Normalize SNP..
 		xs = sp.array(x_snp)
+		x_mac = sum(xs)
 		t_x_snp = sp.dot(((xs - sp.mean(xs)) / sp.std(xs)), H_sqrt_inv).T
-		s1 = time.time()
-                y_cs = []
-                y_ps = []
-                r2s = []
-                t_r2s = []
-                ps = []
-                t_ps = []
-		n_saved = 0
                 for (y_c, y_p, y_snp) in reversed(y_cps):
-			if (x_c, x_p) < (y_c, y_p):
-				ys = sp.array(y_snp)
-				mac = ys.sum()
-				(r, pearson_pval) = st.pearsonr(xs, ys)
-				r2 = r * r
-				if x_c == y_c and y_p - x_p <= 50000 and r2 > save_threshold2 :
-                                        t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
-                                        (t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
-                                        t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
-                                        t_r2 = t_r * t_r
-                                        y_cs.append(y_c)
-                                        y_ps.append(y_p)
-                                        r2s.append(r2)
-                                        t_r2s.append(t_r2)
-                                        ps.append(pearson_pval)
-                                        t_ps.append(t_pearson_pval)
-                                        n_saved += 1
+                	if x_c != y_c:
+                		continue
+                	if abs(x_p - y_p) > max_dist:
+                		continue
+			ys = sp.array(y_snp)
+			x_macs.append(x_mac)
+			y_macs.append(sum(ys))
+			(r, pearson_pval) = st.pearsonr(xs, ys)
+			r2 = r * r
+                        t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
+                        (t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
+                        t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
+                        t_r2 = t_r * t_r
+			dists.append(abs(x_p - y_p))
+                        r2s.append(r2)
+                        t_r2s.append(t_r2)
+                        n_saved += 1
 
-                                elif ((x_c == y_c and y_p - x_p > 50000) or x_c != y_c) and r2 > save_threshold:
-                                        t_y_snp = sp.dot(((ys - sp.mean(ys)) / sp.std(ys)), H_sqrt_inv).T
-                                        (t_r, t_pearson_pval) = st.pearsonr(t_x_snp, t_y_snp) #Done twice, but this is fast..
-                                        t_r, t_pearson_pval = float(t_r), float(t_pearson_pval)
-                                        t_r2 = t_r * t_r
-                                        y_cs.append(y_c)
-                                        y_ps.append(y_p)
-                                        r2s.append(r2)
-                                        t_r2s.append(t_r2)
-                                        ps.append(pearson_pval)
-                                        t_ps.append(t_pearson_pval)
-                                        n_saved += 1
- 			else:
-				break
-                if n_saved > 0:
-                        grp = h5_file.create_group('x%d' % i)
-			grp.create_dataset("n_saved", data=n_saved)
-                        grp.create_dataset("x_c", data=x_c)
-                        grp.create_dataset("x_p", data=x_p)
-			grp.create_dataset("x_snp", compression='gzip', data=x_snp)
-                        grp.create_dataset("y_cs", compression='gzip', data=y_cs)
-                        grp.create_dataset("y_ps", compression='gzip', data=y_ps)
-                        grp.create_dataset("r2s", compression='gzip', data=r2s)
-                        grp.create_dataset("t_r2s", compression='gzip', data=t_r2s)
-                        grp.create_dataset("ps", compression='gzip', data=ps)
-                        grp.create_dataset("t_ps", compression='gzip', data=t_ps)
 
-		time_secs = time.time() - s1
-		print 'It took %d minutes and %d seconds to finish.' % (time_secs / 60, time_secs % 60)
-		print '%d values were saved.' % n_saved
-		sys.stdout.flush()
+	time_secs = time.time() - s1
+	print 'It took %d minutes and %d seconds to finish.' % (time_secs / 60, time_secs % 60)
+	print '%d values were saved.' % n_saved
+	sys.stdout.flush()
 
-	h5_file.close()
+
+	#Now plotting and binning..
+	for m_dist in [50000, 100000, 200000, 500000, 1000000]:
+		kbs = m_dist / 1000
+		bin_ids = sp.digitize(dists, sp.arange(0, m_dist, m_dist / 100)) - 1
+		bin_dict = {}
+		for bid in range(100):
+			bin_dict[bid] = {'r2s': [], 't_r2s': []}
+		filtered_r2s = []
+		filtered_t_r2s = []
+		filtered_dists = []
+		for bid, r2, t_r2, dist in izip(bin_ids, r2s, t_r2s, dists):
+			if dist > m_dist:
+				continue
+			bin_dict[bid]['r2s'].append(r2)
+			filtered_r2s.append(r2)
+			bin_dict[bid]['t_r2s'].append(t_r2)
+			filtered_t_r2s.append(t_r2)
+			filtered_dists.append(dist)
+
+
+		pylab.figure()
+		pylab.plot(filtered_dists, filtered_r2s, alpha=0.3, color='k', marker='.', ls='None')
+		pylab.xlabel('Distance (bases)')
+		pylab.ylabel(r'$r^2$')
+		pylab.savefig(file_prefix + '_%dkb_r2s.png' % (kbs))
+		pylab.figure()
+		pylab.plot(filtered_dists, filtered_t_r2s, alpha=0.3, color='k', marker='.', ls='None')
+		pylab.xlabel('Distance (bases)')
+		pylab.ylabel(r'$r^2$')
+		pylab.savefig(file_prefix + '_%dkb_t_r2s.png' % (kbs))
+
+
+		r2_avgs = []
+		t_r2_avgs = []
+		xs = []
+		l = sp.arange(0, m_dist, m_dist / 100) + (m_dist / 200)
+		for bid in range(100):
+			n = len(bin_dict[bid]['r2s'])
+			if n > 0:
+				r2_avgs.append(sp.sum(bin_dict[bid]['r2s']) / n)
+				t_r2_avgs.append(sp.sum(bin_dict[bid]['t_r2s']) / n)
+				xs.append(l[bid])
+
+		pylab.figure()
+		pylab.plot(xs, r2_avgs, alpha=0.7, color='b', lw=1.8, label=r'standard $r^2$')
+		pylab.plot(xs, t_r2_avgs, alpha=0.7, color='m', lw=1.8, label=r'transformed $r^2$')
+		pylab.legend(loc=1)
+		pylab.xlabel('Distance (bases)')
+		pylab.ylabel(r'$r^2$')
+		pylab.savefig(file_prefix + '_%dkb_r2s_avgs.png' % (kbs))
 
 
 
@@ -1100,6 +1121,8 @@ def plot_gw_r2_decay(file_prefix, num_random_pairs=10000, max_dist=500000, call_
 
 if __name__ == "__main__":
 	#run_r2_calc()
-	plot_r2_results(save_to_file=True)
+	plot_gw_r2_decay(env['results_dir'] + 'ld_cm75', num_random_xs=10000, call_method_id=78,
+				debug_filter=0.5)
+	#plot_r2_results(save_to_file=True)
 	#plot_pval_emmax_correlations()
 	#test_correlation()
