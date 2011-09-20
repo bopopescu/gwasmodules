@@ -4666,6 +4666,20 @@ def plot_tree(K, tree_file, ets, verbose=True, label_values=None):
 
 
 
+def _plot_sweep_trees_():
+	with open('/Users/bjarni.vilhjalmsson/tmp/sweepPosNorth.csv') as f:
+		print f.next()
+		for l in f:
+			line = map(str.strip, l.split(','))
+			chrom = int(line[1])
+			start_pos = float(line[2])
+			end_pos = float(line[3])
+			sd = dp.load_snps_call_method(78)
+			sd = SNPsDataSet(snpsds=[sd.get_region_snpsd(chrom, start_pos=start_pos, end_pos=end_pos)],
+						chromosomes=[chrom], data_format='binary')
+			sd.plot_tree('%stree_chr%d_%f_%f.pdf' % (env.env['results_dir'], chrom, start_pos, end_pos))
+
+
 if __name__ == "__main__":
 	import dataParsers as dp
 	sd = dp.load_snps_call_method(78)

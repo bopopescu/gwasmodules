@@ -826,7 +826,6 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 
 	pd = phen_d[latent_var][heritability][phen_model]
 
-
 	result_dict = {}
 	for mm in mapping_methods:
 		result_dict[mm] = {}
@@ -909,6 +908,7 @@ def run_analysis(sd, K, file_prefix, latent_var, heritability, phen_model, phen_
 	print 'Updating stats for SW EX'
 	_update_sw_stats_(result_dict['Stepw_EX'], emmax_step_info, emmax_opt_dict, c_chr, c_pos, l_chr, l_pos,
 					significance_threshold=bonferroni_threshold, type='EX')
+
 
 	#Record trait pseudo-heritability:
 	result_dict['p_her'] = emmax_step_info[0]['pseudo_heritability']
@@ -1032,6 +1032,7 @@ def generate_example_figure_1():
 	result_file_prefix = '%smlt_%d_random_snp_%s_%d_' % (env.env['tmp_dir'], herit, i_model, pid)
 	result_files = [result_file_prefix + fn for fn in ['lm_step0.pvals', 'emmax_step0.pvals', 'emmax_step1.pvals']]
 	#Load pickle file...
+	r = cPickle.load(open(result_file_prefix[:-1] + 'results.pickled'))
 	results = [gr.Result(result_file=fn) for fn in result_files]
 	#Setting up figure
 	f = pylab.figure(figsize=(9, 7))
@@ -1058,8 +1059,8 @@ def generate_example_figure_1():
 	ax3.set_xticks(tick_positions)
 	ax3.set_xticklabels(tick_labels)
 
-	scpm = phed['snp_chr_pos_maf_list'][17]
-	lcpm = phed['random_snp']['latent_chr_pos_maf_list'][17]
+	scpm = phed['snp_chr_pos_maf_list'][pid]
+	lcpm = phed['random_snp']['latent_chr_pos_maf_list'][pid]
 	highlight_loci = [(lcpm[0], lcpm[1]), (scpm[1], scpm[2])]
 	print highlight_loci
 	#Fill up the figure..
@@ -1081,7 +1082,7 @@ def generate_example_figure_1():
 	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'b')
 
 	cofactors = r['Stepw_EX']['step_info_list'][1]['cofactors']
-	print r['Stepw_EX']['step_info_list'][2]['cofactors']
+	print r['Stepw_EX']['step_info_list'][1]['cofactors']
 	results[2].plot_manhattan2(ax=ax3, neg_log_transform=True, plot_bonferroni=True,
 				chrom_colormap=cm, highlight_markers=cofactors, highlight_loci=highlight_loci,
 				sign_color='#DD1122')
@@ -1099,7 +1100,8 @@ def generate_example_figure_1():
 	f.text(0.43, 0.01, 'Chromosome number')
 
 	#Save the figure?
-	pylab.savefig(env.env['tmp_dir'] + 'test.png')
+	pylab.savefig(env.env['tmp_dir'] + 'test.png', dpi=500)
+	#pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
 
 
 
@@ -1514,5 +1516,5 @@ if __name__ == '__main__':
 	generate_example_figure_1()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
-	perform_human_emmax(4)
+	#perform_human_emmax(4)
 	print "Done!!\n"
