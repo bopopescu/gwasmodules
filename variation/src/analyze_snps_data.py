@@ -16,6 +16,7 @@ import random
 import pdb
 import time
 import h5py
+from itertools import *
 min_float = 5e-324
 
 
@@ -900,7 +901,6 @@ def plot_gw_r2_decay(file_prefix, num_random_xs=200, max_dist=1000000, call_meth
 	"""
 	Plots r2 decay on the genome-wide scale
 	"""
-	from itertools import *
 	dtype = 'single' #To increase matrix multiplication speed... using 32 bits.
 	sd = dp.load_snps_call_method(call_method_id=call_method_id, debug_filter=debug_filter, min_mac=mac_filter)
 	#sd.filter_mac_snps(mac_filter)
@@ -1121,8 +1121,8 @@ def plot_gw_r2_decay(file_prefix, num_random_xs=200, max_dist=1000000, call_meth
 
 if __name__ == "__main__":
 	#run_r2_calc()
-	plot_gw_r2_decay(env['results_dir'] + 'ld_cm75', num_random_xs=10000, call_method_id=78,
-				debug_filter=0.5)
+	plot_gw_r2_decay(env['results_dir'] + 'ld_cm78', num_random_xs=10000, call_method_id=78,
+				debug_filter=0.1)
 	#plot_r2_results(save_to_file=True)
 	#plot_pval_emmax_correlations()
 	#test_correlation()
