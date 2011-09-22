@@ -1121,8 +1121,8 @@ def plot_gw_r2_decay(file_prefix, num_random_xs=200, max_dist=1000000, call_meth
 
 if __name__ == "__main__":
 	#run_r2_calc()
-	plot_gw_r2_decay(env['results_dir'] + 'ld_cm78', num_random_xs=10000, call_method_id=78,
-				debug_filter=0.1)
+	plot_gw_r2_decay(env['results_dir'] + 'ld_cm75', num_random_xs=5000, call_method_id=75,
+				debug_filter=0.2)
 	#plot_r2_results(save_to_file=True)
 	#plot_pval_emmax_correlations()
 	#test_correlation()
