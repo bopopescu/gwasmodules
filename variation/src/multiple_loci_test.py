@@ -1375,7 +1375,7 @@ def generate_example_figure_7():
 
 
 
-def perform_human_emmax(pid=1):
+def perform_human_emmax(pid=4):
 	import dataParsers as dp
 	import phenotypeData as pd
 	import env
@@ -1413,7 +1413,7 @@ def perform_human_emmax(pid=1):
 		else:
 			chrom_col_map[i] = '#11BB00'
 	emmax_res = lm.emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, markersize=5,
-				chrom_col_map=chrom_col_map)
+				chrom_col_map=chrom_col_map, save_pvals=True)
 	#snps = sd.getSnps()
 	#emmax_res = emmax(snps, phen_vals, K)
 	#res = gr.Result(scores=emmax_res['ps'].tolist(), snps_data=sd)
@@ -1486,7 +1486,7 @@ def perform_a_thal_emmax(pid=226):
 	s1 = time.time()
 	sd = snpsdata.SNPsDataSet([sd.get_region_snpsd(4, 6360000, 6460000)],
 				[4], data_format=sd.data_format)
-	emmax_res = lm.emmax_step_wise(phen_vals, K, sd=sd, num_steps=10, file_prefix=file_prefix, markersize=5,
+	emmax_res = lm.emmax_step_wise(phen_vals, K, sd=sd, num_steps=0, file_prefix=file_prefix, markersize=5,
 				chrom_col_map=chrom_col_map, local=True, cand_gene_list=cgs)
 	#snps = sd.getSnps()
 	#emmax_res = emmax(snps, phen_vals, K)
@@ -1513,7 +1513,9 @@ if __name__ == '__main__':
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
 	#_run_()
-	generate_example_figure_1()
+	perform_human_emmax(4)
+	perform_human_emmax(2)
+	#generate_example_figure_1()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)
 	#perform_human_emmax(4)
