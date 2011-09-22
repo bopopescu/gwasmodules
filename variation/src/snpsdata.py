@@ -3706,6 +3706,118 @@ class SNPsDataSet:
 			K = self.get_ibd_kinship_matrix()
                 plot_tree(K, tree_file, self.accessions, verbose=verbose)
 
+
+	def plot_snp_map(self, chromosome, position, pdf_file=None, png_file=None, map_type='global',
+			color_by=None, cmap=None, title=''):
+		"""
+		Plot accessions on a map.
+		
+		'color_by' is by default set to be the phenotype values.
+		"""
+		import phenotypeData as pd
+		import matplotlib
+		matplotlib.use("Agg")
+		import matplotlib.pyplot as plt
+		#matplotlib.rcParams['backend'] = 'GTKAgg'
+		eid = pd.get_ecotype_id_info_dict()
+		lats = []
+		lons = []
+		acc_names = []
+		for e in self.accessions:
+			r = eid[int(e)]
+			acc_names.append(r[0])
+			try:
+				latitude = float(r[2])
+				longitude = float(r[3])
+#				r = eid[str(e)]
+#				latitude = float(r[5])
+#				longitude = float(r[6])
+
+			except Exception, err_str:
+				print "Latitude and Longitude, not found?:", err_str
+				print 'Placing them in the Atlantic.'
+				latitude = 40
+				longitude = -20
+
+			lats.append(latitude)
+			lons.append(longitude)
+
+		from mpl_toolkits.basemap import Basemap
+		import numpy as np
+		from pylab import cm
+		if map_type == "global2":
+			plt.figure(figsize=(14, 12))
+			m = Basemap(width=21.e6, height=21.e6, projection='gnom', lat_0=76, lon_0=15)
+			m.drawparallels(np.arange(20, 90, 20))
+			m.drawmeridians(np.arange(-180, 180, 30))
+		elif map_type == 'global':
+
+			plt.figure(figsize=(16, 4))
+			plt.axes([0.02, 0.02, 0.96, 0.96])
+ 			m = Basemap(projection='cyl', llcrnrlat=10, urcrnrlat=80,
+				    llcrnrlon= -130, urcrnrlon=150, lat_ts=20, resolution='c')
+			m.drawparallels(np.arange(20, 90, 20))
+			m.drawmeridians(np.arange(-180, 180, 30))
+		elif map_type == 'europe':
+
+			plt.figure(figsize=(8, 6))
+			plt.axes([0.02, 0.02, 0.96, 0.96])
+			m = Basemap(projection='cyl', llcrnrlat=35, urcrnrlat=70,
+				    llcrnrlon= -15, urcrnrlon=40, lat_ts=20, resolution='h')
+			m.drawparallels(np.arange(30, 80, 10))
+			m.drawmeridians(np.arange(-20, 100, 10))
+			#m.bluemarble()
+		elif map_type == 'sweden':
+
+			plt.figure(figsize=(2.4, 4))
+			plt.axes([0.02, 0.02, 0.96, 0.96])
+			m = Basemap(projection='merc', llcrnrlat=55, urcrnrlat=67,
+				    llcrnrlon=10, urcrnrlon=25, lat_ts=10, resolution='i')
+			m.drawparallels(np.arange(45, 75, 5))
+			m.drawmeridians(np.arange(5, 30, 5))
+			#m.bluemarble()
+		else:
+			raise Exception("map_type is invalid")
+
+		#m.drawmapboundary(fill_color='aqua')
+		m.drawcoastlines()
+		m.fillcontinents()
+		m.drawcountries()
+		#m.fillcontinents(color='green', lake_color='blue')
+
+		xs = []
+		ys = []
+		for lon, lat in zip(lons, lats):
+			x, y = m(*np.meshgrid([lon], [lat]))
+			xs.append(float(x))
+			ys.append(float(y))
+
+		if not color_by:
+			color_vals = self.get_snp_at(chromosome, position)
+		else:
+			color_vals = color_by
+		assert len(color_vals) == len(self.accessions), "accessions and color_by_vals values don't match ! "
+		if not cmap:
+			num_colors = len(set(color_vals))
+			if num_colors <= 10:
+				cmap = cm.get_cmap('jet', num_colors)
+			else:
+				cmap = cm.get_cmap('jet')
+		lws = [0] * len(xs)
+		plt.scatter(xs, ys, s=10, linewidths=lws, c=color_vals, cmap=cmap, alpha=0.7, zorder=2)
+		#plt.plot(xs, ys, 'o', color='r', alpha=0.5, zorder=2,)
+		if title:
+			plt.title(title)
+		if pdf_file:
+			plt.savefig(pdf_file, format="pdf", dpi=400)
+		if png_file:
+			plt.savefig(png_file, format="png", dpi=400)
+		if not pdf_file and not png_file:
+			plt.show()
+
+		return self.accessions, lats, lons
+
+
 #	def get_snps(self, random_fraction=None, region=None):
 #		snplist = []
 #		if random_fraction:
@@ -4679,6 +4791,23 @@ def _plot_sweep_trees_():
 			sd = SNPsDataSet(snpsds=[sd.get_region_snpsd(chrom, start_pos=start_pos, end_pos=end_pos)],
 						chromosomes=[chrom], data_format='binary')
 			sd.plot_tree('%stree_chr%d_%f_%f.pdf' % (env.env['results_dir'], chrom, start_pos, end_pos))
+
+
+def _plot_interesting_snps_():
+	import dataParsers as dp
+	sd = dp.load_snps_call_method(78)
+	with open(env['phen_dir'] + 'swe_pair_mac15_coverage_filter2.csv') as f:
+		print f.next()
+		for i, l in enumerate(f):
+			line = map(str.strip, l.split(','))
+			cp1 = map(int, line[0].split('_'))
+			png_file_1 = env['results_dir'] + 'weird_snp_%d_geographical_plot_%d_%d.png' % (i, cp1[0], cp1[1])
+			cp2 = map(int, line[0].split('_'))
+			png_file_2 = env['results_dir'] + 'weird_snp_%d_geographical_plot_%d_%d.png' % (i, cp2[0], cp2[1])
+			sd.plot_snp_map(cp1[0], cp1[1], png_file=png_file_1, map_type='sweden')
+			sd.plot_snp_map(cp2[0], cp2[1], png_file=png_file_2, map_type='sweden')
+
+
 
 
 if __name__ == "__main__":
