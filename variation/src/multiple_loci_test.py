@@ -463,7 +463,7 @@ def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power',
 	am_list = ['LM', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
 	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
 	#am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
-	am_colors = ['#CC9922', '#FF0022', '#CC9922', '#FF0022']
+	am_colors = ['#FF0022', '#0022FF', '#FF0022', '#0022FF']
 	am_ls = ['--', '--', '-', '-']
 	am_dot_list = ['Stepw_LM_EBIC', 'Stepw_EX_EBIC']
 	am_dot_colors = ['#FF0022', '#0022FF']
