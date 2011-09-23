@@ -462,11 +462,9 @@ def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power',
 	# TPRs vs. FDRs
 	am_list = ['LM', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
 	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
-	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
-	am_ls = ['-', '-', '-', '-']
-	#am_dot_list = ['Stepw_EX_EBIC', 'Stepw_EX_MBIC', 'Stepw_LM_EBIC', 'Stepw_LM_MBIC']
-	#am_dot_colors = ['#22DD66', '#22DD66', '#DD2266', '#DD2266']
-	#am_dot_marker = ['s', '^', 's', '^']
+	#am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
+	am_colors = ['#CC9922', '#FF0022', '#CC9922', '#FF0022']
+	am_ls = ['--', '--', '-', '-']
 	am_dot_list = ['Stepw_LM_EBIC', 'Stepw_EX_EBIC']
 	am_dot_colors = ['#FF0022', '#0022FF']
 	#am_dot_labels = ['MLML EBIC', 'SWLM EBIC']
@@ -1513,8 +1511,9 @@ if __name__ == '__main__':
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
 	#_run_()
-	perform_human_emmax(4)
-	perform_human_emmax(2)
+	generate_results_figure_2()
+	#perform_human_emmax(4)
+	#perform_human_emmax(2)
 	#generate_example_figure_1()
 #	sd = dp.load_250K_snps()
 #	simulate_phenotypes(env.env['tmp_dir'] + 'simulated_phenotypes.pickled', sd)

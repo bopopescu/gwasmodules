@@ -4805,8 +4805,14 @@ def _plot_interesting_snps_():
 			png_file_1 = env.env['results_dir'] + 'weird_snp_geographical_plot_%d_%d.png' % (cp1[0], cp1[1])
                         cp2 = map(int, cps[1].split('_'))
 			png_file_2 = env.env['results_dir'] + 'weird_snp_geographical_plot_%d_%d.png' % (cp2[0], cp2[1])
-			sd.plot_snp_map(cp1[0], cp1[1], png_file=png_file_1, map_type='sweden')
-			sd.plot_snp_map(cp2[0], cp2[1], png_file=png_file_2, map_type='sweden')
+			try:
+				sd.plot_snp_map(cp1[0], cp1[1], png_file=png_file_1, map_type='sweden')
+			except Exception, err_str:
+				print 'failed for:', cp1
+			try:
+				sd.plot_snp_map(cp2[0], cp2[1], png_file=png_file_2, map_type='sweden')
+			except Exception, err_str:
+				print 'failed for:', cp2
 
 
 
