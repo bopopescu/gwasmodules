@@ -513,8 +513,10 @@ def plot_single_tprs_fdrs_2(summary_dict, ax, ws, w_legend=False, y_label='Power
 	# TPRs vs. FDRs
 	am_list = ['SLR', 'EMMAX', 'FBLR-bwd', 'MLMM-bwd']
 	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
-	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
-	am_ls = ['-', '-', '-', '-']
+	am_colors = ['#FF0022', '#0022FF', '#FF0022', '#0022FF']
+	am_ls = ['--', '--', '-', '-']
+#	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
+#	am_ls = ['-', '-', '-', '-']
 	am_dot_list = ['FBLR-bwd', 'MLMM-bwd']
 	am_dot_colors = ['#FF0022', '#0022FF']
 
@@ -1264,7 +1266,7 @@ def generate_results_figure_3():
 
 	f.text(0.97, 0.105, 'Causatives dropped from data', rotation=90)
 	f.text(0.97, 0.627, 'Causatives in data', rotation=90)
-	f.savefig('/tmp/test.png')
+	f.savefig('/tmp/test2.png')
 
 
 
@@ -1512,7 +1514,7 @@ if __name__ == '__main__':
 	#generate_example_figure_7()
 	#_run_()
 	generate_results_figure_2()
-	#perform_human_emmax(4)
+	generate_results_figure_3()#perform_human_emmax(4)
 	#perform_human_emmax(2)
 	#generate_example_figure_1()
 #	sd = dp.load_250K_snps()
