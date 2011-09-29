@@ -1100,7 +1100,7 @@ def generate_example_figure_1():
 	f.text(0.43, 0.01, 'Chromosome number')
 
 	#Save the figure?
-	pylab.savefig(env.env['tmp_dir'] + 'test.png', dpi=500)
+	pylab.savefig(env.env['tmp_dir'] + 'mlt_figure_1.png', dpi=500)
 	#pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
 
 
@@ -1270,7 +1270,260 @@ def generate_results_figure_3():
 
 
 
-def generate_example_figure_7():
+def _parse_map_file_():
+	chrom_d = {}
+	for chrom in range(1, 24):
+		chrom_d[chrom] = {'positions':[], 'var_ids':[]}
+	var_d = {}
+	with open('/Users/bjarni.vilhjalmsson/Projects/Data/NFBC_results/NFBC_20091001.map') as f:
+		for line in f:
+			l = line.split()
+			chrom = int(l[0])
+			var_id = l[1]
+			position = int(l[2])
+			chrom_d[chrom]['positions'].append(position)
+			chrom_d[chrom]['var_ids'].append(var_id)
+			var_d[var_id] = {'chrom':chrom, 'position':position}
+	return chrom_d, var_d
+
+
+def _draw_var_plot_():
+	pass
+
+def generate_example_figure4():
+	"""
+	HUMAN FIGURE
+	"""
+	import math
+	#chrom_d, var_d = _parse_map_file_()
+	results_dir = '/Users/bjarni.vilhjalmsson/Projects/Data/NFBC_results/'
+	result_files = [results_dir + 'NFBC_emmax_step_ibs_ldlres_pid4_step0.pvals',
+			results_dir + 'NFBC_emmax_step_ibs_ldlres_pid4_step5.pvals']
+	results = []
+	for result_file in result_files:
+		results.append(gr.Result(result_file))
+
+	with open(results_dir + 'NFBC_emmax_step_ibs_ldlres_pid4_stats.csv') as f:
+		lines = f.readlines()
+		l5 = map(str.strip, lines[6].split(','))
+		c_list = l5[14:]
+		cofactors = []
+		for c_p_p in c_list:
+			l = c_p_p.split('_')
+			cofactors.append((int(l[0]), int(l[1]), float(l[2])))
+		rss_list = []
+		p_her_list = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list.append(float(l[1]))
+			p_her_list.append(float(l[9]))
+		num_steps = len(lines) - 1
+		rss_list.append(rss_list[0])
+		p_her_list.append(p_her_list[0])
+
+	print cofactors
+
+	chrom_col_map = {}
+	for i in range(1, 24):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+
+	#Draw plot
+	f = pylab.figure(figsize=(9, 7))
+	ax1 = f.add_axes([0.08, 0.07 + (0.667 * 0.94), 0.9, (0.3 * 0.94) ])
+	ax1.spines['top'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.xaxis.set_label_position('bottom')
+	ax1.set_ylabel(r'$-$log$($p-value$)$')
+	ax2 = f.add_axes([0.08, 0.07 + (0.333 * 0.94), 0.9, (0.3 * 0.94) ])
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r'$-$log$($p-value$)$')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.xaxis.set_label_position('bottom')
+	ax3 = f.add_axes([0.08, 0.06 , 0.73, (0.24 * 0.94) ]) #Partition of variance axes
+	#ax3.spines['top'].set_visible(False)
+	ax3.xaxis.set_ticks_position('bottom')
+	ax3.xaxis.set_label_position('bottom')
+	ax3.set_ylabel('Partition of variance')
+	ax3.set_xlabel('Step number')
+
+
+	#Fill up the figure..
+	results[0].plot_manhattan2(ax=ax1, neg_log_transform=True, plot_bonferroni=True, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, sign_color='#DD1122', wo_xtick_labels=True)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'a')
+
+	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, highlight_markers=cofactors, sign_color='#DD1122')
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'b')
+
+
+	max_rss = max(rss_list)
+	rss_array = sp.array(rss_list) / max_rss
+	p_her_array = rss_array * sp.array(p_her_list)
+	genetic_variance = p_her_array + (1 - rss_array)
+	variance_explained = (1 - rss_array)
+	ax3.fill_between([0, num_steps], 0, 1.1, color='#FFCC33', alpha=0.8, label='Error')
+	ax3.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic')
+	ax3.fill_between(sp.arange(num_steps + 1), -0.1, variance_explained, color='#2255AA', alpha=0.8, label='Explained')
+	ax3.axvline(x=num_steps / 2, c='k', linestyle=':')
+	ax3.axis([0, num_steps, 0, 1])
+	x_min, x_max = ax3.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax3.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(1.185 * x_range + x_min, 0.9 * y_range + y_min, 'c')
+	ax3.bar(-1, 1, color='#FFCC33', alpha=0.8, label='Error')
+	ax3.bar(-1, 1, color='#22CC44', alpha=0.8, label='Genetic')
+	ax3.bar(-1, 1, color='#2255AA', alpha=0.8, label='Explained')
+	ax3.axvline(5, color='#AA0000', alpha=0.8, lw=1.8)
+	ax3.text(0.19 * x_range + x_min, 1.04 * y_range + y_min, 'EBIC/MBONF', fontsize='small')
+	leg = ax3.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+	ltext = leg.get_texts()  # all the text.Text instance in the legend
+	llines = leg.get_lines()  # all the lines.Line2D instance in the legend
+	frame = leg.get_frame()  # the patch.Rectangle instance surrounding the legend
+
+	# see text.Text, lines.Line2D, and patches.Rectangle for more info on
+	# the settable properties of lines, text, and rectangles
+	frame.set_facecolor('0.80')      # set the frame face color to light gray
+	pylab.setp(ltext, fontsize='small')    # the legend text fontsize
+	pylab.setp(llines, linewidth=1.5)      # the legend linewidth
+
+
+	#Save the figure?
+	pylab.savefig(env.env['tmp_dir'] + 'mlt_NFBC_example.png', dpi=500)
+	#pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+
+
+
+def generate_example_figure5():
+	"""
+	SODIUM FIGURE
+	"""
+
+	results_dir = env.env['tmp_dir']
+	result_files = [results_dir + 'abracadabra_pid226_Na23_Soil_3_emmax_step_log_t75_step0.pvals',
+			results_dir + 'abracadabra_pid226_Na23_Soil_3_emmax_step_log_t75_step3.pvals']
+	results = []
+	for result_file in result_files:
+		results.append(gr.Result(result_file))
+
+	with open(results_dir + 'abracadabra_pid226_Na23_Soil_3_emmax_step_log_t75_stats.csv') as f:
+		lines = f.readlines()
+		l5 = map(str.strip, lines[4].split(','))
+		c_list = l5[14:]
+		cofactors = []
+		for c_p_p in c_list:
+			l = c_p_p.split('_')
+			cofactors.append((int(l[0]), int(l[1]), float(l[2])))
+		rss_list = []
+		p_her_list = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list.append(float(l[1]))
+			p_her_list.append(float(l[9]))
+		num_steps = len(lines) - 1
+		rss_list.append(rss_list[0])
+		p_her_list.append(p_her_list[0])
+
+	print cofactors
+
+	chrom_col_map = {}
+	for i in range(1, 6):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+
+	#Draw plot
+	f = pylab.figure(figsize=(9, 7))
+	ax1 = f.add_axes([0.08, 0.07 + (0.667 * 0.94), 0.9, (0.3 * 0.94) ])
+	ax1.spines['top'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.xaxis.set_label_position('bottom')
+	ax1.set_ylabel(r'$-$log$($p-value$)$')
+	ax2 = f.add_axes([0.08, 0.07 + (0.333 * 0.94), 0.9, (0.3 * 0.94) ])
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r'$-$log$($p-value$)$')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.xaxis.set_label_position('bottom')
+	ax3 = f.add_axes([0.08, 0.06 , 0.73, (0.24 * 0.94) ]) #Partition of variance axes
+	#ax3.spines['top'].set_visible(False)
+	ax3.xaxis.set_ticks_position('bottom')
+	ax3.xaxis.set_label_position('bottom')
+	ax3.set_ylabel('Partition of variance')
+	ax3.set_xlabel('Step number')
+
+
+	#Fill up the figure..
+	results[0].plot_manhattan2(ax=ax1, neg_log_transform=True, plot_bonferroni=True, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, sign_color='#DD1122', wo_xtick_labels=True)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'a')
+
+	results[1].plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, highlight_markers=cofactors, sign_color='#DD1122')
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'b')
+
+
+	max_rss = max(rss_list)
+	rss_array = sp.array(rss_list) / max_rss
+	p_her_array = rss_array * sp.array(p_her_list)
+	genetic_variance = p_her_array + (1 - rss_array)
+	variance_explained = (1 - rss_array)
+	ax3.fill_between([0, num_steps], 0, 1.1, color='#FFCC33', alpha=0.8, label='Error')
+	ax3.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic')
+	ax3.fill_between(sp.arange(num_steps + 1), -0.1, variance_explained, color='#2255AA', alpha=0.8, label='Explained')
+	ax3.axvline(3, color='#AA0000', alpha=0.8, lw=1.8)
+	ax3.axvline(x=num_steps / 2, c='k', linestyle=':')
+	ax3.axis([0, num_steps, 0, 1])
+	x_min, x_max = ax3.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax3.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(0.127 * x_range + x_min, 1.04 * y_range + y_min, 'EBIC/MBONF', fontsize='small')
+	ax3.text(1.185 * x_range + x_min, 0.9 * y_range + y_min, 'c')
+	ax3.bar(-1, 1, color='#FFCC33', alpha=0.8, label='Error')
+	ax3.bar(-1, 1, color='#22CC44', alpha=0.8, label='Genetic')
+	ax3.bar(-1, 1, color='#2255AA', alpha=0.8, label='Explained')
+	leg = ax3.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+	ltext = leg.get_texts()  # all the text.Text instance in the legend
+	llines = leg.get_lines()  # all the lines.Line2D instance in the legend
+	frame = leg.get_frame()  # the patch.Rectangle instance surrounding the legend
+
+	# see text.Text, lines.Line2D, and patches.Rectangle for more info on
+	# the settable properties of lines, text, and rectangles
+	frame.set_facecolor('0.80')      # set the frame face color to light gray
+	pylab.setp(ltext, fontsize='small')    # the legend text fontsize
+	pylab.setp(llines, linewidth=1.5)      # the legend linewidth
+
+
+	#Save the figure?
+	pylab.savefig(env.env['tmp_dir'] + 'mlt_sodium_example.png', dpi=500)
+	#pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+
+
+
+def generate_example_figure_7_old():
 	import gwaResults as gr
 
 	result_file_prefix = env.env['results_dir'] + 'bf_most_norm_'
@@ -1504,6 +1757,39 @@ def perform_a_thal_emmax(pid=226):
 
 
 
+def test_bayes_factor_enrichment():
+	import phenotypeData as pd
+	import env
+	cpp_list = []
+	with open('/Users/bjarni.vilhjalmsson/Projects/Data/DTF1.scan.tsv') as f:
+		print f.next()
+		for l in f:
+			line = l.split()
+			cpp_list.append((int(line[1]), int(line[2]), float(line[4])))
+
+	for pid in [314, 315, 316, 317]:
+		sd = dp.load_snps_call_method(75)
+		#phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'phen_raw_112210.csv')
+		phed = pd.get_phenotypes_from_db([pid])
+		phed.convert_to_averages()
+		phed.transform(pid, 'most_normal')
+		sd.coordinate_w_phenotype_data(phed, pid)
+		sd.filter_mac_snps(15)
+		phen_vals = phed.get_values(pid)
+		phen_name = phed.get_name(pid)
+		K = lm.scale_k(sd.get_ibs_kinship_matrix())
+
+		#Candidate genes (TAIR IDs)
+		cg_tair_ids = ['AT1G04400', 'AT1G65480', 'AT1G77080', 'AT2G26330', 'AT4G00650', 'AT5G10140', 'AT5G65050', \
+				'AT5G65060', 'AT5G65070', 'AT5G65080'] \
+				#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
+		cgs = gr.get_genes_w_tair_id(cg_tair_ids)
+		#snp_priors = sd.get_cand_genes_snp_priors(cgs, radius=25000, cg_prior_fold_incr=20)
+		snp_priors = sd.get_snp_priors(cpp_list, cand_genes=cgs)
+		emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_qtl_priors_%s_%d' % (phen_name, pid),
+				snp_priors=snp_priors, cand_gene_list=cgs, save_pvals=True, snp_choose_criteria='ppas')
+
+
 
 
 if __name__ == '__main__':
@@ -1513,8 +1799,9 @@ if __name__ == '__main__':
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
 	#_run_()
-	generate_results_figure_2()
-	generate_results_figure_3()#perform_human_emmax(4)
+	#generate_results_figure_2()
+	generate_example_figure5()
+	#test_bayes_factor_enrichment()
 	#perform_human_emmax(2)
 	#generate_example_figure_1()
 #	sd = dp.load_250K_snps()

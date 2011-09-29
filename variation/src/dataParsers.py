@@ -2624,6 +2624,11 @@ def generate_usual_kinships(call_method_id=76, data_format='binary', debug_filte
 
 
 
+def _merging_80_():
+	sd = load_snps_call_method(78)
+	id_sd = parse_snp_data('/net/gmi.oeaw.ac.at/gwasapp/gwas-frontend/dataset/80/indels_svs_binary.csv')
+	sd.merge_snps_data(id_sd, error_threshold=0, discard_error_threshold=1)
+	sd.writeToFile('/net/gmi.oeaw.ac.at/gwasapp/gwas-frontend/dataset/80/all_chromosomes_binary.csv')
 
 if __name__ == "__main__":
 	_test_plink_tped_parser_()

@@ -735,8 +735,8 @@ class Result(object):
 	def plot_manhattan2(self, ax, plot_type='simple', min_score=None, max_score=None, percentile=50,
 			type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False, b_threshold=None,
 			cand_genes=None, threshold=0, highlight_markers=None, tair_file=None, plot_genes=True,
-			plot_xaxis=True, highlight_loci=None, neg_log_transform=False, chrom_colormap=None,
-			sign_color=None, markersize=5):
+			plot_xaxis=False, highlight_loci=None, neg_log_transform=False, chrom_colormap=None,
+			sign_color=None, markersize=5, wo_xtick_labels=False):
 		"""
 		Generates a manhattan using the given axis (ax)...
 		"""
@@ -855,14 +855,28 @@ class Result(object):
 #			textPos.append(offset + chromosome_end / 2 - 2000000)
 			offset += chromosome_end
 			if plot_xaxis:
-				for j in range(oldOffset, offset, 2000000):
-					ticksList1.append(j)
-				for j in range(0, chromosome_end, 2000000):
-					if j % 4000000 == 0 and j < chromosome_end - 2000000 :
-						ticksList2.append(j / 1000000)
+				if len(chromosome_ends) == 23: #This is probably Human!
+					ticksList1.append(oldOffset + chromosome_end / 2)
+					if wo_xtick_labels:
+						ticksList2.append('')
 					else:
-						ticksList2.append("")
+						if chrom == 23:
+							ticksList2.append('X')
+						elif chrom < 16:
+							ticksList2.append(int(chrom))
+						elif chrom % 2 == 0:
+							ticksList2.append(int(chrom))
+						else:
+							ticksList2.append('')
 
+				else:
+					for j in range(oldOffset, offset, 4000000):
+						ticksList1.append(j)
+					for j in range(0, chromosome_end, 4000000):
+						if j % 8000000 == 0 and j < chromosome_end - 4000000 :
+							ticksList2.append(j / 1000000)
+						else:
+							ticksList2.append("")
 
 
 		if highlight_markers:
@@ -908,7 +922,19 @@ class Result(object):
 				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000',
 					linestyle="--")
 
+		if plot_xaxis:
+			ax.set_xticks(ticksList1)
+			ax.set_xticklabels(ticksList2, fontsize='x-small')
+			if not wo_xtick_labels:
+				if len(chromosome_ends) == 23: #This is probably Human!
+					ax.set_xlabel("Chromosome")
+				else:
+					ax.set_xlabel("Mb")
+		else:
+			ax.set_xlabel("bases")
+
 		x_range = sum(result.chromosome_ends)
+		ax.axis([-x_range * 0.01, x_range * 1.01, min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 
 
 
@@ -2043,6 +2069,52 @@ def load_cand_genes_file(file_name, format=1):
 
 
 
+#def get_genes_w_tair_id(tair_ids):
+#	"""
+#	Retrieves the genes with the given TAIR IDs.
+#	
+#	Uses TAIR 10.
+#	
+#	Only works for proper genes (not TEs etc.)
+#	"""
+#
+#	conn = dbutils.connect_to_default_lookup("genome_tair10")
+#	cursor = conn.cursor()
+#	genes = []
+#	#print tair_ids
+#	tair_ids.sort()
+#	for tair_id in tair_ids:
+#		sql_statment = "SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs \
+#				FROM genome_tair10.gene g \
+#				WHERE g.dbxrefs='TAIR:%s' \
+#				ORDER BY g.chromosome, g.start, g.stop" % (tair_id.upper())
+#		numRows = int(cursor.execute(sql_statment))
+#		if numRows > 1:
+#			print "Found 2 copies:", sql_statment
+#		while(1):
+#			row = cursor.fetchone()
+#			if not row:
+#				break;
+#			try:
+#				if row[1] and  row[2]:
+#					chrom = int(row[0])
+#					start_pos = int(row[1])
+#					end_pos = int(row[2])
+#					#chr, start, stop, gene_symbol, description, dbref,  
+#					gene = Gene(chrom, start_pos, end_pos, name=row[4], description=row[5], dbRef=row[6], tairID=row[3])
+#					gene.tairID = row[6][5:]
+#					genes.append(gene)
+#			except Exception, err_str:
+#				pass
+#				print err_str, ':'
+#				print row
+#
+#	cursor.close()
+#	conn.close()
+#	return genes
+
+
+
 def get_genes_w_tair_id(tair_ids):
 	"""
 	Retrieves the genes with the given TAIR IDs.
@@ -2052,39 +2124,15 @@ def get_genes_w_tair_id(tair_ids):
 	Only works for proper genes (not TEs etc.)
 	"""
 
-	conn = dbutils.connect_to_default_lookup("genome_tair10")
-	cursor = conn.cursor()
+	g_dict = get_gene_dict(only_genes=True)
 	genes = []
-	#print tair_ids
-	tair_ids.sort()
 	for tair_id in tair_ids:
-		sql_statment = "SELECT DISTINCT g.chromosome, g.start, g.stop, g.locustag, g.gene_symbol, g.description, g.dbxrefs \
-				FROM genome_tair10.gene g \
-				WHERE g.dbxrefs='TAIR:%s' \
-				ORDER BY g.chromosome, g.start, g.stop" % (tair_id.upper())
-		numRows = int(cursor.execute(sql_statment))
-		if numRows > 1:
-			print "Found 2 copies:", sql_statment
-		while(1):
-			row = cursor.fetchone()
-			if not row:
-				break;
-			try:
-				if row[1] and  row[2]:
-					chrom = int(row[0])
-					start_pos = int(row[1])
-					end_pos = int(row[2])
-					#chr, start, stop, gene_symbol, description, dbref,  
-					gene = Gene(chrom, start_pos, end_pos, name=row[4], description=row[5], dbRef=row[6], tairID=row[3])
-					gene.tairID = row[6][5:]
-					genes.append(gene)
-			except Exception, err_str:
-				pass
-				print err_str, ':'
-				print row
+		g = g_dict[tair_id]
+		print tair_id
+		gene = Gene(g['chromosome'], g['start_pos'], g['end_pos'], name=g['name'],
+				dbRef=tair_id, tairID=tair_id)
+		genes.append(gene)
 
-	cursor.close()
-	conn.close()
 	return genes
 
 

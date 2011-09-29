@@ -4032,7 +4032,7 @@ class SNPsDataSet:
 
 
 
-	def get_snp_priors(self, cpp_list, cand_genes=None, radius=25000, num_exp_causal=1.0, cg_prior_fold_incr=5):
+	def get_snp_priors(self, cpp_list, cand_genes=None, radius=25000, num_exp_causal=5.0, cg_prior_fold_incr=5):
 		"""
 		Takes a list of SNPs/markers with some priors, and extrapolates that to the SNPs in the data.
 		"""

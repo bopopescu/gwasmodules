@@ -3887,7 +3887,7 @@ def test_bayes_factor_enrichment():
 			line = l.split()
 			cpp_list.append((int(line[1]), int(line[2]), float(line[4])))
 
-	for pid in [ 316, 317]:
+	for pid in [314, 315, 316, 317]:
 		sd = dp.load_snps_call_method(75)
 		phed = pd.parse_phenotype_file(env.env['phen_dir'] + 'phen_raw_112210.csv')
 		#phed = pd.get_phenotypes_from_db([pid])
