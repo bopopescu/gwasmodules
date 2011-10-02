@@ -4032,7 +4032,7 @@ class SNPsDataSet:
 
 
 
-	def get_snp_priors(self, cpp_list, cand_genes=None, radius=25000, num_exp_causal=5.0, cg_prior_fold_incr=5):
+	def get_snp_priors(self, cpp_list, cand_genes=None, radius=25000, num_exp_causal=10.0, cg_prior_fold_incr=10):
 		"""
 		Takes a list of SNPs/markers with some priors, and extrapolates that to the SNPs in the data.
 		"""
@@ -4089,13 +4089,13 @@ class SNPsDataSet:
 
 		snp_priors = sp.array(snp_priors)
 
-		snp_priors = 20 * (snp_priors - snp_priors.min()) / (snp_priors.max() - snp_priors.min()) + 1
-
+		snp_priors = 1000 * (snp_priors - snp_priors.min()) / (snp_priors.max() - snp_priors.min()) + 1
 		if cand_genes:
+			print 'Now for candidate genes'
 			chr_pos_list = self.getChrPosList()
 			num_snps = len(chr_pos_list)
 			i = 0
-			gene_chr_pos_list = sorted([(gene.chromosome, gene.startPos, gene.endPos) for gene in cand_genes])
+			gene_chr_pos_list = sorted([(int(gene.chromosome), gene.startPos, gene.endPos) for gene in cand_genes])
 			num_cgs = len(gene_chr_pos_list)
 			cg_snp_indices = []
 			for gene_chr, gene_start_pos, gene_end_pos in gene_chr_pos_list:
@@ -4105,7 +4105,10 @@ class SNPsDataSet:
 			cg_snp_indices = sorted(list(set(cg_snp_indices)))
 			snp_priors[cg_snp_indices] = snp_priors[cg_snp_indices] * cg_prior_fold_incr
 
-		return  (snp_priors / sum(snp_priors)).tolist()
+		snp_priors = (num_exp_causal * snp_priors / sum(snp_priors)).tolist()
+		print max(snp_priors), min(snp_priors)
+
+		return snp_priors
 
 
 

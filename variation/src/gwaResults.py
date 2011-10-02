@@ -290,8 +290,8 @@ class Result(object):
 					chrom = int(l[0])
 
 			for si in chrom_splits[1:]:
-				self.chromosome_ends.append(self.snp_results['positions'][si - 1])
-			self.chromosome_ends.append(self.snp_results['positions'][-1])
+				self.chromosome_ends.append(int(self.snp_results['positions'][si - 1]))
+			self.chromosome_ends.append(int(self.snp_results['positions'][-1]))
 			self._rank_scores_()
 
 
@@ -722,6 +722,194 @@ class Result(object):
 		plt.close()
 
 
+
+	def _plot_small_manhattan_2_(self, plot_ax, gene_model_ax=None, min_score=0, max_score=None,
+				type="pvals", ylab="$-$log$_{10}(p-$value$)$", plot_bonferroni=False,
+				cand_genes=None, threshold=0, highlight_markers=None, chromosome=None,
+				tair_file=None, color_map=None, markersize=6, sign_color=None, title=None,
+				xlab='kb'):
+
+		b_threshold = -math.log10(1.0 / (len(self.snp_results['positions']) * 20.0))
+		tair_ids = None
+		min_x = min(self.snp_results['positions'])
+		max_x = max(self.snp_results['positions'])
+		if gene_model_ax != None or cand_genes != None:
+			gene_dict = get_gene_dict(chromosome, min_x, max_x, only_genes=True)
+		if gene_model_ax != None:
+			print 'Retrieving genes from DB.'
+			gene_buffer = int((max_x - min_x) / 16) #bp
+			tair_ids = sorted(gene_dict.keys())
+			print "Found", len(tair_ids), "genes in region:", min_x, "to", max_x
+			tid = tair_ids[0]
+			gene_line_list = [tid]
+			gene_line_map = {tid:1}
+			used_lines = set([1])
+			free_lines = set()#[2, 3, 4, 5, 6, 7, 8, 9, 10])
+			for next_tid in tair_ids[1:]:
+				next_g = gene_dict[next_tid]
+				s_pos = next_g['start_pos']
+				new_gene_line_list = [next_tid]
+				for tid in gene_line_list:
+					g = gene_dict[tid]
+					if next_g['start_pos'] - gene_buffer <= g['end_pos']:
+						new_gene_line_list.append(tid)
+					else:
+
+						gl = gene_line_map[tid]
+						used_lines.remove(gl)
+						free_lines.add(gl)
+				#pdb.set_trace()
+				if len(free_lines) > 0:
+					gl = min(free_lines)
+					free_lines.remove(gl)
+				elif len(used_lines) > 0:
+					gl = max(used_lines) + 1
+				else:
+					gl = 1
+				used_lines.add(gl)
+				gene_line_map[next_tid] = gl
+				#pdb.set_trace()
+				gene_line_list = new_gene_line_list
+
+
+#		if tair_file:
+#			with open(tair_file, 'w') as f:
+#				for gene in tair_genes:
+#					f.write(str(gene) + "\n")
+
+
+		if max_score == None:
+			max_score = max(self.snp_results['scores'])
+			if highlight_markers:
+				msh = max([s for c, p, s in highlight_markers])
+				max_score = max(max_score, msh)
+
+		displayed_unit = 1000.0 #kbs
+		scoreRange = max_score - min_score
+		starPoints = [[], [], []]
+		color = 'b'
+		if chromosome:
+			if color_map == None:
+				color_map = {1:'b', 2:'g', 3:'r', 4:'c', 5:'m'}
+			color = color_map[chromosome]
+
+		chrom = self.snp_results['chromosomes'][0]
+		positions = map(lambda x: x / displayed_unit, self.snp_results['positions'])
+		scores = self.snp_results['scores']
+		sign_points = {'positions':[], 'scores':[]}
+		for s_i, (score, pos) in enumerate(it.izip(scores, positions)):
+			if score > max_score:
+				starPoints[0].append(pos)
+				starPoints[1].append(max_score)
+				starPoints[2].append(score)
+				scores[s_i] = max_score
+			elif sign_color != None:
+				if score >= b_threshold:
+					sign_points['scores'].append(score)
+					sign_points['positions'].append(pos)
+
+		max_pos = max(positions)
+		min_pos = min(positions)
+		x_range = max_pos - min_pos
+		plot_ax.axis([min_pos - 0.02 * x_range, max_pos + 0.02 * x_range,
+			min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
+		plot_ax.plot(positions, scores, ".", markersize=markersize + 1, alpha=0.7, color=color)
+
+		if len(sign_points['positions']) > 0:
+			plot_ax.plot(sign_points['positions'], sign_points['scores'], ".", color=sign_color,
+				markersize=markersize + 2)
+		if tair_ids:
+			print "Drawing TAIR genes"
+			for tid in tair_ids:
+				g = gene_dict[tid]
+				y_value = -gene_line_map[tid]
+				if len(tair_ids) < 50:
+					gene_model_ax.text((g['start_pos'] - 0.01 * x_range) / displayed_unit, y_value + 0.2, tid, size=5)
+				if tid in cand_genes:
+					gene_model_ax.plot([g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit],
+							[y_value, y_value], color='#aa11cc', linewidth=4)
+					gene_model_ax.text((g['start_pos'] - 5000) / displayed_unit, y_value - 1.5, 'AtHKT1;1', size=8, color='#9911cc')
+
+				else:
+					gene_model_ax.plot([g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit],
+							[y_value, y_value], color=(0.3, 0.3, 0.3), linewidth=3)
+			gene_model_ax.spines['top'].set_visible(False)
+			gene_model_ax.spines['bottom'].set_visible(False)
+			gene_model_ax.spines['right'].set_visible(False)
+			gene_model_ax.spines['left'].set_visible(False)
+			gene_model_ax.xaxis.set_visible(False)
+			gene_model_ax.yaxis.set_visible(False)
+			min_y = -max([gene_line_map[tid] for tid in gene_line_map])
+			max_y = 0
+			range_y = max_y - min_y
+			gene_model_ax.axis([plot_ax.get_xlim()[0], plot_ax.get_xlim()[1],
+				min_y - 0.05 * range_y, max_y + 0.05 * range_y])
+
+
+
+		if cand_genes:
+			for cg in cand_genes:
+				g = gene_dict[cg]
+				plot_ax.axvspan(g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit, facecolor='#9911cc',
+						alpha=0.2, linewidth=0)
+#				if gene_model_ax != None:
+#					gene_model_ax.axvspan(g['start_pos'] / displayed_unit, g['end_pos'] / displayed_unit, facecolor='#aa11cc',
+#						alpha=0.5, linewidth=0)
+
+
+		if highlight_markers:
+			ys = []
+			xs = []
+			for c, p, score in highlight_markers:
+				xs.append(p / displayed_unit)
+				if score > max_score:
+					plot_ax.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
+					ys.append(max_score)
+				else:
+					ys.append(score)
+			plot_ax.plot(xs, ys, ".", color="#ff9944", markersize=markersize + 4, alpha=0.7)
+
+		if len(starPoints[0]) > 0:
+			plot_ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=markersize + 1)
+			i = 0
+			while i < len(starPoints[0]):
+				max_point = i
+				cur_pos = starPoints[0][i]
+				while i < len(starPoints[0]) and abs(starPoints[0][i] - cur_pos) < 1000000:
+					if starPoints[2][i] > starPoints[2][max_point]:
+						max_point = i
+					i += 1
+				plot_ax.text(starPoints[0][max_point] - 200000, (starPoints[1][max_point] - 1) * 1.15, str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
+
+
+
+
+		if plot_bonferroni:
+			#b_threshold = -math.log10(1.0 / (len(scores) * 20.0))
+			if threshold :
+				plot_ax.plot(list(plot_ax.get_xlim()), [b_threshold, b_threshold], ":")
+				threshold = -math.log10(threshold)
+				plot_ax.plot(list(plot_ax.get_xlim()), [threshold, threshold], color='#6495ed', linestyle='-.')
+			#Bonferroni threshold
+			else:
+				plot_ax.plot(list(plot_ax.get_xlim()), [b_threshold, b_threshold], color='#000000', linestyle="-.")
+
+		if not ylab:
+			if type == "pvals":
+				plot_ax.set_ylabel('$ - log(p - $value$)$')
+
+			else:
+				plot_ax.set_ylabel('score')
+		else:
+			plot_ax.set_ylabel(ylab)
+		if xlab:
+			plot_ax.set_xlabel(xlab)
+		if title == None:
+			plot_ax.set_title('Chromsome %d' % chrom)
+
+
+
+
 	def get_rare_haplotype_list(self, sd):
 		"""
 		Assumes SNPs are defined..
@@ -795,7 +983,7 @@ class Result(object):
 			for chrom in chromosomes:
 				chr_cand_genes[chrom] = []
 			for cg in cand_genes:
-				chr_cand_genes[cg.chromosome].append(cg)
+				chr_cand_genes[int(cg.chromosome)].append(cg)
 
 		if highlight_loci:
 			hl_dict = {}
@@ -831,24 +1019,28 @@ class Result(object):
 					starPoints[1].append(max_score)
 					starPoints[2].append(score)
 					scoreList[s_i] = max_score
-				elif sign_color != None and score >= b_threshold:
-					sign_points['positions'].append(pos)
-					sign_points['scores'].append(score)
+				if sign_color != None and score >= b_threshold:
+					for c, p, pval in highlight_markers:
+						if abs(c - chrom) < 1 and abs(p - pos + offset) < 1:
+							break
+					else:
+						sign_points['positions'].append(pos)
+						sign_points['scores'].append(score)
 
 
 			#Marking candidate genes
 			if cand_genes:
 				for cg in chr_cand_genes[chrom]:
-					ax.axvspan(offset + cg.startPos, offset + cg.endPos,
-							facecolor='#BB0099', edgecolor='#BB0099', alpha=0.6)
+					plot_ax.axvspan(offset + cg.startPos, offset + cg.endPos,
+							facecolor='#555555', edgecolor='#555555', alpha=0.6)
 			#Highlighting loci
 			if highlight_loci:
 				for p in hl_dict[chrom]:
-					ax.axvspan(offset + p - 50000, offset + p + 50000, ec='#660055', fc='#660055',
+					plot_ax.axvspan(offset + p - 50000, offset + p + 50000, ec='#660055', fc='#660055',
 						alpha=0.4,)
 
 			#Plotting scores
-			ax.plot(newPosList, scoreList, "o", markersize=markersize, alpha=0.6,
+			plot_ax.plot(newPosList, scoreList, "o", markersize=markersize, alpha=0.6,
 				color=chrom_colormap[i + 1], ls='', mew=0)
 
 			oldOffset = offset
@@ -886,15 +1078,15 @@ class Result(object):
 				x = chr_offsets[c - 1] + p
 				xs.append(x)
 				if score > max_score:
-					ax.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
+					plot_ax.text(x, max_score * 1.1, str(round(score, 2)), rotation=45, size="small")
 					ys.append(max_score)
 				else:
 					ys.append(score)
-			ax.plot(xs, ys, "o", color="#ff9944", markersize=markersize + 2, alpha=0.9, ls='', mew=0)
+			plot_ax.plot(xs, ys, "o", color="#ff9944", markersize=markersize + 2, alpha=0.9, ls='', mew=0)
 
 
 		if len(starPoints[0]) > 0:
-			ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=markersize + 2)
+			plot_ax.plot(starPoints[0], starPoints[1], ".", color="#ee9922", markersize=markersize + 2)
 			i = 0
 			while i < len(starPoints[0]):
 				max_point = i
@@ -903,38 +1095,39 @@ class Result(object):
 					if starPoints[2][i] > starPoints[2][max_point]:
 						max_point = i
 					i += 1
-				ax.text(starPoints[0][max_point] - 1000000, (starPoints[1][max_point] - 1) * 1.15,
+				plot_ax.text(starPoints[0][max_point] - 1000000, (starPoints[1][max_point] - 1) * 1.15,
 					str(round(starPoints[2][max_point], 2)), rotation=45, size="small")
 
-		if len(sign_points['positions']) > 0:
-			ax.plot(sign_points['positions'], sign_points['scores'], ".", color=sign_color,
-				markersize=markersize + 2)
+		if sign_color:
+			if len(sign_points['positions']) > 0:
+				plot_ax.plot(sign_points['positions'], sign_points['scores'], ".", color=sign_color,
+					markersize=markersize + 2)
 
 
 		if plot_bonferroni:
 			if threshold :
-				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], ":")
+				plot_ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], ":")
 				threshold = -math.log10(threshold)
-				ax.plot([0, sum(result.chromosome_ends)], [threshold, threshold], color='#6495ed',
+				plot_ax.plot([0, sum(result.chromosome_ends)], [threshold, threshold], color='#6495ed',
 					linestyle='-.',)
 			#Bonferroni threshold
 			else:
-				ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000',
+				plot_ax.plot([0, sum(result.chromosome_ends)], [b_threshold, b_threshold], color='#000000',
 					linestyle="--")
 
 		if plot_xaxis:
-			ax.set_xticks(ticksList1)
-			ax.set_xticklabels(ticksList2, fontsize='x-small')
+			plot_ax.set_xticks(ticksList1)
+			plot_ax.set_xticklabels(ticksList2, fontsize='x-small')
 			if not wo_xtick_labels:
 				if len(chromosome_ends) == 23: #This is probably Human!
-					ax.set_xlabel("Chromosome")
+					plot_ax.set_xlabel("Chromosome")
 				else:
-					ax.set_xlabel("Mb")
+					plot_ax.set_xlabel("Mb")
 		else:
-			ax.set_xlabel("bases")
+			plot_ax.set_xlabel("bases")
 
 		x_range = sum(result.chromosome_ends)
-		ax.axis([-x_range * 0.01, x_range * 1.01, min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
+		plot_ax.axis([-x_range * 0.01, x_range * 1.01, min_score - 0.05 * scoreRange, max_score + 0.05 * scoreRange])
 
 
 
@@ -998,7 +1191,7 @@ class Result(object):
 			for chrom in chromosomes:
 				chr_cand_genes[chrom] = []
 			for cg in cand_genes:
-				chr_cand_genes[cg.chromosome].append(cg)
+				chr_cand_genes[int(cg.chromosome)].append(cg)
 
 		if highlight_loci:
 			hl_dict = {}
@@ -1669,7 +1862,7 @@ class Result(object):
 				curr_chr = chromosomes[i]
 				while i < len(chromosomes) and chromosomes[i] == curr_chr:
 					i += 1
-				chromosome_ends.append(self.snp_results['positions'][i - 1])
+				chromosome_ends.append(int(self.snp_results['positions'][i - 1]))
 			self.chromosome_ends = chromosome_ends
 		return self.chromosome_ends
 

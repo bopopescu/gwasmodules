@@ -463,10 +463,10 @@ def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power',
 	am_list = ['LM', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
 	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
 	#am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
-	am_colors = ['#FF0022', '#0022FF', '#FF0022', '#0022FF']
+	am_colors = ['#0022FF', '#FF0022', '#0022FF', '#FF0022']
 	am_ls = ['--', '--', '-', '-']
 	am_dot_list = ['Stepw_LM_EBIC', 'Stepw_EX_EBIC']
-	am_dot_colors = ['#FF0022', '#0022FF']
+	am_dot_colors = ['#0022FF', '#FF0022']
 	#am_dot_labels = ['MLML EBIC', 'SWLM EBIC']
 
 	w_i = window_sizes.index(ws)
@@ -476,12 +476,12 @@ def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power',
 		for pt_i, pt in enumerate(pval_thresholds):
 			ys[pt_i] = summary_dict[am]['tprs'][pt_i][w_i]
 			xs[pt_i] = summary_dict[am]['fdrs'][pt_i][w_i]
-		ax.plot(xs, ys, label=am_label, color=amc, ls=amls, alpha=0.4, lw=2)
+		ax.plot(xs, ys, label=am_label, color=amc, ls=amls, alpha=0.65, lw=2)
 		ax.plot(summary_dict[am]['bonf']['fdrs'][w_i], summary_dict[am]['bonf']['tprs'][w_i], marker='o',
-			ls='', color=amc, alpha=0.45)
+			ls='', color=amc, alpha=0.65)
 	for am, amc in zip(am_dot_list, am_dot_colors):
 		ax.plot(summary_dict[am]['fdrs'][w_i], summary_dict[am]['tprs'][w_i], marker='v',
-			ls='', color=amc, alpha=0.45)
+			ls='', color=amc, alpha=0.65)
 	ax.set_ylabel(y_label)
 	ax.set_xlabel(x_label)
 	if y_lim:
@@ -490,8 +490,8 @@ def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power',
 	x_range = x_max - x_min
 	y_min, y_max = ax.get_ylim()
 	y_range = y_max - y_min
-	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='v', label='EBIC', alpha=0.45)
-	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='o', label='Bonferroni', alpha=0.45)
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='v', label='EBIC', alpha=0.65)
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='o', label='Bonferroni', alpha=0.65)
 	if w_legend:
 		ax.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
 	ax.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range,
@@ -513,21 +513,21 @@ def plot_single_tprs_fdrs_2(summary_dict, ax, ws, w_legend=False, y_label='Power
 	# TPRs vs. FDRs
 	am_list = ['SLR', 'EMMAX', 'FBLR-bwd', 'MLMM-bwd']
 	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
-	am_colors = ['#FF0022', '#0022FF', '#FF0022', '#0022FF']
+	am_colors = ['#0022FF', '#FF0022', '#0022FF', '#FF0022']
 	am_ls = ['--', '--', '-', '-']
 #	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
 #	am_ls = ['-', '-', '-', '-']
 	am_dot_list = ['FBLR-bwd', 'MLMM-bwd']
-	am_dot_colors = ['#FF0022', '#0022FF']
+	am_dot_colors = ['#0022FF', '#FF0022']
 
 	for am, amc, amls, am_label in zip(am_list, am_colors, am_ls, am_labels):
 		ax.plot(summary_dict[ws][am]['fdr'], summary_dict[ws][am]['power'], label=am_label, color=amc,
-			ls=amls, alpha=0.4, lw=2)
+			ls=amls, alpha=0.65, lw=2)
 		ax.plot(summary_dict[ws][am]['BONF']['fdr'], summary_dict[ws][am]['BONF']['power'], marker='o',
-			ls='', color=amc, alpha=0.45)
+			ls='', color=amc, alpha=0.65)
 	for am, amc in zip(am_dot_list, am_dot_colors):
 		ax.plot(summary_dict[ws][am]['EBIC']['fdr'], summary_dict[ws][am]['EBIC']['power'], marker='v',
-			ls='', color=amc, alpha=0.45)
+			ls='', color=amc, alpha=0.65)
 	ax.set_ylabel(y_label)
 	ax.set_xlabel(x_label)
 	if y_lim:
@@ -536,8 +536,8 @@ def plot_single_tprs_fdrs_2(summary_dict, ax, ws, w_legend=False, y_label='Power
 	x_range = x_max - x_min
 	y_min, y_max = ax.get_ylim()
 	y_range = y_max - y_min
-	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='v', label='EBIC', alpha=0.45)
-	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='o', label='Bonferroni', alpha=0.45)
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='v', label='EBIC', alpha=0.65)
+	ax.plot(x_min - x_range, y_min - y_range, color='k', marker='o', label='Bonferroni', alpha=0.65)
 	if w_legend:
 		ax.legend(loc=4, prop=prop, numpoints=1, scatterpoints=1)
 	ax.axis([x_min - 0.025 * x_range, x_max + 0.025 * x_range,
@@ -1280,7 +1280,7 @@ def _parse_map_file_():
 			l = line.split()
 			chrom = int(l[0])
 			var_id = l[1]
-			position = int(l[2])
+			position = int(l[3])
 			chrom_d[chrom]['positions'].append(position)
 			chrom_d[chrom]['var_ids'].append(var_id)
 			var_d[var_id] = {'chrom':chrom, 'position':position}
@@ -1520,6 +1520,450 @@ def generate_example_figure5():
 	#Save the figure?
 	pylab.savefig(env.env['tmp_dir'] + 'mlt_sodium_example.png', dpi=500)
 	#pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+
+
+def generate_example_bayesian_figures():
+	import gwaResults as gr
+	ex_res = gr.Result(result_file=env.env['tmp_dir'] + 'bf_qtl_priors_DTF2ndSwAverage2009_317_step0.pvals')
+	ex_ppa_res = gr.Result(result_file=env.env['tmp_dir'] + 'bf_qtl_priors_DTF2ndSwAverage2009_317_opt_mbonf_step15.ppas')
+	c_ends = ex_res.get_chromosome_ends()
+
+	cg_tair_ids = ['AT1G04400', 'AT1G65480', 'AT1G77080', 'AT2G26330', 'AT4G00650', 'AT5G10140', 'AT5G65050', \
+			'AT5G65060', 'AT5G65070', 'AT5G65080'] \
+			#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
+	cgs = gr.get_genes_w_tair_id(cg_tair_ids)
+
+	chromosomes = []
+	positions = []
+	scores = []
+	last_chr = 1
+	with open('/Users/bjarni.vilhjalmsson/Projects/Data/DTF1.scan.tsv') as f:
+		print f.next()
+		for l in f:
+			line = l.split()
+			chrom = int(line[1])
+			if last_chr != chrom:
+				chromosomes.append(last_chr)
+				positions.append(c_ends[last_chr - 1])
+				scores.append(scores[-1])
+				last_chr = chrom
+			chromosomes.append(chrom)
+			positions.append(int(line[2]))
+			scores.append(float(line[4]))
+
+
+	linkage_res = gr.Result(positions=positions, chromosomes=chromosomes, scores=scores)
+
+
+	with open(env.env['tmp_dir'] + 'bf_qtl_priors_DTF2ndSwAverage2009_317_stats.csv') as f:
+		lines = f.readlines()
+		l15 = map(str.strip, lines[16].split(','))
+		c_list = l15[14:]
+		cofactors = []
+		for c_p_p in c_list:
+			l = c_p_p.split('_')
+			cofactors.append((int(l[0]), int(l[1]), float(l[2])))
+		rss_list = []
+		p_her_list = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list.append(float(l[1]))
+			p_her_list.append(float(l[9]))
+		num_steps = len(lines) - 1
+		rss_list.append(rss_list[0])
+		p_her_list.append(p_her_list[0])
+
+	print cofactors
+	ppa_cofactors = [[5, 3188327, 0.99389222891327844], [4, 177047, 0.99613567887355359], [4, 1330863, 0.95803471534031548], [4, 341989, 0.98581862771623219], [5, 21512983, 0.96576709966410257]]
+
+	chrom_col_map = {}
+	for i in range(1, 6):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+
+	#Draw plot
+	f = pylab.figure(figsize=(9, 9))
+	ax1 = f.add_axes([0.08, 0.07 + (0.84 * 0.94), 0.9, (0.13 * 0.94) ])
+	ax1.spines['top'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.xaxis.set_label_position('bottom')
+	ax1.set_ylabel(r'$-$log$($p-value$)$')
+	ax2 = f.add_axes([0.08, 0.07 + (0.54 * 0.94), 0.9, (0.25 * 0.94) ])
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r'$-$log$($p-value$)$')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.xaxis.set_label_position('bottom')
+	ax3 = f.add_axes([0.08, 0.07 + (0.25 * 0.94), 0.9, (0.25 * 0.94) ])
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel('Posterior prob. of assoc.')
+	ax3.xaxis.set_ticks_position('bottom')
+	ax3.xaxis.set_label_position('bottom')
+	ax4 = f.add_axes([0.08, 0.06 , 0.73, (0.18 * 0.94) ]) #Partition of variance axes
+	#ax4.spines['top'].set_visible(False)
+	ax4.xaxis.set_ticks_position('bottom')
+	ax4.xaxis.set_label_position('bottom')
+	ax4.set_ylabel('Partition of variance')
+	ax4.set_xlabel('Step number')
+
+
+	linkage_res.plot_manhattan2(ax=ax1, neg_log_transform=False, plot_bonferroni=False, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, wo_xtick_labels=True, percentile=0.0)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.96 * x_range + x_min, 0.93 * y_range + y_min, 'a')
+
+	ex_res.plot_manhattan2(ax=ax2, neg_log_transform=True, plot_bonferroni=True, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, sign_color='#DD1122', cand_genes=cgs)
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax2.text(0.96 * x_range + x_min, 0.94 * y_range + y_min, 'b')
+
+	ex_ppa_res.plot_manhattan2(ax=ax3, neg_log_transform=False, plot_bonferroni=False, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, highlight_markers=ppa_cofactors, sign_color=None,
+				cand_genes=cgs)
+	x_min, x_max = ax3.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax3.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(0.96 * x_range + x_min, 0.94 * y_range + y_min, 'c')
+
+	max_rss = max(rss_list)
+	rss_array = sp.array(rss_list) / max_rss
+	p_her_array = rss_array * sp.array(p_her_list)
+	genetic_variance = p_her_array + (1 - rss_array)
+	variance_explained = (1 - rss_array)
+	ax4.fill_between([0, num_steps], 0, 1.1, color='#FFCC33', alpha=0.8, label='Error')
+	ax4.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic')
+	ax4.fill_between(sp.arange(num_steps + 1), -0.1, variance_explained, color='#2255AA', alpha=0.8, label='Explained')
+	ax4.axvline(x=num_steps / 2, c='k', linestyle=':')
+	ax4.axis([0, num_steps, 0, 1])
+	x_min, x_max = ax4.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax4.get_ylim()
+	y_range = y_max - y_min
+	ax4.text(1.185 * x_range + x_min, 0.94 * y_range + y_min, 'd')
+	ax4.bar(-1, 1, color='#FFCC33', alpha=0.8, label='Error')
+	ax4.bar(-1, 1, color='#22CC44', alpha=0.8, label='Genetic')
+	ax4.bar(-1, 1, color='#2255AA', alpha=0.8, label='Explained')
+	ax4.axvline(15, color='#AA0000', alpha=0.8, lw=1.8)
+	ax4.text(0.712 * x_range + x_min, 1.04 * y_range + y_min, 'MBONF', fontsize='small')
+	ax4.axvline(2, color='#AA0000', alpha=0.8, lw=1.8)
+	ax4.text(0.079 * x_range + x_min, 1.04 * y_range + y_min, 'EBIC', fontsize='small')
+	leg = ax4.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+	ltext = leg.get_texts()  # all the text.Text instance in the legend
+	llines = leg.get_lines()  # all the lines.Line2D instance in the legend
+	frame = leg.get_frame()  # the patch.Rectangle instance surrounding the legend
+
+	# see text.Text, lines.Line2D, and patches.Rectangle for more info on
+	# the settable properties of lines, text, and rectangles
+	frame.set_facecolor('0.80')      # set the frame face color to light gray
+	pylab.setp(ltext, fontsize='small')    # the legend text fontsize
+	pylab.setp(llines, linewidth=1.5)      # the legend linewidth
+
+
+
+	pylab.savefig(env.env['tmp_dir'] + 'mlt_bayesian_example.png', dpi=500)
+
+
+def plot_remaining_bayesian_figures():
+	with open(env.env['tmp_dir'] + 'bf_qtl_priors_DTF1stSpAverage2009_314_stats.csv') as f:
+		lines = f.readlines()
+		rss_list1 = []
+		p_her_list1 = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list1.append(float(l[1]))
+			p_her_list1.append(float(l[9]))
+		num_steps = len(lines) - 1
+		rss_list1.append(rss_list1[0])
+		p_her_list1.append(p_her_list1[0])
+	ppa_cofactors1 = [[5, 3188327, 0.99631213930493612]]
+
+	with open(env.env['tmp_dir'] + 'bf_qtl_priors_DTF2ndSpAverage2009_315_stats.csv') as f:
+		lines = f.readlines()
+		rss_list2 = []
+		p_her_list2 = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list2.append(float(l[1]))
+			p_her_list2.append(float(l[9]))
+		num_steps2 = len(lines) - 1
+		rss_list2.append(rss_list2[0])
+		p_her_list2.append(p_her_list2[0])
+	ppa_cofactors2 = [[5, 3188327, 0.99846328919628757]]
+
+	with open(env.env['tmp_dir'] + 'bf_qtl_priors_DTF1stSwAverage2009_316_stats.csv') as f:
+		lines = f.readlines()
+		rss_list3 = []
+		p_her_list3 = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list3.append(float(l[1]))
+			p_her_list3.append(float(l[9]))
+		num_steps3 = len(lines) - 1
+		rss_list3.append(rss_list3[0])
+		p_her_list3.append(p_her_list3[0])
+	ppa_cofactors3 = [[4, 161496, 0.99931725487952472], [4, 269260, 0.9914874431415277]]
+
+	f = pylab.figure(figsize=(9, 7))
+	ax1 = f.add_axes([0.08, 0.07 + (0.667 * 0.94), 0.9, (0.3 * 0.94) ])
+	ax1.spines['top'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.xaxis.set_label_position('bottom')
+	ax1.set_ylabel('Posterior prob. of assoc.')
+	ax2 = f.add_axes([0.08, 0.07 + (0.333 * 0.94), 0.9, (0.3 * 0.94) ])
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel('Posterior prob. of assoc.')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.xaxis.set_label_position('bottom')
+	ax3 = f.add_axes([0.08, 0.07, 0.9, (0.3 * 0.94) ])
+	ax3.spines['top'].set_visible(False)
+	ax3.set_ylabel('Posterior prob. of assoc.')
+	ax3.xaxis.set_ticks_position('bottom')
+	ax3.xaxis.set_label_position('bottom')
+
+	ex_ppa_res1 = gr.Result(result_file=env.env['tmp_dir'] + 'bf_qtl_priors_DTF1stSpAverage2009_314_step1.ppas')
+	ex_ppa_res2 = gr.Result(result_file=env.env['tmp_dir'] + 'bf_qtl_priors_DTF2ndSpAverage2009_315_step1.ppas')
+	ex_ppa_res3 = gr.Result(result_file=env.env['tmp_dir'] + 'bf_qtl_priors_DTF1stSwAverage2009_316_opt_mbonf_step18.ppas')
+
+	chrom_col_map = {}
+	for i in range(1, 6):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+
+
+	ex_ppa_res1.plot_manhattan2(ax=ax1, neg_log_transform=False, plot_bonferroni=False, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, highlight_markers=ppa_cofactors1, sign_color=None)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.96 * x_range + x_min, 0.94 * y_range + y_min, 'a')
+
+	ex_ppa_res2.plot_manhattan2(ax=ax2, neg_log_transform=False, plot_bonferroni=False, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, highlight_markers=ppa_cofactors2, sign_color=None)
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(0.96 * x_range + x_min, 0.94 * y_range + y_min, 'b')
+
+	ex_ppa_res3.plot_manhattan2(ax=ax3, neg_log_transform=False, plot_bonferroni=False, plot_xaxis=True,
+				chrom_colormap=chrom_col_map, highlight_markers=ppa_cofactors3, sign_color=None)
+	x_min, x_max = ax3.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax3.get_ylim()
+	y_range = y_max - y_min
+	ax3.text(0.96 * x_range + x_min, 0.94 * y_range + y_min, 'c')
+
+	pylab.savefig(env.env['tmp_dir'] + 'mlt_remaining_bayesian_examples.png', dpi=500)
+
+
+
+def plot_all_human_figures():
+	"""Plots EBIC plot
+	"""
+	import gwaResults as gr
+	chrom_d, var_d = _parse_map_file_()
+	human_dir = '/Users/bjarni.vilhjalmsson/Documents/Projects_docs/Articles/mlt_paper/human_raw_data/'
+	file_list = [#('BMI', 'bmires_pval_steps.csv', 'bmires_steptable_ok.csv', 0, 'a'),
+			('CRP', 'crpres_pval_steps.csv', 'crpres_steptable_ok.csv', 3, 'a'),
+			#('DBP', 'diares_pval_steps.csv', 'diares_steptable_ok.csv', 0, 'c'),
+			('Glucose', 'glures_pval_steps.csv', 'glures_steptable_ok.csv', 3, 'c'),
+			('HDL', 'hdlres_pval_steps.csv', 'hdlres_steptable_ok.csv', 3, 'c'),
+			#('Height', 'heightres_pval_steps.csv', 'heightres_steptable_ok.csv', 0, 'a'),
+			#('Insulin', 'insres_pval_steps.csv', 'insres_steptable_ok.csv', 0, 'b'),
+			#('LDL', 'ldlres_pval_steps.csv', 'ldlres_steptable_ok.csv', 5, 'c'),
+			('SBP', 'sysres_pval_steps.csv', 'sysres_steptable_ok.csv', 0, 'd'),
+			('TG', 'tgres_pval_steps.csv', 'tgres_steptable_ok.csv', 2, 'e')]
+
+	chrom_col_map = {}
+	for i in range(1, 24):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+
+	for name, pval_file, step_info_file, step_nr, fig_id in file_list:
+		#One plot per file
+		pvals = []
+		chromosomes = []
+		positions = []
+
+		with open(human_dir + pval_file) as f:
+			print f.next()
+			for line in f:
+				l = line.split(',')
+				var_id = l[0].replace('"', '')
+				d = var_d[var_id]
+				chromosomes.append(d['chrom'])
+				positions.append(d['position'])
+				pvals.append(float(l[step_nr + 1]))
+		l = zip(chromosomes, positions, pvals)
+		l.sort()
+		l = map(list, zip(*l))
+		res = gr.Result(scores=l[2], chromosomes=l[0], positions=l[1])
+		res.neg_log_trans()
+		cofactors = []
+		if step_nr > 0:
+			with open(human_dir + step_info_file) as f:
+				print f.next()
+				print f.next()
+				for i in range(step_nr):
+					line = f.next()
+					l = line.split(',')
+					var_id = (l[2].replace('"', ''))[1:]
+					d = var_d[var_id]
+					cofactors.append((d['chrom'], d['position']))
+
+		f = pylab.figure(figsize=(10, 2.5))
+		ax = f.add_axes([0.06, 0.14, 0.93, 0.83])
+		ax.spines['top'].set_visible(False)
+		ax.xaxis.set_ticks_position('bottom')
+		ax.xaxis.set_label_position('bottom')
+		ax.set_ylabel(r'$-$log$($p-value$)$')
+
+		res.plot_manhattan2(ax=ax, neg_log_transform=False, plot_bonferroni=True, plot_xaxis=True,
+					chrom_colormap=chrom_col_map, highlight_markers=cofactors,
+					sign_color='#DD1122', max_score=32)
+		x_min, x_max = ax.get_xlim()
+		x_range = x_max - x_min
+		y_min, y_max = ax.get_ylim()
+		y_range = y_max - y_min
+		ax.text(0.96 * x_range + x_min, 0.94 * y_range + y_min, fig_id)
+		pylab.savefig(env.env['tmp_dir'] + 'mlt_HUMAN_%s.png' % name, dpi=500)
+
+
+
+def plot_local_sodium_figure():
+	cg_tair_id = 'AT4G10310' #6391984 - 6395877 bp
+	cgs = [cg_tair_id]#gr.get_genes_w_tair_id([cg_tair_id])
+	results_dir = env.env['tmp_dir']
+	result_files = [results_dir + 'abracadabra_pid226_Na23_Soil_3_emmax_step_log_t75_4_6291984_6495877_step0.pvals',
+			results_dir + 'abracadabra_pid226_Na23_Soil_3_emmax_step_log_t75_4_6291984_6495877_step6.pvals']
+	results = []
+	for result_file in result_files:
+		res = gr.Result(result_file)
+		res.neg_log_trans()
+		results.append(res)
+
+	with open(results_dir + 'abracadabra_pid226_Na23_Soil_3_emmax_step_log_t75_4_6291984_6495877_stats.csv') as f:
+		lines = f.readlines()
+		l6 = map(str.strip, lines[7].split(','))
+		c_list = l6[14:]
+		cofactors = []
+		for c_p_p in c_list:
+			l = c_p_p.split('_')
+			cofactors.append((int(l[0]), int(l[1]), float(l[2])))
+		rss_list = []
+		p_her_list = []
+		for line in lines[1:]:
+			l = map(str.strip, line.split(','))
+			rss_list.append(float(l[1]))
+			p_her_list.append(float(l[9]))
+		num_steps = len(lines) - 1
+		rss_list.append(rss_list[0])
+		p_her_list.append(p_her_list[0])
+
+	print cofactors
+
+	chrom_col_map = {}
+	for i in range(1, 6):
+		if i % 2 == 0:
+			chrom_col_map[i] = '#1199EE'
+		else:
+			chrom_col_map[i] = '#11BB00'
+
+	#Draw plot
+	f = pylab.figure(figsize=(9, 10))
+	ax1 = f.add_axes([0.08, 0.07 + (0.65 * 0.94), 0.9, (0.28 * 0.94) ])
+	ax1.spines['top'].set_visible(False)
+	ax1.xaxis.set_ticks_position('bottom')
+	ax1.xaxis.set_label_position('bottom')
+	ax1.set_ylabel(r'$-$log$($p-value$)$')
+	ax2 = f.add_axes([0.08, 0.07 + (0.33 * 0.94), 0.9, (0.29 * 0.94) ])
+	ax2.spines['top'].set_visible(False)
+	ax2.set_ylabel(r'$-$log$($p-value$)$')
+	ax2.xaxis.set_ticks_position('bottom')
+	ax2.xaxis.set_label_position('bottom')
+	ax3 = f.add_axes([0.08, 0.07 + (0.19 * 0.94), 0.9, (0.09 * 0.94) ]) #Gene model axes
+	ax4 = f.add_axes([0.08, 0.05 , 0.73, (0.17 * 0.94) ]) #Partition of variance axes
+	#ax3.spines['top'].set_visible(False)
+	ax4.xaxis.set_ticks_position('bottom')
+	ax4.xaxis.set_label_position('bottom')
+	ax4.set_ylabel('Partition of variance')
+	ax4.set_xlabel('Step number')
+
+
+	#Fill up the figure..
+	results[0]._plot_small_manhattan_2_(plot_ax=ax1, plot_bonferroni=True, chromosome=4,
+				color_map=chrom_col_map, sign_color='#DD1122', xlab='',
+				cand_genes=cgs, max_score=15.5)
+	x_min, x_max = ax1.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax1.get_ylim()
+	y_range = y_max - y_min
+	ax1.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'a')
+
+	results[1]._plot_small_manhattan_2_(plot_ax=ax2, gene_model_ax=ax3, plot_bonferroni=True, chromosome=4,
+					color_map=chrom_col_map, highlight_markers=cofactors,
+					sign_color='#DD1122', title='', cand_genes=cgs, max_score=15.5)
+	x_min, x_max = ax2.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax2.get_ylim()
+	y_range = y_max - y_min
+	ax2.text(0.96 * x_range + x_min, 0.85 * y_range + y_min, 'b')
+
+
+	max_rss = max(rss_list)
+	rss_array = sp.array(rss_list) / max_rss
+	p_her_array = rss_array * sp.array(p_her_list)
+	genetic_variance = p_her_array + (1 - rss_array)
+	variance_explained = (1 - rss_array)
+	ax4.fill_between([0, num_steps], 0, 1.1, color='#FFCC33', alpha=0.8, label='Error')
+	ax4.fill_between(sp.arange(num_steps + 1), 0, genetic_variance, color='#22CC44', alpha=0.8, label='Genetic')
+	ax4.fill_between(sp.arange(num_steps + 1), -0.1, variance_explained, color='#2255AA', alpha=0.8, label='Explained')
+	ax4.axvline(6, color='#AA0000', alpha=0.8, lw=1.8)
+	ax4.axvline(5, color='#AA0000', alpha=0.8, lw=1.8)
+	ax4.axvline(x=num_steps / 2, c='k', linestyle=':')
+	ax4.axis([0, num_steps, 0, 1])
+	x_min, x_max = ax4.get_xlim()
+	x_range = x_max - x_min
+	y_min, y_max = ax4.get_ylim()
+	y_range = y_max - y_min
+	ax4.text(0.2 * x_range + x_min, 1.04 * y_range + y_min, 'MBONF', fontsize='small')
+	ax4.text(0.29 * x_range + x_min, 1.04 * y_range + y_min, 'EBIC', fontsize='small')
+	ax4.text(1.185 * x_range + x_min, 0.9 * y_range + y_min, 'c')
+	ax4.bar(-1, 1, color='#FFCC33', alpha=0.8, label='Error')
+	ax4.bar(-1, 1, color='#22CC44', alpha=0.8, label='Genetic')
+	ax4.bar(-1, 1, color='#2255AA', alpha=0.8, label='Explained')
+	leg = ax4.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+	ltext = leg.get_texts()  # all the text.Text instance in the legend
+	llines = leg.get_lines()  # all the lines.Line2D instance in the legend
+	frame = leg.get_frame()  # the patch.Rectangle instance surrounding the legend
+
+	# see text.Text, lines.Line2D, and patches.Rectangle for more info on
+	# the settable properties of lines, text, and rectangles
+	frame.set_facecolor('0.80')      # set the frame face color to light gray
+	pylab.setp(ltext, fontsize='small')    # the legend text fontsize
+	pylab.setp(llines, linewidth=1.5)      # the legend linewidth
+
+
+	#Save the figure?
+	pylab.savefig(env.env['tmp_dir'] + 'mlt_local_sodium_example.png', dpi=500)
+	#pylab.savefig(env.env['tmp_dir'] + 'test.pdf', format='pdf')
+
+
 
 
 
@@ -1785,8 +2229,8 @@ def test_bayes_factor_enrichment():
 				#FT, MAF, ER, FRI, FLC, MAF2-MAF5 (Salome et al. 2011)
 		cgs = gr.get_genes_w_tair_id(cg_tair_ids)
 		#snp_priors = sd.get_cand_genes_snp_priors(cgs, radius=25000, cg_prior_fold_incr=20)
-		snp_priors = sd.get_snp_priors(cpp_list, cand_genes=cgs)
-		emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_qtl_priors_%s_%d' % (phen_name, pid),
+		snp_priors = sd.get_snp_priors(cpp_list)#, cand_genes=cgs)
+		lm.emmax_step_wise(phen_vals, K, sd, 10, env.env['tmp_dir'] + 'bf_qtl_priors_%s_%d' % (phen_name, pid),
 				snp_priors=snp_priors, cand_gene_list=cgs, save_pvals=True, snp_choose_criteria='ppas')
 
 
@@ -1799,9 +2243,11 @@ if __name__ == '__main__':
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
 	#_run_()
-	#generate_results_figure_2()
-	generate_example_figure5()
-	#test_bayes_factor_enrichment()
+	generate_results_figure_2(herit=10)
+	generate_results_figure_2(herit=25)
+	generate_results_figure_3()
+	#generate_example_figure5()
+	#plot_local_sodium_figure()
 	#perform_human_emmax(2)
 	#generate_example_figure_1()
 #	sd = dp.load_250K_snps()

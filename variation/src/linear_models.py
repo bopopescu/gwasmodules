@@ -1540,6 +1540,7 @@ class MultipleTraitLMM(LinearMixedModel):
 		return r_list
 
 
+
 	def get_variance_matrix(self):
 		"""
 		Assumes kinship is there...
@@ -2633,6 +2634,7 @@ def emmax_step_wise(phenotypes, K, sd=None, num_steps=10, file_prefix=None, allo
 	 	kwargs['macs'] = d['mafs']
 	 	kwargs['mafs'] = d['marfs']
  	if snp_priors:
+ 		print 'Using provided SNP priors'
  		kwargs['snp_priors'] = snp_priors[:]
 
 	snps = kwargs['snps'][:]
