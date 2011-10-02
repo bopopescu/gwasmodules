@@ -461,7 +461,7 @@ def plot_single_tprs_fdrs(summary_dict, ax, ws, w_legend=False, y_label='Power',
 
 	# TPRs vs. FDRs
 	am_list = ['LM', 'EX', 'Stepw_LM_Bonf', 'Stepw_EX_Bonf']
-	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
+	am_labels = ['LM', 'EMMAX', 'SWLM', 'MLMM']
 	#am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
 	am_colors = ['#0022FF', '#FF0022', '#0022FF', '#FF0022']
 	am_ls = ['--', '--', '-', '-']
@@ -512,7 +512,7 @@ def plot_single_tprs_fdrs_2(summary_dict, ax, ws, w_legend=False, y_label='Power
 
 	# TPRs vs. FDRs
 	am_list = ['SLR', 'EMMAX', 'FBLR-bwd', 'MLMM-bwd']
-	am_labels = ['LM', 'EX', 'SWLM', 'MLMM']
+	am_labels = ['LM', 'EMMAX', 'SWLM', 'MLMM']
 	am_colors = ['#0022FF', '#FF0022', '#0022FF', '#FF0022']
 	am_ls = ['--', '--', '-', '-']
 #	am_colors = ['#CC9922', '#2299CC', '#FF0022', '#0022FF']
