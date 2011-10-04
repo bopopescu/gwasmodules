@@ -1106,7 +1106,7 @@ def generate_example_figure_1():
 
 
 
-def generate_results_figure_2(file_name='/tmp/test.png', herit=10, window_size=25000):
+def generate_results_figure_2(png_file_name='/tmp/test.png', pdf_file_name='/tmp/test.pdf', herit=10, window_size=25000):
 	file_prefix = '/srv/lab/data/mlt_results/mlt'
 	phed = load_phenotypes(env.env['phen_dir'] + 'multi_locus_phen.pickled')
 	f = pylab.figure(figsize=(11, 7))
@@ -1147,21 +1147,22 @@ def generate_results_figure_2(file_name='/tmp/test.png', herit=10, window_size=2
 	f.text(0.796, 0.962, "'xor'")
 
 
-	f.text(0.072, 0.91, 'A')
-	f.text(0.382, 0.91, "B")
-	f.text(0.688, 0.91, "C")
-	f.text(0.072, 0.46, 'D')
-	f.text(0.382, 0.46, "E")
-	f.text(0.688, 0.46, "F")
+	f.text(0.072, 0.91, 'a')
+	f.text(0.382, 0.91, "b")
+	f.text(0.688, 0.91, "c")
+	f.text(0.072, 0.46, 'd')
+	f.text(0.382, 0.46, "e")
+	f.text(0.688, 0.46, "f")
 
 	f.text(0.97, 0.125, 'North-south latent variable', rotation=90)
 	f.text(0.97, 0.627, 'Two random SNPs', rotation=90)
-	f.savefig(file_name)
+	f.savefig(png_file_name)
+	f.savefig(pdf_file_name, format='pdf')
 
 
 
 
-def generate_results_figure_3():
+def generate_results_figure_3(png_file_name='/tmp/test2.png', pdf_file_name='/tmp/test2.pdf'):
 	file_prefix = '/home/GMI/bjarni.vilhjalmsson/Projects/vincent_plots/plots_sim100loci/'
 	caus_in_file = file_prefix + 'ROC_CAUS_IN.csv'
 	caus_dropped_file = file_prefix + 'ROC_CAUS_DROP.csv'
@@ -1257,16 +1258,17 @@ def generate_results_figure_3():
 	f.text(0.785, 0.962, r'$h^2 = 0.75 $')
 
 
-	f.text(0.072, 0.91, 'A')
-	f.text(0.382, 0.91, "B")
-	f.text(0.688, 0.91, "C")
-	f.text(0.072, 0.46, 'D')
-	f.text(0.382, 0.46, "E")
-	f.text(0.688, 0.46, "F")
+	f.text(0.072, 0.91, 'a')
+	f.text(0.382, 0.91, "b")
+	f.text(0.688, 0.91, "c")
+	f.text(0.072, 0.46, 'd')
+	f.text(0.382, 0.46, "e")
+	f.text(0.688, 0.46, "f")
 
 	f.text(0.97, 0.105, 'Causatives dropped from data', rotation=90)
 	f.text(0.97, 0.627, 'Causatives in data', rotation=90)
-	f.savefig('/tmp/test2.png')
+	f.savefig(png_file_name)
+	f.savefig(pdf_file_name, format='pdf')
 
 
 
@@ -2243,11 +2245,11 @@ if __name__ == '__main__':
 #			generate_results_figure_2(file_name=file_name, herit=herit, window_size=ws)
 	#generate_example_figure_7()
 	#_run_()
-	generate_results_figure_2(file_name='/tmp/test_10_1000.png', herit=10, window_size=1000)
-	generate_results_figure_2(file_name='/tmp/test_10_25000.png', herit=10, window_size=25000)
-	generate_results_figure_2(file_name='/tmp/test_25_1000.png', herit=25, window_size=1000)
-	generate_results_figure_2(file_name='/tmp/test_25_25000.png', herit=25, window_size=25000)
-	generate_results_figure_3()
+	generate_results_figure_2(png_file_name='/tmp/mlt_two_loci_sim_h10_d1000.png', pdf_file_name='/tmp/mlt_two_loci_sim_h10_d1000.pdf', herit=10, window_size=1000)
+	generate_results_figure_2(png_file_name='/tmp/mlt_two_loci_sim_h10_d25000.png', pdf_file_name='/tmp/mlt_two_loci_sim_h10_d25000.pdf', herit=10, window_size=25000)
+	generate_results_figure_2(png_file_name='/tmp/mlt_two_loci_sim_h25_d1000.png', pdf_file_name='/tmp/mlt_two_loci_sim_h25_d1000.pdf', herit=25, window_size=1000)
+	generate_results_figure_2(png_file_name='/tmp/mlt_two_loci_sim_h25_d25000.png', pdf_file_name='/tmp/mlt_two_loci_sim_h25_d25000.pdf', herit=25, window_size=25000)
+	generate_results_figure_3(png_file_name='/tmp/100_loci_sim.png', pdf_file_name='/tmp/100_loci_sim.pdf')
 	#generate_example_figure5()
 	#plot_local_sodium_figure()
 	#perform_human_emmax(2)

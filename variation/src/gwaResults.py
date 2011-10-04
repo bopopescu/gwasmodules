@@ -1047,28 +1047,28 @@ class Result(object):
 #			textPos.append(offset + chromosome_end / 2 - 2000000)
 			offset += chromosome_end
 			if plot_xaxis:
-				if len(chromosome_ends) == 23: #This is probably Human!
-					ticksList1.append(oldOffset + chromosome_end / 2)
-					if wo_xtick_labels:
-						ticksList2.append('')
-					else:
-						if chrom == 23:
-							ticksList2.append('X')
-						elif chrom < 16:
-							ticksList2.append(int(chrom))
-						elif chrom % 2 == 0:
-							ticksList2.append(int(chrom))
-						else:
-							ticksList2.append('')
-
+				#if len(chromosome_ends) == 23: #This is probably Human!
+				ticksList1.append(oldOffset + chromosome_end / 2)
+				if wo_xtick_labels:
+					ticksList2.append('')
 				else:
-					for j in range(oldOffset, offset, 4000000):
-						ticksList1.append(j)
-					for j in range(0, chromosome_end, 4000000):
-						if j % 8000000 == 0 and j < chromosome_end - 4000000 :
-							ticksList2.append(j / 1000000)
-						else:
-							ticksList2.append("")
+					if chrom == 23:
+						ticksList2.append('X')
+					elif chrom < 16:
+						ticksList2.append(int(chrom))
+					elif chrom % 2 == 0:
+						ticksList2.append(int(chrom))
+					else:
+						ticksList2.append('')
+
+#				else:
+#					for j in range(oldOffset, offset, 4000000):
+#						ticksList1.append(j)
+#					for j in range(0, chromosome_end, 4000000):
+#						if j % 8000000 == 0 and j < chromosome_end - 4000000 :
+#							ticksList2.append(j / 1000000)
+#						else:
+#							ticksList2.append("")
 
 
 		if highlight_markers:
