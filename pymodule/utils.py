@@ -509,7 +509,24 @@ def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname):
 	if fname_suffix=='.gz':	#the input file is gzipped. get the new prefix
 		fname_prefix, fname_suffix = os.path.splitext(fname_prefix)
 	return fname_prefix, fname_suffix
-	
+
+
+def getAllFiles(inputDir, inputFiles=[]):
+	"""
+	2011-9-11
+		copied from file_batch_move.py
+	2011-8-3
+		recursively going through the directory to get all files
+		
+	"""
+	import os
+	for inputFname in os.listdir(inputDir):
+		#get the absolute path
+		inputFname = os.path.join(inputDir, inputFname)
+		if os.path.isfile(inputFname):
+			inputFiles.append(inputFname)
+		elif os.path.isdir(inputFname):
+			getAllFiles(inputFname, inputFiles)
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
