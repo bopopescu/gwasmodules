@@ -113,8 +113,11 @@ def restoreMatplotlibRCDefaults():
 	import matplotlib
 	matplotlib.rcdefaults()
 
-def drawHist(data_ls, title=None, xlabel_1D=None, outputFname=None, min_no_of_data_points=50, needLog=False):
+def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, min_no_of_data_points=50, needLog=False, \
+			dpi=200, **kwargs):
 	"""
+	2011-8-24
+		add argument kwargs, xticks
 	2011-4-18
 		a wrapper for histogram drawing using matplotlib
 	"""
@@ -124,14 +127,60 @@ def drawHist(data_ls, title=None, xlabel_1D=None, outputFname=None, min_no_of_da
 	no_of_data_points = len(data_ls)
 	if no_of_data_points>=min_no_of_data_points:
 		no_of_bins = max(10, min(20, no_of_data_points/10))
-		pylab.hist(data_ls, no_of_bins, log=needLog)
+		n, bins, patches = pylab.hist(data_ls, no_of_bins, log=needLog)
 		pylab.title(title)
-		pylab.xlabel(xlabel_1D)
-		pylab.savefig(outputFname, dpi=200)
+		if xlabel_1D is not None:
+			pylab.xlabel(xlabel_1D)
+		if xticks:
+			x_ls = bins[:-1]	#the bins has one extra element.
+			pylab.xticks(x_ls, xticks)
+		pylab.savefig(outputFname, dpi=dpi)
 	
 	sys.stderr.write("Done.\n")
 
+def drawBarChart(x_ls, y_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, bottom=0, needLog=False, dpi=200, **kwargs):
+	"""
+	2011-8-15
+		a wrapper for barChart drawing using matplotlib
+	"""
+	sys.stderr.write("Drawing barChart of %s data points to %s..."%(len(y_ls), outputFname))
+	import pylab
+	pylab.clf()
+	pylab.bar(x_ls, y_ls, width=0.8, bottom=bottom, log=needLog, **kwargs)
+	pylab.title(title)
+	if xlabel_1D is not None:
+		pylab.xlabel(xlabel_1D)
+	if xticks:
+		pylab.xticks(x_ls, xticks)
+	pylab.savefig(outputFname, dpi=dpi)
 	
+	sys.stderr.write("Done.\n")
+
+def drawBoxPlot(data_2D_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, dpi=200, **kwargs):
+	"""
+	2011-8-15
+		a wrapper for boxplot drawing using matplotlib
+		
+		data_2D_ls could be a list of lists or a 2D array.
+			The former is more efficient because boxplot converts
+			a 2-D array into a list of vectors internally anyway.
+	"""
+	sys.stderr.write("Drawing boxplots of %s data points to %s..."%(len(data_2D_ls), outputFname))
+	import pylab
+	pylab.clf()
+	pylab.boxplot(data_2D_ls, notch=0, sym='+', vert=1, whis=1.5, positions=None, \
+				widths=None, **kwargs)
+	#patch_artist = False (default) produces boxes with the Line2D artist
+	#patch_artist = True produces boxes with the Patch artist
+	pylab.title(title)
+	if xlabel_1D is not None:
+		pylab.xlabel(xlabel_1D)
+	if xticks:
+		pylab.xticks(range(len(xticks)), xticks)
+	pylab.savefig(outputFname, dpi=dpi)
+	
+	sys.stderr.write("Done.\n")
+
 def logSum(ls):
 	"""
 	2011-4-27
@@ -142,7 +191,7 @@ def logSum(ls):
 	return math.log10(sum(ls))
 
 def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabel=None, ylabel=None,\
-			colorBarLabel=None, reduce_C_function=None):
+			colorBarLabel=None, reduce_C_function=None, dpi=300):
 	"""
 	2011-4-27
 		draw 2D histogram (reduce_C_function=logSum) or any 3D plot (3rd Dimension is determined by reduce_C_function).
@@ -172,7 +221,7 @@ def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabe
 	if colorBarLabel:
 		cb.set_label(colorBarLabel)
 	if fig_fname:
-		pylab.savefig(fig_fname, dpi=300)
+		pylab.savefig(fig_fname, dpi=dpi)
 
 if __name__ == '__main__':
 	#import pdb

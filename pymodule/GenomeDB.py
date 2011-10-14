@@ -51,28 +51,35 @@ class SequenceType(Entity):
 
 class RawSequence(Entity):
 	"""
+	2011-8-24
+		annot_assembly_gi is not a foreign key anymore.
+		annot_assembly_id replaces it.
 	2010-12-17
 		add a foreign key constraint to column annot_assembly_gi
 		so that if the associated entry in AnnotAssembly is deleted, all raw sequences will be deleted as well.
 	2008-07-27
 		to store chunks of sequences of entries from AnnotAssembly
 	"""
-	annot_assembly = ManyToOne('AnnotAssembly', colname='annot_assembly_gi', ondelete='CASCADE', onupdate='CASCADE')
+	annot_assembly_gi = Field(Integer)
+	annot_assembly = ManyToOne('AnnotAssembly', colname='annot_assembly_id', ondelete='CASCADE', onupdate='CASCADE')
 	start = Field(Integer)
 	stop = Field(Integer)
 	sequence = Field(String(10000))	#each fragment is 10kb
 	using_options(tablename='raw_sequence')
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('annot_assembly_gi', 'start', 'stop'))
+	using_table_options(UniqueConstraint('annot_assembly_id', 'start', 'stop'))
 
 class AnnotAssembly(Entity):
 	"""
+	2011-8-24
+		gi is no longer the primary key.
+		a new id is added as primary key.
 	2010-12-17
 		column raw_sequence_start_id is no longer a foreign key. to avoid circular dependency with RawSequence.
 	2008-07-27
 		table to store meta info of chromosome sequences
 	"""
-	gi = Field(Integer, primary_key=True)
+	gi = Field(Integer)
 	acc_ver = Field(String(32), unique=True)
 	accession = Field(String(32))
 	version = Field(Integer)
@@ -383,7 +390,8 @@ class Gene(Entity):
 	
 	genomic_accession = Field(String(32))
 	genomic_version = Field(Integer)
-	genomic_annot_assembly = ManyToOne('AnnotAssembly', colname='genomic_gi', ondelete='CASCADE', onupdate='CASCADE')
+	genomic_gi = Field(Integer)
+	genomic_annot_assembly = ManyToOne('AnnotAssembly', colname='annot_assembly_id', ondelete='CASCADE', onupdate='CASCADE')
 	entrezgene_type = ManyToOne('EntrezgeneType', colname='entrezgene_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	comment = Field(Text)
 	gene_commentaries = OneToMany('GeneCommentary')
@@ -951,6 +959,33 @@ class GenomeDatabase(ElixirDB):
 			oneGenomeData = OneGenomeData(db_genome=self, tax_id=tax_id, chr_gap=chr_gap)
 			self.tax_id2genomeData[tax_id] = oneGenomeData
 		return self.tax_id2genomeData.get(tax_id)
+	
+	def outputGenomeSequence(self, tax_id=None, sequence_type_id=1, fastaTitlePrefix='chr', outputDir=None, chunkSize=70):
+		"""
+		2011-7-7
+			at this moment, The output is with symap in mind.
+			
+			i.e.:
+			outputDir = os.path.expanduser("~/script/variation/bin/symap_3_3/data/pseudo/vervet177BAC/sequence/pseudo/")
+			db_genome.outputGenomeSequence(tax_id=60711, sequence_type_id=10, fastaTitlePrefix='BAC', outputDir=outputDir, chunkSize=70)
+		"""
+		sys.stderr.write("Outputting genome sequences from tax %s, seq-type %s to %s ...\n"%(tax_id, \
+										sequence_type_id, outputDir))
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).order_by(AnnotAssembly.id)
+		for row in query:
+			fastaTitle = '%s%s'%(fastaTitlePrefix, row.id)
+			outputFname = os.path.join(outputDir, '%s.seq'%(fastaTitle))
+			outf = open(outputFname, 'w')
+			outf.write(">%s\n"%(fastaTitle))
+			sub_query = RawSequence.query.filter_by(annot_assembly_id=row.id).order_by(RawSequence.start)
+			for seq_row in sub_query:
+				sequence = seq_row.sequence
+				while len(sequence)>0:
+					outf.write("%s\n"%(sequence[:chunkSize]))
+					sequence = sequence[chunkSize:]
+			del outf
+		sys.stderr.write("Done.\n")
+		
 	
 def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
 	annot_assembly_table='genome.annot_assembly'):

@@ -584,7 +584,7 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 	if pdata is None:	#2011-2-24 create a PassingData() only when
 		pdata = PassingData(min_MAF=min_MAF)
 	from GeneListRankTest import GeneListRankTest
-	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=pdata)
+	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=param_data)
 	no_of_tests = len(genome_wide_result.data_obj_ls)
 	max_value = genome_wide_result.max_value
 	chr2length = {}

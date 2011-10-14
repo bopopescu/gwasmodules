@@ -2951,7 +2951,6 @@ class Stock_250kDB(ElixirDB):
 					(TableClass.table.name, CNVTableClass.table.name, " and ".join(where_sql_ls))
 		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
 	
-	
 	def getSNPChrPos2IDLs(self,priorTAIRVersion=False):
 		"""
 		2011-5-6
@@ -3011,14 +3010,16 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("%s entries. Done.\n"%(len(dict_to_return)))
 		return dict_to_return
 	
-	def getSNPID2ChrPos(self,):
+	def getSNPID2ChrPos(self, priorTAIRVersion=False):
 		"""
+		2011-10-14 add argument priorTAIRVersion
 		2010-10-13
 			return a dictionary which translates snps.id to (chr, pos).
 			used in DB_250k2data.py
 			
 		"""
-		return self.getSNPChrPos2ID(keyType=2)
+		return self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
+	
 	
 	def get_db_id_given_chr_pos2db_id(self, snp_id):
 		"""
@@ -3072,7 +3073,6 @@ class Stock_250kDB(ElixirDB):
 				chr_pos = db.snp_id2chr_pos.get(1)
 		"""
 		self._snp_id2chr_pos = self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
-	
 	
 	@property
 	def chr_pos2snp_id(self,):

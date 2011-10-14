@@ -391,7 +391,8 @@ def write_data_matrix(data_matrix, output_fname, header, strain_acc_list, catego
 	
 	#figure out no_of_rows, no_of_cols
 	if type(data_matrix)==list and transform_to_numpy:	#2008-02-06 transform the 2D list into array
-		data_matrix = numpy.array(data_matrix,dtype="int8")
+		data_matrix = numpy.array(data_matrix)
+		#data_matrix = numpy.array(data_matrix,dtype="int8")
 		no_of_rows, no_of_cols = data_matrix.shape
 	else:
 		no_of_rows = len(data_matrix)
@@ -2115,7 +2116,7 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 		column_6 = None	#it's genotype_var_perc probably
 		rest_of_row = []
 		stop_pos = None
-		if row[1] and row[1]!='':	#2011-2-24 non-zero on 2nd column, it's position
+		if row[1] and row[1]!='0':	#2011-2-24 non-zero on 2nd column, it's position
 			chr = row[0]	#2011-4-19 no more integer conversion for chromosome.
 			start_pos = int(float(row[1]))
 		elif db_id2chr_pos:	#2011-2-24
