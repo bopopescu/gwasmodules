@@ -2,12 +2,18 @@
 """
 
 Examples:
-	# define landscape for result 4634.
-	DefineAssociationLandscape.py -z banyan -u yh -e 4634
+	# define landscape for result 4634 and others
+	DefineAssociationLandscape.py -z banyan -u yh -j 4634 -c
+	
+	# set the minimum score to 5
+	DefineAssociationLandscape.py -z banyan -u yh -j 4634 -c -f 5
 	
 Description:
 	Program to find the landscape/peaks of a genome wide association result.
 	It fills data into db table ResultPeak, but not table ResultLandscape.
+	
+	Results fetched by combination of (call_method_id, analysis_method_id_ls, phenotype_method_id_ls)
+		will be added to result_id_ls.
 
 """
 import sys, os, math
@@ -37,21 +43,25 @@ class DefineAssociationLandscape(object):
 						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
 						('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
+						('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 						('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
-						('result_id_ls', 1, ): [None, 'e', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
-						('neighbor_distance', 0, int): [5000, '', 1, "within this distance, a locus that increases the association score \
+						('result_id_ls', 1, ): [None, 'j', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
+						('neighbor_distance', 0, int): [5000, 'i', 1, "within this distance, a locus that increases the association score \
 									the fastest is chosen as bridge end. outside this distance, whatever the next point is will be picked."],\
-						('max_neighbor_distance', 0, int): [20000, '', 1, "beyond this distance, no bridge would be formed."],\
+						('max_neighbor_distance', 0, int): [20000, 'm', 1, "beyond this distance, no bridge would be formed."],\
 						('min_MAF', 0, float): [0.1, 'n', 1, 'minimum Minor Allele Frequency.'],\
 						('min_score', 0, float): [4, 'f', 1, 'minimum score to call a peak'],\
-						('ground_score', 0, float): [0, '', 1, 'minimum score possible in this test'],\
+						('ground_score', 0, float): [0, 's', 1, 'minimum score possible in this test'],\
 						('tax_id', 1, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
 						('output_fname', 0, ): [None, 'o', 1, 'if given, output the landscape result.'],\
 						('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	#('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
+	#('analysis_method_id_ls', 0, ):['1,7', 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
+	#("phenotype_method_id_ls", 0, ): [None, 'e', 1, 'comma/dash-separated phenotype_method id list, like 1,3-7. Default is all.'],\
 	
 	def __init__(self,  **keywords):
 		"""
@@ -66,7 +76,18 @@ class DefineAssociationLandscape(object):
 			self.result_id_ls.sort()
 		else:
 			self.result_id_ls = []
-	
+		"""
+		if getattr(self, 'analysis_method_id_ls', None):
+			self.analysis_method_id_ls = getListOutOfStr(self.analysis_method_id_ls, data_type=int)
+			self.analysis_method_id_ls.sort()
+		else:
+			self.analysis_method_id_ls = []
+		if getattr(self, 'phenotype_method_id_ls', None):
+			self.phenotype_method_id_ls = getListOutOfStr(self.phenotype_method_id_ls, data_type=int)
+			self.phenotype_method_id_ls.sort()
+		else:
+			self.phenotype_method_id_ls = []
+		"""
 	
 	def getXDistanceBetweenTwoDataObjs(self, current_obj=None, next_obj=None):
 		"""
@@ -74,6 +95,7 @@ class DefineAssociationLandscape(object):
 			the two arguments are of type DataObject in pymodule/SNP.py.
 			It calculates the distance from current_obj to next_obj.
 		"""
+		
 		
 		deltaX = next_obj.position - current_obj.stopPosition
 		return deltaX
@@ -239,7 +261,7 @@ class DefineAssociationLandscape(object):
 			peak_start_data_obj = None
 			cc.sort()	#each node is identified by index in data_obj_ls
 			cc.insert(0, -1)	#-1 is fake index. standing for the ground point
-			cc.append(-1)	#-1 is fake index. standing for the ground point
+			cc.append(-1)	#-1 is fake index. standing for the ground point in the end
 			no_of_nodes = len(cc)
 			for i in xrange(no_of_nodes-1):
 				start_data_obj_index = cc[i]
@@ -248,7 +270,7 @@ class DefineAssociationLandscape(object):
 					start_data_obj = data_obj_ls[start_data_obj_index]
 				else:
 					start_data_obj = None
-				bridge_x_start = getattr(start_data_obj, 'stopPosition',None)
+				bridge_x_start = getattr(start_data_obj, 'stopPosition', None)	#failsafe if start_data_obj is None.
 				bridge_y_start = getattr(start_data_obj, 'value', None)
 				if stop_data_obj_index!=-1:
 					stop_data_obj = data_obj_ls[stop_data_obj_index]
@@ -275,17 +297,25 @@ class DefineAssociationLandscape(object):
 					pass	#it's an empty segment. no intersection.
 				else:
 					if peak_start_data_obj is None:
+						#there is an intersection, but no starting obj for this potential peak.
+						# so find this starting object first.
 						locus_index = stop_data_obj.index	#backwards starting from the stop_data_obj
 						# start_data_obj could be None.
 						while locus_index>=0:
 							data_obj = data_obj_ls[locus_index]
-							stop_position = getattr(data_obj, 'stopPosition', None)
+							
+							#2011-10-11 bugfix
+								#this data_obj could be a single-position locus (SNP) which doesn't have stopPosition defined.
+							stop_position = data_obj.stopPosition	#same as getattr(data_obj, 'stopPosition', getattr(data_obj, 'position'))
+							
 							if stop_position<intersection_point.x():
 								break
 							locus_index -= 1
 						peak_start_data_obj = data_obj_ls[locus_index+1]	#the loop breaks after the outside locus has been reached.
 						peak_start_data_obj.peak_start = intersection_point.x()	#record the peak starting position
 					else:
+						#intersection exists again.
+						# this should be the ending position for the peak, now find the ending object (peak_stop_data_obj).
 						locus_index = start_data_obj.index	#forward starting from the start_data_obj
 						# start_data_obj could contain something.
 						while locus_index<len(data_obj_ls):
@@ -370,7 +400,10 @@ class DefineAssociationLandscape(object):
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
 									hostname=self.hostname, database=self.dbname)
 		db_250k.setup(create_tables=False)
+		db_250k.session.begin()
 		
+		"""
+		#2011-10-12 below commented out because only required for drawing
 		genome_db = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
 						password=self.db_passwd, hostname=self.hostname, database=self.genome_dbname, )
 		genome_db.setup(create_tables=False)
@@ -378,18 +411,31 @@ class DefineAssociationLandscape(object):
 		oneGenomeData = genome_db.getOneGenomeData(tax_id=self.tax_id, chr_gap=0)
 		#oneGenomeData.chr_id2cumu_start
 		#cumuSpan2ChrRBDict = oneGenomeData.cumuSpan2ChrRBDict
+		"""
 		
-		#param_obj = PassingData(no_of_total_annotations=0, session=db_250k.session, \
-		#			cnv_method_id=self.cnv_method_id, no_of_total_contexts=0, no_of_into_db=0, report=self.report,\
-		#			no_of_cnv_contexts_already_in_db=0, no_of_cnv_annotations_already_in_db=0)
 		
 		pd = PassingData(min_MAF=self.min_MAF,\
 					results_directory=self.results_directory, \
 					need_chr_pos_ls=0,)
 		
-		for result_id in self.result_id_ls:
+		#result_query = db_250k.getResultLs(call_method_id=self.call_method_id, analysis_method_id_ls=self.analysis_method_id_ls, \
+		#				phenotype_method_id_ls=self.phenotype_method_id_ls)
+		result_id_ls = self.result_id_ls
+		#for result in result_query:
+		#	result_id_ls.append(result.id)
+		
+		for result_id in result_id_ls:
 			#establish the map from cnv.id from chr_pos
 			rm = Stock_250kDB.ResultsMethod.get(result_id)
+			result_peak_type = self.getResultPeakType(db_250k, min_score=self.min_score, neighbor_distance=self.neighbor_distance, \
+												max_neighbor_distance=self.max_neighbor_distance)
+			#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
+			query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
+			if query.first():
+				sys.stderr.write("result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id))
+				sys.exit(0)
+			
+			
 			if rm.cnv_method_id and not db_250k._cnv_id2chr_pos:
 				db_250k.cnv_id2chr_pos = rm.cnv_method_id
 				pd.db_id2chr_pos = db_250k.cnv_id2chr_pos
@@ -408,8 +454,7 @@ class DefineAssociationLandscape(object):
 			self.drawBridgeLs(bridge_ls=landscapeData.bridge_ls, outputFname=outputFname, oneGenomeData=oneGenomeData)
 			"""
 			
-			result_peak_type = self.getResultPeakType(db_250k, min_score=self.min_score, neighbor_distance=self.neighbor_distance, \
-												max_neighbor_distance=self.max_neighbor_distance)
+			
 			self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
 						ground_score=self.ground_score, min_score=self.min_score, rm=rm, result_peak_type=result_peak_type)
 			"""
