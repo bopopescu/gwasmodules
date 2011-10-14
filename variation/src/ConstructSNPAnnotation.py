@@ -4,19 +4,20 @@
 Examples:
 	ConstructSNPAnnotation.py -u yh -c
 	
-	ConstructSNPAnnotation.py -u yh -m 0 -g -s /mnt/panfs/250k/snps_context_g1_m0
+	ConstructSNPAnnotation.py -u yh -m 0 -s /mnt/panfs/250k/snps_context_g1_m0
 		-j /Network/Data/250k/tmp-yh/at_gene_model_pickelf_with_cds_mrna_seq -r
 	
 	
 	# for TAIR9
-	ConstructSNPAnnotation.py -u yh -m 0 -g -s snps_context_tair9_g1_m0 
+	ConstructSNPAnnotation.py -u yh -m 0 -s snps_context_tair9_g1_m0 
 		-j ./at_gene_model_pickelf_TAIR9_20100927 -z banyan -c -p xxx -r
 
 Description:
 	2008-1-6 program to construct the annotatioin (intergenic, synonymous, non-synonymous) of a snp.
 	It fills results into db table snp_annotation.
 	
-	Always set min_distance=0 and get_closest=1 and pick the corresponding snps_context_picklef. The algorithm depends on that.
+	Always set min_distance=0 and pick the corresponding snps_context_picklef. The algorithm depends on that.
+	"get_closest=1" is no longer an option, set internally.
 
 """
 import sys, os, math
@@ -50,22 +51,27 @@ class ConstructSNPAnnotation(object):
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('output_fname', 0, ): [None, 'o', 1, 'if given, QC results will be outputed into it.'],\
-							("gene_annotation_picklef", 0, ): [None, 'j', 1, 'given the option, If the file does not exist yet, store a pickled gene_annotation into it. If the file exists, load gene_annotation out of it.'],\
-							("snps_context_picklef", 0, ): [None, 's', 1, 'given the option, if the file does not exist yet, to store a pickled snps_context_wrapper into it, \
-								min_distance and flag get_closest will be attached to the filename. If the file exists, load snps_context_wrapper out of it.'],\
+							("gene_annotation_picklef", 0, ): [None, 'j', 1, 'given the option, If the file does not exist yet, \
+									store a pickled gene_annotation into it. If the file exists, load gene_annotation out of it.'],\
+							("snps_context_picklef", 0, ): [None, 's', 1, 'given the option, if the file does not exist yet, \
+								to store a pickled snps_context_wrapper into it, \
+								min_distance and flag get_closest will be attached to the filename. \
+								If the file exists, load snps_context_wrapper out of it.'],\
 							("min_distance", 1, int): [5000, 'm', 1, 'minimum distance allowed from the SNP to gene'],\
-							("get_closest", 0, int): [1, 'g', 0, 'only get genes closest to the SNP within that distance'],\
 							('tax_id', 0, int): [3702, '', 1, 'Taxonomy ID to get gene position and coordinates.'],\
 							('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+#							("get_closest", 0, int): [1, 'g', 0, 'only get genes closest to the SNP within that distance'],\
 	
 	def __init__(self,  **keywords):
 		"""
 		2009-1-5
 		"""
 		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
+														class_to_have_attr=self)
+		self.get_closest = 1	#2011-01-26, the argument has been commented out. set it to 1 here.
 	
 	def getSNPAnnotationShortName2id(self):
 		"""
@@ -93,7 +99,8 @@ class ConstructSNPAnnotation(object):
 			counter += 1
 			snps_id, chr, pos, allele1, allele2 = snp_info.data_ls[i]
 			snps_context_matrix = snps_context_wrapper.returnGeneLs(chr, pos)
-			snp_annotation_type_short_name_ls = []	#each element is (snp_annotation_type_short_name, gene_id, gene_commentary_id, which_exon_or_intron, pos_within_codon)
+			snp_annotation_type_short_name_ls = []	#each element is (snp_annotation_type_short_name, gene_id, gene_commentary_id, 
+					# which_exon_or_intron, pos_within_codon)
 			if snps_context_matrix:
 				for snps_context in snps_context_matrix:
 					snps_id, disp_pos, gene_id = snps_context
@@ -104,7 +111,8 @@ class ConstructSNPAnnotation(object):
 						if gene_commentary.protein_box_ls:
 							which_intron = -1	#which intron the SNP resides, starting from 1
 							which_coding_exon = -1	#which exon the SNP resides in terms of the CDS sequence, starting from 1
-							accum_intron_len = 0	#the cumulative length of all introns from the one after the first coding exon up till the SNP's position (including the intron the SNP is in if it's under the rule).
+							accum_intron_len = 0	#the cumulative length of all introns from the one \
+								# after the first coding exon up till the SNP's position (including the intron the SNP is in if it's under the rule).
 							exon_5_end_pos = -1	#5' end position of the whole CDS sequence. bad name 'exon'
 							UTR_2nd = 0	#whether this is the 2nd UTR
 							box_type = None
@@ -147,7 +155,8 @@ class ConstructSNPAnnotation(object):
 										no_of_introns += 1
 							
 							if box_type!=None and is_SNP_within_box==1:	#box_type is the type of the box where the SNP resides
-								if UTR_type!=None and box_type=='exon' and is_translated==0:	#it's UTR. bug fixed. make sure after the forloop above, the current box is still the UTR.
+								if UTR_type!=None and box_type=='exon' and is_translated==0:	#it's UTR. bug fixed. make sure after the forloop above, 
+										# the current box is still the UTR.
 									snp_annotation_type_short_name_ls.append((UTR_type, gene_id, gene_commentary.gene_commentary_id))
 								else:
 									if gene_model.strand=='-1':	#reverse the order of exon/intron
@@ -165,13 +174,15 @@ class ConstructSNPAnnotation(object):
 												snp_annotation_type_short_name = 'splice-acceptor'	#on the 3' of this intron
 											else:
 												snp_annotation_type_short_name = 'splice-donor'	#on the 5' of this intron
-											snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, which_intron))
+											snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, \
+																					gene_commentary.gene_commentary_id, which_intron))
 										elif stop-pos<=1:
 											if gene_model.strand=='-1':
 												snp_annotation_type_short_name = 'splice-donor'	#on the 5' of this intron
 											else:
 												snp_annotation_type_short_name = 'splice-acceptor'	#on the 3' of this intron
-											snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, which_intron))
+											snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, \
+																					gene_commentary.gene_commentary_id, which_intron))
 									elif box_type=='exon':	#must be translated
 										try:
 											SNP_index_in_CDS = pos - exon_5_end_pos - accum_intron_len
@@ -183,7 +194,8 @@ class ConstructSNPAnnotation(object):
 												gene_allele1 = allele1
 												gene_allele2 = allele2
 											SNP_index_in_CDS = int(SNP_index_in_CDS)	
-											#SNP_index_in_CDS is type long. without int(), cds_seq[SNP_index_in_CDS] returns a Bio.Seq with one nucleotide, rather than a single-char string
+											# SNP_index_in_CDS is type long. without int(), cds_seq[SNP_index_in_CDS] returns a Bio.Seq with one nucleotide, 
+											# rather than a single-char string
 											SNP_index_in_peptide = SNP_index_in_CDS/3
 											
 											SNP_index_in_peptide = int(SNP_index_in_peptide)	#ditto as int(SNP_index_in_CDS), not necessary
@@ -194,7 +206,8 @@ class ConstructSNPAnnotation(object):
 												sys.stderr.write("Warning: SNP (%s, %s), SNP_index_in_CDS=%s, is beyond any of the boxes from gene %s (chr=%s, %s-%s), \
 														gene_commentary_id %s (%s-%s), box_ls=%s, cds-length=%s. counted as intergenic.\n"%\
 														(chr, pos, SNP_index_in_CDS, gene_id, gene_model.chromosome, gene_model.start, gene_model.stop, \
-														gene_commentary.gene_commentary_id, gene_commentary.start, gene_commentary.stop, repr(gene_commentary.box_ls), len(cds_seq)))
+														gene_commentary.gene_commentary_id, gene_commentary.start, gene_commentary.stop, repr(gene_commentary.box_ls), \
+														len(cds_seq)))
 												snp_annotation_type_short_name_ls.append(['intergenic'])
 												continue
 											if cds_seq[SNP_index_in_CDS]!=gene_allele1 and cds_seq[SNP_index_in_CDS]!=gene_allele2:
@@ -217,15 +230,19 @@ class ConstructSNPAnnotation(object):
 											else:
 												snp_annotation_type_short_name = 'synonymous'
 												comment = None
-											snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, which_coding_exon, pos_within_codon, comment))
+											snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, \
+																					which_coding_exon, pos_within_codon, comment))
 											
 											if aa != alt_aa:
 												if aa=='*' or alt_aa=='*':
-													snp_annotation_type_short_name = 'premature-stop-codon'	#could also be the last stop codon changing to something else and thereby extending the cds
-													snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, which_coding_exon, pos_within_codon, comment))
+													snp_annotation_type_short_name = 'premature-stop-codon'	#could also be the last stop codon changing to something else 
+													# and thereby extending the cds
+													snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, \
+																							which_coding_exon, pos_within_codon, comment))
 												if SNP_index_in_peptide==0:
 													snp_annotation_type_short_name = 'init-Met'
-													snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, which_coding_exon, pos_within_codon, comment))
+													snp_annotation_type_short_name_ls.append((snp_annotation_type_short_name, gene_id, gene_commentary.gene_commentary_id, \
+																							which_coding_exon, pos_within_codon, comment))
 										except:
 											traceback.print_exc()
 											sys.stderr.write('%s.\n'%repr(sys.exc_info()))
@@ -233,7 +250,8 @@ class ConstructSNPAnnotation(object):
 												(chr, pos, gene_id, gene_model.chromosome, gene_model.start, gene_model.stop, \
 												gene_commentary.gene_commentary_id, gene_commentary.start, gene_commentary.stop, repr(gene_commentary.box_ls)))
 							elif box_type!=None and is_SNP_within_box==0:
-								#SNP is over the range of the gene. it happens when one gene has multiple alternative splicing forms. snps_context_wrapper uses the largest span to represent the gene.
+								#SNP is over the range of the gene. it happens when one gene has multiple alternative splicing forms.
+								# snps_context_wrapper uses the largest span to represent the gene.
 								snp_annotation_type_short_name_ls.append(['intergenic'])
 							else:
 								sys.stderr.write("Warning: SNP (%s, %s) not in any of the boxes from gene %s (chr=%s, %s-%s), gene_commentary_id %s (%s-%s), box_ls=%s.\n"%\
@@ -296,8 +314,10 @@ class ConstructSNPAnnotation(object):
 		db.setup(create_tables=False)
 		session = db.session
 		#session.begin()
-		snps_context_wrapper = GeneListRankTest.dealWithSnpsContextWrapper(self.snps_context_picklef, self.min_distance, self.get_closest)
-		gene_annotation = DrawSNPRegion.dealWithGeneAnnotation(self.gene_annotation_picklef)
+		snps_context_wrapper = GeneListRankTest.dealWithSnpsContextWrapper(self.snps_context_picklef, self.min_distance, \
+																	self.get_closest)
+		gene_annotation = DrawSNPRegion.dealWithGeneAnnotation(self.gene_annotation_picklef, tax_id=self.tax_id, \
+															cls_with_db_args=self)
 		snp_info = DrawSNPRegion.getSNPInfo(db)
 		
 		snp_annotation_short_name2id = self.getSNPAnnotationShortName2id()
