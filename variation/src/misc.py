@@ -6564,8 +6564,46 @@ FileFormatExchange.strip_2010_strain_info('./script/variation/data/2010/2010_str
 	"""
 	
 	@classmethod
-	def splitMultiRecordFastaFileIntoSingleRecordFastaFiles(cls, input_fname, output_dir):
+	def fasta2Fastq(cls, inputFname, outputFname, replaceSpaceWithUnderScore=False):
 		"""
+		2011-6-27
+			convert a fasta format to fastq format
+		"""
+		sys.stderr.write("Converting %s from fasta format to fastq ..."%(inputFname))
+		sequences = []
+		outf = open(outputFname, 'w')
+		from Bio import SeqIO
+		handle = open(inputFname, "rU")
+		no_of_records = 0
+		for record in SeqIO.parse(handle, "fasta"):
+			if replaceSpaceWithUnderScore:
+				#replace space with _, so that all become part of id, not truncated in bwa output.
+				record.description = record.description.replace(' ', '_')
+			
+			outf.write(">%s\n"%record.description)
+			outf.write("%s\n"%(record.seq))
+			outf.write("+\n%s\n"%("I"*len(record.seq)))
+			no_of_records += 1
+		handle.close()
+		del outf
+		sys.stderr.write("%s records. Done.\n"%(no_of_records))
+	
+	"""
+		#2011-6-27
+		inputFname = os.path.expanduser("~/script/vervet/src/data/ref/BAC/BAC.accession.fasta")
+		outputFname = os.path.expanduser("~/script/vervet/src/data/ref/BAC/BAC.accession.fastq")
+		FileFormatExchange.fasta2Fastq(inputFname, outputFname)
+		sys.exit(0)
+	"""
+	
+	
+	
+	@classmethod
+	def splitMultiRecordFastaFileIntoSingleRecordFastaFiles(cls, input_fname, output_dir, fastaRecordFilterHandler=None,
+														chunkSize=70):
+		"""
+		2011-7-7
+			use Bio.SeqIO and add argument fastaRecordFilterHandler
 		2010-12-3
 			One fasta file contains >1 sequences. This function writes each sequence to an individual file in output_dir.
 			The sequence title would be the filename in output_dir.
@@ -6574,23 +6612,32 @@ FileFormatExchange.strip_2010_strain_info('./script/variation/data/2010/2010_str
 		"""
 		import os,sys
 		sys.stderr.write("Outputting each sequence in %s into single file ...\n"%(input_fname))
-		inf = open(input_fname, 'r')
+		from Bio import SeqIO
+		inf = open(input_fname, 'rU')
 		outf = None
 		counter = 0
 		real_counter = 0
-		for line in inf:
+		for record in SeqIO.parse(inf, "fasta"):
 			counter += 1
-			if line[0]=='>':
-				real_counter += 1
-				title = line[1:].strip()
-				if outf is not None:
-					outf.close()
-				output_fname = os.path.join(output_dir, '%s.seq'%title)
-				outf = open(output_fname, 'w')
+			title = record.id.split()[0]
+			if fastaRecordFilterHandler is not None and not fastaRecordFilterHandler.run(title):
+				continue
+			
+			real_counter += 1
+			# close old file and open new one
 			if outf is not None:
-				outf.write(line)
-			if counter%10000==0:
+				outf.close()
+			output_fname = os.path.join(output_dir, '%s.seq'%title)
+			outf = open(output_fname, 'w')
+			outf.write(">%s\n"%title)
+			if outf is not None:
+				seq = record.seq
+				while len(seq)>0:
+					outf.write("%s\n"%seq[:chunkSize])
+					seq = seq[chunkSize:]
+			if counter%1000==0:
 				sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("%s%s\t%s"%('\x08'*80, counter, real_counter))
 		sys.stderr.write("Done.\n")
 	
 	"""
@@ -8704,6 +8751,12 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 			DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
 		sys.exit(0)
 		
+		# 2011-5-4
+		# priorTAIRVersion=True if it's connected to banyan's TAIR9 db because the association results are based off TAIR8.
+		# call_method_id=None if you want the function to go through all possible files.
+		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=None, priorTAIRVersion=True)
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -9314,17 +9367,32 @@ class CNV(object):
 	def pickCNVsForValidation(cls, db_250k, cnv_method_id=20, cnv_type_id=1, no_of_loci=100):
 		"""
 		2011-4-27
-			select deletions based on frequency, size, probability
+			select CNVs based on frequency, size, probability
 			output:
 				accession name, deletion location, size, sequence deleted, 2-3kb flanking sequence
 				
 				which base in the flanking sequence is a SNP (either 250k or perlegen)
 				
-				avoid region with excessive polymorphism
+			Conditions:
+				1. avoid region with excessive polymorphism. need a global diversity plot
+				
 		"""
 		sys.stderr.write("Picking %s type %s CNVs from method %s for validation ..."%(no_of_loci, cnv_type_id, cnv_method_id))
 		import Stock_250kDB
 		query = Stock_250kDB.CNVArrayCall.query.filter_by(cnv_type_id=cnv_type_id).filter_by(cnv_method_id=cnv_method_id)
+		
+		highDiversityRegionRBDict = RBDict()
+		
+		cnv_metric_key2id_ls = {}
+		for row in query:
+			key_metric = (row.cnv.frequency, (row.cnv.stop-row.cnv.start+1))
+			if key_metric not in cnv_metric_key2id_ls:
+				cnv_metric_key2id_ls[key_metric] = []
+			cnv_metric_key2id_ls[key_metric].append(row.id)
+		
+		
+		
+		sys.stderr.write("Outputing chosen CNVs ...")
 		
 		sys.stderr.write("Done.\n")
 		
@@ -20356,11 +20424,18 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		# 2011-5-4
-		# priorTAIRVersion=True if it's connected to banyan's TAIR9 db because the association results are based off TAIR8.
-		# call_method_id=None if you want the function to go through all possible files.
-		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=None, priorTAIRVersion=True)
+		#2011-6-27
+		inputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/last_updated_vervet_GSS_seqs.fasta")
+		outputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/last_updated_vervet_GSS_seqs.fastq")
+		FileFormatExchange.fasta2Fastq(inputFname, outputFname, replaceSpaceWithUnderScore=True)
 		sys.exit(0)
+		
+		#2011-6-27
+		inputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/BAC.accession.fasta")
+		outputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/BAC.accession.fastq")
+		FileFormatExchange.fasta2Fastq(inputFname, outputFname)
+		sys.exit(0)
+		
 		
 		
 		# 2011-4-22
