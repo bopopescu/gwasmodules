@@ -3185,6 +3185,22 @@ class Stock_250kDB(ElixirDB):
 		cls.genome_wide_result = genome_wide_result
 		return genome_wide_result
 	
+	def getResultLs(self, call_method_id=None, analysis_method_id_ls=[], phenotype_method_id_ls=[]):
+		"""
+		2011-10-12
+			bugfix in filter by call_method_id
+		2011-5-9
+			given constraints, find all association results from ResultsMethod
+		"""
+		query = ResultsMethod.query
+		if call_method_id:
+			query = query.filter_by(call_method_id=call_method_id)
+		if analysis_method_id_ls:
+			query = query.filter(ResultsMethod.analysis_method_id.in_(analysis_method_id_ls))
+		if phenotype_method_id_ls:
+			query = query.filter(ResultsMethod.phenotype_method_id.in_(phenotype_method_id_ls))
+		return query
+	
 	def getGeneList(self, list_type_id):
 		"""
 		2011-3-16
