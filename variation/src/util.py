@@ -3,6 +3,19 @@ Various useful functions.
 """
 import numpy as np
 
+def parse_ids(arg_str):
+	t_ids = arg_str.split(',')
+	ids = []
+	for s in t_ids:
+		if '-' in s:
+			id_range = map(int, s.split('-'))
+		        for id in range(id_range[0], id_range[1] + 1):
+		        	ids.append(id)
+		else:
+			ids.append(int(s))
+	return ids
+
+
 def getRanks(values, withTies=True):
 	"""
 	returns ranks (large values w. large ranks)
@@ -10,7 +23,7 @@ def getRanks(values, withTies=True):
 	srt_vals = zip(values[:], range(len(values)))
 	srt_vals.sort()
 	srt_ranks = np.zeros(len(srt_vals))
-	if withTies:	
+	if withTies:
 		i = 0
 		while i < len(srt_vals):
 			curVal = srt_vals[i][0]
@@ -25,9 +38,9 @@ def getRanks(values, withTies=True):
 
 	else:
 		srt_ranks = np.arange(len(srt_vals))
-			
+
 	ranks = np.zeros(len(srt_vals))
-	
+
 	for i, (val, val_index) in enumerate(srt_vals):
 		ranks[val_index] = srt_ranks[i]
 	return ranks
@@ -41,7 +54,7 @@ def _kw_get_ranks_(values, withTies=True):
 	srt_vals.sort()
 	srt_ranks = np.zeros(len(srt_vals))
 	group_counts = []
-	if withTies:	
+	if withTies:
 		i = 0
 		while i < len(srt_vals):
 			curVal = srt_vals[i][0]
@@ -58,21 +71,21 @@ def _kw_get_ranks_(values, withTies=True):
 	else:
 		srt_ranks = np.arange(len(srt_vals))
 		group_counts = [1] * len(srt_vals)
-			
+
 	ranks = np.zeros(len(srt_vals))
-	
+
 	for i, (val, val_index) in enumerate(srt_vals):
 		ranks[val_index] = srt_ranks[i]
 	return ranks, np.array(group_counts)
-			
+
 
 def kruskal_wallis(snps, phenVals, useTieCorrection=True, verbose=True):
 	from scipy import stats
 	if verbose:
 		import time
-		s1 = time.time()	
+		s1 = time.time()
 	assert len(snps[0]) == len(phenVals), "SNPs and phenotypes are not equal length."
-	
+
 	ranks, group_counts = _kw_get_ranks_(phenVals)
 	assert len(group_counts) == len(set(ranks)), 'Somethings wrong..'
 	tieCorrection = 1.0
@@ -82,11 +95,11 @@ def kruskal_wallis(snps, phenVals, useTieCorrection=True, verbose=True):
 		s = np.sum(group_counts * (group_counts * group_counts - ones_array))
 		s = s / (n_total * (n_total * n_total - 1.0))
 		tieCorrection = 1.0 / (1 - s)
-	
+
 	n = len(phenVals)
 	ds = np.zeros(len(snps))
 	c = 12.0 / (n * (n + 1))
-	for i, snp in enumerate(snps):		
+	for i, snp in enumerate(snps):
 		ns = np.bincount(snp)
 		rs = np.array([0.0, np.sum(snp * ranks)])
 		rs[0] = np.sum(ranks) - rs[1]
@@ -118,13 +131,13 @@ def plotHist(x, y):
 
 class Queue:
 	"A first-in-first-out queue."
-	def __init__(self, items=None): 
-		self.start = 0 
+	def __init__(self, items=None):
+		self.start = 0
 		self.A = items or []
-	
+
 	def __len__(self):
 		return len(self.A) - self.start
-	
+
 	def append(self, item):
 		self.A.append(item)
 
@@ -148,38 +161,26 @@ def valListToStrList(l):
 	return newl
 
 
-def calcVar(l):
-	mean = sum(l) / float(len(l))
-	var = 0
-	for i in range(0, len(l)):
-		var = var + (l[i] - mean) * (l[i] - mean)
-	var = var / float(len(l) - 1)
-	return var
+#def calcVar(l):
+#	mean = sum(l) / float(len(l))
+#	var = 0
+#	for i in range(0, len(l)):
+#		var = var + (l[i] - mean) * (l[i] - mean)
+#	var = var / float(len(l) - 1)
+#	return var
 
-def _transposeDoubleListsOld_(l):
-	newl = [[] for i in range(0, len(l[0]))]
-	for i in range(0, len(l)):
-		for j in range(0, len(l[0])):
-			newl[j].append(l[i][j])
-	return newl
-
-def _transposeDoubleListsOld2_(l):
-	import numpy
-	m = numpy.matrix(l)
-	m = numpy.transpose(m)
-	return m.tolist()
 
 def transposeDoubleLists(l):
 	return map(list, zip(*l))
-	
-def calcSD(l):
-	mean = sum(l) / float(len(l))
-	var = 0
-	for i in range(0, len(l)):
-		var = var + (l[i] - mean) * (l[i] - mean)
-	var = var / float(len(l) - 1)
-	import math
-	return math.sqrt(var)
+
+#def calcSD(l):
+#	mean = sum(l) / float(len(l))
+#	var = 0
+#	for i in range(0, len(l)):
+#		var = var + (l[i] - mean) * (l[i] - mean)
+#	var = var / float(len(l) - 1)
+#	import math
+#	return math.sqrt(var)
 
 def calcQuantiles(numbers):
 	"""
@@ -187,7 +188,7 @@ def calcQuantiles(numbers):
 	"""
 	import math
 	numbers.sort()
-	
+
 	if len(numbers) % 2 == 0:
 		#Even
 		ns1 = numbers[0:len(numbers) / 2]
@@ -196,7 +197,7 @@ def calcQuantiles(numbers):
 	else:
 		#Odd
 		ns1 = numbers[0:(len(numbers) - 1) / 2]
-		ns2 = numbers[(len(numbers) + 1) / 2:len(numbers)]		
+		ns2 = numbers[(len(numbers) + 1) / 2:len(numbers)]
 		median = numbers[(len(numbers) - 1) / 2]
 
 	if len(ns1) % 2 == 0:
@@ -208,7 +209,7 @@ def calcQuantiles(numbers):
 		q3 = ns2[(len(ns2) - 1) / 2]
 
 	return (q1, median, q3)
-	
+
 def calcIQR(numbers):
 	"""
 	Calculates the inter-quantile range.
@@ -216,8 +217,8 @@ def calcIQR(numbers):
 	quantiles = calcQuantiles(numbers)
 	print quantiles
 	return quantiles[2] - quantiles[0]
-	
-	
+
+
 def bin_counts(values, bins):
 	counts = [0] * (len(bins) - 1)
 	out_of_bounds_values = []
@@ -227,7 +228,7 @@ def bin_counts(values, bins):
 			i += 1
 		if i + 1 < len(bins) and bins[i] < value <= bins[i + 1]:
 			counts[i] += 1
-		else: 
+		else:
 			out_of_bounds_values.append(value)
 	if len(out_of_bounds_values):
 		print "These values were OOB:", out_of_bounds_values
@@ -237,9 +238,9 @@ def bin_counts(values, bins):
 def r_list_2_dict(rList):
 	pyDict = {}
 	for name, value in zip([i for i in rList.getnames()], [i for i in rList]):
-	    	if len(value) == 1: 
+	    	if len(value) == 1:
 	    		pyDict[name] = value[0]
-	    	else: 
+	    	else:
 	    		pyDict[name] = [i for i in value]
 	return pyDict
 
@@ -263,7 +264,7 @@ def snp_kinship_correlation(binary_snps, k, num_perm=0, permutation_snps=None, k
 	Currently only one kinship matrix is supported
 	"""
 	#Construct a distance matrix using the snps.	
-	
+
 	import scipy as sp
 	import scipy.spatial as spat
 	num_snps = len(binary_snps)
@@ -296,8 +297,8 @@ def snp_kinship_correlation(binary_snps, k, num_perm=0, permutation_snps=None, k
 #		for i in range(num_perm):
 #			random.sample()
 	return {'corr':corr, 'pval':pval}
-			
-			
+
+
 
 def kolmogorov_smirnov_test(self, pvalues):
 	"""

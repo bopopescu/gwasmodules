@@ -7,7 +7,7 @@ class tair8_to_tair9_map():
 	"""
 	def __init__(self):
 		#Read conversion manual.
-		file_name = env.home_dir + 'Projects/Data/tair/TAIR9_assembly_updates_relative_to_TAIR8_TAIR9_assemblies.csv'
+		file_name = env.env['data_dir'] + 'tair/TAIR9_assembly_updates_relative_to_TAIR8_TAIR9_assemblies.csv'
 		self.offsets = {}
 		self.offset_positions = {}
 		for chrom in [1, 2, 3, 4, 5]:
@@ -57,8 +57,13 @@ class tair8_to_tair9_map():
 		return pos + self.offsets[chrom][i]
 
 
-	def get_tair_positions(self, chrom, pos_list):
-		raise NotImplementedError
+	def get_tair9_positions(self, chrom, pos_list):
+		l = self.offset_positions[chrom]
+		new_pos_list = []
+		for pos in pos_list:
+			i = bisect.bisect(l, pos) - 1
+			new_pos_list.append(pos + self.offsets[chrom][i])
+		return new_pos_list
 
 
 def test_conversion():

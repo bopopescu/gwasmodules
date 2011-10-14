@@ -408,7 +408,7 @@ def get_total_gene_ls(curs, gene_table='genome.gene', tax_id=3702, debug=False):
 	"""
 	if debug:
 		sys.stderr.write("Getting gene_id_ls ... ")
-	rows = curs.execute("select distinct gene_id from %s where tax_id=%s and chromosome is not null and chromosome!='MT'"%\
+	rows = curs.execute("select distinct id as gene_id from %s where tax_id=%s and chromosome is not null and chromosome!='MT'"%\
 								(gene_table, tax_id))
 	is_elixirdb = 1
 	if hasattr(curs, 'fetchall'):	#2008-10-07 this curs is not elixirdb.metadata.bind
@@ -584,8 +584,8 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 	if pdata is None:	#2011-2-24 create a PassingData() only when
 		pdata = PassingData(min_MAF=min_MAF)
 	from GeneListRankTest import GeneListRankTest
-	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=pdata)
-	
+	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=param_data)
+	no_of_tests = len(genome_wide_result.data_obj_ls)
 	max_value = genome_wide_result.max_value
 	chr2length = {}
 	max_length = 0
@@ -616,6 +616,7 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 			'chr2length': chr2length,
 			'max_value': max_value,
 			'max_length': max_length,
+			'no_of_tests': no_of_tests,
 			}
 	sys.stderr.write("Done.\n")
 	import simplejson

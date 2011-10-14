@@ -581,8 +581,8 @@ class GeneListRankTest(object):
 		non_candidate_gene_sample_set = Set()
 		
 		score_ls = [data_obj.value for data_obj in genome_wide_result.data_obj_ls]
-		import rpy
-		rank_ls = rpy.r.rank(score_ls)	#rpy.rank also exists!!
+		from scipy import stats
+		rank_ls = stats.rankdata(score_ls)	#rpy.rank also exists!!
 		max_rank = max(rank_ls)	#2008-10-28 used to subtract any rank to get the reverse rank. In rank_ls, higher score=higher rank. we want reverse.
 		
 		if min_score is not None:

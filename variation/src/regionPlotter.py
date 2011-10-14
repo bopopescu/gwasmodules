@@ -93,7 +93,7 @@ def _plot_one_gene_(gene , y_value=1, buffer=0.4, highlight=False, color=(0.8, 0
 	"""
 	y_value = buffer + y_value / 2.0
 	if highlight:
-		pylab.text(gene.startPos, -y_value + 0.08, gene.tairID, size=8, color=color)
+		pylab.text(gene.startPos, -y_value + 0.08, gene.tairID, fontsize=8, color=color)
 		if len(gene.exons) > 0:
 			for i in gene.introns:
 				pylab.plot([i.startPos, i.endPos], [-y_value, -y_value], color=color, linewidth=2)

@@ -10,21 +10,21 @@ import os
 user = os.getenv("USER")
 home_dir = os.getenv("HOME") + "/"
 config_file = home_dir + '.gwa_config'
-results_dir = '/tmp/'
-data_dir = '/Network/Data/250k/'
-data_1001_dir = home_dir + 'Projects/Data/1001genomes/'
+results_dir = '/home/GMI/bjarni.vilhjalmsson/results/' #'/projects/cegs/rna_seq_results/raw_results/'
+data_dir = '/projects/genotype-callmethods/'
 rf_dir = None
 env = dict()
 env['home_dir'] = home_dir
 env['results_dir'] = results_dir
 env['data_dir'] = data_dir
-env['data_1001_dir'] = data_1001_dir
 env['rf_dir'] = rf_dir
-env['default_lookup_db'] = 'gmi-ara-devel-be.gmi.oeaw.ac.at'
-env['default_insert_db'] = 'gmi-ara-devel-be.gmi.oeaw.ac.at'
+env['default_lookup_db'] = 'ara-devel-be.gmi.oeaw.ac.at'
+env['default_insert_db'] = 'ara-devel-be.gmi.oeaw.ac.at'
 env['db_results_dir'] = '/Network/Data/250k/db/results/type_1/'
 env['tmp_dir'] = '/tmp/'
-env['phen_dir'] = '/Users/bjarni.vilhjalmsson/Projects/Data/phenotypes/'
+env['phen_dir'] = '/home/GMI/bjarni.vilhjalmsson/data/'
+env['tair_dir'] = '/home/GMI/bjarni.vilhjalmsson/data/tair10/'
+env['script_dir'] = '/home/GMI/bjarni.vilhjalmsson/src/' #Used on the cluster
 
 #This should be changed in the .gwa_config file.
 env['db_user'] = "bvilhjal"

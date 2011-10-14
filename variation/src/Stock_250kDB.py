@@ -1996,7 +1996,7 @@ class Users(Entity):
 		"""encrypts password on the fly using the encryption
         algo defined in the configuration
         """
-		self._password = self.__encrypt_password(password)
+		self._password = self._encrypt_password(password)
 
 	def _get_password(self):
 		"""returns password
@@ -2006,7 +2006,7 @@ class Users(Entity):
 	password = property(_get_password,_set_password)
 
 	@classmethod
-	def __encrypt_password(cls,  password):
+	def _encrypt_password(cls,  password):
 		"""Hash the given password with the specified algorithm. Valid values
         for algorithm are 'md5' and 'sha1'. All other algorithm values will
         be essentially a no-op."""
@@ -2951,6 +2951,32 @@ class Stock_250kDB(ElixirDB):
 					(TableClass.table.name, CNVTableClass.table.name, " and ".join(where_sql_ls))
 		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
 	
+	def getSNPChrPos2IDLs(self,priorTAIRVersion=False):
+		"""
+		2011-5-6
+			returns both maps
+		"""
+		dict_to_return = {}
+		snp_id2chr_pos = {}
+		chr_pos_2snp_id = {}
+		if priorTAIRVersion==True:
+			chromosome_table_fieldname = 'tair8_chromosome'
+			position_table_fieldname = 'tair8_position'
+		else:
+			chromosome_table_fieldname = 'chromosome'
+			position_table_fieldname = 'position'
+		
+		rows = self.metadata.bind.execute("select id, %s as chromosome, %s as position from %s where %s is not null and %s is not null"\
+										%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
+										chromosome_table_fieldname, position_table_fieldname, ))
+		for row in rows:
+			chr_pos_2snp_id[(row.chromosome,row.position)] = row.id
+			snp_id2chr_pos[row.id] = (row.chromosome,row.position)
+		dict_to_return['snp_id2chr_pos'] = snp_id2chr_pos
+		dict_to_return['chr_pos_2snp_id'] = chr_pos_2snp_id
+		return dict_to_return
+	
+	
 	def getSNPChrPos2ID(self, keyType=1, priorTAIRVersion=False):
 		"""
 		2011-5-4
@@ -2975,36 +3001,25 @@ class Stock_250kDB(ElixirDB):
 				2: id is key, (chr, pos) is value.
 		"""
 		sys.stderr.write("Getting a map between Snps.id and (chr,pos), keyType %s ..."%(keyType))
-		dict_to_return = {}
-		if priorTAIRVersion==True:
-			chromosome_table_fieldname = 'tair8_chromosome'
-			position_table_fieldname = 'tair8_position'
-		else:
-			chromosome_table_fieldname = 'chromosome'
-			position_table_fieldname = 'position'
+		data = self.getSNPChrPos2IDLs(priorTAIRVersion)
 		
-		rows = self.metadata.bind.execute("select id, %s as chromosome, %s as position from %s where %s is not null and %s is not null"\
-										%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
-										chromosome_table_fieldname, position_table_fieldname, ))
-		for row in rows:
-			if keyType==1:
-				key = (row.chromosome, row.position)
-				value = row.id
-			else:
-				key = row.id
-				value = (row.chromosome, row.position)
-			dict_to_return[key] = value
+		if keyType==1:
+			dict_to_return = data.get('chr_pos_2snp_id')
+		else:
+			dict_to_return = data.get('snp_id2chr_pos')
 		sys.stderr.write("%s entries. Done.\n"%(len(dict_to_return)))
 		return dict_to_return
 	
-	def getSNPID2ChrPos(self,):
+	def getSNPID2ChrPos(self, priorTAIRVersion=False):
 		"""
+		2011-10-14 add argument priorTAIRVersion
 		2010-10-13
 			return a dictionary which translates snps.id to (chr, pos).
 			used in DB_250k2data.py
 			
 		"""
-		return self.getSNPChrPos2ID(keyType=2)
+		return self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
+	
 	
 	def get_db_id_given_chr_pos2db_id(self, snp_id):
 		"""

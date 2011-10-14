@@ -392,6 +392,7 @@ def write_data_matrix(data_matrix, output_fname, header, strain_acc_list, catego
 	#figure out no_of_rows, no_of_cols
 	if type(data_matrix)==list and transform_to_numpy:	#2008-02-06 transform the 2D list into array
 		data_matrix = numpy.array(data_matrix)
+		#data_matrix = numpy.array(data_matrix,dtype="int8")
 		no_of_rows, no_of_cols = data_matrix.shape
 	else:
 		no_of_rows = len(data_matrix)
@@ -523,7 +524,7 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 	if double_header:
 		second_header = reader.next()
 		second_header = second_header[:data_starting_col] + [second_header[i+data_starting_col] for i in col_index_ls]
-		header = [header, second_header]
+		header = zip(second_header,header)
 	
 	data_matrix = []
 	strain_acc_list = []
@@ -700,6 +701,19 @@ class SNPData(object):
 			return True
 		else:
 			return False
+		
+	def isSNPId(self):
+		"""
+		2011-5-6
+			returns if the cols are in chr_pos or snpid format
+		"""
+		isSNP = True
+		if len(self.col_id_ls) > 0:
+			try:
+				int(self.col_id_ls[0])
+			except:
+				isSNP = False
+		return isSNP
 	
 	def processRowIDColID(self):
 		"""
@@ -718,7 +732,7 @@ class SNPData(object):
 			correct a bug here, opposite judgement of self.data_matrix
 		"""
 		if not self.isDataMatrixEmpty(self.data_matrix) and self.turn_into_array:
-			self.data_matrix = num.array(self.data_matrix)
+			self.data_matrix = num.array(self.data_matrix,dtype="int8")
 		
 		if self.row_id_ls is None and self.strain_acc_list is not None:
 			self.row_id_ls = []
@@ -1626,6 +1640,34 @@ class SNPData(object):
 					allele_index2allele[1] = allele1
 		sys.stderr.write("Done.\n")
 		return newSnpData, allele_index2allele_ls
+	
+	@classmethod
+	def loadSNPDataObj(cls,row_id_key_set=None, row_id_hash_func=None, col_id_key_set=None, col_id_hash_func=None, **keywords):
+		import cPickle as cPickle
+		import pickle as pickle
+		input_fname = keywords['input_fname']
+		if input_fname  != "":
+			if os.path.isfile(input_fname + ".pickle"):
+				input = open(input_fname + '.pickle','r')
+				data = cPickle.load(input)
+				input.close()
+			else:
+				data = SNPData(**keywords)
+				#new_data = transposeSNPData(data)
+				#new_data.strain_acc_list = None
+				#new_data.category_list = None
+				#new_data.tofile(input_fname+".tsv")
+				try:
+					output = open(input_fname + '.pickle', 'wb')
+					cPickle.dump(data, output, protocol=2)
+				except Exception as exp:
+					sys.stderr.write("Error in pickleing file: "+ str(exp))
+				finally:
+					if output is not None:
+						output.close() 
+		else:
+			data = SNPData(row_id_key_set,row_id_hash_func,col_id_key_set,col_id_hash_func,keywords)
+		return data
 		
 from db import TableClass
 class GenomeWideResults(TableClass):

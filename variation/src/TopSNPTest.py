@@ -43,7 +43,7 @@ from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
 from sets import Set
 from heapq import heappush, heappop, heapreplace
 from common import get_total_gene_ls
-import rpy, random, numpy
+import  random, numpy
 
 class TopSNPTest(GeneListRankTest):
 	__doc__ = __doc__

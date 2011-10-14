@@ -66,7 +66,7 @@ from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOut
 from numpy import linalg
 
 from Kruskal_Wallis import Kruskal_Wallis
-import rpy
+#import rpy
 from sets import Set
 #from DrawEcotypeOnMap import DrawEcotypeOnMap
 

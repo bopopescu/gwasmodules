@@ -337,6 +337,51 @@ def load_phentoype_file_nc_resistance_2():
 
 
 
+def load_phentoype_file_nc_resistance_3():
+	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/20dd5_330.csv"
+	with open(filename) as f:
+		line = map(str.strip, f.next().split(','))
+		phenotype_names = line[-1:]
+		print phenotype_names
+		phenotypes = []
+		accession_names = []
+		ecotypes = []
+		full_accession_names = []
+		for l in f:
+			line = map(str.strip, l.split(','))
+			accession_names.append(line[1].lower())
+			ecotypes.append(line[0])
+			full_accession_names.append(line[5].lower())
+			phenotypes.append(line[4])
+
+	print accession_names
+	acc_dict = pd.get_accession_to_ecotype_id_dict(accession_names)#+["n13","kno-10","kno-10","shahdara","nd-1"])
+#	acc_dict["cibc-5"] = 6908
+#	acc_dict["wa-1"] = 6978
+#	acc_dict["gu-0"] = 7149
+#	acc_dict['Rubezhnoe-1'] = 7323
+	print len(acc_dict), acc_dict
+	ets = []
+	phen_vals = []
+	for acc1, acc2, et, pt in zip(accession_names, full_accession_names, ecotypes, phenotypes):
+		if acc1 in acc_dict:
+			ecotype = acc_dict[acc1]
+
+			if str(ecotype) != et and et != 'NA':
+				print "Ecotype mismatch.. %s, %s, %s, %s" % (unicode(acc1, "latin-1"),
+									unicode(acc2, "latin-1"), et, ecotype)
+			else:
+				et = ecotype
+			if et != 'NA' and et != '':
+				ets.append(et)
+				if not pt in ['R', 'S']: print pt
+				phen_vals.append(0 if pt == 'R' else 1)
+	print len(phen_vals)
+
+	phen_dict = {1:{'name':'resistance_20dd5', 'ecotypes':ets, 'values':phen_vals}}
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file('resistance_20dd5.csv', ',')
+
 
 
 def load_phentoype_file_bergelsson():
@@ -410,6 +455,151 @@ def load_phentoype_file_bergelsson():
 
 
 
+def load_duszynska_file4():
+	"""
+	Loads the heterosis data.
+	"""
+	fn = env['home_dir'] + 'Projects/duszynska_data/seed_size_heterosis.csv'
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+	phen_dict = {}
+
+	name_dict = {'knox-18':'kno-18', 'knox-10':'kno-10', 'kas-1':'kas-2', 'pu-2-7':'pu2-7', 'cs22491':'n13',
+			'shahdara':'sha'}
+
+	with open(fn) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(','))
+		et_indices = [0, 3, 6, 9]
+		phen_names = [phen_names[1], phen_names[4], phen_names[7], phen_names[10]]
+		for i, pn in zip([1, 2, 3, 4], phen_names):
+			phen_dict[i] = {'name': pn, 'values':[], 'ecotypes':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			for e_i, pid in zip(et_indices, [1, 2, 3, 4]):
+				acc = l[e_i].lower()
+				if acc in name_dict:
+					acc = name_dict[acc]
+				if not acc in acc_dict:
+					print "(%s) is missing in dictionary" % (acc)
+				else:
+					phen_dict[pid]['ecotypes'].append(acc_dict[acc][4])
+					phen_dict[pid]['values'].append(float(l[e_i + 1]))
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'duszynska_heterosis_data.csv')
+
+
+def load_duszynska_file3():
+	fn1 = env['home_dir'] + 'Projects/duszynska_data/ANU_proportions_4x2_male.csv'
+	fn2 = env['home_dir'] + 'Projects/duszynska_data/ANU_proportions_2x4_female.csv'
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+	phen_names = []
+	phen_dict = {}
+
+	name_dict = {'knox-18':'kno-18', 'knox-10':'kno-10', 'kas-1':'kas-2', 'pu-2-7':'pu2-7', 'cs22491':'n13',
+			'shahdara':'sha'}
+
+	with open(fn1) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(',')[1:])
+		for i, pn in zip([1, 2, 3, 4, 5, 6, 7], phen_names):
+			phen_dict[i] = {'name':'male_4x2_' + pn, 'values':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc = l[0].lower()
+			if acc in name_dict:
+				acc = name_dict[acc]
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ets.append(acc_dict[acc][4])
+				for pid in [1, 2, 3, 4, 5, 6, 7]:
+					phen_dict[pid]['values'].append(float(l[pid]))
+		for pid in [1, 2, 3, 4, 5, 6, 7]:
+			phen_dict[pid]['ecotypes'] = ets[:]
+
+
+	with open(fn2) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(',')[1:])
+		for i, pn in zip([8, 9, 10, 11, 12, 13, 14], phen_names):
+			phen_dict[i] = {'name':'female_2x4_' + pn, 'values':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc = l[0].lower()
+			if acc in name_dict:
+				acc = name_dict[acc]
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ets.append(acc_dict[acc][4])
+				for pid in [8, 9, 10, 11, 12, 13, 14]:
+					phen_dict[pid]['values'].append(float(l[pid - 7]))
+		for pid in [8, 9, 10, 11, 12, 13, 14]:
+			phen_dict[pid]['ecotypes'] = ets[:]
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'duszynska_data_new.csv')
+
+
+
+def load_duszynska_file2():
+	fn1 = env['home_dir'] + 'Projects/duszynska_data/male_data_proportion_AN.csv'
+	fn2 = env['home_dir'] + 'Projects/duszynska_data/female_data_proportion_AN.csv'
+	acc_dict = pd.get_250K_accession_to_ecotype_dict()
+	phen_names = []
+	phen_dict = {}
+
+	name_dict = {'knox-18':'kno-18', 'knox-10':'kno-10', 'kas-1':'kas-2', 'pu-2-7':'pu2-7', 'cs22491':'n13',
+			'shahdara':'sha'}
+
+	with open(fn1) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(',')[1:])
+		for i, pn in zip([1, 2, 3], phen_names):
+			phen_dict[i] = {'name':'male_' + pn, 'values':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc = l[0].lower()
+			if acc in name_dict:
+				acc = name_dict[acc]
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ets.append(acc_dict[acc][4])
+				for pid in [1, 2, 3]:
+					phen_dict[pid]['values'].append(float(l[pid]))
+		for pid in [1, 2, 3]:
+			phen_dict[pid]['ecotypes'] = ets[:]
+
+
+	with open(fn2) as f:
+		ets = []
+		header = f.next()
+		phen_names = map(str.strip, header.split(',')[1:])
+		for i, pn in zip([4, 5, 6], phen_names):
+			phen_dict[i] = {'name':'female_' + pn, 'values':[]}
+		for line in f:
+			l = map(str.strip, line.split(','))
+			acc = l[0].lower()
+			if acc in name_dict:
+				acc = name_dict[acc]
+			if not acc in acc_dict:
+				print "(%s) is missing in dictionary" % (acc)
+			else:
+				ets.append(acc_dict[acc][4])
+				for pid in [4, 5, 6]:
+					phen_dict[pid]['values'].append(float(l[pid - 3]))
+		for pid in [4, 5, 6]:
+			phen_dict[pid]['ecotypes'] = ets[:]
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'duszynska_data.csv')
+
 
 
 
@@ -445,6 +635,7 @@ def load_phentoype_file_duszynska():
 
 	phed = pd.phenotype_data(phen_dict)
 	phed.write_to_file(env['phen_dir'] + 'seed_size.csv')
+
 
 
 
@@ -494,53 +685,264 @@ def load_phentoype_file_riha():
 	phed.write_to_file(env['phen_dir'] + 'telomere_lengths_192.csv')
 
 
+def load_gene_expression_traits():
+	filename = '/Users/bjarni.vilhjalmsson/Projects/Data/rna_seq/gene_expression_table_20110208.tsv'
+	ecotypes = []
+	et_ids = []
+	import scipy as sp
+	with open(filename, "r") as f:
+		i = 0
+		for line in f:
+			if line[0] != '#': break
+			l = line.split('\t')
+			if l[7] == '16C':
+				ecotypes.append(l[5])
+				et_ids.append(i)
+			i += 1
+		gene_ids = line.split('\t')
+		print len(ecotypes), len(set(ecotypes))
+		print ecotypes
+		et_dict = {'Col-0':'6909', 'Col':'6909', 'Ler':'6932', 'Ws-0':'6980'}
+		ets = []
+		for et in ecotypes:
+			if et in et_dict:
+				ets.append(et_dict[et])
+			else:
+				ets.append(et)
+		print ets
+		phen_dict = {}
+		num_const_phen = 0
+		phen_i = 1
+		for i, line in enumerate(f): #For each gene
+			l = line.split()
+			phen_name = l[0]
+			phen_vals = map(float, l[1:])
+			phen_vals = [phen_vals[i] for i in et_ids]
+			if len(phen_vals) != len(ets):
+				raise Exception('Arrg')
+			if len(sp.unique(phen_vals)) > 1:
+				phen_dict[phen_i] = {'name':phen_name, 'ecotypes':ets, 'values':phen_vals}
+				phen_i += 1
+			else:
+				num_const_phen += 1
+	print 'Total number of gene expressions was %d, of which %d were constant (removed), leaving %d gene expressions.' \
+		% ((phen_i - 1) + num_const_phen, num_const_phen, phen_i - 1)
+
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'rna_seq_020811_16C.csv')
 
 
 
-def add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids, method_descriptions=None, data_descriptions=None, host="papaya.usc.edu", user="bvilhjal", passwd="bjazz32"):
-	"""
-	Insert phenotypes into the DB
-	
-	Use the format from above...
-	"""
-	import MySQLdb
-	print "Connecting to db, host=" + host
-	if not user:
-		import sys
-		sys.stdout.write("Username: ")
-		user = sys.stdin.readline().rstrip()
-	if not passwd:
-		import getpass
-		passwd = getpass.getpass()
-	try:
-		conn = MySQLdb.connect (host=host, user=user, passwd=passwd, db="at")
-	except MySQLdb.Error, e:
-		print "Error %d: %s" % (e.args[0], e.args[1])
-		sys.exit (1)
-	cursor = conn.cursor ()
-	#Retrieve the filenames
-	print "Inserting data"
+def load_gene_expression_traits_2():
+	import scipy as sp
+	filename = env['home_dir'] + \
+			'Projects/Data/rna_seq/expression_matrices_upload_8_01_2011/' + \
+			'expression_matrix_wSNPmap_7_29_2011-bioreps_combined_cov_filter-normalized.txt'
+	print 'Loading file:', filename
+	ets = {'10C':[], '16C':[]}
+	i_map = {}
+	expressions_dict = {}
+	with open(filename, "r") as f:
+		i = 0
+		line = f.next()
+		l = map(str.strip, line.split())
+		for i in range(2, len(l)):
+			e_t_l = l[i].split('_')
+			et = e_t_l[0][1:]
+			t = e_t_l[1]
+			i_map[i] = t
+			if int(et) == 2:
+				et = '6932'
+			elif int(et) == 3:
+				et = '6980'
+			if int(et) == 4:
+				et = 'ALyr'
+			elif int(et) == 5:
+				et = 'ACap'
+			ets[t].append(et)
 
-	for i in range(len(phenotype_names)):
-		sql_statement = "INSERT INTO stock_250k.phenotype_method  (id, short_name, only_first_96, biology_category_id, method_description, data_description, data_type) VALUES (" + str(method_ids[i]) + ", '" + phenotype_names[i] + "', true, 1, '" + method_descriptions[i] + "', '" + data_descriptions[i] + "', 'quantitative')"
-		print sql_statement
-		numRows = int(cursor.execute(sql_statement))
-		row = cursor.fetchone()
-		if row:
-			print row
+		for line in f:
+			l = map(str.strip, line.split())
+			gene_name = l[0]
+			gene_type = l[1]
+			d = {'gene_type':gene_type, '10C':[], '16C':[]}
+			for i in range(2, len(l)):
+				t = i_map[i]
+				val = float(l[i])
+				d[t].append(val)
+			expressions_dict[gene_name] = d
+	print 'File was parsed, now constructing phenotype object'
+	phen_dict_10C = {}
+	phen_dict_16C = {}
+	phen_i = 1
+	for gene_name in expressions_dict:
+		values = expressions_dict[gene_name]['10C']
+		if len(sp.unique(values)) > 1:
+			phen_dict_10C[phen_i] = {'name':gene_name, 'ecotypes':ets['10C'],
+						'values':expressions_dict[gene_name]['10C']}
+		phen_i += 1
 
-		for j in range(0, len(ecotypes)):
-			val = phenotypes[i][j]
-			if val != "NA":
-				sql_statement = "INSERT INTO stock_250k.phenotype_avg (ecotype_id, value, ready_for_publication, method_id, transformed_value) VALUES ( " + str(ecotypes[j]) + ", " + str(val) + ", 0, " + str(method_ids[i]) + ", " + str(val) + " )"
-				print sql_statement
-				numRows = int(cursor.execute(sql_statement))
-				row = cursor.fetchone()
-				if row:
-					print row
-	conn.commit()
-	cursor.close ()
-	conn.close ()
+	phen_i = 1
+	for gene_name in expressions_dict:
+		values = expressions_dict[gene_name]['16C']
+		if len(sp.unique(values)) > 1:
+			phen_dict_16C[phen_i] = {'name':gene_name, 'ecotypes':ets['16C'],
+						'values':expressions_dict[gene_name]['16C']}
+		phen_i += 1
+
+
+	phed_10C = pd.phenotype_data(phen_dict_10C)
+	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict_10C)
+	phed_10C.write_to_file(env['phen_dir'] + 'rna_seq_081411_10C.csv')
+	phed_16C = pd.phenotype_data(phen_dict_16C)
+	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict_16C)
+	phed_16C.write_to_file(env['phen_dir'] + 'rna_seq_081411_16C.csv')
+
+
+def load_gene_expression_traits_3(temperature='10C'):
+	import scipy as sp
+	filename = env['home_dir'] + \
+			'/Projects/Data/rna_seq/expression_variance_stabilized_11_08_11/' + \
+			'expr_%s_merged.csv' % temperature
+	phen_dict = {}
+	phen_i = 1
+	with open(filename) as f:
+		header = (f.next().strip()).split(',')
+		ets = map(lambda x: x[1:], header[1:])
+		for i in range(len(ets)):
+			if int(ets[i]) == 2:
+				ets[i] = '6932'
+			elif int(ets[i]) == 3:
+				ets[i] = '6980'
+			if int(ets[i]) == 4:
+				ets[i] = 'ALyr'
+			elif int(ets[i]) == 5:
+				ets[i] = 'ACap'
+		print ets
+		for l in f:
+			line = (l.strip()).split(',')
+			gene_name = line[0]
+			vals = map(float, line[1:])
+			phen_dict[phen_i] = {'name':gene_name, 'ecotypes':ets, 'values':vals}
+			phen_i += 1
+
+	phed = pd.phenotype_data(phen_dict)
+	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'rna_seq_vs_081411_%s.csv' % temperature)
+
+
+
+
+def load_total_expressions():
+	import scipy as sp
+	filename = env['home_dir'] + \
+			'Projects/Data/rna_seq/expression_matrix_upload_data_5_10_2011/mapping_files/' + \
+			'all_expression_matrix_5_09_2011_flagged_removed_libID_bioreps_combined_cov_filter.txt'
+	print 'Loading file:', filename
+	ets = {'10C':[], '16C':[]}
+	i_map = {}
+	expressions_dict = {}
+	with open(filename, "r") as f:
+		i = 0
+		line = f.next()
+		l = map(str.strip, line.split())
+		for i in range(2, len(l)):
+			e_t_l = l[i].split('_')
+			et = e_t_l[0][1:]
+			t = e_t_l[1]
+			i_map[i] = t
+			ets[t].append(et)
+
+		line = f.next()
+		l = map(str.strip, line.split())
+		gene_name = l[0]
+		gene_type = l[1]
+		d = {'gene_type':gene_type, '10C':[], '16C':[]}
+		for i in range(2, len(l)):
+			t = i_map[i]
+			val = float(l[i])
+			d[t].append(val)
+		expressions_dict[gene_name] = d
+	print 'File was parsed, now constructing phenotype object'
+	phen_dict = {}
+	phen_i = 1
+	for t in ['10C', '16C']:
+		values = expressions_dict['GENE'][t]
+		phen_dict[phen_i] = {'name':'total_expression_%s' % t, 'ecotypes':ets[t], 'values':values}
+		phen_i += 1
+
+
+	phed = pd.phenotype_data(phen_dict)
+	print 'Phenotype object constructed with %d phenotypes, now writing to phenotype file' % len(phen_dict)
+	phed.write_to_file(env['phen_dir'] + 'rna_seq_061611_total.csv')
+
+
+
+
+
+def parse_NFBC_traits():
+	phen_dict = {}
+	height_file = env['data_dir'] + 'NFBC_20091001/pheno.Height'
+	with open(height_file) as f:
+		f.next()
+		ets = []
+		values = []
+		for line in f:
+			l = line.split()
+			ets.append(int(l[0]))
+			values.append(float(l[2]))
+	phen_dict[1] = {'name':'height', 'ecotypes':ets, 'values':values}
+
+	metabolite_file = env['data_dir'] + 'NFBC_20091001/MetaboPheno.txt'
+	with open(metabolite_file) as f:
+		line = f.next()
+		l = map(str.strip, line.split())
+		phen_names = l[2:]
+		for i, pname in enumerate(phen_names):
+			phen_dict[i + 2] = {'name':pname, 'ecotypes':[], 'values':[]}
+		ets = []
+		values = []
+		for line in f:
+			l = line.split()
+			et = int(l[0])
+			for i, v in enumerate(l[2:]):
+				try:
+					val = int(v)
+				except Exception:
+					val = float(v)
+				if val != -9 and type(val) != int:
+					phen_dict[i + 2]['ecotypes'].append(et)
+					phen_dict[i + 2]['values'].append(val)
+	phed = pd.phenotype_data(phen_dict)
+	phed.write_to_file(env['data_dir'] + 'NFBC_20091001/phenotype.scv')
+	return phed
+
+
+
+def load_skin_color_traits():
+	import env
+	dir_prefix = env.env['home_dir'] + 'Projects/data/skin_eye_color/'
+	#dir_prefix = env.env['home_dir'] + 'Projects/Data/Skin_color/'
+	filename = dir_prefix + 'CV685-skin_eye_color.txt'
+	d = {1:{'name':'skin_color', 'ecotypes':[], 'values':[]}, 2:{'name':'eye_color', 'ecotypes':[], 'values':[]}}
+	sc_vals = []
+	ec_vals = []
+	sc_iids = [] #individual IDs (ecotypes)
+	with open(filename) as f:
+		print f.next()
+		for line in f:
+			l = line.split()
+			if int(float(l[2])) != -9:
+				d[1]['values'].append(float(l[2]))
+				d[1]['ecotypes'].append(l[1])
+			if int(float(l[3])) != -9:
+				d[2]['values'].append(float(l[3]))
+				d[2]['ecotypes'].append(l[1])
+	phed = pd.phenotype_data(d)
+	phed.write_to_file(dir_prefix + 'phenotypes.csv')
+	return phed
+
+
 
 def _run_():
 	pd = load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
@@ -555,12 +957,15 @@ def _run_():
 	data_descriptions = ["Stable soil growth condition and new Roch PCR machine." for i in range(len(phenotype_names))]
 	add_phenotypes_to_db(phenotypes, phenotype_names, ecotypes, method_ids=range(352, 352 + len(phenotype_names)), method_descriptions=method_descriptions, data_descriptions=data_descriptions)
 
+
 if __name__ == "__main__":
 	#_run_()
 	#load_phentoype_file("/Users/bjarnivilhjalmsson/Projects/FLC_analysis/data_102509/FLC_soil_data_102509.csv")
 	#load_phentoype_file_Pecinka()
 	#load_phentoype_file_wilczek()
-	load_phentoype_file_duszynska()
+	load_gene_expression_traits_2()
+	#load_gene_expression_traits_3('16C')
+	#load_phentoype_file_nc_resistance_3()
 	print "Done!"
 
 
