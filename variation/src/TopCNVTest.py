@@ -37,7 +37,8 @@ from pymodule import getGenomeWideResultFromFile
 from pymodule import ProcessOptions, PassingData, GenomeDB, figureOutDelimiter
 from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
 import rpy, random, numpy
-from pymodule.CNV import CNVCompareBySmallOverlapRatio, CNVSegmentBinarySearchTreeKey, CNVCompareByBigOverlapRatio, CNVCompareByOverlapLen
+from pymodule.CNV import CNVCompareBySmallOverlapRatio, CNVSegmentBinarySearchTreeKey, CNVCompareByBigOverlapRatio, \
+	CNVCompareByOverlapLen, get_overlap_ratio
 from pymodule.RBTree import RBDict
 
 class TopCNVTest(GeneListRankTest):
@@ -78,41 +79,66 @@ class TopCNVTest(GeneListRankTest):
 		"""
 		GeneListRankTest.__init__(self, **keywords)
 	
-	def translateChrPosDataObjectIntoCumuPos(self, top_loci, chr_id2cumu_start):
+	def translateChrPosDataObjectIntoCumuPos(self, top_loci, chrSpan2cumuStartRBDict=None):
 		"""
+		2011-4-22
+			change chr_id2cumu_start to chrSpan2cumuStartRBDict
 		2011-3-21
 			top_loci has become a list of DataObject of GWR.
 		2011-3-16
 		
 		"""
+		sys.stderr.write("Translating %s loci from chr-span coordinates into cumu-span ..."%(len(top_loci)))
 		top_loci_in_cumu_pos = []
+		no_of_loci_skipped = 0
+		compareIns = CNVCompareBySmallOverlapRatio(min_reciprocal_overlap=0.0000001)
 		for top_locus in top_loci:
-			start = top_locus.position
-			stop = top_locus.stop_position
-			chr = str(top_locus.chromosome) 	#chr in chr_id2cumu_start is of type "str"
-			cumu_start = chr_id2cumu_start.get(chr) + start -1	#cumu_start is 1-based.
-			cumu_stop = chr_id2cumu_start.get(chr) + stop - 1
-			top_loci_in_cumu_pos.append([cumu_start, cumu_stop])
+			chr = top_locus.chromosome
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chr, \
+							span_ls=[top_locus.position, top_locus.stop_position], \
+							min_reciprocal_overlap=0.00000000000001,)
+			node_ls = []
+			chrSpan2cumuStartRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
+			if len(node_ls)==0:
+				no_of_loci_skipped += 1
+			for node in node_ls:
+				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
+										[node.key.start, node.key.stop])[:5]
+				cumu_start = overlap_start_pos - node.key.start + 1 + node.value	#overlap_start_pos is in normal genome coordinates.
+				cumu_stop = overlap_stop_pos - node.key.start + 1 + node.value
+				top_loci_in_cumu_pos.append([cumu_start, cumu_stop])
+		sys.stderr.write("%s loci skipped. now %s loci.\n"%(no_of_loci_skipped, len(top_loci_in_cumu_pos)))
 		return top_loci_in_cumu_pos
 	
-	def translateCumuPosIntoChrPos(self, top_loci_in_cumu_pos, cumuSpan2ChrRBDict):
+	def translateCumuPosIntoChrPos(self, top_loci_in_cumu_pos, cumuSpan2ChrSpanRBDict=None, compareIns=None):
 		"""
+		2011-4-22
+			adjust because chr_id2cumu_start is now 0-based.
+		2011-4-22
+			For CNVs, one (cumu_start, cumu_stop) could span multiple keys in cumuSpan2ChrSpanRBDict
 		2011-3-16
 		"""
 		top_loci = []
+		compareIns = CNVCompareBySmallOverlapRatio(min_reciprocal_overlap=0.0000001)
 		for span in top_loci_in_cumu_pos:
-			cumu_start, cumu_stop = span[:3]
+			cumu_start, cumu_stop = span[:2]
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=0, \
 							span_ls=[cumu_start, cumu_stop], \
 							min_reciprocal_overlap=0.00000000000001,)
 							#2010-8-17 overlapping keys are regarded as separate instances as long as they are identical.
-			node = cumuSpan2ChrRBDict.findNode(segmentKey)
-			if node is None:
-				sys.stderr.write("(%s, %s) not found in cumuSpan2ChrRBDict.\n"%(cumu_start, cumu_stop))
-			else:
-				chr = str(node.value[0]) 	#chr in chr_id2cumu_start is of type "str"
-				start = cumu_start - node.key.span_ls[0] + 1
-				stop = cumu_stop - node.key.span_ls[0] + 1
+			node_ls = []
+			cumuSpan2ChrSpanRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
+			if len(node_ls)==0:
+				sys.stderr.write("(%s, %s) not found in cumuSpan2ChrSpanRBDict.\n"%(cumu_start, cumu_stop))
+			for node in node_ls:
+				chr, node_chr_start, node_chr_stop = node.value[:3]
+				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
+										[node.key.start, node.key.stop])[:5]
+				
+				start = overlap_start_pos - node.key.span_ls[0] + node_chr_start	#overlap_start_pos is in cumu coordinates.
+				stop = overlap_stop_pos - node.key.span_ls[0] + node_chr_start
+				if stop>node_chr_stop:	#truncate it. shouldn't happen though
+					stop = node_chr_stop
 				top_loci.append([chr, start, stop])
 		return top_loci
 	
@@ -154,22 +180,21 @@ class TopCNVTest(GeneListRankTest):
 							len(permData.captured_candidate_gene_set)))
 		return permData
 	
-	def applyGWLoopToCumuPos(self, top_loci_in_cumu_pos, cumuSpan2ChrRBDict, shift=None):
+	def applyGWLoopToCumuPos(self, top_loci_in_cumu_pos, cumuSpan2ChrSpanRBDict, shift=None, compareIns=None):
 		"""
 		2011-3-12
 		"""
-		genome_size = max([max(rbNode.key.span_ls) for rbNode in cumuSpan2ChrRBDict])
+		genome_size = max([max(rbNode.key.span_ls) for rbNode in cumuSpan2ChrSpanRBDict])
 		if shift is None:
 			shift = random.randint(1, genome_size)
 		top_loci_in_cumu_pos_perm = (numpy.array(top_loci_in_cumu_pos)+shift)%genome_size	#modulo to recycle
 		
-		return self.translateCumuPosIntoChrPos(top_loci_in_cumu_pos_perm, cumuSpan2ChrRBDict)
+		return self.translateCumuPosIntoChrPos(top_loci_in_cumu_pos_perm, cumuSpan2ChrSpanRBDict)
 	
 	
 	def get_enrichment_pvalue_by_gw_looping(self, candidate_sample_size, top_loci_in_cumu_pos, candidate_gene_set=None, \
-							genomeRBDict=None, cumuSpan2ChrRBDict=None, no_of_permutations=20000, \
-							no_of_min_breaks=30,\
-							param_data=None):
+							genomeRBDict=None, cumuSpan2ChrSpanRBDict=None, no_of_permutations=20000, \
+							no_of_min_breaks=30, param_data=None, compareIns=None):
 		"""
 		2011-3-18
 			do the test against permData.captured_candidate_gene_set
@@ -181,8 +206,8 @@ class TopCNVTest(GeneListRankTest):
 		i = 0
 		no_of_hits = 0
 		while i<no_of_permutations:
-			permuted_top_loci_in_chr_start_stop = self.applyGWLoopToCumuPos(top_loci_in_cumu_pos, cumuSpan2ChrRBDict)
-			
+			permuted_top_loci_in_chr_start_stop = self.applyGWLoopToCumuPos(top_loci_in_cumu_pos, cumuSpan2ChrSpanRBDict, \
+															compareIns=compareIns)
 			permData = self.prepareDataForPermutationRankTest(permuted_top_loci_in_chr_start_stop, genomeRBDict, param_data)
 			new_candidate_sample_size = len(permData.captured_candidate_gene_set)
 			if new_candidate_sample_size>=candidate_sample_size:	#pvalue = Prob(X>=candidate_sample_size)
@@ -195,6 +220,53 @@ class TopCNVTest(GeneListRankTest):
 		if self.debug:
 			sys.stderr.write("%s/%s tests in total. Done.\n"%(no_of_hits, i))
 		return return_data
+	
+	def getTranslationDataStructureForBackgroundLoci(self, db_250k, cnv_method_id=None, min_MAF=0.1):
+		"""
+		2011-4-22
+			1. get all loci whose MAF is above min_MAF
+			2. construct a (chr,start,stop) 2 cumu_start dictionary
+			3. construct a (cumu_start, cumu_stop) 2 (chr, start, stop) RBDict
+			
+		"""
+		sys.stderr.write("Getting translation structures between (chr, start, stop) and (cumu_start, cumu_stop) for cnv method %s ..."%\
+						cnv_method_id)
+		TableClass = Stock_250kDB.CNV
+		query = TableClass.query.filter_by(cnv_method_id=cnv_method_id).order_by(TableClass.chromosome).order_by(TableClass.start)
+		
+		chrSpan2cumuStartRBDict = RBDict()
+		cumuSpan2ChrSpanRBDict = RBDict()
+		
+		cumu_start = 0
+		counter = 0
+		real_counter = 0
+		for row in query:
+			counter += 1
+			maf = min(row.frequency, 1-row.frequency)
+			if maf<=min_MAF:
+				continue
+			
+			real_counter += 1
+			chrSpanKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+							span_ls=[row.start, row.stop], \
+							min_reciprocal_overlap=0.00000000000001,)
+					#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
+			chrSpan2cumuStartRBDict[chrSpanKey] = cumu_start	#cumu_start is 0-based
+			
+			size = row.stop-row.start+1
+			span_ls=[cumu_start+1, cumu_start+size]
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=0, \
+							span_ls=span_ls, \
+							min_reciprocal_overlap=0.00000000000001,)
+					#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
+			if segmentKey not in cumuSpan2ChrSpanRBDict:
+				cumuSpan2ChrSpanRBDict[segmentKey] = (row.chromosome, row.start, row.stop)
+			else:
+				sys.stderr.write("Error: %s of chr %s is already in cumuSpan2ChrSpanRBDict.\n"%(segmentKey, row.chromosome))
+			
+			cumu_start += size
+		sys.stderr.write("%s out of %s CNVs are included. Done.\n"%(real_counter, counter))
+		return PassingData(cumuSpan2ChrSpanRBDict=cumuSpan2ChrSpanRBDict, chrSpan2cumuStartRBDict=chrSpan2cumuStartRBDict)
 	
 	def run(self):
 		"""
@@ -219,7 +291,6 @@ class TopCNVTest(GeneListRankTest):
 		db_250k.setup(create_tables=False)
 		
 		oneGenomeData = genome_db.getOneGenomeData(tax_id=self.tax_id, chr_gap=0)
-		cumuSpan2ChrRBDict = oneGenomeData.cumuSpan2ChrRBDict
 		genomeRBDict = genome_db.dealWithGenomeRBDict(self.genomeRBDictPickleFname, tax_id=self.tax_id, \
 									max_distance=self.max_distance, debug=self.debug)
 		#genomeRBDict = None
@@ -234,6 +305,7 @@ class TopCNVTest(GeneListRankTest):
 					no_of_permutations=self.no_of_permutations,\
 					no_of_min_breaks=self.no_of_min_breaks)
 		
+		compareIns = CNVCompareByOverlapLen(min_overlap_len=100)	#any overlap is an overlap
 		for result_id in self.results_id_ls:
 			#establish the map from cnv.id from chr_pos
 			rm = Stock_250kDB.ResultsMethod.get(result_id)
@@ -242,16 +314,18 @@ class TopCNVTest(GeneListRankTest):
 				continue
 			if not db_250k._cnv_id2chr_pos:
 				db_250k.cnv_id2chr_pos = rm.cnv_method_id
+				translationData = self.getTranslationDataStructureForBackgroundLoci(db_250k, cnv_method_id=rm.cnv_method_id, min_MAF=self.min_MAF)
 			pd.db_id2chr_pos = db_250k.cnv_id2chr_pos
 			
 			candidate_gene_set = db_250k.dealWithCandidateGeneList(self.list_type_id, return_set=True)	#internal cache
 			pd.candidate_gene_set = candidate_gene_set
 			
-			gwr = db_250k.getResultMethodContent(result_id, pdata=pd)
+			gwr = db_250k.getResultMethodContent(result_id, pdata=pd, min_value_cutoff=self.min_score)
 		
-			top_loci = gwr.getTopLoci(no_of_top_loci=self.no_of_top_loci)
-			top_loci_in_cumu_pos = self.translateChrPosDataObjectIntoCumuPos(top_loci, oneGenomeData.chr_id2cumu_start)
-			top_loci_in_chr_pos = self.translateCumuPosIntoChrPos(top_loci_in_cumu_pos, cumuSpan2ChrRBDict)
+			top_loci = gwr.getTopLoci(no_of_top_loci=self.no_of_top_loci, min_score=self.min_score)
+			top_loci_in_cumu_pos = self.translateChrPosDataObjectIntoCumuPos(top_loci, translationData.chrSpan2cumuStartRBDict)
+			top_loci_in_chr_pos = self.translateCumuPosIntoChrPos(top_loci_in_cumu_pos, translationData.cumuSpan2ChrSpanRBDict, \
+													compareIns=compareIns)
 			param_data = pd
 			permData = self.prepareDataForPermutationRankTest(top_loci_in_chr_pos, genomeRBDict, param_data, report=True)
 			
@@ -262,8 +336,9 @@ class TopCNVTest(GeneListRankTest):
 			non_candidate_sample_size = len(permData.non_candidate_gene_snp_rank_ls)
 			
 			return_data = self.get_enrichment_pvalue_by_gw_looping(candidate_sample_size, top_loci_in_cumu_pos, candidate_gene_set, \
-							genomeRBDict, cumuSpan2ChrRBDict=cumuSpan2ChrRBDict, \
-							no_of_permutations=pd.no_of_permutations, no_of_min_breaks=pd.no_of_min_breaks, param_data=param_data)
+							genomeRBDict, cumuSpan2ChrSpanRBDict=translationData.cumuSpan2ChrSpanRBDict, \
+							no_of_permutations=pd.no_of_permutations, no_of_min_breaks=pd.no_of_min_breaks, param_data=param_data,\
+							compareIns=compareIns)
 			pvalue = return_data.pvalue
 			no_of_tests = return_data.no_of_tests
 			no_of_tests_passed = return_data.no_of_tests_passed
