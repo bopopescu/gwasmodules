@@ -223,6 +223,30 @@ def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabe
 	if fig_fname:
 		pylab.savefig(fig_fname, dpi=dpi)
 
+
+
+def drawScatter(x_ls, y_ls, fig_fname=None, title=None, xlabel=None, ylabel=None,\
+			dpi=300):
+	"""
+	2011-10-17
+	"""
+	sys.stderr.write("Drawing scatter of %s points vs %s points to %s ..."%(len(x_ls), len(y_ls), fig_fname))
+	import pylab, numpy
+	import matplotlib.cm as cm
+	pylab.clf()
+	pylab.plot(x_ls, y_ls, '.')
+	if title is None:
+		title = "%s data points."%(len(x_ls))
+	pylab.title(title)
+	if xlabel:
+		pylab.xlabel(xlabel)
+	if ylabel:
+		pylab.ylabel(ylabel)
+	if fig_fname:
+		pylab.savefig(fig_fname, dpi=dpi)
+	sys.stderr.write("Done.\n")
+
+
 if __name__ == '__main__':
 	#import pdb
 	#pdb.set_trace()
