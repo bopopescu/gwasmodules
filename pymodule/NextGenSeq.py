@@ -49,5 +49,45 @@ def getPEInputFiles(input_dir, isPE=True):
 					(avg_no_of_files_per_prefix, no_of_fastq_files, no_of_files))
 	return pairedEndPrefix2FileLs
 
+def isFileNameVCF(inputFname, includeIndelVCF=False):
+	"""
+	2011-11-11
+	"""
+	isVCF = False
+	if (inputFname[-3:]=='vcf' or inputFname[-6:]=='vcf.gz'):
+		isVCF=True
+		if not includeIndelVCF and inputFname.find('indel')!=-1:	#exclude indel vcf
+			isVCF =False
+	return isVCF
+
+def isVCFFileEmpty(inputFname, checkContent=False):
+	"""
+	2011-11-11
+		function to test if the input VCF has any locus.
+		empty VCF file could still have headers.
+	"""
+	import os
+	if not os.path.isfile(inputFname):
+		return True
+	fileSize = os.path.getsize(inputFname)
+	if fileSize==0:
+		return True
+	if checkContent:
+		if inputFname[-2:]=='gz':
+			import gzip
+			inf = gzip.open(inputFname)
+		else:
+			inf = open(inputFname)
+		
+		fileIsEmpty = True
+		for line in inf:
+			if line[0]!='#':
+				fileIsEmpty=False
+				break
+		del inf
+		return fileIsEmpty
+	else:
+		return False
+
 if __name__ == '__main__':
 	pass
