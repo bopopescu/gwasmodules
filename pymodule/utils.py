@@ -528,6 +528,18 @@ def getAllFiles(inputDir, inputFiles=[]):
 		elif os.path.isdir(inputFname):
 			getAllFiles(inputFname, inputFiles)
 
+def sumOfReciprocals(n):
+	"""
+	2011-10-21
+		for normalized nucleotide diversity
+		\pi = no-of-polymorphic-loci/sumOfReciprocals
+	"""
+	sum = 0.0
+	for i in range(n-1):
+		sum = sum + 1/(i+1.0)
+	return sum
+
+
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
 	print FigureOutTaxID_ins.returnTaxIDGivenSentence('>gi|172045488|ref|NW_001867254.1| Physcomitrella patens subsp. patens PHYPAscaffold_10696, whole genome shotgun sequence')
