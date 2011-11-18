@@ -325,9 +325,15 @@ def db_connect(hostname, dbname, schema=None, password=None, user=None):
 	return (conn, curs)
 
 
-def get_sequence_segment(curs, gi, start, stop, annot_assembly_table='sequence.annot_assembly', \
-	raw_sequence_table='sequence.raw_sequence', chunk_size=10000):
+def get_sequence_segment(curs, gi=None, start=None, stop=None, annot_assembly_id=None, \
+						annot_assembly_table='sequence.annot_assembly', \
+						raw_sequence_table='sequence.raw_sequence', chunk_size=10000):
 	"""
+	2011-10-25
+		add argument annot_assembly_id
+		Primary key of table annot_assembly is a self-contained "id". "gi" is no longer a primary key,
+			although it's still kept. For some entries, it could be null.
+		start and stop are 1-based.
 	2010-10-05 if this AnnotAssembly is not associated with any raw sequence (raw_sequence_start_id is None).
 		return ''
 	2009-01-03
@@ -344,7 +350,14 @@ def get_sequence_segment(curs, gi, start, stop, annot_assembly_table='sequence.a
 	need_reverse = int(start>stop)
 	if need_reverse:
 		start, stop = stop, start
-	rows = curs.execute("select acc_ver, start, stop, raw_sequence_start_id from %s where gi=%s"%(annot_assembly_table, gi))
+	if annot_assembly_id:	#2011-10-25
+		annot_assembly_key_name = "id"
+		annot_assembly_key_value = annot_assembly_id
+	else:
+		annot_assembly_key_name = "gi"
+		annot_assembly_key_value = gi
+	rows = curs.execute("select acc_ver, start, stop, raw_sequence_start_id from %s where %s=%s"%(annot_assembly_table, \
+															annot_assembly_key_name, annot_assembly_key_value))
 	is_elixirdb = 1
 	if hasattr(curs, 'fetchall'):	#2009-01-03 this curs is not elixirdb.metadata.bind
 		rows = curs.fetchall()
@@ -373,8 +386,8 @@ def get_sequence_segment(curs, gi, start, stop, annot_assembly_table='sequence.a
 	#get the sequence from raw_sequence_table
 	seq = ''
 	for i in range(offset):
-		rows = curs.execute("select sequence from %s where annot_assembly_gi=%s and id=%s"%\
-						(raw_sequence_table, gi, raw_sequence_start_id+i))
+		rows = curs.execute("select sequence from %s where annot_assembly_%s=%s and id=%s"%\
+				(raw_sequence_table, annot_assembly_key_name, annot_assembly_key_value, raw_sequence_start_id+i))
 		if is_elixirdb:	#2009-01-03
 			rows = rows.fetchone()
 		else:
@@ -387,7 +400,9 @@ def get_sequence_segment(curs, gi, start, stop, annot_assembly_table='sequence.a
 				seq += rows[0][0]
 		else:
 			sys.stderr.write("id %s missing in raw_sequence table.\n"%(raw_sequence_start_id+i))
-			sys.stderr.write("gi: %s, start: %s, stop: %s, raw_sequence_start_id: %s\n"%(gi, start, stop, raw_sequence_start_id))
+			sys.stderr.write("%s: %s, start: %s, stop: %s, raw_sequence_start_id: %s\n"%\
+							(annot_assembly_key_name, \
+							annot_assembly_key_value, start, stop, raw_sequence_start_id))
 	relative_start = start - no_of_chunks_before*chunk_size
 	segment = seq[relative_start-1:relative_start-1+segment_size]	#WATCH index needs -1
 	if need_reverse:
