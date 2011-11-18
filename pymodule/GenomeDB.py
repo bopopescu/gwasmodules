@@ -985,7 +985,57 @@ class GenomeDatabase(ElixirDB):
 					sequence = sequence[chunkSize:]
 			del outf
 		sys.stderr.write("Done.\n")
-		
+	
+	def getSequenceSegment(self, tax_id=None, chromosome=None, start=None, stop=None, schema='genome'):
+		"""
+		2011-10-24
+			start and stop are 1-based.
+		"""
+		chromosome = str(chromosome)
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(chromosome=chromosome).order_by(AnnotAssembly.id)
+		annot_assembly_id_ls = []
+		for row in query:
+			annot_assembly_id_ls.append(row.id)
+		if len(annot_assembly_id_ls)>1:
+			sys.stderr.write("Warning: more than 1 entries from tax_id %s, chromosome %s. take first one.\n"%(tax_id, chromosome))
+		elif len(annot_assembly_id_ls)==0:
+			sys.stderr.write("Warning: no entry available from tax_id %s, chromosome %s.\n"%(tax_id, chromosome))
+			return ""
+		annot_assembly_id = annot_assembly_id_ls[0]
+		from db import get_sequence_segment
+		curs = __metadata__.bind	#or self.table.bind or self.table.metadata.bind
+		seq = get_sequence_segment(curs, gi=None, start=start, stop=stop, annot_assembly_id=annot_assembly_id,\
+								annot_assembly_table='%s.%s'%(schema, AnnotAssembly.table.name), \
+								raw_sequence_table='%s.%s'%(schema, RawSequence.table.name))
+		return seq
+	
+	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9):
+		"""
+		2011-11-7
+			copied from vervet/src/AlignmentToCallPipeline.py
+		2011-11-6
+			rename argument topNumberOfContigs to contigMaxRankBySize
+			add argument contigMinRankBySize
+		2011-9-13
+			return refName2size instead of a set of ref names
+		2011-7-12
+			get all the top contigs
+		"""
+		no_of_contigs_to_fetch = contigMaxRankBySize-contigMinRankBySize+1
+		sys.stderr.write("Getting %s chromosomes with rank (by size) between %s and %s  ..."%\
+						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
+		refName2size = {}
+		from sqlalchemy import desc
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).order_by(desc(AnnotAssembly.stop))
+		counter = 0
+		for row in query:
+			counter += 1
+			if counter>=contigMinRankBySize and counter<=contigMaxRankBySize:
+				refName2size[row.chromosome] = row.stop
+			if len(refName2size)>=no_of_contigs_to_fetch:
+				break
+		sys.stderr.write("%s contigs. Done.\n"%(len(refName2size)))
+		return refName2size
 	
 def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
 	annot_assembly_table='genome.annot_assembly'):
