@@ -165,6 +165,33 @@ nt_number_matching_matrix = [[1, 1,1,1,1,1, 1,1,1,1,1],
 	[1, 0,1,0,1,0, 0,0,0,1,0],
 	[1, 0,0,1,1,0, 0,0,0,0,1]]
 
+def calDistOfTwoHetCallsInNumber(call1, call2, hetHalfMatchDistance=0.5):
+	"""
+	2011-10-20
+		add argument hetHalfMatchDistance
+	2011-10-18
+		calculate distance between calls.
+			0 = same. 1 = full distance. 0.5 half match.
+		one or both calls could be heterozygous
+	"""
+	if call1==call2:
+		return 0
+	else:
+		call1_nt = number2nt[call1]
+		call2_nt = number2nt[call2]
+		call1_nt_set = set()
+		for nt in call1_nt:
+			call1_nt_set.add(nt)
+		
+		call2_nt_set = set()
+		for nt in call2_nt:
+			call2_nt_set.add(nt)
+		intersectionSet = call1_nt_set&call2_nt_set
+		if len(intersectionSet)>0:	#one haplotype matches
+			return hetHalfMatchDistance
+		else:	#completely different
+			return 1
+
 def get_nt_number2diff_matrix_index(number2nt):
 	"""
 	2009-5-18
@@ -1333,8 +1360,12 @@ class SNPData(object):
 		
 	
 	def calRowPairwiseDist(self, NA_set =Set([0, 'NA', 'N', -2, '|']), ref_row_id=None, assumeBiAllelic=False,
-						outputFname=None):
+						outputFname=None, hetHalfMatchDistance=0.5):
 		"""
+		2011-10-20
+			call function calDistOfTwoHetCallsInNumber()
+			add argument hetHalfMatchDistance (default = 0.5). it's applied between two heterozygous calls or one het + one homo.
+			
 		2011-3-31
 			add argument outputFname
 				if given, output row_id2pairwise_dist to it.
@@ -1364,14 +1395,13 @@ class SNPData(object):
 					if row_i_allele not in NA_set and row_j_allele not in NA_set:
 						no_of_non_NA_pairs += 1
 						if row_i_allele == row_j_allele:
-							continue
-						elif row_i_allele>=5 and row_j_allele>=5:
-							if row_i_allele != row_j_allele:
-								no_of_mismatches += 1
-						elif assumeBiAllelic and ((row_i_allele>=5 and row_j_allele<5) or (row_i_allele<5 and row_j_allele>=5)):
+							no_of_mismatches += 0
+						elif assumeBiAllelic:
 							#one of them is heterozygous. can't be both heterozygous.
 							#assuming there is one kind of heterozygous and each locus is biallelic.
-							no_of_mismatches += 0.5
+							#no_of_mismatches += 0.5
+							no_of_mismatches += calDistOfTwoHetCallsInNumber(row_i_allele, row_j_allele, \
+																			hetHalfMatchDistance=hetHalfMatchDistance)
 						elif row_i_allele != row_j_allele:
 							no_of_mismatches += 1
 				if no_of_non_NA_pairs>0:
