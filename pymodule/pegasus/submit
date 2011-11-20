@@ -1,0 +1,252 @@
+#!/bin/bash
+
+set -e
+
+TOPDIR=`pwd`
+
+if test $# -lt 3 ; then
+	echo "Please specify local or condorpool as argument. Examples:"
+	echo "  $0 dagFile siteName finalOutputDir [STORAGE_SITE] [submitFolderName]"
+	echo ""
+	echo "Note:"
+	echo "	#. siteName is the running site. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
+	echo ""
+	echo "	#. finalOutputDir is the directory which would contain the final genotype matrix and all files requested to be transferred out. If it doesn't exist, pegasus would create one."
+	echo "	#. STORAGE_SITE is the site to which final output is staged to. default to local."
+	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
+	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
+	echo ""
+	echo "Examples:"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 condorpool TrioInconsistency15DistantVRC_20110929T1726"
+	exit 1
+fi
+
+dagFile=$1
+TargetSite=$2
+finalOutputDir=$3
+STORAGE_SITE=$4
+submitFolderName=$5
+
+if test -z "$submitFolderName"
+then
+	submitFolderName=$finalOutputDir
+fi
+
+if [ -z $STORAGE_SITE ]; then
+	STORAGE_SITE="local"
+fi
+
+echo "Submitting to $TargetSite"
+echo STORAGE_SITE $STORAGE_SITE
+
+# figure out where Pegasus is installed
+export PEGASUS_HOME=`which pegasus-plan | sed 's/\/bin\/*pegasus-plan//'`
+if [ "x$PEGASUS_HOME" = "x" ]; then
+	echo "Unable to determine location of your Pegasus install"
+	echo "Please make sure pegasus-plan is in your path"
+	exit 1
+fi 
+echo $PEGASUS_HOME
+
+if [ "x$GLOBUS_LOCATION" = "x" ]; then
+	echo "Please set GLOBUS_LOCATION to the location of your Pegasus install"
+	exit 1
+fi 
+ 
+echo GLOBUS_LOCATION: $GLOBUS_LOCATION
+
+# 2011-8-28 same as the submitted user's home directory
+# it's a must to export HOME in condor environment because HOME is not set by default.
+CONDOR_HOME_DIR=$HOME
+
+VCF_PERL5LIB=script/vcftools/perl
+
+UCLA_CLUSTER_HOSTNAME="grid4.hoffman2.idre.ucla.edu"
+UCLA_CLUSTER_SCHEDULER="sge"
+UCLA_CLUSTER_HOME_DIR="/u/home/eeskin/polyacti"
+UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME_DIR/bin/pegasus"
+UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
+UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME_DIR"/pg_work"
+UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
+UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyactis/pegasus"
+freeSpace="50000G"
+
+USC_CLUSTER_HOSTNAME="hpc-login2.usc.edu"
+USC_CLUSTER_SCHEDULER="pbs"
+USC_CLUSTER_HOME="/home/cmb-03/mn/yuhuang"
+USC_CLUSTER_WORK_DIR=$USC_CLUSTER_HOME"/pg_work"
+USC_CLUSTER_PEGASUS_HOME=$USC_CLUSTER_HOME"/bin/pegasus"
+USC_CLUSTER_GLOBUS_LOCATION="/usr/usc/globus/default/"
+#USC_CLUSTER_GLOBUS_LOCATION="/usr/local/globus/default"
+
+
+# create the site catalog
+cat >sites.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<sitecatalog xmlns="http://pegasus.isi.edu/schema/sitecatalog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pegasus.isi.edu/schema/sitecatalog http://pegasus.isi.edu/schema/sc-3.0.xsd" version="3.0">
+	<site  handle="local" arch="x86_64" os="LINUX">
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<head-fs>
+			<scratch>
+				<shared>
+				<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+				<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
+				</shared>
+			</scratch>
+			<storage>
+				<shared>
+				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+				</shared>
+			</storage>
+		</head-fs>
+		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+		<profile namespace="env" key="PEGASUS_HOME" >$PEGASUS_HOME</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >$GLOBUS_LOCATION</profile>
+		<profile namespace="env" key="HOME">$HOME</profile>
+	</site>
+	<site  handle="condorpool" arch="x86_64" os="LINUX">
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="unknown" jobtype="compute"/>
+		<head-fs>
+			<scratch>
+			<shared>
+				<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+				<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
+			</shared>
+			</scratch>
+			<storage>
+			<shared>
+				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+			</shared>
+			</storage>
+		</head-fs>
+		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+		<profile namespace="pegasus" key="style" >condor</profile>
+		<profile namespace="condor" key="universe" >vanilla</profile>
+		<profile namespace="env" key="PEGASUS_HOME" >$PEGASUS_HOME</profile>
+		<profile namespace="env" key="PERL5LIB">$CONDOR_HOME_DIR/$VCF_PERL5LIB</profile>
+		<profile namespace="env" key="HOME" >$CONDOR_HOME_DIR</profile>
+		<profile namespace="env" key="PATH" >$CONDOR_HOME_DIR/bin:$PATH</profile>
+	</site>
+	<site  handle="hcondor" arch="x86_64" os="LINUX">
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="unknown" jobtype="compute"/>
+		<head-fs>
+			<scratch>
+			<local>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+			</local>
+			<shared>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_SCRATCH"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+			</shared>
+			</scratch>
+			<storage>
+			<local>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+			</local>
+			<shared>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR" free-size="$freeSpace" total-size="$freeSpace"/>
+			</shared>
+			</storage>
+		</head-fs>
+		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+		<profile namespace="pegasus" key="style" >condor</profile>
+		<profile namespace="condor" key="universe" >vanilla</profile>
+		<profile namespace="env" key="PEGASUS_HOME" >$UCLA_CLUSTER_PEGASUS_HOME</profile>
+		<profile namespace="env" key="PERL5LIB">$UCLA_CLUSTER_HOME/$VCF_PERL5LIB</profile>
+		<profile namespace="env" key="HOME" >$UCLA_CLUSTER_HOME</profile>
+		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME/bin:$PATH</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >$UCLA_CLUSTER_GLOBUS_LOCATION</profile>
+		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+		
+		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
+		<profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
+		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
+		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
+		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
+	</site>
+	<site  handle="hoffman2" arch="x86_64" os="LINUX">
+		<grid  type="gt5" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<grid  type="gt5" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-$UCLA_CLUSTER_SCHEDULER" scheduler="unknown" jobtype="compute"/>
+		<head-fs>
+			<scratch>
+			<shared>
+				<file-server protocol="gsiftp" url="gsiftp://$UCLA_CLUSTER_HOSTNAME/" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR" />
+			</shared>
+			</scratch>
+			<storage>
+			<shared>
+				<file-server protocol="gsiftp" url="gsiftp://$UCLA_CLUSTER_HOSTNAME" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+			</shared>
+			</storage>
+		</head-fs>
+		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+		<profile namespace="env" key="PEGASUS_HOME" >$UCLA_CLUSTER_PEGASUS_HOME</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >$UCLA_CLUSTER_GLOBUS_LOCATION</profile>
+		<profile namespace="globus" key="maxwalltime">1430</profile>
+		<profile namespace="env" key="BOWTIE_INDEXES">$UCLA_CLUSTER_HOME_DIR/bin/bowtieIndexes</profile>
+		<profile namespace="env" key="HOME">$UCLA_CLUSTER_HOME_DIR</profile>
+		<profile namespace="env" key="PERL5LIB">$UCLA_CLUSTER_HOME_DIR/$VCF_PERL5LIB/</profile>
+		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+		
+		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
+		<profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
+		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
+		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
+		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
+		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME_DIR/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/apps/python/2.6.5/bin/:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.2/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME_DIR/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
+	</site>
+	<site  handle="uschpc" arch="x86_64" os="LINUX">
+		<grid  type="gt2" contact="$USC_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<grid  type="gt2" contact="$USC_CLUSTER_HOSTNAME/jobmanager-$USC_CLUSTER_SCHEDULER" scheduler="unknown" jobtype="compute"/>
+		<head-fs>
+			<scratch>
+			<shared>
+				<file-server protocol="gsiftp" url="gsiftp://$USC_CLUSTER_HOSTNAME/" mount-point="$USC_CLUSTER_HOME/pg_work"/>
+				<internal-mount-point mount-point="$USC_CLUSTER_HOME/pg_work" />
+			</shared>
+			</scratch>
+			<storage />
+		</head-fs>
+		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+		<profile namespace="env" key="PEGASUS_HOME" >$USC_CLUSTER_PEGASUS_HOME</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >$USC_CLUSTER_GLOBUS_LOCATION</profile>
+		<profile namespace="globus" key="queue" >cmb</profile>
+		<profile namespace="globus" key="maxwalltime">4800</profile>
+		<profile namespace="env" key="BOWTIE_INDEXES">$USC_CLUSTER_HOME/bin/bowtieIndexes</profile>
+		<profile namespace="env" key="HOME">$USC_CLUSTER_HOME</profile>
+		<profile namespace="env" key="PERL5LIB">$USC_CLUSTER_HOME/$VCF_PERL5LIB/</profile>
+		<profile namespace="env" key="PATH" >$USC_CLUSTER_HOME/bin:/usr/usc/python/default/bin/:/usr/usc/root/5.27.02/bin:/usr/usc/matlab/2009a/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/usr/usc/jdk/default/bin/</profile>
+		<profile namespace="env" key="PYTHONPATH">$USC_CLUSTER_HOME/lib/python:/usr/usc/python/default/lib/python2.6/site-packages/</profile>
+	</site>
+</sitecatalog>
+EOF
+# plan and submit the  workflow
+
+export CLASSPATH=.:$PEGASUS_HOME/lib/pegasus.jar:$CLASSPATH
+echo $CLASSPATH
+
+pegasus-plan \
+	--conf pegasusrc \
+	--sites $TargetSite \
+	--dir work \
+	--relative-dir $submitFolderName \
+	--dax $dagFile \
+	--output $STORAGE_SITE \
+	--cluster horizontal \
+	--submit
+# add the option below for debugging
+#	-vvvvv \
+#	--nocleanup \
+
+# 3.0	-D pegasus.user.properties=pegasusrc \
