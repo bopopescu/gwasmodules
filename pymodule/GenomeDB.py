@@ -532,6 +532,9 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 
 class OneGenomeData(PassingData):
 	"""
+	2011-11-28 add two arguments
+		self.chrOrder = None	#2011-11-21
+		self.sequence_type_id = None	#2011-11-21
 	2011-3-25
 		a structure to wrap data related to one genome (identified by tax_id)
 		
@@ -548,9 +551,11 @@ class OneGenomeData(PassingData):
 		self.chr_gap = None
 		self.chr_id_ls = None
 		
+		self.chrOrder = None	#2011-11-21
+		self.sequence_type_id = None	#2011-11-21
 		self._cumuSpan2ChrRBDict = None
 		
-		PassingData.__init__(self, **keywords)	#keywords could contain chr_gap
+		PassingData.__init__(self, **keywords)	#keywords could contain chr_gap, chrOrder
 	
 	@property
 	def chr_id2size(self):
@@ -564,6 +569,9 @@ class OneGenomeData(PassingData):
 	@chr_id2size.setter
 	def chr_id2size(self, argument_ls):
 		"""
+		#2011-11-21
+			order the chromosomes according to self.chrOrder
+			select sequences based on self.sequence_type_id
 		2011-3-12
 			modified from get_chr_id2size() of variation/src/common.py
 			keywords could include, tax_id=3702.
@@ -576,8 +584,16 @@ class OneGenomeData(PassingData):
 		sys.stderr.write("Getting chr_id2size for tax_id %s ..."%(tax_id))
 		
 		#query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
-		rows = self.db_genome.metadata.bind.execute("select chromosome, stop from %s where tax_id=%s and start=1"%\
-						(AnnotAssembly.table.name, tax_id))
+		if self.chrOrder==2:
+			orderByString = 'order by stop desc'
+		else:
+			orderByString = ""
+		if self.sequence_type_id:
+			extraCondition = " and sequence_type_id=%s "%self.sequence_type_id
+		else:
+			extraCondition = ""
+		rows = self.db_genome.metadata.bind.execute("select chromosome, stop from genome.%s where tax_id=%s and start=1 %s %s"%\
+						(AnnotAssembly.table.name, tax_id, extraCondition, orderByString))
 		chr_id2size = {}
 		for row in rows:
 			chr_id = row.chromosome
@@ -642,6 +658,10 @@ class OneGenomeData(PassingData):
 	@chr_id2cumu_start.setter
 	def chr_id2cumu_start(self, argument_list):
 		"""
+		2011-11-21
+			deal with chrOrder
+				=1: alphabetical order
+				=2: by size , descendingly
 		2011-4-22
 			cumu_start is now 0-based, which makes it easy to generate adjusted coordinates.
 				new_start = cumu_start + start.
@@ -665,7 +685,13 @@ class OneGenomeData(PassingData):
 			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
 		
 		chr_id_ls = self.chr_id2size.keys()
-		chr_id_ls.sort()
+		if self.chrOrder==2:
+			size_chr_id_ls = [(value, key) for key, value in self.chr_id2size.iteritems()]
+			size_chr_id_ls.sort()
+			size_chr_id_ls.reverse()
+			chr_id_ls = [row[1] for row in size_chr_id_ls]
+		else:
+			chr_id_ls.sort()
 		first_chr = chr_id_ls[0] 
 		self._chr_id2cumu_start = {first_chr:0}	#chr_id_ls might not be continuous integers. so dictionary is better
 			#start from 0.
@@ -950,13 +976,18 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("%s unique genomic spans. Done.\n"%(len(genomeRBDict)))
 		return genomeRBDict
 	
-	def getOneGenomeData(self, tax_id=3702, chr_gap=0):
+	def getOneGenomeData(self, tax_id=3702, chr_gap=0, chrOrder=1, sequence_type_id=None):
 		"""
+		2011-11-21
+			add argument chrOrder (order of chromosomes)
+				1: whatever order in database
+				2: order by size, descendingly
 		2011-3-25
 			API to get & set OneGenomeData for one taxonomy.
 		"""
 		if tax_id not in self.tax_id2genomeData:
-			oneGenomeData = OneGenomeData(db_genome=self, tax_id=tax_id, chr_gap=chr_gap)
+			oneGenomeData = OneGenomeData(db_genome=self, tax_id=tax_id, chr_gap=chr_gap, chrOrder=chrOrder,\
+										sequence_type_id=sequence_type_id)
 			self.tax_id2genomeData[tax_id] = oneGenomeData
 		return self.tax_id2genomeData.get(tax_id)
 	
