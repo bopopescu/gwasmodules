@@ -114,8 +114,10 @@ def restoreMatplotlibRCDefaults():
 	matplotlib.rcdefaults()
 
 def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, min_no_of_data_points=50, needLog=False, \
-			dpi=200, **kwargs):
+			dpi=200, min_no_of_bins=20, **kwargs):
 	"""
+	2011-11-28
+		add argument min_no_of_bins
 	2011-8-24
 		add argument kwargs, xticks
 	2011-4-18
@@ -126,7 +128,7 @@ def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None,
 	pylab.clf()
 	no_of_data_points = len(data_ls)
 	if no_of_data_points>=min_no_of_data_points:
-		no_of_bins = max(10, min(20, no_of_data_points/10))
+		no_of_bins = max(10, min(min_no_of_bins, no_of_data_points/10))
 		n, bins, patches = pylab.hist(data_ls, no_of_bins, log=needLog)
 		pylab.title(title)
 		if xlabel_1D is not None:
