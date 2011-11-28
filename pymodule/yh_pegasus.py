@@ -59,22 +59,28 @@ def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, i
 		refFastaFList.append(refFastaF)
 	return refFastaFList
 
-def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_walltime=None):
+def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_walltime=120):
 	"""
+	2011-11-23
+		set max_walltime default to 120 minutes (2 hours)
 	2011-11-16
 		add more requirements
 	2011-11-11
 		job_max_memory is in MB.
 		max_walltime is in minutes.
 	"""
-	job.addProfile(Profile(Namespace.GLOBUS, key="maxmemory", value="%s"%job_max_memory))
-	job.addProfile(Profile(Namespace.CONDOR, key="requirements", value="(memory>=%s)"%job_max_memory))
-	job.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%job_max_memory))	#for dynamic slots
+	job.addProfile(Profile(Namespace.GLOBUS, key="maxmemory", value="%s"%(job_max_memory)))
+	job.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(job_max_memory)))	#for dynamic slots
+	condorJobRequirementLs = ["(memory>=%s)"%(job_max_memory)]
 	
 	if no_of_cpus is not None:
-		job.addProfile(Profile(Namespace.CONDOR, key="request_cpus", value="%s"%no_of_cpus))	#for dynamic slots
+		job.addProfile(Profile(Namespace.CONDOR, key="request_cpus", value="%s"%(no_of_cpus)) )	#for dynamic slots
 	
 	if max_walltime is not None:
-		job.addProfile(Profile(Namespace.GLOBUS, key="maxwalltime", value="%s"%max_walltime))
+		job.addProfile(Profile(Namespace.GLOBUS, key="maxwalltime", value="%s"%(max_walltime)) )
+		#TimeToLive is in seconds
+		condorJobRequirementLs.append("(Target.TimeToLive>=%s)"%(int(max_walltime)*60) )
+	#key='requirements' could only be added once for the condor profile
+	job.addProfile(Profile(Namespace.CONDOR, key="requirements", value=" && ".join(condorJobRequirementLs) ))
 
 setJobProperRequirement = setJobToProperMemoryRequirement
