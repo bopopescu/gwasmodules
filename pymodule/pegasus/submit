@@ -17,7 +17,8 @@ if test $# -lt 3 ; then
 	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
 	echo ""
 	echo "Examples:"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 condorpool TrioInconsistency15DistantVRC_20110929T1726"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726"
+	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726"
 	exit 1
 fi
 
@@ -67,8 +68,11 @@ UCLA_CLUSTER_HOME="/u/home/eeskin/polyacti"
 UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
-UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
-UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyactis/pegasus"
+UCLA_CLUSTER_SCRATCH="/u/scratch2/polyacti/pegasus"
+#UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
+#UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
+#if you choose hcondor as storage site, it's stored in local scratch!! make sure it's in shared storage.
+UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 freeSpace="50000G"
 
 USC_CLUSTER_HOSTNAME="hpc-login2.usc.edu"
@@ -163,7 +167,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="HOME" >$UCLA_CLUSTER_HOME</profile>
 		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME/bin:$PATH</profile>
 		<profile namespace="env" key="GLOBUS_LOCATION" >$UCLA_CLUSTER_GLOBUS_LOCATION</profile>
-		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+		<profile namespace="env" key="LD_LIBRARY_PATH" >$UCLA_CLUSTER_HOME/lib:/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
 		
 		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
 		<profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
@@ -196,7 +200,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="BOWTIE_INDEXES">$UCLA_CLUSTER_HOME/bin/bowtieIndexes</profile>
 		<profile namespace="env" key="HOME">$UCLA_CLUSTER_HOME</profile>
 		<profile namespace="env" key="PERL5LIB">$UCLA_CLUSTER_HOME/$VCF_PERL5LIB/</profile>
-		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+		<profile namespace="env" key="LD_LIBRARY_PATH" >$UCLA_CLUSTER_HOME/lib:/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
 		
 		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
 		<profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
