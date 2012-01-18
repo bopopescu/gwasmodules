@@ -193,8 +193,18 @@ def logSum(ls):
 	return math.log10(sum(ls))
 
 def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabel=None, ylabel=None,\
-			colorBarLabel=None, reduce_C_function=None, dpi=300):
+			colorBarLabel=None, reduce_C_function=None, dpi=300, mincnt=None, marginals=False, xscale='linear',\
+			scale='linear'):
 	"""
+	2011.12.22
+		xscale: [ linear | log]
+			Use a linear or log10 scale on the horizontal axis.
+		scale: [ linear | log]
+			Use a linear or log10 scale on the vertical axis.
+		mincnt: None | a positive integer
+			If not None, only display cells with more than mincnt number of points in the cell
+		marginals: True|False
+			if marginals is True, plot the marginal density as colormapped rectagles along the bottom of the x-axis and left of the y-axis
 	2011-4-27
 		draw 2D histogram (reduce_C_function=logSum) or any 3D plot (3rd Dimension is determined by reduce_C_function).
 		default of reduce_C_function: numpy.median.
@@ -210,7 +220,8 @@ def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabe
 	if reduce_C_function is None:
 		reduce_C_function = numpy.median
 	pylab.clf()
-	pylab.hexbin(x_ls, y_ls, C=C_ls, gridsize=gridsize, reduce_C_function=reduce_C_function, cmap=cm.jet)
+	pylab.hexbin(x_ls, y_ls, C=C_ls, gridsize=gridsize, reduce_C_function=reduce_C_function, cmap=cm.jet,\
+				mincnt=mincnt, marginals=marginals, xscale=xscale)#, scale=scale
 	pylab.axis([min(x_ls), max(x_ls), min(y_ls), max(y_ls)])
 	if title is None:
 		title = "gridsize %s, %s probes."%(gridsize, len(x_ls))
