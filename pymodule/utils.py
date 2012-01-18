@@ -273,6 +273,8 @@ def getListOutOfStr(list_in_str, data_type=int, separator1=',', separator2='-'):
 
 def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
 		"""
+		2011.12.19
+			output stdout/stderr only when there is something to output
 		2008-1-5
 			copied from utility/grid_job_mgr/hpc_cmb_pbs.py
 		2008-11-07
@@ -283,7 +285,7 @@ def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
 			run a command local (not on the cluster)
 		"""
 		import subprocess
-		import StringIO
+		import cStringIO
 		command_handler = subprocess.Popen(commandline, shell=True, \
 										stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 		#command_handler.wait() #Warning: This will deadlock if the child process generates enough output to a stdout or stderr pipe
@@ -299,14 +301,14 @@ def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
 		output_stdout = None
 		output_stderr = None
 		if not report_stdout:	#if not reporting, assume the user wanna to have a file handler returned
-			output_stdout = StringIO.StringIO(stdout_content)
+			output_stdout = cStringIO.StringIO(stdout_content)
 		if not report_stderr:
-			output_stderr = StringIO.StringIO(stderr_content)
+			output_stderr = cStringIO.StringIO(stderr_content)
 		
-		if report_stdout:
+		if report_stdout and stdout_content:
 			sys.stderr.write('stdout of %s: %s \n'%(commandline, stdout_content))
 		
-		if report_stderr:
+		if report_stderr and stderr_content:
 			sys.stderr.write('stderr of %s: %s \n'%(commandline, stderr_content))
 		
 		return_data = PassingData(commandline=commandline, output_stdout=output_stdout, output_stderr=output_stderr,\
