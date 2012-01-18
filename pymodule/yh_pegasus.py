@@ -11,10 +11,13 @@ from Pegasus.DAX3 import *
 
 def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=None):
 	"""
+	2011-11-28
+		get namespace and version from workflow first
 	2011-9-14
 	"""
 	# Add a mkdir job for any directory.
-	mkDirJob = Job(namespace=namespace, name=mkdir.name, version=version)
+	mkDirJob = Job(namespace=getattr(workflow, 'namespace', namespace), name=mkdir.name, \
+				version=getattr(workflow, 'version', version))
 	mkDirJob.addArguments(outputDir)
 	mkDirJob.folder = outputDir	#custom attribute
 	workflow.addJob(mkDirJob)
@@ -84,3 +87,14 @@ def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_w
 	job.addProfile(Profile(Namespace.CONDOR, key="requirements", value=" && ".join(condorJobRequirementLs) ))
 
 setJobProperRequirement = setJobToProperMemoryRequirement
+
+def registerFile(workflow, filename):
+	"""
+	2011.12.13
+		function to register any file to the workflow.input_site_handler, 
+	"""
+	file = File(os.path.basename(filename))
+	file.addPFN(PFN("file://" + os.path.abspath(filename), \
+								workflow.input_site_handler))
+	workflow.addFile(file)
+	return file
