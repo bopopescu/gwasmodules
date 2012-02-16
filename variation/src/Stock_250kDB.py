@@ -3200,16 +3200,28 @@ class Stock_250kDB(ElixirDB):
 		cls.genome_wide_result = genome_wide_result
 		return genome_wide_result
 	
-	def getResultLs(self, call_method_id=None, analysis_method_id_ls=[], phenotype_method_id_ls=[]):
+	def getResultLs(self, call_method_id=None, analysis_method_id_ls=[], phenotype_method_id_ls=[], \
+				call_method_id_ls=[], cnv_method_id=None):
 		"""
+		2011-10-16
+			add argument call_method_id_ls & cnv_method_id
 		2011-10-12
 			bugfix in filter by call_method_id
 		2011-5-9
 			given constraints, find all association results from ResultsMethod
 		"""
 		query = ResultsMethod.query
+		datasetConditionLS = []
 		if call_method_id:
-			query = query.filter_by(call_method_id=call_method_id)
+			datasetConditionLS.append(ResultsMethod.call_method_id==call_method_id)
+		if call_method_id_ls:
+			datasetConditionLS.append(ResultsMethod.call_method_id.in_(call_method_id_ls))
+		if cnv_method_id:
+			datasetConditionLS.append(ResultsMethod.cnv_method_id==cnv_method_id)
+		
+		if datasetConditionLS:
+			query = query.filter(or_(*datasetConditionLS))
+		
 		if analysis_method_id_ls:
 			query = query.filter(ResultsMethod.analysis_method_id.in_(analysis_method_id_ls))
 		if phenotype_method_id_ls:
@@ -3249,6 +3261,20 @@ class Stock_250kDB(ElixirDB):
 			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_set
 		else:
 			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_list
+	
+	def getPhenotypeMethodLsGivenBiologyCategoryID(self, biology_category_id=None):
+		"""
+		2011-10-17
+		"""
+		sys.stderr.write("Getting list of phenotype method id with biology category id=%s ..."%(biology_category_id))
+		query = PhenotypeMethod.query.filter_by(biology_category_id=biology_category_id)
+		phenotype_method_id_ls = []
+		for row in query:
+			phenotype_method_id_ls.append(row.id)
+		
+		sys.stderr.write("%s phenotypes.\n"%(len(phenotype_method_id_ls)))
+		return phenotype_method_id_ls
+		
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
