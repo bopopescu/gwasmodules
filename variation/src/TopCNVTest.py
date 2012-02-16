@@ -3,7 +3,7 @@
 Examples:
 
 	#2011-3-16 run test on result 4634, list 28, top 500 loci, 20kb max distance from locus to gene 
-	TopCNVTest.py -e 4634 -l 28 -f 500 -s genomeDictTaxID3702MaxDist20kb.pickle -m 20000 -y15 -u yh -z banyan
+	%s -e 4634 -l 28 -f 500 -s genomeDictTaxID3702MaxDist20kb.pickle -m 20000 -y15 -u yh -z banyan
 	
 Description:
 	2011-3-25
@@ -25,6 +25,7 @@ Description:
 """
 
 import sys, os, math
+__doc__ = __doc__%(sys.argv[0])
 bit_number = math.log(sys.maxint)/math.log(2)
 #if bit_number>40:       #64bit
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
@@ -51,7 +52,7 @@ class TopCNVTest(GeneListRankTest):
 						('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-						("results_id_ls", 1, ): [None, 'e', 1, 'comma/dash-separated results_by_gene id list, like 1,3-7'],\
+						("result_id_ls", 1, ): [None, 'e', 1, 'comma/dash-separated results_by_gene id list, like 1,3-7'],\
 						("max_distance", 1, int): [20000, 'm', 1, 'maximum distance allowed from the locus to gene'],\
 						('min_MAF', 0, float): [0.1, 'n', 1, 'minimum Minor Allele Frequency.'],\
 						('min_sample_size', 0, int): [1, 'i', 1, 'minimum size for both candidate and non-candidate sets to do wilcox.test'],\
@@ -63,7 +64,7 @@ class TopCNVTest(GeneListRankTest):
 						("no_of_permutations", 1, int): [20000, 'N', 1, 'no of permutations to carry out'],\
 						("no_of_min_breaks", 1, int): [10, 'B', 1, 'minimum no of times that rank_sum_stat_perm>=rank_sum_stat to break away. if 0, no breaking'],\
 						('null_distribution_type_id', 0, int):[1, 'C', 1, 'Type of null distribution. 1=original, 2=permutation, 3=random gene list. check DB table null_distribution_type'],\
-						("min_big_overlap", 1, float): [0.3, '', 1, 'minimum of max(overlap1, overlap2) to declare a CNV is close to a gene'],\
+						("min_big_overlap", 1, float): [0.3, 'a', 1, 'minimum of max(overlap1, overlap2) to declare a CNV is close to a gene'],\
 						('min_no_of_genes', 1, int):[10, 'G', 1, 'minimum no of genes one candidate gene list should harbor. effective only in MPI version'],\
 						('tax_id', 1, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
 						('no_of_top_loci', 1, int): [200, 'f', 1, 'how many number of top snps based on score or -log(pvalue).'],\
@@ -166,8 +167,8 @@ class TopCNVTest(GeneListRankTest):
 			for node in node_ls:
 				geneSegKey = node.key
 				for oneGeneData in node.value:
-					if oneGeneData.ncbi_gene_id in param_data.candidate_gene_set:
-						permData.captured_candidate_gene_set.add(oneGeneData.ncbi_gene_id)
+					if oneGeneData.gene_id in param_data.candidate_gene_set:
+						permData.captured_candidate_gene_set.add(oneGeneData.gene_id)
 						isNearCandidate = True
 						break
 			if isNearCandidate:
@@ -306,7 +307,8 @@ class TopCNVTest(GeneListRankTest):
 					no_of_min_breaks=self.no_of_min_breaks)
 		
 		compareIns = CNVCompareByOverlapLen(min_overlap_len=100)	#any overlap is an overlap
-		for result_id in self.results_id_ls:
+		translationData = None
+		for result_id in self.result_id_ls:
 			#establish the map from cnv.id from chr_pos
 			rm = Stock_250kDB.ResultsMethod.get(result_id)
 			if not rm.cnv_method_id:
@@ -315,6 +317,9 @@ class TopCNVTest(GeneListRankTest):
 			if not db_250k._cnv_id2chr_pos:
 				db_250k.cnv_id2chr_pos = rm.cnv_method_id
 				translationData = self.getTranslationDataStructureForBackgroundLoci(db_250k, cnv_method_id=rm.cnv_method_id, min_MAF=self.min_MAF)
+				if not translationData.chrSpan2cumuStartRBDict:
+					sys.stderr.write("Error: translationData.chrSpan2cumuStartRBDict is empty for cnv method %s. exit.\n"%(rm.cnv_method_id))
+					sys.exit(3)
 			pd.db_id2chr_pos = db_250k.cnv_id2chr_pos
 			
 			candidate_gene_set = db_250k.dealWithCandidateGeneList(self.list_type_id, return_set=True)	#internal cache
@@ -326,8 +331,7 @@ class TopCNVTest(GeneListRankTest):
 			top_loci_in_cumu_pos = self.translateChrPosDataObjectIntoCumuPos(top_loci, translationData.chrSpan2cumuStartRBDict)
 			top_loci_in_chr_pos = self.translateCumuPosIntoChrPos(top_loci_in_cumu_pos, translationData.cumuSpan2ChrSpanRBDict, \
 													compareIns=compareIns)
-			param_data = pd
-			permData = self.prepareDataForPermutationRankTest(top_loci_in_chr_pos, genomeRBDict, param_data, report=True)
+			permData = self.prepareDataForPermutationRankTest(top_loci_in_chr_pos, genomeRBDict, pd, report=True)
 			
 			#m = self.dealWithNoOfSNPsAssociatedWithCandidateGeneList(pd.list_type_id, rm, pd)	#cache is internally going on
 			#n = permData.no_of_total_snps - m
@@ -337,7 +341,7 @@ class TopCNVTest(GeneListRankTest):
 			
 			return_data = self.get_enrichment_pvalue_by_gw_looping(candidate_sample_size, top_loci_in_cumu_pos, candidate_gene_set, \
 							genomeRBDict, cumuSpan2ChrSpanRBDict=translationData.cumuSpan2ChrSpanRBDict, \
-							no_of_permutations=pd.no_of_permutations, no_of_min_breaks=pd.no_of_min_breaks, param_data=param_data,\
+							no_of_permutations=pd.no_of_permutations, no_of_min_breaks=pd.no_of_min_breaks, param_data=pd,\
 							compareIns=compareIns)
 			pvalue = return_data.pvalue
 			no_of_tests = return_data.no_of_tests
