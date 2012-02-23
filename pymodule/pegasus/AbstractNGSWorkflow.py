@@ -8,24 +8,25 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
-import VervetDB
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq
 from Pegasus.DAX3 import *
 
 
 class AbstractNGSWorkflow(object):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
+	option_default_dict = {
+						('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
 						('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
 						('schema', 0, ): ['public', 'k', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+						('port', 0, ):[None, '', 1, 'database port number'],\
 						('ref_ind_seq_id', 1, int): [524, 'a', 1, 'IndividualSequence.id. To pick alignments with this sequence as reference', ],\
 						("samtools_path", 1, ): ["%s/bin/samtools", '', 1, 'samtools binary'],\
 						("picard_path", 1, ): ["%s/script/picard/dist", '', 1, 'picard folder containing its jar binaries'],\
 						("gatk_path", 1, ): ["%s/script/gatk/dist", '', 1, 'GATK folder containing its jar binaries'],\
+						("pymodulePath", 1, ): ["%s/script/pymodule", '', 1, 'path to the pymodule folder'],\
 						("vervetSrcPath", 1, ): ["%s/script/vervet/src", '', 1, 'vervet source code folder'],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
@@ -43,7 +44,8 @@ class AbstractNGSWorkflow(object):
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
+						}
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
 
 	def __init__(self,  **keywords):
@@ -56,6 +58,7 @@ class AbstractNGSWorkflow(object):
 		self.samtools_path = self.insertHomePath(self.samtools_path, self.home_path)
 		self.picard_path =  self.insertHomePath(self.picard_path, self.home_path)
 		self.gatk_path =  self.insertHomePath(self.gatk_path, self.home_path)
+		self.pymodulePath = self.insertHomePath(self.pymodulePath, self.home_path)
 		self.vervetSrcPath =  self.insertHomePath(self.vervetSrcPath, self.home_path)
 		self.tabixPath =  self.insertHomePath(self.tabixPath, self.home_path)
 		
@@ -153,7 +156,7 @@ class AbstractNGSWorkflow(object):
 		#mkdirWrap is better than mkdir that it doesn't report error when the directory is already there.
 		mkdirWrap = Executable(namespace=namespace, name="mkdirWrap", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
-		mkdirWrap.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/mkdirWrap.sh"), site_handler))
+		mkdirWrap.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "shell/mkdirWrap.sh"), site_handler))
 		mkdirWrap.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%workflow.clusters_size))
 		workflow.addExecutable(mkdirWrap)
 		workflow.mkdirWrap = mkdirWrap

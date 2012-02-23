@@ -943,6 +943,81 @@ class SNPData(object):
 		sys.stderr.write("%s out of %s rows kept. Now call keepRowsByRowIndex() to do actual work.\n"%(no_of_rows_kept, no_of_total))
 		return self.keepRowsByRowIndex(self, row_index_ls)
 	
+	def getSortedNegativeMissingCount(self, row_id2missing_data, to_be_removed_row_id_set):
+		"""
+		"""
+		negative_missing_count_row_id_ls = []
+		for row_id, missing_data in row_id2missing_data.iteritems():
+			if row_id not in to_be_removed_row_id_set:
+				negative_missing_count = -missing_data.missing_count
+				negative_missing_count_row_id_ls.append((negative_missing_count, row_id))
+		negative_missing_count_row_id_ls.sort()
+		return negative_missing_count_row_id_ls
+	
+	def removeRowsSoThatMatrixHasNoMissingData(self, missingDataValue=-1):
+		"""
+		2012.2.17
+			the matrix has to be symmetric.
+			
+			a greedy algorithm.
+			#. it starts by removing the row with the most missing cells
+				#. update the missing count for all other rows that have missing data in their pairing with that removed row/column (symmetric matrix)
+			#.
+		"""
+		sys.stderr.write("Removing row/column(s) so that no missing cells exist in the data matrix ...  ")
+		from pymodule import PassingData
+		row_id2missing_data = {}
+		no_of_missing_cells = 0
+		no_of_rows = len(self.row_id_ls)
+		no_of_cols = len(self.col_id_ls)
+		if no_of_rows!=no_of_cols:
+			sys.stderr.write("matrix is not symmetric. no_of_rows=%s, no_of_cols=%s. Skip.\n"%(no_of_rows, no_of_cols))
+			return
+		for i in xrange(no_of_rows):
+			for j in xrange(i+1, no_of_rows):
+				if self.data_matrix[i][j]==missingDataValue:
+					row_i_id = self.row_id_ls[i]
+					row_j_id = self.row_id_ls[j]
+					if row_i_id not in row_id2missing_data:
+						row_id2missing_data[row_i_id] = PassingData(missing_index_ls=[], missing_count=0)
+					if row_j_id not in row_id2missing_data:
+						row_id2missing_data[row_j_id] = PassingData(missing_index_ls=[], missing_count=0)
+					row_id2missing_data[row_i_id].missing_index_ls.append(j)
+					row_id2missing_data[row_i_id].missing_count += 1
+					row_id2missing_data[row_j_id].missing_index_ls.append(i)
+					row_id2missing_data[row_j_id].missing_count += 1
+					
+					no_of_missing_cells += 1
+		
+		sys.stderr.write("%s missing cells.\n"%(no_of_missing_cells))
+		
+		to_be_removed_row_id_set = set()
+		negative_missing_count_row_id_ls = self.getSortedNegativeMissingCount(row_id2missing_data, to_be_removed_row_id_set)
+		
+		while len(negative_missing_count_row_id_ls)>0 and negative_missing_count_row_id_ls[0][0]<0:
+			negative_missing_count, row_id = negative_missing_count_row_id_ls.pop(0)
+			to_be_removed_row_id_set.add(row_id)
+			missing_index_ls = row_id2missing_data.get(row_id).missing_index_ls
+			for row_index in missing_index_ls:
+				row_id = self.row_id_ls[row_index]
+				if row_id not in to_be_removed_row_id_set:	#otherwise it's already removed
+					row_id2missing_data[row_id].missing_count -= 1
+			negative_missing_count_row_id_ls = self.getSortedNegativeMissingCount(row_id2missing_data, to_be_removed_row_id_set)
+		
+		new_row_id_ls = []
+		slice_index_ls = []
+		for i in xrange(no_of_rows):
+			row_id = self.row_id_ls[i]
+			if row_id in to_be_removed_row_id_set:
+				continue
+			else:
+				slice_index_ls.append(i)
+				new_row_id_ls.append(row_id)
+		newSNPData = SNPData(row_id_ls=new_row_id_ls, col_id_ls=new_row_id_ls, data_matrix = self.data_matrix[slice_index_ls,:][:,slice_index_ls])
+		
+		sys.stderr.write("\t %s rows to be removed.\n"%(len(to_be_removed_row_id_set)))
+		return newSNPData
+	
 	@classmethod
 	def keepRowsWhoseOneColMatchValue(cls, snpData, col_id, col_value):
 		"""

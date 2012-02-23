@@ -459,6 +459,15 @@ class Value2Color(object):
 		
 		
 	"""
+	def __init__(self, min_value=0., max_value=255., treat_above_max_as_NA=True):
+		"""
+		2012.2.22
+			value<min_value is treated as NA. >max_value is treated as max_value by default unless treat_above_max_as_NA is set to True.
+		"""
+		self.min_value = float(min_value)
+		self.max_value = float(max_value)
+		self.treat_above_max_as_NA = treat_above_max_as_NA
+		
 	max_gray_value = 255
 	special_value2color = {-1:(255,255,255),\
 						-2:'red',\
@@ -485,14 +494,21 @@ class Value2Color(object):
 	
 	max_hue_value = 255	#In Inkscape, the maximum possible hue value, 255, looks almost same as hue=0. cut off before reaching 255.
 	#but it's not the case in PIL.
-	def value2HSLcolor(cls, value, min_value=0., max_value=255., treat_above_max_as_NA=True):
+	def value2HSLcolor(cls, value, min_value=0., max_value=255., treat_above_max_as_NA=True, returnType=1):
 		"""
+		2012.2.22
+			add argument returnType
+				1: return a hsl string. "hsl(%s"%(hue_value)+",100%,50%)"
+				2: return a tuple. (hue_value/max_hue_value, 1.0, 0.5)
 		2009-10-18
 			change how to deal with out-of-range value. Before, both <min_value and >max_value are treated as NA.
 			Now, <min_value is treated as NA. >max_value is treated as max_value by default unless treat_above_max_as_NA is set to True. 
 		2008-08-28
 			use Hue-Saturation-Lightness (HSL) color to replace the simple gray gradient represented by (R,G,B)
 		"""
+		max_value = float(max_value)
+		min_value = float(min_value)
+		
 		if value in cls.special_value2color:
 			return cls.special_value2color[value]
 		elif value<min_value:
@@ -508,9 +524,27 @@ class Value2Color(object):
 		#in (R,G,B) mode, the bigger R/G/B is, the darker the color is
 		#R_value = int(Y/math.pow(2,8))
 		#G_value = int(Y- R_value*math.pow(2,8))
-		return "hsl(%s"%(hue_value)+",100%,50%)"
+		if returnType==2:
+			return (hue_value/float(cls.max_hue_value), 1.0, 0.5)
+		else:
+			return "hsl(%s"%(hue_value)+",100%,50%)"
 	
 	value2HSLcolor = classmethod(value2HSLcolor)
+	
+	def valueByMatplotlibColorMap(self, value, colormap='jet'):
+		"""
+		2012.2.22
+			use matplotlib's colormap to translate a value into color
+		"""
+		import matplotlib
+		from matplotlib import cm
+		valueColorMap = cm.get_cmap(colormap)
+		valueNormalizer = matplotlib.colors.Normalize(vmin=self.min_value, vmax=self.max_value)
+		if valueColorMap:
+			return valueColorMap(valueNormalizer(value))	#return (r,g,b,a), each in [0,1]
+		else:
+			return None
+
 
 
 def drawMatrixLegend(data_matrix, left_label_ls=[], top_label_ls=[], min_value=None, max_value=None,\

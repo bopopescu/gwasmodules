@@ -3,18 +3,19 @@
 set -e
 
 TOPDIR=`pwd`
-
+STORAGE_SITE_DEFAULT="local"
 if test $# -lt 3 ; then
 	echo "Please specify local or condorpool as argument. Examples:"
-	echo "  $0 dagFile siteName finalOutputDir [STORAGE_SITE] [submitFolderName]"
+	echo "  $0 dagFile siteName finalOutputDir [STORAGE_SITE] [submitFolderName] [onlyPlan]"
 	echo ""
 	echo "Note:"
 	echo "	#. siteName is the running site. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
 	echo ""
 	echo "	#. finalOutputDir is the directory which would contain the final genotype matrix and all files requested to be transferred out. If it doesn't exist, pegasus would create one."
-	echo "	#. STORAGE_SITE is the site to which final output is staged to. default to local."
+	echo "	#. STORAGE_SITE is the site to which final output is staged to. default is $STORAGE_SITE_DEFAULT."
 	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
 	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
+	echo "	#. onlyPlan means pegasus will only do the planning but not submit the final workflow. Just put any string there to make it non-empty."
 	echo ""
 	echo "Examples:"
 	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726"
@@ -27,6 +28,7 @@ TargetSite=$2
 finalOutputDir=$3
 STORAGE_SITE=$4
 submitFolderName=$5
+onlyPlan=$6
 
 if test -z "$submitFolderName"
 then
@@ -34,7 +36,13 @@ then
 fi
 
 if [ -z $STORAGE_SITE ]; then
-	STORAGE_SITE="local"
+	STORAGE_SITE=$STORAGE_SITE_DEFAULT
+fi
+
+if [ -z $onlyPlan ]; then
+	submitOption="--submit"
+else
+	submitOption=""
 fi
 
 echo "Submitting to $TargetSite"
@@ -247,8 +255,7 @@ pegasus-plan \
 	--relative-dir $submitFolderName \
 	--dax $dagFile \
 	--output $STORAGE_SITE \
-	--cluster horizontal \
-	--submit
+	--cluster horizontal $submitOption
 # add the option below for debugging
 #	-vvvvv \
 #	--nocleanup \

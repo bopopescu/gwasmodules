@@ -272,48 +272,48 @@ def getListOutOfStr(list_in_str, data_type=int, separator1=',', separator2='-'):
 	return list_to_return
 
 def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
-		"""
-		2011.12.19
-			output stdout/stderr only when there is something to output
-		2008-1-5
-			copied from utility/grid_job_mgr/hpc_cmb_pbs.py
-		2008-11-07
-			command_handler.communicate() is more stable than command_handler.stderr.read()
-		2008-11-04
-			refactor out of runRemoteCommand()
-			
-			run a command local (not on the cluster)
-		"""
-		import subprocess
-		import cStringIO
-		command_handler = subprocess.Popen(commandline, shell=True, \
-										stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-		#command_handler.wait() #Warning: This will deadlock if the child process generates enough output to a stdout or stderr pipe
-		#	 such that it blocks waiting for the OS pipe buffer to accept more data. Use communicate() to avoid that.
+	"""
+	2011.12.19
+		output stdout/stderr only when there is something to output
+	2008-1-5
+		copied from utility/grid_job_mgr/hpc_cmb_pbs.py
+	2008-11-07
+		command_handler.communicate() is more stable than command_handler.stderr.read()
+	2008-11-04
+		refactor out of runRemoteCommand()
 		
-		#command_handler.stderr.read() command_handler.stdout.read() also constantly deadlock the whole process.
-		
-		stderr_content = None
-		stdout_content = None
-		
-		stdout_content, stderr_content = command_handler.communicate()	#to circumvent deadlock caused by command_handler.stderr.read()
-		
-		output_stdout = None
-		output_stderr = None
-		if not report_stdout:	#if not reporting, assume the user wanna to have a file handler returned
-			output_stdout = cStringIO.StringIO(stdout_content)
-		if not report_stderr:
-			output_stderr = cStringIO.StringIO(stderr_content)
-		
-		if report_stdout and stdout_content:
-			sys.stderr.write('stdout of %s: %s \n'%(commandline, stdout_content))
-		
-		if report_stderr and stderr_content:
-			sys.stderr.write('stderr of %s: %s \n'%(commandline, stderr_content))
-		
-		return_data = PassingData(commandline=commandline, output_stdout=output_stdout, output_stderr=output_stderr,\
-								stderr_content=stderr_content, stdout_content=stdout_content)
-		return return_data
+		run a command local (not on the cluster)
+	"""
+	import subprocess
+	import cStringIO
+	command_handler = subprocess.Popen(commandline, shell=True, \
+									stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+	#command_handler.wait() #Warning: This will deadlock if the child process generates enough output to a stdout or stderr pipe
+	#	 such that it blocks waiting for the OS pipe buffer to accept more data. Use communicate() to avoid that.
+	
+	#command_handler.stderr.read() command_handler.stdout.read() also constantly deadlock the whole process.
+	
+	stderr_content = None
+	stdout_content = None
+	
+	stdout_content, stderr_content = command_handler.communicate()	#to circumvent deadlock caused by command_handler.stderr.read()
+	
+	output_stdout = None
+	output_stderr = None
+	if not report_stdout:	#if not reporting, assume the user wanna to have a file handler returned
+		output_stdout = cStringIO.StringIO(stdout_content)
+	if not report_stderr:
+		output_stderr = cStringIO.StringIO(stderr_content)
+	
+	if report_stdout and stdout_content:
+		sys.stderr.write('stdout of %s: %s \n'%(commandline, stdout_content))
+	
+	if report_stderr and stderr_content:
+		sys.stderr.write('stderr of %s: %s \n'%(commandline, stderr_content))
+	
+	return_data = PassingData(commandline=commandline, output_stdout=output_stdout, output_stderr=output_stderr,\
+							stderr_content=stderr_content, stdout_content=stdout_content)
+	return return_data
 
 
 #2009-2-4 code to link something like AT1G01010.1 or AT1G01040 to NCBI gene id
@@ -541,6 +541,21 @@ def sumOfReciprocals(n):
 		sum = sum + 1/(i+1.0)
 	return sum
 
+def get_md5sum(filename):
+	"""
+	2012.1.27
+		copied from variation/src/Array2DB_250k.py
+	"""
+	import subprocess
+	md5sum_command = 'md5sum'
+	md5sum_p = subprocess.Popen([md5sum_command, filename], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+	md5sum_stdout_out = md5sum_p.stdout.read()
+	md5sum_stderr_out = md5sum_p.stderr.read()
+	if md5sum_stderr_out:
+		sys.stderr.write("%s %s failed with stderr: %s.\n"%(md5sum_command, filename, md5sum_stderr_out))
+		sys.exit(4)
+	else:
+		return md5sum_stdout_out.split()[0]
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
