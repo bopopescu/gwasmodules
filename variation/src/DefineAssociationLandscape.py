@@ -34,12 +34,14 @@ from pymodule.db import formReadmeObj
 from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 from pymodule.RBTree import RBDict
 import networkx as nx
+from sqlalchemy import func
 
 import CGAL	#computational geometry algorithm python binding
 
 class DefineAssociationLandscape(object):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+	option_default_dict = {
+						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
 						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
 						('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
@@ -55,10 +57,12 @@ class DefineAssociationLandscape(object):
 						('min_score', 0, float): [4, 'f', 1, 'minimum score to call a peak'],\
 						('ground_score', 0, float): [0, 's', 1, 'minimum score possible in this test'],\
 						('tax_id', 1, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
+						('logFilename', 0, ): [None, '', 1, 'file to contain logs. use it only if this program is at the end of pegasus workflow'],\
 						('output_fname', 0, ): [None, 'o', 1, 'if given, output the landscape result.'],\
 						('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
+						}
 	#('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 	#('analysis_method_id_ls', 0, ):['1,7', 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
 	#("phenotype_method_id_ls", 0, ): [None, 'e', 1, 'comma/dash-separated phenotype_method id list, like 1,3-7. Default is all.'],\
@@ -350,6 +354,7 @@ class DefineAssociationLandscape(object):
 			db_250k.session.flush()
 			#subgraph = nx.subgraph(locusLandscapeNeighborGraph, cc)
 		sys.stderr.write("%s peaks.\n"%(no_of_peaks))
+		return no_of_peaks
 	
 	def getLocusBasedOnDataObj(self, db_250k, data_obj):
 		"""
@@ -373,16 +378,18 @@ class DefineAssociationLandscape(object):
 		db_250k.session.flush()
 		sys.stderr.write("%s loci inserted into db. Done.\n"%(no_of_newly_added_loci))
 	
-	def getResultPeakType(self, db_250k, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
+	def getResultPeakType(self, db_250k, min_MAF=None, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
 		"""
 		2011-4-20
 		"""
-		
-		result_peak_type = Stock_250kDB.ResultPeakType.query.filter_by(min_score=min_score).filter_by(neighbor_distance=neighbor_distance).\
+		TableClass = Stock_250kDB.ResultPeakType
+		result_peak_type = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).filter_by(min_score=min_score).\
+			filter_by(neighbor_distance=neighbor_distance).\
 			filter_by(max_neighbor_distance=max_neighbor_distance).first()
 		if result_peak_type is None:
-			result_peak_type = Stock_250kDB.ResultPeakType(min_score=self.min_score, neighbor_distance=self.neighbor_distance, \
-						max_neighbor_distance=self.max_neighbor_distance)
+			result_peak_type = Stock_250kDB.ResultPeakType(min_MAF=min_MAF, min_score=min_score, \
+									neighbor_distance=neighbor_distance, \
+									max_neighbor_distance=max_neighbor_distance)
 			db_250k.session.add(result_peak_type)
 			db_250k.session.flush()
 		return result_peak_type
@@ -424,15 +431,23 @@ class DefineAssociationLandscape(object):
 		#for result in result_query:
 		#	result_id_ls.append(result.id)
 		
+		if self.logFilename:
+			logF = open(self.logFilename, 'w')
+		else:
+			logF = None
 		for result_id in result_id_ls:
 			#establish the map from cnv.id from chr_pos
 			rm = Stock_250kDB.ResultsMethod.get(result_id)
-			result_peak_type = self.getResultPeakType(db_250k, min_score=self.min_score, neighbor_distance=self.neighbor_distance, \
-												max_neighbor_distance=self.max_neighbor_distance)
+			result_peak_type = self.getResultPeakType(db_250k, min_MAF=self.min_MAF, min_score=self.min_score, \
+											neighbor_distance=self.neighbor_distance, \
+											max_neighbor_distance=self.max_neighbor_distance)
 			#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
 			query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
 			if query.first():
-				sys.stderr.write("result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id))
+				logString = "result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id)
+				if logF:
+					logF.write(logString)
+				sys.stderr.write(logString)
 				sys.exit(0)
 			
 			
@@ -455,15 +470,22 @@ class DefineAssociationLandscape(object):
 			"""
 			
 			
-			self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
+			no_of_peaks = self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
 						ground_score=self.ground_score, min_score=self.min_score, rm=rm, result_peak_type=result_peak_type)
 			"""
 			#2011-4-21 to check how far things are from each other.
 			#self.drawBridgeChromosomalLengthHist(bridge_ls)
 			"""
+			if logF:
+				logF.write("Result %s has %s peaks.\n"%(result_id, no_of_peaks))
+			
 		db_250k.session.flush()
 		if self.commit:
 			db_250k.session.commit()
+		
+		if logF:
+			logF.close()
+		
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

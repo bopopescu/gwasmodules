@@ -518,11 +518,14 @@ class ResultPeak(Entity):
 
 class ResultPeakType(Entity):
 	"""
+	2012.2.15
+		add field, min_MAF
 	2011-4-19
 		type for ResultPeak
 	"""
 	short_name = Field(String(30), unique=True)
 	description = Field(Text)
+	min_MAF = Field(Float)
 	min_score = Field(Float)
 	neighbor_distance = Field(Integer)
 	max_neighbor_distance = Field(Integer)
@@ -532,8 +535,33 @@ class ResultPeakType(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='result_peak_type', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('min_score', 'neighbor_distance', 'max_neighbor_distance'))
+	using_table_options(UniqueConstraint('min_MAF', 'min_score', 'neighbor_distance', 'max_neighbor_distance'))
 
+class ResultPeakOverlap(Entity):
+	"""
+	2012.2.22
+		
+	"""
+	result1 = ManyToOne('ResultsMethod', colname='result1_id', ondelete='CASCADE', onupdate='CASCADE')
+	result2 = ManyToOne('ResultsMethod', colname='result2_id', ondelete='CASCADE', onupdate='CASCADE')
+	
+	result1_peak_type = ManyToOne('ResultPeakType', colname='result1_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	result2_peak_type = ManyToOne('ResultPeakType', colname='result2_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	peak_padding = Field(Integer)	#this is the extension of peak width in checking peak overlap to accommodate LD
+	
+	no_of_result1_peaks = Field(Integer)
+	no_of_result2_peaks = Field(Integer)
+	no_of_result1_peaks_in_result2 = Field(Integer)
+	no_of_result2_peaks_in_result1 = Field(Integer)
+	
+	comment = Field(Text)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='result_peak_overlap', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('result1_id', 'result2_id', 'result1_peak_type_id', 'result2_peak_type_id', 'peak_padding'))
 
 class Results(Entity):
 	"""
@@ -3262,19 +3290,27 @@ class Stock_250kDB(ElixirDB):
 		else:
 			return self.list_type_id2candidate_gene_list_info[list_type_id].candidate_gene_list
 	
-	def getPhenotypeMethodLsGivenBiologyCategoryID(self, biology_category_id=None):
+	def getPhenotypeMethodLsGivenBiologyCategoryID(self, biology_category_id=None, access=None):
 		"""
+		2012.2.22
+			add argument access. If None, no filter based on this.
+				1=public
+				2=restricted
 		2011-10-17
 		"""
-		sys.stderr.write("Getting list of phenotype method id with biology category id=%s ..."%(biology_category_id))
-		query = PhenotypeMethod.query.filter_by(biology_category_id=biology_category_id)
-		phenotype_method_id_ls = []
+		sys.stderr.write("Getting list of phenotype method with biology category id=%s, access=%s ..."%(biology_category_id, access))
+		query = PhenotypeMethod.query
+		if biology_category_id is not None:
+			query = query.filter_by(biology_category_id=biology_category_id)
+		if access is not None:
+			query = query.filter_by(access=access)
+		phenotype_method_ls = []
 		for row in query:
-			phenotype_method_id_ls.append(row.id)
+			phenotype_method_ls.append(row)
 		
-		sys.stderr.write("%s phenotypes.\n"%(len(phenotype_method_id_ls)))
-		return phenotype_method_id_ls
-		
+		sys.stderr.write("%s phenotypes.\n"%(len(phenotype_method_ls)))
+		return phenotype_method_ls
+	
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

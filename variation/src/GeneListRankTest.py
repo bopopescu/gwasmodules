@@ -153,10 +153,17 @@ class GeneListRankTest(object):
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 		
 		if getattr(self, 'results_id_ls', None):
-			self.results_id_ls = getListOutOfStr(self.results_id_ls, data_type=int)
+			self.result_id_ls = getListOutOfStr(self.results_id_ls, data_type=int)
 			self.results_id_ls.sort()
 		else:
 			self.results_id_ls = []
+			
+		#2011-10-15 some descendent classes use result_id_ls instead of results_id_ls
+		if getattr(self, 'result_id_ls', None):
+			self.result_id_ls = getListOutOfStr(self.result_id_ls, data_type=int)
+			self.result_id_ls.sort()
+		else:
+			self.result_id_ls = []
 			
 	def constructDataStruc(cls, min_distance=50000, get_closest=0):
 		"""

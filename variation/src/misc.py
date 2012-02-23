@@ -6594,6 +6594,14 @@ FileFormatExchange.strip_2010_strain_info('./script/variation/data/2010/2010_str
 		outputFname = os.path.expanduser("~/script/vervet/src/data/ref/BAC/BAC.accession.fastq")
 		FileFormatExchange.fasta2Fastq(inputFname, outputFname)
 		sys.exit(0)
+		
+		#2011-6-27
+		inputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/last_updated_vervet_GSS_seqs.fasta")
+		outputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/last_updated_vervet_GSS_seqs.fastq")
+		FileFormatExchange.fasta2Fastq(inputFname, outputFname, replaceSpaceWithUnderScore=True)
+		sys.exit(0)
+		
+		
 	"""
 	
 	
@@ -8958,6 +8966,231 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	
 	
 class CNV(object):
+	class GWA(object):
+		"""
+		2012.2.21
+			association-related functions
+		"""
+		def __init__(self):
+			pass
+		
+		@classmethod
+		def drawNumberOfPeaks(cls, db_250k, cnv_method_id=None, call_method_id=None, analysis_method_id=1,\
+							result_peak_type_id_ls=[1,2,3,5,6], outputFname=None,\
+							gap_between_phenotype=1, gap_between_category=3, gap_between_peak_type=5, maxNoOfPeaks=None,\
+							color_ls = [(0,0,1), (0,1,0), (1,0,0), (0,1,1), (0.5,0,0.5), (1,1,0)]):
+			"""
+			2012.2.21
+				color_ls corresponds to 	color_ls = ['b', 'g','r', 'c', 'm', 'y']
+			"""
+			import Stock_250kDB
+			from pymodule import PassingData
+			from pymodule.DrawMatrix import Value2Color
+			import colorsys
+			
+			sys.stderr.write("Getting phenotypes in a particular order ...")
+			phenotype_id2positionData = {}	#positionData is an object with index and x-axis float value
+			
+			rows = db_250k.metadata.bind.execute("select distinct p.id, p.biology_category_id, p.short_name from %s p\
+				where access=1 order by p.biology_category_id, p.id"%\
+				(Stock_250kDB.PhenotypeMethod.table.name))	#access=1 is public phenotypes
+			prev_biology_category_id = -1
+			counter = 0
+			no_of_separators = 0
+			max_phenotype_axis_value = -1
+			for row in rows:
+				if prev_biology_category_id == -1:
+					prev_biology_category_id = row.biology_category_id
+				elif row.biology_category_id!=prev_biology_category_id:
+					prev_biology_category_id = row.biology_category_id
+					no_of_separators += 1
+				counter += 1
+				if row.id not in phenotype_id2positionData:
+					phenotype_id2positionData[row.id] = PassingData(index=len(phenotype_id2positionData))
+				
+				axis_value = counter*gap_between_phenotype + no_of_separators*gap_between_category
+				if axis_value > max_phenotype_axis_value:
+					max_phenotype_axis_value = axis_value
+				
+				label = '%s_%s'%(row.id, row.short_name)
+				phenotype_id2positionData[row.id].label = label
+				phenotype_id2positionData[row.id].axis_value = axis_value
+			sys.stderr.write(" %s phenotypes.\n"%(len(phenotype_id2positionData)))
+			
+			sys.stderr.write("Getting peak type in a ascending order ...")
+			Table=Stock_250kDB.ResultPeakType
+			query = Table.query.filter(Table.id.in_(result_peak_type_id_ls)).order_by(Table.min_score)
+			peak_type_id2plotData = {}
+			max_peak_type_axis_value = -1
+			min_peak_type_axis_value = 100
+			counter = 0
+			for row in query:
+				color_index = counter%len(color_ls)
+				color = color_ls[color_index]
+				counter += 1
+				axis_value=counter*gap_between_peak_type
+				peak_type_id2plotData[row.id] = PassingData(min_score=row.min_score, color=color, axis_value=axis_value)
+				if axis_value>max_peak_type_axis_value:
+					max_peak_type_axis_value  = axis_value
+				if axis_value<min_peak_type_axis_value:
+					min_peak_type_axis_value = axis_value
+			
+			value2color_func = lambda x: Value2Color.value2HSLcolor(x, min_peak_type_axis_value, max_peak_type_axis_value, \
+														treat_above_max_as_NA=False, returnType=2)
+			value2colorInstance = Value2Color(min_value=min_peak_type_axis_value, max_value=max_peak_type_axis_value,
+											treat_above_max_as_NA=False)
+			for peak_type_id, plotData in peak_type_id2plotData.iteritems():
+				#hslColor = value2color_func(plotData.axis_value)
+				#h, s, l = hslColor
+				#rgbColor = colorsys.hls_to_rgb(h, l, s)
+				r,g,b,a = value2colorInstance.valueByMatplotlibColorMap(plotData.axis_value)
+				rgbColor = (r,g,b)
+				plotData.color = rgbColor
+			sys.stderr.write(" %s peak types.\n"%(len(peak_type_id2plotData)))
+			
+			sys.stderr.write("Getting the peak data ...")
+			Table = Stock_250kDB.ResultPeak
+			query = Table.query.filter(Table.result_peak_type_id.in_(result_peak_type_id_ls))
+			if cnv_method_id is not None:
+				query = query.filter(Table.result.has(cnv_method_id=cnv_method_id))
+			if call_method_id is not None:
+				query = query.filter(Table.result.has(call_method_id=call_method_id))
+			if analysis_method_id is not None:
+				query = query.filter(Table.result.has(analysis_method_id=analysis_method_id))
+			
+			peak_type2phenotype_id2no_of_peaks = {}
+			counter =0
+			for row in query:
+				phenotype_id = row.result.phenotype_method_id
+				peak_type_id = row.result_peak_type_id
+				if peak_type_id not in peak_type2phenotype_id2no_of_peaks:
+					peak_type2phenotype_id2no_of_peaks[peak_type_id] = {}
+				if phenotype_id not in peak_type2phenotype_id2no_of_peaks[peak_type_id]:
+					peak_type2phenotype_id2no_of_peaks[peak_type_id][phenotype_id] = 0
+					counter += 1
+				peak_type2phenotype_id2no_of_peaks[peak_type_id][phenotype_id] += 1
+			
+			sys.stderr.write(" %s peak data points for %s peak types.\n"%(counter, len(peak_type2phenotype_id2no_of_peaks)))
+			
+			
+			sys.stderr.write("Drawing ...")
+			
+			"""
+			from mpl_toolkits.mplot3d import Axes3D
+			import matplotlib.pyplot as plt
+			import numpy as np
+			import pylab
+			#fig = plt.figure()
+			#ax = Axes3D(pylab.figure(), azim=60,elev=50)	#pylab.gcf() doesn't work. have to use pylab.figure()
+			ax = Axes3D(pylab.figure())
+			#ax = fig.add_subplot(111, projection='3d')
+			
+			xs = []	#different peak_type
+			ys = []	# no of peaks
+			zs = []	#phenotype's axis_value
+			cs = []	#color of each bar
+			"""
+			from enthought.mayavi import mlab
+			from pymodule.yh_mayavi import customBarchart
+			import numpy
+			fig = mlab.figure(figure=None, bgcolor=(1,1,1), fgcolor=None, engine=None, size=(800, 700))
+			mlab.clf()
+			no_of_phenotypes = len(phenotype_id2positionData)
+			for peak_type_id, plotData in peak_type_id2plotData.iteritems():
+				phenotype_id2no_of_peaks = peak_type2phenotype_id2no_of_peaks.get(peak_type_id)
+				if phenotype_id2no_of_peaks is not None:
+					x, y = numpy.mgrid[0:no_of_phenotypes:1, 0:1:1]	#added a gap of 1 column between two phenotypes. one phenotype occupies two rows & two columns.
+					y[:,:] = plotData.axis_value
+					z = numpy.ones(x.shape, numpy.int)
+					needed_index_ls = []
+					for phenotype_id, positionData in phenotype_id2positionData.iteritems():
+						if phenotype_id in phenotype_id2no_of_peaks:
+							no_of_peaks = phenotype_id2no_of_peaks.get(phenotype_id)
+							if maxNoOfPeaks and no_of_peaks>maxNoOfPeaks:
+								no_of_peaks = maxNoOfPeaks
+							needed_index_ls.append(positionData.index)
+							x[positionData.index] = positionData.axis_value
+							z[positionData.index] = no_of_peaks
+					needed_index_ls.sort()
+					x = x[needed_index_ls,:]
+					y = y[needed_index_ls,:]
+					z = z[needed_index_ls,:]
+					if len(x)>1:
+						#from enthought.mayavi import mlab
+						#from pymodule.yh_mayavi import customBarchart
+						#mlab.clf()
+						bar = customBarchart(x, y, z, x_scale=0.9*gap_between_phenotype, y_scale=0.9*gap_between_peak_type, \
+											opacity=1, mode='cube', color=plotData.color, scale_factor=1.0)
+						#ax.bar(xs, ys, zs=zs, zdir='y', color=cs, alpha=0.95)
+				#plt.show()
+				#s = raw_input("Continue:")
+			
+			x, y = numpy.mgrid[0:max_phenotype_axis_value + gap_between_phenotype:1, 0:max_peak_type_axis_value + gap_between_peak_type:1]
+			s = numpy.zeros(x.shape, numpy.int)
+			#s[0,1]=0.5
+			surf = mlab.surf(x, y, s, opacity=0.6, extent=[-gap_between_phenotype, max_phenotype_axis_value + gap_between_phenotype, \
+														-gap_between_peak_type, max_peak_type_axis_value + gap_between_peak_type, 0.0,0.0])
+			
+			from pymodule.DrawMatrix import get_font 
+			font = get_font()
+			#draw the z-axis
+			for i in range(0,110,25):
+				label = repr(i)
+				if label=='100':
+					label = '100+'
+				char_width, char_height = font.getsize(label)	#W is the the biggest(widest)
+				mlab.text(0, max_peak_type_axis_value+gap_between_peak_type, label, z=i, color=(0,0,0), width=char_width/1000.)	#min(0.0075*len(label), 0.04))
+			
+			mlab.savefig(outputFname, size=None, figure=mlab.gcf(), magnification=2)
+			#mlab.show()
+			
+			"""
+			import numpy as np
+			no_of_points = 4
+			for c, z in zip(['r', 'g', 'b', 'y'], [30, 20, 10, 0]):
+				xs = np.arange(no_of_points)
+				ys = np.random.rand(no_of_points)
+			
+				# You can provide either a single color or an array. To demonstrate this,
+				# the first bar of each set will be colored cyan.
+				cs = [c] * len(xs)
+				cs[0] = 'c'
+				ax.bar(xs, ys, zs=z, zdir='y', color=cs, alpha=0.95)
+			ax.set_xlabel('X')
+			ax.set_ylabel('Y')
+			ax.set_zlabel('Z')
+			plt.savefig(outputFname, dpi=200)
+			plt.show()
+			"""
+		"""
+		#2012.2.21
+		cnv_method_id = None	#20	#None	#20
+		call_method_id = 80#	#	#	#32	#80	#32, None
+		analysis_method_id=1
+		outputFname = os.path.expanduser('~/doc/20110315ArabidopsisDeletionPolymorphism/figures/GWAS_call%s_cnv%s_analysis%s_noOfPeaks.png'%
+										(call_method_id, cnv_method_id, analysis_method_id))
+		CNV.GWA.drawNumberOfPeaks(db_250k, cnv_method_id=cnv_method_id, call_method_id=call_method_id, \
+				analysis_method_id=analysis_method_id, \
+				result_peak_type_id_ls=[1,2,3,5,6,7], outputFname=outputFname,\
+				gap_between_phenotype=1, gap_between_category=10, gap_between_peak_type=5, maxNoOfPeaks=100)
+		sys.exit(0)
+		
+		#2012.2.21
+		for analysis_method_id in [1,7,32]:
+			for call_method_id in [32,80]:
+				cnv_method_id = None	#20	#None	#20
+				#call_method_id = None#	#	#	#32	#80	#32, None
+				#analysis_method_id=1
+				outputFname = os.path.expanduser('~/doc/20110315ArabidopsisDeletionPolymorphism/figures/GWAS_call%s_cnv%s_analysis%s_noOfPeaks.png'%
+												(call_method_id, cnv_method_id, analysis_method_id))
+				CNV.GWA.drawNumberOfPeaks(db_250k, cnv_method_id=cnv_method_id, call_method_id=call_method_id, \
+						analysis_method_id=analysis_method_id, \
+						result_peak_type_id_ls=[1,2,3,5,6,7], outputFname=outputFname,\
+						gap_between_phenotype=1, gap_between_category=10, gap_between_peak_type=5, maxNoOfPeaks=100)
+		sys.exit(0)
+		
+		"""
+	
 	class Lyrata(object):
 		"""
 		2010-8-2
@@ -9734,7 +9967,8 @@ class CNV(object):
 	
 	@classmethod
 	def comparePeaksFromTwoAssociationResults(cls, db_250k, result1_id=None, result1_peak_type_id=None,\
-											result2_id=None, result2_peak_type_id=None, result2_peak_ext_dist=0):
+											result2_id=None, result2_peak_type_id=None, result2_peak_ext_dist=0,\
+											outputDir='/Network/Data/250k/tmp-yh/CNV/'):
 		"""
 		2011-4-22
 			peak data is from table ResultPeak.
@@ -9791,11 +10025,14 @@ class CNV(object):
 		sys.stderr.write("%s/%s peaks in result %s not found in result %s. Done.\n"%(no_of_peaks_not_in_result2,\
 												counter, result1_id, result2_id))
 		from pymodule import yh_matplotlib
+		outputFname  = os.path.join(outputDir, 'hist_of_result%s_overlap_rate_in_result%s.png'%(result1_id, result2_id))
 		yh_matplotlib.drawHist(overlap_ls, title='Histogram of overlap rate of %s peaks'%(len(overlap_ls)), \
 							xlabel_1D='overlap rate',\
-							outputFname='/tmp/hist_of_result%s_overlap_rate_in_result%s.png'%(result1_id, result2_id), \
+							outputFname=outputFname, \
 							min_no_of_data_points=10, needLog=False)
-		outputFname = '/tmp/hist_of_result%s_overlap_rate_in_result%s_2D.png'%(result1_id, result2_id)
+		
+		outputFname  = os.path.join(outputDir, 'hist_of_result%s_overlap_rate_in_result%s_2D.png'%(result1_id, result2_id))
+		#outputFname = 'hist_of_result%s_overlap_rate_in_result%s_2D.png'%(result1_id, result2_id)
 		C_ls = [1]*len(overlap_ls)
 		colorBarLabel='log(count)'
 		reduce_C_function = yh_matplotlib.logSum
@@ -9833,6 +10070,16 @@ class CNV(object):
 			result2_id = result2_id_ls[i]
 		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\						result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
 		sys.exit(0)
+		
+		# 2011-4-22
+		result1_id = 4634	#cnv_20_LD_KW
+		result1_peak_type_id = 1 #min_score=4
+		result2_id = 4635	#cnv_20_LDV_KW
+		result2_peak_type_id = 1	#min_score=4
+		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\
+										result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -20387,7 +20634,7 @@ class DBGenome(object):
 class Main(object):
 	__doc__ = __doc__
 	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
+							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
 							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
 							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
@@ -20424,29 +20671,20 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		#2011-6-27
-		inputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/last_updated_vervet_GSS_seqs.fasta")
-		outputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/last_updated_vervet_GSS_seqs.fastq")
-		FileFormatExchange.fasta2Fastq(inputFname, outputFname, replaceSpaceWithUnderScore=True)
+		#2012.2.21
+		for analysis_method_id in [1,7,32]:
+			for call_method_id in [32,80]:
+				cnv_method_id = None	#20	#None	#20
+				#call_method_id = None#	#	#	#32	#80	#32, None
+				#analysis_method_id=1
+				outputFname = os.path.expanduser('~/doc/20110315ArabidopsisDeletionPolymorphism/figures/GWAS_call%s_cnv%s_analysis%s_noOfPeaks.png'%
+												(call_method_id, cnv_method_id, analysis_method_id))
+				CNV.GWA.drawNumberOfPeaks(db_250k, cnv_method_id=cnv_method_id, call_method_id=call_method_id, \
+						analysis_method_id=analysis_method_id, \
+						result_peak_type_id_ls=[1,2,3,5,6,7], outputFname=outputFname,\
+						gap_between_phenotype=1, gap_between_category=10, gap_between_peak_type=5, maxNoOfPeaks=100)
 		sys.exit(0)
 		
-		#2011-6-27
-		inputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/BAC.accession.fasta")
-		outputFname = os.path.expanduser("~/script/vervet/data/ref/BAC/BAC.accession.fastq")
-		FileFormatExchange.fasta2Fastq(inputFname, outputFname)
-		sys.exit(0)
-		
-		
-		
-		# 2011-4-22
-		result1_id = 4634	#cnv_20_LD_KW
-		result1_peak_type_id = 1 #min_score=4
-		result2_id = 4635	#cnv_20_LDV_KW
-		result2_peak_type_id = 1	#min_score=4
-		CNV.comparePeaksFromTwoAssociationResults(db_250k, result1_id=result1_id, result1_peak_type_id=result1_peak_type_id,\
-										result2_id=result2_id, result2_peak_type_id=result2_peak_type_id, result2_peak_ext_dist=0)
-		sys.exit(0)
-
 
 #2007-03-05 common codes to initiate database connection
 import sys, os, math
