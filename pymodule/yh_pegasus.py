@@ -25,8 +25,17 @@ def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=No
 
 def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, input_site_handler='local',\
 						checkAffiliateFileExistence=True,\
-						affiliateFilenameSuffixLs=['amb', 'ann', 'bwt', 'dict', 'fai', 'pac', 'rbwt', 'rpac', 'rsa', 'sa']):
+						affiliateFilenameSuffixLs=['dict', 'fai', 'amb', 'ann', 'bwt', 'pac', 'sa', 'rbwt', 'rpac', 'rsa', \
+												'stidx', 'sthash']):
 	"""
+	2012.2.24
+		dict is via picard
+		fai is via "samtools faidx" (index reference)
+		amb', 'ann', 'bwt', 'pac', 'sa', 'rbwt', 'rpac', 'rsa' are all bwa index.
+		stidx is stampy index.
+		sthash is stampy hash.
+	2012.2.23
+		add two suffixes, stidx (stampy index) and sthash (stampy hash)
 	2011-11-11
 		if needAffiliatedFiles,
 			all other files, with suffix in affiliateFilenameSuffixLs, will be registered (symlinked or copied) as well.
@@ -98,3 +107,13 @@ def registerFile(workflow, filename):
 								workflow.input_site_handler))
 	workflow.addFile(file)
 	return file
+
+def getAbsPathOutOfExecutable(executable):
+	"""
+	2012.2.24
+		This function extracts path out of a registered executable.
+			executable is a registered pegasus executable with PFNs.
+	"""
+	pfn = (list(executable.pfns)[0])
+	#the url looks like "file:///home/crocea/bin/bwa"
+	return pfn.url[7:]
