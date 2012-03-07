@@ -144,12 +144,13 @@ class TwoGWASPeakOverlap(object):
 			result1 = Stock_250kDB.ResultsMethod.get(result1_id)
 			result2 = Stock_250kDB.ResultsMethod.get(result2_id)
 			
-			writer.writerow(['result1_id', 'result2_id', \
+			writer.writerow(['result1_id', 'result2_id|string', \
 							'result1_category_id', 'result2_category_id', \
 							"no_of_result1_peaks", "no_of_result2_peaks", \
 							"no_of_result1_peaks_in_result2", "no_of_result2_peaks_in_result1", \
 							"overlapFraction"])
-			writer.writerow([result1_id, result2_id, \
+			writer.writerow(['%s_%s'%(result1_id, result1.phenotype_method.short_name), \
+							'%s_%s'%(result2_id, result2.phenotype_method.short_name), \
 							result1.phenotype_method.biology_category_id,\
 							result2.phenotype_method.biology_category_id,\
 							no_of_result1_peaks, no_of_result2_peaks, \

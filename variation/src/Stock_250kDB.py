@@ -253,6 +253,8 @@ class SnpsContext(Entity):
 
 class CallMethod(Entity):
 	"""
+	2012.2.28
+		add column no_of_accessions, no_of_loci
 	2010-2-22
 		add accession_set_id
 		make column parent_id a foreign key to CallMethod
@@ -277,6 +279,8 @@ class CallMethod(Entity):
 	max_snp_mismatch_rate = Field(Float)
 	max_snp_NA_rate = Field(Float)
 	npute_window_size = Field(Integer)
+	no_of_accessions = Field(Integer)	#2012.2.28
+	no_of_loci = Field(Integer)	#2012.2.28
 	imputed = Field(Boolean)
 	unique_ecotype = Field(Boolean)
 	avg_array_mismatch_rate = Field(Float)
@@ -1601,12 +1605,16 @@ class CNVArrayCall(Entity):
 
 class CNVMethod(Entity):
 	"""
+	2012.2.28
+		add column no_of_accessions, no_of_loci
 	2011-2-17
 		add column filename
 	2009-10-26
 		which type of method is used to infer CNVs
 	"""
 	short_name = Field(String(200), unique=True)
+	no_of_accessions = Field(Integer)	#2012.2.28
+	no_of_loci = Field(Integer)	#2012.2.28
 	description = Field(String(8000))
 	filename = Field(Text)
 	comment = Field(String(8000))

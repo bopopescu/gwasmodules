@@ -14,13 +14,21 @@ Examples:
 	%s -x 2 -l 32 -a 1 -o call32Analysis1_peakType2_pairwisePeakOverlap.xml -B condorpool -D condorpool
 		-u yh -z banyan
 	
+	#2012.2.28
+	%s -x 2 -l 32 -a 1 -i 1 -o call32Analysis1_peakType2_biologyCategory1_publicPhenotype_pairwisePeakOverlap.xml
+		-B condorpool -D condorpool -u yh -z banyan -s1
+	
+	#2012.2.28
+	%s -x 1 -l 80 -a 1 -i 1 -o call80Analysis1_peakType1_biologyCategory1_publicPhenotype_pairwisePeakOverlap.xml
+		-B condorpool -D condorpool -u yh -z banyan -s1
+	
 Description:
 	2011-10-12
 		output a workflow that runs the PairwiseGWASPeakOverlap.py on all specified gwas results
 		
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
@@ -37,7 +45,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 	common_option_dict = {
 						("phenotype_method_id_ls", 0, ): [None, 'y', 1, 'comma/dash-separated phenotype_method id list, like 1,3-7. Default is all.'],\
 						('biology_category_id', 0, int): [None, 'i', 1, 'phenotype biology category id. Default is no filter'],\
-						('access', 0, int): [None, '', 1, 'Restrict phenotype via access field in db. 1: public phenotypes, 2: restricted. Default is no filter'],\
+						('access', 0, int): [None, 's', 1, 'Restrict phenotype via access field in db. 1: public phenotypes, 2: restricted. Default is no filter'],\
 						('peak_padding', 1, int): [10000, '', 1, 'the extension for each peak on both sides. Rationale is if two peaks are '],\
 						}
 	option_default_dict.update(common_option_dict)

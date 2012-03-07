@@ -8629,7 +8629,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	"""
 	
 	@classmethod
-	def convertSNPDatasetLocusIDIntoDBID(cls, db, input_fname, output_fname):
+	def convertSNPDatasetLocusIDIntoDBID(cls, db, input_fname, output_fname, priorTAIRVersion=True):
 		"""
 		2011-2-24
 			input_fname is Strain X SNP format.
@@ -8639,7 +8639,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		"""
 		from pymodule import read_data
 		chr_pos_set = set()
-		chr_pos2snp_id = db.getSNPChrPos2ID(keyType=1)
+		chr_pos2snp_id = db.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion)
 		#chr_pos2snp_id = db.chr_pos2snp_id
 		for chr_pos, db_id in chr_pos2snp_id.iteritems():
 			chr, pos = chr_pos[:2]
@@ -8650,8 +8650,8 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		
 		new_header = header[:2]
 		for chr_pos in header[2:]:
-			chr_pos = map(int, chr_pos.split('_'))
-			chr_pos = tuple(chr_pos)
+			chr_pos = chr_pos.split('_')
+			chr_pos = (chr_pos[0], int(chr_pos[1]))	#chr in string format
 			db_id = chr_pos2snp_id[chr_pos]
 			new_header.append(db_id)
 		header = new_header
@@ -8671,6 +8671,15 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
 		DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname)
 		sys.exit(2)
+		
+		#2012.3.1
+		call_method_id=32
+		input_fname = "/Network/Data/250k/db/dataset/call_method_%s.old.tsv"%(call_method_id)
+		output_fname = "/Network/Data/250k/db/dataset/call_method_%s.db.tsv"%(call_method_id)
+		DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname, priorTAIRVersion=True)
+			
+		sys.exit(2)
+		
 	"""
 	
 	@classmethod
@@ -20671,19 +20680,20 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		#2012.2.21
-		for analysis_method_id in [1,7,32]:
-			for call_method_id in [32,80]:
-				cnv_method_id = None	#20	#None	#20
-				#call_method_id = None#	#	#	#32	#80	#32, None
-				#analysis_method_id=1
-				outputFname = os.path.expanduser('~/doc/20110315ArabidopsisDeletionPolymorphism/figures/GWAS_call%s_cnv%s_analysis%s_noOfPeaks.png'%
-												(call_method_id, cnv_method_id, analysis_method_id))
-				CNV.GWA.drawNumberOfPeaks(db_250k, cnv_method_id=cnv_method_id, call_method_id=call_method_id, \
-						analysis_method_id=analysis_method_id, \
-						result_peak_type_id_ls=[1,2,3,5,6,7], outputFname=outputFname,\
-						gap_between_phenotype=1, gap_between_category=10, gap_between_peak_type=5, maxNoOfPeaks=100)
-		sys.exit(0)
+		# 2012.3.3
+		for call_method_id in range(43,57) + [72]:
+			input_fname = "/Network/Data/250k/db/dataset/call_method_%s.tsv"%(call_method_id)
+			output_fname = "/Network/Data/250k/db/dataset/call_method_%s.db.tsv"%(call_method_id)
+			DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname, priorTAIRVersion=True)
+			
+			input_new_fname = "/Network/Data/250k/db/dataset/call_method_%s.old.tsv"%(call_method_id)
+			commandline = 'mv %s %s'%(input_fname, input_new_fname)
+			from pymodule.utils import runLocalCommand
+			return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+			commandline = 'mv %s %s'%(output_fname, input_fname)
+			from pymodule.utils import runLocalCommand
+			return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+		sys.exit(2)
 		
 
 #2007-03-05 common codes to initiate database connection
