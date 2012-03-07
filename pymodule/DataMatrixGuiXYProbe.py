@@ -134,8 +134,8 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			if event.inaxes is not None:
 				print 'data coords', event.xdata, event.ydata
 				for row in self.list_2d:
-					x_data = row[x_column]
-					y_data = row[y_column]
+					x_data = float(row[x_column])
+					y_data = float(row[y_column])
 					if abs(x_data-event.xdata)<x_grain_size and abs(y_data-event.ydata)<y_grain_size:
 						info = row[dot_label_column]
 						if to_label_dot:
@@ -306,7 +306,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		hist_ls = []
 		hist_column = int(self.entry_hist_column.get_text())
 		for i in range(len(self.liststore)):
-			hist_ls.append(self.liststore[i][hist_column])
+			hist_ls.append(float(self.liststore[i][hist_column]))
 		self.ax.set_title("Histogram of %s %s"%(self.plot_title, self.column_header[hist_column]))
 		no_of_bins = int(self.entry_no_of_bins.get_text())
 		self.ax.hist(hist_ls, no_of_bins)

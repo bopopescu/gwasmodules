@@ -613,7 +613,12 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 		sys.stderr.write("Row no: %s. %s ....\n"%(i, repr(row[:10])))
 		raise
 	del reader
-	sys.stderr.write("%s rows and %s data points. Done.\n"%(len(data_matrix), no_of_data_points))
+	no_of_rows = len(data_matrix)
+	if no_of_rows>0:
+		no_of_cols = no_of_data_points/float(no_of_rows)
+	else:
+		no_of_cols=None
+	sys.stderr.write("%s rows, %s columns, %s data points. Done.\n"%(no_of_rows, no_of_cols, no_of_data_points))
 	return header, strain_acc_list, category_list, data_matrix
 
 class SNPData(object):
@@ -1149,8 +1154,10 @@ class SNPData(object):
 		return newSnpData
 	
 	@classmethod
-	def removeColsByMAF(cls, snpData, min_MAF=1):
+	def removeColsByMAF(cls, snpData, min_MAF=1, NA_set =Set([0, 'NA', 'N', -2, '|'])):
 		"""
+		2012.2.29
+			added the NA_set argument
 		2008-05-29
 			remove SNPs whose MAF is lower than min_MAF
 		"""
@@ -1171,7 +1178,7 @@ class SNPData(object):
 			allele_index2allele = allele_index2allele_ls[j]
 			for i in range(no_of_rows):
 				allele = snpData.data_matrix[i][j]
-				if allele==0 or allele==-2:
+				if allele in NA_set:
 					allele_index = num.nan	#numpy.nan is better than -2
 				elif allele not in allele2index_ls[j]:
 					allele_index = len(allele2index_ls[j])
@@ -1203,8 +1210,10 @@ class SNPData(object):
 		return newSnpData
 	
 	@classmethod
-	def removeMonomorphicCols(cls, snpData):
+	def removeMonomorphicCols(cls, snpData, NA_set =Set([0, 'NA', 'N', -2, '|'])):
 		"""
+		2012.2.29
+			added the NA_set argument
 		2010-2-2
 			fix the bug that newSnpData was initiated with an empty col_id_ls, which results in an empty col_id2col_index.
 		2008-05-19
@@ -1217,7 +1226,7 @@ class SNPData(object):
 			non_negative_number_set = Set()
 			for i in range(no_of_rows):
 				number = snpData.data_matrix[i][j]
-				if number >0:
+				if number not in NA_set:
 					non_negative_number_set.add(number)
 			if len(non_negative_number_set)>1:	#not monomorphic
 				col_index_wanted_ls.append(j)

@@ -391,6 +391,14 @@ class AbstractNGSWorkflow(object):
 		workflow.addExecutable(tabixRetrieve)
 		workflow.tabixRetrieve = tabixRetrieve
 		
+		#2012.3.1
+		MergeFiles = Executable(namespace=namespace, name="MergeFiles", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		MergeFiles.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "shell/MergeFiles.sh"), site_handler))
+		MergeFiles.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		workflow.addExecutable(MergeFiles)
+		workflow.MergeFiles = MergeFiles
+	
 	def initiateWorkflow(self, workflowName):
 		"""
 		2011-11-22
@@ -457,11 +465,13 @@ class AbstractNGSWorkflow(object):
 		for inputFile in inputFileList:
 			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 	
-	def registerOneInputFile(self, workflow, inputFname,):
+	def registerOneInputFile(self, workflow, inputFname, folderName=""):
 		"""
+		2012.3.1
+			add argument folderName, which will put the file in specific pegasus workflow folder
 		2011.12.21
 		"""
-		file = File(os.path.basename(inputFname))
+		file = File(os.path.join(folderName, os.path.basename(inputFname)))
 		file.addPFN(PFN("file://" + os.path.abspath(inputFname), workflow.input_site_handler))
 		workflow.addFile(file)
 		return file

@@ -961,9 +961,15 @@ class TwoSNPData(QualityControl):
 			row_id2row_index1[row_id] = i
 		
 		row_id2row_index2 = {}
+		SNPData2_proper_row_key2row_index = {}	#2012.3.2	#for matching purpose only
 		for i in range(len(row_id_ls2)):
 			row_id = row_id_ls2[i]
 			row_id2row_index2[row_id] = i
+			if isinstance(row_matching_by_which_value, int):
+				key = row_id[row_matching_by_which_value]
+			else:
+				key = row_id
+			SNPData2_proper_row_key2row_index[key] = [i, row_id]
 		
 		row_id12row_id2 = {}
 		for row_id in row_id2row_index1:
@@ -971,8 +977,8 @@ class TwoSNPData(QualityControl):
 				key = row_id[row_matching_by_which_value]
 			else:
 				key = row_id
-			if key in row_id2row_index2:
-				row_id12row_id2[row_id] = key
+			if key in SNPData2_proper_row_key2row_index:
+				row_id12row_id2[row_id] = SNPData2_proper_row_key2row_index[key][1]	#pur the original row_id in row_id12row_id2
 			else:
 				if hasattr(self, 'debug') and getattr(self,'debug'):
 					sys.stderr.write('Row Matching Failure: %s.\n'% repr(row_id))
@@ -1489,8 +1495,32 @@ class TwoSNPData(QualityControl):
 					writer.writerow([chr, pos, mismatch_rate])
 		del writer
 		sys.stderr.write("Done.\n")
+	
+	def order2ndSNPDataRowsSameAs1stSNPData(self,):
+		"""
+		2012.3.2
+			similar to variation.src.Kruskal_Wallis.get_phenotype_matrix_in_data_matrix_order()
+			but this function skips rows that are present in 1st SNPData but not 2nd. So the end SNPData might be smaller than both.
+		"""
 		
+		sys.stderr.write("Ordering 2nd SNP data rows same as 1st SNP data  ...")
 		
+		no_of_rows = len(self.row_id12row_id2)
+		no_of_cols = len(self.SNPData2.col_id_ls)
+		new_data_matrix = num.zeros([no_of_rows, no_of_cols], self.SNPData2.data_matrix.dtype)
+		row_id_ls = []
+		row_index_in_final_data = 0
+		for i in range(len(self.SNPData1.row_id_ls)):
+			row_id = self.SNPData1.row_id_ls[i]
+			if row_id in self.row_id12row_id2:
+				row_id2 = self.row_id12row_id2.get(row_id)
+				row_index2 = self.SNPData2.row_id2row_index[row_id2]
+				new_data_matrix[row_index_in_final_data,:] = self.SNPData2.data_matrix[row_index2,:]
+				row_index_in_final_data += 1
+				row_id_ls.append(row_id2)
+		sys.stderr.write("%s X %s dataset.\n"%(no_of_rows, no_of_cols))
+		return SNPData(row_id_ls=row_id_ls, header=self.SNPData2.header, data_matrix=new_data_matrix)
+
 class MergeTwoSNPData(object):
 	__doc__ = __doc__
 	option_default_dict = {('input_fname1',1, ): [None, 'i', 1, 'to form SNPData1'],\
@@ -1500,7 +1530,8 @@ class MergeTwoSNPData(object):
 							('priority', 1, int): [1, 'p', 1, '1=SNPData1 with SNPData2 covering where SNPData1 is NA, 2=SNPData2 with SNPData1 covering where SNPData2 is NA, 3=SNPData1 (not care SNPData2), 4=SNPData2'],\
 							('output_fname', 1, ): [None, 'o', 1, 'Final output.', ],\
 							('sortColumnInChrPosOrder', 0, int):[0, 's', 0, 'sort the columns in chromosomal order. Implying column IDs are SNP IDs like 3_1342 or 3_1343_0'],\
-							('row_matching_by_which_value', 0, int):[0, 'm', 1, 'which column in the input_fname1 should be used to establish row-id linking to input_fname2. 0=both inputs discard the 2nd column and use the 1st column, 1=1st column(input_fname1 keeps both columns), 2=2nd column(ditto).'],\
+							('row_matching_by_which_value', 0, int):[0, 'm', 1, 'which column in the input_fname1 should be used to establish row-id linking to input_fname2. \
+								0=both inputs discard the 2nd column and use the 1st column, 1=1st column(but both input keeps both columns), 2=2nd column(ditto).'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
 							#('input_fname1_format',1,int): [1, 'k', 1, 'Format of input_fname1. 1=strain X snp (Yu). 2=snp X strain (Bjarni) without arrayId. 3=snp X strain with arrayId.'],\
@@ -1525,7 +1556,7 @@ class MergeTwoSNPData(object):
 			snpData1 = SNPData(input_fname=self.input_fname1, turn_into_array=1, ignore_2nd_column=1)
 		else:
 			snpData1 = SNPData(input_fname=self.input_fname1, turn_into_array=1)
-		snpData2 = SNPData(input_fname=self.input_fname2, turn_into_array=1, ignore_2nd_column=1)
+		snpData2 = SNPData(input_fname=self.input_fname2, turn_into_array=1)
 		
 		if self.row_matching_by_which_value==1 or self.row_matching_by_which_value==2:
 			row_matching_by_which_value = self.row_matching_by_which_value-1

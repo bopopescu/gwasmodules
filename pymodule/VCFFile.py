@@ -170,9 +170,9 @@ class VCFRecord(object):
 		self.col_index_individual_name_ls = col_index_individual_name_ls
 		self.minDepth = minDepth
 		self.data_row = []
-		self._parse(row)
 		self.alleleLs = []	#index 0 is refBase, 1 is first altBase, 2 is 2nd altBase .. 
 		self.alleleNumber2Base = {}	#map string type of allele 0,1,2 to the actual base
+		self._parse(row)
 		
 	def _parse(self, row):
 		returnData = parseOneVCFRow(row, self.col_name2index, self.col_index_individual_name_ls, self.sample_id2index, \
@@ -185,6 +185,7 @@ class VCFRecord(object):
 		self.info_tag2value = returnData.info_tag2value
 		self.data_row = returnData.data_row
 		self.alleleNumber2Base = returnData.alleleNumber2Base
+		self.alleleLs = returnData.alleleLs
 	
 	def getAAF(self):
 		"""
@@ -374,10 +375,11 @@ class VCFFile(object):
 			an iterator over each line (call data) in VCF
 		"""
 		for row in self.reader:
-			yield VCFRecord(row, col_name2index=self.col_name2index, \
+			vcfRecord = VCFRecord(row, col_name2index=self.col_name2index, \
 						individual_name2col_index=self.individual_name2col_index, sample_id2index=self.sample_id2index,\
 						col_index_individual_name_ls=self.col_index_individual_name_ls,\
 						minDepth=self.minDepth)
+			yield vcfRecord
 	
 	def countHomoHetCallsForEachSampleFromVCF(self):
 		"""
