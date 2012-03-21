@@ -7,7 +7,7 @@ Examples:
 
 Description:
 	2012.3.1
-
+	This program merges multiple output of CalculateColCorBetweenTwoHDF5/FindMaxLDBetweenPeakAndEachLocus into one.
 """
 
 import sys, os, math
@@ -47,8 +47,9 @@ class MergeTwoLocusCorrelationHDF5(AbstractMapper):
 		outputF = h5py.File(self.outputFname, 'w')
 		dtype = numpy.dtype([('input1LocusID', 'i'), ('input2LocusID', 'i'), ('correlation', 'f')])
 		shape = (self.datasetExpansionUnit,)	#initial shape
-		ds = outputF.create_dataset(self.datasetName, shape, dtype, maxshape=(None,), chunks=True)
-		#compression='gzip', compression_opts=4,  # no compression. it's really slow.
+		ds = outputF.create_dataset(self.datasetName, shape, dtype, compression='gzip', compression_opts=4, \
+								maxshape=(None,), chunks=True)
+		#compression seems to have little impact on the running speed.
 		no_of_records = 0
 		for inputFname in self.inputFnameLs:
 			if not os.path.isfile(inputFname):
@@ -59,7 +60,8 @@ class MergeTwoLocusCorrelationHDF5(AbstractMapper):
 			no_of_records += d1_length
 			if ds.shape[0]<no_of_records:
 				ds.resize((no_of_records+self.datasetExpansionUnit,))
-			ds[no_of_records-d1_length:no_of_records] = d1
+			#2012.3.21 d1 and d1[:] show different performance. the latter is a lot faster.
+			ds[no_of_records-d1_length:no_of_records] = d1[:]
 			f1.close() 
 		
 		if ds.shape[0]!=no_of_records:
