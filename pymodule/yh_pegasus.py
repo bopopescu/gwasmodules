@@ -9,8 +9,11 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 from ProcessOptions import  ProcessOptions
 from Pegasus.DAX3 import *
 
-def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=None):
+def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=None,\
+			parentJobLs=[], extraDependentInputLs=[]):
 	"""
+	2012.3.10
+		add argument parentJobLs, extraDependentInputLs
 	2011-11-28
 		get namespace and version from workflow first
 	2011-9-14
@@ -21,6 +24,10 @@ def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=No
 	mkDirJob.addArguments(outputDir)
 	mkDirJob.folder = outputDir	#custom attribute
 	workflow.addJob(mkDirJob)
+	for parentJob in parentJobLs:
+		workflow.depends(parent=parentJob, child=mkDirJob)
+	for input in extraDependentInputLs:
+		mkDirJob.uses(input, transfer=True, register=True, link=Link.INPUT)
 	return mkDirJob
 
 def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, input_site_handler='local',\

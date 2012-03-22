@@ -563,11 +563,11 @@ class OneGenomeData(PassingData):
 		2011-3-13
 		"""
 		if self._chr_id2size is None:
-			self.chr_id2size = (self.tax_id)
+			self.chr_id2size = (self.tax_id, )
 		return self._chr_id2size
 	
 	@chr_id2size.setter
-	def chr_id2size(self, argument_ls):
+	def chr_id2size(self, argument_ls=[]):
 		"""
 		#2011-11-21
 			order the chromosomes according to self.chrOrder
@@ -578,9 +578,10 @@ class OneGenomeData(PassingData):
 		2008-10-07 curs could be elixirdb.metadata.bind
 		2007-10-12
 		"""
-		if len(argument_ls)==0:
+		if argument_ls and len(argument_ls)>0:
+			tax_id = argument_ls[0]
+		else:
 			tax_id = self.tax_id
-		tax_id = argument_ls[0]
 		sys.stderr.write("Getting chr_id2size for tax_id %s ..."%(tax_id))
 		
 		#query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
@@ -862,6 +863,9 @@ class GenomeDatabase(ElixirDB):
 	
 	def createGenomeRBDict(self, tax_id=3702, max_distance=20000, debug=False):
 		"""
+		2012.3.19
+			add an attribute to geneSpanRBDict:
+				genomeRBDict.genePadding (=max_distance)
 		2011-3-24
 			stop casting row.chromosome into integer (just string type)
 			add ncbi_gene_id to oneGeneData
@@ -880,6 +884,7 @@ class GenomeDatabase(ElixirDB):
 		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		from RBTree import RBDict
 		genomeRBDict = RBDict()
+		genomeRBDict.genePadding = max_distance	#2012.3.19
 		query = Gene.query.filter_by(tax_id=tax_id).filter(Gene.start!=None).\
 			filter(Gene.stop!=None).filter(Gene.chromosome!=None)
 		counter = 0

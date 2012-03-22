@@ -447,7 +447,7 @@ def write_data_matrix(data_matrix, output_fname, header, strain_acc_list, catego
 	del writer
 	sys.stderr.write("%s NA rows. Done.\n"%no_of_all_NA_rows)
 
-def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=0, delimiter=None, \
+def read_data(inputFname, input_alphabet=0, turn_into_integer=1, double_header=0, delimiter=None, \
 			matrix_data_type=int, ignore_het=0,\
 			data_starting_col=2, row_id_key_set=None, row_id_hash_func=None, col_id_key_set=None, col_id_hash_func=None):
 	"""
@@ -456,11 +456,11 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 	2010-3-31
 		add 2 arguments:
 			col_id_key_set: only retain columns whose keys are in this set 
-			col_id_hash_func: a function that maps the original col-id (=row[0:2]) from input_fname to the one in col_id_key_set
+			col_id_hash_func: a function that maps the original col-id (=row[0:2]) from inputFname to the one in col_id_key_set
 	2009-12-11
 		add 2 arguments:
 			row_id_key_set: only retain rows whose keys are in this set 
-			row_id_hash_func: a function that maps the original row-id (=row[0:2]) from input_fname to the one in row_id_key_set
+			row_id_hash_func: a function that maps the original row-id (=row[0:2]) from inputFname to the one in row_id_key_set
 	2009-10-12
 		add argument data_starting_col, specifying which column (index from 0) the data starts from. default is 2 (3rd column).
 	2009-10-11
@@ -472,7 +472,7 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 		eg:
 		
 		#read a phenotype matrix. turn_into_integer=2 because it's not nucleotides
-		header_phen, strain_acc_list_phen, category_list_phen, data_matrix_phen = read_data(input_fname, turn_into_integer=2, \
+		header_phen, strain_acc_list_phen, category_list_phen, data_matrix_phen = read_data(inputFname, turn_into_integer=2, \
 			matrix_data_type=float)
 		phenData = SNPData(header=header_phen, strain_acc_list=strain_acc_list_phen, data_matrix=data_matrix_phen)
 		
@@ -510,7 +510,7 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 		add turn_into_integer
 	"""
 	import csv
-	sys.stderr.write("Reading data from %s ..."%input_fname)
+	sys.stderr.write("Reading data from %s ..."%inputFname)
 	if ignore_het:
 		nt2number_mapper = nt2number_without_het
 	else:
@@ -521,8 +521,8 @@ def read_data(input_fname, input_alphabet=0, turn_into_integer=1, double_header=
 		else:
 			return x
 	if delimiter is None:
-		delimiter = figureOutDelimiter(input_fname)
-	reader = csv.reader(open(input_fname), delimiter=delimiter)
+		delimiter = figureOutDelimiter(inputFname)
+	reader = csv.reader(open(inputFname), delimiter=delimiter)
 	
 	header = reader.next()
 	# 2010-3-31 pick the columns according to col_id_key_set
@@ -1834,7 +1834,8 @@ class GenomeWideResults(TableClass):
 		self.genome_wide_result_ls = []
 		self.genome_wide_result_obj_id2index = {}
 		self.max_value = None
-		
+	
+	
 class GenomeWideResult(object):
 	"""
 	2009-4-24
@@ -1889,19 +1890,25 @@ class GenomeWideResult(object):
 	def get_data_obj_by_obj_index(self, obj_index):
 		return self.data_obj_ls[obj_index]
 	
-	def get_data_obj_by_chr_pos(self, chromosome, position):
+	def get_data_obj_by_chr_pos(self, chromosome, position=None, stopPosition=None):
 		"""
+		2012.3.7
+			add argument stopPosition
 		2008-09-24
 		"""
+		if stopPosition is None:
+			stopPosition = position
 		if self.chr_pos2index==None:
 			return None
 		else:
-			obj_index = self.chr_pos2index.get((chromosome, position))
+			obj_index = self.chr_pos2index.get((chromosome, position, stopPosition))
 			if obj_index is not None:
 				return self.data_obj_ls[obj_index]
 	
 	def add_one_data_obj(self, data_obj, chr_pos2index=None):
 		"""
+		2012.3.7
+			add data_obj.stopPosition into the chr_pos key
 		2009-4-24 update self.chr2min_max_pos
 		2008-10-23
 			handle chr2no_of_snps
@@ -1926,7 +1933,7 @@ class GenomeWideResult(object):
 		if self.construct_chr_pos2index:	#2008-09-24
 			if self.chr_pos2index ==None:
 				self.chr_pos2index = {}
-			chr_pos = (data_obj.chromosome, data_obj.position)
+			chr_pos = (data_obj.chromosome, data_obj.position, data_obj.stopPosition)	#2012.3.7 add data_obj.stopPosition
 			if chr_pos not in self.chr_pos2index:
 				self.chr_pos2index[chr_pos] = data_obj_index
 		if self.min_value is None or data_obj.value<self.min_value:
@@ -2027,7 +2034,206 @@ class GenomeWideResult(object):
 		self.data_obj_id2index = new_data_obj_id2index
 		no_of_new_objs = len(self.data_obj_ls)
 		sys.stderr.write("%s out of %s retained.\n"%(no_of_new_objs, no_of_objs))
+	
+	def drawManhattanPlot(self, db_genome, outputFnamePrefix=None, min_value=2.5, need_svg=False, ylim_type=1,\
+					drawBonferroni=True, highlightBandLs=[]):
+		"""
+		2012.3.9
+			copied from variation.src.misc.GWA.drawGWANicer()
+			add argument drawBonferroni
+			add argument highlightBandLs, a list of [chr,start,stop], to be highlighted in red, with alpha=0.4
+		2010-3-9
+			if min_value is None, no filter.
+			add argument ylim_type:
+				1: ylim = ax.get_ylim(); ax.set_ylim([0, ylim[1]])
+				2: ax.set_ylim([min_y, max_y])
+		2008-1-11 draw nicer genome wide plots
+		"""
+		chr2xy_ls = {}
+		counter = 0
+		for data_obj in self.data_obj_ls:
+			if min_value and data_obj.value<min_value:	#2010-3-9
+				continue
+			chr = data_obj.chromosome
+			if chr not in chr2xy_ls:
+				chr2xy_ls[chr] = [[],[]]
+			chr2xy_ls[chr][0].append(data_obj.position)
+			chr2xy_ls[chr][1].append(data_obj.value)
+			counter += 1
+		
+		chr_gap = 0
+		oneGenomeData = db_genome.getOneGenomeData(tax_id=3702, chr_gap=0, chrOrder=1, sequence_type_id=None)
+		chr_id_int2size = oneGenomeData.chr_id2size
+		chr_id2cumu_start = oneGenomeData.chr_id2cumu_start
+		
+		sys.stderr.write("Drawing manhattan plot for %s objects ..."%(counter))
+		import pylab
+		pylab.clf()
+		fig = pylab.figure(figsize=(10,2))
+		#ax = pylab.axes()
+		ax = fig.gca()
+		import numpy
+		chr_ls = chr2xy_ls.keys()
+		chr_ls.sort()
+		max_y = None
+		min_y = None
+		for chr in chr_ls:
+			xy_ls = chr2xy_ls[chr]
+			x_ls = numpy.array(xy_ls[0])
+			x_ls += chr_id2cumu_start[chr]
+			if xy_ls:
+				if max_y is None:
+					max_y = max(xy_ls[1])
+				else:
+					max_y = max(max_y, max(xy_ls[1]))
+				if min_y is None:
+					min_y = min(xy_ls[1])
+				else:
+					min_y = min(min_y, min(xy_ls[1]))
+				ax.plot(x_ls, xy_ls[1], '.', markeredgewidth=0, markersize=5, alpha=0.8)
+		
+		#separate each chromosome
+		for chr in chr_ls:
+		#	print chr
+			ax.axvline(chr_id2cumu_start[chr], linestyle='--', color='k', linewidth=0.8)
+		
+		if drawBonferroni:
+			#draw the bonferroni line
+			bonferroni_value = -math.log10(0.01/len(genome_wide_result.data_obj_ls))
+			ax.axhline(bonferroni_value, linestyle='--', color='k', linewidth=0.8)
+		
+		for highlightBand in highlightBandLs:
+			chr, start, stop = highlightBand[:3]
+			cumu_start = start + chr_id2cumu_start[chr]
+			cumu_stop = stop + chr_id2cumu_start[chr]
+			ax.axvspan(cumu_start, cumu_stop, facecolor="red", alpha=0.4)
+		#ax.set_ylabel("-log(P-value)")
+		#ax.set_xlabel('Chromosomal Position')
+		#ax.set_xlim([0, chr_id2cumu_size[chr_ls[-1]]])
+		
+		if ylim_type==1:
+			ylim = ax.get_ylim()
+			ax.set_ylim([0, ylim[1]])
+		elif ylim_type==2:
+			ax.set_ylim([min_y, max_y])
+		
+		pylab.savefig('%s.png'%outputFnamePrefix, dpi=300)
+		if need_svg:
+			pylab.savefig('%s.svg'%outputFnamePrefix, dpi=300)
+		sys.stderr.write(".\n")
+	
+	def fillGenomeWideResultFromHDF5CorrelationFile(self, inputFname, datasetName='correlation', min_value_cutoff=None, \
+							do_log10_transformation=False, pdata=None,\
+							chr_pos2index=None, max_value_cutoff=None, \
+							OR_min_max=False, takeAbsValue=True):
+		"""
+		2012.3.9
+			the inputFname is a HDF5 format file. with an array of a compound data type:
+				DATATYPE  H5T_COMPOUND {
+					H5T_STD_I32LE "input1LocusID";
+					H5T_STD_I32LE "input2LocusID";
+					H5T_IEEE_F32LE "correlation";
+				}
+		"""
+		sys.stderr.write("Filling genome wide result from %s ... "%inputFname)
+		
+		chr_pos2index = getattr(pdata, 'chr_pos2index', chr_pos2index)	#2008-10-21
+		db_id2chr_pos = getattr(pdata, 'db_id2chr_pos', None)	#2011-2-24
+		score_for_0_pvalue = getattr(pdata, 'score_for_0_pvalue', 50)	#2012.3.9 only used when score=0 and do_log10_transformation=True
+		max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
+		OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
+		
+		#2011-3-21
+		chromosome_request = getattr(pdata, 'chromosome', None)
+		start_request = getattr(pdata, 'start', None)
+		try:
+			start_request = float(start_request)	#passed from web interface functions is of str type
+		except:
+			pass
+		stop_request = getattr(pdata, 'stop', None)
+		try:
+			stop_request = float(stop_request)	#passed from web interface functions is of str type. int('12384.84') results in failure.
+		except:
+			pass
+		min_MAF_request = getattr(pdata, 'min_MAF', None)
+		min_MAC_request = getattr(pdata, 'min_MAC', None)	#2009-1-29
+		
+		genome_wide_result_id = id(self)
+		
+		import h5py, numpy
+		f1 = h5py.File(inputFname, 'r')
+		d1 = f1[datasetName]
+		d1_length = d1.shape[0]
+		
+		no_of_lines = 0
+		header = []
+		#figure out the compound data type , names
+		"""
+		DATATYPE  H5T_COMPOUND {
+		 H5T_STD_I32LE "input1LocusID";
+		 H5T_STD_I32LE "input2LocusID";
+		 H5T_IEEE_F32LE "correlation";
+			}
+		"""
+		for i in xrange(d1_length):
+			locus1_id = d1[i][0]
+			score = d1[i][2]	#correlation
+			if takeAbsValue:
+				score = abs(score)
+			db_id = locus1_id
+			chr = None
+			start_pos = None
+			stop_pos = None
+			if db_id in db_id2chr_pos:
+				chr_pos = db_id2chr_pos.get(db_id)
+				if len(chr_pos)>=2:
+					chr, start_pos = chr_pos[:2]
+				if len(chr_pos)>=3:
+					stop_pos = chr_pos[2]
+			else:	#ignore this row
+				continue
 			
+			if chromosome_request!=None and chr!=chromosome_request:
+				continue
+			if start_request!=None and start_pos<start_request:
+				continue
+			if stop_request!=None and start_pos>stop_request:
+				continue
+			if do_log10_transformation:
+				if score<=0:
+					sys.stderr.write("score <=0. can't do log10. row is %s. assign %s to it.\n"%(repr(row), score_for_0_pvalue))
+					#continue
+					score = score_for_0_pvalue
+				else:
+					score = -math.log10(score)
+			
+			# 2009-10-27 procedure to decide whether to include the data point or not
+			include_the_data_point = False	# default is False
+			if min_value_cutoff is not None and max_value_cutoff is not None:	# both are specified. check OR_min_max.
+				if OR_min_max:	# condition is OR
+					if score>=min_value_cutoff or score<=max_value_cutoff:
+						include_the_data_point = True
+				else:	# condition is AND
+					if score>=min_value_cutoff and score<=max_value_cutoff:
+						include_the_data_point = True
+			
+			elif min_value_cutoff is not None and score>=min_value_cutoff:
+				include_the_data_point = True
+			elif max_value_cutoff is not None and score<=max_value_cutoff:
+				include_the_data_point = True
+			elif min_value_cutoff is None and max_value_cutoff is None:	# both are not specified.
+				include_the_data_point = True
+			
+			if include_the_data_point:
+				data_obj = DataObject(db_id=db_id, chromosome=chr, position=start_pos, stop_position=stop_pos, value =score)
+				
+				data_obj.genome_wide_result_id = genome_wide_result_id
+				data_obj.genome_wide_result_name = self.name	# 2010-3-15
+				self.add_one_data_obj(data_obj, chr_pos2index)
+			
+		del d1, f1
+		sys.stderr.write(" %s data points\n"%(len(self.data_obj_ls)))
+	
 class DataObject(object):
 	"""
 	2009-1-7
@@ -2116,7 +2322,7 @@ import re
 pa_has_characters = re.compile(r'[a-zA-Z_]')
 import math
 
-def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
+def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=True,\
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False):
@@ -2127,7 +2333,7 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	2011-3-10
 		db_id2chr_pos's value could be in the format of (chr,pos) OR (chr,start,stop).
 	2011-2-24
-		deal with input_fname with db id for locus id , rather than chr, pos
+		deal with inputFname with db id for locus id , rather than chr, pos
 			if 2nd_column (pos) is nothing or "0", it's regarded as db_id.
 		use pdata.id2chr_pos to translate db id into chr, pos
 	2010-10-13
@@ -2146,7 +2352,7 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 		column 6 and 7 are allowed to be empty placeholder. (previously it causes type cast error if it's empty)
 	2008-12-18
 		if pdata has attribute 'gwr_name', assign it to GenomeWideResult.name.
-		otherwise GenomeWideResult.name = os.path.basename(input_fname)
+		otherwise GenomeWideResult.name = os.path.basename(inputFname)
 	2008-11-20
 		fix a bug that column_5th was skipped and column_6 was tried when there are only 5 columns
 	2008-11-12
@@ -2177,14 +2383,14 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	#A dictionary to understand new headers:
 	header_dict = {}
 	
-	sys.stderr.write("Getting genome wide result from %s ... "%input_fname)
+	sys.stderr.write("Getting genome wide result from %s ... "%inputFname)
 	construct_chr_pos2index = getattr(pdata, 'construct_chr_pos2index', construct_chr_pos2index)	#2008-09-24
 	construct_data_obj_id2index = getattr(pdata, 'construct_data_obj_id2index', construct_data_obj_id2index)	#2008-10-28 for get_data_obj_by_obj_index()
 	is_4th_col_stop_pos = getattr(pdata, 'is_4th_col_stop_pos', is_4th_col_stop_pos)	#2008-10-14
 	chr_pos2index = getattr(pdata, 'chr_pos2index', chr_pos2index)	#2008-10-21
 	db_id2chr_pos = getattr(pdata, 'db_id2chr_pos', None)	#2011-2-24
 	score_for_0_pvalue = getattr(pdata, 'score_for_0_pvalue', 50)
-	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(input_fname))
+	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(inputFname))
 	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
 	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
 	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
@@ -2210,8 +2416,8 @@ def getGenomeWideResultFromFile(input_fname, min_value_cutoff=None, do_log10_tra
 	gwr.data_obj_id2index = {}
 	genome_wide_result_id = id(gwr)
 	import csv
-	delimiter = figureOutDelimiter(input_fname)
-	reader = csv.reader(open(input_fname), delimiter=delimiter)
+	delimiter = figureOutDelimiter(inputFname)
+	reader = csv.reader(open(inputFname), delimiter=delimiter)
 	no_of_lines = 0
 	from utils import getColName2IndexFromHeader
 	col_name2index = {}
@@ -2359,6 +2565,8 @@ def cmpStringSNPID(x, y):
 
 class SNPInfo(object):
 	"""
+	2012.3.8
+		add locusRBDict
 	2009-2-18
 		a class to hold chromosome, position, allele, snps_id (db)
 		DrawSNPRegion.getSNPInfo(db) does the job of filling it up
@@ -2367,6 +2575,9 @@ class SNPInfo(object):
 	chr_pos2index = None
 	snps_id2index = None
 	data_ls = None	#a list of [snps_d, chromosome, position, allele1, allele2]
+	#2012.3.8 key is CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, span_ls=[position, end_position], min_reciprocal_overlap=1,)
+	# value is a list of queried db objects.
+	locusRBDict = None	#
 	
 	def __init__(self, **keywords):
 		"""

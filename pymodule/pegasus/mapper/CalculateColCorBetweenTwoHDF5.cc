@@ -343,10 +343,16 @@ int CalculateColCorBetweenTwoHDF5::output(s1_t* &dataInMemory, H5std_string &out
 	mtype1.insertMember(outputTypeMember3, HOFFSET(s1_t, c), PredType::NATIVE_FLOAT);
 
 	/*
+	 * add chunks and compression to the output data
+	 */
+	DSetCreatPropList propList = DSetCreatPropList();
+	propList.setChunk(outputDatasetRank, dim );
+	propList.setDeflate(4);
+	/*
 	 * Create the dataset.
 	 */
 	DataSet* dataset;
-	dataset = new DataSet(out.createDataSet(outputDatasetName, mtype1, space));
+	dataset = new DataSet(out.createDataSet(outputDatasetName, mtype1, space, propList));
 
 	/*
 	 * Write data to the dataset;
@@ -371,15 +377,16 @@ void print_usage(FILE* stream,int exit_code)
 {
 	assert(stream !=NULL);
         fprintf(stream,"Usage: %s options inputfile\n",program_name);
-	fprintf(stream,"\t-h  --help	Display the usage infomation.\n"\
-		"\t-o ..., --output=...	Write output to file, gph_output(default)\n"\
-		"\t-i ..., --input1Fname=...	Same as output_filename(default)\n"\
-		"\t-j ..., --input2Fname=...	\n"\
+	fprintf(stream,"This program calculates correlation between columns of the data matrices from two input. Their rows must match.\n"\
+			"\t-h  --help	Display the usage infomation.\n"\
+		"\t-o ..., --output=...	output HDF5 to store the pairwise correlation\n"\
+		"\t-i ..., --input1Fname=...	1st polymorphism dataset in HDF5\n"\
+		"\t-j ..., --input2Fname=...	2nd polymorphism dataset in HDF5\n"\
 		"\t-c ..., --min_cor=...	minimum abs(correlation) for output, -1.0(default)\n"\
-		"\t-s ..., --i1_start=...,	\n"\
-		"\t-t ..., --i1_stop=...	\n"\
-		"\t-u ..., --i2_start=...	\n"\
-		"\t-v ..., --i2_stop=...	\n"\
+		"\t-s ..., --i1_start=...,	starting locus index for the 1st polymorphism dataset, 0(default)\n"\
+		"\t-t ..., --i1_stop=...	stop locus index for the 1st polymorphism dataset (inclusive), 0(default)\n"\
+		"\t-u ..., --i2_start=...	starting locus index for the 2nd polymorphism dataset, 0(default)\n"\
+		"\t-v ..., --i2_stop=...	stop locus index for the 2nd polymorphism dataset (inclusive), 0(default)\n"\
 		"\tFor long option, = or ' '(blank) is same.\n"\
 		"\tLine tokenizer is one space, tab, or \\r\n");
 	exit(3);

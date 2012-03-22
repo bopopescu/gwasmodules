@@ -41,6 +41,9 @@ class AbstractNGSWorkflow(object):
 							If site_handler is condorpool, this must be condorpool and files will be symlinked. \
 							If site_handler is hoffman2, input_site_handler=local induces file transfer and input_site_handler=hoffman2 induces symlink.'],\
 						('clusters_size', 1, int):[30, 'C', 1, 'For short jobs that will be clustered, how many of them should be clustered int one'],\
+						('pegasusFolderName', 0, ): ['folder', 'F', 1, 'the folder relative to pegasus workflow root to contain input & output.\
+								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
+								If empty, everything is in the pegasus root.', ],\
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
@@ -435,12 +438,12 @@ class AbstractNGSWorkflow(object):
 		yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=javaMaxMemory)
 		index_sam_job.bamFile = inputBamF
 		index_sam_job.baiFile = baiFile
+		index_sam_job.output = baiFile	#2012.3.20
+		index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.INPUT)
 		if stageOutFinalOutput:
-			index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.INPUT)
 			#index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.OUTPUT)
 			index_sam_job.uses(baiFile, transfer=True, register=True, link=Link.OUTPUT)
 		else:
-			index_sam_job.uses(inputBamF, transfer=False, register=True, link=Link.INPUT)
 			#index_sam_job.uses(inputBamF, transfer=False, register=True, link=Link.OUTPUT)
 			index_sam_job.uses(baiFile, transfer=False, register=True, link=Link.OUTPUT)
 			#pass	#don't register the files so leave them there
@@ -476,6 +479,25 @@ class AbstractNGSWorkflow(object):
 		workflow.addFile(file)
 		return file
 	
+	def registerAllInputFiles(self, workflow, inputFnameLs=[], input_site_handler=None, pegasusFolderName=''):
+		"""
+		2012.3.9
+			copied from variation.src.LDBetweenTwoSNPDataWorkflow.py
+		2012.3.3
+		"""
+		sys.stderr.write("Registering %s input file ..."%(len(inputFnameLs)))
+		returnData = PassingData(jobDataLs = [])
+		counter = 0
+		for inputFname in inputFnameLs:
+			counter += 1
+			inputF = File(os.path.join(pegasusFolderName, os.path.basename(inputFname)))
+			inputF.addPFN(PFN("file://" + inputFname, input_site_handler))
+			inputF.abspath = inputFname
+			workflow.addFile(inputF)
+			returnData.jobDataLs.append(PassingData(output=inputF, jobLs=[]))
+		sys.stderr.write(" %s files registered.\n"%(len(returnData.jobDataLs)))
+		return returnData
+	
 	def addRefFastaFaiIndexJob(self, workflow, samtools=None, refFastaF=None, ):
 		"""
 		2011-11-25
@@ -486,8 +508,8 @@ class AbstractNGSWorkflow(object):
 		#not os.path.isfile(refFastaIndexFname)
 		fastaIndexJob = Job(namespace=workflow.namespace, name=samtools.name, version=workflow.version)
 		fastaIndexJob.addArguments("faidx", refFastaF)
-		fastaIndexJob.uses(refFastaF,  transfer=True, register=False, link=Link.INPUT)
-		fastaIndexJob.uses(refFastaIndexFname, transfer=True, register=False, link=Link.OUTPUT)
+		fastaIndexJob.uses(refFastaF,  transfer=True, register=True, link=Link.INPUT)
+		fastaIndexJob.uses(refFastaIndexFname, transfer=True, register=True, link=Link.OUTPUT)
 		fastaIndexJob.refFastaIndexF = refFastaIndexF
 		yh_pegasus.setJobProperRequirement(fastaIndexJob, job_max_memory=1000)
 		workflow.addJob(fastaIndexJob)
@@ -504,8 +526,8 @@ class AbstractNGSWorkflow(object):
 		fastaDictJob = Job(namespace=workflow.namespace, name=createSequenceDictionaryJava.name, version=workflow.version)
 		fastaDictJob.addArguments('-jar', createSequenceDictionaryJar, \
 				'REFERENCE=', refFastaF, 'OUTPUT=', refFastaDictF)
-		fastaDictJob.uses(refFastaF,  transfer=True, register=False, link=Link.INPUT)
-		fastaDictJob.uses(refFastaDictF, transfer=True, register=False, link=Link.OUTPUT)
+		fastaDictJob.uses(refFastaF,  transfer=True, register=True, link=Link.INPUT)
+		fastaDictJob.uses(refFastaDictF, transfer=True, register=True, link=Link.OUTPUT)
 		yh_pegasus.setJobProperRequirement(fastaDictJob, job_max_memory=1000)
 		fastaDictJob.refFastaDictF = refFastaDictF
 		workflow.addJob(fastaDictJob)
@@ -528,9 +550,11 @@ class AbstractNGSWorkflow(object):
 		statMergeJob.output = outputF
 		workflow.addJob(statMergeJob)
 		for parentJob in parentJobLs:
-			workflow.depends(parent=parentJob, child=statMergeJob)
+			if parentJob:
+				workflow.depends(parent=parentJob, child=statMergeJob)
 		for input in extraDependentInputLs:
-			statMergeJob.uses(input, transfer=True, register=True, link=Link.INPUT)
+			if input:
+				statMergeJob.uses(input, transfer=True, register=True, link=Link.INPUT)
 		return statMergeJob
 	
 	def addInputToStatMergeJob(self, workflow, statMergeJob=None, inputF=None, \
@@ -830,3 +854,19 @@ class AbstractNGSWorkflow(object):
 		else:
 			chr = os.path.splitext(os.path.split(filename)[1])[0]
 		return chr
+	
+	def getFilesWithProperSuffixFromFolder(self, inputFolder=None, suffix='.h5'):
+		"""
+		2012.3.21
+			moved from variation/src/FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow.py
+		"""
+		sys.stderr.write("Getting files with %s as suffix from %s ..."%(suffix, inputFolder))
+		inputFnameLs = []
+		counter = 0
+		for filename in os.listdir(inputFolder):
+			prefix, file_suffix = os.path.splitext(filename)
+			counter += 1
+			if file_suffix==suffix:
+				inputFnameLs.append(os.path.join(inputFolder, filename))
+		sys.stderr.write("%s files out of %s total.\n"%(len(inputFnameLs), counter))
+		return inputFnameLs

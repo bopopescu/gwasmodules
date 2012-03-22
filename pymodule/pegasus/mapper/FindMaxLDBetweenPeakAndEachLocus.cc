@@ -213,10 +213,17 @@ int FindMaxLDBetweenPeakAndEachLocus::output(H5std_string &outputFname){
 	mtype1.insertMember(outputTypeMember3, HOFFSET(s1_t, c), PredType::NATIVE_FLOAT);
 
 	/*
+	 * add chunks and compression to the output data
+	 */
+	DSetCreatPropList propList = DSetCreatPropList();
+	propList.setChunk(outputDatasetRank, dim);
+	propList.setDeflate(4);
+
+	/*
 	 * Create the dataset.
 	 */
 	DataSet* dataset;
-	dataset = new DataSet(out.createDataSet(outputDatasetName, mtype1, space));
+	dataset = new DataSet(out.createDataSet(outputDatasetName, mtype1, space, propList));
 
 	outputDataInMemory = new s1_t[outputDatasetLength];
 	__gnu_cxx::hash_map<int, s1_t >::iterator fstLocusIter = fstLocusId2CorStruc.begin();
@@ -253,7 +260,7 @@ void print_usage(FILE* stream,int exit_code)
 		"\t-i ..., --input1=...	input HDF5 file which contains correlation between 1st locus and 2nd locus\n"\
 		"\t-j ..., --withinPeakLocusIDFname=...	a HDF5 file contains a list of 2nd locus ID\n"\
 		"\t-s ..., --i1_start=...,	start index of the input HDF5. default: 0\n"\
-		"\t-t ..., --i1_stop=...	stop index for the input HDF5. It'll be included. default: -1 (=end)\n"\
+		"\t-t ..., --i1_stop=...	stop index for the input HDF5. The column itself will be included. default: -1 (=end)\n"\
 		"\tFor long option, = or ' '(blank) is same.\n"\
 		"\tLine tokenizer is one space, tab, or \\r\n");
 	exit(3);

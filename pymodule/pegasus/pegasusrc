@@ -13,8 +13,8 @@ dagman.retry=3
 
 #pegasus.dir.submit.logs=/var/pegasus_tmp/
 pegasus.condor.logs.symlink=false
-#2011.11.28 generation of *.arg files to store extra-long job arguments when its length is >=400K
-#pegasus.gridstart.invoke.length=400000
+#2011.11.28 generation of *.arg files to store extra-long job arguments when its length is >=10M
+pegasus.gridstart.invoke.length=10000000
 
 #2011.11.28 increase the nubmer of stagein and stageout jobs to 20 (default is 4)
 stageout.clusters=20
