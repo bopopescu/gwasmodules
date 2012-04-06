@@ -195,7 +195,7 @@ class ElixirDB(object):
 							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
 							('username', 1, ):[None, 'u', 1, 'database username',],\
 							('password', 1, ):[None, 'p', 1, 'database password', ],\
-							('port', 0, ):[None, 'o', 1, 'database port number'],\
+							('port', 0, ):[None, '', 1, 'database port number'],\
 							('pool_recycle', 0, int):[3600, '', 1, 'the length of time to keep connections open before recycling them.'],\
 							('sql_echo', 0, ):[False, '', 1, 'wanna echo the underlying sql of every sql query'],\
 							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
