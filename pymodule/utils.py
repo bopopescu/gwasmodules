@@ -557,6 +557,20 @@ def get_md5sum(filename):
 	else:
 		return md5sum_stdout_out.split()[0]
 
+def getDateStampedFilename(filename):
+	"""
+	2012.3.26
+		copied from variation.src.Stock_250kDB.ResultsMethod
+	2012.3.21
+		xxx.tsv => xxx.2012_3_21.tsv
+	"""
+	from datetime import datetime
+	lastModDatetime = datetime.fromtimestamp(os.stat(filename).st_mtime)
+	prefix, suffix = os.path.splitext(filename)
+	newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
+								lastModDatetime.day, suffix)
+	return newFilename
+
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
 	print FigureOutTaxID_ins.returnTaxIDGivenSentence('>gi|172045488|ref|NW_001867254.1| Physcomitrella patens subsp. patens PHYPAscaffold_10696, whole genome shotgun sequence')
