@@ -392,8 +392,9 @@ class CheckCandidateGeneRank(GeneListRankTest):
 			#force no log10 transformation. otherwise, transformation based on analysis_method
 		if self.null_distribution_type_id==2 or self.null_distribution_type_id==3:	#gw-looping or random gene list
 			snp_info = DrawSNPRegion.getSNPInfo(db)
-			candidate_gene_snp_index_ls = self.get_candidate_gene_snp_index_ls(candidate_gene_set, snp_info.chr_pos_ls, snps_context_wrapper)
-			no_of_snps = len(snp_info.chr_pos_ls)
+			chr_pos_ls = [(row.chromosome, row.position) for row in snp_info.data_ls]
+			candidate_gene_snp_index_ls = self.get_candidate_gene_snp_index_ls(candidate_gene_set, chr_pos_ls, snps_context_wrapper)
+			no_of_snps = len(snp_info.data_ls)
 			no_of_permutations = no_of_snps/len(candidate_gene_snp_index_ls) + 1
 			param_data.chr_pos2index = snp_info.chr_pos2index	#pass to getGenomeWideResultFromFile
 			if self.null_distribution_type_id==2:
@@ -405,7 +406,7 @@ class CheckCandidateGeneRank(GeneListRankTest):
 				non_candidate_gene_snp_index_ls = numpy.zeros(0, numpy.int)
 				while len(non_candidate_gene_snp_index_ls)<no_of_snps:
 					non_candidate_gene_set = Set(random.sample(gene_id_ls, no_of_candidate_genes))
-					_non_candidate_gene_snp_index_ls = self.get_candidate_gene_snp_index_ls(non_candidate_gene_set, snp_info.chr_pos_ls, snps_context_wrapper)
+					_non_candidate_gene_snp_index_ls = self.get_candidate_gene_snp_index_ls(non_candidate_gene_set, chr_pos_ls, snps_context_wrapper)
 					non_candidate_gene_snp_index_ls = numpy.hstack((non_candidate_gene_snp_index_ls, _non_candidate_gene_snp_index_ls))
 		
 		for phenotype_id, results_id_ls in phenotype_id2results_id_ls.iteritems():
@@ -441,7 +442,7 @@ class CheckCandidateGeneRank(GeneListRankTest):
 						elif self.results_type==2:
 							score_rank_data = self.getScoreRankFromRBG(rm, candidate_gene_set, self.results_directory)
 					elif self.null_distribution_type_id==2 or self.null_distribution_type_id==3:
-						genome_wide_result = self.getResultMethodContent(rm, param_data.results_directory, param_data.min_MAF, pdata=param_data)
+						genome_wide_result = db.getResultMethodContent(rm.id, param_data.results_directory, param_data.min_MAF, pdata=param_data)
 						if not genome_wide_result:
 							continue
 						score_rank_data = self.getScoreRankFromPermIndexLs(genome_wide_result, candidate_gene_snp_index_ls, non_candidate_gene_snp_index_ls)

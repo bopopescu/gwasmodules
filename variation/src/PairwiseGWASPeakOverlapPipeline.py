@@ -80,20 +80,6 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		else:
 			self.phenotype_method_id_ls = []
 	
-	def filterResultIDLsBasedOnResultPeak(self, result_id_ls, result_peak_type_id):
-		"""
-		2011-10-17
-			return a list of ResultsMethod.id that have entries in ResultPeak with result_peak_type_id
-		"""
-		sys.stderr.write("Filtering a list of %s results by checking ResultPeak (result_peak_type_id=%s)..."%(len(result_id_ls), \
-																							result_peak_type_id))
-		new_result_id_ls = []
-		for result_id in result_id_ls:
-			firstPeak = Stock_250kDB.ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id).first()
-			if firstPeak:
-				new_result_id_ls.append(result_id)
-		sys.stderr.write(" %s entries left.\n"%(len(new_result_id_ls)))
-		return new_result_id_ls
 	
 	def registerCustomExecutables(self, workflow):
 		"""
@@ -216,7 +202,8 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		sameCategoryPhenotypeMethodIDLs = [pm.id for pm in sameCategoryPhenotypeMethodLs]
 		
 		#merge the two lists of phenotype method id together
-		phenotype_method_id_ls = self.phenotype_method_id_ls + sameCategoryPhenotypeMethodIDLs
+		phenotype_method_id_ls = list(set(self.phenotype_method_id_ls + sameCategoryPhenotypeMethodIDLs))
+		phenotype_method_id_ls.sort()
 		
 		result_query = db_250k.getResultLs(call_method_id=self.call_method_id, analysis_method_id_ls=self.analysis_method_id_ls, \
 						phenotype_method_id_ls=phenotype_method_id_ls, cnv_method_id=self.cnv_method_id)
@@ -225,7 +212,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 			result_id_ls.append(result.id)
 		
 		#make sure the entries with (result_id, self.result_peak_type_id) exists in ResultPeak
-		result_id_ls = self.filterResultIDLsBasedOnResultPeak(result_id_ls, self.result_peak_type_id)
+		result_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result_id_ls, self.result_peak_type_id)
 		
 		# Create a abstract dag
 		workflowName = os.path.splitext(os.path.basename(self.outputFname))[0]

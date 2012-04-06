@@ -93,7 +93,7 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 		sameCategoryPhenotypeMethodLs = db_250k.getPhenotypeMethodLsGivenBiologyCategoryID(self.biology_category_id, access=self.access)
 		sameCategoryPhenotypeMethodIDLs = [pm.id for pm in sameCategoryPhenotypeMethodLs]
 		#merge the two lists of phenotype method id together
-		phenotype_method_id_ls = self.phenotype_method_id_ls + sameCategoryPhenotypeMethodIDLs
+		phenotype_method_id_ls = list(set(self.phenotype_method_id_ls + sameCategoryPhenotypeMethodIDLs))
 		
 		result1_query = db_250k.getResultLs(call_method_id=self.call_method1_id, analysis_method_id_ls=[self.analysis_method1_id], \
 						phenotype_method_id_ls=phenotype_method_id_ls, cnv_method_id=self.cnv_method1_id)
@@ -109,8 +109,8 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 			result2_id_ls.append(result.id)
 		
 		#make sure the entries with (result_id, self.result_peak_type_id) exists in ResultPeak
-		result1_id_ls = self.filterResultIDLsBasedOnResultPeak(result1_id_ls, self.result1_peak_type_id)
-		result2_id_ls = self.filterResultIDLsBasedOnResultPeak(result2_id_ls, self.result2_peak_type_id)
+		result1_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result1_id_ls, self.result1_peak_type_id)
+		result2_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result2_id_ls, self.result2_peak_type_id)
 		
 		phenotype_method_id2result1_id = self.getPhenotypeMethodId2ResultID(result1_id_ls)
 		phenotype_method_id2result2_id = self.getPhenotypeMethodId2ResultID(result2_id_ls)

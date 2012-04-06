@@ -3,10 +3,10 @@
 
 Examples:
 	# define landscape for result 4634 and others
-	DefineAssociationLandscape.py -z banyan -u yh -j 4634 -c
+	%s -z banyan -u yh -j 4634 -c
 	
 	# set the minimum score to 5
-	DefineAssociationLandscape.py -z banyan -u yh -j 4634 -c -f 5
+	%s -z banyan -u yh -j 4634 -c -f 5
 	
 Description:
 	Program to find the landscape/peaks of a genome wide association result.
@@ -17,13 +17,9 @@ Description:
 
 """
 import sys, os, math
-bit_number = math.log(sys.maxint)/math.log(2)
-if bit_number>40:       #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
-else:   #32bit
-	sys.path.insert(0, os.path.expanduser('~/lib/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+__doc__ = __doc__%(sys.argv[0], sys.argv[0])
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import time, csv, getopt
 import warnings, traceback
@@ -154,9 +150,9 @@ class DefineAssociationLandscape(object):
 				deltaX = self.getXDistanceBetweenTwoDataObjs(current_obj, obj_with_fastest_score_increase)
 				locusLandscapeNeighborGraph[source_index][target_index]['deltaX'] = deltaX
 				start_index = obj_with_fastest_score_increase.index		#new starting point
-			else:
 				
-				start_index = start_index+1	#no bridge is built. at chromosome boundary.
+			else:
+				start_index = start_index+1	#no bridge is built. at chromosome boundary or beyond the max allowable distance.
 		
 		sys.stderr.write("%s bridges. Done.\n"%(len(bridge_ls)))
 		
@@ -251,6 +247,8 @@ class DefineAssociationLandscape(object):
 	def findPeaks(self, db_250k, locusLandscapeNeighborGraph, bridge_ls=None, data_obj_ls=None, ground_score=0, min_score=4,\
 				rm=None, result_peak_type=None):
 		"""
+		2012.3.12
+			bugfixing, bounds the peak start  locus and peak stop locus within each connected component (one landscape)
 		2011-4-19
 		"""
 		no_of_bridges = len(bridge_ls)
@@ -264,9 +262,13 @@ class DefineAssociationLandscape(object):
 		for cc in cc_list:
 			peak_start_data_obj = None
 			cc.sort()	#each node is identified by index in data_obj_ls
+			cc_start_obj_index = cc[0]
+			cc_stop_obj_index = cc[-1]
 			cc.insert(0, -1)	#-1 is fake index. standing for the ground point
 			cc.append(-1)	#-1 is fake index. standing for the ground point in the end
 			no_of_nodes = len(cc)
+			no_of_loci_in_cc = cc_stop_obj_index - cc_start_obj_index + 1	#2012.3.13
+			
 			for i in xrange(no_of_nodes-1):
 				start_data_obj_index = cc[i]
 				stop_data_obj_index = cc[i+1]
@@ -303,9 +305,9 @@ class DefineAssociationLandscape(object):
 					if peak_start_data_obj is None:
 						#there is an intersection, but no starting obj for this potential peak.
 						# so find this starting object first.
-						locus_index = stop_data_obj.index	#backwards starting from the stop_data_obj
+						locus_index = stop_data_obj.index	#backwards starting from the stop_data_obj (which could not be None)
 						# start_data_obj could be None.
-						while locus_index>=0:
+						while locus_index>=0 and locus_index>=cc_start_obj_index:	#2012.3.12 within the cc.
 							data_obj = data_obj_ls[locus_index]
 							
 							#2011-10-11 bugfix
@@ -320,9 +322,9 @@ class DefineAssociationLandscape(object):
 					else:
 						#intersection exists again.
 						# this should be the ending position for the peak, now find the ending object (peak_stop_data_obj).
-						locus_index = start_data_obj.index	#forward starting from the start_data_obj
+						locus_index = start_data_obj.index	#forward starting from the start_data_obj (which could not be None)
 						# start_data_obj could contain something.
-						while locus_index<len(data_obj_ls):
+						while locus_index<=cc_stop_obj_index:	#2012.3.12 bounded by the last object in the cc
 							data_obj = data_obj_ls[locus_index]
 							start_position = getattr(data_obj, 'position')
 							if start_position>intersection_point.x():
@@ -330,6 +332,12 @@ class DefineAssociationLandscape(object):
 							locus_index += 1
 						peak_stop_data_obj = data_obj_ls[locus_index-1]
 						no_of_loci = peak_stop_data_obj.index - peak_start_data_obj.index + 1
+						if no_of_loci>no_of_loci_in_cc:
+							sys.stderr.write("Error: no_of_loci of a peak, %s, could not be larger than no_of_loci within its landscape: %s.\n"%\
+											(no_of_loci, no_of_loci_in_cc))
+							#import pdb
+							#pdb.set_trace()
+							sys.exit(4)
 						peak_data_obj = self.findPeakDataObjWithinPeak(data_obj_ls=data_obj_ls, connected_component_node_list=cc, \
 												peak_start_data_obj=peak_start_data_obj, peak_stop_data_obj=peak_stop_data_obj)
 						result_peak = Stock_250kDB.ResultPeak(result_id = rm.id, chromosome=peak_start_data_obj.chromosome,\

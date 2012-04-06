@@ -397,7 +397,7 @@ def getEcotypeInfo(db, country_order_type=1):
 			country2order[row.country] = len(country2order)
 	ecotype_info.ecotype_id2ecotype_obj = ecotype_id2ecotype_obj
 	ecotype_info.country2order = country2order
-	sys.stderr.write("Done.\n")
+	sys.stderr.write("%s ecotypes.\n"%(len(ecotype_id2ecotype_obj)))
 	return ecotype_info
 
 def get_total_gene_ls(curs, gene_table='genome.gene', tax_id=3702, debug=False):
@@ -528,14 +528,14 @@ def calculate7NumberSummaryForOneList(ls, returnObj=None):
 	returnObj.maximum = numpy.max(ls)
 	return returnObj
 
-def getResultForComparison(rm_x,rm_y,no_of_top_snps = 500):
+def getResultForComparison(rm_x, rm_y, db_250k=None, no_of_top_snps = 500):
 	from GeneListRankTest import GeneListRankTest
 	sys.stderr.write("Getting json_data from result %s ... "%rm_x.id)
-	genome_wide_result_x = GeneListRankTest.getResultMethodContent(rm_x)
+	genome_wide_result_x = db_250k.getResultMethodContent(rm_x.id)
 	max_value_x = genome_wide_result_x.max_value
 	
 	sys.stderr.write("Getting json_data from result %s ... "%rm_y.id)
-	genome_wide_result_y = GeneListRankTest.getResultMethodContent(rm_y)
+	genome_wide_result_y = db_250k.getResultMethodContent(rm_y.id)
 	max_value_y = genome_wide_result_y.max_value
 	sorted_values ={}
 	for i in range(no_of_top_snps):
@@ -569,7 +569,7 @@ def getResultForComparison(rm_x,rm_y,no_of_top_snps = 500):
 	
 		
 
-def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
+def getOneResultJsonData(rm, db_250k=None, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 	"""
 	2011-2-24
 		add argument pdata, to pass db_id2chr_pos to getGenomeWideResultFromFile() in pymodule/SNP.py
@@ -584,7 +584,7 @@ def getOneResultJsonData(rm, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 	if pdata is None:	#2011-2-24 create a PassingData() only when
 		pdata = PassingData(min_MAF=min_MAF)
 	from GeneListRankTest import GeneListRankTest
-	genome_wide_result = GeneListRankTest.getResultMethodContent(rm, min_MAF=min_MAF, pdata=param_data)
+	genome_wide_result = db_250k.getResultMethodContent(rm.id, min_MAF=min_MAF, pdata=param_data)
 	no_of_tests = len(genome_wide_result.data_obj_ls)
 	max_value = genome_wide_result.max_value
 	chr2length = {}

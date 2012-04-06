@@ -113,6 +113,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 					useAlleleToDetermineAlpha=False,\
 					snp_value2color=None, snp_label_font_size=None, drawGrid=False):
 		"""
+		2012.3.27 default index_type for each SNP (if not present in snp_id2index_type) is 2 (based on MAF).
 		2010-4-23
 			add argument drawGrid: whether to draw a grid (horizontal, vertical lines across the whole matrix)
 		2010-4-21
@@ -162,6 +163,9 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		max_img_x_pos = None
 		for i in range(no_of_snps):
 			snp_id = top_snp_data.snp_id_ls[i]
+			#if snp_id not in SNPID2PCAPosInfo.snp_id2img_x_pos:	#skip it if it's not in the dictionary
+			# 2012.3.26 if snp_id not in snp_id2img_x_pos, something is wrong (gwas result file has a locus id not in snp_id2img_x_pos).
+			#	continue
 			#draw snp label
 			snp_img_x_pos = SNPID2PCAPosInfo.snp_id2img_x_pos[snp_id]
 			if type(snp_img_x_pos)==tuple or type(snp_img_x_pos)==list:	#2008-11-25 it's tuple used in DrawSNPRegion.py
@@ -185,11 +189,12 @@ class PlotGroupOfSNPs(GeneListRankTest):
 			
 			col_index = subSNPData.col_id2col_index[snp_id]
 			index_type = subSNPData.snp_id2index_type[snp_id]
+			#index_type = subSNPData.snp_id2index_type.get(snp_id, 2)	#2012.3.27 default is 2 (based on MAF)
 			score = top_snp_data.score_ls[i]
 			alpha = (score-min_score)/(max_score-min_score)*(1-0.2)+0.2	#alpha from 0.2 to 1. can't be low.
 			for j in range(len(StrainID2PCAPosInfo.strain_id_ls)):
 				strain_id = StrainID2PCAPosInfo.strain_id_ls[j]
-				strain_img_y_pos = StrainID2PCAPosInfo.strain_id2img_y_pos[strain_id]					
+				strain_img_y_pos = StrainID2PCAPosInfo.strain_id2img_y_pos[strain_id]
 				row_index = subSNPData.row_id2row_index[strain_id]
 				allele = subSNPData.data_matrix[row_index][col_index]
 				_linewidth=0
@@ -255,13 +260,13 @@ class PlotGroupOfSNPs(GeneListRankTest):
 					axe_snp_matrix.text(x_pos, strain_img_y_pos, strain_label, \
 							horizontalalignment ='left', verticalalignment='bottom', size=strain_snp_label_font_size)
 				center = (snp_img_x_pos+cell_x_len/2., strain_img_y_pos+cell_y_len/2.)
-				if index_type==1:
+				if index_type==1:	#(polarized, ancestral vs. derived), shape=rectangle.
 					xs = [snp_img_x_pos, snp_img_x_pos+cell_x_len, snp_img_x_pos+cell_x_len, snp_img_x_pos]
 					ys = [strain_img_y_pos, strain_img_y_pos, strain_img_y_pos+cell_y_len, strain_img_y_pos+cell_y_len]
 					patch = Polygon(zip(xs,ys), facecolor=facecolor, linewidth=_linewidth, alpha=alpha)	#
-				elif index_type==2:
+				elif index_type==2:	#based on MAF
 					patch = Ellipse(center, cell_x_len, cell_y_len, facecolor=facecolor, linewidth=_linewidth, alpha=alpha)
-				else:
+				else:	#others
 					xs = [snp_img_x_pos, snp_img_x_pos+cell_x_len, snp_img_x_pos+cell_x_len/2.]
 					ys = [strain_img_y_pos, strain_img_y_pos, strain_img_y_pos+cell_y_len]
 					patch = Polygon(zip(xs,ys), facecolor=facecolor, linewidth=_linewidth, alpha=alpha)
@@ -725,7 +730,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		return snpData
 	
 	@classmethod
-	def getSubStrainSNPMatrix(cls, snpData, phenData, phenotype_method_id, phenotype_col_index, snp_id_ls, \
+	def getSubStrainSNPMatrix(cls, snpData, phenData, phenotype_method_id=None, phenotype_col_index=None, snp_id_ls=None, \
 							chr_pos2ancestral_allele=None, need_convert_alleles2binary=True, skip_strains_with_NA_phenotype=False):
 		"""
 		2010-4-21 getRowIndexGivenRowID is more versatile than row_id2row_index.
@@ -761,8 +766,10 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		sub_matrix = numpy.zeros([no_of_sub_rows, no_of_sub_snps], snpData.data_matrix.dtype)
 		snp_id2snp_index2allele = {}
 		snp_id2snp_allele2index = {}
+		snpDataColIDType = type(snpData.col_id2col_index.keys()[0])		#2012.3.8
 		for j in range(no_of_sub_snps):
 			snp_id = snp_id_ls[j]
+			snp_id = snpDataColIDType(snp_id)		#2012.3.8
 			col_index = snpData.col_id2col_index.get(snp_id)
 			if col_index is None:
 				sys.stderr.write("Warning: col_index for snp: %s is None and so is skipped.\n"%snp_id)
@@ -815,12 +822,18 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		subSNPData.snp_id2snp_allele2index = snp_id2snp_allele2index
 		subSNPData = cls.assignAncestralAlleleSmallerNumber(subSNPData, chr_pos2ancestral_allele)
 		
-		sys.stderr.write("Done.\n")
+		sys.stderr.write("%s X %s.\n"%(subSNPData.data_matrix.shape[0], subSNPData.data_matrix.shape[1]))
 		return subSNPData
 	
 	@classmethod
-	def getTopSNPData(cls, genome_wide_result=None, no_of_top_hits=None, snp_region_tup=[], chr_pos_ls=[], sortChrPosLs=True):
+	def getTopSNPData(cls, genome_wide_result=None, no_of_top_hits=None, snp_region_tup=[], chr_pos_ls=[],\
+					sortChrPosLs=True, snpIDType=str):
 		"""
+		2012.3.27
+			give more stdout/err message regarding the input.
+		2012.3.7
+			return the db_id as snp_id, instead of chr_pos
+				cast it to str (argument snpIDType) format because col_id in SNPData.col_id2col_index is of str type.
 		2010-4-6
 			add argument sortChrPosLs. default to True which means sort genome_chr_pos_ls.
 			check if chr_pos is of type str before proceedng.
@@ -835,13 +848,18 @@ class PlotGroupOfSNPs(GeneListRankTest):
 			if snp_region_tup is given, no_of_top_hits is defunct.
 		2008-10-07
 		"""
-		sys.stderr.write("Getting Top %s SNPs ..."%(no_of_top_hits))
+		lengthFunctor = getattr(chr_pos_ls, '__len__', None)	#2012.3.27
+		if lengthFunctor:
+			no_of_given_chr_pos = lengthFunctor()
+		else:
+			no_of_given_chr_pos = None
+		sys.stderr.write("Getting Top %s SNPs within %s or from %s (chr_pos)s ..."%(no_of_top_hits, snp_region_tup, no_of_given_chr_pos))
 		top_snp_data = PassingData()
 		snp_id_ls = []
 		score_ls = []
 		if snp_region_tup:
 			start_snp_chr, start_snp_pos, stop_snp_chr, stop_snp_pos = snp_region_tup
-			if chr_pos_ls:
+			if chr_pos_ls:	#2012.3.8 this route should not be activated. because snp is identified by chr_pos, rather than db-id
 				genome_chr_pos_ls = chr_pos_ls
 				if sortChrPosLs:
 					genome_chr_pos_ls.sort()
@@ -849,32 +867,36 @@ class PlotGroupOfSNPs(GeneListRankTest):
 					if type(chr_pos)==str:	# 2010-4-6
 						chr_pos = chr_pos.split('_')
 						chr_pos = map(int, chr_pos)
-					chr, pos = chr_pos[:2]
+					chr, pos, stopPosition = chr_pos[:3]
+					chr = str(chr)
 					include_this_SNP = False
-					if chr>start_snp_chr and chr<stop_snp_chr:	# no need to check position
-						include_this_SNP = True
-					elif (chr==start_snp_chr and pos>=start_snp_pos) or (chr==stop_snp_chr and pos<=stop_snp_pos):
+					#if chr>start_snp_chr and chr<stop_snp_chr:	# no need to check position, between two chromosomes
+					#	include_this_SNP = True
+					if (chr==start_snp_chr and stopPosition>=start_snp_pos) or (chr==stop_snp_chr and pos<=stop_snp_pos):
 						include_this_SNP = True
 					
 					if include_this_SNP:
 						chr_pos = map(str, chr_pos)
-						snp_id_ls.append('_'.join(chr_pos))
+						snp_id_ls.append('_'.join(chr_pos))	#2012.3.27 this type of SNP id only fits old-style.
 						score_ls.append(1.0)
 			else:
 				genome_chr_pos_ls = genome_wide_result.chr_pos2index.keys()
 				if sortChrPosLs:
 					genome_chr_pos_ls.sort()
 				for chr_pos in genome_chr_pos_ls:
-					chr, pos = chr_pos
-					if chr==start_snp_chr and chr==stop_snp_chr and pos>=start_snp_pos and pos<=stop_snp_pos:
-						data_obj = genome_wide_result.get_data_obj_by_chr_pos(chr_pos[0], chr_pos[1])
-						snp_id_ls.append('%s_%s'%(data_obj.chromosome, data_obj.position))
+					chr, pos, stopPosition = chr_pos[:3]
+					if chr==start_snp_chr and chr==stop_snp_chr and stopPosition>=start_snp_pos and pos<=stop_snp_pos:
+						data_obj = genome_wide_result.get_data_obj_by_chr_pos(chr, pos, stopPosition)
+						snp_id_ls.append(data_obj.db_id)	#2012.3.7 use db_id instead of chr_start_stop
+						#snp_id_ls.append('%s_%s_%s'%(data_obj.chromosome, data_obj.position, stopPosition))
 						score_ls.append(data_obj.value)
 		else:
 			for i in range(no_of_top_hits):
 				data_obj = genome_wide_result.get_data_obj_at_given_rank(i+1)	#rank starts from 1
-				snp_id_ls.append('%s_%s'%(data_obj.chromosome, data_obj.position))
+				snp_id_ls.append(data_obj.db_id)	#2012.3.7 use db_id instead of chr_start_stop
+				#snp_id_ls.append('%s_%s_%s'%(data_obj.chromosome, data_obj.position, data_obj.stopPosition))
 				score_ls.append(data_obj.value)
+		snp_id_ls = map(snpIDType, snp_id_ls)
 		top_snp_data.snp_id_ls = snp_id_ls
 		top_snp_data.score_ls = score_ls
 		sys.stderr.write("%s SNPs.\n"%len(snp_id_ls))
@@ -947,6 +969,8 @@ class PlotGroupOfSNPs(GeneListRankTest):
 	
 	def getStrainID2PCAPosInfo(cls, subSNPData, pca_range=[0,1], snp_id_label_y_offset=0.95, explained_var=None, T=None):
 		"""
+		2012.3.27
+			in the case that subSNPData has only 1 SNP/locus in it. PC matrix T will only have one column.
 		2008-10-08
 			fix a bug that using PC2 and PC3 to get coordinates.
 		2008-10-07
@@ -962,11 +986,18 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		
 		#T[:,0] and T[:,1] are new positions corresponding to PC1 and PC2
 		strain_id_ls, strain_id2pca_y = cls.sortObjByPCA_value_ls(subSNPData.row_id2row_index, T[:,0], pca_range)
-		strain_id2pca_x = cls.getObj2posFromPCA_value_ls(subSNPData.row_id2row_index, T[:,1], pca_range)
+		if T.shape[1]>1:	#2012.3.27 subSNPData has >1 SNPs, and then >1 PCs in T.
+			strain_id2pca_x = cls.getObj2posFromPCA_value_ls(subSNPData.row_id2row_index, T[:,1], pca_range)
+		else:	#2012.3.27 subSNPData has only one column, and thus only one PC in T.
+			strain_id2pca_x = cls.getObj2posFromPCA_value_ls(subSNPData.row_id2row_index, T[:,0], pca_range)
+			
 		StrainID2PCAPosInfo.strain_id_ls = strain_id_ls
 		StrainID2PCAPosInfo.strain_id2pca_y = strain_id2pca_y
 		StrainID2PCAPosInfo.strain_id2pca_x = strain_id2pca_x
-		StrainID2PCAPosInfo.x_var = explained_var[1]
+		if len(explained_var)>1:
+			StrainID2PCAPosInfo.x_var = explained_var[1]
+		else:
+			StrainID2PCAPosInfo.x_var = explained_var[0]
 		StrainID2PCAPosInfo.y_var = explained_var[0]
 		StrainID2PCAPosInfo.PC_matrix = T	#2008-12-08
 		StrainID2PCAPosInfo.explained_var = explained_var	#2008-12-08
@@ -980,6 +1011,8 @@ class PlotGroupOfSNPs(GeneListRankTest):
 	
 	def getSNPID2PCAPosInfo(self, subSNPData, pca_range=[0,1], strain_id_label_x_offset=0.95, sortObjByPCA_value=True):
 		"""
+		2012.3.27
+			in the case that subSNPData has only 1 individual/row in it. PC matrix T will only have one column.
 		2008-11-19
 			add option sortObjByPCA_value to allow user decide whether to sort SNPs according PCA or not.
 		2008-10-08
@@ -1002,8 +1035,10 @@ class PlotGroupOfSNPs(GeneListRankTest):
 			for i in range(len(snp_id_ls)):
 				snp_id = snp_id_ls[i]
 				snp_id2pca_x[snp_id] = pca_range[0] + i*pca_range_gap
-				
-		snp_id2pca_y = self.getObj2posFromPCA_value_ls(subSNPData.col_id2col_index, T[:,1], pca_range)
+		if T.shape[1]>1:	#2012.3.27
+			snp_id2pca_y = self.getObj2posFromPCA_value_ls(subSNPData.col_id2col_index, T[:,1], pca_range)
+		else:
+			snp_id2pca_y = self.getObj2posFromPCA_value_ls(subSNPData.col_id2col_index, T[:,0], pca_range)
 		SNPID2PCAPosInfo.snp_id_ls = snp_id_ls
 		SNPID2PCAPosInfo.snp_id2pca_x = snp_id2pca_x
 		SNPID2PCAPosInfo.snp_id2pca_y = snp_id2pca_y
@@ -1116,7 +1151,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		if genome_wide_result is None:
 			chr_pos_ls = snpData.col_id_ls
 		else:
-			chr_pos_ls = None
+			chr_pos_ls = []
 		top_snp_data = self.getTopSNPData(genome_wide_result, self.no_of_top_hits, snp_region_tup=snp_region_tup, \
 										chr_pos_ls=chr_pos_ls)
 		subSNPData = self.getSubStrainSNPMatrix(snpData, phenData, self.phenotype_method_id_ls[0], \

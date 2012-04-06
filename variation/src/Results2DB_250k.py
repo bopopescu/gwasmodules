@@ -54,26 +54,28 @@ from common import getOneResultJsonData
 
 class Results2DB_250k(object):
 	__doc__ = __doc__	#use documentation in the beginning of the file as this class's doc
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, '', ],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-							('input_fname',1, ): [None, 'i', 1, 'File containing association results'],\
-							('output_dir',1, ): ['/Network/Data/250k/db/results/', 'o', 1, 'file system storage for the results files. results_method.filename'],\
-							('short_name', 0, ): [None, 'f', 1, 'short name for this result. Must be unique from previous ones. combining phenotype, data, method is a good one. If not given, will be automatically generated.' ],\
-							('phenotype_method_id',1,int): [None, 'e', 1, 'which phenotype you used, check table phenotype_method'],\
-							('call_method_id', 1, int ): [None, 'a', 1, 'data from which call_method, field id in table call_method'],\
-							('data_description', 0, ): [None, 'n', 1, 'Describe how your data is derived from that call method. like non-redundant set, 1st 96, etc.'],\
-							('method_description', 0, ): [None, 'm', 1, 'Describe your method and what type of score, association (-log or not), recombination etc.'],\
-							('results_method_type_id', 1, int): [1, 's', 1, 'which type of method. field id in table results_method_type. 1="association"',],\
-							('analysis_method_id', 1, int): [None, 'l', 1, ''],\
-							('cnv_method_id', 1, int): [None, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
-							('comment',0, ): [None, 't', 1, 'Anything more worth for other people to know?'],\
-							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	option_default_dict = {
+						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
+						('dbname', 1, ): ['stock_250k', 'd', 1, '', ],\
+						('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
+						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
+						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+						('input_fname',1, ): [None, 'i', 1, 'File containing association results'],\
+						('output_dir',1, ): ['/Network/Data/250k/db/results/', 'o', 1, 'file system storage for the results files. results_method.filename'],\
+						('short_name', 0, ): [None, 'f', 1, 'short name for this result. Must be unique from previous ones. combining phenotype, data, method is a good one. If not given, will be automatically generated.' ],\
+						('phenotype_method_id',1,int): [None, 'e', 1, 'which phenotype you used, check table phenotype_method'],\
+						('call_method_id', 1, int ): [None, 'a', 1, 'data from which call_method, field id in table call_method'],\
+						('data_description', 0, ): [None, 'n', 1, 'Describe how your data is derived from that call method. like non-redundant set, 1st 96, etc.'],\
+						('method_description', 0, ): [None, 'm', 1, 'Describe your method and what type of score, association (-log or not), recombination etc.'],\
+						('results_method_type_id', 1, int): [1, 's', 1, 'which type of method. field id in table results_method_type. 1="association"',],\
+						('analysis_method_id', 1, int): [None, 'l', 1, ''],\
+						('cnv_method_id', 1, int): [None, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
+						('comment',0, ): [None, 't', 1, 'Anything more worth for other people to know?'],\
+						('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
+						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
+						}
 	
 	pa_has_characters = re.compile(r'[a-zA-Z_]')	#2008-05-30 check if a string has character in it, used to judge whether the 1st line is header or not.
 	"""
@@ -377,6 +379,8 @@ class Results2DB_250k(object):
 				analysis_method_id=None, results_method_type_short_name=None, output_dir=None, commit=0,\
 				cnv_method_id=None):
 		"""
+		2012.3.9
+			add locus_type_id to ResultsMethod
 		2011-2-22
 			add argument cnv_method_id
 			deal with the association file format change. locus is now identified by Snps.id or CNV.id
@@ -449,7 +453,7 @@ class Results2DB_250k(object):
 										results_method_type_id)
 		
 		rm = ResultsMethod(short_name=short_name, method_description=method_description, \
-						data_description=data_description, comment=comment, created_by=user)
+				data_description=data_description, comment=comment, created_by=user, locus_type_id=cm.locus_type_id)	#2012.3.9
 		rm.phenotype_method = pm
 		rm.call_method = cm
 		rm.analysis_method = am

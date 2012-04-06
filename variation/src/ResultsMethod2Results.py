@@ -57,9 +57,11 @@ class ResultsMethod2Results(object):
 		self.phenotype_id_ls = getListOutOfStr(self.phenotype_id_ls, data_type=int)
 		
 	@classmethod
-	def rm2result(cls, session, rm, chr_pos2db_id, max_rank=1000, commit=False, min_rank=1, results_directory=None, \
-				min_score=None,update=True,db_id2chr_pos=None):
+	def rm2result(cls, session, rm=None, chr_pos2db_id=None, max_rank=1000, commit=False, min_rank=1, results_directory=None, \
+				min_score=None,update=True,db_id2chr_pos=None, db_250k=None):
 		"""
+		2012.3.23
+			add argument db_250k
 		2010-3-8
 			add argument min_score to exclude SNPs whose scores are too low. This argument has an AND relationship with max_rank.
 				log transformation is automatically determined based on analysis_method.smaller_score_more_significant in db.
@@ -81,7 +83,7 @@ class ResultsMethod2Results(object):
 			
 		
 		param_data = PassingData(min_MAC=0, db_id2chr_pos = db_id2chr_pos)
-		genome_wide_result = GeneListRankTest.getResultMethodContent(rm, results_directory=results_directory, min_MAF=0., \
+		genome_wide_result = db_250k.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=0., \
 																pdata=param_data, min_value_cutoff=min_score)
 		
 		counter = 0
@@ -124,6 +126,7 @@ class ResultsMethod2Results(object):
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
 									password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db.setup(create_tables=False)
+		self.db_250k = db_250k = db
 		
 		session = db.session
 		session.begin()
@@ -139,7 +142,8 @@ class ResultsMethod2Results(object):
 			query = query.filter(Stock_250kDB.ResultsMethod.phenotype_method_id.in_(self.phenotype_id_ls))
 		for rm in query:
 			self.rm2result(session, rm, chr_pos2db_id, max_rank=self.max_rank, commit=self.commit, \
-						results_directory=self.results_directory, min_score=self.min_score,db_id2chr_pos = db_id2chr_pos)
+						results_directory=self.results_directory, min_score=self.min_score,db_id2chr_pos = db_id2chr_pos,\
+						db_250k=db_250k)
 		if self.commit:
 			session.commit()
 	

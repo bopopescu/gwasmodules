@@ -14,7 +14,7 @@ Description:
 		output a workflow that calculates LD between two Yu-format (Strain X Locus) SNP datasets.
 		
 		0. figure out how many columns each dataset has
-		1. remove non-intersecting rows via TwoSNPData.py for each dataset
+		1. (defunct, superceded by step 2) remove non-intersecting rows via TwoSNPData.py for each dataset
 			~/script/pymodule/TwoSNPData.py -i /Network/Data/250k/db/dataset/call_method_57.tsv
 				-j /Network/Data/250k/db/dataset/call_method_32.tsv
 				-o /tmp/call_method_57_only_accessions_in_call_32.tsv -c0 -m0 -p3 -w2
@@ -24,6 +24,7 @@ Description:
 					-j /Network/Data/250k/db/dataset/call_method_80.2011.5.2.same.as.57.tsv -o /tmp/call_method_57_in_32_order.tsv  -m1
 			
 		3. convert each dataset into hdf5 format with min-MAF filter
+			~/script/pymodule/pegasus/mapper/ConvertSNPData2HDF5.py
 		4. call a C++ program to calculate correlation between two datasets given column-index-span
 			~/script/pymodule/pegasus/mapper/CalculateColCorBetweenTwoHDF5 -o /tmp/out
 				-i /tmp/call_80.hdf5 -j /tmp/call_80.hdf5 -s 0 -t 5000 -u 20000 -v 25885 -c 0.4
@@ -51,9 +52,6 @@ class LDBetweenTwoSNPDataWorkflow(AbstractVariationWorkflow):
 						('chunkSize', 0, int): [5000, '', 1, 'Loci from each will be partitioned into chunks of 5000'],\
 						('min_MAF', 1, float): [0.1, '', 1, 'minimum minor allele frequency to filter the input dataset'],\
 						('min_cor', 1, float): [0.1, '', 1, 'minimum correlation for output'],\
-						('pegasusFolderName', 0, ): ['', 'F', 1, 'the folder relative to pegasus workflow root to contain input & output.\
-								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
-								If empty, everything is in the pegasus root.', ],\
 						}
 	
 	option_default_dict.update(common_option_dict)
@@ -191,23 +189,6 @@ class LDBetweenTwoSNPDataWorkflow(AbstractVariationWorkflow):
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		return job
 	
-	def registerAllInputFiles(self, workflow, inputFnameLs=[], input_site_handler=None, pegasusFolderName=''):
-		"""
-		2012.3.3
-		"""
-		sys.stderr.write("Registering %s input file ..."%(len(inputFnameLs)))
-		returnData = PassingData(jobDataLs = [])
-		counter = 0
-		for inputFname in inputFnameLs:
-			counter += 1
-			inputF = File(os.path.join(pegasusFolderName, os.path.basename(inputFname)))
-			inputF.addPFN(PFN("file://" + inputFname, input_site_handler))
-			inputF.abspath = inputFname
-			workflow.addFile(inputF)
-			returnData.jobDataLs.append(PassingData(output=inputF, jobLs=[]))
-		sys.stderr.write(" %s files registered.\n"%(len(returnData.jobDataLs)))
-		return returnData
-	
 	def addJobs(self, workflow, inputData=None, min_MAF=None, min_cor=None, chunkSize=None, pegasusFolderName=""):
 		"""
 		2012.3.3
@@ -267,7 +248,7 @@ class LDBetweenTwoSNPDataWorkflow(AbstractVariationWorkflow):
 												inputFile1=convertDataset2HDF5Job1.output, inputFile2=convertDataset2HDF5Job2.output, \
 												outputFile=outputFile, i1_start=i1_start, i1_stop=i1_stop, i2_start=i2_start, i2_stop=i2_stop,\
 												min_cor=min_cor, parentJobLs=[convertDataset2HDF5Job1, convertDataset2HDF5Job2], \
-												extraDependentInputLs=[], transferOutput=False, extraArguments=None, \
+												extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
 												job_max_memory=50)
 				no_of_jobs += 1
 				self.addInputToStatMergeJob(workflow, statMergeJob=correlationMergeJob, \

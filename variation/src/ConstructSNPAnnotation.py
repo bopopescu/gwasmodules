@@ -97,7 +97,13 @@ class ConstructSNPAnnotation(object):
 		real_counter = 0
 		for i in range(len(snp_info.chr_pos_ls)):
 			counter += 1
-			snps_id, chr, pos, allele1, allele2 = snp_info.data_ls[i]
+			snp_db_entry = snp_info.data_ls[i]
+			snps_id=snp_db_entry.id
+			chr=snp_db_entry.chromosome
+			pos = snp_db_entry.position
+			allele1 = snp_db_entry.allele1
+			allele2 = snp_db_entry.allele2
+			
 			snps_context_matrix = snps_context_wrapper.returnGeneLs(chr, pos)
 			snp_annotation_type_short_name_ls = []	#each element is (snp_annotation_type_short_name, gene_id, gene_commentary_id, 
 					# which_exon_or_intron, pos_within_codon)

@@ -65,26 +65,6 @@ class TwoGWASPeakOverlap(object):
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
 	
-	def constructRBDictFromResultPeak(self, result_id, result_peak_type_id, peakPadding=10000):
-		"""
-		2011-10-16
-		"""
-		sys.stderr.write("Constructing RBDict for peaks from result %s, (peak type %s) ..."%(result_id, result_peak_type_id))
-		result_peakRBDict = RBDict()
-		query = Stock_250kDB.ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id)
-		counter = 0
-		real_counter = 0
-		for row in query:
-			counter += 1
-			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
-							span_ls=[max(1, row.start - peakPadding), row.stop + peakPadding], \
-							min_reciprocal_overlap=1,)
-							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
-			if segmentKey not in result_peakRBDict:
-				result_peakRBDict[segmentKey] = []
-			result_peakRBDict[segmentKey].append(row)
-		sys.stderr.write("%s peaks. Done.\n"%counter)
-		return result_peakRBDict
 	
 	def calculateNoOfResult1PeaksCoveredByResult2(self, result1_peakRBDict, result2_peakRBDict):
 		"""
@@ -125,8 +105,8 @@ class TwoGWASPeakOverlap(object):
 		"""
 		sys.stderr.write("Comparing peaks from result %s against result %s ...\n"%(result1_id, result2_id))
 		
-		result1_peakRBDict = self.constructRBDictFromResultPeak(result1_id, result1_peak_type_id, peakPadding=peakPadding)
-		result2_peakRBDict = self.constructRBDictFromResultPeak(result2_id, result2_peak_type_id, peakPadding=peakPadding)
+		result1_peakRBDict = db_250k.constructRBDictFromResultPeak(result1_id, result1_peak_type_id, peakPadding=peakPadding)
+		result2_peakRBDict = db_250k.constructRBDictFromResultPeak(result2_id, result2_peak_type_id, peakPadding=peakPadding)
 		
 		no_of_result1_peaks = len(result1_peakRBDict)
 		no_of_result2_peaks = len(result2_peakRBDict)

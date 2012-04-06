@@ -17,7 +17,7 @@ class AbstractVariationWorkflow(AbstractNGSWorkflow):
 	__doc__ = __doc__
 	option_default_dict = {
 						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-						('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
+						('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
 						('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
 						('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
@@ -38,6 +38,9 @@ class AbstractVariationWorkflow(AbstractNGSWorkflow):
 						("input_site_handler", 1, ): ["local", 'D', 1, 'which site has all the input files: local, condorpool, hoffman2. \
 							If site_handler is condorpool, this must be condorpool and files will be symlinked. \
 							If site_handler is hoffman2, input_site_handler=local induces file transfer and input_site_handler=hoffman2 induces symlink.'],\
+						('pegasusFolderName', 0, ): ['folder', 'F', 1, 'the folder relative to pegasus workflow root to contain input & output.\
+								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
+								If empty, everything is in the pegasus root.', ],\
 						('clusters_size', 1, int):[15, 'C', 1, 'For short jobs that will be clustered, how many of them should be clustered int one'],\
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\

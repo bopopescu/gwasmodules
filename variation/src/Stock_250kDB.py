@@ -68,7 +68,7 @@ class Phenotype(Entity):
 	ecotype_id = Field(Integer, nullable=False)
 	value = Field(Float)
 	replicate = Field(Integer)
-	phenotype_method = ManyToOne('PhenotypeMethod', colname='method_id', ondelete='CASCADE', onupdate='CASCADE')
+	phenotype_method = ManyToOne('%s.PhenotypeMethod'%__name__, colname='method_id', ondelete='CASCADE', onupdate='CASCADE')
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
@@ -104,25 +104,43 @@ class PhenotypeAvg(Entity):
 	using_table_options(mysql_engine='InnoDB')
 
 class BiologyCategory(Entity):
+	"""
+	2012.3.22
+		add column preferred_gene_list
 	#2008-08-21
+	"""
 	short_name = Field(String(256), unique=True)
 	description = Field(String(8192))
-	gene_list_type_ls = OneToMany("GeneListType")
-	phenotype_method_ls = OneToMany("PhenotypeMethod")
+	gene_list_type_ls = OneToMany("%s.GeneListType"%__name__)
+	phenotype_method_ls = OneToMany("%s.PhenotypeMethod"%__name__)
+	preferred_gene_list = ManyToOne('%s.GeneListType'%__name__, colname='preferred_list_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
 	using_options(tablename='biology_category', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
+	
+	def returnGeneListIDList(self):
+		"""
+		2012.3.23
+		
+		"""
+		if self.preferred_list_type_id:
+			return [self.preferred_list_type_id]
+		else:
+			list_type_id_ls = []
+			for list_type in self.gene_list_type_ls:
+				list_type_id_ls.append(list_type.id)
+			return list_type_id_ls
 
 class GeneListType(Entity):
 	short_name = Field(String(256))
-	biology_category = ManyToOne("BiologyCategory", colname='biology_category_id', ondelete='CASCADE', onupdate='CASCADE')
-	type = ManyToOne("GeneListSuperType", colname='super_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	biology_category = ManyToOne("%s.BiologyCategory"%__name__, colname='biology_category_id', ondelete='CASCADE', onupdate='CASCADE')
+	type = ManyToOne("%s.GeneListSuperType"%__name__, colname='super_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	original_filename = Field(String(760), unique=True)	#for unique constraint in mysql, max key length is 767 bytes
 	description = Field(String(8192))
-	gene_list = OneToMany('GeneList')
+	gene_list = OneToMany('%s.GeneList'%__name__)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
@@ -144,8 +162,13 @@ class GeneListSuperType(Entity):
 	using_table_options(mysql_engine='InnoDB')
 
 class GeneList(Entity):
+	"""
+	2012.3.26
+		add ncbi_gene_id
+	"""
 	gene_id = Field(Integer)
-	list_type = ManyToOne('GeneListType', colname='list_type_id', ondelete='CASCADE', onupdate='CASCADE', inverse='gene_list')
+	ncbi_gene_id = Field(Integer)	#2012.3.26
+	list_type = ManyToOne('%s.GeneListType'%__name__, colname='list_type_id', ondelete='CASCADE', onupdate='CASCADE', inverse='gene_list')
 	original_name = Field(String(128))
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
@@ -193,8 +216,8 @@ class GenomeWideResult(Entity):
 	2010-10-10
 		a general table to store all kinds of genomic data
 	"""
-	method = ManyToOne('GenomeWideResultMethod', colname='method_id', ondelete='CASCADE', onupdate='CASCADE')
-	marker = ManyToOne('GenomeMarker', colname='marker_id', ondelete='CASCADE', onupdate='CASCADE')
+	method = ManyToOne('%s.GenomeWideResultMethod'%__name__, colname='method_id', ondelete='CASCADE', onupdate='CASCADE')
+	marker = ManyToOne('%s.GenomeMarker'%__name__, colname='marker_id', ondelete='CASCADE', onupdate='CASCADE')
 	value = Field(Float)
 	rank = Field(Integer)
 	object = Field(LargeBinary(13217728), deferred=True)	#a python dictionary to store other attributes
@@ -228,16 +251,31 @@ class Snps(Entity):
 	tair8_chromosome = Field(String(256))
 	tair8_position = Field(Integer)
 	include_after_qc = Field(Integer, default=0)
+	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	created_by = Field(String(200), deferred=True)
 	updated_by = Field(String(200), deferred=True)
 	date_created = Field(DateTime, default=datetime.now, deferred=True)
 	date_updated = Field(DateTime, deferred=True)
 	using_options(tablename='snps', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('name', 'chromosome', 'position', 'end_position'))
+	using_table_options(UniqueConstraint('name', 'chromosome', 'position', 'end_position', 'locus_type_id'))
+
+class LocusType(Entity):
+	"""
+	2012.3.7
+		used to separate different sets of loci in table Snps
+	"""
+	short_name = Field(String(256), unique=True)
+	description = Field(String(8192))
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='locus_type', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
 
 class SnpsContext(Entity):
-	snp = ManyToOne('Snps', colname='snps_id', ondelete='CASCADE', onupdate='CASCADE')
+	snp = ManyToOne('%s.Snps'%__name__, colname='snps_id', ondelete='CASCADE', onupdate='CASCADE')
 	disp_pos = Field(Integer)
 	gene_id = Field(Integer)
 	gene_strand = Field(String(1))
@@ -253,6 +291,8 @@ class SnpsContext(Entity):
 
 class CallMethod(Entity):
 	"""
+	2012.3.9
+		add column locus_type
 	2012.2.28
 		add column no_of_accessions, no_of_loci
 	2010-2-22
@@ -273,6 +313,7 @@ class CallMethod(Entity):
 	short_name = Field(String(20))
 	parent_call_method = ManyToOne('%s.CallMethod'%__name__, colname='parent_id', ondelete='CASCADE', onupdate='CASCADE')
 	accession_set = ManyToOne('%s.AccessionSet'%__name__, colname='accession_set_id', ondelete='CASCADE', onupdate='CASCADE')
+	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	min_oligo_call_prob = Field(Float)
 	max_array_mismatch_rate = Field(Float)
 	max_array_NA_rate = Field(Float)
@@ -296,7 +337,7 @@ class CallMethod(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='call_method', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('parent_id', 'accession_set_id'))
+	using_table_options(UniqueConstraint('parent_id', 'accession_set_id', 'locus_type_id'))
 	
 class PhenotypeMethod(Entity):
 	"""
@@ -361,6 +402,18 @@ class PhenotypeMethod(Entity):
 		if [group in self.groups for group in user.groups]: 
 			return True
 		return False
+	
+	def getProperShortName(self):
+		"""
+		2012.3.11
+			replace <i>, </i> with emptry string
+		"""
+		tmp_str = self.short_name.replace("<i>", "")
+		tmp_str = tmp_str.replace("</i>", "")
+		tmp_str = tmp_str.replace('<', '')
+		tmp_str = tmp_str.replace('>', '')
+		tmp_str = tmp_str.replace('/', '')
+		return tmp_str
 		
 		
 class AnalysisMethod(Entity):
@@ -425,6 +478,8 @@ class AccessionSet2Ecotype(Entity):
 
 class ResultsMethod(Entity):
 	"""
+	2012.3.7
+		add column locus_type
 	2011-2-6
 		add column cnv_method to hold CNV association results
 		change unique constraint to include cnv_method_id
@@ -445,6 +500,7 @@ class ResultsMethod(Entity):
 	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	cnv_method = ManyToOne("%s.CNVMethod"%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	rm_json = OneToMany('%s.ResultsMethodJson'%__name__)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -457,7 +513,18 @@ class ResultsMethod(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
 										'results_method_type_id', 'analysis_method_id', 'cnv_method_id'))
-
+	
+	def getDateStampedFilename(self):
+		"""
+		2012.3.21
+			xxx.tsv => xxx.2012_3_21.tsv
+		"""
+		from datetime import datetime
+		lastModDatetime = datetime.fromtimestamp(os.stat(self.filename).st_mtime)
+		prefix, suffix = os.path.splitext(self.filename)
+		newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
+									lastModDatetime.day, suffix)
+		return newFilename
 class ResultsMethodJson(Entity):
 	"""
 	2009-5-4
@@ -2157,10 +2224,46 @@ class Stock_250kDB(ElixirDB):
 		#2008-08-26 setup_all() would setup other databases as well if they also appear in the program. Seperate this to be envoked after initialization
 		# to ensure the metadata of other databases is setup properly.
 	
-	@classmethod
-	def getGWA(cls, call_method_id, phenotype_method_id, analysis_method_id, results_directory=None, min_MAF=0.1, \
+	@property
+	def data_dir(self, ):
+		"""
+		2012.3.23
+			(learnt from VervetDB)
+			get the master directory in which all files attached to this db are stored.
+		"""
+		dataDirEntry = README.query.filter_by(title='data_dir').first()
+		if not dataDirEntry or not dataDirEntry.description or not os.path.isdir(dataDirEntry.description):
+			# todo: need to test dataDirEntry.description is writable to the user
+			sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
+			raise
+			return None
+		else:
+			return dataDirEntry.description
+	
+	def reScalePathByNewDataDir(self, filePath="", newDataDir=""):
+		"""
+		2012.3.23
+			in case that the whole /Network/Data/250k/db is stored in a different place (=newDataDir)
+				how to rescale the filePath ( stored in the database tables) to reflect its new path.
+		"""
+		if not newDataDir:	#newDataDir is nothing.
+			return filePath
+		else:
+			oldDataDir = self.data_dir()
+			if filePath.find(oldDataDir)==0:
+				relativePath = filePath[len(oldDataDir)-1:]
+				newPath = os.path.join(newDataDir, relativePath)
+				return newPath
+			else:
+				sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
+				return None
+	
+	#@classmethod
+	def getGWA(self, call_method_id, phenotype_method_id, analysis_method_id, results_directory=None, min_MAF=0.1, \
 			construct_chr_pos2index=False, pdata=None):
 		"""
+		2012.3.23
+			not a classmethod anymore
 		2010-3-14
 			become a classmethod
 		2009-3-12
@@ -2168,8 +2271,8 @@ class Stock_250kDB(ElixirDB):
 		"""
 		rm = ResultsMethod.query.filter_by(call_method_id=call_method_id).filter_by(phenotype_method_id=phenotype_method_id).\
 					filter_by(analysis_method_id=analysis_method_id).first()
-		from GeneListRankTest import GeneListRankTest
-		return GeneListRankTest.getResultMethodContent(rm, results_directory=results_directory, min_MAF=min_MAF, 
+		#from GeneListRankTest import GeneListRankTest
+		return self.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=min_MAF, 
 																construct_chr_pos2index=construct_chr_pos2index,\
 																pdata=pdata)
 	
@@ -2185,23 +2288,155 @@ class Stock_250kDB(ElixirDB):
 		snpData = SNPData(input_fname=cm.filename, turn_into_array=1, ignore_2nd_column=ignore_2nd_column)	#use 1st column (ecotype id) as main ID
 		return snpData
 	
-	def getSNP(self, chromosome=None, start=None, stop=None):
+	def getSNP(self, chromosome=None, start=None, stop=None, locus_type_id=None):
 		"""
+		2012.3.20
+			add locus_type_id
 		2011-4-22
 			get Snps object based on chromosome, start, stop or else create it if not in db
 		"""
 		query = Snps.query.filter_by(chromosome=chromosome).filter_by(position=start)
 		if stop:
-			query.filter_by(end_position=stop)
+			query = query.filter(Snps.end_position==stop)
 		db_entry = query.first()
+		no_of_entries = query.count()
+		if no_of_entries>1:
+			sys.stderr.write("Warning: %s db entries for (chr=%s, start=%s, stop=%s).\n"%(no_of_entries, chromosome, start, stop))
 		if not db_entry:
 			name = '%s_%s'%(chromosome, start)
 			if stop:
 				name += '_%s'%(stop)
 			db_entry = Snps(name=name, chromosome=chromosome, position=start, \
-										end_position=stop)
+							end_position=stop, locus_type_id=locus_type_id)
 			self.session.add(db_entry)
 		return db_entry
+	
+	def dealWithSNPInfo(self, snpInfoPickleFname, locus_type_id=1):
+		"""
+		2012.3.19 a wrapper around getSNPInfo() to pickle the data structure
+		"""
+		sys.stderr.write("Dealing with SNPInfo ...")
+		from pymodule.SNP import SNPInfo
+		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from pymodule.RBTree import RBDict
+		import cPickle
+		if snpInfoPickleFname:
+			if os.path.isfile(snpInfoPickleFname):	#if this file is already there, suggest to un-pickle it.
+				picklef = open(snpInfoPickleFname)
+				snpInfo = cPickle.load(picklef)
+				del picklef
+			else:	#if the file doesn't exist, but the filename is given, pickle data into it
+				snpInfo = self.getSNPInfo(locus_type_id=locus_type_id)
+				#pickle the object
+				picklef = open(snpInfoPickleFname, 'w')
+				cPickle.dump(snpInfo, picklef, -1)
+				picklef.close()
+		else:
+			snpInfo = self.getSNPInfo(locus_type_id=locus_type_id)
+		sys.stderr.write(" %s snps, %s distinct loci in locusRBDict. %s loci have the same genomic coordinates.\n"%\
+						(len(snpInfo.snps_id2index), len(snpInfo.locusRBDict), snpInfo.no_of_same_position_loci))
+		return snpInfo
+	
+	def getSNPInfo(self, locus_type_id=1):
+		"""
+		2012.3.19
+			moved from variation.src.DrawSNPRegion.DrawSNPRegion
+		2012.3.7
+			add end_position into chr_pos
+			todo :
+				#. have to somehow separate snp-gwas loci and cnv-gwas loci , because they overlap
+				#. generate RB dictionary to store all loci for fast retrieval based on (chr, start, stop)
+		2009-2-18
+			replace PassingData with class SNPInfo from pymodule.SNP to wrap up all data
+		2009-1-22
+			order by chromosome, position
+			no chr_pos2snps_id, can get snps_id from chr_pos2index => data_ls
+		2009-1-5
+			add chr_pos2snps_id
+		2008-09-24
+			in order
+		"""
+		sys.stderr.write("Getting info of locus_type_id=%s loci in chromosomal order ...  "%(locus_type_id))
+		chr_pos_ls = []
+		data_ls = []
+		chr_pos2index = {}
+		snps_id2index = {}
+		i = 0
+		block_size = 50000
+		
+		from pymodule.SNP import SNPInfo
+		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from pymodule.RBTree import RBDict
+		locusRBDict = RBDict()
+		
+		where_ls = ['chromosome is not null', 'position is not null']
+		if locus_type_id:
+			where_ls.append('locus_type_id=%s'%(locus_type_id))
+		
+		rows = self.metadata.bind.execute("select id, chromosome, position, end_position, allele1, allele2, locus_type_id from %s \
+				where  %s order by chromosome, position, end_position"%(Snps.table.name, ' and '.join(where_ls)))
+		#.query.offset(i).limit(block_size)
+		#while rows.count()!=0:
+		prev_outputted_i = ""
+		no_of_same_position_loci = 0
+		for row in rows:
+			obj = PassingData()
+			for item in row.items():
+				setattr(obj, item[0], item[1])
+			if obj.end_position is None:
+				obj.end_position = obj.position	#this operation couldn't happen on row (a RowProxy object). 
+				#*** AttributeError: 'RowProxy' object has no attribute 'end_position'
+			chr_pos = (obj.chromosome, obj.position, obj.end_position)
+			chr_pos_ls.append(chr_pos)
+			chr_pos2index[chr_pos] = len(chr_pos2index)
+			snps_id2index[obj.id] = len(snps_id2index)
+			data_ls.append(obj)
+			
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=obj.chromosome, \
+							span_ls=[obj.position, obj.end_position], \
+							min_reciprocal_overlap=1,)
+							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
+			if segmentKey not in locusRBDict:
+				locusRBDict[segmentKey] = []
+			else:
+				no_of_same_position_loci += 1
+			locusRBDict[segmentKey].append(snps_id2index[obj.id])	#value is a list of the index
+			i += 1
+		#	if self.debug and i>40000:
+		#		break
+		#	rows = Stock_250kDB.Snps.query.offset(i).limit(block_size)
+			if i%10000==0:
+				sys.stderr.write("%s%s"%('\x08'*len(str(prev_outputted_i)), i))
+				prev_outputted_i = i
+		sys.stderr.write("%s%s"%('\x08'*len(str(prev_outputted_i)), i))
+		snpInfo = SNPInfo(locus_type_id=locus_type_id)
+		#snpInfo.chr_pos_ls = chr_pos_ls
+		snpInfo.chr_pos2index = chr_pos2index
+		snpInfo.snps_id2index = snps_id2index
+		snpInfo.data_ls = data_ls
+		snpInfo.locusRBDict = locusRBDict
+		snpInfo.no_of_same_position_loci = no_of_same_position_loci
+		sys.stderr.write(" %s snps, %s distinct loci in locusRBDict. %s loci have the same genomic coordinates.\n"%\
+						(len(snpInfo.snps_id2index), len(snpInfo.locusRBDict), snpInfo.no_of_same_position_loci))
+		return snpInfo
+	
+		
+	def getNonCNVSnpsID2CNVSnpsID(self, cnv_locus_type_id=2):
+		"""
+		2012-3.20
+			create a dictionary between locus_type_id=1 and locus_type_id=2 on the condition value of (chromosome, postion) pairs.
+		"""
+		sys.stderr.write("Getting a map between non-CNV Snps.id (locus_type_id!=%s) and cnv-like Snps.id (locus_type_id=%s) ..."%\
+						(cnv_locus_type_id, cnv_locus_type_id))
+		dc= {}
+		query = self.metadata.bind.execute("select s1.id as sid, s2.id as tid from (select id,chromosome,position from %s where locus_type_id!=%s) as s1, \
+			(select id, chromosome, position from %s where locus_type_id=%s) as s2 \
+			where s1.chromosome=s2.chromosome and s1.position=s2.position"%(Snps.table.name, cnv_locus_type_id, Snps.table.name, cnv_locus_type_id))
+		for row in query:
+			dc[row.sid] = row.tid
+		
+		sys.stderr.write("%s entries.\n"%(len(dc)))
+		return dc
 	
 	@classmethod
 	def getCNVQCInGWA(cls, accession_id=None, cnv_type_id=None, min_size=None, min_no_of_probes=None,\
@@ -2987,8 +3222,12 @@ class Stock_250kDB(ElixirDB):
 					(TableClass.table.name, CNVTableClass.table.name, " and ".join(where_sql_ls))
 		return self.getIDShortNameInfoGivenSQLQuery(sql_string)
 	
-	def getSNPChrPos2IDLs(self,priorTAIRVersion=False):
+	def getSNPChrPos2IDLs(self, priorTAIRVersion=False, locus_type_id=None):
 		"""
+		2012.3.9
+			add argument locus_type_id
+		2012.3.7
+			key is changed from (chr, pos) to (chr, pos, end_position)
 		2011-5-6
 			returns both maps
 		"""
@@ -2998,23 +3237,35 @@ class Stock_250kDB(ElixirDB):
 		if priorTAIRVersion==True:
 			chromosome_table_fieldname = 'tair8_chromosome'
 			position_table_fieldname = 'tair8_position'
+			endPositionFieldName = 'end_position'
 		else:
 			chromosome_table_fieldname = 'chromosome'
 			position_table_fieldname = 'position'
+			endPositionFieldName = 'end_position'
 		
-		rows = self.metadata.bind.execute("select id, %s as chromosome, %s as position from %s where %s is not null and %s is not null"\
-										%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
-										chromosome_table_fieldname, position_table_fieldname, ))
+		where_sentence = 'where %s is not null and %s is not null'%(chromosome_table_fieldname, position_table_fieldname)
+		if locus_type_id is not None:
+			where_sentence += ' and locus_type_id=%s'%(locus_type_id)
+		rows = self.metadata.bind.execute("select id, %s as chromosome, %s as position, %s from %s %s "%\
+								(chromosome_table_fieldname, position_table_fieldname, endPositionFieldName, Snps.table.name, \
+								where_sentence, ))
 		for row in rows:
-			chr_pos_2snp_id[(row.chromosome,row.position)] = row.id
-			snp_id2chr_pos[row.id] = (row.chromosome,row.position)
+			if row.end_position is None:	#2012.3.7
+				end_position = row.position
+			else:
+				end_position = row.end_position
+			key = (row.chromosome, row.position, end_position)
+			chr_pos_2snp_id[key] = row.id
+			snp_id2chr_pos[row.id] = key
 		dict_to_return['snp_id2chr_pos'] = snp_id2chr_pos
 		dict_to_return['chr_pos_2snp_id'] = chr_pos_2snp_id
 		return dict_to_return
 	
 	
-	def getSNPChrPos2ID(self, keyType=1, priorTAIRVersion=False):
+	def getSNPChrPos2ID(self, keyType=1, priorTAIRVersion=False, locus_type_id=None):
 		"""
+		2012.3.9
+			add argument locus_type_id
 		2011-5-4
 			bugfix: when priorTAIRVersion=True, alias the field names to chromosome and position
 				(instead of tair8_chromosome, tair8_position)
@@ -3036,25 +3287,28 @@ class Stock_250kDB(ElixirDB):
 				1: (chr,pos) is key. id is value
 				2: id is key, (chr, pos) is value.
 		"""
-		sys.stderr.write("Getting a map between Snps.id and (chr,pos), keyType %s ..."%(keyType))
-		data = self.getSNPChrPos2IDLs(priorTAIRVersion)
+		sys.stderr.write("Getting a map between Snps.id and (chr,pos), keyType %s, priorTAIRVersion=%s, locus_type_id=%s ..."%\
+						(keyType, priorTAIRVersion, locus_type_id))
+		data = self.getSNPChrPos2IDLs(priorTAIRVersion, locus_type_id=locus_type_id)
 		
 		if keyType==1:
 			dict_to_return = data.get('chr_pos_2snp_id')
 		else:
 			dict_to_return = data.get('snp_id2chr_pos')
-		sys.stderr.write("%s entries. Done.\n"%(len(dict_to_return)))
+		sys.stderr.write("%s entries.\n"%(len(dict_to_return)))
 		return dict_to_return
 	
-	def getSNPID2ChrPos(self, priorTAIRVersion=False):
+	def getSNPID2ChrPos(self, priorTAIRVersion=False, locus_type_id=None):
 		"""
+		2012.3.9
+			add argument locus_type_id
 		2011-10-14 add argument priorTAIRVersion
 		2010-10-13
 			return a dictionary which translates snps.id to (chr, pos).
 			used in DB_250k2data.py
 			
 		"""
-		return self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
+		return self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion, locus_type_id=locus_type_id)
 	
 	
 	def get_db_id_given_chr_pos2db_id(self, snp_id):
@@ -3101,14 +3355,19 @@ class Stock_250kDB(ElixirDB):
 		return self._snp_id2chr_pos
 	
 	@snp_id2chr_pos.setter
-	def snp_id2chr_pos(self, priorTAIRVersion=False):
+	def snp_id2chr_pos(self, argument_ls=[False, None]):
 		"""
-		2011-2-28
+		2012.3.9
+			replace argument priorTAIRVersion with argument_ls
 			usage:
-				db.snp_id2chr_pos = True	#if you need to set priorTAIRVersion to True.
+				db.snp_id2chr_pos = True	#if you need to set priorTAIRVersion to True and leave locus_type_id to default (None).
+				db.snp_id2chr_pos = (True, None)	#if you need to set priorTAIRVersion to True and locus_type_id=None
 				chr_pos = db.snp_id2chr_pos.get(1)
+		2011-2-28
 		"""
-		self._snp_id2chr_pos = self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion)
+		argData = self.handleSNPChrPos2IDArguments(argument_ls)
+		self._snp_id2chr_pos = self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=argData.priorTAIRVersion,\
+										locus_type_id=argData.locus_type_id)
 	
 	@property
 	def chr_pos2snp_id(self,):
@@ -3120,16 +3379,43 @@ class Stock_250kDB(ElixirDB):
 			self.chr_pos2snp_id = False
 		return self._chr_pos2snp_id
 	
+	
 	@chr_pos2snp_id.setter
-	def chr_pos2snp_id(self, priorTAIRVersion=False):
+	def chr_pos2snp_id(self, argument_ls=[False, None]):
 		"""
-		2011-2-28
-		
+		2012.3.9
+			replace argument priorTAIRVersion with argument_ls
 			usage:
-				db.chr_pos2snp_id = True	# if you need to set priorTAIRVersion to True.
+				db.chr_pos2snp_id = True	#if you need to set priorTAIRVersion to True and leave locus_type_id to default (None).
+				db.chr_pos2snp_id = (True,1)	# if you need to set priorTAIRVersion to True and locus_type_id=1
+				snp_id = db.chr_pos2snp_id.get((1,657))
+		2011-2-28
+		"""
+		argData = self.handleSNPChrPos2IDArguments(argument_ls)
+		self._chr_pos2snp_id = self.getSNPChrPos2ID(keyType=1, priorTAIRVersion=argData.priorTAIRVersion,\
+												locus_type_id=argData.locus_type_id)
+	
+	def handleSNPChrPos2IDArguments(self, argument_ls=[False, None]):
+		"""
+		2012.3.9
+			called by chr_pos2snp_id or snp_id2chr_pos:
+				db.snp_id2chr_pos = True	#if you need to set priorTAIRVersion to True and leave locus_type_id to default (None).
+				db.snp_id2chr_pos = (True, None)	#if you need to set priorTAIRVersion to True and locus_type_id=None
+				chr_pos = db.snp_id2chr_pos.get(1)
+				
+				db.chr_pos2snp_id = True	#if you need to set priorTAIRVersion to True and leave locus_type_id to default (None).
+				db.chr_pos2snp_id = (True,1)	# if you need to set priorTAIRVersion to True and locus_type_id=1
 				snp_id = db.chr_pos2snp_id.get((1,657))
 		"""
-		self._chr_pos2snp_id = self.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion)
+		priorTAIRVersion = False
+		locus_type_id = None
+		if type(argument_ls)==list or type(argument_ls)==tuple:
+			priorTAIRVersion = argument_ls[0]
+			if len(argument_ls)>1:
+				locus_type_id = argument_ls[1]
+		else:	#2012.3.9 single argument (old way).
+			priorTAIRVersion = argument_ls
+		return PassingData(priorTAIRVersion=priorTAIRVersion, locus_type_id=locus_type_id)
 	
 	@property
 	def cnv_id2chr_pos(self):
@@ -3163,10 +3449,13 @@ class Stock_250kDB(ElixirDB):
 			self._cnv_id2chr_pos[key] = value
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
 	
-	@classmethod
-	def getResultMethodContent(cls, results_method_id, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
-							pdata=None, min_value_cutoff=None,):
+	#@classmethod
+	def getResultMethodContent(self, results_method_id, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
+						pdata=None, min_value_cutoff=None,):
 		"""
+		2012.3.23
+			results_directory is equivalent to /Network/Data/250k/db/, not /Network/Data/250k/db/results/type_1/ (before).
+			also use self.reScalePathByNewDataDir() to get the updated path.
 		2011-3-10
 			moved from GeneListRankTest
 		2010-3-8
@@ -3201,11 +3490,13 @@ class Stock_250kDB(ElixirDB):
 		if rm.analysis_method_id==13: #Huh -Bjarni
 			sys.stderr.write("Analysis method id=%s is not supported.\n"%rm.analysis_method_id)
 			return None
-		
+		"""
 		if results_directory:	#given a directory where all results are.
 			result_fname = os.path.join(results_directory, os.path.basename(rm.filename))
 		else:
 			result_fname = rm.filename
+		"""
+		result_fname = self.reScalePathByNewDataDir(filePath=rm.filename, newDataDir=results_directory)
 		
 		if do_log10_transformation is None:
 			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
@@ -3233,7 +3524,7 @@ class Stock_250kDB(ElixirDB):
 		else:
 			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
 			genome_wide_result = None
-		cls.genome_wide_result = genome_wide_result
+		self.genome_wide_result = genome_wide_result
 		return genome_wide_result
 	
 	def getResultLs(self, call_method_id=None, analysis_method_id_ls=[], phenotype_method_id_ls=[], \
@@ -3319,6 +3610,61 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("%s phenotypes.\n"%(len(phenotype_method_ls)))
 		return phenotype_method_ls
 	
+	def getResultPeakList(self, result_id_ls=[], result_peak_type_id=None):
+		"""
+		2012.3.10
+			return a list of result_peak objects + unique biology categories
+			
+		"""
+		sys.stderr.write("Filtering a list of %s results by checking ResultPeak (result_peak_type_id=%s)..."%(len(result_id_ls), \
+																							result_peak_type_id))
+		TableClass = ResultPeak
+		query = TableClass.query.filter(TableClass.result_id.in_(result_id_ls))
+		if result_peak_type_id is not None:
+			query = query.filter_by(result_peak_type_id=result_peak_type_id)
+		return query
+	
+	def constructRBDictFromResultPeak(self, result_id, result_peak_type_id, peakPadding=10000):
+		"""
+		2012.3.19
+			moved from variation.src.TwoGWASPeakOverlap
+		2011-10-16
+		"""
+		sys.stderr.write("Constructing RBDict for peaks from result %s, (peak type %s) ..."%(result_id, result_peak_type_id))
+		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from pymodule.RBTree import RBDict
+		result_peakRBDict = RBDict()
+		query = ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id)
+		counter = 0
+		real_counter = 0
+		for row in query:
+			counter += 1
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+							span_ls=[max(1, row.start - peakPadding), row.stop + peakPadding], \
+							min_reciprocal_overlap=1,)
+							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
+			if segmentKey not in result_peakRBDict:
+				result_peakRBDict[segmentKey] = []
+			result_peakRBDict[segmentKey].append(row)
+		sys.stderr.write("%s peaks. Done.\n"%counter)
+		return result_peakRBDict
+	
+	def filterResultIDLsBasedOnResultPeak(self, result_id_ls, result_peak_type_id=None):
+		"""
+		2012.3.22
+			moved from PairwiseGWASPeakOverlapPipeline.py
+		2011-10-17
+			return a list of ResultsMethod.id that have entries in ResultPeak with result_peak_type_id
+		"""
+		sys.stderr.write("Filtering a list of %s results by checking ResultPeak (result_peak_type_id=%s)..."%(len(result_id_ls), \
+																							result_peak_type_id))
+		new_result_id_ls = []
+		for result_id in result_id_ls:
+			firstPeak = ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id).first()
+			if firstPeak:
+				new_result_id_ls.append(result_id)
+		sys.stderr.write(" %s entries left.\n"%(len(new_result_id_ls)))
+		return new_result_id_ls
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

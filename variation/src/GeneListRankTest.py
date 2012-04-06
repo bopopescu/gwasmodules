@@ -216,9 +216,11 @@ class GeneListRankTest(object):
 		return chrpos2pvalue
 	
 	@classmethod
-	def getResultMethodContent(cls, rm, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
+	def getResultMethodContent(cls, db_250k=None, rm=None, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
 							pdata=None, min_value_cutoff=None,):
 		"""
+		2012.3.23
+			Stock_250kDB.getResultMethodContent() is not a classmethod anymore.
 		2011-3-10
 			moved to Stock_250kDB.Stock_250kDB
 		2010-3-8
@@ -242,13 +244,15 @@ class GeneListRankTest(object):
 		2008-08-13
 			split from getGeneID2MostSignificantHit()
 		"""
-		genome_wide_result = Stock_250kDB.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=min_MAF, \
+		genome_wide_result = db_250k.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=min_MAF, \
 											construct_chr_pos2index=construct_chr_pos2index, \
 											pdata=pdata, min_value_cutoff=min_value_cutoff,)
 		return genome_wide_result
 	
-	def getGeneID2MostSignificantHit(self, rm, snps_context_wrapper, results_directory=None, min_MAF=0.1):
+	def getGeneID2MostSignificantHit(self, rm, snps_context_wrapper, results_directory=None, min_MAF=0.1, db_250k=None):
 		"""
+		2012.3.23
+			add argument db_250k
 		2009-5-4
 			specify the comment as 'touch' or 'away'
 		2008-09-16
@@ -265,7 +269,10 @@ class GeneListRankTest(object):
 			reverse the order of 1st-read results file, 2nd-read db.snps_context
 		"""
 		sys.stderr.write("Getting gene_id2hit ... \n")
-		genome_wide_result = self.getResultMethodContent(rm, results_directory, min_MAF)
+		if db_250k is None:
+			db_250k = getattr(self, 'db_250k')
+		
+		genome_wide_result = db_250k.getResultMethodContent(rm.id, results_directory, min_MAF)
 		if genome_wide_result is None:
 			return None
 		gene_id2hit = {}
@@ -357,8 +364,11 @@ class GeneListRankTest(object):
 								non_candidate_gene_ls=non_candidate_gene_ls, non_candidate_gene_pvalue_list=non_candidate_gene_pvalue_list)
 		return passingdata
 	
-	def prepareDataForRankTest(self, rm, snps_context_wrapper, candidate_gene_list, results_directory=None, min_MAF=0.1):
+	def prepareDataForRankTest(self, rm, snps_context_wrapper=None, candidate_gene_list=None, results_directory=None, min_MAF=0.1,\
+							db_250k=None):
 		"""
+		2012.3.23
+			add argument db_250k
 		2008-08-13
 			for each gene, don't take the most significant hit
 		"""
@@ -369,7 +379,10 @@ class GeneListRankTest(object):
 		non_candidate_gene_ls = []
 		non_candidate_gene_pvalue_list = []
 		
-		genome_wide_result = self.getResultMethodContent(rm, results_directory, min_MAF)
+		if db_250k is None:
+			db_250k = getattr(self, 'db_250k')
+		
+		genome_wide_result = db_250k.getResultMethodContent(rm.id, results_directory, min_MAF)
 		
 		counter = 0
 		for data_obj in genome_wide_result.data_obj_ls:
@@ -514,8 +527,10 @@ class GeneListRankTest(object):
 			sys.stderr.write("Done.\n")
 		return candidate_gene_snp_index_ls
 	
-	def prepareDataForPermutationRankTest(self, rm, snps_context_wrapper, param_data):
+	def prepareDataForPermutationRankTest(self, rm, snps_context_wrapper, param_data=None, db_250k=None):
 		"""
+		2012.3.23
+			add argument db_250k
 		2009-9-17
 			fix a bug. add "+1" in "no_of_total_snps+1" of below:
 				ranks_to_be_checked = range(starting_rank, min(starting_rank+int(no_of_snps), no_of_total_snps+1))
@@ -557,7 +572,10 @@ class GeneListRankTest(object):
 		
 		#input file is in chromosome,position order
 		param_data.construct_chr_pos2index = getattr(param_data, 'construct_chr_pos2index', True)	#get_data_obj_by_chr_pos() needs chr_pos2index in gwr
-		genome_wide_result = self.getResultMethodContent(rm, param_data.results_directory, param_data.min_MAF, pdata=param_data)
+		if db_250k is None:
+			db_250k = getattr(self, 'db_250k')
+		
+		genome_wide_result = db_250k.getResultMethodContent(rm.id, param_data.results_directory, param_data.min_MAF, pdata=param_data)
 		if genome_wide_result is None:
 			return None
 		no_of_total_snps = len(genome_wide_result.data_obj_ls)
@@ -1077,6 +1095,7 @@ class GeneListRankTest(object):
 		db = Stock_250kDB(drivername=self.drivername, username=self.db_user,
 				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db.setup(create_tables=False)
+		self.db_250k = db	#2012.3.23
 		session = db.session
 		snps_context_wrapper = self.dealWithSnpsContextWrapper(self.snps_context_picklef, self.min_distance, self.get_closest)
 		
@@ -1089,11 +1108,11 @@ class GeneListRankTest(object):
 		else:
 			writer = None
 		pd = PassingData(list_type_id=self.list_type_id, snps_context_wrapper=snps_context_wrapper,\
-							results_directory=self.results_directory, \
-							min_MAF=self.min_MAF, get_closest=self.get_closest, min_distance=self.min_distance, \
-							min_sample_size=self.min_sample_size, test_type_id=self.test_type_id, \
-							results_type=self.results_type, no_of_permutations=self.no_of_permutations,\
-							no_of_min_breaks=self.no_of_min_breaks, db_250k=db)
+					results_directory=self.results_directory, \
+					min_MAF=self.min_MAF, get_closest=self.get_closest, min_distance=self.min_distance, \
+					min_sample_size=self.min_sample_size, test_type_id=self.test_type_id, \
+					results_type=self.results_type, no_of_permutations=self.no_of_permutations,\
+					no_of_min_breaks=self.no_of_min_breaks, db_250k=db)
 		for results_id in self.results_id_ls:
 			pd.results_id = results_id
 			candidate_gene_rank_sum_test_result = self.run_wilcox_test(pd)

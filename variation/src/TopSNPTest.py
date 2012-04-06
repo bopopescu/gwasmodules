@@ -74,12 +74,16 @@ class TopSNPTest(GeneListRankTest):
 			sys.stderr.write("Done.\n")
 		return row.count
 	
-	def prepareDataForHGTest(self, rm, snps_context_wrapper, candidate_gene_list, results_directory, min_MAF, no_of_top_snps):
+	def prepareDataForHGTest(self, rm, snps_context_wrapper, candidate_gene_list, results_directory=None, min_MAF=None, \
+							no_of_top_snps=None,\
+							db_250k=None):
 		"""
+		2012.3.23
+			add argument db_250k
 		2008-08-20
 		"""
 		sys.stderr.write("Preparing data for HG test ... ")
-		genome_wide_result = self.getResultMethodContent(rm, results_directory, min_MAF)
+		genome_wide_result = db_250k.getResultMethodContent(rm.id, results_directory, min_MAF)
 		genome_wide_result.data_obj_ls.sort()	#in value descending order. each SNP object has a defined method for comparison based on its value
 		genome_wide_result.data_obj_ls.reverse()
 		candidate_gene_set = Set(candidate_gene_list)
@@ -617,7 +621,8 @@ class TopSNPTest(GeneListRankTest):
 			if rm.analysis_method_id==13:
 				passingdata = self.prepareDataForHGTest_SNPPair(rm, pd.snps_context_wrapper, candidate_gene_list, pd.results_directory, pd.min_MAF, pd.no_of_top_snps)
 			else:
-				passingdata = self.prepareDataForHGTest(rm, pd.snps_context_wrapper, candidate_gene_list, pd.results_directory, pd.min_MAF, pd.no_of_top_snps)
+				passingdata = self.prepareDataForHGTest(rm, pd.snps_context_wrapper, candidate_gene_list, pd.results_directory, \
+					pd.min_MAF, pd.no_of_top_snps, db_250k=self.db_250k)
 			"""
 			param_data = PassingData(results_directory=pd.results_directory, candidate_gene_list=candidate_gene_list, \
 									min_MAF=pd.min_MAF, allow_two_sample_overlapping=pd.allow_two_sample_overlapping,\
@@ -827,6 +832,7 @@ class TopSNPTest(GeneListRankTest):
 		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
 				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db.setup(create_tables=False)
+		self.db_250k = db
 		session = db.session
 		
 		total_gene_id_ls = get_total_gene_ls(db.metadata.bind)

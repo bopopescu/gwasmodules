@@ -227,8 +227,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.66449955"
-     inkscape:cx="862.27156"
-     inkscape:cy="1346.5129"
+     inkscape:cx="1196.9039"
+     inkscape:cy="1164.0054"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      inkscape:window-width="1394"
@@ -2746,23 +2746,23 @@
       <text
          xml:space="preserve"
          style="font-size:20px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-         x="781.52069"
-         y="3055.9863"
+         x="615.48749"
+         y="3054.4814"
          id="text3145"><tspan
            sodipodi:role="line"
            id="tspan3147"
-           x="781.52069"
-           y="3055.9863">Compare Association Methods</tspan></text>
+           x="615.48749"
+           y="3054.4814">Compare Association Methods</tspan></text>
       <text
          xml:space="preserve"
          style="font-size:14px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-         x="939.43646"
-         y="3082.2212"
+         x="773.40326"
+         y="3080.7163"
          id="text3149"><tspan
            sodipodi:role="line"
            id="tspan3151"
-           x="939.43646"
-           y="3082.2212">CalculateOverlappingStat.py</tspan></text>
+           x="773.40326"
+           y="3080.7163">CalculateOverlappingStat.py</tspan></text>
       <text
          xml:space="preserve"
          style="font-size:16px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
@@ -3333,30 +3333,30 @@
     <text
        xml:space="preserve"
        style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="67.518646"
+       x="43.518646"
        y="3653.0198"
        id="text8065"><tspan
          sodipodi:role="line"
-         x="67.518646"
+         x="43.518646"
          y="3653.0198"
          id="tspan8069">plot showing how enrichment/pvalue going down along cutoff</tspan><tspan
          sodipodi:role="line"
-         x="67.518646"
+         x="43.518646"
          y="3668.0198"
          id="tspan8073">at different min_distance. one phenotype only.</tspan></text>
     <text
        xml:space="preserve"
        style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="492.29715"
-       y="3627.281"
+       x="348.29715"
+       y="3623.281"
        id="text8075"><tspan
          sodipodi:role="line"
          id="tspan8077"
-         x="492.29715"
-         y="3627.281">similar to DrawTopTest2DMapForOneRM.py, but across multiple phenotypes</tspan><tspan
+         x="348.29715"
+         y="3623.281">similar to DrawTopTest2DMapForOneRM.py, but across multiple phenotypes</tspan><tspan
          sodipodi:role="line"
-         x="492.29715"
-         y="3642.281"
+         x="348.29715"
+         y="3638.281"
          id="tspan8079">with only one min_distance.</tspan></text>
     <text
        xml:space="preserve"
@@ -3386,12 +3386,12 @@
     <text
        xml:space="preserve"
        style="font-size:12px;font-style:normal;font-weight:normal;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="470.73184"
+       x="452.73184"
        y="3579.8901"
        id="text50731"><tspan
          sodipodi:role="line"
          id="tspan50733"
-         x="470.73184"
+         x="452.73184"
          y="3579.8901">PlotTopSNPCandidateCrossPhenotype.py</tspan></text>
     <text
        xml:space="preserve"
@@ -4444,47 +4444,42 @@
          d="m 1034.8361,3181.9608 142.4021,0"
          style="fill:#00000c;fill-opacity:1;stroke:#000000;stroke-width:1.49251854px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend)" />
     </g>
-    <text
-       xml:space="preserve"
-       style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="609.2663"
-       y="3373.043"
-       id="text4836"
-       sodipodi:linespacing="125%"><tspan
-         sodipodi:role="line"
-         id="tspan4838"
-         x="609.2663"
-         y="3373.043"
-         style="font-size:20px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Arial;-inkscape-font-specification:Arial Bold">PairwiseGWASPeakOverlapPipeline.py</tspan></text>
-    <text
-       xml:space="preserve"
-       style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="652.90814"
-       y="3404.6458"
-       id="text4840"
-       sodipodi:linespacing="125%"><tspan
-         sodipodi:role="line"
-         id="tspan4842"
-         x="652.90814"
-         y="3404.6458"
-         style="font-size:14px">TwoGWASPeakOverlap.py</tspan><tspan
-         sodipodi:role="line"
-         x="652.90814"
-         y="3422.1458"
-         id="tspan4844"
-         style="font-size:14px">PlotResultPeakOverlap.py</tspan></text>
-    <text
-       xml:space="preserve"
-       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="607.22394"
-       y="3474.0708"
-       id="text4836-4"
-       sodipodi:linespacing="125%"><tspan
-         sodipodi:role="line"
-         id="tspan4838-0"
-         x="607.22394"
-         y="3474.0708"
-         style="font-size:20px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Arial;-inkscape-font-specification:Arial Bold">PairwiseSamePhenotypeGWASPeakOverlapPipeline.py</tspan></text>
+    <g
+       id="g3952"
+       transform="translate(35.957642,-29.999973)">
+      <g
+         id="g3920">
+        <text
+           xml:space="preserve"
+           style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+           x="609.2663"
+           y="3373.043"
+           id="text4836"
+           sodipodi:linespacing="125%"><tspan
+             sodipodi:role="line"
+             id="tspan4838"
+             x="609.2663"
+             y="3373.043"
+             style="font-size:20px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Arial;-inkscape-font-specification:Arial Bold">PairwiseGWASPeakOverlapPipeline.py</tspan></text>
+        <text
+           xml:space="preserve"
+           style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+           x="652.90814"
+           y="3392.6458"
+           id="text4840"
+           sodipodi:linespacing="125%"><tspan
+             sodipodi:role="line"
+             id="tspan4842"
+             x="652.90814"
+             y="3392.6458"
+             style="font-size:14px">TwoGWASPeakOverlap.py</tspan><tspan
+             sodipodi:role="line"
+             x="652.90814"
+             y="3410.1458"
+             id="tspan4844"
+             style="font-size:14px">PlotResultPeakOverlap.py</tspan></text>
+      </g>
+    </g>
     <text
        xml:space="preserve"
        style="font-size:16px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
@@ -4513,34 +4508,97 @@
          id="tspan4885"
          x="939.05255"
          y="3380.7898" /></text>
-    <text
-       xml:space="preserve"
-       style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
-       x="653.30701"
-       y="3497.0808"
-       id="text4840-8"
-       sodipodi:linespacing="125%"><tspan
-         sodipodi:role="line"
-         id="tspan4842-6"
-         x="653.30701"
-         y="3497.0808"
-         style="font-size:14px">TwoGWASPeakOverlap.py</tspan><tspan
-         sodipodi:role="line"
-         x="653.30701"
-         y="3514.5808"
-         id="tspan4844-5"
-         style="font-size:14px">PlotResultPeakOverlap.py</tspan></text>
+    <g
+       id="g3945"
+       transform="translate(38,-55.298069)">
+      <g
+         id="g3927"
+         transform="translate(0,-14)">
+        <text
+           xml:space="preserve"
+           style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+           x="607.22394"
+           y="3474.0708"
+           id="text4836-4"
+           sodipodi:linespacing="125%"><tspan
+             sodipodi:role="line"
+             id="tspan4838-0"
+             x="607.22394"
+             y="3474.0708"
+             style="font-size:20px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Arial;-inkscape-font-specification:Arial Bold">PairwiseSamePhenotypeGWASPeakOverlapPipeline.py</tspan></text>
+        <text
+           xml:space="preserve"
+           style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+           x="653.30701"
+           y="3491.0808"
+           id="text4840-8"
+           sodipodi:linespacing="125%"><tspan
+             sodipodi:role="line"
+             id="tspan4842-6"
+             x="653.30701"
+             y="3491.0808"
+             style="font-size:14px">TwoGWASPeakOverlap.py</tspan><tspan
+             sodipodi:role="line"
+             x="653.30701"
+             y="3508.5808"
+             id="tspan4844-5"
+             style="font-size:14px">PlotResultPeakOverlap.py</tspan></text>
+      </g>
+    </g>
+    <g
+       id="g3936"
+       transform="translate(-274.58411,-97.720127)">
+      <text
+         sodipodi:linespacing="125%"
+         id="text4326"
+         y="3557.6299"
+         x="919.72992"
+         style="font-size:36px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+         xml:space="preserve"><tspan
+           style="font-size:20px;font-weight:bold;-inkscape-font-specification:Arial Bold"
+           y="3557.6299"
+           x="919.72992"
+           id="tspan4328"
+           sodipodi:role="line">LDBetweenTwoSNPDataWorkflow.py</tspan></text>
+      <text
+         sodipodi:linespacing="125%"
+         id="text4840-8-2"
+         y="3579.8303"
+         x="928.06427"
+         style="font-size:28px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Bitstream Vera Sans"
+         xml:space="preserve"><tspan
+           style="font-size:14px"
+           y="3579.8303"
+           x="928.06427"
+           id="tspan4842-6-6"
+           sodipodi:role="line">pymodule/pegasus/mapper/Order2ndSNPDataRowsSameAs1stSNPData.py</tspan><tspan
+           id="tspan3932"
+           style="font-size:14px"
+           y="3597.3303"
+           x="928.06427"
+           sodipodi:role="line">pymodule/pegasus/mapper/ConvertSNPData2HDF5.py</tspan><tspan
+           style="font-size:14px"
+           id="tspan4844-5-8"
+           y="3614.8303"
+           x="928.06427"
+           sodipodi:role="line">pymodule/pegasus/mapper/CalculateColCorBetweenTwoHDF5</tspan><tspan
+           id="tspan3934"
+           style="font-size:14px"
+           y="3632.3303"
+           x="928.06427"
+           sodipodi:role="line">pymodule/pegasus/mapper/MergeTwoLocusCorrelationHDF5.py</tspan></text>
+    </g>
     <text
        xml:space="preserve"
        style="font-size:36px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
-       x="919.72992"
-       y="3557.6299"
-       id="text4326"
+       x="641.32501"
+       y="3562.1445"
+       id="text3916"
        sodipodi:linespacing="125%"><tspan
          sodipodi:role="line"
-         id="tspan4328"
-         x="919.72992"
-         y="3557.6299"
-         style="font-size:20px;font-weight:bold;-inkscape-font-specification:Arial Bold">LDBetweenTwoSNPDataWorkflow.py</tspan></text>
+         id="tspan3918"
+         x="641.32501"
+         y="3562.1445"
+         style="font-size:20px;font-weight:bold;-inkscape-font-specification:Arial Bold">FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow.py</tspan></text>
   </g>
 </svg>

@@ -7,7 +7,7 @@ Examples:
 	# 2011-10-16 call method 57 or cnv method 20, analysis method 1, min score 4
 	%s -q 57 -A 20 -a 1 -f 4 -o call57cnv20analysis1MinScore4.xml -u yh -z banyan -c -D condorpool
 	
-	#ditto but analysis method 7 and min score 3
+	#ditto but analysis method 7 and min score 3 (make sure -c is added, otherwise nothing will be stored in db)
 	%s -q 57 -A 20 -a 7 -f 3 -o call57cnv20analysis7MinScore3.xml -u yh -z banyan -c -B condorpool -D condorpool
 	#ditto but analysis method 32
 	%s -q 57 -A 20 -a 32 -f 3 -o call57cnv20analysis32MinScore3.xml -u yh  -z banyan -c -B condorpool -D condorpool
@@ -102,7 +102,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		defineAssociationLandscape = Executable(namespace=namespace, name="DefineAssociationLandscape", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		defineAssociationLandscape.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "DefineAssociationLandscape.py"), site_handler))
-		#nucmer.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		defineAssociationLandscape.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		workflow.addExecutable(defineAssociationLandscape)
 		workflow.defineAssociationLandscape = defineAssociationLandscape
 	

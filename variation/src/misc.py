@@ -6724,6 +6724,43 @@ class Data250k(object):
 	"""
 	
 	@classmethod
+	def checkIfTwoSNPDatasetsHaveOverlapColumns(cls, inputFname1, inputFname2):
+		"""
+		2012.3.20
+			
+		"""
+		def getColIDList(inputFname):
+			from pymodule import figureOutDelimiter
+			import csv
+			reader = csv.reader(open(inputFname), delimiter = figureOutDelimiter(inputFname))
+			header = reader.next()
+			del reader
+			col_id_list = header[2:]
+			sys.stderr.write("%s has %s columns.\n"%(inputFname, len(col_id_list)))
+			return col_id_list
+		
+		colIDSet1 = set(getColIDList(inputFname1))
+		colIDSet2 = set(getColIDList(inputFname2))
+		
+		overlapColIDSet = colIDSet1&colIDSet2
+		sys.stderr.write("%s overlapping columns.\n"%(len(overlapColIDSet)))
+		return overlapColIDSet
+	
+	"""
+		#2012.3.20
+		inputFname1 = '/Network/Data/250k/db/dataset/call_method_32.tsv'
+		inputFname2 = '/Network/Data/250k/db/dataset/call_method_57.tsv'
+		inputFname2 = '/Network/Data/250k/db/dataset/call_method_80.tsv'
+		overlapColIDSet = Data250k.checkIfTwoSNPDatasetsHaveOverlapColumns(inputFname1, inputFname2)
+		import pdb
+		pdb.set_trace()
+		sys.exit(0)
+		
+	
+	"""
+		
+	
+	@classmethod
 	def recoverArrayID2ndCol(cls, input_fname, data_with_array_id_fname, output_fname):
 		"""
 		2008-01-04 recover array id (2nd column) of a StrainXSNP data file based on its old version
@@ -7909,6 +7946,115 @@ class CmpDifferentData(object):
 
 class DB250k(object):
 	@classmethod
+	def bringBackOldAssociationResults(cls, db_250k, call_method_id=None):
+		"""
+		2012.3.21
+			bring the *.old.tsv to *.tsv. Backup existing *.tsv to *.datetime.tsv
+		"""
+		import Stock_250kDB
+		import csv, sys, os
+		from pymodule import SNP
+		sys.stderr.write("Bringing back old association results of call method %s ..."%(call_method_id))
+		#type 2 is segment-based recombination rate. only one result.
+		# analysis method 13 is BooleanSNPPair. ignore
+		TableClass = Stock_250kDB.ResultsMethod
+		query = TableClass.query.filter_by(call_method_id=call_method_id)
+		counter = 0
+		real_counter = 0
+		no_of_files = query.count()
+		for row in query:
+			counter += 1
+			sys.stderr.write("%d/%d:\t%s "%(counter, no_of_files, row.filename))
+			if not os.path.isfile(row.filename):	#2011-5-4 bugfix: file might not exist at all.
+				sys.stderr.write(" file doesn't exist.\n")
+				continue
+			
+			no_of_lines = 0
+			no_of_lines_changed = 0
+			sys.stderr.write("...")
+			# backup the old file first
+			oldFormatFname = '%s.old.tsv'%(os.path.splitext(row.filename)[0])
+			if os.path.isfile(oldFormatFname) and os.path.isfile(row.filename):
+				os.rename(row.filename, row.getDateStampedFilename())
+				real_counter += 1
+			
+			if os.path.isfile(oldFormatFname):
+				os.rename(oldFormatFname, row.filename)
+			sys.stderr.write("  .\n")
+		sys.stderr.write("%s files out of %s total were brought back.\n"%(real_counter, counter))
+		return real_counter
+	"""
+		#2012.3.21 Error happened in transforming association results for call 57.
+		no_of_files_moved = DB250k.bringBackOldAssociationResults(db_250k, call_method_id=57)
+		sys.exit(0)
+		
+		#2012.3.27
+		# Error happened in transforming association results for some old call methods (some snps were IDed as CNV or recombination locus IDs).
+		for call_method_id in xrange(20,73):
+			if call_method_id!=57 and call_method_id!=32:	#57 is CNV (and translated correctly already). 32 has been recently translated.
+				no_of_files_moved = DB250k.bringBackOldAssociationResults(db_250k, call_method_id=call_method_id)
+				if no_of_files_moved>0:	#2012.3.27 do nothing if there is no old files moved 
+					# priorTAIRVersion=True because these old association results are based on TAIR8 coordinates.
+					DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
+	def bringBackOldCallMethodDataset(cls, db_250k, call_method_id=None):
+		"""
+		2012.3.27
+			bring the *.old.tsv to *.tsv. Backup existing *.tsv to *.datetime.tsv
+		"""
+		import Stock_250kDB
+		import csv, sys, os
+		from pymodule import SNP
+		from pymodule.utils import getDateStampedFilename
+		sys.stderr.write("Bringing back old SNP datasets of call method %s ... \n"%(call_method_id))
+		#type 2 is segment-based recombination rate. only one result.
+		# analysis method 13 is BooleanSNPPair. ignore
+		TableClass = Stock_250kDB.CallMethod
+		call_method = TableClass.get(call_method_id)
+		if not call_method:
+			sys.stderr.write("CallMethod %s doesn't exist in db.\n"%(call_method_id))
+			return
+		counter = 0
+		sys.stderr.write("%d/:\t%s "%(counter, call_method.filename))
+		if call_method.filename is None or not os.path.isfile(call_method.filename):	#2011-5-4 bugfix: file might not exist at all.
+			sys.stderr.write(" file doesn't exist.\n")
+			return None
+		
+		sys.stderr.write("...")
+		# backup the old file first
+		oldFormatFname = '%s.old.tsv'%(os.path.splitext(call_method.filename)[0])
+		if os.path.isfile(oldFormatFname) and os.path.isfile(call_method.filename):
+			os.rename(call_method.filename, getDateStampedFilename(call_method.filename))
+			counter += 1
+		
+		if os.path.isfile(oldFormatFname):
+			os.rename(oldFormatFname, call_method.filename)
+		sys.stderr.write("  .\n")
+		sys.stderr.write("%s files brought back.\n"%(counter))
+		return call_method
+	
+	"""
+		
+		#2012.3.27 Error happened in translating SNP Ids for numerous call methods (non-SNP loci IDs got mixed in).
+		DB250k.bringBackOldCallMethodDataset(db_250k, call_method_id=57)
+		sys.exit(0)
+		
+		#2012.3.27 Error happened in translating SNP Ids for numerous call methods (non-SNP loci, CNV or recombination locus IDs got mixed in).
+		call_method_id=32
+		for call_method_id in xrange(17,73):
+			if call_method_id!=57 and call_method_id!=32:	#57 is CNV-derived. 32 has been done a moment ago.
+				call_method = DB250k.bringBackOldCallMethodDataset(db_250k, call_method_id=call_method_id)
+				if call_method:	#not None
+					DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+		
+	"""
+	
+	@classmethod
 	def dumpFTGene2File(cls, db, output_fname, list_type_id=28):
 		"""
 		2008-11-25 dump all flowering time genes from table ft_gene into file. (for MpiInterGeneSNPPairAsso.py)
@@ -8494,7 +8640,7 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 						(no_of_replicate_entries, no_of_replicate_entries_with_individual_data, no_of_replicate_entries_but_no_individual_data))
 		
 	"""
-DB250k.cleanUpTablePhenotypeAvg(db)
+		DB250k.cleanUpTablePhenotypeAvg(db)
 	"""
 	
 	@classmethod
@@ -8550,15 +8696,18 @@ DB250k.cleanUpTablePhenotypeAvg(db)
 						(avg_count, new_avg_count, multi_avg_count, replicate_count))
 	
 	"""
-DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k, phenotype_condition='where date_created>"2009-08-23" order by method_id, ecotype_id')
+		DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k, phenotype_condition='where date_created>"2009-08-23" order by method_id, ecotype_id')
 
-#update all phenotype_avg entries that have inidividual values in table phenotype 
-DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
+		#update all phenotype_avg entries that have inidividual values in table phenotype 
+		DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	"""	
 	
 	@classmethod
-	def convertOldFormatCallFileIntoNewFormat(cls, db_250k, method_id=3, priorTAIRVersion=False):
+	def convertOldFormatCallFileIntoNewFormat(cls, db_250k, call_method_id=3, priorTAIRVersion=False):
 		"""
+		2012.3.27
+			add locus_type_id to db_250k.getSNPChrPos2ID()
+		
 		2011-2-24
 			add argument priorTAIRVersion, if true, it means using Snps.tair8_chromosome,Snps.tair8_position
 				rather than Snps.chromosome,Snps.position.
@@ -8568,10 +8717,14 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				old format: 1_3102_A_G      G       0.985079453549666
 				new format: 2       G       0.985079453549666
 		"""
-		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=priorTAIRVersion)
+		import Stock_250kDB
+		call_method = Stock_250kDB.CallMethod.get(call_method_id)
+		chr_pos2db_id = db_250k.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion, locus_type_id=call_method.locus_type_id)
+		
+		#chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=priorTAIRVersion)
 		import Stock_250kDB, os, sys, csv
-		sys.stderr.write("Converting old format call files from method %s into new format ... \n"%(method_id))
-		query = Stock_250kDB.CallInfo.query.filter_by(method_id=method_id)
+		sys.stderr.write("Converting old format call files from method %s into new format ... \n"%(call_method_id))
+		query = Stock_250kDB.CallInfo.query.filter_by(method_id=call_method_id)
 		counter = 0
 		no_of_files = query.count()
 		for row in query:
@@ -8602,8 +8755,10 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				for row in reader:
 					no_of_lines += 1
 					chr_pos = row[0].split('_')[:2]
-					chr_pos = tuple(map(int, chr_pos))
-					db_id = chr_pos2db_id.get(chr_pos)
+					chr = chr_pos[0]
+					pos = int(chr_pos[1])
+					chr_pos_key = tuple(chr, pos, pos)
+					db_id = chr_pos2db_id.get(chr_pos_key)
 					if db_id is not None:
 						no_of_lines_after_conversion += 1
 						new_row = [db_id] + row[1:]
@@ -8617,41 +8772,84 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 	"""
 		# 2011-1-24
 		# 
-		DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, method_id=3)
+		DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, call_method_id=3)
 		sys.exit(0)
 		
 		# 2011-2-15
 		# 	Watch: use papaya's TAIR8 db because the call info files contains calls in TAIR8 coordinates.
 		for call_method_id in xrange(20,73):
-			DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, method_id=call_method_id)
+			DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, call_method_id=call_method_id)
 		sys.exit(0)
 		
 	"""
+	@classmethod
+	def convertOldCallMethodDatasetIntoDBIDFormat(cls, db_250k, call_method_id=None, priorTAIRVersion=True):
+		"""
+		2012.3.27
+			a working-on-db_250k version of convertSNPDatasetLocusIDIntoDBID()
+			pass locus_type_id to db_250k.getSNPChrPos2ID()
+			
+			
+		"""
+		import Stock_250kDB
+		call_method = Stock_250kDB.CallMethod.get(call_method_id)
+		if not call_method:
+			sys.stderr.write("CallMethod %s doesn't exist in db_250k.\n"%(call_method_id))
+			return None
+		# backup the old file first
+		from pymodule.utils import getDateStampedFilename
+		oldFormatFname = getDateStampedFilename(call_method.filename)
+		os.rename(call_method.filename, oldFormatFname)
+		
+		cls.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname=oldFormatFname, output_fname=call_method.filename, \
+									priorTAIRVersion=priorTAIRVersion, \
+									locus_type_id=call_method.locus_type_id)
+	
+	"""
+		#2012.3.27
+		call_method_id=32
+		DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+		
+		#2012.3.27 Error happened in translating SNP Ids for numerous call methods (non-SNP loci, CNV or recombination locus IDs got mixed in).
+		call_method_id=32
+		for call_method_id in xrange(17,73):
+			if call_method_id!=57 and call_method_id!=32:	#57 is CNV-derived. 32 has been done a moment ago.
+				call_method = DB250k.bringBackOldCallMethodDataset(db_250k, call_method_id=call_method_id)
+				if call_method:	#not None
+					DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+	"""
+	
 	
 	@classmethod
-	def convertSNPDatasetLocusIDIntoDBID(cls, db, input_fname, output_fname, priorTAIRVersion=True):
+	def convertSNPDatasetLocusIDIntoDBID(cls, db_250k, input_fname=None, output_fname=None, priorTAIRVersion=True, locus_type_id=1):
 		"""
+		2012.3.27
+			pass locus_type_id to db_250k.getSNPChrPos2ID()
 		2011-2-24
 			input_fname is Strain X SNP format.
-			This function replaces SNP id in chr_pos format with db id. Snps.id.
+			This function replaces SNP id in chr_pos format with db_250k id. Snps.id.
 			
 			
 		"""
 		from pymodule import read_data
 		chr_pos_set = set()
-		chr_pos2snp_id = db.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion)
-		#chr_pos2snp_id = db.chr_pos2snp_id
+		chr_pos2snp_id = db_250k.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion, locus_type_id=locus_type_id)
+		#chr_pos2snp_id = db_250k.getSNPChrPos2ID(keyType=1, priorTAIRVersion=priorTAIRVersion)
 		for chr_pos, db_id in chr_pos2snp_id.iteritems():
 			chr, pos = chr_pos[:2]
 			chr_pos = '%s_%s'%(chr, pos)
 			chr_pos_set.add(chr_pos)
+		
 		
 		header, strain_acc_list, category_list, data_matrix = read_data(input_fname, col_id_key_set=chr_pos_set)
 		
 		new_header = header[:2]
 		for chr_pos in header[2:]:
 			chr_pos = chr_pos.split('_')
-			chr_pos = (chr_pos[0], int(chr_pos[1]))	#chr in string format
+			pos = int(chr_pos[1])
+			chr_pos = (chr_pos[0], pos, pos)	#chr in string format
 			db_id = chr_pos2snp_id[chr_pos]
 			new_header.append(db_id)
 		header = new_header
@@ -8663,7 +8861,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		# 2011-2-24
 		input_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005.csv"
 		output_fname = "/Network/Data/250k/db/reference_dataset/2010_149_384_20091005_db_id.tsv"
-		DB250k.convertSNPDatasetLocusIDIntoDBID(db, input_fname, output_fname)
+		DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname)
 		sys.exit(2)
 		
 		# 2011-2-24 be careful which db (old TAIR8 or TAIR9) to use. this case is TAIR8 (papaya).
@@ -8680,11 +8878,32 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 			
 		sys.exit(2)
 		
+		# 2012.3.3 range(43,57)
+		# 2012.3.27 use DB250k.convertOldCallMethodDatasetIntoDBIDFormat() instead.
+		for call_method_id in range(54,57) + [72]:
+			input_fname = "/Network/Data/250k/db/dataset/call_method_%s.tsv"%(call_method_id)
+			output_fname = "/Network/Data/250k/db/dataset/call_method_%s.db.tsv"%(call_method_id)
+			DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname, priorTAIRVersion=True)
+			
+			input_new_fname = "/Network/Data/250k/db/dataset/call_method_%s.old.tsv"%(call_method_id)
+			commandline = 'mv %s %s'%(input_fname, input_new_fname)
+			from pymodule.utils import runLocalCommand
+			return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+			commandline = 'mv %s %s'%(output_fname, input_fname)
+			from pymodule.utils import runLocalCommand
+			return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+		sys.exit(2)
+		
 	"""
 	
 	@classmethod
 	def convertOldFormatResultMethodFileIntoNewFormat(cls, db_250k, call_method_id=None, priorTAIRVersion=False):
 		"""
+		2012.3.21
+			get (chr,pos) -> id map only for call_method.locus_type_id
+			oldFormatFname is now replaced by row.getDateStampedFilename()
+		2012.3.20 bugfix. one extra read.next() line is commented out.
+			first_data_row = reader.next()
 		2011-5-4 bugfix: file might not exist at all.
 		2011-5-4
 			use Stock_250kDB.Snps.id to replace chr, pos ... in the files associated with table ResultsMethod.
@@ -8699,7 +8918,24 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		import Stock_250kDB, os, sys, csv
 		from pymodule import SNP
 		sys.stderr.write("Converting old format results_method files from method %s into new format ... \n"%(call_method_id))
-		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=priorTAIRVersion)
+		call_method = Stock_250kDB.CallMethod.get(call_method_id)
+		if not call_method:
+			sys.stderr.write("CallMethod %s doesn't exist in db.\n"%(call_method_id))
+			return None
+		chr_pos2db_id = db_250k.getSNPChrPos2ID(priorTAIRVersion=priorTAIRVersion, locus_type_id=call_method.locus_type_id)
+		
+		if call_method.locus_type_id==2:
+			#2012.3.21
+			#cnv type, the key is (chr, start, stop).
+			#needs to convert it to (chr, start, start) because cnv old association files stores data as (chr, start, score ,...)
+			# without stop.
+			new_chr_pos2db_id = {}
+			for chr_pos, db_id in chr_pos2db_id.iteritems():
+				chr, start, stop = chr_pos[:3]
+				new_chr_pos = (chr, start, start)	#2012.3.26 discard "stop" even for structural variations,
+					# because only (chr, start) is stored in the ResultsMethod.filename.
+				new_chr_pos2db_id[new_chr_pos] = db_id
+			chr_pos2db_id = new_chr_pos2db_id
 		
 		#type 2 is segment-based recombination rate. only one result.
 		# analysis method 13 is BooleanSNPPair. ignore
@@ -8721,7 +8957,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 			if SNP.pa_has_characters.search(first_data_row[0]):	#first column of 1st row has character in it. this file contains header. 
 				first_data_row = reader.next()
 				hasHeader = True
-			first_data_row = reader.next()
+			#first_data_row = reader.next()	#2012.3.20 bugfix. this line should not be needed.
 			if first_data_row[1] and first_data_row[1]!='0':	#2011-5-3 2nd column is something other than '0'. conversion is needed.
 				convertData = True
 			else:
@@ -8733,7 +8969,7 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				no_of_lines_after_conversion = 0
 				sys.stderr.write("...")
 				# backup the old file first
-				oldFormatFname = '%s.old.tsv'%(os.path.splitext(row.filename)[0])
+				oldFormatFname = row.getDateStampedFilename()
 				os.rename(row.filename, oldFormatFname)
 				
 				# writing data into the old filename in new format
@@ -8745,14 +8981,15 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 				for row in reader:
 					no_of_lines += 1
 					chr_pos = row[:2]
-					chr_pos = (chr_pos[0], int(chr_pos[1]))	#chr is of type str. pos is of type int. in chr_pos2db_id
+					pos = int(chr_pos[1])
+					chr_pos = (chr_pos[0], pos, pos)	#chr is of type str. pos is of type int. in chr_pos2db_id
 					db_id = chr_pos2db_id.get(chr_pos)
 					if db_id is not None:
 						no_of_lines_after_conversion += 1
 						new_row = [db_id, ''] + row[2:]	#2nd column (pos) should be empty in new format.
 						writer.writerow(new_row)
 				del reader, writer
-				sys.stderr.write("%s lines different after conversion.\n"%(no_of_lines_after_conversion-no_of_lines))
+				sys.stderr.write("%s lines less after conversion.\n"%(no_of_lines_after_conversion-no_of_lines))
 			else:
 				sys.stderr.write("no conversion. (maybe converted already).\n")
 	
@@ -8765,13 +9002,37 @@ DB250k.updatePhenotypeAvgBasedOnPhenotype(db_250k);
 		# 2011-2-15
 		# 	Watch: use papaya's TAIR8 db because the call info files contains calls in TAIR8 coordinates.
 		for call_method_id in xrange(20,73):
-			DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+			if call_method_id!=57:	#57 is CNV method 20 and already uses the new TAIR9/TAIR10 coordinates.
+				DB250k.convertOldFormatCallFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
 		sys.exit(0)
 		
 		# 2011-5-4
 		# priorTAIRVersion=True if it's connected to banyan's TAIR9 db because the association results are based off TAIR8.
-		# call_method_id=None if you want the function to go through all possible files.
+		# call_method_id=None if you want the function to go through all possible files. exclude the call method 57/80 (cnv already in TAIR9)
 		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=None, priorTAIRVersion=True)
+		sys.exit(0)
+		
+		# 2012.3.21
+		# priorTAIRVersion=False because call 57's association results are based on TAIR9/TAIR10 coordinates.
+		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=57, priorTAIRVersion=False)
+		sys.exit(0)
+		
+		#2012.3.26
+		# Error happened in transforming association results for call 32 (some snps were IDed as CNV or recombination locus IDs).
+		call_method_id=32
+		DB250k.bringBackOldAssociationResults(db_250k, call_method_id=call_method_id)
+		# priorTAIRVersion=True because call 32's old association results are based on TAIR8 coordinates.
+		DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+		
+		#2012.3.27
+		# Error happened in transforming association results for some old call methods (some snps were IDed as CNV or recombination locus IDs).
+		for call_method_id in xrange(20,73):
+			if call_method_id!=57 and call_method_id!=32:	#57 is CNV (and translated correctly already). 32 has been recently translated.
+				no_of_files_moved = DB250k.bringBackOldAssociationResults(db_250k, call_method_id=call_method_id)
+				if no_of_files_moved>0:	#2012.3.27 do nothing if there is no old files moved 
+					# priorTAIRVersion=True because these old association results are based on TAIR8 coordinates.
+					DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
 		sys.exit(0)
 		
 	"""
@@ -9648,7 +9909,9 @@ class CNV(object):
 		"""
 		import Stock_250kDB
 		sys.stderr.write("Putting cnvs from method %s into db ...\n"%(cnv_method_id))
-		query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id)
+		
+		query = Stock_250kDB.CNV.query.filter_by(cnv_method_id=cnv_method_id).\
+			order_by(Stock_250kDB.CNV.chromosome).order_by(Stock_250kDB.CNV.start).order_by(Stock_250kDB.CNV.stop)
 		counter = 0
 		real_counter = 0
 		for row in query:
@@ -9656,11 +9919,16 @@ class CNV(object):
 			db_entry = db_250k.getSNP(chromosome=row.chromosome, start=row.start, stop=row.stop)
 			if db_entry.id is None:
 				real_counter += 1
+			if not db_entry.end_position:
+				sys.stderr.write("Error: CNV (%s, chr=%s, start=%s, stop=%s)'s Snps entry(id=%s)'s end_position %s should not be null.\n"%
+								(row.id, row.chromosome, row.start, row.stop, db_entry.id, db_entry.end_position))
+				sys.exit(4)
 			if counter%5000==0:
 				sys.stderr.write("%s\t%s\t%s"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("%s\t%s\t%s.\n"%('\x08'*80, counter, real_counter))
 		db_250k.session.flush()
 		db_250k.session.commit()
-		sys.stderr.write("%s\t%s\t%s.\n"%('\x08'*80, counter, real_counter))
+		sys.stderr.write("%s new entries into db.\n"%(real_counter))
 	
 	"""
 		#2011-4-22
@@ -9670,7 +9938,117 @@ class CNV(object):
 		
 		
 	"""
+		
 	
+	@classmethod
+	def fixSNPLikeCNVDatasetColID(cls, db_250k, inputFname=None, nonCNVSnpsID2CNVSnpsID=None):
+		"""
+		2012.3.20
+			There are ~162 non-CNV Snps.id in SNP-like cnv dataset (call method 57 & 80 now)
+				that these loci are actually SNP loci (no end_position), not CNV loci.
+			This function fixes that.
+		"""
+		import csv
+		no_of_lines = 0
+		no_of_lines_after_conversion = 0
+		sys.stderr.write("...")
+		# backup the old file first
+		oldFormatFname = '%s.with%sNonCNVLoci.tsv'%(os.path.splitext(inputFname)[0], len(nonCNVSnpsID2CNVSnpsID))
+		os.rename(inputFname, oldFormatFname)
+		# writing data into the old filename in new format
+		reader = csv.reader(open(oldFormatFname), delimiter='\t')
+		header_row = reader.next()
+		new_header_row = header_row[:2]	#first two columns are not locus ID.
+		no_of_changed_cols = 0
+		for col_id in header_row[2:]:
+			col_id = int(col_id)
+			new_col_id = nonCNVSnpsID2CNVSnpsID.get(col_id, col_id)	#if col_id is not in the map, return col_id.
+			if col_id!=new_col_id:
+				no_of_changed_cols += 1
+			new_header_row.append(new_col_id)
+		sys.stderr.write("%s columns have changed its ID.\n"%(no_of_changed_cols))
+		writer = csv.writer(open(inputFname, 'w'), delimiter='\t')
+		writer.writerow(new_header_row)
+		for row in reader:
+			no_of_lines += 1
+			writer.writerow(row)
+		del reader, writer
+		sys.stderr.write("%s lines written.\n"%(no_of_lines))
+	
+	"""
+		#2012.3.20
+		nonCNVSnpsID2CNVSnpsID = db_250k.getNonCNVSnpsID2CNVSnpsID()
+		for inputFname in ['/Network/Data/250k/db/dataset/call_method_57.tsv', '/Network/Data/250k/db/dataset/call_method_80.tsv']:
+			CNV.fixSNPLikeCNVDatasetColID(db_250k, inputFname, nonCNVSnpsID2CNVSnpsID=nonCNVSnpsID2CNVSnpsID)
+		sys.exit(0)
+	"""
+	
+	@classmethod
+	def fixCNVAssociationResultLocusID(cls, db_250k, call_method_id=None, nonCNVSnpsID2CNVSnpsID=None):
+		"""
+		2012.3.20
+			There are 162 non-CNV Snps.id in SNP-like cnv association results (call method 57 & 80 now)
+				that these loci are actually SNP loci (no end_position), not CNV loci.
+			This function fixes that.
+		"""
+		import Stock_250kDB
+		import csv, sys, os
+		from pymodule import SNP
+		#type 2 is segment-based recombination rate. only one result.
+		# analysis method 13 is BooleanSNPPair. ignore
+		TableClass = Stock_250kDB.ResultsMethod
+		query = TableClass.query.filter_by(call_method_id=call_method_id)
+		counter = 0
+		no_of_files = query.count()
+		for row in query:
+			counter += 1
+			sys.stderr.write("%d/%d:\t%s "%(counter, no_of_files, row.filename))
+			if not os.path.isfile(row.filename):	#2011-5-4 bugfix: file might not exist at all.
+				sys.stderr.write(" file doesn't exist.\n")
+				continue
+			reader = csv.reader(open(row.filename), delimiter='\t')
+			first_data_row = reader.next()
+			hasHeader = False
+			if SNP.pa_has_characters.search(first_data_row[0]):	#first column of 1st row has character in it. this file contains header. 
+				first_data_row = reader.next()
+				hasHeader = True
+			
+			
+			no_of_lines = 0
+			no_of_lines_changed = 0
+			sys.stderr.write("...")
+			# backup the old file first
+			oldFormatFname = '%s.with%sNonCNVLoci.tsv'%(os.path.splitext(row.filename)[0], len(nonCNVSnpsID2CNVSnpsID))
+			os.rename(row.filename, oldFormatFname)
+			
+			# writing data into the old filename in new format
+			reader = csv.reader(open(oldFormatFname), delimiter='\t')
+			writer = csv.writer(open(row.filename, 'w'), delimiter='\t')
+			if hasHeader:
+				header_row = reader.next()
+				writer.writerow(['snp_id', 'none']+ header_row[2:])
+			for row in reader:
+				no_of_lines += 1
+				locus_id = int(row[0])
+				new_locus_id = nonCNVSnpsID2CNVSnpsID.get(locus_id, locus_id)
+				if new_locus_id!=locus_id:
+					no_of_lines_changed += 1
+				new_row = [new_locus_id, ''] + row[2:]	#2nd column (pos) should be empty in new format.
+				writer.writerow(new_row)
+			del reader, writer
+			sys.stderr.write("%s lines different after conversion. %s total lines.\n"%(no_of_lines_changed, no_of_lines))
+	
+	"""
+		#2012.3.20
+		nonCNVSnpsID2CNVSnpsID = db_250k.getNonCNVSnpsID2CNVSnpsID()
+		for call_method_id in [57, 80]:
+			CNV.fixCNVAssociationResultLocusID(db_250k, call_method_id=call_method_id, \
+											nonCNVSnpsID2CNVSnpsID=nonCNVSnpsID2CNVSnpsID)
+		
+		sys.exit(0)
+	"""
+	
+
 	@classmethod
 	def outputNonOverlappingCNVAsSNP(cls, db_250k, output_fname, cnv_method_id=None, cnv_type_id=None):
 		"""
@@ -15206,17 +15584,17 @@ class CNV(object):
 		"""
 		
 		@classmethod
-		def putLerContigsIntoDB(cls, db, data_source, accession_name, fasta_input_fname, addSeqIntoDB=True):
+		def putLerContigsIntoDB(cls, db_250k, data_source, accession_name, fasta_input_fname, addSeqIntoDB=True):
 			"""
 			2010-11-12
 				add argument addSeqIntoDB:
-					indicating whether raw sequences shall be added into db
+					indicating whether raw sequences shall be added into db_250k
 			2010-1-27
 				put ler contigs sequences and ids into table Stock_250kDB.SequenceFragment
 			"""
 			import os, sys
-			sys.stderr.write("Putting Ler contigs into db ... ")
-			session = db.session
+			sys.stderr.write("Putting Ler contigs into db_250k ... ")
+			session = db_250k.session
 			import Stock_250kDB
 			from CNVQCConstruct import CNVQCConstruct
 			data_source_obj = CNVQCConstruct.getDBObj(session, Stock_250kDB.DataSource, data_source)
@@ -15258,7 +15636,7 @@ class CNV(object):
 		"""
 		
 		@classmethod
-		def outputLerContigSpanDataFromDBInRunGADAOutputFormat(cls, db, output_fname):
+		def outputLerContigSpanDataFromDBInRunGADAOutputFormat(cls, db_250k, output_fname):
 			"""
 			2010-2-10
 			"""
@@ -15266,7 +15644,7 @@ class CNV(object):
 			import csv
 			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
 			RunGADA.output_header(writer)
-			rows = db.metadata.bind.execute("select a.ecotype_id, sp.chromosome, sp.start, sp.stop, sp.stop-sp.start as length, sp.start_probe_id, sp.stop_probe_id \
+			rows = db_250k.metadata.bind.execute("select a.ecotype_id, sp.chromosome, sp.start, sp.stop, sp.stop-sp.start as length, sp.start_probe_id, sp.stop_probe_id \
 					from sequence_fragment_ref_pos sp, sequence_fragment s, cnv_qc_accession a where sp.sequence_fragment_id=s.id and s.accession_id=a.id")
 			for row in rows:
 				start_probe = '%s_%s'%(row.chromosome, row.start+12)
@@ -20680,20 +21058,16 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		# 2012.3.3
-		for call_method_id in range(43,57) + [72]:
-			input_fname = "/Network/Data/250k/db/dataset/call_method_%s.tsv"%(call_method_id)
-			output_fname = "/Network/Data/250k/db/dataset/call_method_%s.db.tsv"%(call_method_id)
-			DB250k.convertSNPDatasetLocusIDIntoDBID(db_250k, input_fname, output_fname, priorTAIRVersion=True)
-			
-			input_new_fname = "/Network/Data/250k/db/dataset/call_method_%s.old.tsv"%(call_method_id)
-			commandline = 'mv %s %s'%(input_fname, input_new_fname)
-			from pymodule.utils import runLocalCommand
-			return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
-			commandline = 'mv %s %s'%(output_fname, input_fname)
-			from pymodule.utils import runLocalCommand
-			return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
-		sys.exit(2)
+		
+		
+		#2012.3.27 Error happened in translating SNP Ids for numerous call methods (non-SNP loci, CNV or recombination locus IDs got mixed in).
+		call_method_id=32
+		for call_method_id in xrange(18,73):
+			if call_method_id!=57 and call_method_id!=32:	#57 is CNV-derived. 32 has been done a moment ago.
+				call_method = DB250k.bringBackOldCallMethodDataset(db_250k, call_method_id=call_method_id)
+				if call_method:	#not None
+					DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
 		
 
 #2007-03-05 common codes to initiate database connection

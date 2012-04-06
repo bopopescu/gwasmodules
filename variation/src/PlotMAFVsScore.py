@@ -102,7 +102,7 @@ class PlotMAFVsScore(object):
 			if rows.count()>0:
 				sys.stderr.write("Ignore. MAF vs score plot done for %s.\n"%rm.id)
 				continue
-			gwr = GeneListRankTest.getResultMethodContent(rm, results_directory=self.results_directory, min_MAF=0)
+			gwr = db.getResultMethodContent(rm.id, results_directory=self.results_directory, min_MAF=0)
 			if gwr is None:
 				continue
 			if self.output_dir:

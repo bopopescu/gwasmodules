@@ -103,6 +103,8 @@ class CalculateOverlappingStat(object):
 										no_of_top_snps=1000, association_overlapping_type=None, commit=False, \
 										results_directory=None):
 		"""
+		2012.3.23
+			pass argument db_250k to ResultsMethod2Results.rm2result()
 		2009-11-2
 		"""
 		sys.stderr.write("Calculating overlapping stat for phenotype %s and combo %s ...\n"%(phenotype_method_id, \
@@ -124,7 +126,7 @@ class CalculateOverlappingStat(object):
 					if self.snp_info is None:
 						self.snp_info = DrawSNPRegion.getSNPInfo(db)
 					ResultsMethod2Results.rm2result(session, rm, self.snp_info, min_rank=min_rank, max_rank=max_rank, \
-												commit=commit, results_directory=results_directory)
+												commit=commit, results_directory=results_directory, db_250k=db)
 					association_entries = Stock_250kDB.Results.query.filter_by(results_id=rm.id).\
 							filter(Stock_250kDB.Results.rank<=no_of_top_snps)
 				no_of_association_entries = association_entries.count()
