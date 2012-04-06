@@ -164,6 +164,7 @@ class VCFRecord(object):
 		2012.1.17
 			add argument minDepth
 		"""
+		self.row = row
 		self.col_name2index = col_name2index
 		self.individual_name2col_index = individual_name2col_index
 		self.sample_id2index = sample_id2index
@@ -242,6 +243,8 @@ class VCFFile(object):
 		else:
 			self.inf = open(self.inputFname)
 		self.reader =csv.reader(self.inf, delimiter='\t')
+		self.headerContentLs = []	#2012.3.28 anything before the "#CHROM" line. each entry is a raw line content, including '\n'
+		self.sampleIDHeader = []	#2012.3.20 a list of column headers (#CHROM)
 		self._parseHeader()
 	
 	def getIndividual2ColIndex(self, header, col_name2index, sampleStartingColumn=9):
@@ -285,7 +288,6 @@ class VCFFile(object):
 		"""
 		sys.stderr.write("Parsing %s ... \n"%(os.path.basename(self.inputFname),))
 		
-		sample_id2index = self.sample_id2index
 		locus_id2row_index = self.locus_id2row_index
 		
 		"""
@@ -330,11 +332,13 @@ class VCFFile(object):
 	
 	def _parseHeader(self):
 		"""
+		2012.3.28
+			add all header content into self.headerContentLs
+				except the last header line, which goes into self.sampleIDHeader
 		2011-11-2
 			this function is run inside __init__()
 		"""
-		sample_id2index = self.sample_id2index
-		sample_id2index['ref'] = 0	#ref is at column 0. "ref" must not be equal to any read_group.
+		self.sample_id2index['ref'] = 0	#ref is at column 0. "ref" must not be equal to any read_group.
 		self.sample_id_ls.append('ref')
 		read_group2coverage = {}	#2011-9-2
 		
@@ -352,20 +356,24 @@ class VCFFile(object):
 		counter = 0
 		real_counter = 0
 		
-		for row in self.reader:
-			if row[0] =='#CHROM':
-				row[0] = 'CHROM'	#discard the #
-				header = row
+		for line in self.inf:
+			if line[:6]=='#CHROM':
+				line.strip()	#get rid of the trailing \n
+				row = line.split('\t')
+				self.sampleIDHeader = row
+				header = row[:]
+				header[0] = 'CHROM'	#discard the #
 				self.col_name2index = getColName2IndexFromHeader(header, skipEmptyColumn=True)
 				self.col_index_individual_name_ls = self.getIndividual2ColIndex(header, self.col_name2index)
 				for individual_col_index, individual_name in self.col_index_individual_name_ls:
 					read_group = individual_name
-					if read_group not in sample_id2index:
-						sample_id2index[read_group] = len(sample_id2index)
+					if read_group not in self.sample_id2index:
+						self.sample_id2index[read_group] = len(self.sample_id2index)
 						self.sample_id_ls.append(read_group)
 				break	# "#CHROM" is the last line of the header
-			elif row[0][0]=='#':	#2011-3-4
-				continue
+			elif line[0]=='#':	#2011-3-4
+				self.headerContentLs.append(line)
+				#continue
 			else:	#leave everything for parseFile or parseIter
 				break
 	
