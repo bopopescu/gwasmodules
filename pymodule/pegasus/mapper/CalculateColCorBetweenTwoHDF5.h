@@ -122,6 +122,7 @@ class FindMaxLDBetweenPeakAndEachLocus
 		~FindMaxLDBetweenPeakAndEachLocus();
 		int readDataIntoMemory(DataSet &dataset, DataSpace &dataspace);
 		int readLocusIDLs();
+		void exitIfFileNotGood(char* inputFname, int exitCode);
 		void cleanupMemory();
 		void run();
 		int output(H5std_string &outputFname);

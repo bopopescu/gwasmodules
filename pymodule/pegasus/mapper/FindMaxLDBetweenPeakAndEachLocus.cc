@@ -9,7 +9,14 @@
 FindMaxLDBetweenPeakAndEachLocus::FindMaxLDBetweenPeakAndEachLocus(char* _input1Fname, char* _withinPeakLocusIDFname, char* _outputFname, int _i1_start, int _i1_stop)\
 	:outputFname(_outputFname), i1_start(_i1_start), i1_stop(_i1_stop), input1Fname(_input1Fname), withinPeakLocusIDFname(_withinPeakLocusIDFname)
 {
-	std::cerr<<"start ...";
+	std::cerr<<"FindMaxLDBetweenPeakAndEachLocus starting ...";
+	/*
+	 * 2012.3.28 check whether input file exists
+	 */
+	exitIfFileNotGood(_input1Fname, 0);	//exitCode is 0 because in the context of FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow.py
+	// i don't want clustered jobs in the workflow to be disrupted when the input is empty (no SNPs in LD with given peak).
+	exitIfFileNotGood(_withinPeakLocusIDFname, 1); //exitCode is 1 because this should not happen.
+
 	input1 = H5File(_input1Fname, H5F_ACC_RDONLY);
 	dataset1 = input1.openDataSet(outputDatasetName);
 	std::cerr << endl;
@@ -60,7 +67,13 @@ FindMaxLDBetweenPeakAndEachLocus::FindMaxLDBetweenPeakAndEachLocus(char* _input1
 	}
 	noOfSelectedEntries = i1_stop - i1_start + 1;
 	std::cerr << "input1 dimension:" << dims_out[0] << ". " << noOfSelectedEntries << " rows to be read." << endl;
-
+	if (noOfSelectedEntries<=0){	//2012.3.28 exit if there is no data in input.
+		std:cerr<< "Exit as there is "<< noOfSelectedEntries  << " data."<<endl;
+		dataspace1.close();
+		dataset1.close();
+		input1.close();
+		exit(0);
+	}
 	/*
 	 * for the output
 	 */
@@ -77,6 +90,21 @@ FindMaxLDBetweenPeakAndEachLocus::~FindMaxLDBetweenPeakAndEachLocus()
 	dataspace1.close();
 	dataset1.close();
 	input1.close();
+}
+
+void FindMaxLDBetweenPeakAndEachLocus::exitIfFileNotGood(char* inputFname, int exitCode){
+	/*
+	 * 2012.3.28 check whether file exists, it not exits the program
+	 */
+	ifstream my_file(inputFname);
+	if (my_file.good())
+	{
+		my_file.close();
+	}
+	else{
+		std::cerr<<"Can't read " << inputFname << ". It probably doesn't exist."<<std::endl;
+		exit(exitCode);
+	}
 }
 
 int FindMaxLDBetweenPeakAndEachLocus::readLocusIDLs(){
