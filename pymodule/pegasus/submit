@@ -76,7 +76,7 @@ UCLA_CLUSTER_HOME="/u/home/eeskin/polyacti"
 UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
-UCLA_CLUSTER_SCRATCH="/u/scratch2/polyacti/pegasus"
+UCLA_CLUSTER_SCRATCH="/u/scratch/p/polyacti/pegasus"
 #UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
 #UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
 #if you choose hcondor as storage site, it's stored in local scratch!! make sure it's in shared storage.
@@ -182,7 +182,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
 		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
 		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
-		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages:/u/local/python/2.6/lib64/python2.6-other</profile>
 	</site>
 	<site  handle="hoffman2" arch="x86_64" os="LINUX">
 		<grid  type="gt5" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -216,7 +216,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
 		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
 		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/apps/python/2.6.5/bin/:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.2/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
-		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages:/u/local/python/2.6/lib64/python2.6-other</profile>
 	</site>
 	<site  handle="uschpc" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="$USC_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
