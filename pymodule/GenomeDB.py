@@ -7,15 +7,17 @@ Examples:
 	# 2010-12-15 setup genome schema in vervetdb.
 	GenomeDB.py -u yh -k genome -d vervetdb -v postgresql
 	
-	#setup database in mysql
-	GenomeDB.py -v mysql -u yh -z papaya -d genome -k ""
-	
-	
+	#setup database in mysql (if it's already setup, output the pickled geneAnnotation data structure)
+	GenomeDB.py -v mysql -u yh -z papaya -d genome -k "" -t 3702 -o /tmp/geneAnnotationTax3702.pickle
+
 Description:
 	2008-07-09
 	This is a wrapper for the genome database, build on top of elixir. supercedes the table definitions in genomedb.sql.
 """
 import sys, os
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
 from sqlalchemy.engine.url import URL
 from elixir import Unicode, DateTime, String, Integer, UnicodeText, Text
 from elixir import Entity, Field, using_options, using_table_options
@@ -27,7 +29,7 @@ from sqlalchemy.schema import ThreadLocalMetaData, MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy import and_, or_, not_
-from utils import PassingData
+from pymodule import PassingData	#2012.3.26 "from utils import PassingData" won't work because no module named "utils" exists outside pymodule (!=pymodule.utils). 
 
 from db import ElixirDB
 
@@ -183,6 +185,9 @@ class GeneCommentary(Entity):
 	
 	def getSequence(self, box_ls):
 		"""
+		2012.3.26
+			get_sequence_segment()'s API has been changed.
+			But this way of calling get_sequence_segment() is still outdated. valid only for banyan's mysql genome db. 
 		2009-01-03
 		"""
 		from db import get_sequence_segment
@@ -190,8 +195,10 @@ class GeneCommentary(Entity):
 		curs = __metadata__.bind	#or self.table.bind or self.table.metadata.bind
 		for box in box_ls:
 			genomic_start, genomic_stop = box[:2]
-			seq += get_sequence_segment(curs, self.gene.genomic_gi, genomic_start, genomic_stop, AnnotAssembly.table.name,\
-									RawSequence.table.name)
+			seq += get_sequence_segment(curs, gi=self.gene.genomic_gi, start=genomic_start, stop=genomic_stop, \
+									annot_assembly_id=None,\
+									annot_assembly_table=AnnotAssembly.table.name,\
+									raw_sequence_table=RawSequence.table.name)
 		if self.gene.strand=='-1' and seq:	#need to reverse complement
 			from Bio.Seq import Seq
 			from Bio.Alphabet import IUPAC
@@ -757,6 +764,16 @@ class GenomeDatabase(ElixirDB):
 	option_default_dict = ElixirDB.option_default_dict.copy()
 	option_default_dict[('drivername', 1,)][0] = 'mysql'
 	option_default_dict[('database', 1,)][0] = 'genome'
+	option_default_dict.update({
+							
+							('geneAnnotationPickleFname', 0, ): ['', 'o', 1, 'The optional output file to contain a pickled object with three attributes: \n\
+		1. gene_id2model \n \
+		2. chr_id2gene_id_ls \n \
+		3. geneSpanRBDict. \n \
+		It is optional because it is only used when you run GenomeDB.py as a standalone program'],\
+							('tax_id', 0, int): [3702, 't', 1, 'Taxonomy ID for geneAnnotationPickleFname.'],\
+							
+							})
 	def __init__(self, **keywords):
 		"""
 		2011-3-25
@@ -777,8 +794,10 @@ class GenomeDatabase(ElixirDB):
 		self.tax_id2genomeData = {}
 	
 	
-	def get_gene_id2model(self, tax_id=3702):
+	def get_gene_id2model(self, tax_id=3702, needSequence=False):
 		"""
+		2012.3.26
+			add argument needSequence: whether CDS_sequence, mrna_sequence is fetched for each gene_commentary
 		2010-10-11
 			bug fix: several genes could have the same segmentKey in geneSpanRBDict.
 		2009-1-3
@@ -801,7 +820,7 @@ class GenomeDatabase(ElixirDB):
 		geneSpanRBDict = RBDict()
 		
 		i = 0
-		block_size = 5000
+		block_size = 50000
 		query = Gene.query.filter_by(tax_id=tax_id).order_by(Gene.chromosome).order_by(Gene.start)
 		rows = query.offset(i).limit(block_size)
 		while rows.count()!=0:
@@ -835,7 +854,8 @@ class GenomeDatabase(ElixirDB):
 						if not gene_commentary.gene_commentary_id:	#ignore gene_commentary that are derived from other gene_commentaries. they'll be handled within the parental gene_commentary.
 							#gene_commentary.constructAnnotatedBox()
 							gene_commentary.construct_annotated_box()	#2010-9-21 it sets protein_label and etc. constructAnnotatedBox() doesn't do this.
-							gene_commentary.getCDSsequence()
+							if needSequence:
+								gene_commentary.getCDSsequence()
 							#pass everything to a database-independent object, easy for pickling
 							new_gene_commentary = GeneModel(gene_id=gene_id, gene_commentary_id=gene_commentary.id, \
 														start=gene_commentary.start, stop=gene_commentary.stop, \
@@ -1073,6 +1093,31 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("%s contigs. Done.\n"%(len(refName2size)))
 		return refName2size
 	
+	def run(self):
+		"""
+		"""
+		if self.debug:
+			import pdb
+			pdb.set_trace()
+	
+		if self.geneAnnotationPickleFname and self.tax_id:	#only pick the file if the output file is not empty.
+			import cPickle
+			pickle_fname = os.path.expanduser(self.geneAnnotationPickleFname)	#2012.3.26 stopped using '~/at_gene_model_pickelf',
+			if os.path.isfile(pickle_fname):
+				#2011-1-20 check if the pickled file already exists or not
+				sys.stderr.write("File %s already exists, no gene model pickle output.\n"%(pickle_fname))
+				sys.exit(2)
+			else:
+				#2008-10-01	get gene model and pickle it into a file
+				gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = self.get_gene_id2model(tax_id=self.tax_id)
+				gene_annotation = PassingData()
+				gene_annotation.gene_id2model = gene_id2model
+				gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
+				gene_annotation.geneSpanRBDict = geneSpanRBDict
+				picklef = open(os.path.expanduser(pickle_fname), 'w')
+				cPickle.dump(gene_annotation, picklef, -1)
+				picklef.close()
+	
 def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
 	annot_assembly_table='genome.annot_assembly'):
 	"""
@@ -1140,19 +1185,20 @@ if __name__ == '__main__':
 	
 	instance = main_class(**po.long_option2value)
 	instance.setup()
-	
+	instance.run()
+	"""
 	if instance.debug:
 		import pdb
 		pdb.set_trace()
 	
 	import cPickle
 	#2011-1-20 check if the pickled file already exists or not
-	pickle_fname = '~/at_gene_model_pickelf'
+	pickle_fname = po.arguments[0]	#2012.3.26 stopped using '~/at_gene_model_pickelf', instead use the 1st argument
 	if os.path.isfile(os.path.expanduser(pickle_fname)):
 		sys.stderr.write("File %s already exists, no gene model pickle output.\n"%(pickle_fname))
 	else:
 		#2008-10-01	get gene model and pickle it into a file
-		gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = instance.get_gene_id2model()
+		gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = instance.get_gene_id2model(tax_id=3702)
 		gene_annotation = PassingData()
 		gene_annotation.gene_id2model = gene_id2model
 		gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
@@ -1160,7 +1206,7 @@ if __name__ == '__main__':
 		picklef = open(os.path.expanduser(pickle_fname), 'w')
 		cPickle.dump(gene_annotation, picklef, -1)
 		picklef.close()
-	
+	"""
 	import sqlalchemy as sql
 	#print dir(Gene)
 	#print Gene.table.c.keys()
@@ -1169,8 +1215,8 @@ if __name__ == '__main__':
 	#print dir(results)
 	#print dir(Gene.query)
 	
-	import pdb
-	pdb.set_trace()
+	#import pdb
+	#pdb.set_trace()
 	i = 0
 	block_size = 10
 	rows = Gene.query.offset(i).limit(block_size)
