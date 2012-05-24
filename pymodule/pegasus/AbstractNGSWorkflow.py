@@ -47,6 +47,7 @@ class AbstractNGSWorkflow(object):
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+						('needSSHDBTunnel', 0, int):[0, 'H', 0, 'DB-interacting jobs need a ssh tunnel (running on cluster behind firewall).'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
 						}
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
@@ -303,10 +304,18 @@ class AbstractNGSWorkflow(object):
 		vcf_concat = Executable(namespace=namespace, name="vcf_concat", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcf_concat.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
-		#vcf_concat might involve a very long argument, which would be converted to *.arg and then pegasus bug
 		vcf_concat.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		workflow.addExecutable(vcf_concat)
 		workflow.vcf_concat = vcf_concat
+		
+		vcfSubsetPath = os.path.join(self.home_path, "bin/vcftools/vcf-subset")
+		workflow.vcfSubsetPath = vcfSubsetPath	#vcfSubsetPath is first argument to vcfSubsetPath
+		vcfSubset = Executable(namespace=namespace, name="vcfSubset", version=version, \
+										os=operatingSystem, arch=architecture, installed=True)
+		vcfSubset.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcfSubset.sh"), site_handler))
+		vcfSubset.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		workflow.addExecutable(vcfSubset)
+		workflow.vcfSubset = vcfSubset
 		
 		concatGATK = Executable(namespace=namespace, name="concatGATK", version=version, \
 							os=operatingSystem, arch=architecture, installed=True)
@@ -424,10 +433,17 @@ class AbstractNGSWorkflow(object):
 	@classmethod
 	def addBAMIndexJob(cls, workflow, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					inputBamF=None,\
-					parentJob=None, parentJobLs=[], namespace='workflow', version='1.0',\
+					parentJobLs=[], namespace='workflow', version='1.0',\
 					stageOutFinalOutput=True, javaMaxMemory=2500,\
 					**keywords):
 		"""
+		 2012.4.12
+			remove argument parentJob and stop adding it to parentJobLs, which causes an insidious bug
+				that accumulates parent jobs from multiple calls of addBAMIndexJob() into parentJobLs
+				(they all become parents of this bam index job.)
+		2012.3.22
+			bugfix, change argument parentJobLs's default value from [] to None. [] would make every run have the same parentJobLs 
+			proper transfer/register setup
 		2011-11-20
 		"""
 		index_sam_job = Job(namespace=getattr(workflow, 'namespace', namespace), name=BuildBamIndexFilesJava.name, \
@@ -435,20 +451,14 @@ class AbstractNGSWorkflow(object):
 		baiFile = File('%s.bai'%inputBamF.name)
 		index_sam_job.addArguments("-Xms128m", "-Xmx%sm"%(javaMaxMemory), "-jar", BuildBamIndexFilesJar, "VALIDATION_STRINGENCY=LENIENT", \
 						"INPUT=", inputBamF, "OUTPUT=", baiFile)
-		yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=javaMaxMemory)
 		index_sam_job.bamFile = inputBamF
 		index_sam_job.baiFile = baiFile
 		index_sam_job.output = baiFile	#2012.3.20
 		index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.INPUT)
-		if stageOutFinalOutput:
-			#index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.OUTPUT)
-			index_sam_job.uses(baiFile, transfer=True, register=True, link=Link.OUTPUT)
-		else:
-			#index_sam_job.uses(inputBamF, transfer=False, register=True, link=Link.OUTPUT)
-			index_sam_job.uses(baiFile, transfer=False, register=True, link=Link.OUTPUT)
-			#pass	#don't register the files so leave them there
+		#index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.OUTPUT)
+		index_sam_job.uses(baiFile, transfer=stageOutFinalOutput, register=True, link=Link.OUTPUT)
+		yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=javaMaxMemory)
 		workflow.addJob(index_sam_job)
-		parentJobLs.append(parentJob)
 		for parentJob in parentJobLs:
 			if parentJob:
 				workflow.depends(parent=parentJob, child=index_sam_job)
@@ -470,12 +480,15 @@ class AbstractNGSWorkflow(object):
 	
 	def registerOneInputFile(self, workflow, inputFname, folderName=""):
 		"""
+		2012.3.22
+			add abspath attribute to file.
 		2012.3.1
 			add argument folderName, which will put the file in specific pegasus workflow folder
 		2011.12.21
 		"""
 		file = File(os.path.join(folderName, os.path.basename(inputFname)))
-		file.addPFN(PFN("file://" + os.path.abspath(inputFname), workflow.input_site_handler))
+		file.abspath = os.path.abspath(inputFname)
+		file.addPFN(PFN("file://" + file.abspath, workflow.input_site_handler))
 		workflow.addFile(file)
 		return file
 	
@@ -535,14 +548,18 @@ class AbstractNGSWorkflow(object):
 	
 	def addStatMergeJob(self, workflow, statMergeProgram=None, outputF=None, \
 					parentJobLs=[], \
-					extraDependentInputLs=[], transferOutput=True, extraArguments=None, **keywords):
+					extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
+					namespace=None, version=None, **keywords):
 		"""
+		2012.4.3
+			make argument namespace, version optional
 		2011-11-28
 			moved from CalculateVCFStatPipeline.py
 		2011-11-17
 			add argument extraArguments
 		"""
-		statMergeJob = Job(namespace=workflow.namespace, name=statMergeProgram.name, version=workflow.version)
+		statMergeJob = Job(namespace=getattr(workflow, 'namespace', namespace), name=statMergeProgram.name, \
+						version=getattr(workflow, 'version', version))
 		statMergeJob.addArguments('-o', outputF)
 		if extraArguments:
 			statMergeJob.addArguments(extraArguments)
@@ -623,7 +640,7 @@ class AbstractNGSWorkflow(object):
 		return bgzip_tabix_job
 	
 	def addVCFConcatJob(self, workflow, concatExecutable=None, parentDirJob=None, outputF=None, \
-							namespace=None, version=None, transferOutput=True, vcf_job_max_memory=None):
+							namespace=None, version=None, transferOutput=True, vcf_job_max_memory=500):
 		"""
 		2011-11-5
 		"""
@@ -638,6 +655,134 @@ class AbstractNGSWorkflow(object):
 		workflow.addJob(vcfConcatJob)
 		workflow.depends(parent=parentDirJob, child=vcfConcatJob)
 		return vcfConcatJob
+	
+	def addVCFSubsetJob(self, workflow, executable=None, vcfSubsetPath=None, sampleIDFile=None,\
+					inputVCF=None, outputF=None, \
+					parentJobLs=[], namespace=None, version=None, transferOutput=True, job_max_memory=200,\
+					extraArguments=None, extraDependentInputLs=[]):
+		"""
+		2012.5.10
+		"""
+		#2011-9-22 union of all samtools intervals for one contig
+		job = Job(namespace=getattr(workflow, 'namespace', namespace), name=executable.name, \
+						version=getattr(workflow, 'version', version))
+		job.addArguments(vcfSubsetPath, sampleIDFile, inputVCF, outputF)
+		
+		if extraArguments:
+			job.addArguments(extraArguments)
+		job.uses(inputVCF, transfer=True, register=True, link=Link.INPUT)
+		job.uses(sampleIDFile, transfer=True, register=True, link=Link.INPUT)
+		for input in extraDependentInputLs:
+			if input:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		job.output = outputF
+		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
+		workflow.addJob(job)
+		for parentJob in parentJobLs:
+			if parentJob:
+				workflow.depends(parent=parentJob, child=job)
+		return job
+
+	def addVCF2MatrixJob(self, workflow, executable=None, inputVCF=None, outputFile=None, \
+						refFastaF=None, run_type=3, numberOfReadGroups=10, seqCoverageF=None, \
+						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+						extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.5.8
+			executable is GenotypeCallByCoverage
+		"""
+		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
+		#2012.5.8 "-n 10" means numberOfReadGroups is 10 but it's irrelevant when "-y 3" (run_type =3, read from vcf without filter)
+		job.addArguments("-i", inputVCF, "-n 10", "-o", outputFile, '-y 3')
+		if refFastaF:
+			job.addArguments("-e", refFastaF)
+			job.uses(refFastaF, transfer=True, register=True, link=Link.INPUT)
+		if extraArguments:
+			job.addArguments(extraArguments)
+		if seqCoverageF:
+			job.addArguments("-q", seqCoverageF)
+			job.uses(seqCoverageF, transfer=True, register=True, link=Link.INPUT)
+		job.uses(inputVCF, transfer=True, register=True, link=Link.INPUT)
+		job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		job.output = outputFile
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
+		workflow.addJob(job)
+		for parentJob in parentJobLs:
+			if parentJob:
+				workflow.depends(parent=parentJob, child=job)
+		for input in extraDependentInputLs:
+			if input:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		return job
+	
+	def addCalculatePairwiseDistanceFromSNPXStrainMatrixJob(self, workflow, executable=None, inputFile=None, outputFile=None, \
+						min_MAF=0, max_NA_rate=0.4, convertHetero2NA=0, hetHalfMatchDistance=0.5,\
+						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+						extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.5.11
+			executable is CalculatePairwiseDistanceOutOfSNPXStrainMatrix.py
+			
+			#add the pairwise distance matrix job after filter is done
+			calcula_job = Job(namespace=namespace, name=calcula.name, version=version)
+			
+			calcula_job.addArguments("-i", genotypeCallOutput, "-n", str(self.min_MAF), \
+						"-o", calculaOutput, '-m', repr(self.max_NA_rate), '-c', str(self.convertHetero2NA),\
+						'-H', repr(self.hetHalfMatchDistance))
+			calcula_job.uses(genotypeCallOutput, transfer=False, register=False, link=Link.INPUT)
+			calcula_job.uses(calculaOutput, transfer=True, register=False, link=Link.OUTPUT)
+			
+			workflow.addJob(calcula_job)
+			workflow.depends(parent=genotypeCallByCoverage_job, child=calcula_job)
+			workflow.depends(parent=matrixDirJob, child=calcula_job)
+		"""
+		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
+		job.addArguments("-i", inputFile,  "-n %s"%(min_MAF), \
+					"-o", outputFile, '-m %s'%(max_NA_rate), '-c %s'%(convertHetero2NA),\
+					'-H %s'%(hetHalfMatchDistance))
+		if extraArguments:
+			job.addArguments(extraArguments)
+		job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+		job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		job.output = outputFile
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
+		workflow.addJob(job)
+		for parentJob in parentJobLs:
+			if parentJob:
+				workflow.depends(parent=parentJob, child=job)
+		for input in extraDependentInputLs:
+			if input:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		return job	
+	
+	def addAbstractMapperLikeJob(self, workflow, executable=None, \
+					inputVCF=None, outputF=None, \
+					parentJobLs=[], namespace=None, version=None, transferOutput=True, job_max_memory=200,\
+					extraArguments=None, extraDependentInputLs=[]):
+		"""
+		2012.5.11
+		"""
+		#2011-9-22 union of all samtools intervals for one contig
+		job = Job(namespace=getattr(workflow, 'namespace', namespace), name=executable.name, \
+						version=getattr(workflow, 'version', version))
+		job.addArguments("-i", inputVCF, "-o", outputF)
+		
+		if extraArguments:
+			job.addArguments(extraArguments)
+		job.uses(inputVCF, transfer=True, register=True, link=Link.INPUT)
+		for input in extraDependentInputLs:
+			if input:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		job.output = outputF
+		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
+		workflow.addJob(job)
+		for parentJob in parentJobLs:
+			if parentJob:
+				workflow.depends(parent=parentJob, child=job)
+		return job
+
 	
 	@classmethod
 	def findProperVCFDirIdentifier(cls, vcfDir, defaultName='vcf1'):
@@ -657,7 +802,7 @@ class AbstractNGSWorkflow(object):
 		return vcf1Name
 	
 	def addSelectVariantsJob(self, workflow, SelectVariantsJava=None, genomeAnalysisTKJar=None, inputF=None, outputF=None, \
-					refFastaFList=[], parentJobLs=[], \
+					refFastaFList=[], parentJobLs=None, \
 					extraDependentInputLs=[], transferOutput=True, extraArguments=None, job_max_memory=2000, interval=None,\
 					**keywords):
 		"""
@@ -677,8 +822,10 @@ class AbstractNGSWorkflow(object):
 		job.output = outputF
 		workflow.addJob(job)
 		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		for parentJob in parentJobLs:
-			workflow.depends(parent=parentJob, child=job)
+		if parentJobLs:
+			for parentJob in parentJobLs:
+				if parentJob:
+					workflow.depends(parent=parentJob, child=job)
 		for input in extraDependentInputLs:
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		return job
@@ -768,6 +915,86 @@ class AbstractNGSWorkflow(object):
 			workflow.depends(parent=parentJob, child=filterByDepthJob)
 		yh_pegasus.setJobProperRequirement(filterByDepthJob, job_max_memory=job_max_memory)
 		return filterByDepthJob
+	
+	def addFilterJobByvcftools(self, workflow, vcftoolsWrapper=None, inputVCFF=None, outputFnamePrefix=None, \
+							parentJobLs=None, snpMisMatchStatFile=None, minMAC=2, minMAF=None, maxSNPMissingRate=0.9,\
+							namespace=None, version=None, extraDependentInputLs=[], transferOutput=False, \
+							outputFormat='--recode', extraArguments=None):
+		"""
+		2012.5.9
+			moved from FilterVCFPipeline.py
+			add argument outputFormat to make "--recode" explicit and allow other output formats
+			add argument extraArguments
+			
+			this could be just used to output vcf in various formats
+		2011-11-21
+			argument vcftools is replaced with a wrapper, which takes vcftools path as 1st argument
+		"""
+		# Add a mkdir job for any directory.
+		vcftoolsJob = Job(namespace=getattr(workflow, 'namespace', namespace), name=vcftoolsWrapper.name, \
+						version=getattr(workflow, 'version', version))
+		vcftoolsJob.addArguments(workflow.vcftoolsPath)	#2011-11-21
+		if inputVCFF.name[-2:]=='gz':
+			vcftoolsJob.addArguments("--gzvcf", inputVCFF)
+		else:
+			vcftoolsJob.addArguments("--vcf", inputVCFF)
+		vcftoolsJob.addArguments("--out", outputFnamePrefix, outputFormat)
+		if snpMisMatchStatFile:
+			vcftoolsJob.addArguments("--positions", snpMisMatchStatFile)
+			vcftoolsJob.uses(snpMisMatchStatFile, transfer=True, register=True, link=Link.INPUT)
+		
+		if maxSNPMissingRate is not None:
+			vcftoolsJob.addArguments("--geno %s"%(1-maxSNPMissingRate))
+		if minMAF is not None:
+			vcftoolsJob.addArguments("--maf %s"%(minMAF))
+		if minMAC is not None:
+			vcftoolsJob.addArguments("--mac %s"%(minMAC))
+		if extraArguments:
+			vcftoolsJob.addArguments(extraArguments)
+		vcftoolsJob.uses(inputVCFF, transfer=True, register=True, link=Link.INPUT)
+		for input in extraDependentInputLs:
+			if input:
+				vcftoolsJob.uses(input, transfer=True, register=True, link=Link.INPUT)
+		if outputFormat=='--recode':	#2012.5.9
+			outputVCFF = File("%s.recode.vcf"%(outputFnamePrefix))
+			vcftoolsJob.uses(outputVCFF, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			vcftoolsJob.output = outputVCFF
+		elif outputFormat=='--plink-tped':
+			output1 = File("%s.tped"%(outputFnamePrefix))
+			output2 = File("%s.tfam"%(outputFnamePrefix))
+			vcftoolsJob.output = output1
+			vcftoolsJob.outputList=[output1, output2]
+			for output in vcftoolsJob.outputList:
+				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		elif outputFormat=='--plink':
+			output1 = File("%s.ped"%(outputFnamePrefix))
+			output2 = File("%s.fam"%(outputFnamePrefix))
+			vcftoolsJob.output = output1
+			vcftoolsJob.outputList=[output1, output2]
+			for output in vcftoolsJob.outputList:
+				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		elif outputFormat=='--IMPUTE':
+			output1 = File("%s.impute.hap"%(outputFnamePrefix))
+			output2 = File("%s.impute.hap.legend"%(outputFnamePrefix))
+			output3 = File("%s.impute.hap.indv"%(outputFnamePrefix))
+			vcftoolsJob.output = output1
+			vcftoolsJob.outputList=[output1, output2, output3]
+			for output in vcftoolsJob.outputList:
+				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		elif outputFormat=='--BEAGLE-GL':
+			output1 = File("%s.BEAGLE.GL"%(outputFnamePrefix))
+			vcftoolsJob.output = output1
+			vcftoolsJob.outputList=[output1]
+			for output in vcftoolsJob.outputList:
+				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		else:
+			vcftoolsJob.output = None
+			vcftoolsJob.outputList = []
+		workflow.addJob(vcftoolsJob)
+		for parentJob in parentJobLs:
+			if parentJob:
+				workflow.depends(parent=parentJob, child=vcftoolsJob)
+		return vcftoolsJob
 	
 	def addCalculateTwoVCFSNPMismatchRateJob(self, workflow, executable=None, \
 							vcf1=None, vcf2=None, snpMisMatchStatFile=None, \
@@ -870,3 +1097,77 @@ class AbstractNGSWorkflow(object):
 				inputFnameLs.append(os.path.join(inputFolder, filename))
 		sys.stderr.write("%s files out of %s total.\n"%(len(inputFnameLs), counter))
 		return inputFnameLs
+	
+	def getFilesWithSuffixFromFolderRecursive(self, inputFolder=None, suffixSet=set(['.h5']), fakeSuffix='.gz', inputFnameLs=[]):
+		"""
+		2012.4.30
+			similar to getFilesWithProperSuffixFromFolder() but recursively go through all sub-folders
+				and it uses utils.getRealPrefixSuffixOfFilenameWithVariableSuffix() to get the suffix.
+		"""
+		sys.stderr.write("Getting files with %s as suffix (%s as fake suffix) from %s ...\n"%(repr(suffixSet), fakeSuffix, inputFolder))
+		counter = 0
+		from pymodule import utils
+		for filename in os.listdir(inputFolder):
+			inputFname = os.path.join(inputFolder, filename)
+			counter += 1
+			if os.path.isfile(inputFname):
+				prefix, file_suffix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(filename, fakeSuffix=fakeSuffix)
+				if file_suffix in suffixSet:
+					inputFnameLs.append(inputFname)
+			elif os.path.isdir(inputFname):
+				self.getFilesWithSuffixFromFolderRecursive(inputFname, suffixSet=suffixSet, fakeSuffix=fakeSuffix, inputFnameLs=inputFnameLs)
+		sys.stderr.write("%s files out of %s total.\n"%(len(inputFnameLs), counter))
+		#return inputFnameLs
+	
+	def addPutStuffIntoDBJob(self, workflow, executable=None, inputFileLs=[], \
+					logFile=None, commit=False, \
+					parentJobLs=[], extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
+					job_max_memory=10, sshDBTunnel=0, **keywords):
+		"""
+		2012.5.8 add sshDBTunnel
+		2012.4.3
+		"""
+		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
+		job.addArguments("-v", self.drivername, "-z", self.hostname, "-d", self.dbname, \
+						"-u", self.db_user, "-p", self.db_passwd)
+		if extraArguments:
+			job.addArguments(extraArguments)
+		if commit:
+			job.addArguments("-c")
+		if logFile:
+			job.addArguments("--logFilename", logFile)
+			job.uses(logFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			job.output = logFile
+		for inputFile in inputFileLs:	#2012.4.3 this inputFile addition has to be at last. as it doesn't have options ahead of them. 
+			job.addArguments(inputFile)
+			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+		workflow.addJob(job)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel)
+		for parentJob in parentJobLs:
+			workflow.depends(parent=parentJob, child=job)
+		for input in extraDependentInputLs:
+			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		return job
+	
+	def addSamtoolsFlagstatJob(self, workflow, executable=None, inputF=None, outputF=None, \
+					parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+					extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.4.3
+			samtools (sam_stat.c) has been modified so that it could take one more optional argument to store the
+				stats that are usually directed to stdout. 
+			inputF is bam file. outputF is to store the output.
+			
+		"""
+		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
+		job.addArguments('flagstat', inputF, outputF)
+		job.uses(inputF, transfer=True, register=True, link=Link.INPUT)
+		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		job.output = outputF
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
+		workflow.addJob(job)
+		for parentJob in parentJobLs:
+			workflow.depends(parent=parentJob, child=job)
+		for input in extraDependentInputLs:
+			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		return job
