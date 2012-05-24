@@ -17,6 +17,15 @@ from pymodule import SNP
 
 class AbstractMapper(object):
 	__doc__ = __doc__
+	db_option_dict = {
+					('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
+					('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
+					('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
+					('schema', 0, ): ['public', 'k', 1, 'database schema name', ],\
+					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
+					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+					('port', 0, ):[None, '', 1, 'database port number'],\
+							}
 	option_default_dict = {
 						('inputFname', 1, ): ['', 'i', 1, 'input file.', ],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
@@ -33,4 +42,17 @@ class AbstractMapper(object):
 		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
-	
+		self.connectDB()
+		
+	def connectDB(self):
+		"""
+		2012.5.11
+			place holder. AbstractVervetMapper.py will use it 
+		"""
+		pass
+		"""
+		db_vervet = VervetDB.VervetDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
+									hostname=self.hostname, database=self.dbname, schema=self.schema, port=self.port)
+		db_vervet.setup(create_tables=False)
+		self.db_vervet = db_vervet
+		"""	
