@@ -23,9 +23,9 @@ class BlastWorkflow(AbstractWorkflow):
 	option_default_dict = AbstractWorkflow.option_default_dict.copy()
 	option_default_dict.update({
 						("inputFname", 1, ): ["", 'i', 1, 'the input fasta file'],\
-						("formatdbPath", 1, ): ["/usr/bin/formatdb", '', 1, 'path to formatdb, index fasta database file'],\
-						("blastallPath", 1, ): ["/usr/bin/blastall", '', 1, 'path to blastall'],\
-						("blockSize", 1, int): [1000, '', 1, 'how many sequences each blast job handles'],\
+						("formatdbPath", 1, ): ["/usr/bin/formatdb", 'f', 1, 'path to formatdb, index fasta database file'],\
+						("blastallPath", 1, ): ["/usr/bin/blastall", 's', 1, 'path to blastall'],\
+						("blockSize", 1, int): [1000, 'c', 1, 'how many sequences each blast job handles'],\
 						('databaseFname', 1, ): ['', 'd', 1, 'filename of the database to blast against, must be indexed', ],\
 						('minNoOfIdentities', 0, int): [None, 'm', 1, 'minimum number of identities between a query and target', ],\
 						('maxNoOfMismatches', 0, int): [None, 'a', 1, 'minimum number of mismatches between a query and target', ],\

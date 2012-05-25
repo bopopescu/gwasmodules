@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 """
 Examples:
-	%s 
+	#run on hoffman2's condor
+	%s -d ~/NetworkData/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta
+		-i ~/script/vervet/data/OphoffMethylation/HumanMethylation450_15017482_v.1.1.fasta.gz 
+		-a 3 -l hcondor -j hcondor   -C 1 -o workflow/BlastHumanMethylation450_ProbeSeqAgainst524_3Mismatches.xml
+		-s ~/bin/blast/bin/blastall -f ~/bin/blast/bin/formatdb
 	
 	%s -d /Network/Data/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta -i /tmp/input.fasta
 		-a 2 -o /tmp/output.tsv
