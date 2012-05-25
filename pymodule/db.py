@@ -221,7 +221,9 @@ class ElixirDB(object):
 		if getattr(self, 'schema', None):	#for postgres
 			for entity in entities:
 				if entity.__module__==self.__module__:	#entity in the same module
-					using_table_options_handler(entity, schema=self.schema)
+					using_table_options_handler(entity, schema=self.schema)	#2012.5.16 this changes the entity._descriptor.table_fullname
+					#if self.schema!='public':
+					#	entity._descriptor.tablename = '%s.%s'%(self.schema, entity._descriptor.tablename)	#2012.5.16 change the tablename
 		#2008-10-05 MySQL typically close connections after 8 hours resulting in a "MySQL server has gone away" error.
 		metadata.bind = create_engine(self._url, pool_recycle=self.pool_recycle, echo=self.sql_echo)	#, convert_unicode=True, encoding="utf8")
 		self.metadata = metadata
@@ -234,12 +236,13 @@ class ElixirDB(object):
 		2008-08-26
 		"""
 		from elixir import setup_all
-		setup_all(create_tables=create_tables)	#create_tables=True causes setup_all to call elixir.create_all(), which in turn calls metadata.create_all()
+		setup_all(create_tables=create_tables)	#create_tables=True causes setup_all to call elixir.create_all(),
+				#which in turn calls metadata.create_all()
 	
 	def _url(self):
 		return URL(drivername=self.drivername, username=self.username,
-				   password=self.password, host=self.hostname,
-				   port=self.port, database=self.database)
+				password=self.password, host=self.hostname,
+				port=self.port, database=self.database)
 	_url = property(_url)
 	
 	"""
