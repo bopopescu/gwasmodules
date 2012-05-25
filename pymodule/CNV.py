@@ -16,6 +16,7 @@ import numpy
 
 def get_overlap_ratio(span1_ls, span2_ls):
 	"""
+	2012.5.17 bugfix. overlap_length can't be negative (hard-set to zero).
 	2010-8-18
 		figure out the overlap coordinates
 	2010-8-2
@@ -42,6 +43,7 @@ def get_overlap_ratio(span1_ls, span2_ls):
 		if overlap_length>0:
 			overlap1 = 1.0
 		else:
+			overlap_length = 0	#2012.5.17 bugfix. can't be negative
 			overlap1 = 0.0
 	else:
 		overlap1 = overlap_length/(segment_stop_pos-segment_start_pos)
@@ -49,6 +51,7 @@ def get_overlap_ratio(span1_ls, span2_ls):
 		if overlap_length>0:
 			overlap2 = 1.0
 		else:
+			overlap_length = 0#2012.5.17 bugfix. can't be negative
 			overlap2 = 0.0
 	else:
 		overlap2 = overlap_length/(qc_stop-qc_start)
