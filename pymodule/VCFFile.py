@@ -29,6 +29,8 @@ diploidGenotypePattern = re.compile(r'([\d.])[|/]([\d.])')
 def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2index, minDepth=1,\
 				dataEntryType=1):
 	"""
+	2012.5.10
+		complete representation of one locus
 	2012.1.17
 		common snippet split out of VCFFile & VCFRecord
 		row is a list of input columns from one VCF file line
@@ -38,14 +40,16 @@ def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2
 	"""
 	chr = row[0]
 	pos = row[1]
+	vcf_locus_id=row[2]
 	quality = row[5]
-	
+	filter=row[6]
 	info = row[7]
+	format = row[8]
 	info_ls = info.split(';')
 	info_tag2value = {}
-	for info in info_ls:
+	for info_entry in info_ls:
 		try:
-			tag, value = info.split('=')
+			tag, value = info_entry.split('=')
 		except:
 			#sys.stderr.write("Error in splitting %s by =.\n"%info)	###Error in splitting DS by =.
 			continue
@@ -88,25 +92,29 @@ def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2
 		#GL_index = format_column_name2index.get('GL')
 		if len(genotype_data_ls)<len(format_column_name2index):	#this genotype call is probably empty "./." due to no reads
 			continue
-		if depth_index is None or genotype_call_index is None:
+		if genotype_call_index is None:
 			sys.stderr.write("")
 			continue
 		#genotype_quality = genotype_data_ls[genotype_quality_index]
 		genotype_call = genotype_data_ls[genotype_call_index]
+		callData = {}
 		if genotype_call=='./.':
 			continue
-		depth = genotype_data_ls[depth_index]
-		if depth=='.':	#this means depth=0
-			depth = 0
-		else:
-			depth = int(depth)
-		if depth<minDepth:	#no read. samtools would still assign ref/ref to this individual
+		if minDepth>0 and depth_index is None:
 			continue
-		#if depth>maxNoOfReads*coverage or depth<minNoOfReads*coverage:	#2011-3-29 skip. coverage too high or too low
-		#	continue
-		genotypeCallInBase = 'NA'
-		callData = {'DP':depth}
+		elif minDepth>0 and depth_index is not None:
+			depth = genotype_data_ls[depth_index]
+			if depth=='.':	#this means depth=0
+				depth = 0
+			else:
+				depth = int(depth)
+			if depth<minDepth:	#no read. samtools would still assign ref/ref to this individual
+				continue
+			#if depth>maxNoOfReads*coverage or depth<minNoOfReads*coverage:	#2011-3-29 skip. coverage too high or too low
+			#	continue
+			callData['DP'] = depth
 		patternSearchResult = diploidGenotypePattern.search(genotype_call)
+		genotypeCallInBase = 'NA'
 		if patternSearchResult:
 			allele1 = alleleNumber2Base[patternSearchResult.group(1)]
 			allele2 = alleleNumber2Base[patternSearchResult.group(2)]
@@ -150,8 +158,10 @@ def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2
 			if genotypeCallInBase not in genotypeCall2Count:
 				genotypeCall2Count[genotypeCallInBase] = 0
 			genotypeCall2Count[genotypeCallInBase] += 1
-	return PassingData(chr=chr, pos=pos, locus_id=locus_id, quality=quality, info_tag2value=info_tag2value, refBase=refBase, altBase=altBase, \
-			alleleLs=alleleLs, alleleNumber2Base=alleleNumber2Base, genotypeCall2Count=genotypeCall2Count, data_row=data_row)
+	return PassingData(chr=chr, pos=pos, locus_id=locus_id, quality=quality, info_tag2value=info_tag2value, \
+					refBase=refBase, altBase=altBase, \
+					alleleLs=alleleLs, alleleNumber2Base=alleleNumber2Base, genotypeCall2Count=genotypeCall2Count, data_row=data_row,\
+					info=info, format=format, filter=filter, vcf_locus_id=vcf_locus_id,)
 
 class VCFRecord(object):
 	"""
@@ -168,7 +178,7 @@ class VCFRecord(object):
 		self.col_name2index = col_name2index
 		self.individual_name2col_index = individual_name2col_index
 		self.sample_id2index = sample_id2index
-		self.col_index_individual_name_ls = col_index_individual_name_ls
+		self.col_index_individual_name_ls = col_index_individual_name_ls	#list of [column-index, sample-id], column-index >=9
 		self.minDepth = minDepth
 		self.data_row = []
 		self.alleleLs = []	#index 0 is refBase, 1 is first altBase, 2 is 2nd altBase .. 
@@ -176,17 +186,28 @@ class VCFRecord(object):
 		self._parse(row)
 		
 	def _parse(self, row):
+		"""
+		2012.5.2
+			add refBase, altBase to self
+		"""
 		returnData = parseOneVCFRow(row, self.col_name2index, self.col_index_individual_name_ls, self.sample_id2index, \
 					minDepth=self.minDepth, dataEntryType=2)
 		
 		self.chr = returnData.chr
 		self.pos = returnData.pos
 		self.locus_id = returnData.locus_id
-		self.quality = returnData.quality
+		self.vcf_locus_id = returnData.vcf_locus_id
 		self.info_tag2value = returnData.info_tag2value
-		self.data_row = returnData.data_row
+		self.data_row = returnData.data_row	#a list of dictionary {'GT': base-call, 'DP': depth}, including one extra sample, the ref
 		self.alleleNumber2Base = returnData.alleleNumber2Base
 		self.alleleLs = returnData.alleleLs
+		
+		self.refBase = returnData.refBase
+		self.altBase = returnData.altBase
+		self.quality = returnData.quality
+		self.filter = returnData.filter
+		self.info = returnData.info
+		self.format = returnData.format
 	
 	def getAAF(self):
 		"""
@@ -203,7 +224,9 @@ class VCFRecord(object):
 	
 class VCFFile(object):
 	__doc__ = __doc__
-	option_default_dict = {('inputFname', 1, ): [None, 'o', 1, 'a VCF input file.'],\
+	option_default_dict = {
+						('inputFname', 0, ): [None, 'i', 1, 'a VCF input file to read in the VCF content.'],\
+						('outputFname', 0, ): [None, 'o', 1, 'a VCF output file to hold the the VCF content.'],\
 						('openMode', 1, ): ['rb', '', 1, 'rb: bam file. r: sam file.'],\
 						('minorAlleleDepthLowerBoundCoeff', 1, float): [1/4., 'M', 1, 'minimum read depth multiplier for an allele to be called (heterozygous or homozygous)', ],\
 						('minorAlleleDepthUpperBoundCoeff', 1, float): [3/4., 'A', 1, 'maximum read depth multiplier for the minor allele of a heterozygous call', ],\
@@ -217,7 +240,9 @@ class VCFFile(object):
 						('defaultCoverage', 1, float): [5, 'd', 1, 'default coverage when coverage is not available for a read group'],\
 						("site_type", 1, int): [1, 's', 1, '1: all sites, 2: variants only'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						("sampleStartingColumn", 1, int): [9, '', 1, 'The column index (starting from 0) of the 1st sample genotype'],\
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
+						}
 	
 	def __init__(self, **keywords):
 		"""
@@ -226,7 +251,8 @@ class VCFFile(object):
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
 		
-		self.header = None
+		self.header = None	#2012.5.10 the list of column headers (the header line starting by #CHROM)
+		self.headerWithoutHash = None	#2012.5.10 same as self.header except, instead of "#CHROM", it is "CHROM".
 		self.sample_id_ls = []
 		self.sample_id2index = {}	#the index is the index of its column in the genotype_call_matrix
 		self.locus_id_ls = []
@@ -236,16 +262,41 @@ class VCFFile(object):
 		self.col_name2index = {}	#column index in file
 		self.col_index_individual_name_ls = None
 		self.individual_name2col_index = {}	#not the matrix column, the column in input file
+		self.metaInfoLs = []	#2012.3.28 anything before the "#CHROM" line. each entry is a raw line content, including '\n'
+		self.sampleIDHeader = []	#2012.3.20 a list of sample column headers (from sampleStartingColumn)
 		
-		if self.inputFname[-3:]=='.gz':
-			import gzip
-			self.inf = gzip.open(self.inputFname)
-		else:
-			self.inf = open(self.inputFname)
-		self.reader =csv.reader(self.inf, delimiter='\t')
-		self.headerContentLs = []	#2012.3.28 anything before the "#CHROM" line. each entry is a raw line content, including '\n'
-		self.sampleIDHeader = []	#2012.3.20 a list of column headers (#CHROM)
-		self._parseHeader()
+		self.inf = None
+		self.reader = None
+		self.initializeInput(self.inputFname)
+		
+		self.outf = None
+		self.writer = None
+		self.initializeOutput(self.outputFname)
+	
+	def initializeInput(self, inputFname=None):
+		"""
+		2012.5.10
+			split out of __init__()
+		"""
+		if inputFname:
+			self.metaInfoLs = []	#2012.3.28 anything before the "#CHROM" line. each entry is a raw line content, including '\n'
+			self.sampleIDHeader = []	#2012.3.20 a list of column headers (#CHROM)
+			if inputFname[-3:]=='.gz':
+				import gzip
+				self.inf = gzip.open(inputFname)
+			else:
+				self.inf = open(inputFname)
+			self.reader =csv.reader(self.inf, delimiter='\t')
+			self._parseHeader()
+	
+	def initializeOutput(self, outputFname=None):
+		"""
+		2012.5.10
+			split out of __init__()
+		"""
+		if self.outputFname:
+			self.outf = open(self.outputFname, 'w')
+			self.writer = csv.writer(self.outf, delimiter='\t')
 	
 	def getIndividual2ColIndex(self, header, col_name2index, sampleStartingColumn=9):
 		"""
@@ -259,7 +310,7 @@ class VCFFile(object):
 		
 		counter = 0
 		for i in xrange(sampleStartingColumn, no_of_cols):
-			individualName = header[i]
+			individualName = header[i].strip()
 			col_index = col_name2index.get(individualName)
 			if not individualName:	#ignore empty column
 				continue
@@ -333,7 +384,7 @@ class VCFFile(object):
 	def _parseHeader(self):
 		"""
 		2012.3.28
-			add all header content into self.headerContentLs
+			add all header content into self.metaInfoLs
 				except the last header line, which goes into self.sampleIDHeader
 		2011-11-2
 			this function is run inside __init__()
@@ -358,21 +409,22 @@ class VCFFile(object):
 		
 		for line in self.inf:
 			if line[:6]=='#CHROM':
-				line.strip()	#get rid of the trailing \n
+				line = line.strip()	#get rid of the trailing \n
 				row = line.split('\t')
-				self.sampleIDHeader = row
-				header = row[:]
-				header[0] = 'CHROM'	#discard the #
-				self.col_name2index = getColName2IndexFromHeader(header, skipEmptyColumn=True)
-				self.col_index_individual_name_ls = self.getIndividual2ColIndex(header, self.col_name2index)
+				self.sampleIDHeader = row[self.sampleStartingColumn:]
+				self.header = row[:]
+				self.headerWithoutHash= row[:]
+				self.headerWithoutHash[0] = 'CHROM'	#discard the #
+				self.col_name2index = getColName2IndexFromHeader(self.headerWithoutHash, skipEmptyColumn=True)
+				self.col_index_individual_name_ls = self.getIndividual2ColIndex(self.headerWithoutHash, self.col_name2index)
 				for individual_col_index, individual_name in self.col_index_individual_name_ls:
-					read_group = individual_name
+					read_group = individual_name.strip()
 					if read_group not in self.sample_id2index:
 						self.sample_id2index[read_group] = len(self.sample_id2index)
 						self.sample_id_ls.append(read_group)
-				break	# "#CHROM" is the last line of the header
+				break	# "#CHROM" is the last line of the self.headerWithoutHash
 			elif line[0]=='#':	#2011-3-4
-				self.headerContentLs.append(line)
+				self.metaInfoLs.append(line)
 				#continue
 			else:	#leave everything for parseFile or parseIter
 				break
@@ -439,3 +491,51 @@ class VCFFile(object):
 				fractionOfHomoAlt = -1
 				fractionOfHet = -1
 		sys.stderr.write("Done.\n")
+	
+	def writeMetaAndHeader(self, outf=None):
+		"""
+		2012.5.10
+			vcfFile = VCFFile(outputFname=...)
+			vcfFile.metaInfoLs = oldVCFFile.metaInfoLs
+			vcfFile.header = [...]
+			vcfFile.writeMetaAndHeader()
+			
+			write out the self.header and self.metaInfoLs
+		"""
+		if outf is None:
+			outf = self.outf
+			writer = self.writer
+		else:
+			writer = csv.writer(outf, delimiter='\t')
+		if outf is None:
+			sys.stderr.write("Warning: outf is None. nothing is written out.\n")
+		else:
+			for metaInfo in self.metaInfoLs:
+				outf.write(metaInfo)
+			writer.writerow(self.header)
+	
+	def writeVCFRecord(self, vcfRecord=None, outf=None):
+		"""
+		2012.5.10
+		"""
+		if outf is None:
+			outf = self.outf
+			writer = self.writer
+		else:
+			writer = csv.writer(outf, delimiter='\t')
+		if outf is None:
+			sys.stderr.write("Warning: outf is None. nothing is written out.\n")
+		else:
+			data_row = [vcfRecord.chr, vcfRecord.pos, vcfRecord.vcf_locus_id, vcfRecord.refBase, vcfRecord.altBase, \
+					vcfRecord.quality, vcfRecord.filter,\
+					vcfRecord.info, vcfRecord.format] + vcfRecord.row[self.sampleStartingColumn:]
+			writer.writerow(data_row)
+	
+	def close(self,):
+		"""
+		2012.5.10
+		"""
+		if self.inf:
+			del self.inf, self.reader
+		if self.outf:
+			del self.outf, self.writer

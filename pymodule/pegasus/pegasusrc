@@ -5,9 +5,13 @@ pegasus.catalog.site.file=sites.xml
 #pegasus.catalog.replica.file=replica.txt
 
 # 2012.4.3 database as replica catalog
-pegasus.catalog.replica.db.url=jdbc:postgresql://localhost:5432/pegasus
-pegasus.catalog.replica.db.user=yh
-pegasus.catalog.replica.db.password=
+#pegasus.catalog.replica.db.url=jdbc:postgresql://localhost:5432/pegasus
+#pegasus.catalog.replica.db.user=yh
+#pegasus.catalog.replica.db.password=
+
+#Introduced a Boolean property pegasus.dir.storage.deep . On setting this property to true, the relative submit directory structure is replicated on the output site.
+#Also introduced a property pegasus.dir.useTimestamp . This results in the timestamp being used to created the run number for the relative submit directory.
+
 
 pegasus.dir.useTimestamp=true
 pegasus.dir.storage.deep=false
@@ -28,3 +32,6 @@ stagein.clusters=20
 #2011.11.29 -B sz	Resizes the data section size for stdio capture, default is 262144.
 #pegasus.gridstart.arguments -B 400000
 pegasus.gridstart.arguments=-B 4000000
+
+#2012.4.9 monitord could blow out the memory on large worklfows. run it later with '--replay' to re-create the jobstate.log file, or re-populate the stats database from scratch.
+#pegasus.monitord.event=false

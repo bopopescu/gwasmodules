@@ -31,10 +31,12 @@ def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=No
 	return mkDirJob
 
 def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, input_site_handler='local',\
-						checkAffiliateFileExistence=True,\
+						checkAffiliateFileExistence=True, addPicardDictFile=True,\
 						affiliateFilenameSuffixLs=['dict', 'fai', 'amb', 'ann', 'bwt', 'pac', 'sa', 'rbwt', 'rpac', 'rsa', \
 												'stidx', 'sthash']):
 	"""
+	2012.5.23
+		add an argument "addPicardDictFile" to offer user option to exclude this file (i.e. registerBlastNucleotideDatabaseFile)
 	2012.2.24
 		dict is via picard
 		fai is via "samtools faidx" (index reference)
@@ -59,8 +61,9 @@ def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, i
 		
 		#add extra affiliated files
 		pathToFileLs = []
-		dictFname = '%s.dict'%(os.path.splitext(refFastaFname)[0])	#remove ".fasta" from refFastaFname
-		pathToFileLs.append(dictFname)
+		if addPicardDictFile:	#2012.5.23
+			dictFname = '%s.dict'%(os.path.splitext(refFastaFname)[0])	#remove ".fasta" from refFastaFname
+			pathToFileLs.append(dictFname)
 		for suffix in affiliateFilenameSuffixLs:
 			pathToFile = '%s.%s'%(refFastaFname, suffix)
 			pathToFileLs.append(pathToFile)
@@ -78,8 +81,12 @@ def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, i
 		refFastaFList.append(refFastaF)
 	return refFastaFList
 
-def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_walltime=120):
+def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_walltime=120, sshDBTunnel=0):
 	"""
+	2012.4.16
+		add argument sshDBTunnel.
+			=1: this job needs a ssh tunnel to access psql db on dl324b-1.
+			=anything else: no need for that.
 	2011-11-23
 		set max_walltime default to 120 minutes (2 hours)
 	2011-11-16
@@ -91,6 +98,9 @@ def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_w
 	job.addProfile(Profile(Namespace.GLOBUS, key="maxmemory", value="%s"%(job_max_memory)))
 	job.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(job_max_memory)))	#for dynamic slots
 	condorJobRequirementLs = ["(memory>=%s)"%(job_max_memory)]
+	#2012.4.16
+	if sshDBTunnel==1:
+		condorJobRequirementLs.append("(sshDBTunnel==%s)"%(sshDBTunnel))	#use ==, not =.
 	
 	if no_of_cpus is not None:
 		job.addProfile(Profile(Namespace.CONDOR, key="request_cpus", value="%s"%(no_of_cpus)) )	#for dynamic slots

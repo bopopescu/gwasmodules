@@ -78,8 +78,11 @@ def importNumericArray():
 			setattr(num, numpy_type, getattr(num, numpy_type_in_other))
 	return num
 
-def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ','], use_sniff=False):
+def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', ' '], use_sniff=False):
 	"""
+	2012.5.8
+		if input_fname is a file object, don't delete it (deleting closes it) and seek to the beginning of the file.
+			bugfix: the file object could be file or gzip.GzipFile 
 	2008-01-08
 		don't use cs.sniff unless the user specifies it. sniff gives you unexpected delimiter when it's a single-column.
 	2008-08-28
@@ -105,10 +108,13 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ','],
 		import sys
 		sys.stderr.write("Figuring out delimiter for %s ..."%input_fname)
 	cs = csv.Sniffer()
+	inputIsFileObject = False
+	import gzip
 	if isinstance(input_fname, str) and os.path.isfile(input_fname):
 		inf = open(input_fname)
-	elif isinstance(input_fname, file):	#could be a file object
+	elif isinstance(input_fname, file) or isinstance(input_fname, gzip.GzipFile) :	#could be a file/gzip-file object
 		inf = input_fname
+		inputIsFileObject = True
 	elif isinstance(input_fname, str) and not os.path.isfile(input_fname):	#it's the input
 		import StringIO
 		inf = StringIO.StringIO(input_fname)
@@ -128,7 +134,10 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ','],
 			if delimiter_count>0:
 				delimiter_chosen = delimiter
 				break
-	del inf
+	if inputIsFileObject:
+		inf.seek(0)
+	else:
+		del inf
 	if report:
 		sys.stderr.write("Done.\n")
 	return delimiter_chosen
@@ -498,8 +507,11 @@ def getPhredScoreOutOfSolexaScore(solexaChar):
 	import math
 	return 10*math.log10(1 + math.pow(10, (ord(solexaChar) - 64) / 10.0))
 
-def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname):
+def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname, fakeSuffix='.gz'):
 	"""
+	2012.4.30
+		make the fakeSuffix an option.
+		if fakeSuffix is None or nothing, the 2nd os.path.splitext() won't run.
 	2011-2-7
 		purpose of this function is to get the prefix, suffix of a filename regardless of whether it
 			has two suffices (gzipped) or one. 
@@ -508,7 +520,7 @@ def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname):
 		Prefix is always sequence_628BWAAXX_4_1
 	"""
 	fname_prefix, fname_suffix = os.path.splitext(fname)
-	if fname_suffix=='.gz':	#the input file is gzipped. get the new prefix
+	if fakeSuffix and fname_suffix==fakeSuffix:	#the input file is gzipped. get the real prefix, suffix
 		fname_prefix, fname_suffix = os.path.splitext(fname_prefix)
 	return fname_prefix, fname_suffix
 
@@ -570,6 +582,31 @@ def getDateStampedFilename(filename):
 	newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
 								lastModDatetime.day, suffix)
 	return newFilename
+
+def openGzipFile(inputFname):
+	"""
+	2012.5.23
+		if suffix is .gz, use gzip to open it
+	"""
+	import os
+	fname_prefix, fname_suffix = os.path.splitext(inputFname)
+	if fname_suffix=='.gz':
+		import gzip
+		inf = gzip.open(inputFname)
+	else:
+		inf = open(inputFname)
+	return inf
+
+def comeUpSplitFilename(outputFnamePrefix=None, suffixLength=3, fileOrder=0, filenameSuffix=""):
+	"""
+	2012.5.24
+		
+		'%0*d'%(suffixLength, fileOrder) is same as str(fileOrder).zfill(suffixLength).
+		If fileOrder's length is beyond suffixLength, then it's just fileOrder itself without truncation.
+		like 001, 002, 999, 1234.
+	"""
+	
+	return '%s%0*d%s'%(outputFnamePrefix, suffixLength, fileOrder, filenameSuffix)
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()

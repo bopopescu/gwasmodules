@@ -4,9 +4,10 @@ set -e
 
 TOPDIR=`pwd`
 STORAGE_SITE_DEFAULT="local"
+submitOptionDefault="--submit"
 if test $# -lt 3 ; then
 	echo "Please specify local or condorpool as argument. Examples:"
-	echo "  $0 dagFile siteName finalOutputDir [STORAGE_SITE] [submitFolderName] [onlyPlan]"
+	echo "  $0 dagFile siteName finalOutputDir [STORAGE_SITE] [submitFolderName] [submitOption]"
 	echo ""
 	echo "Note:"
 	echo "	#. siteName is the running site. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
@@ -15,11 +16,13 @@ if test $# -lt 3 ; then
 	echo "	#. STORAGE_SITE is the site to which final output is staged to. default is $STORAGE_SITE_DEFAULT."
 	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
 	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
-	echo "	#. onlyPlan means pegasus will only do the planning but not submit the final workflow. Just put any string there to make it non-empty."
+	echo "	#. submitOption are extra options passed to pegasus-plan. Default is $submitOptionDefault. '--submit' means pegasus will plan & submit the workflow. '--submit --nocleanup' means pegasus won't add cleanup jobs = all intermediate files will be kept. If you set it to empty string, '', only planning will be done but no submission."
 	echo ""
 	echo "Examples:"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726"
-	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726"
+	echo "  #only planning, no running"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726 \"\""
+	echo "  #run the workflow without cleanup. good for testing in which you often need to modify rescue log to backtrack finished jobs"
+	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726 \"--submit --nocleanup\" "
 	exit 1
 fi
 
@@ -28,7 +31,7 @@ TargetSite=$2
 finalOutputDir=$3
 STORAGE_SITE=$4
 submitFolderName=$5
-onlyPlan=$6
+submitOption=$6
 
 if test -z "$submitFolderName"
 then
@@ -39,14 +42,19 @@ if [ -z $STORAGE_SITE ]; then
 	STORAGE_SITE=$STORAGE_SITE_DEFAULT
 fi
 
-if [ -z $onlyPlan ]; then
-	submitOption="--submit"
-else
-	submitOption=""
+if test -z "$submitOption"
+then
+	submitOption=$submitOptionDefault
 fi
 
 echo "Submitting to $TargetSite"
 echo STORAGE_SITE $STORAGE_SITE
+echo "submitOption=$submitOption"
+
+# 2012.5.3 these two condor profiles are for condor sites to have computing nodes keep stdout on local storage and transfer them to central manager upon exit/evict
+# it's useful in the case that there are too many jobs (.sub, .err, .out files) and the filesystem is not good at dealing with numerous small files (like panasas filesystem)
+#		<profile namespace="condor" key="should_transfer_files">YES</profile> <profile>
+#		<profile namespace="condor" key="when_to_transfer_output">ON_EXIT_OR_EVICT</profile>
 
 # figure out where Pegasus is installed
 export PEGASUS_HOME=`which pegasus-plan | sed 's/\/bin\/*pegasus-plan//'`
@@ -79,8 +87,10 @@ UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
 UCLA_CLUSTER_SCRATCH="/u/scratch/p/polyacti/pegasus"
 #UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
 #UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
-#if you choose hcondor as storage site, it's stored in local scratch!! make sure it's in shared storage.
+#if you choose hcondor as storage site, final output is stored in local scratch!! make sure it's in shared storage.
 UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
+UCLA_CLUSTER_PYTHON_DIR="/u/local/python/2.6/"
+UCLA_CLUSTER_R_DIR="/u/local/apps/R/R-2.12.2-gnu/"
 freeSpace="50000G"
 
 USC_CLUSTER_HOSTNAME="hpc-login2.usc.edu"
@@ -175,14 +185,17 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="HOME" >$UCLA_CLUSTER_HOME</profile>
 		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME/bin:$PATH</profile>
 		<profile namespace="env" key="GLOBUS_LOCATION" >$UCLA_CLUSTER_GLOBUS_LOCATION</profile>
-		<profile namespace="env" key="LD_LIBRARY_PATH" >$UCLA_CLUSTER_HOME/lib:/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+		<profile namespace="env" key="LD_LIBRARY_PATH" >$UCLA_CLUSTER_HOME/lib:$UCLA_CLUSTER_R_DIR/lib64/R/lib:$UCLA_CLUSTER_PYTHON_DIR/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
 		
 		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
 		<profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
-		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
-		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
-		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
-		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages:/u/local/python/2.6/lib64/python2.6-other</profile>
+		<profile namespace="env" key="R_BIN">$UCLA_CLUSTER_R_DIR/bin</profile>
+		<profile namespace="env" key="R_DIR">$UCLA_CLUSTER_R_DIR</profile>
+		<profile namespace="env" key="R_HOME">$UCLA_CLUSTER_R_DIR/lib64/R</profile>
+		<profile namespace="env" key="PYTHON_DIR">$UCLA_CLUSTER_PYTHON_DIR</profile>
+		<profile namespace="env" key="PYTHON_INC">$UCLA_CLUSTER_PYTHON_DIR/include/python2.6</profile>
+		<profile namespace="env" key="PYTHON_LIB">$UCLA_CLUSTER_PYTHON_DIR/lib</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:$UCLA_CLUSTER_PYTHON_DIR/lib64/python2.6/site-packages:$UCLA_CLUSTER_PYTHON_DIR/lib/python2.6/site-packages:/u/home/eeskin/polyacti/bin/pegasus/lib/pegasus/python:$UCLA_CLUSTER_PYTHON_DIR/lib64/python2.6-other</profile>
 	</site>
 	<site  handle="hoffman2" arch="x86_64" os="LINUX">
 		<grid  type="gt5" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
