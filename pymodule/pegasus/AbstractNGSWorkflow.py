@@ -365,33 +365,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
 			self.addExecutable(executable)
 			setattr(self, executable.name, executable)
-		
 	
-	def initiateWorkflow(self, workflowName=None):
-		"""
-		2012.5.23
-			AbstractWorkflow is now a derivative of ADAG.
-		2011-11-22
-		"""
-		"""
-		# Create a abstract dag
-		workflow = ADAG(workflowName)
-		workflow.site_handler = self.site_handler
-		workflow.input_site_handler = self.input_site_handler
-		# Add executables to the DAX-level replica catalog
-		# In this case the binary is keg, which is shipped with Pegasus, so we use
-		# the remote PEGASUS_HOME to build the path.
-		workflow.architecture = "x86_64"
-		workflow.operatingSystem = "linux"
-		workflow.namespace = "workflow"
-		workflow.version="1.0"
-		#clusters_size controls how many jobs will be aggregated as a single job.
-		workflow.clusters_size = self.clusters_size
-		"""
-		return self
 	
-	@classmethod
-	def addBAMIndexJob(cls, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					inputBamF=None,\
 					parentJobLs=[], namespace='workflow', version='1.0',\
 					stageOutFinalOutput=True, javaMaxMemory=2500,\
