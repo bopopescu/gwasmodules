@@ -207,10 +207,15 @@ class FigureOutTaxID(object):
 	curs = property(curs)
 	
 	def scientific_name2tax_id(self):
+		"""
+		2012.6.6
+			update it to get table names from TaxonomyDB
+		"""
+		import TaxonomyDB
 		scientific_name2tax_id = {}
 		curs = self.curs
-		curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.names n, taxonomy.nodes o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species'")
+		curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species'"%(TaxonomyDB.Name.tablename, TaxonomyDB.Node.tablename))
 		rows = curs.fetchall()
 		for row in rows:
 			scientific_name, tax_id = row
