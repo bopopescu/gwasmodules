@@ -11,11 +11,14 @@ c_flags		= -O2
 c_compiler	= gcc
 
 
-all:	$(cxx_targets) $(c_targets)
+all:	$(cxx_targets) $(c_targets) CalculateMedianMeanOfInputColumn
 
 
 $(cxx_targets):	%:	%.o
-	$(cxx_compiler) $(cxx_flags) $(HDF5Lib) $< -o $@
+	-$(cxx_compiler) $(cxx_flags) $(HDF5Lib) $< -o $@
+
+CalculateMedianMeanOfInputColumn:	%:	%.o
+	-$(cxx_compiler) $(cxx_flags) -lboost_program_options -lboost_iostreams -larmadillo $< -o $@
 
 .cc.o:
 	$(cxx_compiler) $(cxx_flags) -c $< -o $@
