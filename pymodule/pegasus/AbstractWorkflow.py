@@ -70,7 +70,31 @@ class AbstractWorkflow(ADAG):
 		self.operatingSystem = "linux"
 		self.namespace = "workflow"
 		self.version="1.0"
+	
 		
+	def initiateWorkflow(self, workflowName=None):
+		"""
+		2012.5.23
+			AbstractWorkflow is now a derivative of ADAG.
+		2011-11-22
+		"""
+		"""
+		# Create a abstract dag
+		workflow = ADAG(workflowName)
+		workflow.site_handler = self.site_handler
+		workflow.input_site_handler = self.input_site_handler
+		# Add executables to the DAX-level replica catalog
+		# In this case the binary is keg, which is shipped with Pegasus, so we use
+		# the remote PEGASUS_HOME to build the path.
+		workflow.architecture = "x86_64"
+		workflow.operatingSystem = "linux"
+		workflow.namespace = "workflow"
+		workflow.version="1.0"
+		#clusters_size controls how many jobs will be aggregated as a single job.
+		workflow.clusters_size = self.clusters_size
+		"""
+		return self
+	
 	def insertHomePath(self, inputPath, home_path):
 		"""
 		2012.5.23 copied from AbstractNGSWorkflow
@@ -248,15 +272,20 @@ class AbstractWorkflow(ADAG):
 			moved from CalculateVCFStatPipeline.py
 		"""
 		statMergeJob.addArguments(inputF)
-		statMergeJob.uses(inputF, transfer=False, register=True, link=Link.INPUT)
+		statMergeJob.uses(inputF, transfer=True, register=True, link=Link.INPUT)
+		for input in extraDependentInputLs:
+			if input:
+				statMergeJob.uses(input, transfer=True, register=True, link=Link.INPUT)
 		for parentJob in parentJobLs:
 			self.depends(parent=parentJob, child=statMergeJob)
 	
 	def addGenericJob(self, executable=None, inputFile=None, outputFile=None, \
-						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
-						extraArguments=None, extraArgumentList=[], job_max_memory=2000,  sshDBTunnel=None, \
+						parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+						extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
 						**keywords):
 		"""
+		2012.6.1
+			add argument extraOutputLs
 		2012.5.24
 			generic job addition function for other functions to use
 		"""
@@ -264,24 +293,45 @@ class AbstractWorkflow(ADAG):
 		
 		if inputFile:
 			job.addArguments("-i", inputFile)
+			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 		if outputFile:
 			job.addArguments("-o", outputFile)
+			job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			job.output = outputFile
 		if extraArgumentList:
 			job.addArguments(*extraArgumentList)
 		
 		if extraArguments:
 			job.addArguments(extraArguments)
-		job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
-		if outputFile:
-			job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			job.output = outputFile
-			
+		
 		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel)
 		self.addJob(job)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			if input:
-				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		if parentJobLs:
+			for parentJob in parentJobLs:
+				if parentJob:
+					self.depends(parent=parentJob, child=job)
+		if extraDependentInputLs:
+			for input in extraDependentInputLs:
+				if input:
+					job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		if extraOutputLs:
+			for output in extraOutputLs:
+				if output:
+					job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		return job
+	
+	def addDBArgumentsToOneJob(self, job=None, objectWithDBArguments=None):
+		"""
+		2012.6.5
+			tired of adding all these arguments to db-interacting jobs
+		"""
+		if objectWithDBArguments is None:
+			objectWithDBArguments = self
+		job.addArguments("-v", objectWithDBArguments.drivername, "-z", objectWithDBArguments.hostname, \
+						"-d", objectWithDBArguments.dbname, \
+						"-u", objectWithDBArguments.db_user, "-p %s"%objectWithDBArguments.db_passwd)
+		if objectWithDBArguments.schema:
+			job.addArguments("-k", objectWithDBArguments.schema)
+		if getattr(objectWithDBArguments, 'port', None):
+			job.addArguments("--port=%s"%(objectWithDBArguments.port))
 		return job
