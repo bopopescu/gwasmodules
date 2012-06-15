@@ -259,6 +259,7 @@ class GeneCommentary(Entity):
 		for gene_segment in gene_segments:
 			self.mrna_box_ls.append([gene_segment.start, gene_segment.stop, gene_segment.id])
 		self.mrna_box_ls.sort()
+		return self.mrna_box_ls
 	
 	def construct_protein_box(self):
 		"""
@@ -299,6 +300,7 @@ class GeneCommentary(Entity):
 			self.protein_comment = None
 			self.protein_text = None
 		self.protein_box_ls.sort()
+		return self.protein_box_ls
 	
 	def constructAnnotatedBox(self):
 		"""
@@ -441,6 +443,39 @@ class GeneCommentary(Entity):
 		self.CDS_5_end_pos = CDS_5_end_pos
 		self.no_of_introns = no_of_introns
 		return self.box_ls
+	
+	def outputSequenceInUpperLowerCase(self, outf):
+		"""
+		2012.6.11
+			Segments present in GeneSegment are outputted in upper case. All others are outputted in lower case.
+		"""
+		import copy
+		#use copy to avoid modifying self.mrna_box_ls and self.protein_box_ls
+		box_ls = copy.deepcopy(self.construct_mrna_box())
+		
+		if not box_ls:	#this is a protein gene commentary.
+			box_ls = copy.deepcopy(self.construct_protein_box())
+		
+		outf.write(">GeneCommentary%s_fromGene%s\n"%(self.id, self.gene.id))
+		if self.start<box_ls[0][0]:	#need to output the beginning in lower case.
+			firstBoxStart = box_ls[0][0]
+			sequence = self.getSequence([[self.start, firstBoxStart-1]])
+			outf.write("%s"%(sequence.lower()))
+		
+		for i in xrange(len(box_ls)):
+			box = box_ls[i]
+			sequence = self.getSequence([[box[0], box[1]]])
+			outf.write("%s"%(sequence.upper()))
+			if i<len(box_ls)-1:
+				#output the inter-box sequences in lower case
+				next_box = box_ls[i+1]
+				sequence = self.getSequence([[box[1]+1, next_box[0]-1]])
+				outf.write("%s"%(sequence.lower()))
+		if self.stop>box_ls[-1][1]:
+			lastBoxStop = box_ls[-1][1]
+			sequence = self.getSequence([[lastBoxStop+1, self.stop]])
+			outf.write("%s"%(sequence.lower()))
+		outf.write("\n")
 	
 class GeneSegment(Entity):
 	"""
