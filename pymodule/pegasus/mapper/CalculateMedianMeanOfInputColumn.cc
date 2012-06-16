@@ -75,7 +75,7 @@ void CalculateMedianMeanOfInputColumn::run(){
 			}
 			string statInStr = *tokenizer_iter;
 			int stat = atoi(statInStr.c_str());
-			cout<<	stat << endl;
+			//cout<<	stat << endl;
 			//statList <<  atoi(stat.c_str()) << endr;	//endr is not recognized
 			statList(noOfSampledData-1,0) = stat;
 			acc(stat);
