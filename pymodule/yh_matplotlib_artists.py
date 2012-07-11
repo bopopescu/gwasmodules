@@ -3,9 +3,9 @@
 2008-02-02 extend the artists in matplotlib
 """
 import math
-from matplotlib.numerix import array, arange, sin, cos, pi, Float, sqrt, \
-	 matrixmultiply, sqrt, nonzero, equal, asarray, dot, concatenate
-from matplotlib.artist import Artist, setp, kwdocd
+from numpy import array, arange, sin, cos, pi, sqrt, sqrt, nonzero, equal, asarray, dot, concatenate
+#2012.7.9 replace matplotlib.numerix with numpy. the former is gone.
+from matplotlib.artist import Artist, setp, kwdoc
 from matplotlib.cbook import dedent
 from matplotlib.patches import Polygon
 from matplotlib.collections import PolyCollection, LineCollection
@@ -13,6 +13,7 @@ from matplotlib.collections import PolyCollection, LineCollection
 # these are not available for the object inspector until after the
 # class is build so we define an initial set here for the init
 # function and they will be overridden after object defn
+kwdocd = kwdoc.func_dict	#2012.7.9 kwdocd is no longer available from matplotlib.artist
 kwdocd['Patch'] = """\
 		  alpha: float
 		  animated: [True | False]
@@ -139,8 +140,8 @@ class Gene(Polygon):
 			cx = float(dx)/distance
 			sx = float(dy)/distance
 			M = array([[cx, sx],[-sx,cx]])
-			verts = matrixmultiply(coords, M) + (x+dx, y+dy)
-
+			#verts = matrixmultiply(coords, M) + (x+dx, y+dy)
+			verts =coords*M + (x+dx, y+dy)	#2012.7.9 replace matrixmultiply with "*" as matrixmultiply is not available from numpy
 		Polygon.__init__(self, map(tuple, verts), **kwargs)
 	__init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
