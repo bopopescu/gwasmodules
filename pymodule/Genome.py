@@ -2,6 +2,8 @@
 2008-10-01
 	module related to Genome
 """
+import os,sys
+
 class GeneModel(object):
 	def __init__(self, **keywords):
 		"""
@@ -127,4 +129,39 @@ class LargeFastaFileTraverse:
 					else:
 						seqlineFunctor(line)
 			sys.stderr.write("\n")
+
+import re
+chr_pattern = re.compile(r'(\w+\d+).*')
+contig_id_pattern = re.compile(r'Contig(\d+).*')
+def getContigIDFromFname(filename):
+	"""
+	2012.7.14 copied from  pymodule.pegasus.AbstractNGSWorkflow
+	2011-10-20
 		
+		If filename is like .../Contig0.filter_by_vcftools.recode.vcf.gz,
+			It returns "0", excluding the "Contig".
+			If you want "Contig" included, use getChrIDFromFname().
+		If search fails, it returns the prefix in the basename of filename.
+	"""
+	contig_id_pattern_sr = contig_id_pattern.search(filename)
+	if contig_id_pattern_sr:
+		contig_id = contig_id_pattern_sr.group(1)
+	else:
+		contig_id = os.path.splitext(os.path.split(filename)[1])[0]
+	return contig_id
+
+def getChrFromFname(filename):
+	"""
+	2012.7.14 copied from  pymodule.pegasus.AbstractNGSWorkflow
+	2011-10-20
+		filename example: Contig0.filter_by_vcftools.recode.vcf.gz
+			It returns "Contig0".
+			If you want just "0", use getContigIDFromFname().
+		If search fails, it returns the prefix in the basename of filename.
+	"""
+	chr_pattern_sr = chr_pattern.search(filename)
+	if chr_pattern_sr:
+		chr = chr_pattern_sr.group(1)
+	else:
+		chr = os.path.splitext(os.path.split(filename)[1])[0]
+	return chr

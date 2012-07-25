@@ -26,18 +26,18 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		"""
 		AbstractNGSWorkflow.__init__(self, **keywords)
 		
-	def registerExecutables(self, workflow):
+	def registerExecutables(self, workflow=None):
 		"""
 		"""
 		AbstractNGSWorkflow.registerExecutables(self, workflow)
 	
-	def registerCommonExecutables(self, workflow):
+	def registerCommonExecutables(self, workflow=None):
 		"""
 		"""
 		AbstractNGSWorkflow.registerCommonExecutables(self, workflow)
 	
 	@classmethod
-	def registerAllInputFiles(cls, workflow, inputDir, input_site_handler=None, checkEmptyVCFByReading=False, pegasusFolderName=''):
+	def registerAllInputFiles(cls, workflow=None, inputDir=None, input_site_handler=None, checkEmptyVCFByReading=False, pegasusFolderName=''):
 		"""
 		2012.5.9
 			register the tbi file if it exists

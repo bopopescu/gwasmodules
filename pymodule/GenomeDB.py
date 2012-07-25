@@ -228,11 +228,11 @@ class GeneCommentary(Entity):
 		2009-01-03 implemented
 		2008-09-22 implement later
 		"""
-		if not hasattr(self, 'protein_box_ls'):
+		if not getattr(self, 'protein_box_ls', None):
 			self.construct_protein_box()
 		
 		self.cds_sequence = self.getSequence(self.protein_box_ls)
-		self.mrna_sequence = self.getSequence(self.mrna_box_ls)
+		#self.mrna_sequence = self.getSequence(self.mrna_box_ls)
 	
 	def construct_mrna_box(self):
 		"""
@@ -446,15 +446,25 @@ class GeneCommentary(Entity):
 	
 	def outputSequenceInUpperLowerCase(self, outf):
 		"""
+		2012.6.18
+			get the box_ls from self.gene_segments. If it's mRNA commentary, this function outputs pre-splicing mRNA.
+			If it's protein commentary, this function outputs CDS sequence with introns.
 		2012.6.11
-			Segments present in GeneSegment are outputted in upper case. All others are outputted in lower case.
+			Segments present in GeneSegment are outputted in upper case. All inter-between segments are outputted in lower case.
 		"""
+		"""
+		#2012.6.18 commented out
 		import copy
 		#use copy to avoid modifying self.mrna_box_ls and self.protein_box_ls
 		box_ls = copy.deepcopy(self.construct_mrna_box())
 		
 		if not box_ls:	#this is a protein gene commentary.
 			box_ls = copy.deepcopy(self.construct_protein_box())
+		"""
+		box_ls = []
+		for geneSegment in self.gene_segments:
+			box_ls.append([geneSegment.start, geneSegment.stop])
+		box_ls.sort()
 		
 		outf.write(">GeneCommentary%s_fromGene%s\n"%(self.id, self.gene.id))
 		if self.start<box_ls[0][0]:	#need to output the beginning in lower case.
@@ -476,6 +486,24 @@ class GeneCommentary(Entity):
 			sequence = self.getSequence([[lastBoxStop+1, self.stop]])
 			outf.write("%s"%(sequence.lower()))
 		outf.write("\n")
+	
+	def getProteinSequence(self,):
+		"""
+		2012.6.18
+			assuming this is a mRNA gene commentary. won't work on its derivative protein commentary.
+			get the protein_box_ls
+			get all nucleotide sequence
+			translate it into protein sequence
+			return a fastq record.
+		"""
+		self.getCDSsequence()
+		#self.cds_sequence
+		from Bio.Seq import Seq
+		from Bio.Alphabet import IUPAC
+		cds_seq = Seq(self.cds_sequence, IUPAC.unambiguous_dna)
+		peptide = cds_seq.translate()
+		return peptide
+		
 	
 class GeneSegment(Entity):
 	"""

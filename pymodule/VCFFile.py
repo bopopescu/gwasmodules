@@ -492,6 +492,14 @@ class VCFFile(object):
 				fractionOfHet = -1
 		sys.stderr.write("Done.\n")
 	
+	def getSampleIDList(self):
+		"""
+		2012.7.18
+			self.sample_id_ls includes a "ref" in index=0 cell. this function helps to reduce confusion by returning
+			a list of sample IDs without "ref"
+		"""
+		return self.sample_id_ls[1:]
+	
 	def writeMetaAndHeader(self, outf=None):
 		"""
 		2012.5.10

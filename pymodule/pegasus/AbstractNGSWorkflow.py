@@ -8,7 +8,7 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, Genome
 from Pegasus.DAX3 import *
 from AbstractWorkflow import AbstractWorkflow
 
@@ -121,6 +121,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	
 	def registerCommonExecutables(self, workflow=None):
 		"""
+		2012.7.25
+			add noDefaultClustersSizeExecutableList
 		2011-11-22
 		"""
 		namespace = self.namespace
@@ -132,6 +134,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		vervetSrcPath = self.vervetSrcPath
 		
 		executableList = []
+		noDefaultClustersSizeExecutableList = []
 		
 		
 		selectAndSplit = Executable(namespace=namespace, name="SelectAndSplitAlignment", version=version, \
@@ -361,11 +364,21 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		MergeFiles.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "shell/MergeFiles.sh"), site_handler))
 		executableList.append(MergeFiles)
 		
+		#2012.7.25
+		MergeVCFReplicateHaplotypesJava= Executable(namespace=namespace, name="MergeVCFReplicateHaplotypesJava", \
+											version=version, os=operatingSystem,\
+											arch=architecture, installed=True)
+		MergeVCFReplicateHaplotypesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		noDefaultClustersSizeExecutableList.append(MergeVCFReplicateHaplotypesJava)
+		
 		for executable in executableList:
 			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
 			self.addExecutable(executable)
 			setattr(self, executable.name, executable)
-	
+		
+		for executable in noDefaultClustersSizeExecutableList:
+			self.addExecutable(executable)
+			setattr(self, executable.name, executable)
 	
 	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					inputBamF=None,\
@@ -611,35 +624,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		for input in extraDependentInputLs:
 			if input:
 				job.uses(input, transfer=True, register=True, link=Link.INPUT)
-		return job	
-	
-	def addAbstractMapperLikeJob(self, workflow=None, executable=None, \
-					inputVCF=None, outputF=None, \
-					parentJobLs=[], namespace=None, version=None, transferOutput=True, job_max_memory=200,\
-					extraArguments=None, extraDependentInputLs=[]):
-		"""
-		2012.5.11
-		"""
-		#2011-9-22 union of all samtools intervals for one contig
-		job = Job(namespace=getattr(self, 'namespace', namespace), name=executable.name, \
-						version=getattr(self, 'version', version))
-		job.addArguments("-i", inputVCF, "-o", outputF)
-		
-		if extraArguments:
-			job.addArguments(extraArguments)
-		job.uses(inputVCF, transfer=True, register=True, link=Link.INPUT)
-		for input in extraDependentInputLs:
-			if input:
-				job.uses(input, transfer=True, register=True, link=Link.INPUT)
-		job.output = outputF
-		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		self.addJob(job)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=job)
 		return job
-
 	
 	@classmethod
 	def findProperVCFDirIdentifier(cls, vcfDir, defaultName='vcf1'):
@@ -910,6 +895,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	
 	def getContigIDFromFname(self, filename):
 		"""
+		2012.7.14 copied to pymodule.Genome
 		2011-10-20
 			
 			If filename is like .../Contig0.filter_by_vcftools.recode.vcf.gz,
@@ -917,28 +903,19 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				If you want "Contig" included, use getChrIDFromFname().
 			If search fails, it returns the prefix in the basename of filename.
 		"""
-		contig_id_pattern_sr = self.contig_id_pattern.search(filename)
-		if contig_id_pattern_sr:
-			contig_id = contig_id_pattern_sr.group(1)
-		else:
-			contig_id = os.path.splitext(os.path.split(filename)[1])[0]
-		return contig_id
+		return Genome.getContigIDFromFname(filename)
 	
 	def getChrFromFname(self, filename):
 		"""
+		2012.7.14 copied to pymodule.Genome
 		2011-10-20
 			filename example: Contig0.filter_by_vcftools.recode.vcf.gz
 				It returns "Contig0".
 				If you want just "0", use getContigIDFromFname().
 			If search fails, it returns the prefix in the basename of filename.
 		"""
-		chr_pattern_sr = self.chr_pattern.search(filename)
-		if chr_pattern_sr:
-			chr = chr_pattern_sr.group(1)
-		else:
-			chr = os.path.splitext(os.path.split(filename)[1])[0]
-		return chr
-	
+		return Genome.getChrFromFname(filename)
+		
 	def addPutStuffIntoDBJob(self, workflow=None, executable=None, inputFileLs=[], \
 					logFile=None, commit=False, \
 					parentJobLs=[], extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
@@ -990,4 +967,50 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			self.depends(parent=parentJob, child=job)
 		for input in extraDependentInputLs:
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		return job
+	
+	def addMergeVCFReplicateGenotypeColumnsJob(self, workflow=None, executable=None, genomeAnalysisTKJar=None, \
+						inputF=None, outputF=None, replicateIndividualTag=None, \
+						debugHaplotypeDistanceFile=None, \
+						debugMajoritySupportFile=None,\
+						refFastaFList=[], parentJobLs=[], extraDependentInputLs=None, transferOutput=False, \
+						extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.7.25
+			use self.addGenericJob() and moved from AlignmentToTrioCallPipeline.py
+		2012.6.1
+			change MergeVCFReplicateGenotypeColumns to MergeVCFReplicateHaplotypes
+			
+		2012.4.2
+			java -jar /home/crocea/script/gatk/dist/GenomeAnalysisTK.jar -T MergeVCFReplicateGenotypeColumns 
+				-R /Network/Data/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta
+				--variant /tmp/Contig0.vcf -o /tmp/contig0_afterMerge.vcf --onlyKeepBiAllelicSNP --replicateIndividualTag copy
+		"""
+		#GATK job
+		javaMemRequirement = "-Xms128m -Xmx%sm"%job_max_memory
+		refFastaF = refFastaFList[0]
+		extraArgumentList = [javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T", "MergeVCFReplicateHaplotypes",\
+			"-R", refFastaF, "--variant:VCF", inputF, "--out", outputF,\
+			'--onlyKeepBiAllelicSNP', "--replicateIndividualTag %s"%(replicateIndividualTag)]
+		if debugHaplotypeDistanceFile:
+			extraArgumentList.extend(["--debugHaplotypeDistanceFname", debugHaplotypeDistanceFile])
+		if debugMajoritySupportFile:
+			extraArgumentList.extend(["--debugMajoritySupportFname", debugMajoritySupportFile])
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		if extraDependentInputLs is None:
+			_extraDependentInputLs=[inputF] + refFastaFList
+		else:
+			import copy
+			_extraDependentInputLs = copy.deepcopy(extraDependentInputLs)
+			_extraDependentInputLs.append(inputF)
+			_extraDependentInputLs.extend(refFastaFList)
+		
+		# don't pass inputF and outputF to addGenericJob() because it'll add "-i" and "-o" in front of the two respectively
+		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
+						parentJobLs=parentJobLs, extraDependentInputLs=_extraDependentInputLs, \
+						extraOutputLs=[outputF, debugHaplotypeDistanceFile, debugMajoritySupportFile],\
+						transferOutput=transferOutput, \
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory)
+		
 		return job

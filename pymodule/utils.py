@@ -558,13 +558,12 @@ def sumOfReciprocals(n):
 		sum = sum + 1/(i+1.0)
 	return sum
 
-def get_md5sum(filename):
+def get_md5sum(filename, md5sum_command = 'md5sum'):
 	"""
 	2012.1.27
 		copied from variation/src/Array2DB_250k.py
 	"""
 	import subprocess
-	md5sum_command = 'md5sum'
 	md5sum_p = subprocess.Popen([md5sum_command, filename], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 	md5sum_stdout_out = md5sum_p.stdout.read()
 	md5sum_stderr_out = md5sum_p.stderr.read()
@@ -612,6 +611,66 @@ def comeUpSplitFilename(outputFnamePrefix=None, suffixLength=3, fileOrder=0, fil
 	"""
 	
 	return '%s%0*d%s'%(outputFnamePrefix, suffixLength, fileOrder, filenameSuffix)
+
+def findFilesWithOneSuffixRecursively(inputDir='./', suffix='.bam'):
+	"""
+	2012.7.11
+		if suffix is empty string, it'll get all files.
+	"""
+	import fnmatch
+	import os
+	
+	matches = []
+	for root, dirnames, filenames in os.walk(inputDir):
+		for filename in fnmatch.filter(filenames, '*%s'%(suffix)):
+			matches.append(os.path.join(root, filename))
+	return matches
+
+
+def getFolderSize(inputDir = '.'):
+	"""
+	2012.7.13
+	"""
+	import os
+	total_size = 0
+	for dirpath, dirnames, filenames in os.walk(inputDir):
+		for f in filenames:
+			fp = os.path.join(dirpath, f)
+			total_size += os.path.getsize(fp)
+	return total_size
+
+def getFileOrFolderSize(path='.'):
+	"""
+	2012.7.13
+	"""
+	file_size = None
+	if path:
+		if os.path.isfile(path):	#2012.7.12
+			statinfo = os.stat(path)
+			file_size = statinfo.st_size
+		elif os.path.isdir(path):
+			file_size = getFolderSize(path)
+	return file_size
+
+def copyFile(srcFilename=None, dstFilename=None, copyCommand="cp -aprL", srcFilenameLs=None, dstFilenameLs=None):
+	"""
+	2012.7.18
+		-L of cp meant "always follow symbolic links in SOURCE".
+	"""
+	#move the file
+	commandline = '%s %s %s'%(copyCommand, srcFilename, dstFilename)
+	return_data = runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+	if srcFilenameLs is not None:
+		srcFilenameLs.append(srcFilename)
+	if dstFilenameLs is not None:
+		dstFilenameLs.append(dstFilename)
+	if return_data.stderr_content:
+		#something wrong. abort
+		sys.stderr.write("commandline %s failed: %s\n"%(commandline, return_data.stderr_content))
+		exitCode = 3
+	else:
+		exitCode = 0
+	return exitCode
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()

@@ -119,6 +119,8 @@ class AbstractWorkflow(ADAG):
 	
 	def registerExecutables(self):
 		"""
+		2012.7.4
+			added cp
 		2012.1.9 a symlink to registerCommonExecutables()
 		"""
 		namespace = self.namespace
@@ -146,6 +148,18 @@ class AbstractWorkflow(ADAG):
 		mv = Executable(namespace=namespace, name="mv", version=version, os=operatingSystem, arch=architecture, installed=True)
 		mv.addPFN(PFN("file://" + "/bin/mv", site_handler))
 		executableList.append(mv)
+		
+		#the copy command
+		cp = Executable(namespace=namespace, name="cp", version=version, os=operatingSystem, arch=architecture, installed=True)
+		cp.addPFN(PFN("file://" + "/bin/cp", site_handler))
+		executableList.append(cp)
+		
+		gzip = Executable(namespace=namespace, name="gzip", \
+											version=version, \
+											os=operatingSystem, arch=architecture, installed=True)
+		gzip.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/shell/gzip.sh"), \
+														site_handler))
+		executableList.append(gzip)
 		
 		for executable in executableList:
 			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
@@ -284,12 +298,14 @@ class AbstractWorkflow(ADAG):
 						extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
 						**keywords):
 		"""
+		2012.6.27 add job.outputLs to hold more output files.
 		2012.6.1
 			add argument extraOutputLs
 		2012.5.24
 			generic job addition function for other functions to use
 		"""
 		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
+		job.outputLs = []	#2012.6.27 to hold more output files
 		
 		if inputFile:
 			job.addArguments("-i", inputFile)
@@ -298,6 +314,7 @@ class AbstractWorkflow(ADAG):
 			job.addArguments("-o", outputFile)
 			job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 			job.output = outputFile
+			job.outputLs.append(outputFile)
 		if extraArgumentList:
 			job.addArguments(*extraArgumentList)
 		
@@ -317,6 +334,7 @@ class AbstractWorkflow(ADAG):
 		if extraOutputLs:
 			for output in extraOutputLs:
 				if output:
+					job.outputLs.append(output)
 					job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		return job
 	
@@ -334,4 +352,68 @@ class AbstractWorkflow(ADAG):
 			job.addArguments("-k", objectWithDBArguments.schema)
 		if getattr(objectWithDBArguments, 'port', None):
 			job.addArguments("--port=%s"%(objectWithDBArguments.port))
+		return job
+	
+	def addGzipSubWorkflow(self, workflow=None, inputData=None, transferOutput=True,\
+						outputDirPrefix="", **keywords):
+		"""
+		2012.7.19
+		"""
+		if workflow is None:
+			workflow = self
+		sys.stderr.write("Adding gzip jobs for %s input job data ... "%(len(inputData.jobDataLs)))
+		no_of_jobs= 0
+		
+		
+		topOutputDir = "%sGzip"%(outputDirPrefix)
+		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
+		no_of_jobs += 1
+		
+		returnData = PassingData()
+		returnData.jobDataLs = []
+		for jobData in inputData.jobDataLs:
+			for inputF in jobData.fileList:
+				inputFBaseName = os.path.basename(inputF.name)
+				outputF = File(os.path.join(topOutputDir, '%s.gz'%(inputFBaseName)))
+				abstractMapperJob = self.addAbstractMapperLikeJob(workflow, executable=workflow.gzip, \
+						inputF=inputF, outputF=outputF, \
+						parentJobLs=[topOutputDirJob]+jobData.jobLs, transferOutput=transferOutput, job_max_memory=200,\
+						extraArguments=None, extraDependentInputLs=[])
+				
+				returnData.jobDataLs.append(PassingData(jobLs=[abstractMapperJob], vcfFile=None, \
+										fileList=[outputF]))
+				no_of_jobs += 1
+		sys.stderr.write("%s jobs. Done.\n"%(no_of_jobs))
+		return returnData
+	
+	def addAbstractMapperLikeJob(self, workflow=None, executable=None, \
+					inputVCF=None, inputF=None, outputF=None, \
+					parentJobLs=[], namespace=None, version=None, transferOutput=True, job_max_memory=200,\
+					extraArguments=None, extraDependentInputLs=[]):
+		"""
+		2012.7.19
+			moved from AbstractNGSWorkflow to here.
+			add argument inputF. inputVCF is not generic enough.
+		2012.5.11
+		"""
+		if inputF is None:	#2012.7.19
+			inputF = inputVCF
+		#2011-9-22 union of all samtools intervals for one contig
+		job = Job(namespace=getattr(self, 'namespace', namespace), name=executable.name, \
+						version=getattr(self, 'version', version))
+		job.addArguments("-i", inputF, "-o", outputF)
+		
+		if extraArguments:
+			job.addArguments(extraArguments)
+		job.uses(inputF, transfer=True, register=True, link=Link.INPUT)
+		for input in extraDependentInputLs:
+			if input:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		job.output = outputF
+		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
+		self.addJob(job)
+		for parentJob in parentJobLs:
+			if parentJob:
+				self.depends(parent=parentJob, child=job)
 		return job

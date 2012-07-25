@@ -134,3 +134,11 @@ def getAbsPathOutOfExecutable(executable):
 	pfn = (list(executable.pfns)[0])
 	#the url looks like "file:///home/crocea/bin/bwa"
 	return pfn.url[7:]
+
+
+def getAbsPathOutOfFile(file):
+	"""
+	2012.7.25
+		call getAbsPathOutOfExecutable
+	"""
+	return getAbsPathOutOfExecutable(file)

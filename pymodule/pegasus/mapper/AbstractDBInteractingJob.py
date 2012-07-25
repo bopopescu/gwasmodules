@@ -20,8 +20,9 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule.AbstractDBInteractingClass import AbstractDBInteractingClass
 
-class AbstractDBInteractingJob(AbstractMapper):
+class AbstractDBInteractingJob(AbstractDBInteractingClass):
 	__doc__ = __doc__
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	#option_default_dict.pop(('inputFname', 1, ))
@@ -34,12 +35,12 @@ class AbstractDBInteractingJob(AbstractMapper):
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
-		AbstractMapper.__init__(self, **keywords)	#self.connectDB() called within its __init__()
-		self.inputFnameLs = inputFnameLs
-		self.connectDB()
+		AbstractDBInteractingClass.__init__(self, inputFnameLs=inputFnameLs, **keywords)	#self.connectDB() called within its __init__()
 	
 	def connectDB(self):
 		"""
 			split out of __init__() so that derived classes could overwrite this function
 		"""
 		pass
+	
+	
