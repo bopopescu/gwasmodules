@@ -131,8 +131,9 @@ class LargeFastaFileTraverse:
 			sys.stderr.write("\n")
 
 import re
-chr_pattern = re.compile(r'(\w+\d+).*')
-contig_id_pattern = re.compile(r'Contig(\d+).*')
+chr_pattern = re.compile(r'([a-zA-Z]+\d+)[._\-:]*')	#the last - has special meaning in [] when it's not the last character. 
+contig_id_pattern = re.compile(r'Contig(\d+)[._\-:]*')
+
 def getContigIDFromFname(filename):
 	"""
 	2012.7.14 copied from  pymodule.pegasus.AbstractNGSWorkflow
