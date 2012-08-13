@@ -167,7 +167,7 @@ class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflo
 					job_max_memory=10, **keywords):
 		"""
 		2012.3.10
-			DrawManhattanPlotForLDInHDF5.py -w corba1.0 -i /tmp/output.2.h5 -l 59444 -N correlation
+			DrawManhattanPlotForLDInHDF5.py -w secret -i /tmp/output.2.h5 -l 59444 -N correlation
 				-O /tmp/gw_LD_pattern_between_snp_and_peak_59444 -u yh -p secret
 		"""
 		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
