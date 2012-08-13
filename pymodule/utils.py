@@ -80,6 +80,7 @@ def importNumericArray():
 
 def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', ' '], use_sniff=False):
 	"""
+	#2012.8.10 max count determines the delimiter
 	2012.5.8
 		if input_fname is a file object, don't delete it (deleting closes it) and seek to the beginning of the file.
 			bugfix: the file object could be file or gzip.GzipFile 
@@ -129,11 +130,13 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', 
 	else:
 		line = inf.read(20000)	##binary file doesn't have readline(). have to use this dumb approach due to '\n' might mess up sniff()
 		delimiter_chosen = None
+		delimiterData = PassingData(delimiterWithMaxCount='\t', maxCount=-1)
 		for delimiter in delimiter_choice_ls:
 			delimiter_count = line.count(delimiter)
-			if delimiter_count>0:
-				delimiter_chosen = delimiter
-				break
+			if delimiter_count>delimiterData.maxCount:	#2012.8.10 max count
+				delimiterData.delimiterWithMaxCount = delimiter
+				
+		delimiter_chosen = delimiterData.delimiterWithMaxCount
 	if inputIsFileObject:
 		inf.seek(0)
 	else:
@@ -651,6 +654,39 @@ def getFileOrFolderSize(path='.'):
 		elif os.path.isdir(path):
 			file_size = getFolderSize(path)
 	return file_size
+
+def getNoOfLinesInOneFileByWC(inputFname=None):
+	"""
+	2012.7.30
+		call wc to finish the task
+		
+		"wc -l"'s output looks like this:
+		
+		crocea@crocea:~$ wc -l script/vervet/src/shell/countNoOfVariantsInOneVCFFolder.sh
+		16 script/vervet/src/shell/countNoOfVariantsInOneVCFFolder.sh
+
+	"""
+	counter = 0
+	#commandline = "wc -l %s|awk -F ' ' '{print $1}'"%inputFname
+	commandline = "wc -l %s"%inputFname	#just wc
+	return_data = runLocalCommand(commandline, report_stderr=False, report_stdout=False)
+	stdout_content = return_data.stdout_content
+	noOfLines = int(stdout_content.split()[0].strip())
+	
+	return noOfLines
+
+
+def getNoOfLinesInOneFileByOpen(inputFname=None):
+	"""
+	2012.7.30
+		open the file and count
+
+	"""
+	counter = 0
+	inf = open(inputFname)
+	for line in inf:
+		counter += 1
+	return counter
 
 def copyFile(srcFilename=None, dstFilename=None, copyCommand="cp -aprL", srcFilenameLs=None, dstFilenameLs=None):
 	"""

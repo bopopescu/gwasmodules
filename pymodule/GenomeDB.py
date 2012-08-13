@@ -1244,25 +1244,25 @@ class GenomeDatabase(ElixirDB):
 			rename argument topNumberOfContigs to contigMaxRankBySize
 			add argument contigMinRankBySize
 		2011-9-13
-			return refName2size instead of a set of ref names
+			return chr2size instead of a set of ref names
 		2011-7-12
 			get all the top contigs
 		"""
 		no_of_contigs_to_fetch = contigMaxRankBySize-contigMinRankBySize+1
 		sys.stderr.write("Getting %s chromosomes with rank (by size) between %s and %s  ..."%\
 						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
-		refName2size = {}
+		chr2size = {}
 		from sqlalchemy import desc
 		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).order_by(desc(AnnotAssembly.stop))
 		counter = 0
 		for row in query:
 			counter += 1
 			if counter>=contigMinRankBySize and counter<=contigMaxRankBySize:
-				refName2size[row.chromosome] = row.stop
-			if len(refName2size)>=no_of_contigs_to_fetch:
+				chr2size[row.chromosome] = row.stop
+			if len(chr2size)>=no_of_contigs_to_fetch:
 				break
-		sys.stderr.write("%s contigs. Done.\n"%(len(refName2size)))
-		return refName2size
+		sys.stderr.write("%s contigs. Done.\n"%(len(chr2size)))
+		return chr2size
 	
 	def run(self):
 		"""

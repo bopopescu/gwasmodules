@@ -27,7 +27,8 @@ class AbstractWorkflow(ADAG):
 						("vervetSrcPath", 1, ): ["%s/script/vervet/src", '', 1, 'vervet source code folder'],\
 						("pymodulePath", 1, ): ["%s/script/pymodule", '', 1, 'path to the pymodule folder'],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
-						("javaPath", 1, ): ["/usr/bin/java", 'J', 1, 'java interpreter binary'],\
+						("javaPath", 1, ): ["/usr/bin/java", 'J', 1, 'path to java interpreter binary'],\
+						("plinkPath", 1, ): ["%s/bin/plink", '', 1, 'path to the plink binary, http://pngu.mgh.harvard.edu/~purcell/plink/index.shtml'],\
 						("site_handler", 1, ): ["condorpool", 'l', 1, 'which site to run the jobs: condorpool, hoffman2'],\
 						("input_site_handler", 1, ): ["local", 'j', 1, 'which site has all the input files: local, condorpool, hoffman2. \
 							If site_handler is condorpool, this must be condorpool and files will be symlinked. \
@@ -58,9 +59,11 @@ class AbstractWorkflow(ADAG):
 		workflowName = os.path.splitext(os.path.basename(self.outputFname))[0]
 		self.name = workflowName
 		
-		self.javaPath =  self.insertHomePath(self.javaPath, self.home_path)
-		self.pymodulePath = self.insertHomePath(self.pymodulePath, self.home_path)
-		self.vervetSrcPath =  self.insertHomePath(self.vervetSrcPath, self.home_path)
+		pathToInsertHomePathList = ['javaPath', 'pymodulePath', 'vervetSrcPath', 'plinkPath']
+		for pathName in pathToInsertHomePathList:
+			setattr(self, pathName, self.insertHomePath(getattr(self, pathName, None), self.home_path))
+		#self.pymodulePath = self.insertHomePath(self.pymodulePath, self.home_path)
+		#self.vervetSrcPath =  self.insertHomePath(self.vervetSrcPath, self.home_path)
 		
 		
 		# Add executables to the DAX-level replica catalog
@@ -70,7 +73,6 @@ class AbstractWorkflow(ADAG):
 		self.operatingSystem = "linux"
 		self.namespace = "workflow"
 		self.version="1.0"
-	
 		
 	def initiateWorkflow(self, workflowName=None):
 		"""
@@ -117,12 +119,22 @@ class AbstractWorkflow(ADAG):
 		"""
 		pass
 	
-	def registerExecutables(self):
+	def registerCommonExecutables(self, workflow=None):
+		"""
+		2012.7.25
+			add noDefaultClustersSizeExecutableList
+		2011-11-22
+		"""
+		self.registerExecutables(workflow=workflow)
+
+	def registerExecutables(self, workflow=None):
 		"""
 		2012.7.4
 			added cp
 		2012.1.9 a symlink to registerCommonExecutables()
 		"""
+		if not workflow:
+			workflow = self
 		namespace = self.namespace
 		version = self.version
 		operatingSystem = self.operatingSystem
@@ -131,47 +143,111 @@ class AbstractWorkflow(ADAG):
 		site_handler = self.site_handler
 		vervetSrcPath = self.vervetSrcPath
 		
-		executableList = []
+		#executableList = []
+		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
+		#noClusteringExecutableSet = set()	#2012.8.2 you don't want to cluster for some jobs.
 		
 		mergeSameHeaderTablesIntoOne = Executable(namespace=namespace, name="mergeSameHeaderTablesIntoOne", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
 		mergeSameHeaderTablesIntoOne.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/MergeSameHeaderTablesIntoOne.py"), site_handler))
-		executableList.append(mergeSameHeaderTablesIntoOne)
+		executableClusterSizeMultiplierList.append((mergeSameHeaderTablesIntoOne,0))
+		
+		ReduceMatrixByChosenColumn = Executable(namespace=namespace, name="ReduceMatrixByChosenColumn", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		ReduceMatrixByChosenColumn.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixByChosenColumn.py"), site_handler))
+		executableClusterSizeMultiplierList.append((ReduceMatrixByChosenColumn,0))
+		
+		ReduceMatrixBySumSameKeyColsAndThenDivide = Executable(namespace=namespace, name="ReduceMatrixBySumSameKeyColsAndThenDivide", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		ReduceMatrixBySumSameKeyColsAndThenDivide.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixBySumSameKeyColsAndThenDivide.py"), \
+											site_handler))
+		executableClusterSizeMultiplierList.append((ReduceMatrixBySumSameKeyColsAndThenDivide,0))
+		
+		
+		ReduceMatrixByAverageColumnsWithSameKey = Executable(namespace=namespace, name="ReduceMatrixByAverageColumnsWithSameKey", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		ReduceMatrixByAverageColumnsWithSameKey.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixByAverageColumnsWithSameKey.py"), \
+												site_handler))
+		executableClusterSizeMultiplierList.append((ReduceMatrixByAverageColumnsWithSameKey,0))
+		
 		
 		#mkdirWrap is better than mkdir that it doesn't report error when the directory is already there.
 		mkdirWrap = Executable(namespace=namespace, name="mkdirWrap", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		mkdirWrap.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "shell/mkdirWrap.sh"), site_handler))
-		executableList.append(mkdirWrap)
+		executableClusterSizeMultiplierList.append((mkdirWrap, 1))
 		
 		#mv to rename files and move them
 		mv = Executable(namespace=namespace, name="mv", version=version, os=operatingSystem, arch=architecture, installed=True)
 		mv.addPFN(PFN("file://" + "/bin/mv", site_handler))
-		executableList.append(mv)
+		executableClusterSizeMultiplierList.append((mv, 1))
 		
 		#the copy command
 		cp = Executable(namespace=namespace, name="cp", version=version, os=operatingSystem, arch=architecture, installed=True)
 		cp.addPFN(PFN("file://" + "/bin/cp", site_handler))
-		executableList.append(cp)
+		executableClusterSizeMultiplierList.append((cp, 1))
 		
-		gzip = Executable(namespace=namespace, name="gzip", \
-											version=version, \
-											os=operatingSystem, arch=architecture, installed=True)
-		gzip.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/shell/gzip.sh"), \
-														site_handler))
-		executableList.append(gzip)
+		gzip = Executable(namespace=namespace, name="gzip", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		gzip.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "shell/gzip.sh"), site_handler))
+		executableClusterSizeMultiplierList.append((gzip, 1))
 		
-		for executable in executableList:
-			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
+		SelectLineBlockFromFile = Executable(namespace=namespace, name="SelectLineBlockFromFile", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		SelectLineBlockFromFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/SelectLineBlockFromFile.py"), \
+										site_handler))
+		executableClusterSizeMultiplierList.append((SelectLineBlockFromFile, 1))
+		
+		AbstractPlot =  Executable(namespace=namespace, name="AbstractPlot", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		AbstractPlot.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "plot/AbstractPlot.py"), site_handler))
+		executableClusterSizeMultiplierList.append((AbstractPlot, 0))
+		
+		PlotLD = Executable(namespace=namespace, name="PlotLD", version=version, os=operatingSystem, arch=architecture, installed=True)
+		PlotLD.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "plot/PlotLD.py"), site_handler))
+		executableClusterSizeMultiplierList.append((PlotLD, 0))
+		
+		PlotXYAsBarChart = Executable(namespace=namespace, name="PlotXYAsBarChart", version=version, os=operatingSystem, arch=architecture, installed=True)
+		PlotXYAsBarChart.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "plot/PlotXYAsBarChart.py"), site_handler))
+		executableClusterSizeMultiplierList.append((PlotXYAsBarChart, 0))
+		
+		DrawHistogram =  Executable(namespace=namespace, name="DrawHistogram", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		DrawHistogram.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "plot/DrawHistogram.py"), site_handler))
+		executableClusterSizeMultiplierList.append((DrawHistogram, 0))
+		
+		java = Executable(namespace=namespace, name="java", version=version, os=operatingSystem, arch=architecture, installed=True)
+		java.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((java, 1))
+		
+		plink =  Executable(namespace=namespace, name="plink", \
+						version=version, os=operatingSystem, arch=architecture, installed=True)
+		plink.addPFN(PFN("file://" + self.plinkPath, site_handler))
+		executableClusterSizeMultiplierList.append((plink, 1))
+		
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+	
+	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
+		"""
+		2012.8.9
+			
+		"""
+		if defaultClustersSize is None:
+			defaultClustersSize = self.clusters_size
+		for executableAndclusterSizeMultipler in executableClusterSizeMultiplierList:
+			executable = executableAndclusterSizeMultipler[0]
+			if len(executableAndclusterSizeMultipler)==1:
+				clusterSizeMultipler = 1
+			elif len(executableAndclusterSizeMultipler)>1:
+				clusterSizeMultipler = executableAndclusterSizeMultipler[1]
+			clusterSize = int(defaultClustersSize*clusterSizeMultipler)
+			if clusterSize>1:
+				executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusterSize))
 			self.addExecutable(executable)
 			setattr(self, executable.name, executable)
 		
+		
 	
-	def registerCommonExecutables(self):
-		"""
-		2011-11-22
-		"""
-		pass
 	
 	def getFilesWithProperSuffixFromFolder(self, inputFolder=None, suffix='.h5'):
 		"""
@@ -246,15 +322,18 @@ class AbstractWorkflow(ADAG):
 		"""
 		file = File(os.path.join(folderName, os.path.basename(inputFname)))
 		file.abspath = os.path.abspath(inputFname)
+		file.absPath = os.path.abspath(inputFname)
 		file.addPFN(PFN("file://" + file.abspath, self.input_site_handler))
 		self.addFile(file)
 		return file
 	
 	def addStatMergeJob(self, workflow=None, statMergeProgram=None, outputF=None, \
-					parentJobLs=[], \
-					extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
-					namespace=None, version=None, **keywords):
+					parentJobLs=None, \
+					extraDependentInputLs=None, transferOutput=True, extraArguments=None, \
+					namespace=None, version=None, job_max_memory=1000, **keywords):
 		"""
+		2012.8.10
+			use addGenericJob()
 		2012.4.3
 			make argument namespace, version optional
 		2011-11-28
@@ -262,21 +341,21 @@ class AbstractWorkflow(ADAG):
 		2011-11-17
 			add argument extraArguments
 		"""
-		statMergeJob = Job(namespace=getattr(self, 'namespace', namespace), name=statMergeProgram.name, \
-						version=getattr(self, 'version', version))
-		statMergeJob.addArguments('-o', outputF)
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		
+		extraArgumentList = []
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		
 		if extraArguments:
-			statMergeJob.addArguments(extraArguments)
-		statMergeJob.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		statMergeJob.output = outputF
-		self.addJob(statMergeJob)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=statMergeJob)
-		for input in extraDependentInputLs:
-			if input:
-				statMergeJob.uses(input, transfer=True, register=True, link=Link.INPUT)
-		return statMergeJob
+			extraArgumentList.append(extraArguments)
+		job= self.addGenericJob(executable=statMergeProgram, inputFile=None, outputFile=outputF, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
+		return job
 	
 	def addInputToStatMergeJob(self, workflow=None, statMergeJob=None, inputF=None, \
 							parentJobLs=[], \
@@ -293,25 +372,38 @@ class AbstractWorkflow(ADAG):
 		for parentJob in parentJobLs:
 			self.depends(parent=parentJob, child=statMergeJob)
 	
-	def addGenericJob(self, executable=None, inputFile=None, outputFile=None, \
-						parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
-						extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-						**keywords):
+	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
+					outputFile=None, outputArgumentOption="-o", \
+					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
+					key2ObjectForJob=None, **keywords):
 		"""
+		2012.8.2
+			add argument inputArgumentOption, outputArgumentOption so that user 
+		2012.7.31 add argument key2ObjectForJob, which is a dictionary with strings as key, to set key:object for each job
+		#2012.7.28 if job.output is not set, set it to the 1st entry of job.outputLs
 		2012.6.27 add job.outputLs to hold more output files.
 		2012.6.1
 			add argument extraOutputLs
 		2012.5.24
 			generic job addition function for other functions to use
 		"""
-		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
+		if workflow is None:
+			workflow =self
+		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
 		job.outputLs = []	#2012.6.27 to hold more output files
-		
+		job.inputLs = []
 		if inputFile:
-			job.addArguments("-i", inputFile)
+			if inputArgumentOption:
+				job.addArguments(inputArgumentOption)
+			job.addArguments(inputFile)
 			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+			job.input = inputFile
+			job.inputLs.append(inputFile)
 		if outputFile:
-			job.addArguments("-o", outputFile)
+			if outputArgumentOption:
+				job.addArguments(outputArgumentOption)
+			job.addArguments(outputFile)
 			job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 			job.output = outputFile
 			job.outputLs.append(outputFile)
@@ -322,20 +414,29 @@ class AbstractWorkflow(ADAG):
 			job.addArguments(extraArguments)
 		
 		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel)
-		self.addJob(job)
+		workflow.addJob(job)
 		if parentJobLs:
 			for parentJob in parentJobLs:
 				if parentJob:
-					self.depends(parent=parentJob, child=job)
+					workflow.depends(parent=parentJob, child=job)
 		if extraDependentInputLs:
 			for input in extraDependentInputLs:
 				if input:
 					job.uses(input, transfer=True, register=True, link=Link.INPUT)
+					job.inputLs.append(input)
 		if extraOutputLs:
 			for output in extraOutputLs:
 				if output:
 					job.outputLs.append(output)
 					job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		if key2ObjectForJob:
+			for key, object in key2ObjectForJob.iteritems():
+				setattr(job, key, object)	#key should be a string.
+		#2012.7.28 if job.output is not set, set it to the 1st entry of job.outputLs
+		if getattr(job, 'output', None) is None and job.outputLs:
+			job.output = job.outputLs[0]
+		if getattr(job, 'input', None) is None and job.inputLs:
+			job.input = job.inputLs[0]
 		return job
 	
 	def addDBArgumentsToOneJob(self, job=None, objectWithDBArguments=None):
@@ -357,6 +458,7 @@ class AbstractWorkflow(ADAG):
 	def addGzipSubWorkflow(self, workflow=None, inputData=None, transferOutput=True,\
 						outputDirPrefix="", **keywords):
 		"""
+		2012.8.2 bugfix.
 		2012.7.19
 		"""
 		if workflow is None:
@@ -375,12 +477,25 @@ class AbstractWorkflow(ADAG):
 			for inputF in jobData.fileList:
 				inputFBaseName = os.path.basename(inputF.name)
 				outputF = File(os.path.join(topOutputDir, '%s.gz'%(inputFBaseName)))
+				key2ObjectForJob = {}
+				extraArgumentList = []
+				#make sure set inputArgumentOption&outputArgumentOption to None, \
+				# otherwise addGenericJob will add "-i" and "-o" in front of it
+				job= self.addGenericJob(workflow=workflow, executable=workflow.gzip, inputFile=inputF,
+							inputArgumentOption=None, outputArgumentOption=None,  outputFile=outputF, \
+							parentJobLs=[topOutputDirJob]+jobData.jobLs, extraDependentInputLs=None, \
+							extraOutputLs=[],\
+							transferOutput=transferOutput, \
+							extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, \
+							job_max_memory=200, **keywords)
+				"""	
+				# 2012.8.2 wrong, because -i and -o will be added in front.
 				abstractMapperJob = self.addAbstractMapperLikeJob(workflow, executable=workflow.gzip, \
-						inputF=inputF, outputF=outputF, \
+						inputF=None, outputF=outputF, \
 						parentJobLs=[topOutputDirJob]+jobData.jobLs, transferOutput=transferOutput, job_max_memory=200,\
-						extraArguments=None, extraDependentInputLs=[])
-				
-				returnData.jobDataLs.append(PassingData(jobLs=[abstractMapperJob], vcfFile=None, \
+						extraArguments=None, extraDependentInputLs=[inputF], )
+				"""
+				returnData.jobDataLs.append(PassingData(jobLs=[job], vcfFile=None, \
 										fileList=[outputF]))
 				no_of_jobs += 1
 		sys.stderr.write("%s jobs. Done.\n"%(no_of_jobs))
@@ -416,4 +531,418 @@ class AbstractWorkflow(ADAG):
 		for parentJob in parentJobLs:
 			if parentJob:
 				self.depends(parent=parentJob, child=job)
+		return job
+	
+	def addSelectLineBlockFromFileJob(self, executable=None, inputFile=None, outputFile=None,\
+					startLineNumber=None, stopLineNumber=None, parentJobLs=None, extraDependentInputLs=None, \
+					transferOutput=False, \
+					extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.7.30
+		"""
+		extraArgumentList = ['-s %s'%(startLineNumber), '-t %s'%(stopLineNumber)]
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		
+		job= self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=outputFile, \
+						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+						extraOutputLs=[],\
+						transferOutput=transferOutput, \
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
+		return job
+	
+	def getJVMMemRequirment(self, job_max_memory=4000, minMemory=2000):
+		"""
+		2012.8.2
+			job_max_memory could be set by user to lower than minMemory.
+			but minMemory makes sure it's never too low.
+		"""
+		MaxPermSize_user = job_max_memory*2/5
+		mxMemory_user = job_max_memory*3/5
+		MaxPermSize= min(35000, max(minMemory, MaxPermSize_user))
+		PermSize=MaxPermSize*3/4
+		mxMemory = max(minMemory, job_max_memory)
+		msMemory = mxMemory*3/4
+		memRequirementInStr = "-Xms%sm -Xmx%sm -XX:PermSize=%sm -XX:MaxPermSize=%sm"%\
+				(msMemory, mxMemory, PermSize, MaxPermSize)
+		memRequirement = MaxPermSize + mxMemory
+		
+		return PassingData(memRequirementInStr=memRequirementInStr, memRequirement=memRequirement)
+	
+	def addPlotLDJob(self, workflow=None, executable=None, inputFileList=None, outputFile=None, \
+					outputFnamePrefix=None,
+					whichColumn=None, whichColumnLabel=None, whichColumnPlotLabel=None, \
+					logWhichColumn=True,\
+					posColumnPlotLabel=None, chrLengthColumnLabel=None, chrColumnLabel=None, \
+					minChrLength=1000000, pos1ColumnLabel=None, pos2ColumnLabel=None, minNoOfTotal=100,\
+					figureDPI=300, ylim_type=2, samplingRate=0.0001,  need_svg=False, \
+					parentJobLs=None, \
+					extraDependentInputLs=None, \
+					extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
+		"""
+		2012.8.2 moved from vervet/src/CalculateVCFStatPipeline.py
+		2012.8.1
+		('outputFname', 1, ): [None, 'o', 1, 'output file for the figure.'],\
+			('minNoOfTotal', 1, int): [100, 'i', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
+			('title', 1, ): [None, 't', 1, 'title for the figure.'],\
+			('figureDPI', 1, int): [200, 'f', 1, 'dpi for the output figures (png)'],\
+			('formatString', 1, ): ['.', 'a', 1, 'formatString passed to matplotlib plot'],\
+			('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: 0 to max. 2: min to max'],\
+			('samplingRate', 1, float): [0.001, 's', 1, 'how often you include the data'],\
+			('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+			('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
+			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
+			('whichColumnLabel', 0, ): ["", 'W', 1, 'column label (in the header) for the data to be plotted as y-axis value, substitute whichColumn'],\
+			('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
+			('whichColumnPlotLabel', 1, ): ['#SNPs in 100kb window', 'D', 1, 'plot label for data of the whichColumn', ],\
+			('chrLengthColumnLabel', 1, ): ['chrLength', 'c', 1, 'label of the chromosome length column', ],\
+			('chrColumnLabel', 1, ): ['CHR', 'C', 1, 'label of the chromosome column', ],\
+			('minChrLength', 1, int): [1000000, 'm', 1, 'minimum chromosome length for one chromosome to be included', ],\
+			('pos1ColumnLabel', 1, ): ['POS1', 'l', 1, 'label of the 1st position column', ],\
+			('pos2ColumnLabel', 1, ): ['POS2', 'p', 1, 'label of the 2nd position column', ],\
+			('posColumnPlotLabel', 1, ): ['distance', 'x', 1, 'x-axis label in  plot', ],\
+			
+		"""
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if inputFileList:
+			extraDependentInputLs.extend(inputFileList)
+		extraArgumentList = ['-m %s'%(minChrLength), '-i %s'%(minNoOfTotal), \
+							'-f %s'%(figureDPI), '-y %s'%(ylim_type), '-s %s'%(samplingRate)]
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		if whichColumnLabel:
+			extraArgumentList.append("-W %s"%(whichColumnLabel))
+		if whichColumn:
+			extraArgumentList.append("-w %s"%(whichColumn))
+		if logWhichColumn:
+			extraArgumentList.append('-g')
+		if whichColumnPlotLabel:
+			extraArgumentList.append("-D %s"%(whichColumnPlotLabel))
+		if posColumnPlotLabel:
+			extraArgumentList.append("-x %s"%(posColumnPlotLabel))
+		if chrLengthColumnLabel:
+			extraArgumentList.append("-c %s"%(chrLengthColumnLabel))
+		if chrColumnLabel:
+			extraArgumentList.append("-C %s"%(chrColumnLabel))
+		if pos1ColumnLabel:
+			extraArgumentList.append('-l %s'%(pos1ColumnLabel))
+		if pos2ColumnLabel:
+			extraArgumentList.append('-p %s'%(pos2ColumnLabel))
+		if need_svg:
+			extraArgumentList.append('-n')
+			if not outputFnamePrefix:
+				outputFnamePrefix = os.path.split(os.path.basename(outputFile.name))[0]
+			extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		#add all input files to the last
+		extraArgumentList.extend(inputFileList)
+		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=outputFile, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
+		return job
+	
+	def addAbstractPlotJob(self, workflow=None, executable=None, inputFileList=None, outputFile=None, \
+					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
+					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=50, \
+					xColumnHeader=None, xColumnPlotLabel=None, \
+					minNoOfTotal=100,\
+					figureDPI=300, formatString='.', ylim_type=2, samplingRate=0.001, need_svg=False, \
+					parentJobLs=None, \
+					extraDependentInputLs=None, \
+					extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
+		"""
+		#no spaces or parenthesis or any other shell-vulnerable letters in the x or y axis labels (whichColumnPlotLabel, xColumnPlotLabel)
+		2012.8.2
+			('outputFname', 0, ): [None, 'o', 1, 'output file for the figure.'],\
+			('minNoOfTotal', 1, int): [100, 'i', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
+			('title', 0, ): [None, 't', 1, 'title for the figure.'],\
+			('figureDPI', 1, int): [200, 'f', 1, 'dpi for the output figures (png)'],\
+			('formatString', 1, ): ['-', '', 1, 'formatString passed to matplotlib plot'],\
+			('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: 0 to max. 2: min to max'],\
+			('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
+			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
+			('whichColumnHeader', 0, ): ["", 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
+			('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
+			('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
+			('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
+				only effective when logWhichColumn is toggled. '],\
+			('valueForNonPositiveYValue', 1, float): [50, '', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
+					what yValue should be.'],\
+			('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\
+			('xColumnPlotLabel', 0, ): ['', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
+			('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
+			
+		"""
+		if executable is None:
+			executable = self.AbstractPlot
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if inputFileList:
+			extraDependentInputLs.extend(inputFileList)
+		extraArgumentList = ['-l %s'%(xColumnHeader)]
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		if outputFnamePrefix:
+			extraArgumentList.append('-O %s'%(outputFnamePrefix))
+			if outputFile is None:
+				extraOutputLs.append(File('%s.png'%(outputFnamePrefix)))
+				if need_svg:
+					extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
+		if minNoOfTotal:
+			extraArgumentList.append('-i %s'%(minNoOfTotal))
+		if figureDPI:
+			extraArgumentList.append('-f %s'%(figureDPI))
+		if formatString:
+			extraArgumentList.append('-m %s'%(formatString))
+		if ylim_type:
+			extraArgumentList.append('-y %s'%(ylim_type))
+		if samplingRate is not None:
+			extraArgumentList.append('-s %s'%(samplingRate))
+		if whichColumnHeader:
+			extraArgumentList.append("-W %s"%(whichColumnHeader))
+		if whichColumn:
+			extraArgumentList.append("-w %s"%(whichColumn))
+		if logWhichColumn:
+			extraArgumentList.append('-g')
+		if whichColumnPlotLabel:
+			extraArgumentList.append("-D %s"%(whichColumnPlotLabel))
+		if xColumnPlotLabel:
+			extraArgumentList.append("-x %s"%(xColumnPlotLabel))
+		if positiveLog:
+			extraArgumentList.append('-p')
+		if valueForNonPositiveYValue:
+			extraArgumentList.append("-v %s"%(valueForNonPositiveYValue))
+		if need_svg:
+			extraArgumentList.append('-n')
+			if not outputFnamePrefix:
+				outputFnamePrefix = os.path.split(os.path.basename(outputFile.name))[0]
+			extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		#add all input files to the last
+		extraArgumentList.extend(inputFileList)
+		job= self.addGenericJob(workflow=workflow, executable=executable, inputFile=None, outputFile=outputFile, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
+		return job
+	
+	def addDrawHistogramJob(self, workflow=None, executable=None, inputFileList=None, outputFile=None, \
+					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
+					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=50, \
+					minNoOfTotal=10,\
+					figureDPI=100, formatString='.', ylim_type=2, samplingRate=0.001, need_svg=False, \
+					parentJobLs=None, \
+					extraDependentInputLs=None, \
+					extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
+		"""
+		#no spaces or parenthesis or any other shell-vulnerable letters in the x or y axis labels (whichColumnPlotLabel, xColumnPlotLabel)
+		2012.8.2
+			('outputFname', 0, ): [None, 'o', 1, 'output file for the figure.'],\
+			('minNoOfTotal', 1, int): [100, 'i', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
+			('title', 0, ): [None, 't', 1, 'title for the figure.'],\
+			('figureDPI', 1, int): [200, 'f', 1, 'dpi for the output figures (png)'],\
+			('formatString', 1, ): ['-', '', 1, 'formatString passed to matplotlib plot'],\
+			('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: 0 to max. 2: min to max'],\
+			('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
+			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
+			('whichColumnHeader', 0, ): ["", 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
+			('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
+			('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
+			('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
+				only effective when logWhichColumn is toggled. '],\
+			('valueForNonPositiveYValue', 1, float): [50, '', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
+					what yValue should be.'],\
+			('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
+			
+		"""
+		if executable is None:
+			executable = self.AbstractPlot
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if inputFileList:
+			extraDependentInputLs.extend(inputFileList)
+		extraArgumentList = []
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		if outputFnamePrefix:
+			extraArgumentList.append('-O %s'%(outputFnamePrefix))
+			if outputFile is None:
+				extraOutputLs.append(File('%s.png'%(outputFnamePrefix)))
+				if need_svg:
+					extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
+		if minNoOfTotal:
+			extraArgumentList.append('-i %s'%(minNoOfTotal))
+		if figureDPI:
+			extraArgumentList.append('-f %s'%(figureDPI))
+		if formatString:
+			extraArgumentList.append('-m %s'%(formatString))
+		if ylim_type:
+			extraArgumentList.append('-y %s'%(ylim_type))
+		if samplingRate is not None:
+			extraArgumentList.append('-s %s'%(samplingRate))
+		if whichColumnHeader:
+			extraArgumentList.append("-W %s"%(whichColumnHeader))
+		if whichColumn:
+			extraArgumentList.append("-w %s"%(whichColumn))
+		if logWhichColumn:
+			extraArgumentList.append('-g')
+		if whichColumnPlotLabel:
+			extraArgumentList.append("-D %s"%(whichColumnPlotLabel))
+		if positiveLog:
+			extraArgumentList.append('-p')
+		if valueForNonPositiveYValue:
+			extraArgumentList.append("-v %s"%(valueForNonPositiveYValue))
+		if need_svg:
+			extraArgumentList.append('-n')
+			if not outputFnamePrefix:
+				outputFnamePrefix = os.path.split(os.path.basename(outputFile.name))[0]
+			extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		#add all input files to the last
+		extraArgumentList.extend(inputFileList)
+		job= self.addGenericJob(workflow=workflow, executable=executable, inputFile=None, outputFile=outputFile, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
+		return job
+	
+	def addPlinkJob(self, workflow=None, executable=None, inputFileList=None, tpedFile=None, tfamFile=None,\
+				pedFile=None, famFile=None, mapFile=None, bedFile=None, bimFile=None,\
+				inputFnamePrefix=None, inputOption='--file', \
+				outputFnamePrefix=None, outputOption='--out',\
+				makeBED=False, calculateMendelError=False, checkSex=False, \
+				LDPruneWindowSize=100, LDPruneWindowShiftSize=5, LDPruneByPairwiseR2=False, LDPruneMinR2=0.1,\
+				LDPruneByRegression=False, LDPruneMinVarianceInflationFactor=2,\
+				estimatePairwiseGenomeWideIBD=False,\
+				extractSNPFile=None, recodeOutput=False,\
+				mergeListFile=None,\
+				parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
+				extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.8.9
+			inputFileList is a list of pegasus Files (.ped, .fam, or .tped, .tfam, etc.) or could be supplied individually.
+			
+			inputOption could be, "--file" for .ped .map ; "--tfile" for .tped, .tfam; or '--bfile' for .bed, .fam, .bim
+		
+			if extractSNPFile or mergeListFile is given, either recodeOutput or makeBED have to be on. otherwise, no output.
+			http://pngu.mgh.harvard.edu/~purcell/plink/index.shtml
+			
+			i.e.
+			
+				bedFnamePrefix = os.path.join(topOutputDir, '%s_bed'%(commonPrefix))
+				convertSingleTPED2BEDJob = self.addPlinkJob(executable=self.plink, inputFileList=[], 
+									tpedFile=modifyTPEDJob.output, tfamFile=tfamJob.tfamFile,\
+					outputFnamePrefix=bedFnamePrefix, outputOption='--out',\
+					makeBED=True, \
+					extraDependentInputLs=None, transferOutput=transferOutput, \
+					extraArguments=None, job_max_memory=2000,\
+					parentJobLs = convertSingleTPED2BEDParentJobLs)
+					
+				
+				convertMergedTPED2BEDJob = self.addPlinkJob(executable=self.plink, inputFileList=[tpedFileMergeJob.output, tfamJob.tfamFile], \
+								inputFnamePrefix=mergedPlinkFnamePrefix, inputOption='--tfile', \
+				outputFnamePrefix=mergedPlinkBEDFnamePrefix, outputOption='--out',\
+				makeBED=True, \
+				extraDependentInputLs=None, transferOutput=transferOutput, \
+				extraArguments=None, job_max_memory=2000, parentJobLs=[mergedOutputDirJob, tpedFileMergeJob, tfamJob])
+			
+		"""
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if inputFileList:
+			extraDependentInputLs.extend(inputFileList)
+		
+		extraArgumentList = []
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		if inputOption and inputFnamePrefix:
+			extraArgumentList.extend([inputOption, inputFnamePrefix])
+		if tpedFile:
+			extraDependentInputLs.append(tpedFile)
+			extraArgumentList.extend(["--tped", tpedFile])
+		if tfamFile:
+			extraDependentInputLs.append(tfamFile)
+			extraArgumentList.extend(["--tfam", tfamFile])
+		if pedFile:
+			extraDependentInputLs.append(pedFile)
+			extraArgumentList.extend(["--ped", pedFile])
+		if famFile:
+			extraDependentInputLs.append(famFile)
+			extraArgumentList.extend(["--fam", famFile])
+		if mapFile:
+			extraDependentInputLs.append(mapFile)
+			extraArgumentList.extend(["--map", mapFile])
+		if bedFile:
+			extraDependentInputLs.append(bedFile)
+			extraArgumentList.extend(["--bed", bedFile])
+		if bimFile:
+			extraDependentInputLs.append(bimFile)
+			extraArgumentList.extend(["--bim", bimFile])
+		
+		if outputFnamePrefix and outputOption:
+			extraArgumentList.extend([outputOption, outputFnamePrefix])
+		else:
+			outputFnamePrefix = 'plink'
+		
+		logFile = File('%s.log'%(outputFnamePrefix))	#2012.8.10 left in the folder dying
+		extraOutputLs.append(logFile)
+		
+		suffixAndNameTupleList = []	# a list of tuples , in each tuple, 1st element is the suffix. 2nd element is the proper name of the suffix.
+			#job.$nameFile will be the way to access the file.
+			#if 2nd element (name) is missing, suffix[1:].replace('.', '_') is the name (dot replaced by _) 
+		if makeBED:
+			extraArgumentList.append('--make-bed')
+			suffixAndNameTupleList.extend([['.bed',], ('.fam',), ['.bim',]])		#, binary map file, is excluded for now
+		if calculateMendelError:
+			extraArgumentList.append('--mendel')
+			suffixAndNameTupleList.extend([('.mendel',), ('.imendel',), ('.fmendel',), ('.lmendel',)])
+			#its output is not tab-delimited. rather it's space (multi) delimited.
+		if checkSex:
+			extraArgumentList.append('--check-sex')
+			suffixAndNameTupleList.extend([('.sexcheck',)])	#.sexcheck file is accessible as job.sexcheckFile 
+		if LDPruneByPairwiseR2:
+			extraArgumentList.append('--indep-pairwise %s %s %s'%(LDPruneWindowSize, LDPruneWindowShiftSize, LDPruneMinR2))
+			suffixAndNameTupleList.extend([('.prune.in',), ('.prune.out',)])	#".prune.in" is accessible as job.prune_inFile
+		if LDPruneByRegression:
+			extraArgumentList.append('--indep %s %s %s'%(LDPruneWindowSize, LDPruneWindowShiftSize, LDPruneMinVarianceInflationFactor))
+			suffixAndNameTupleList.extend([('.prune.in',), ('.prune.out',)])	#".prune.in" is accessible as job.prune_inFile
+		if estimatePairwiseGenomeWideIBD:
+			extraArgumentList.append('--genome')
+			suffixAndNameTupleList.extend([('.genome',)])	#.genome is accessible as job.genomeFile
+		if extractSNPFile:
+			extraArgumentList.extend(['--extract', extractSNPFile])
+			extraDependentInputLs.append(extractSNPFile)
+		if recodeOutput:
+			extraArgumentList.extend(['--recode',])
+			suffixAndNameTupleList.extend([('.ped',), ('.map',)])
+		if mergeListFile:
+			extraArgumentList.extend(['--merge-list', mergeListFile])
+			extraDependentInputLs.append(mergeListFile)
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		
+		for suffixNameTuple in suffixAndNameTupleList:
+			if len(suffixNameTuple)==1:
+				suffix = suffixNameTuple[0]
+				name = suffix[1:].replace('.', '_')	#replace dot with underscore. as dot is used to access method/attribute of python object
+				# i.e. ".prune.in" is accessible as job.prune_inFile
+			elif len(suffixNameTuple)>=2:
+				suffix, name = suffixNameTuple[:2]
+			outputFile = File('%s%s'%(outputFnamePrefix, suffix))
+			extraOutputLs.append(outputFile)
+			key2ObjectForJob['%sFile'%(name)] = outputFile
+		
+		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
 		return job

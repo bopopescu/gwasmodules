@@ -7,4 +7,4 @@ then
 	noOfLines=$noOfLinesDefault
 fi
 
-watch -d -n 8 "condor_status |tail -n $noOfLines"
+watch -d -n 12 "condor_status |tail -n $noOfLines"

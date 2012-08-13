@@ -330,6 +330,7 @@ class VCFFile(object):
 	
 	def parseFile(self):
 		"""
+		#2012.8.8 bug fix, same locus appearing >1 times
 		2011.11.30
 			bugfix: genotype_call could be ./.(missing) and depth=. (missing) in "./.:.:.:.:.".
 		2011-9-27
@@ -358,6 +359,7 @@ class VCFFile(object):
 		real_counter = 0
 		
 		for row in self.reader:
+			counter += 1
 			returnData = parseOneVCFRow(row, self.col_name2index, self.col_index_individual_name_ls, self.sample_id2index, \
 					minDepth=self.minDepth, dataEntryType=1)
 			
@@ -372,11 +374,15 @@ class VCFFile(object):
 			
 			if len(genotypeCall2Count)>self.site_type-1:	#whether polymorphic across samples or all sites in vcf
 				real_counter += 1
-				locus_id2row_index[current_locus] = len(locus_id2row_index)
-				self.locus_id_ls.append(current_locus)
-				self.genotype_call_matrix.append(data_row)
+				if current_locus in locus_id2row_index:	#2012.8.8 bug fix, same locus appearing >1 times
+					sys.stderr.write("WARNING: Locus %s at line %s already in locus_id2row_index with row_index = %s. Skip\n"%\
+									(repr(current_locus), counter, locus_id2row_index.get(current_locus)))
+				else:
+					locus_id2row_index[current_locus] = len(locus_id2row_index)
+					self.locus_id_ls.append(current_locus)
+					self.genotype_call_matrix.append(data_row)
+					real_counter += 1
 			
-			counter += 1
 			if counter%2000==0 and self.report:
 				sys.stderr.write("%s\t%s\t%s"%("\x08"*80, counter, real_counter))
 		sys.stderr.write("%s loci X %s samples.\n"%(len(self.locus_id_ls), len(self.sample_id_ls)))

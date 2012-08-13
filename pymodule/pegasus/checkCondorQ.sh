@@ -7,4 +7,4 @@ then
 	noOfLines=$noOfLinesDefault
 fi
 
-watch -d -n 8 "condor_q -cputime -dag |tail -n $noOfLines"
+watch -d -n 12 "condor_q -cputime -dag |tail -n $noOfLines"

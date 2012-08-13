@@ -23,6 +23,10 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						("picard_path", 1, ): ["%s/script/picard/dist", '', 1, 'picard folder containing its jar binaries'],\
 						("gatk_path", 1, ): ["%s/script/gatk/dist", '', 1, 'GATK folder containing its jar binaries'],\
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
+						('maxContigID', 0, int): [None, 'x', 1, 'if contig/chromosome(non-sex) ID > this number, it will not be included. If None or 0, no restriction.', ],\
+						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
+						("contigMaxRankBySize", 1, int): [1, 'N', 1, 'maximum rank number (rank 1=biggest) controls how small a contig to be included in calling'],\
+						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank number (rank 1=biggest contig) controls how big a contig to be included in calling'],\
 						("dataDir", 0, ): ["", 't', 1, 'the base directory where all db-affiliated files are stored. \
 									If not given, use the default stored in db.'],\
 						("localDataDir", 0, ): ["", 'D', 1, 'localDataDir should contain same files as dataDir but accessible locally.\
@@ -45,9 +49,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		self.gatk_path =  self.insertHomePath(self.gatk_path, self.home_path)
 		self.tabixPath =  self.insertHomePath(self.tabixPath, self.home_path)
 		
-		import re
-		self.chr_pattern = re.compile(r'(\w+\d+).*')
-		self.contig_id_pattern = re.compile(r'Contig(\d+).*')
+		self.chr_pattern = Genome.chr_pattern
+		self.contig_id_pattern = Genome.contig_id_pattern
 	
 	def registerJars(self, workflow=None, ):
 		"""
@@ -112,19 +115,23 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		pass
 	
-	def registerExecutables(self, workflow=None):
-		"""
-		2012.1.9 a symlink to registerCommonExecutables()
-		"""
-		AbstractWorkflow.registerExecutables(self)
-		self.registerCommonExecutables(workflow=workflow)
-	
 	def registerCommonExecutables(self, workflow=None):
 		"""
+		2012.7.30
+			become a link to registerExecutables()
 		2012.7.25
 			add noDefaultClustersSizeExecutableList
 		2011-11-22
 		"""
+		self.registerExecutables(workflow=workflow)
+	
+	def registerExecutables(self, workflow=None):
+		"""
+		2012.8.7 remove noDefaultClustersSizeExecutableList, use executableClusterSizeMultiplierList instead
+		2012.1.9 a symlink to registerCommonExecutables()
+		"""
+		AbstractWorkflow.registerExecutables(self)
+		
 		namespace = self.namespace
 		version = self.version
 		operatingSystem = self.operatingSystem
@@ -133,214 +140,158 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		site_handler = self.site_handler
 		vervetSrcPath = self.vervetSrcPath
 		
-		executableList = []
-		noDefaultClustersSizeExecutableList = []
+		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		
 		
 		selectAndSplit = Executable(namespace=namespace, name="SelectAndSplitAlignment", version=version, \
 								os=operatingSystem, arch=architecture, installed=True)
 		selectAndSplit.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "SelectAndSplitAlignment.py"), site_handler))
-		self.addExecutable(selectAndSplit)
-		self.selectAndSplit = selectAndSplit
+		executableClusterSizeMultiplierList.append((selectAndSplit, 0))
 		
 		selectAndSplitFasta = Executable(namespace=namespace, name="SelectAndSplitFastaRecords", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		selectAndSplitFasta.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "SelectAndSplitFastaRecords.py"), site_handler))
-		self.addExecutable(selectAndSplitFasta)
-		self.selectAndSplitFasta = selectAndSplitFasta
+		executableClusterSizeMultiplierList.append((selectAndSplitFasta, 0))
 		
 		samtools = Executable(namespace=namespace, name="samtools", version=version, os=operatingSystem, arch=architecture, installed=True)
 		samtools.addPFN(PFN("file://" + self.samtools_path, site_handler))
-		self.addExecutable(samtools)
-		self.samtools = samtools
+		executableClusterSizeMultiplierList.append((samtools, 0))
 		
-		java = Executable(namespace=namespace, name="java", version=version, os=operatingSystem, arch=architecture, installed=True)
-		java.addPFN(PFN("file://" + self.javaPath, site_handler))
-		self.addExecutable(java)
-		self.java = java
 		
 		addOrReplaceReadGroupsJava = Executable(namespace=namespace, name="addOrReplaceReadGroupsJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		addOrReplaceReadGroupsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		self.addExecutable(addOrReplaceReadGroupsJava)
-		self.addOrReplaceReadGroupsJava = addOrReplaceReadGroupsJava
+		executableClusterSizeMultiplierList.append((addOrReplaceReadGroupsJava, 0))
 		
 		genotyperJava = Executable(namespace=namespace, name="genotyperJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		genotyperJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((genotyperJava, 0))
 		#clustering is controlled by a separate parameter
 		#genotyperJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(genotyperJava)
-		self.genotyperJava = genotyperJava
 		
 		BuildBamIndexFilesJava = Executable(namespace=namespace, name="BuildBamIndexFilesJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		BuildBamIndexFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		self.addExecutable(BuildBamIndexFilesJava)
-		self.BuildBamIndexFilesJava = BuildBamIndexFilesJava
+		executableClusterSizeMultiplierList.append((BuildBamIndexFilesJava, 0))
+		
 		
 		createSequenceDictionaryJava = Executable(namespace=namespace, name="createSequenceDictionaryJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		createSequenceDictionaryJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		self.addExecutable(createSequenceDictionaryJava)
-		self.createSequenceDictionaryJava = createSequenceDictionaryJava
+		executableClusterSizeMultiplierList.append((createSequenceDictionaryJava, 0))
 		
 		DOCWalkerJava = Executable(namespace=namespace, name="DepthOfCoverageWalker", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		#no clusters_size for this because it could run on a whole bam for hours
 		#DOCWalkerJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		DOCWalkerJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		self.addExecutable(DOCWalkerJava)
-		self.DOCWalkerJava = DOCWalkerJava
+		executableClusterSizeMultiplierList.append((DOCWalkerJava, 0))
 		
 		VariousReadCountJava = Executable(namespace=namespace, name="VariousReadCountJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		VariousReadCountJava.addPFN(PFN("file://" + self.javaPath, site_handler))
 		#no clusters_size for this because it could run on a whole bam for hours
 		#VariousReadCountJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(VariousReadCountJava)
-		self.VariousReadCountJava = VariousReadCountJava
+		executableClusterSizeMultiplierList.append((VariousReadCountJava, 0))
 		
 		
 		MarkDuplicatesJava = Executable(namespace=namespace, name="MarkDuplicatesJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		MarkDuplicatesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
 		#MarkDuplicatesJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(MarkDuplicatesJava)
-		self.MarkDuplicatesJava = MarkDuplicatesJava
+		executableClusterSizeMultiplierList.append((MarkDuplicatesJava, 0))
 		
 		SelectVariantsJava = Executable(namespace=namespace, name="SelectVariantsJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		SelectVariantsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableList.append(SelectVariantsJava)
+		executableClusterSizeMultiplierList.append((SelectVariantsJava, 1))
 		
 		CombineVariantsJava = Executable(namespace=namespace, name="CombineVariantsJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		CombineVariantsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		CombineVariantsJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(CombineVariantsJava)
-		self.CombineVariantsJava = CombineVariantsJava
+		executableClusterSizeMultiplierList.append((CombineVariantsJava, 1))
 		
 		CallVariantBySamtools = Executable(namespace=namespace, name="CallVariantBySamtools", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		CallVariantBySamtools.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/CallVariantBySamtools.sh"), site_handler))
 		#clustering is controlled by a separate parameter
 		#CallVariantBySamtools.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(CallVariantBySamtools)
-		self.CallVariantBySamtools = CallVariantBySamtools
+		executableClusterSizeMultiplierList.append((CallVariantBySamtools, 0))
 		
-		genotypeCallByCoverage = Executable(namespace=namespace, name="GenotypeCallByCoverage", version=version, \
+		GenotypeCallByCoverage = Executable(namespace=namespace, name="GenotypeCallByCoverage", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
-		genotypeCallByCoverage.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "GenotypeCallByCoverage.py"), site_handler))
-		genotypeCallByCoverage.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(genotypeCallByCoverage)
-		self.genotypeCallByCoverage = genotypeCallByCoverage
+		GenotypeCallByCoverage.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "GenotypeCallByCoverage.py"), site_handler))
+		executableClusterSizeMultiplierList.append((GenotypeCallByCoverage, 1))
 		
-		mergeGenotypeMatrix = Executable(namespace=namespace, name="MergeGenotypeMatrix", version=version, \
+		MergeGenotypeMatrix = Executable(namespace=namespace, name="MergeGenotypeMatrix", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
-		mergeGenotypeMatrix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "MergeGenotypeMatrix.py"), site_handler))
-		mergeGenotypeMatrix.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(mergeGenotypeMatrix)
-		self.mergeGenotypeMatrix = mergeGenotypeMatrix
+		MergeGenotypeMatrix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "MergeGenotypeMatrix.py"), site_handler))
+		executableClusterSizeMultiplierList.append((MergeGenotypeMatrix, 1))
 		
 		bgzip_tabix = Executable(namespace=namespace, name="bgzip_tabix", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		bgzip_tabix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/bgzip_tabix.sh"), site_handler))
-		bgzip_tabix.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(bgzip_tabix)
-		self.bgzip_tabix = bgzip_tabix
+		#2012.8.8 bgzip_tabix runs really fast. so multiplier set to 4. 
+		executableClusterSizeMultiplierList.append((bgzip_tabix, 4))
 		
 		vcf_convert = Executable(namespace=namespace, name="vcf_convert", version=version, \
 								os=operatingSystem, arch=architecture, installed=True)
 		vcf_convert.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_convert.sh"), site_handler))
-		vcf_convert.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(vcf_convert)
-		self.vcf_convert = vcf_convert
+		executableClusterSizeMultiplierList.append((vcf_convert, 1))
 		
 		vcf_isec = Executable(namespace=namespace, name="vcf_isec", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcf_isec.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_isec.sh"), site_handler))
-		vcf_isec.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(vcf_isec)
-		self.vcf_isec = vcf_isec
+		executableClusterSizeMultiplierList.append((vcf_isec, 1))
 		
 		vcf_concat = Executable(namespace=namespace, name="vcf_concat", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcf_concat.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
-		vcf_concat.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(vcf_concat)
-		self.vcf_concat = vcf_concat
+		executableClusterSizeMultiplierList.append((vcf_concat, 1))
 		
 		vcfSubsetPath = os.path.join(self.home_path, "bin/vcftools/vcf-subset")
 		self.vcfSubsetPath = vcfSubsetPath	#vcfSubsetPath is first argument to vcfSubsetPath
 		vcfSubset = Executable(namespace=namespace, name="vcfSubset", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcfSubset.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcfSubset.sh"), site_handler))
-		vcfSubset.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(vcfSubset)
-		self.vcfSubset = vcfSubset
+		executableClusterSizeMultiplierList.append((vcfSubset, 1))
 		
 		concatGATK = Executable(namespace=namespace, name="concatGATK", version=version, \
 							os=operatingSystem, arch=architecture, installed=True)
 		concatGATK.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
-		concatGATK.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(concatGATK)
-		self.concatGATK = concatGATK
+		executableClusterSizeMultiplierList.append((concatGATK, 1))
 		
 		concatSamtools = Executable(namespace=namespace, name="concatSamtools", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		concatSamtools.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
-		concatSamtools.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(concatSamtools)
-		self.concatSamtools = concatSamtools
+		executableClusterSizeMultiplierList.append((concatSamtools, 1))
 		
-		calcula = Executable(namespace=namespace, name="CalculatePairwiseDistanceOutOfSNPXStrainMatrix", \
+		calcula = Executable(namespace=namespace, name="calcula", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		calcula.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "CalculatePairwiseDistanceOutOfSNPXStrainMatrix.py"), site_handler))
-		calcula.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(calcula)
-		self.calcula = calcula
+		calcula.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "mapper/CalculatePairwiseDistanceOutOfSNPXStrainMatrix.py"), site_handler))
+		executableClusterSizeMultiplierList.append((calcula,1))
+		#calcula.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		#self.addExecutable(calcula)
+		#self.calcula = calcula
 		
 		
-		
-		ReduceMatrixByChosenColumn = Executable(namespace=namespace, name="ReduceMatrixByChosenColumn", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		ReduceMatrixByChosenColumn.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixByChosenColumn.py"), site_handler))
-		ReduceMatrixByChosenColumn.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(ReduceMatrixByChosenColumn)
-		self.ReduceMatrixByChosenColumn = ReduceMatrixByChosenColumn
-		
-		ReduceMatrixBySumSameKeyColsAndThenDivide = Executable(namespace=namespace, name="ReduceMatrixBySumSameKeyColsAndThenDivide", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		ReduceMatrixBySumSameKeyColsAndThenDivide.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixBySumSameKeyColsAndThenDivide.py"), \
-															site_handler))
-		ReduceMatrixBySumSameKeyColsAndThenDivide.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(ReduceMatrixBySumSameKeyColsAndThenDivide)
-		self.ReduceMatrixBySumSameKeyColsAndThenDivide = ReduceMatrixBySumSameKeyColsAndThenDivide
-		
-		ReduceMatrixByAverageColumnsWithSameKey = Executable(namespace=namespace, name="ReduceMatrixByAverageColumnsWithSameKey", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		ReduceMatrixByAverageColumnsWithSameKey.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixByAverageColumnsWithSameKey.py"), site_handler))
-		ReduceMatrixByAverageColumnsWithSameKey.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(ReduceMatrixByAverageColumnsWithSameKey)
-		self.ReduceMatrixByAverageColumnsWithSameKey = ReduceMatrixByAverageColumnsWithSameKey
 		
 		vcftoolsPath = os.path.join(self.home_path, "bin/vcftools/vcftools")
 		self.vcftoolsPath = vcftoolsPath	#vcftoolsPath is first argument to vcftoolsWrapper
 		vcftoolsWrapper = Executable(namespace=namespace, name="vcftoolsWrapper", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcftoolsWrapper.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcftoolsWrapper.sh"), site_handler))
-		vcftoolsWrapper.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		vcftoolsWrapper.vcftoolsPath = vcftoolsPath
-		self.addExecutable(vcftoolsWrapper)
-		self.vcftoolsWrapper = vcftoolsWrapper
+		executableClusterSizeMultiplierList.append((vcftoolsWrapper,1))
+		#vcftoolsWrapper.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		#self.addExecutable(vcftoolsWrapper)
+		#self.vcftoolsWrapper = vcftoolsWrapper
 		
 		tabix = Executable(namespace=namespace, name="tabix", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		tabix.addPFN(PFN("file://" + self.tabixPath, site_handler))
-		tabix.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(tabix)
-		self.tabix = tabix
+		executableClusterSizeMultiplierList.append((tabix,5))
 		
 		#2011.12.21 moved from FilterVCFPipeline.py
 		FilterVCFByDepthJava = Executable(namespace=namespace, name="FilterVCFByDepth", version=version, os=operatingSystem,\
@@ -362,23 +313,23 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		MergeFiles = Executable(namespace=namespace, name="MergeFiles", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
 		MergeFiles.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "shell/MergeFiles.sh"), site_handler))
-		executableList.append(MergeFiles)
+		executableClusterSizeMultiplierList.append((MergeFiles,1 ))
 		
 		#2012.7.25
 		MergeVCFReplicateHaplotypesJava= Executable(namespace=namespace, name="MergeVCFReplicateHaplotypesJava", \
 											version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		MergeVCFReplicateHaplotypesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		noDefaultClustersSizeExecutableList.append(MergeVCFReplicateHaplotypesJava)
+		executableClusterSizeMultiplierList.append((MergeVCFReplicateHaplotypesJava,1))
 		
-		for executable in executableList:
-			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
-			self.addExecutable(executable)
-			setattr(self, executable.name, executable)
+		#2012.7.29, moved from CheckTwoVCFOverlapPipeline.py
+		CheckTwoVCFOverlap = Executable(namespace=namespace, name="CheckTwoVCFOverlap", version=version, \
+										os=operatingSystem, arch=architecture, installed=True)
+		CheckTwoVCFOverlap.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "mapper/CheckTwoVCFOverlap.py"), site_handler))
+		executableClusterSizeMultiplierList.append((CheckTwoVCFOverlap, 1))
 		
-		for executable in noDefaultClustersSizeExecutableList:
-			self.addExecutable(executable)
-			setattr(self, executable.name, executable)
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+		
 	
 	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					inputBamF=None,\
@@ -395,10 +346,14 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			proper transfer/register setup
 		2011-11-20
 		"""
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=javaMaxMemory, minMemory=2000)
+		job_max_memory = memRequirementObject.memRequirement
+		javaMemRequirement = memRequirementObject.memRequirementInStr
+		
 		index_sam_job = Job(namespace=getattr(self, 'namespace', namespace), name=BuildBamIndexFilesJava.name, \
 						version=getattr(self, 'version', version))
 		baiFile = File('%s.bai'%inputBamF.name)
-		index_sam_job.addArguments("-Xms128m", "-Xmx%sm"%(javaMaxMemory), "-jar", BuildBamIndexFilesJar, "VALIDATION_STRINGENCY=LENIENT", \
+		index_sam_job.addArguments(javaMemRequirement, "-jar", BuildBamIndexFilesJar, "VALIDATION_STRINGENCY=LENIENT", \
 						"INPUT=", inputBamF, "OUTPUT=", baiFile)
 		index_sam_job.bamFile = inputBamF
 		index_sam_job.baiFile = baiFile
@@ -406,7 +361,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.INPUT)
 		#index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.OUTPUT)
 		index_sam_job.uses(baiFile, transfer=stageOutFinalOutput, register=True, link=Link.OUTPUT)
-		yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=javaMaxMemory)
+		yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=job_max_memory)
 		self.addJob(index_sam_job)
 		for parentJob in parentJobLs:
 			if parentJob:
@@ -502,11 +457,13 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		bgzip_tabix_job.uses(tbi_F, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		bgzip_tabix_job.output = outputF
 		bgzip_tabix_job.tbi_F = tbi_F
+		bgzip_tabix_job.outputLs = [outputF, tbi_F] 	#2012.7.30
 		self.addJob(bgzip_tabix_job)
 		if parentJob:
 			self.depends(parent=parentJob, child=bgzip_tabix_job)
 		for parentJob in parentJobLs:
-			self.depends(parent=parentJob, child=bgzip_tabix_job)
+			if parentJob:
+				self.depends(parent=parentJob, child=bgzip_tabix_job)
 		return bgzip_tabix_job
 	
 	def addVCFConcatJob(self, workflow=None, concatExecutable=None, parentDirJob=None, outputF=None, \
@@ -681,7 +638,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		for inputFname in os.listdir(inputDir):
 			inputAbsPath = os.path.join(os.path.abspath(inputDir), inputFname)
 			if NextGenSeq.isFileNameVCF(inputFname, includeIndelVCF=False) and not NextGenSeq.isVCFFileEmpty(inputAbsPath):
-				fileID = self.chr_pattern.search(inputFname).group(1)
+				fileID = Genome.getChrFromFname(inputFname)
 				if fileID in vcfFileID2path:
 					sys.stderr.write("fileID %s already has value (%s) in dictionary. but now a 2nd file %s overwrites previous value.\n"%\
 									(fileID, vcfFileID2path.get(fileID), inputFname))
@@ -690,31 +647,38 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		return vcfFileID2path
 	
 	def addCheckTwoVCFOverlapJob(self, workflow=None, executable=None, vcf1=None, vcf2=None, chromosome=None, chrLength=None, \
-					outputFnamePrefix=None, parentJobLs=[], \
-					extraDependentInputLs=[], transferOutput=False, extraArguments=None, job_max_memory=1000, \
-					**keywords):
+					outputF=None, outputFnamePrefix=None, parentJobLs=None, \
+					extraDependentInputLs=None, transferOutput=False, extraArguments=None, job_max_memory=1000, \
+					perSampleMismatchFraction=False, **keywords):
 		"""
 		2011.12.9
 		"""
-		overlapSitePosF = File('%s_overlapSitePos.tsv'%(outputFnamePrefix))
-		outputF = File('%s_overlap.tsv'%(outputFnamePrefix))
-		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
-		job.addArguments("-i", vcf1, "-j", vcf2, "-c", chromosome, "-l %s"%(chrLength), '-o', outputF,\
-						'-O', outputFnamePrefix)
+		if outputF is None and outputFnamePrefix:
+			outputF = File('%s_overlap.tsv'%(outputFnamePrefix))
+		extraOutputLs = []
+		extraArgumentList = ["-j", vcf2]
+		if chromosome:
+			extraArgumentList.extend(["-c", chromosome])
+		if chrLength:
+			extraArgumentList.append("-l %s"%(chrLength))
+		if perSampleMismatchFraction:
+			extraArgumentList.append("-p")
+		if outputFnamePrefix:
+			extraArgumentList.extend(['-O', outputFnamePrefix])
+			overlapSitePosF = File('%s_overlapSitePos.tsv'%(outputFnamePrefix))
+			extraOutputLs.append(overlapSitePosF)
 		if extraArguments:
-			job.addArguments(extraArguments)
-		job.uses(vcf1, transfer=True, register=True, link=Link.INPUT)
-		job.uses(vcf2, transfer=True, register=True, link=Link.INPUT)
-		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		job.uses(overlapSitePosF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		job.overlapSitePosF = overlapSitePosF
-		job.output = outputF
-		self.addJob(job)
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		for parentJob in parentJobLs:
-			self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+			extraArgumentList.append(extraArguments)
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraDependentInputLs.append(vcf2)
+		job= self.addGenericJob(executable=executable, inputFile=vcf1, outputFile=outputF, \
+						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+						extraOutputLs=extraOutputLs,\
+						transferOutput=transferOutput, \
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
+		if outputFnamePrefix:
+			job.overlapSitePosF = overlapSitePosF
 		return job
 	
 	def addFilterVCFByDepthJob(self, workflow=None, FilterVCFByDepthJava=None, genomeAnalysisTKJar=None, \
@@ -759,84 +723,363 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		return filterByDepthJob
 	
 	def addFilterJobByvcftools(self, workflow=None, vcftoolsWrapper=None, inputVCFF=None, outputFnamePrefix=None, \
-							parentJobLs=None, snpMisMatchStatFile=None, minMAC=2, minMAF=None, maxSNPMissingRate=0.9,\
-							namespace=None, version=None, extraDependentInputLs=[], transferOutput=False, \
-							outputFormat='--recode', extraArguments=None):
+							snpMisMatchStatFile=None, minMAC=None, minMAF=None, maxSNPMissingRate=None,\
+							perIndividualDepth=False, perIndividualHeterozygosity=False, \
+							perSiteHWE=False, haploLD=False, genoLD=False, minLDr2=0.2, LDWindowByNoOfSites=None,\
+							LDWindowByBP=None, TsTvWindowSize=None, piWindowSize=None, perSitePI=False, \
+							SNPDensityWindowSize=None, calculateMissingNess=False, calculateFreq=False, calculateFreq2=False,\
+							getSiteDepth=False, getSiteMeanDepth=False, getSiteQuality=False,\
+							outputFormat='--recode', parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
+							extraArguments=None, job_max_memory=2000, **keywords):
 		"""
+		2012.8.1
 		2012.5.9
 			moved from FilterVCFPipeline.py
-			add argument outputFormat to make "--recode" explicit and allow other output formats
-			add argument extraArguments
+			add argument outputFormat to make "--recode" by default and also allow other output formats.
+			add argument extraArguments to accept something like "--recode-INFO-all".
 			
 			this could be just used to output vcf in various formats
+			
 		2011-11-21
 			argument vcftools is replaced with a wrapper, which takes vcftools path as 1st argument
+			outputFormat="--recode" instructs vcftools to output a VCF file. Without it, "--recode-INFO-all" will do nothing.
+				"--recode-INFO-all" is added to vcftools to output input VCF also in VCF format and recalculate all the INFO fields.
+				OR "--recode-INFO string" options only keeps key=string in the INFO field.
+				The latter two arguments should be added through extraArguments.
+				i.e.
+				vcf1KeepGivenSNPByvcftoolsJob = self.addFilterJobByvcftools(workflow, vcftoolsWrapper=workflow.vcftoolsWrapper, \
+								inputVCFF=vcf1, \
+								outputFnamePrefix=outputFnamePrefix, \
+								parentJobLs=[vcf1_vcftoolsFilterDirJob], \
+								snpMisMatchStatFile=keepSNPPosF, \
+								minMAC=None, minMAF=None, \
+								maxSNPMissingRate=None,\
+								extraDependentInputLs=[vcf1.tbi_F], outputFormat='--recode', extraArguments="--recode-INFO-all")
+				 
 		"""
-		# Add a mkdir job for any directory.
-		vcftoolsJob = Job(namespace=getattr(self, 'namespace', namespace), name=vcftoolsWrapper.name, \
-						version=getattr(self, 'version', version))
-		vcftoolsJob.addArguments(self.vcftoolsPath)	#2011-11-21
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraDependentInputLs.append(inputVCFF)
+		extraArgumentList = [self.vcftoolsPath]
+		extraOutputLs = []
+		key2ObjectForJob = {}
 		if inputVCFF.name[-2:]=='gz':
-			vcftoolsJob.addArguments("--gzvcf", inputVCFF)
+			extraArgumentList.extend(["--gzvcf", inputVCFF])
 		else:
-			vcftoolsJob.addArguments("--vcf", inputVCFF)
-		vcftoolsJob.addArguments("--out", outputFnamePrefix, outputFormat)
+			extraArgumentList.extend(["--vcf", inputVCFF])
+		#filter options
 		if snpMisMatchStatFile:
-			vcftoolsJob.addArguments("--positions", snpMisMatchStatFile)
-			vcftoolsJob.uses(snpMisMatchStatFile, transfer=True, register=True, link=Link.INPUT)
-		
+			extraArgumentList.extend(["--positions", snpMisMatchStatFile])
+			extraDependentInputLs.append(snpMisMatchStatFile)
 		if maxSNPMissingRate is not None:
-			vcftoolsJob.addArguments("--geno %s"%(1-maxSNPMissingRate))
+			extraArgumentList.append("--geno %s"%(1-maxSNPMissingRate))
 		if minMAF is not None:
-			vcftoolsJob.addArguments("--maf %s"%(minMAF))
+			extraArgumentList.append("--maf %s"%(minMAF))
 		if minMAC is not None:
-			vcftoolsJob.addArguments("--mac %s"%(minMAC))
-		if extraArguments:
-			vcftoolsJob.addArguments(extraArguments)
-		vcftoolsJob.uses(inputVCFF, transfer=True, register=True, link=Link.INPUT)
-		for input in extraDependentInputLs:
-			if input:
-				vcftoolsJob.uses(input, transfer=True, register=True, link=Link.INPUT)
+			extraArgumentList.append("--mac %s"%(minMAC))
+		
+		if outputFnamePrefix:
+			extraArgumentList.extend(["--out", outputFnamePrefix])
+		
+		suffixAndNameTupleList = []	# a list of tuples , in each tuple, 1st element is the suffix. 2nd element is the proper name of the suffix.
+			#job.$nameFile will be the way to access the file.
+			#if 2nd element (name) is missing, suffix[1:].replace('.', '_') is the name (dot replaced by _) 
+		
+		#prime output, added into extraOutputLs, ahead of all others.
+		if outputFormat:
+			extraArgumentList.append(outputFormat)
+		
 		if outputFormat=='--recode':	#2012.5.9
 			outputVCFF = File("%s.recode.vcf"%(outputFnamePrefix))
-			vcftoolsJob.uses(outputVCFF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			vcftoolsJob.output = outputVCFF
+			extraOutputLs.insert(0, outputVCFF)
+				#since outputFile passed to addGenericJob is None, 1st entry of extraOutputLs
+				# becomes job.output
 		elif outputFormat=='--plink-tped':
-			output1 = File("%s.tped"%(outputFnamePrefix))
-			output2 = File("%s.tfam"%(outputFnamePrefix))
-			vcftoolsJob.output = output1
-			vcftoolsJob.outputList=[output1, output2]
-			for output in vcftoolsJob.outputList:
-				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			suffixAndNameTupleList.extend([['.tped'], ['.tfam']])
 		elif outputFormat=='--plink':
-			output1 = File("%s.ped"%(outputFnamePrefix))
-			output2 = File("%s.fam"%(outputFnamePrefix))
-			vcftoolsJob.output = output1
-			vcftoolsJob.outputList=[output1, output2]
-			for output in vcftoolsJob.outputList:
-				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			suffixAndNameTupleList.extend([['.ped'], ['.fam']])
 		elif outputFormat=='--IMPUTE':
-			output1 = File("%s.impute.hap"%(outputFnamePrefix))
-			output2 = File("%s.impute.hap.legend"%(outputFnamePrefix))
-			output3 = File("%s.impute.hap.indv"%(outputFnamePrefix))
-			vcftoolsJob.output = output1
-			vcftoolsJob.outputList=[output1, output2, output3]
-			for output in vcftoolsJob.outputList:
-				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			suffixAndNameTupleList.extend([['.impute.hap'], ['.impute.hap.legend'], ['.impute.hap.indv']])
 		elif outputFormat=='--BEAGLE-GL':
-			output1 = File("%s.BEAGLE.GL"%(outputFnamePrefix))
-			vcftoolsJob.output = output1
-			vcftoolsJob.outputList=[output1]
-			for output in vcftoolsJob.outputList:
-				vcftoolsJob.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		else:
-			vcftoolsJob.output = None
-			vcftoolsJob.outputList = []
-		self.addJob(vcftoolsJob)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=vcftoolsJob)
-		return vcftoolsJob
+			suffixAndNameTupleList.extend([['.BEAGLE.GL']])
+			#output1 = File("%s.BEAGLE.GL"%(outputFnamePrefix))
+			#extraOutputLs.extend([output1, output2])
+		
+		#leave the log file in workflow folder, not staging it out
+		vcftoolsLogFile = File('%s.log'%(outputFnamePrefix))
+		#2nd-tier output, mostly stats output		
+		if perIndividualDepth:
+			"""
+			output example:
+			*.idepth
+INDV    N_SITES MEAN_DEPTH
+1511_639_1987079_GA_vs_524      2483    21.3363
+1512_640_1985088_GA_vs_524      2483    28.8647
+1513_641_1986014_GA_vs_524      2483    29.9299
+1514_642_1988009_GA_vs_524      2483    27.7483
+1515_688_1988086_GA_vs_524      2483    16.1776
+
+			"""
+			extraArgumentList.append('--depth')
+			suffixAndNameTupleList.extend([['.idepth']])
+		if perIndividualHeterozygosity:
+			"""
+			output example:
+INDV    O(HOM)  E(HOM)  N_SITES F
+1511_639_1987079_GA_vs_524      1741    1778.7  2475    -0.05418
+1512_640_1985088_GA_vs_524      1589    1778.7  2475    -0.27248
+1513_641_1986014_GA_vs_524      1588    1778.7  2475    -0.27392
+1514_642_1988009_GA_vs_524      1423    1778.7  2475    -0.51089
+1515_688_1988086_GA_vs_524      2455    1778.7  2475    0.97128
+
+			"""
+			extraArgumentList.append('--het')
+			suffixAndNameTupleList.extend([['.het'], ])
+		if perSiteHWE:
+			"""
+			output example:
+CHR     POS     OBS(HOM1/HET/HOM2)      E(HOM1/HET/HOM2)        ChiSq   P
+Contig966       203     4/8/4   4.00/8.00/4.00  0.000000        1.000000
+Contig966       570     15/1/0  15.02/0.97/0.02 0.016649        1.000000
+Contig966       1462    5/8/3   5.06/7.88/3.06  0.004031        1.000000
+Contig966       3160    15/1/0  15.02/0.97/0.02 0.016649        1.000000
+Contig966       3311    15/1/0  15.02/0.97/0.02 0.016649        1.000000
+Contig966       3539    15/1/0  15.02/0.97/0.02 0.016649        1.000000
+
+
+			"""
+			extraArgumentList.append('--hardy')
+			suffixAndNameTupleList.extend([['.hwe']])
+		if haploLD or genoLD:
+			if haploLD:
+				extraArgumentList.append('--hap-r2')
+				output = File('%s.hap.ld'%(outputFnamePrefix))
+			elif genoLD:
+				"""
+				example:
+CHR     POS1    POS2    N_INDV  R^2
+Contig966       203     1462    16      0.790323
+Contig966       203     4101    16      0.790323
+Contig966       203     4200    16      0.790323
+Contig966       203     4573    16      1
+Contig966       203     4984    16      0.882883
+Contig966       203     5289    16      0.790323
+Contig966       203     7383    16      0.790323
+Contig966       203     7403    16      0.882883
+Contig966       203     8129    16      0.882883
+Contig966       203     8453    16      0.333333
+Contig966       203     8508    16      1
+Contig966       203     8655    16      0.790323
+Contig966       203     8817    16      0.790323
+Contig966       203     9862    16      0.790323
+Contig966       203     10439   16      1
+
+				"""
+				extraArgumentList.append('--geno-r2')
+				output = File('%s.geno.ld'%(outputFnamePrefix))
+			extraArgumentList.append('--min-r2 %s'%(minLDr2))
+			if LDWindowByBP:
+				extraArgumentList.append("--ld-window-bp %s"%(LDWindowByBP))
+			elif LDWindowByNoOfSites:
+				extraArgumentList.append("--ld-window %s"%(LDWindowByNoOfSites))
+			extraOutputLs.append(output)
+			key2ObjectForJob['ldFile'] = output
+		
+		if TsTvWindowSize:
+			"""
+			output example:
+			*.TsTv
+CHROM   BinStart        SNP_count       Ts/Tv
+Contig459       0       96      1.18182
+Contig459       20000   118     1.40816
+Contig459       40000   97      1.30952
+Contig459       60000   91      0.857143
+Contig459       80000   91      1.275
+Contig459       100000  109     0.786885
+Contig459       120000  92      1.55556
+
+			*.TsTv.summary
+MODEL   COUNT
+AC      1948
+AG      3139
+AT      696
+CG      899
+CT      3230
+GT      1935
+Ts      6369
+Tv      5478
+
+			"""
+			extraArgumentList.append("--TsTv %s"%(TsTvWindowSize))
+			TsTvFile = File('%s.TsTv'%(outputFnamePrefix))
+			TsTvSummaryFile = File('%s.TsTv.summary'%(outputFnamePrefix))
+			extraOutputLs.extend([TsTvFile, TsTvSummaryFile])
+			key2ObjectForJob['TsTvFile'] = TsTvFile
+			key2ObjectForJob['TsTvSummaryFile'] = TsTvSummaryFile
+		if piWindowSize:
+			"""
+			output example:
+CHROM   BIN_START       N_SNPS  PI
+Contig966       0       56      16.9133
+Contig966       20000   80      19.1976
+Contig966       40000   48      14.9133
+Contig966       60000   132     28.8085
+
+			"""
+			extraArgumentList.append("--window-pi %s"%(piWindowSize))
+			windowPIFile = File('%s.windowed.pi'%(outputFnamePrefix))
+			extraOutputLs.append(windowPIFile)
+			key2ObjectForJob['windowPIFile'] = windowPIFile
+		if perSitePI:
+			"""
+			example:
+CHROM   POS     PI
+Contig966       203     0.516129
+Contig966       570     0.0625
+Contig966       1462    0.508065
+Contig966       3160    0.0625
+Contig966       3311    0.0625
+Contig966       3539    0.0625
+Contig966       4101    0.508065
+Contig966       4200    0.508065
+
+			"""
+			extraArgumentList.append("--site-pi")
+			sitePIFile = File('%s.sites.pi'%(outputFnamePrefix))
+			extraOutputLs.append(sitePIFile)
+			key2ObjectForJob['sitePIFile'] = sitePIFile
+		if SNPDensityWindowSize:
+			"""
+			output example:
+CHROM   BIN_START       SNP_COUNT       SNPS/KB
+Contig966       0       56      2.8
+Contig966       20000   80      4
+Contig966       40000   50      2.5
+Contig966       60000   132     6.6
+Contig966       80000   53      2.65
+
+			"""
+			extraArgumentList.append("--SNPdensity %s"%(SNPDensityWindowSize))
+			snpDensityFile = File('%s.snpden'%(outputFnamePrefix))
+			extraOutputLs.append(snpDensityFile)
+			key2ObjectForJob['snpDensityFile'] = snpDensityFile
+		if calculateMissingNess:
+			"""
+			output example:
+			*.imiss
+INDV    N_DATA  N_GENOTYPES_FILTERED    N_MISS  F_MISS
+1511_639_1987079_GA_vs_524      2483    0       0       0
+1512_640_1985088_GA_vs_524      2483    0       0       0
+1513_641_1986014_GA_vs_524      2483    0       0       0
+1514_642_1988009_GA_vs_524      2483    0       0       0
+			
+			*.lmiss
+CHR     POS     N_DATA  N_GENOTYPE_FILTERED     N_MISS  F_MISS
+Contig966       203     32      0       0       0
+Contig966       570     32      0       0       0
+Contig966       1462    32      0       0       0
+Contig966       3160    32      0       0       0
+
+			"""
+			extraArgumentList.append("--missing")
+			imissFile = File('%s.imiss'%(outputFnamePrefix))
+			lmissFile = File('%s.lmiss'%(outputFnamePrefix))
+			extraOutputLs.extend([imissFile, lmissFile])
+			key2ObjectForJob['imissFile'] = imissFile
+			key2ObjectForJob['lmissFile'] = lmissFile
+		if calculateFreq or calculateFreq2:
+			if calculateFreq:
+				"""
+				output example:
+CHROM   POS     N_ALLELES       N_CHR   {ALLELE:FREQ}
+Contig966       203     2       32      A:0.5   G:0.5
+Contig966       570     2       32      C:0.96875       A:0.03125
+Contig966       1462    2       32      T:0.5625        A:0.4375
+Contig966       3160    2       32      A:0.96875       C:0.03125
+Contig966       3311    2       32      G:0.96875       A:0.03125
+Contig966       3539    2       32      C:0.96875       T:0.03125
+
+				"""
+				extraArgumentList.append("--freq")
+			elif calculateFreq2:
+				extraArgumentList.append("--freq2")
+				"""
+				output example:
+				
+CHROM   POS     N_ALLELES       N_CHR   {FREQ}
+Contig966       203     2       32      0.5     0.5
+Contig966       570     2       32      0.96875 0.03125
+Contig966       1462    2       32      0.5625  0.4375
+
+				"""
+			freqFile = File('%s.frq'%(outputFnamePrefix))
+			extraOutputLs.extend([freqFile])
+			key2ObjectForJob['freqFile'] = freqFile
+		if getSiteDepth:
+			"""
+			output example:
+CHROM   POS     SUM_DEPTH       SUMSQ_DEPTH
+Contig966       203     332     7590
+Contig966       570     349     8751
+Contig966       1462    119     1223
+Contig966       3160    273     6331
+Contig966       3311    327     7715
+
+			"""
+			extraArgumentList.append("--site-depth")
+			outputFile = File('%s.ldepth'%(outputFnamePrefix))
+			extraOutputLs.append(outputFile)
+			key2ObjectForJob['ldepthFile'] = outputFile
+		if getSiteMeanDepth:
+			"""
+			output example:
+CHROM   POS     MEAN_DEPTH      VAR_DEPTH
+Contig966       203     20.75   46.7333
+Contig966       570     21.8125 75.8958
+Contig966       1462    7.4375  22.5292
+Contig966       3160    17.0625 111.529
+Contig966       3311    20.4375 68.7958
+
+			"""
+			extraArgumentList.append("--site-mean-depth")
+			outputFile = File('%s.ldepth.mean'%(outputFnamePrefix))
+			extraOutputLs.append(outputFile)
+			key2ObjectForJob['ldpethMeanFile'] = outputFile
+		if getSiteQuality:
+			"""
+			output example:
+CHROM   POS     QUAL
+Contig966       203     999
+Contig966       570     999
+Contig966       1462    999
+Contig966       3160    50
+
+			"""
+			extraArgumentList.append("--site-quality")
+			outputFile = File('%s.lqual'%(outputFnamePrefix))
+			extraOutputLs.append(outputFile)
+			key2ObjectForJob['lqualFile'] = outputFile
+			
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		
+		for suffixNameTuple in suffixAndNameTupleList:
+			if len(suffixNameTuple)==1:
+				suffix = suffixNameTuple[0]
+				name = suffix[1:].replace('.', '_')	#replace dot with underscore. as dot is used to access method/attribute of python object
+				# i.e. ".prune.in" is accessible as job.prune_inFile
+			elif len(suffixNameTuple)>=2:
+				suffix, name = suffixNameTuple[:2]
+			outputFile = File('%s%s'%(outputFnamePrefix, suffix))
+			extraOutputLs.append(outputFile)
+			key2ObjectForJob['%sFile'%(name)] = outputFile
+		
+		job= self.addGenericJob(executable=vcftoolsWrapper, inputFile=None, outputFile=None, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
+		return job
 	
 	def addCalculateTwoVCFSNPMismatchRateJob(self, workflow=None, executable=None, \
 							vcf1=None, vcf2=None, snpMisMatchStatFile=None, \
@@ -859,7 +1102,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		for input in extraDependentInputLs:
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		for parentJob in parentJobLs:
-			self.depends(parent=parentJob, child=job)
+			if parentJob:
+				self.depends(parent=parentJob, child=job)
 		return job
 
 	def addTabixRetrieveJob(self, workflow=None, executable=None, tabixPath=None, \
@@ -915,7 +1159,197 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			If search fails, it returns the prefix in the basename of filename.
 		"""
 		return Genome.getChrFromFname(filename)
+	
+	def getTopNumberOfContigs(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9):
+		"""
+		2012.8.2
+			moved from vervet/src/AlignmentToCallPipeline.py
+			call GenomeDB.getTopNumberOfContigs() instead
+		2011-11-6
+			rename argument maxContigID to contigMaxRankBySize
+			add argument contigMinRankBySize
+		2011-9-13
+			return chr2size instead of a set of ref names
+		2011-7-12
+			get all the top contigs
+		"""
+		no_of_contigs_to_fetch = contigMaxRankBySize-contigMinRankBySize+1
+		sys.stderr.write("Getting %s contigs with rank (by size) between %s and %s  ..."%\
+						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
+		chr2size = {}
 		
+		from pymodule import GenomeDB
+		db_genome = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
+						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema="genome")
+		db_genome.setup(create_tables=False)
+		chr2size = db_genome.getTopNumberOfChomosomes(contigMaxRankBySize=contigMaxRankBySize, contigMinRankBySize=contigMinRankBySize, \
+											tax_id=tax_id, sequence_type_id=sequence_type_id)
+		return chr2size
+	
+	def restrictContigDictionry(self, dc=None, maxContigID=None, minContigID=None):
+		"""
+		2012.8.2
+			if maxContigID is None or zero, no filter. same for minContigID.
+		"""
+		sys.stderr.write("Restricting a contig dictionary of size %s within minContigID=%s, maxContigID=%s, ... "%\
+						(len(dc), maxContigID, minContigID))
+		if (maxContigID is not None and maxContigID!=0) and (minContigID is not None and minContigID!=0):
+			new_dc = {}
+			for contig, data in dc.iteritems():
+				try:
+					contigID = int(self.getContigIDFromFname(contig))
+					included = True
+					if (maxContigID is not None and maxContigID!=0) and contigID>maxContigID:
+						included = False
+					if (minContigID is not None and minContigID!=0) and contigID<minContigID:
+						included = False
+					if included:
+						new_dc[contig] = data
+				except:
+					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+			dc = new_dc
+		sys.stderr.write(" %s contigs left.\n"%(len(dc)))
+		return dc
+	
+	def getChr2IntervalDataLsBySplitBEDFile(self, intervalFname=None, noOfLinesPerUnit=2000, folderName=None, parentJobLs= None):
+		"""
+		2012.8.9 update it so that the interval encompassing all lines in one block/unit is known.
+			good for mpileup to only work on that interval and then "bcftools view" select from sites from the block.
+			TODO: offer partitioning by equal-chromosome span, rather than number of sites.
+				Some sites could be in far from each other in one block, which could incur long-running mpileup. goal is to skip these deserts.
+		2012.8.8 bugfix add -1 to the starting number below cuz otherwise it's included in the next block's start
+				blockStopLineNumber = min(startLineNumber+(i+1)*noOfLinesPerUnit-1, stopLineNumber)	
+		2012.7.30
+			1. intervalFname is in BED format (tab/comma-delimited, chr start stop) and has to be sorted.
+				start and stop are 0-based. i.e. start=0, stop=100 means bases from 0-99.
+			2. folderName is the relative path of the folder in the pegasus workflow, that holds intervalFname.
+				it'll be created upon file stage-in. no mkdir job for it.
+				
+			get the number of lines in intervalFname.
+			get chr2StartStopDataLsTuple
+			for each chr, split its lines into units  that don't exceed noOfLinesPerUnit
+				add the split job
+				 
+		"""
+		sys.stderr.write("Splitting %s into blocks of %s lines ... "%(intervalFname, noOfLinesPerUnit))
+		#from pymodule import utils
+		#noOfLines = utils.getNoOfLinesInOneFileByWC(intervalFname)
+		chr2StartStopDataLs = {}
+		import csv
+		from pymodule import figureOutDelimiter
+		inf = open(intervalFname)
+		reader = csv.reader(inf, delimiter=figureOutDelimiter(intervalFname))
+		lineNumber = 0
+		previousChromosome = None
+		previousLine = None
+		chromosome = None
+		for row in reader:
+			lineNumber += 1
+			chromosome, start, stop = row[:3]
+			start = int(start)	#0-based, starting base
+			stop = int(stop)	#0-based, stopping base but not inclusive, i.e. [start, stop)
+			
+			if previousLine is None or chromosome!=previousLine.chromosome:	#first line or different chromosome
+				if previousLine is not None and previousLine.chromosome is not None:
+					
+					prevChrLastStartStopData = chr2StartStopDataLs[previousLine.chromosome][-1]
+					if prevChrLastStartStopData.stopLineNumber is None:
+						prevChrLastStartStopData.stopLineNumber = previousLine.lineNumber
+						prevChrLastStartStopData.stopLineStart = previousLine.start
+						prevChrLastStartStopData.stopLineStop = previousLine.stop
+					
+				if chromosome not in chr2StartStopDataLs:
+					StartStopData = PassingData(startLineNumber=lineNumber, startLineStart=start, startLineStop=stop, \
+											stopLineNumber=None, stopLineStart=None, stopLineStop=None)
+					chr2StartStopDataLs[chromosome] = [StartStopData]
+			else:	#same chromosome and not first line
+				lastStartStopData = chr2StartStopDataLs[chromosome][-1]
+				if lastStartStopData.stopLineNumber is None:	#last block hasn't been closed yet.
+					noOfLinesInCurrentBlock = lineNumber - lastStartStopData.startLineNumber +1
+					if noOfLinesInCurrentBlock>=noOfLinesPerUnit:	#time to close it
+						lastStartStopData.stopLineNumber = lineNumber
+						lastStartStopData.stopLineStart = start
+						lastStartStopData.stopLineStop = stop
+				else:	#generate a new block
+					StartStopData = PassingData(startLineNumber=lineNumber, startLineStart=start, startLineStop=stop, \
+											stopLineNumber=None, stopLineStart=None, stopLineStop=None)
+					chr2StartStopDataLs[chromosome].append(StartStopData)
+			previousLine = PassingData(chromosome = chromosome, start=start, stop=stop, lineNumber=lineNumber)
+		#final closure
+		if previousLine is not None:	#intervalFname is not empty
+			lastStartStopData = chr2StartStopDataLs[previousLine.chromosome][-1]
+			if lastStartStopData.stopLineNumber is None:	#last block hasn't been closed yet.
+				#close it regardless of whether it has enough lines in it or not.
+				lastStartStopData.stopLineNumber = previousLine.lineNumber
+				lastStartStopData.stopLineStart = previousLine.start
+				lastStartStopData.stopLineStop = previousLine.stop
+		sys.stderr.write("%s chromosomes out of %s lines.\n"%(len(chr2StartStopDataLs), lineNumber))
+		
+		intervalFile = self.registerOneInputFile(inputFname=intervalFname, folderName=folderName)
+		chr2IntervalDataLs = {}
+		counter = 0
+		for chr, startStopDataLs in chr2StartStopDataLs.iteritems():
+			for startStopData in startStopDataLs:
+				blockStartLineNumber = startStopData.startLineNumber
+				blockStopLineNumber = startStopData.stopLineNumber
+				# 2012.8.9 the large interval that encompasses all BED lines 
+				interval = '%s:%s-%s'%(chr, startStopData.startLineStart, startStopData.stopLineStop)
+				blockIntervalFile = File(os.path.join(folderName, '%s_line_%s_%s_bed.tsv'%(chr, \
+												blockStartLineNumber, blockStopLineNumber)))
+				blockIntervalJob = self.addSelectLineBlockFromFileJob(executable=self.SelectLineBlockFromFile, \
+						inputFile=intervalFile, outputFile=blockIntervalFile,\
+						startLineNumber=blockStartLineNumber, stopLineNumber=blockStopLineNumber, \
+						parentJobLs=parentJobLs, extraDependentInputLs=None, \
+						transferOutput=False, job_max_memory=500)
+				intervalFnameSignature = '%s_%s_%s'%(chr, blockStartLineNumber, blockStopLineNumber)
+				if chr not in chr2IntervalDataLs:
+					chr2IntervalDataLs[chr] = []
+				intervalData = PassingData(file=blockIntervalFile, intervalFnameSignature=intervalFnameSignature, interval=interval,\
+										chr=chr, jobLs=[blockIntervalJob], job=blockIntervalJob)
+				chr2IntervalDataLs[chr].append(intervalData)
+				counter += 1
+		sys.stderr.write("%s intervals and %s SelectLineBlockFromFile jobs.\n"%(counter, counter))
+		return chr2IntervalDataLs
+	
+	def getChr2IntervalDataLsBySplitChrSize(self, chr2size=None, intervalSize=None, intervalOverlapSize=None):
+		"""
+		2012.7.30
+		"""
+		sys.stderr.write("Splitting %s references into intervals of %s bp (overlap=%s) ... "%(len(chr2size), intervalSize,\
+																		intervalOverlapSize))
+		chr2IntervalDataLs = {}
+		counter =0
+		for chr, refSize in chr2size.iteritems():
+			no_of_intervals = max(1, int(math.ceil(refSize/float(intervalSize)))-1)
+			for i in range(no_of_intervals):
+				originalStartPos = i*intervalSize + 1
+				#to render adjacent intervals overlapping because trioCaller uses LD
+				startPos = max(1, originalStartPos-intervalOverlapSize)
+				if i<no_of_intervals-1:
+					originalStopPos = min((i+1)*intervalSize, refSize)
+				else:	#last chunk, include bp till the end
+					originalStopPos = refSize
+				#to render adjacent intervals overlapping because trioCaller uses LD
+				stopPos = min(refSize, originalStopPos+intervalOverlapSize)
+				
+				interval = "%s:%s-%s"%(chr, originalStartPos, originalStopPos)
+				intervalFnameSignature = '%s_%s_%s'%(chr, originalStartPos, originalStopPos)
+				overlapInterval = "%s:%s-%s"%(chr, startPos, stopPos)
+				overlapIntervalFnameSignature = '%s_%s_%s'%(chr, startPos, stopPos)
+				if chr not in chr2IntervalDataLs:
+					chr2IntervalDataLs[chr] = []
+				intervalData = PassingData(overlapInterval=overlapInterval, overlapIntervalFnameSignature=overlapIntervalFnameSignature,\
+							interval=interval, intervalFnameSignature=intervalFnameSignature, \
+							file=None,\
+							chr=chr, start=originalStartPos,\
+							stop=originalStopPos, jobLs=[])
+				chr2IntervalDataLs[chr].append(intervalData)
+				counter += 1
+		sys.stderr.write("%s intervals.\n"%(counter))
+		return chr2IntervalDataLs
+	
 	def addPutStuffIntoDBJob(self, workflow=None, executable=None, inputFileLs=[], \
 					logFile=None, commit=False, \
 					parentJobLs=[], extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
@@ -978,6 +1412,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2012.7.25
 			use self.addGenericJob() and moved from AlignmentToTrioCallPipeline.py
+			added "-XX:MaxPermSize=1024m" jvm combat this error:
+				java.lang.OutOfMemoryError: Java heap space
 		2012.6.1
 			change MergeVCFReplicateGenotypeColumns to MergeVCFReplicateHaplotypes
 			
@@ -987,7 +1423,12 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				--variant /tmp/Contig0.vcf -o /tmp/contig0_afterMerge.vcf --onlyKeepBiAllelicSNP --replicateIndividualTag copy
 		"""
 		#GATK job
-		javaMemRequirement = "-Xms128m -Xmx%sm"%job_max_memory
+		#MaxPermSize= min(35000, max(1024, job_max_memory*9/7))
+		#javaMemRequirement = "-Xms%sm -Xmx%sm -XX:PermSize=%sm -XX:MaxPermSize=%sm"%(job_max_memory*95/100, job_max_memory, \
+		#																			MaxPermSize*95/100, MaxPermSize)
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementObject.memRequirement
+		javaMemRequirement = memRequirementObject.memRequirementInStr
 		refFastaF = refFastaFList[0]
 		extraArgumentList = [javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T", "MergeVCFReplicateHaplotypes",\
 			"-R", refFastaF, "--variant:VCF", inputF, "--out", outputF,\

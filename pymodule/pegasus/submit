@@ -7,31 +7,38 @@ STORAGE_SITE_DEFAULT="local"
 submitOptionDefault="--submit"
 if test $# -lt 3 ; then
 	echo "Please specify local or condorpool as argument. Examples:"
-	echo "  $0 dagFile siteName finalOutputDir [STORAGE_SITE] [submitFolderName] [submitOption]"
+	echo "  $0 dagFile siteName finalOutputDir [toggleCleanUp] [STORAGE_SITE] [submitFolderName] [submitOption]"
 	echo ""
 	echo "Note:"
 	echo "	#. siteName is the running site. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
 	echo ""
 	echo "	#. finalOutputDir is the directory which would contain the final genotype matrix and all files requested to be transferred out. If it doesn't exist, pegasus would create one."
+	echo "	#. toggleCleanUp (value=1 means cleanup, 0 is or any other non-empty string means nocleanup.) is used to change the default submit option ($submitOptionDefault) to --submit or --submit --nocleanup."
 	echo "	#. STORAGE_SITE is the site to which final output is staged to. default is $STORAGE_SITE_DEFAULT."
 	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
 	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
-	echo "	#. submitOption are extra options passed to pegasus-plan. Default is $submitOptionDefault. '--submit' means pegasus will plan & submit the workflow. '--submit --nocleanup' means pegasus won't add cleanup jobs = all intermediate files will be kept. If you set it to empty string, '', only planning will be done but no submission."
+	echo "	#. submitOption are extra options passed to pegasus-plan. Default is $submitOptionDefault. '--submit' means pegasus will plan & submit the workflow. '--submit --nocleanup' means pegasus won't add cleanup jobs = all intermediate files will be kept. If you set it to empty string, '', only planning will be done but no submission. It will overwrite the toggleCleanup value, which modifies the default option."
 	echo ""
 	echo "Examples:"
-	echo "  #only planning, no running"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726 \"\""
+	echo "  #plan & submit and auto-cleanup"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1"
+	echo "  #plan & submit and no cleanup"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 0"
+	echo "  #only planning, no running (toggleCleanup does not matter)"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1 local TrioInconsistency15DistantVRC_20110929T1726 \"\""
 	echo "  #run the workflow without cleanup. good for testing in which you often need to modify rescue log to backtrack finished jobs"
-	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 local TrioInconsistency15DistantVRC_20110929T1726 \"--submit --nocleanup\" "
+	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 0 local TrioInconsistency15DistantVRC_20110929T1726 \"--submit --nocleanup\" "
 	exit 1
 fi
 
 dagFile=$1
 TargetSite=$2
 finalOutputDir=$3
-STORAGE_SITE=$4
-submitFolderName=$5
-submitOption=$6
+toggleCleanUp=$4
+STORAGE_SITE=$5
+submitFolderName=$6
+submitOption=$7
 
 if test -z "$submitFolderName"
 then
@@ -41,6 +48,13 @@ fi
 if [ -z $STORAGE_SITE ]; then
 	STORAGE_SITE=$STORAGE_SITE_DEFAULT
 fi
+
+if test "$toggleCleanUp" = "1"; then
+	submitOptionDefault="--submit"
+elif test -n "$toggleCleanUp"; then
+	submitOptionDefault="--submit --nocleanup"
+fi
+echo "submitOptionDefault is now = $submitOptionDefault "
 
 if test -z "$submitOption"
 then
@@ -101,6 +115,9 @@ USC_CLUSTER_PEGASUS_HOME=$USC_CLUSTER_HOME"/bin/pegasus"
 USC_CLUSTER_GLOBUS_LOCATION="/usr/usc/globus/default/"
 #USC_CLUSTER_GLOBUS_LOCATION="/usr/local/globus/default"
 
+# 2012.7.31 the two lines below are added to any condor cluster that do not use shared file system or filesystem that is not good at handling numerous small files in one folder
+#		<profile namespace="condor" key="should_transfer_files">YES</profile>
+#		<profile namespace="condor" key="when_to_transfer_output">ON_EXIT_OR_EVICT</profile>
 
 # create the site catalog
 cat >sites.xml <<EOF

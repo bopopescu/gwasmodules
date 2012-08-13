@@ -36,12 +36,13 @@ class AbstractMapper(object):
 						}
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
 
-	def __init__(self,  **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
 		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
+		self.inputFnameLs = inputFnameLs
 		self.connectDB()
 		
 	def connectDB(self):

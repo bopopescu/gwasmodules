@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 from ProcessOptions import  ProcessOptions
 from Pegasus.DAX3 import *
 
-def addMkDirJob(workflow, mkdir=None, outputDir=None, namespace=None, version=None,\
+def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, version=None,\
 			parentJobLs=[], extraDependentInputLs=[]):
 	"""
 	2012.3.10

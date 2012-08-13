@@ -91,7 +91,7 @@ def autoLabelBarChartWithHeight(axe, rects):
 		height = rect.get_height()
 		axe.text(rect.get_x()+rect.get_width()/2., 1.05*height, '%.2f'%float(height), ha='center', va='bottom', fontsize='xx-small')
 
-def setFontAndLabelSize(base_size=6):
+def setFontAndLabelSize(base_size=9):
 	"""
 	2010-4-14
 		function to change matplotlib font size globally
@@ -113,9 +113,10 @@ def restoreMatplotlibRCDefaults():
 	import matplotlib
 	matplotlib.rcdefaults()
 
-def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, min_no_of_data_points=50, needLog=False, \
-			dpi=200, min_no_of_bins=20, **kwargs):
+def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, max_no_of_data_points=50, needLog=False, \
+			dpi=200, max_no_of_bins=20, **kwargs):
 	"""
+	2012.8.6 argument min_no_of_bins renamed to max_no_of_bins, which is actually what it does.
 	2011-11-28
 		add argument min_no_of_bins
 	2011-8-24
@@ -126,9 +127,12 @@ def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None,
 	sys.stderr.write("Drawing histogram of %s data points to %s..."%(len(data_ls), outputFname))
 	import pylab
 	pylab.clf()
+	fig = pylab.figure(figsize=(10, 10))
+	#ax = pylab.axes()
+	#ax = fig.gca()
 	no_of_data_points = len(data_ls)
-	if no_of_data_points>=min_no_of_data_points:
-		no_of_bins = max(10, min(min_no_of_bins, no_of_data_points/10))
+	if no_of_data_points>=max_no_of_data_points:
+		no_of_bins = max(10, min(max_no_of_bins, no_of_data_points/10))
 		n, bins, patches = pylab.hist(data_ls, no_of_bins, log=needLog)
 		pylab.title(title)
 		if xlabel_1D is not None:

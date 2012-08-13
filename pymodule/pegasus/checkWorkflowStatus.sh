@@ -8,4 +8,4 @@ then
 	noOfLines=$noOfLinesDefault
 fi
 
-watch -d -n 8 "pegasus-status --noutf8  $workflowDir |tail -n $noOfLines"
+watch -d -n 13 "pegasus-status --noutf8  $workflowDir |tail -n $noOfLines"
