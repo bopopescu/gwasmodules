@@ -12,6 +12,12 @@ then
 exit
 fi
 
+shellDir=`dirname $0`
+source $shellDir/common.sh
+
 inputFname=$1
 outputFname=$2
+
+exitIfFileExists $outputFname
+
 gzip -c $inputFname > $outputFname
