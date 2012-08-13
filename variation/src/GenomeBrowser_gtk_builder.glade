@@ -1545,7 +1545,7 @@
                     <property name="tooltip_text" translatable="yes">database password for this mysql connection</property>
                     <property name="visibility">False</property>
                     <property name="invisible_char">&#x25CF;</property>
-                    <property name="text" translatable="yes">yh324</property>
+                    <property name="text" translatable="yes">secret</property>
                   </object>
                   <packing>
                     <property name="position">1</property>

@@ -4,7 +4,7 @@ from variation.src.misc import *
 import Stock_250kDB
 
 db_250k = Stock_250kDB.Stock_250kDB(drivername='mysql', username='yh',
-                                   password='yh324', hostname='gmi-ara-devel-be', database='stock_250k')
+                                   password='secret', hostname='gmi-ara-devel-be', database='stock_250k')
 db_250k.setup(create_tables=False)
 
 

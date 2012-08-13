@@ -8,6 +8,6 @@ output_dir='/tmp/est_selfing_out'
 mkdir $output_dir
 for input_file in `ls $filename_prefix.*`
 	do echo $input_file, which_method=$which_method
-	~/script/variation/src/EstimateSelfingRate.py -i $input_file -o $output_dir/$input_file\.y$which_method -y $which_method -s popid2s_$pop_size -c -u yh -p yh324
+	~/script/variation/src/EstimateSelfingRate.py -i $input_file -o $output_dir/$input_file\.y$which_method -y $which_method -s popid2s_$pop_size -c -u yh -p secret
 done
 

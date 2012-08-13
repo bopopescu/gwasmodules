@@ -47,6 +47,6 @@ for ((i=0;i<m;i++)); do
 	echo "tail -n $content_n $fname|head -n $bottom_index -|tail -n $step >>$tmp_fname"	#1. remove the header, 2. take everything above the bottom_index, 3 tail the step block 
 	tail -n $content_n "$fname"|head -n $bottom_index -|tail -n $step >>$tmp_fname
 	#sleep 3s
-	~/script/variation/src/DrawSNPRegion.py -i $tmp_fname -I /Network/Data/250k/tmp-yh/call_method_17.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -u yh -s -p yh324 $plot_type_short_name $commit
+	~/script/variation/src/DrawSNPRegion.py -i $tmp_fname -I /Network/Data/250k/tmp-yh/call_method_17.tsv -N /Network/Data/250k/tmp-yh/phenotype.tsv -l 28 -o /Network/Data/250k/tmp-yh/snp_region -j /Network/Data/250k/tmp-yh/at_gene_model_pickelf -u yh -s -p secret $plot_type_short_name $commit
 done
     
