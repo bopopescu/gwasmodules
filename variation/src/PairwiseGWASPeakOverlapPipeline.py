@@ -5,21 +5,21 @@ Examples:
 	%s -i 1 -x 1 -c 20 -a 1 -o cnv20Analysis1BiologyCategory1_peakType1_pairwisePeakOverlap.xml -B condorpool -D condorpool
 		-u yh -z banyan
 	
-	%s -x 1 -l 80 -a 1 -o call80Analysis1_peakType1_pairwisePeakOverlap.xml -B condorpool -D condorpool
+	%s -x 1 -E 80 -a 1 -o call80Analysis1_peakType1_pairwisePeakOverlap.xml -B condorpool -D condorpool
 		-u yh -z banyan
 	
-	%s -x 3 -l 80 -a 32 -o call80Analysis32_peakType3_pairwisePeakOverlap.xml -B condorpool -D condorpool
+	%s -x 3 -E 80 -a 32 -o call80Analysis32_peakType3_pairwisePeakOverlap.xml -B condorpool -D condorpool
 		-u yh -z banyan
 	
-	%s -x 2 -l 32 -a 1 -o call32Analysis1_peakType2_pairwisePeakOverlap.xml -B condorpool -D condorpool
+	%s -x 2 -E 32 -a 1 -o call32Analysis1_peakType2_pairwisePeakOverlap.xml -B condorpool -D condorpool
 		-u yh -z banyan
 	
 	#2012.2.28
-	%s -x 2 -l 32 -a 1 -i 1 -o call32Analysis1_peakType2_biologyCategory1_publicPhenotype_pairwisePeakOverlap.xml
+	%s -x 2 -E 32 -a 1 -i 1 -o call32Analysis1_peakType2_biologyCategory1_publicPhenotype_pairwisePeakOverlap.xml
 		-B condorpool -D condorpool -u yh -z banyan -s1
 	
 	#2012.2.28
-	%s -x 1 -l 80 -a 1 -i 1 -o call80Analysis1_peakType1_biologyCategory1_publicPhenotype_pairwisePeakOverlap.xml
+	%s -x 1 -E 80 -a 1 -i 1 -o call80Analysis1_peakType1_biologyCategory1_publicPhenotype_pairwisePeakOverlap.xml
 		-B condorpool -D condorpool -u yh -z banyan -s1
 	
 Description:
@@ -50,8 +50,8 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 						}
 	option_default_dict.update(common_option_dict)
 	option_default_dict.update({
-						('result_id_ls', 0, ): [None, 'j', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
-						('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
+						('result_id_ls', 0, ): [None, 'w', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
+						('call_method_id', 0, int):[None, 'E', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 						('cnv_method_id', 0, int):[None, 'c', 1, 'Restrict results based on this cnv_method. Default is no such restriction.'],\
 						('analysis_method_id_ls', 0, ):[1, 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
 						('result_peak_type_id', 1, int): [None, 'x', 1, 'peak type id for result peaks'],\
@@ -215,8 +215,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		result_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result_id_ls, self.result_peak_type_id)
 		
 		# Create a abstract dag
-		workflowName = os.path.splitext(os.path.basename(self.outputFname))[0]
-		workflow = self.initiateWorkflow(workflowName)
+		workflow = self.initiateWorkflow()
 		
 		self.registerExecutables(workflow)
 		self.registerCustomExecutables(workflow)
@@ -268,7 +267,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		sys.stderr.write("%s gwas peak overlap jobs.\n"%(counter))
 		# Write the DAX to stdout
 		outf = open(self.outputFname, 'w')
-		workflow.writeXML(outf)
+		self.writeXML(outf)
 
 
 if __name__ == '__main__':

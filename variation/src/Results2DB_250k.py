@@ -3,18 +3,18 @@
 
 Examples:
 	#test run without commiting database (no records in database in the end)
-	./src/Results2DB_250k.py -i /home/nordborglab/pvalue.log -a 1 -e 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh
+	./src/Results2DB_250k.py -i /home/nordborglab/pvalue.log -a 1 -E 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh
 	
 	#commit transaction
-	./src/Results2DB_250k.py -i /home/nordborglab/pvalue.log -a 1 -e 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh -c
+	./src/Results2DB_250k.py -i /home/nordborglab/pvalue.log -a 1 -E 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh -c
 	
 	#omit short_name
-	Results2DB_250k.py -a 17 -e 186 -i /Network/KW_newDataset_186_Bact_titer.pvals -l 1 -u yh -c
+	Results2DB_250k.py -a 17 -E 186 -i /Network/KW_newDataset_186_Bact_titer.pvals -l 1 -u yh -c
 	
 	# 2011-2-24 submit cnv association results (locus identified by CNV.ID) into db.
 	# set the call_method_id (-a) to -1 so that no call method will be fetched from db.
 	Results2DB_250k.py -i cnvMethod20_cnvID/cnvMethod20_cnvID_y1_pheno_pheno_183_Trichome\ avg\ C.tsv 
-		-g 20 -a -1 -e 183 -l 1 -u yh -z banyan -s 3 -c
+		-g 20 -a -1 -E 183 -l 1 -u yh -z banyan -s 3 -c
 	
 Description:
 	This program would submit simple association results into database.
@@ -44,6 +44,7 @@ from pymodule import figureOutDelimiter, PassingData
 
 import sqlalchemy as sql
 from common import getOneResultJsonData
+from pymodule.pegasus.mapper.AbstractDBInteractingJob import AbstractDBInteractingJob
 
 """
 2008-04-16 temporarily put here
@@ -52,30 +53,32 @@ from common import getOneResultJsonData
 	-a ...,	data_description*	which data you used
 """
 
-class Results2DB_250k(object):
+class Results2DB_250k(AbstractDBInteractingJob):
 	__doc__ = __doc__	#use documentation in the beginning of the file as this class's doc
-	option_default_dict = {
-						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+	"""
+	('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
 						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['stock_250k', 'd', 1, '', ],\
 						('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-						('input_fname',1, ): [None, 'i', 1, 'File containing association results'],\
+	"""
+	option_default_dict = AbstractDBInteractingJob.option_default_dict.copy()
+	option_default_dict.pop(('outputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
 						('output_dir',1, ): ['/Network/Data/250k/db/results/', 'o', 1, 'file system storage for the results files. results_method.filename'],\
-						('short_name', 0, ): [None, 'f', 1, 'short name for this result. Must be unique from previous ones. combining phenotype, data, method is a good one. If not given, will be automatically generated.' ],\
-						('phenotype_method_id',1,int): [None, 'e', 1, 'which phenotype you used, check table phenotype_method'],\
+						('short_name', 0, ): [None, 'f', 1, 'short name for this result. Must be unique from previous ones. \
+							combining phenotype, data, method is a good one. If not given, will be automatically generated.' ],\
+						('phenotype_method_id',1,int): [None, 'E', 1, 'which phenotype you used, check table phenotype_method'],\
 						('call_method_id', 1, int ): [None, 'a', 1, 'data from which call_method, field id in table call_method'],\
 						('data_description', 0, ): [None, 'n', 1, 'Describe how your data is derived from that call method. like non-redundant set, 1st 96, etc.'],\
 						('method_description', 0, ): [None, 'm', 1, 'Describe your method and what type of score, association (-log or not), recombination etc.'],\
 						('results_method_type_id', 1, int): [1, 's', 1, 'which type of method. field id in table results_method_type. 1="association"',],\
 						('analysis_method_id', 1, int): [None, 'l', 1, ''],\
-						('cnv_method_id', 1, int): [None, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
+						('cnv_method_id', 0, int): [0, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
 						('comment',0, ): [None, 't', 1, 'Anything more worth for other people to know?'],\
-						('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
-						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
-						}
+						})
 	
 	pa_has_characters = re.compile(r'[a-zA-Z_]')	#2008-05-30 check if a string has character in it, used to judge whether the 1st line is header or not.
 	"""
@@ -90,9 +93,21 @@ class Results2DB_250k(object):
 			use ProcessOptions, newer option handling class
 		2008-04-16
 		"""
+		AbstractDBInteractingJob.__init__(self, inputFnameLs=None, **keywords)
 		
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+	
+	def connectDB(self):
+		"""
+		2012.6.5
+			overwrite the parent class
+		"""
+		self.db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
+				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema,\
+				port=self.port)
+		self.db.setup(create_tables=False)
+		
 	
 	def check_if_phenotype_method_id_in_db(self, curs, phenotype_method_table, phenotype_method_id):
 		"""
@@ -379,6 +394,8 @@ class Results2DB_250k(object):
 				analysis_method_id=None, results_method_type_short_name=None, output_dir=None, commit=0,\
 				cnv_method_id=None):
 		"""
+		2012.6.6
+			pass db to getOneResultJsonData()
 		2012.3.9
 			add locus_type_id to ResultsMethod
 		2011-2-22
@@ -424,9 +441,14 @@ class Results2DB_250k(object):
 		if not pm:
 			sys.stderr.write("No phenotype method available for phenotype_method_id=%s.\n"%phenotype_method_id)
 			sys.exit(3)
-		
-		cm = CallMethod.query.get(call_method_id)
-		cnv_m = Stock_250kDB.CNVMethod.get(cnv_method_id)
+		if call_method_id:	#2012.6.6
+			cm = CallMethod.query.get(call_method_id)
+		else:
+			cm = None
+		if cnv_method_id:	#2012.6.6 this could None
+			cnv_m = Stock_250kDB.CNVMethod.get(cnv_method_id)
+		else:
+			cnv_m = None
 		if not cm and not cnv_m:
 			sys.stderr.write("Neither call method (%s) nor cnv method (%s) available.\n"%(call_method_id, cnv_method_id))
 			sys.exit(3)
@@ -492,7 +514,7 @@ class Results2DB_250k(object):
 							db.cnv_id2chr_pos = cnv_m.id
 						db_id2chr_pos = db.cnv_id2chr_pos
 					pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
-					json_data = getOneResultJsonData(rm, min_MAF, no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
+					json_data = getOneResultJsonData(rm, db_250k=db, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
 					rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
 					rm_json.result = rm
 					rm_json.json_data = json_data
@@ -522,18 +544,21 @@ class Results2DB_250k(object):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
-		db.setup()
+		
 		#db = Stock_250kDatabase(username=self.user,
 		#		   password=self.passwd, hostname=self.hostname, database=self.dbname)
-		if not os.path.isfile(self.input_fname):
-			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.input_fname))
+		if not os.path.isfile(self.inputFname):
+			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.inputFname))
 			sys.exit(3)
-		self.plone_run(db, self.short_name, self.phenotype_method_id, self.call_method_id, self.data_description, \
-				self.method_description, self.comment, self.input_fname, self.db_user, results_method_type_id=self.results_method_type_id,\
+		self.plone_run(self.db, self.short_name, self.phenotype_method_id, self.call_method_id, self.data_description, \
+				self.method_description, self.comment, self.inputFname, self.db_user, results_method_type_id=self.results_method_type_id,\
 				analysis_method_id=self.analysis_method_id, output_dir=self.output_dir, commit=self.commit,
 				cnv_method_id=self.cnv_method_id)
+		#2012.6.5
+		if self.logFilename:
+			logFile = open(self.logFilename, 'w')
+			logFile.write("submission done.\n")
+			logFile.close()
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

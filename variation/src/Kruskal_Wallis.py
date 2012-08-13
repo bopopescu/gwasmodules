@@ -2,7 +2,9 @@
 """
 
 Examples:
-	./src/Kruskal_Wallis.py -i /tmp/250K_method_5_after_imputation_noRedundant_051908.tsv -p /Network/Data/250k/finalData_051808/phenotypes.tsv -e -r -o /tmp/250K_method_5_after_imputation_noRedundant_051908.LD.pvalue
+	%s -i /tmp/250K_method_5_after_imputation_noRedundant_051908.tsv
+		-P /Network/Data/250k/finalData_051808/phenotypes.tsv -E -r
+		-o /tmp/250K_method_5_after_imputation_noRedundant_051908.LD.pvalue
 
 Description:
 	class to do kruskal wallis test on SNP data.
@@ -20,13 +22,15 @@ Description:
 """
 
 import sys, os, math
-bit_number = math.log(sys.maxint)/math.log(2)
-if bit_number>40:       #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
-else:   #32bit
-	sys.path.insert(0, os.path.expanduser('~/lib/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+__doc__ = __doc__%(sys.argv[0])
+#bit_number = math.log(sys.maxint)/math.log(2)
+#if bit_number>40:       #64bit
+#	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
+#	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
+#else:   #32bit
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
 import csv, numpy
 from pymodule import read_data, ProcessOptions, PassingData
 
@@ -51,14 +55,18 @@ def returnTop2Allele(snp_allele2count):
 
 class Kruskal_Wallis:
 	__doc__ = __doc__
-	option_default_dict = {('input_fname', 1, ): ['', 'i', 1, 'input genotype matrix. Strain X SNP format.', ],\
-							('output_fname', 1, ): ['', 'o', 1, 'store the pvalue', ],\
-							('phenotype_fname', 1, ): [None, 'p', 1, 'phenotype file, "NA" or empty is regarded as missing value.', ],\
-							('minus_log_pvalue', 0, ): [0, 'e', 0, 'toggle -log(pvalue)', ],\
-							('which_phenotype', 1, int): [0, 'w', 1, 'which phenotype, 0=first phenotype (3rd column in phenotype_fname) and so on.',],\
-							('min_data_point', 1, int): [3, 'm', 1, 'minimum number of ecotypes for either alleles of a single SNP to be eligible for kruskal wallis test'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	common_option_dict = {('input_fname', 1, ): ['', 'i', 1, 'input genotype matrix. Strain X SNP format.', ],\
+						('phenotype_fname', 1, ): [None, 'P', 1, 'phenotype file, "NA" or empty is regarded as missing value.', ],\
+						('minus_log_pvalue', 0, ): [0, 'E', 0, 'toggle -log(pvalue)', ],\
+						('min_data_point', 1, int): [3, 'm', 1, 'minimum number of ecotypes for either alleles of a single SNP to be eligible for kruskal wallis test'],\
+						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	option_default_dict = {}
+	option_default_dict.update(common_option_dict.copy())
+	option_default_dict.update({
+				('which_phenotype', 1, int): [0, 'w', 1, 'which phenotype, 0=first phenotype (3rd column in phenotype_fname) and so on.',],\
+				('output_fname', 1, ): ['', 'o', 1, 'store the pvalue', ],\
+				})
 	def __init__(self, **keywords):
 		"""
 		2008-02-14

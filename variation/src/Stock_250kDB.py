@@ -113,7 +113,7 @@ class BiologyCategory(Entity):
 	description = Field(String(8192))
 	gene_list_type_ls = OneToMany("%s.GeneListType"%__name__)
 	phenotype_method_ls = OneToMany("%s.PhenotypeMethod"%__name__)
-	preferred_gene_list = ManyToOne('%s.GeneListType'%__name__, colname='preferred_list_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	preferred_list_type_id = Field(Integer)	#2012.7.9 not a foreign key anymore as it causes cyclic dependency (check GeneListType)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
@@ -418,6 +418,8 @@ class PhenotypeMethod(Entity):
 		
 class AnalysisMethod(Entity):
 	"""
+	2012.6.5
+		add column association_test_type
 	2009-5-14
 		add min_MAF
 	2008-09-16
@@ -427,6 +429,7 @@ class AnalysisMethod(Entity):
 	method_description = Field(String(8000))
 	min_maf = Field(Float)
 	smaller_score_more_significant = Field(Integer)
+	association_test_type = Field(Integer)	#2012.6.5 corresponds to Association.py's test_type
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
@@ -563,20 +566,22 @@ class ResultLandscape(Entity):
 
 class ResultPeak(Entity):
 	"""
+	2012.6.22 add column association_locus
 	2011-4-19
 		table to store the peaks of association result
 	"""
-	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
-	result_peak_type = ManyToOne('ResultPeakType', colname='result_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	result = ManyToOne('%s.ResultsMethod'%__name__, colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
+	result_peak_type = ManyToOne('%s.ResultPeakType'%__name__, colname='result_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
-	start_locus = ManyToOne('Snps', colname='start_locus_id', ondelete='CASCADE', onupdate='CASCADE')
-	stop_locus = ManyToOne('Snps', colname='stop_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	start_locus = ManyToOne('%s.Snps'%__name__, colname='start_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	stop_locus = ManyToOne('%s.Snps'%__name__, colname='stop_locus_id', ondelete='CASCADE', onupdate='CASCADE')
 	no_of_loci = Field(Integer)	#number of loci in between stop_locus of start_bridge and start_locus of stop_bridge,
 	# including the two as well.
-	peak_locus = ManyToOne('Snps', colname='peak_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	peak_locus = ManyToOne('%s.Snps'%__name__, colname='peak_locus_id', ondelete='CASCADE', onupdate='CASCADE')
 	peak_score = Field(Float)
+	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='CASCADE', onupdate='CASCADE')
 	comment = Field(Text)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
@@ -585,6 +590,46 @@ class ResultPeak(Entity):
 	using_options(tablename='result_peak', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('result_id', 'result_peak_type_id', 'chromosome', 'start', 'stop'))
+
+
+class AssociationLocus(Entity):
+	#2012.6.22
+	chromosome = Field(String(256))
+	start = Field(Integer)
+	stop = Field(Integer)
+	threshold = Field(Float)
+	connectivity = Field(Float)
+	no_of_peaks = Field(Integer)
+	comment = Field(Text)
+	result_peak_ls = OneToMany("%s.ResultPeak"%(__name__))
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_locus', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('chromosome', 'start', 'stop', 'threshold'))
+
+
+class AssociationLocusStat(Entity):
+	#2012.6.22
+	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_phenotypes = Field(Integer)
+	biology_category = ManyToOne("%s.BiologyCategory"%__name__, colname='biology_category_id', ondelete='CASCADE', onupdate='CASCADE')
+	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	result_peak_type = ManyToOne('%s.ResultPeakType'%__name__, colname='result_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	#result_peak_type_id = Field(Integer)
+	comment = Field(Text)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_locus_stat', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('association_locus_id', 'biology_category_id', 'call_method_id', 'analysis_method_id', \
+										'result_peak_type_id'))
+
 
 
 class ResultPeakType(Entity):
@@ -2199,16 +2244,8 @@ class Stock_250kDB(ElixirDB):
 			#handler.setFormatter(formatter)
 			#my_logger.addHandler(handler)
 			my_logger.setLevel(logging.DEBUG)
-		if getattr(self, 'schema', None):	#for postgres
-			for entity in entities:
-				if entity.__module__==self.__module__:	#entity in the same module
-					using_table_options_handler(entity, schema=self.schema)
+		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 		
-		#2008-10-05 MySQL typically close connections after 8 hours resulting in a "MySQL server has gone away" error.
-		__metadata__.bind = create_engine(self._url, pool_recycle=self.pool_recycle, echo=self.sql_echo)
-		
-		self.metadata = __metadata__
-		self.session = __session__
 		
 		self._cnv_id2chr_pos = {}	#2011-2-24
 		self._cnv_method_id = None	#2011-2-24
@@ -2420,7 +2457,6 @@ class Stock_250kDB(ElixirDB):
 						(len(snpInfo.snps_id2index), len(snpInfo.locusRBDict), snpInfo.no_of_same_position_loci))
 		return snpInfo
 	
-		
 	def getNonCNVSnpsID2CNVSnpsID(self, cnv_locus_type_id=2):
 		"""
 		2012-3.20
@@ -2436,6 +2472,46 @@ class Stock_250kDB(ElixirDB):
 			dc[row.sid] = row.tid
 		
 		sys.stderr.write("%s entries.\n"%(len(dc)))
+		return dc
+	
+	def getSNPsID2SpecificTypeSNPsID(self, locus_type_id=1, priorTAIRVersion=False):
+		"""
+		2012.4.24
+			Some SNP db ID were mixed up with recombination locus db ID / CNV locus db ID or vice versa.
+			
+			An example is some old SNP datasets in which tair8_chromosome, tair8_position are shared by one SNP and one recombination locus.
+			In the eventual SNP dataset (locus was marked with DB ID), instead of SNP db ID, some SNPs have recombination locus DB ID.
+			
+			This function provides a map to translate these wrong DB IDs back to the correct ones
+				based on tair8_chromosome, tair8_position from table snps.
+			This function is similar to getNonCNVSnpsID2CNVSnpsID() and is more flexible.
+		"""
+		if priorTAIRVersion==True:
+			chromosome_table_fieldname = 'tair8_chromosome'
+			position_table_fieldname = 'tair8_position'
+			endPositionFieldName = 'end_position'
+		else:
+			chromosome_table_fieldname = 'chromosome'
+			position_table_fieldname = 'position'
+			endPositionFieldName = 'end_position'
+		sys.stderr.write("Getting a map from Snps.id to Snps.id with locus_type_id=%s based on matching (%s, %s)  ..."%\
+						(locus_type_id, chromosome_table_fieldname, position_table_fieldname))
+		dc= {}
+		query = self.metadata.bind.execute("select s1.id as sid, s2.id as tid from (select id, %s, %s from %s) as s1, \
+			(select id, %s, %s from %s where locus_type_id=%s) as s2 \
+			where s1.%s=s2.%s and s1.%s=s2.%s"%(chromosome_table_fieldname, position_table_fieldname, Snps.table.name, \
+			chromosome_table_fieldname, position_table_fieldname, Snps.table.name, locus_type_id, \
+			chromosome_table_fieldname, chromosome_table_fieldname, position_table_fieldname, position_table_fieldname))
+		counter = 0
+		real_counter = 0
+		for row in query:
+			counter += 1
+			if row.sid!=row.tid:
+				real_counter += 1
+			
+			dc[row.sid] = row.tid
+		
+		sys.stderr.write("%s out of %s entries were linked to a differing Snps.id.\n"%(real_counter, len(dc)))
 		return dc
 	
 	@classmethod
@@ -3530,6 +3606,8 @@ class Stock_250kDB(ElixirDB):
 	def getResultLs(self, call_method_id=None, analysis_method_id_ls=[], phenotype_method_id_ls=[], \
 				call_method_id_ls=[], cnv_method_id=None):
 		"""
+		2012.6.28
+			handle the query it differently when datasetConditionLS has only one entry
 		2011-10-16
 			add argument call_method_id_ls & cnv_method_id
 		2011-10-12
@@ -3547,7 +3625,10 @@ class Stock_250kDB(ElixirDB):
 			datasetConditionLS.append(ResultsMethod.cnv_method_id==cnv_method_id)
 		
 		if datasetConditionLS:
-			query = query.filter(or_(*datasetConditionLS))
+			if len(datasetConditionLS)>1:
+				query = query.filter(or_(*datasetConditionLS))
+			elif len(datasetConditionLS)==1:	#only one
+				query = query.filter(datasetConditionLS[0])
 		
 		if analysis_method_id_ls:
 			query = query.filter(ResultsMethod.analysis_method_id.in_(analysis_method_id_ls))
@@ -3626,6 +3707,8 @@ class Stock_250kDB(ElixirDB):
 	
 	def constructRBDictFromResultPeak(self, result_id, result_peak_type_id, peakPadding=10000):
 		"""
+		2012.6.24
+			add attributes to result_peakRBDict 
 		2012.3.19
 			moved from variation.src.TwoGWASPeakOverlap
 		2011-10-16
@@ -3634,6 +3717,9 @@ class Stock_250kDB(ElixirDB):
 		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		from pymodule.RBTree import RBDict
 		result_peakRBDict = RBDict()
+		result_peakRBDict.result_id = result_id	#2012.6.22
+		result_peakRBDict.result_peak_type_id = result_peak_type_id	#2012.6.22
+		result_peakRBDict.peakPadding = peakPadding
 		query = ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id)
 		counter = 0
 		real_counter = 0
@@ -3641,7 +3727,7 @@ class Stock_250kDB(ElixirDB):
 			counter += 1
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
 							span_ls=[max(1, row.start - peakPadding), row.stop + peakPadding], \
-							min_reciprocal_overlap=1,)
+							min_reciprocal_overlap=1, result_peak_id=row.id)
 							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
 			if segmentKey not in result_peakRBDict:
 				result_peakRBDict[segmentKey] = []
@@ -3665,6 +3751,22 @@ class Stock_250kDB(ElixirDB):
 				new_result_id_ls.append(result_id)
 		sys.stderr.write(" %s entries left.\n"%(len(new_result_id_ls)))
 		return new_result_id_ls
+	
+	def getAssociationLocus(self, chromosome=None, start=None, stop=None, no_of_peaks=None, connectivity=None,\
+						threshold=None, result_peak_ls=None):
+		"""
+		2012.6.28
+		"""
+		association_locus = AssociationLocus.query.filter_by(chromosome=chromosome).filter_by(start=start).filter_by(stop=stop).\
+			filter_by(threshold=threshold).first()
+		
+		if not association_locus:
+			association_locus = AssociationLocus(chromosome=chromosome, start=start, stop=stop, threshold=threshold,\
+							no_of_peaks=no_of_peaks, connectivity=connectivity)
+			association_locus.result_peak_ls = result_peak_ls
+			self.session.add(association_locus)
+			#self.session.flush()
+		return association_locus
 	
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

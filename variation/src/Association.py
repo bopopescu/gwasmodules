@@ -3,43 +3,43 @@
 
 Examples:
 	#try kruskal wallis
-	Association.py -i /tmp/250K_method_5_after_imputation_noRedundant_051908.tsv -p /Network/Data/250k/finalData_051808/phenotypes.tsv -e -r -o /tmp/250K_method_5_after_imputation_noRedundant_051908.LD.pvalue
+	%s -i /tmp/250K_method_5_after_imputation_noRedundant_051908.tsv -P /Network/Data/250k/finalData_051808/phenotypes.tsv -E -r -o /tmp/250K_method_5_after_imputation_noRedundant_051908.LD.pvalue
 	
 	#try linear model
-	Association.py -i /Network/Data/250k/tmp-yh/call_method_17_test.tsv -p ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_lm.tsv -y2
+	%s -i /Network/Data/250k/tmp-yh/call_method_17_test.tsv -P ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_lm.tsv -y2
 	
 	#try emma (linear mixture model) on 1st 7 phenotypes
-	Association.py -i ./mnt2/panfs/250k/call_method_17.tsv -p ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_y3.tsv  -y3 -w 1-7
+	%s -i ./mnt2/panfs/250k/call_method_17.tsv -P ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_y3.tsv  -y3 -w 1-7
 
 	#linear model with principal components 0 to 9, phenotype from 1 to 7
-	Association.py -i /Network/Data/250k/tmp-yh/call_method_17.tsv -p /Network/Data/250k/tmp-yh/phenotype.tsv -y4 -o /Network/Data/250k/tmp-yh/eigenstrat//call_method_17_lm_with_pc0_9 -W 0-9 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -r -w 1-7
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -y4 -o /Network/Data/250k/tmp-yh/eigenstrat//call_method_17_lm_with_pc0_9 -W 0-9 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -r -w 1-7
 	
 	#linear model with PCs 0 to 1, phenotype from 1 to 5. the PCs are calculated on the fly according to the snp input file.
-	Association.py -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_chr4_100000_700000.tsv -p /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_chr4_100000_700000_y4_pc0_1 -W 0-1 -y 4 -w 1-5 -r
+	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_chr4_100000_700000.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_chr4_100000_700000_y4_pc0_1 -W 0-1 -y 4 -w 1-5 -r
 	
 	#y = SNP + environment + noise, for phenotype 1 & 2
-	Association.py -i /Network/Data/250k/tmp-yh/call_method_17.tsv -p /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y5.tsv -y5 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y5.tsv -y5 -w 1,2 -r
 	
 	#y = SNP + environment + PC1 + PC2 + noise, for phenotype 1 & 2
-	Association.py -i /Network/Data/250k/tmp-yh/call_method_17.tsv -p /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y5.tsv -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y5 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y5.tsv -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y5 -w 1,2 -r
 	
 	#y = SNP + environment + SNP X environ + noise, for phenotype 1 & 2
-	Association.py -i /Network/Data/250k/tmp-yh/call_method_17.tsv -p /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y6.tsv -y6 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y6.tsv -y6 -w 1,2 -r
 	
 	#y = SNP + environment + SNP X environ + PC1 + PC2 + noise, for phenotype 1 & 2
-	Association.py -i /Network/Data/250k/tmp-yh/call_method_17.tsv -p /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y6.tsv -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y6 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y6.tsv -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y6 -w 1,2 -r
 	
 	# 2010-2-1 EMMAX
-	~/script/variation/src/Association.py -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv -p /Network/Data/250k/tmp-yh//phenotype.tsv -o /tmp/call_method_17_y8.tsv  -y8 -w 1
+	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv -P /Network/Data/250k/tmp-yh//phenotype.tsv -o /tmp/call_method_17_y8.tsv  -y8 -w 1
 	
 	#2010-8-7 Run KW on binary (0-1) CNV deletion data. -n is added to turn off snpAlleleOrdinalConversion.
-	Association.py -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -p ~/panfs/250k/phenotype/phenotype.tsv
+	%s -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -P ~/panfs/250k/phenotype/phenotype.tsv
 		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y1_pheno.tsv -y1 -w 1-7 -n
 	
 	# 2011-4-27 run EMMAX on cnv-turned-into-SNP dataset with precomputed kinship matrix (same format as snp data in inputFname).
 	# "-n" is essential because in this CNV-SNP dataset, 0 is normal, not NA; 1 is deletion.
-	Association.py -i /Network/Data/250k/db/dataset/call_method_57.tsv -k ~/script/variation/data/JBLabSeasonFlowering/data/K.tsv
-		-p /Network/Data/250k/tmp-yh//phenotype/phenotype20100419.tsv -o /tmp/call_method_57_y8.tsv  -y8 -w 1 -n
+	%s -i /Network/Data/250k/db/dataset/call_method_57.tsv -K ~/script/variation/data/JBLabSeasonFlowering/data/K.tsv
+		-P /Network/Data/250k/tmp-yh//phenotype/phenotype20100419.tsv -o /tmp/call_method_57_y8.tsv  -y8 -w 1 -n
 	
 Description:
 	class to do association test on SNP data. option 'test_type' decides which test to run.
@@ -58,7 +58,9 @@ Description:
 """
 
 import sys, os, math
-bit_number = math.log(sys.maxint)/math.log(2)
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], \
+				sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
+#bit_number = math.log(sys.maxint)/math.log(2)
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv, numpy, traceback
@@ -66,7 +68,7 @@ from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOut
 from numpy import linalg
 
 from Kruskal_Wallis import Kruskal_Wallis
-#import rpy
+import rpy
 from sets import Set
 #from DrawEcotypeOnMap import DrawEcotypeOnMap
 
@@ -75,19 +77,35 @@ class Association(Kruskal_Wallis):
 	debug = 0
 	report = 0
 	__doc__ = __doc__
-	option_default_dict = Kruskal_Wallis.option_default_dict.copy()
-	option_default_dict.pop(("which_phenotype", 1, int))
-	option_default_dict.update({('phenotype_method_id_ls', 0, ): ['1', 'w', 1, 'which phenotypes to work on. a comma-dash-separated list phenotype_method ids in the phenotype file. Check db Table phenotype_method. \
-		if not available, take all phenotypes in the phenotype_fname.',]})
-	option_default_dict.update({('test_type', 1, int): [1, 'y', 1, 'Which type of test to do. 1:Kruskal_Wallis, 2:linear model(y=xb+e), 3:Emma, 4:LM with PCs, 5: LM two phenotypes with PCs, \
-		6: LM two phenotypes with PCs, GeneXEnvironment Interaction, 7: Emma for genotype matrix without NA (no MAC and MAF output), 8: EMMAX (variance matrix is estimated once)']})
-	option_default_dict.update({('eigen_vector_fname', 0, ): [None, 'f', 1, 'eigen vector file with PCs outputted by smartpca.perl from EIGENSOFT', ]})
-	option_default_dict.update({('kinship_fname', 0, ): [None, 'k', 1, 'file which contains the kinship matrix', ]})
-	option_default_dict.update({('genotype_fname_to_generate_kinship', 0, ): [None, 'g', 1, 'genotype file which is used to generate kinship, if not given, kinship will be generated from inputFname', ]})
-	option_default_dict.update({('which_PC_index_ls', 0, ): [None, 'W', 1, 'list of indices indicating which PC(s) from eigen_vector_fname should be used. format: 0,1-3', ]})
-	option_default_dict.update({('noSNPAlleleOrdinalConversion', 0, ): [0, 'n', 0, 'by default (exept test-type 4), it converts everything other than 0(=NA) into binary. toggle this for no such conversion.', ]})
-	
-	
+	option_default_dict = {}
+	common_option_dict = Kruskal_Wallis.common_option_dict.copy()
+	common_option_dict.update({
+							('phenotype_method_id_ls', 0, ): ['1', 'w', 1, 'which phenotypes to work on. \
+								a comma-dash-separated list phenotype_method ids in the phenotype file. \
+								Check db Table phenotype_method. \
+								if not available, take all phenotypes in the phenotype_fname.',],
+							('eigen_vector_fname', 0, ): [None, 'f', 1, 'eigen vector file with PCs outputted by smartpca.perl from EIGENSOFT', ],\
+							('kinship_fname', 0, ): [None, 'K', 1, 'file which contains the kinship matrix', ],\
+							('genotype_fname_to_generate_kinship', 0, ): [None, 'G', 1, 'genotype file which is used to generate kinship, \
+									if not given, kinship will be generated from inputFname', ],\
+							('which_PC_index_ls', 0, ): [None, 'W', 1, 'list of indices indicating which PC(s) from eigen_vector_fname should be used. format: 0,1-3', ],\
+							('noSNPAlleleOrdinalConversion', 0, ): [0, 'n', 0, 'by default (exept test-type 4), \
+								it converts everything other than 0(=NA) into binary. toggle this for no such conversion.', ],\
+							})
+	#common_option_dict will be inherited by AssociationWorkflow.py
+	option_default_dict.update(common_option_dict)
+	option_default_dict.update({
+						('output_fname', 1, ): ['', 'o', 1, 'file to store the pvalue. If multiple phenotypes are give, \
+							phenotype id will be attached.', ],\
+						('test_type', 1, int): [1, 'y', 1, 'Which type of test to do. \n\
+	1: Kruskal_Wallis, 2:linear model(y=xb+e), \n\
+	3: Emma, \n\
+	4: LM with PCs, \n\
+	5: LM two phenotypes with PCs, \n\
+	6: LM two phenotypes with PCs, GeneXEnvironment Interaction, \n\
+	7: Emma for genotype matrix without NA (no MAC and MAF output),\n\
+	8: EMMAX (variance matrix is estimated once)'],\
+						})
 	def __init__(self, **keywords):
 		"""
 		2008-11-10
@@ -1344,7 +1362,10 @@ class Association(Kruskal_Wallis):
 			else:
 				phenotype_name = initData.phenData.col_id_ls[which_phenotype]
 			phenotype_name = phenotype_name.replace('/', '_')	#'/' will be recognized as directory in output_fname
-			output_fname='%s_pheno_%s.tsv'%(os.path.splitext(self.output_fname)[0], phenotype_name)	#make up a new name corresponding to this phenotype
+			if len(which_phenotype_index_ls)==1:	#2012.6.5 only one phenotype, don't bother change output_fname
+				output_fname = self.output_fname
+			else:
+				output_fname='%s_pheno_%s.tsv'%(os.path.splitext(self.output_fname)[0], phenotype_name)	#make up a new name corresponding to this phenotype
 			results = self.run_whole_matrix[self.test_type](initData.snpData, initData.phenData.data_matrix[:, which_phenotype], \
 											self.min_data_point, PC_matrix=initData.PC_matrix, \
 											which_PC_index_ls=self.which_PC_index_ls, environment_matrix=environment_matrix,\

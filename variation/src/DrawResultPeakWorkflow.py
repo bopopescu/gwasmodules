@@ -316,11 +316,11 @@ class DrawResultPeakWorkflow(AbstractVariationWorkflow):
 		#add PickleSNPInfo job for each call method
 		call_method_id2JobData = {}
 		for call_method_id in call_method_id_set:
-			callMethod = Stock_250kDB.CallMethod.get(call_method_id)
+			call_method = Stock_250kDB.CallMethod.get(call_method_id)
 			snpMatrixFile = self.registerOneInputFile(workflow, \
-											db_250k.reScalePathByNewDataDir(filePath=callMethod.filename, newDataDir=results_directory),\
+											db_250k.reScalePathByNewDataDir(filePath=call_method.filename, newDataDir=results_directory),\
 											folderName=pegasusFolderName)
-			outputF = File(os.path.join(topOutputDir, 'SNPInfo_LocusType%s.pickle'%(callMethod.locus_type_id)))
+			outputF = File(os.path.join(topOutputDir, 'SNPInfo_LocusType%s.pickle'%(call_method.locus_type_id)))
 			pickleSNPInfoJob = self.addPickleSNPInfoJob(workflow, workflow.PickleSNPInfo, \
 									outputF=outputF, call_method_id=call_method_id, \
 									parentJobLs=[topOutputDirJob], job_max_memory=100, \
@@ -360,7 +360,7 @@ class DrawResultPeakWorkflow(AbstractVariationWorkflow):
 								extraDependentInputLs=[], transferOutput=True)
 				no_of_jobs += 1
 				for call_method_id in call_method_id_set:
-					callMethod = Stock_250kDB.CallMethod.get(call_method_id)
+					call_method = Stock_250kDB.CallMethod.get(call_method_id)
 					if call_method.locus_type_id==2:	#2012.3.27 CNV locus type. no need to convert alleles into binary form.
 						snp_matrix_data_type=4
 						#2012.3.26 these CNV-derived SNP dataset doesn't need its alleles to be converted to binary form as it's already binary.

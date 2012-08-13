@@ -199,6 +199,7 @@ class OutputMultiGWASOverlapPeakSpan(AbstractVariationMapper):
 				fileNamePrefixLs.append('cand_%s'%('_'.join(near_peak_candidate_gene_id_list)))
 			else:
 				fileNamePrefixLs.append("nonCand")
+			fileNamePrefixLs.append("chr%s_%s_%s"%(chromosome, min_start, max_stop))
 			peak_id_ls_str = map(str, cc)
 			fileNamePrefixLs.append("peak_id_%s"%('_'.join(peak_id_ls_str)))
 			

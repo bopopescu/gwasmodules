@@ -2,15 +2,15 @@
 """
 Examples:
 	# 2011-10-10 call method 80, analysis method 1, min_score 5
-	%s  -l 80 -a 1 -f 5 -o call80analysis1MinScore5.xml -u yh -z banyan -c -D condorpool
+	%s  -E 80 -a 1 -f 5 -o call80analysis1MinScore5.xml -u yh -z banyan -c -l condorpool
 	
 	# 2011-10-16 call method 57 or cnv method 20, analysis method 1, min score 4
-	%s -q 57 -A 20 -a 1 -f 4 -o call57cnv20analysis1MinScore4.xml -u yh -z banyan -c -D condorpool
+	%s -q 57 -A 20 -a 1 -f 4 -o call57cnv20analysis1MinScore4.xml -u yh -z banyan -c -l condorpool
 	
 	#ditto but analysis method 7 and min score 3 (make sure -c is added, otherwise nothing will be stored in db)
-	%s -q 57 -A 20 -a 7 -f 3 -o call57cnv20analysis7MinScore3.xml -u yh -z banyan -c -B condorpool -D condorpool
+	%s -q 57 -A 20 -a 7 -f 3 -o call57cnv20analysis7MinScore3.xml -u yh -z banyan -c -j condorpool -l condorpool
 	#ditto but analysis method 32
-	%s -q 57 -A 20 -a 32 -f 3 -o call57cnv20analysis32MinScore3.xml -u yh  -z banyan -c -B condorpool -D condorpool
+	%s -q 57 -A 20 -a 32 -f 3 -o call57cnv20analysis32MinScore3.xml -u yh  -z banyan -c -j condorpool -l condorpool
 
 Description:
 	2011-10-12
@@ -23,13 +23,13 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
 from sqlalchemy.types import LargeBinary
 
-bit_number = math.log(sys.maxint)/math.log(2)
-if bit_number>40:	   #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
-else:   #32bit
-	sys.path.insert(0, os.path.expanduser('~/lib/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+#bit_number = math.log(sys.maxint)/math.log(2)
+#if bit_number>40:	   #64bit
+#	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
+#	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
+#else:   #32bit
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import subprocess, cStringIO
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
@@ -41,8 +41,8 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 	__doc__ = __doc__
 	option_default_dict = AbstractVariationWorkflow.option_default_dict
 	option_default_dict.update({
-						('result_id_ls', 0, ): [None, 'j', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
-						('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
+						('result_id_ls', 0, ): [None, 'w', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
+						('call_method_id', 0, int):[None, 'E', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 						('call_method_id_ls', 0, ):[None, 'q', 1, 'Restrict results based on list of call_method_id. Default is no such restriction.'],\
 						('cnv_method_id', 0, int):[None, 'A', 1, 'Restrict results based on this cnv_method. Default is no such restriction.'],\
 						('analysis_method_id_ls', 0, ):['1,7', 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
@@ -88,7 +88,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 			self.phenotype_method_id_ls = []
 	
 	
-	def registerCustomExecutables(self, workflow):
+	def registerCustomExecutables(self, workflow=None):
 		"""
 		2012.2.15
 		"""
@@ -106,7 +106,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		workflow.addExecutable(defineAssociationLandscape)
 		workflow.defineAssociationLandscape = defineAssociationLandscape
 	
-	def addPeakFindingJob(self, workflow, executable=None, \
+	def addPeakFindingJob(self, workflow=None, executable=None, \
 							result_id=None, neighbor_distance=None, max_neighbor_distance=None,\
 							min_MAF=None, min_score=None, ground_score=None, tax_id=None, \
 							commit=0, results_directory=None, logFile=None,\
@@ -119,9 +119,8 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 			
 		"""
 		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
-		job.addArguments("-v", self.drivername, "-z", self.hostname, "-d", self.dbname, \
-						"-u", self.db_user, "-p", self.db_passwd,\
-						"-j", repr(int(result_id)), "-i", repr(neighbor_distance), \
+		self.addDBArgumentsToOneJob(job)
+		job.addArguments("-j", repr(int(result_id)), "-i", repr(neighbor_distance), \
 						"-m", repr(max_neighbor_distance), "-n", repr(min_MAF), "-f", repr(min_score),\
 						"-s", repr(ground_score), "-x", repr(tax_id))
 		if commit:
@@ -167,19 +166,19 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		for result in result_query:
 			result_id_ls.append(result.id)
 			
-		workflowName = os.path.splitext(os.path.basename(self.outputFname))[0]
-		workflow = self.initiateWorkflow(workflowName)
+		workflow = self.initiateWorkflow()
 		
-		self.registerExecutables(workflow)
+		self.registerExecutables()
 		self.registerCustomExecutables(workflow)
 		
 		counter = 0
 		for result_id in result_id_ls:
 			logFile = File('DefineAssociationPeak_%s.log'%(result_id))
 			rm = Stock_250kDB.ResultsMethod.get(result_id)
-			inputFile = self.registerOneInputFile(workflow, rm.filename)
+			inputFile = self.registerOneInputFile(inputFname=rm.filename)
 			peakFindingJob = self.addPeakFindingJob(workflow, executable=workflow.defineAssociationLandscape, \
-							result_id=result_id, neighbor_distance=self.neighbor_distance, max_neighbor_distance=self.max_neighbor_distance,\
+							result_id=result_id, neighbor_distance=self.neighbor_distance, \
+							max_neighbor_distance=self.max_neighbor_distance,\
 							min_MAF=self.min_MAF, min_score=self.min_score, ground_score=self.ground_score, tax_id=self.tax_id, \
 							commit=self.commit, results_directory=self.results_directory, logFile=logFile,\
 							parentJobLs=[], \
@@ -189,7 +188,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		sys.stderr.write("%s DefineAssociationLandscape jobs.\n"%(counter))
 		# Write the DAX to stdout
 		outf = open(self.outputFname, 'w')
-		workflow.writeXML(outf)
+		self.writeXML(outf)
 		
 
 

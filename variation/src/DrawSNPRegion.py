@@ -1069,7 +1069,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				fileNamePrefix = this_snp.fileNamePrefix[:maxPrefixLength]
 			else:
 				fileNamePrefix = this_snp.fileNamePrefix
-			fname_basename = "%s_%s"%(fileNamePrefix, fname_basename)
+			fname_basename = "%s_call%s_phenotype_%s_%s"%(fileNamePrefix, call_method_id, phenotype.id, phenotype.getProperShortName())
 		fname_basename = fname_basename.replace('/', '_')	#to avoid file system error
 		if os.path.isdir(output_dir):
 			output_fname_prefix = os.path.join(output_dir, fname_basename)

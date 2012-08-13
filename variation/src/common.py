@@ -571,6 +571,7 @@ def getResultForComparison(rm_x, rm_y, db_250k=None, no_of_top_snps = 500):
 
 def getOneResultJsonData(rm, db_250k=None, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
 	"""
+	2012.6.6 bugfix. add change param_data to pdata in calling  db_250k.getResultMethodContent()
 	2011-2-24
 		add argument pdata, to pass db_id2chr_pos to getGenomeWideResultFromFile() in pymodule/SNP.py
 	2010-5-3
@@ -584,7 +585,8 @@ def getOneResultJsonData(rm, db_250k=None, min_MAF=0.0, no_of_top_snps=10000, pd
 	if pdata is None:	#2011-2-24 create a PassingData() only when
 		pdata = PassingData(min_MAF=min_MAF)
 	from GeneListRankTest import GeneListRankTest
-	genome_wide_result = db_250k.getResultMethodContent(rm.id, min_MAF=min_MAF, pdata=param_data)
+	genome_wide_result = db_250k.getResultMethodContent(rm.id, min_MAF=min_MAF, pdata=pdata,\
+													results_directory=getattr(pdata, 'results_directory', None))
 	no_of_tests = len(genome_wide_result.data_obj_ls)
 	max_value = genome_wide_result.max_value
 	chr2length = {}

@@ -8052,6 +8052,15 @@ class DB250k(object):
 					DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
 		sys.exit(0)
 		
+		#2012.3.27 Error happened in translating SNP Ids for numerous call methods (non-SNP loci, CNV or recombination locus IDs got mixed in).
+		call_method_id=32
+		for call_method_id in xrange(18,73):
+			if call_method_id!=57 and call_method_id!=32:	#57 is CNV-derived. 32 has been done a moment ago.
+				call_method = DB250k.bringBackOldCallMethodDataset(db_250k, call_method_id=call_method_id)
+				if call_method:	#not None
+					DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
+		sys.exit(0)
+		
 	"""
 	
 	@classmethod
@@ -8821,6 +8830,55 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 		sys.exit(0)
 	"""
 	
+	@classmethod
+	def fixSNPDatasetWithWrongSNPDBID(cls, db_250k, inputFname=None, wrongSnpsID2SnpsID=None):
+		"""
+		2012.4.22
+			This function is to fix some old SNP datasets in which (tair8_chromosome, tair8_position) is shared by one SNP and one recombination locus.
+			In the eventual SNP dataset (locus was marked with DB ID), instead of SNP db ID, some SNPs have recombination locus DB ID.
+			
+			This function provides a map to translate these wrong DB IDs back to the correct ones
+				based on tair8_chromosome, tair8_position from table snps.
+			This function is similar to getNonCNVSnpsID2CNVSnpsID() and is more flexible.
+		"""
+		import csv
+		no_of_lines = 0
+		no_of_lines_after_conversion = 0
+		sys.stderr.write("...")
+		from pymodule import utils
+		# backup the old file first
+		oldFormatFname = utils.getDateStampedFilename(inputFname)
+		oldFormatFname = '%s.withWrongSnps.id.tsv'%(os.path.splitext(oldFormatFname)[0])
+		os.rename(inputFname, oldFormatFname)
+		# writing data into the old filename in new format
+		reader = csv.reader(open(oldFormatFname), delimiter='\t')
+		header_row = reader.next()
+		new_header_row = header_row[:2]	#first two columns are not locus ID.
+		no_of_changed_cols = 0
+		for col_id in header_row[2:]:
+			col_id = int(col_id)
+			new_col_id = wrongSnpsID2SnpsID.get(col_id, col_id)	#if col_id is not in the map, return col_id.
+			if col_id!=new_col_id:
+				no_of_changed_cols += 1
+			new_header_row.append(new_col_id)
+		sys.stderr.write("%s columns have changed its ID.\n"%(no_of_changed_cols))
+		writer = csv.writer(open(inputFname, 'w'), delimiter='\t')
+		writer.writerow(new_header_row)
+		for row in reader:
+			no_of_lines += 1
+			writer.writerow(row)
+		del reader, writer
+		sys.stderr.write("%s lines written.\n"%(no_of_lines))
+	
+	"""
+		#2012.4.24 errors happened  in translating SNP Ids for numerous call methods (non-SNP loci, CNV or recombination locus IDs got mixed in).
+		# and no old format call dataset files are available for these call methods.
+		SNPsID2SNPOnlySNPsID = db_250k.getSNPsID2SpecificTypeSNPsID(locus_type_id=1, priorTAIRVersion=True)
+		for inputFname in ['/Network/Data/250k/db/dataset/call_method_72.tsv', '/Network/Data/250k/db/dataset/call_method_73.tsv',\
+				'/Network/Data/250k/db/dataset/call_method_75.tsv']:
+			DB250k.fixSNPDatasetWithWrongSNPDBID(db_250k, inputFname, wrongSnpsID2SnpsID=SNPsID2SNPOnlySNPsID)
+		sys.exit(0)
+	"""
 	
 	@classmethod
 	def convertSNPDatasetLocusIDIntoDBID(cls, db_250k, input_fname=None, output_fname=None, priorTAIRVersion=True, locus_type_id=1):
@@ -21057,17 +21115,6 @@ class Main(object):
 		#import MySQLdb
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
-		
-		
-		
-		#2012.3.27 Error happened in translating SNP Ids for numerous call methods (non-SNP loci, CNV or recombination locus IDs got mixed in).
-		call_method_id=32
-		for call_method_id in xrange(18,73):
-			if call_method_id!=57 and call_method_id!=32:	#57 is CNV-derived. 32 has been done a moment ago.
-				call_method = DB250k.bringBackOldCallMethodDataset(db_250k, call_method_id=call_method_id)
-				if call_method:	#not None
-					DB250k.convertOldCallMethodDatasetIntoDBIDFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
-		sys.exit(0)
 		
 
 #2007-03-05 common codes to initiate database connection

@@ -48,6 +48,6 @@ fi
 
 for((i=$start_phenotype_id;i<=$end_phenotype_id;i++))
 	do echo $i;
-	#~/script/variation/src/Results2DB_250k.py -a $call_method_id -e $i -i $file_prefix$i\_*[^s][^r].tsv -l $analysis_method_id -u $db_user -p $db_password -c -z $db_host -s $results_method_type_id
-	~/script/variation/src/Results2DB_250k.py -a $call_method_id -e $i -i $file_prefix$i\_*.tsv -l $analysis_method_id -u $db_user -p $db_password -c -z $db_host -s $results_method_type_id -g $cnv_method_id
+	#~/script/variation/src/Results2DB_250k.py -a $call_method_id -E $i -i $file_prefix$i\_*[^s][^r].tsv -l $analysis_method_id -u $db_user -p $db_password -c -z $db_host -s $results_method_type_id
+	~/script/variation/src/Results2DB_250k.py -a $call_method_id -E $i -i $file_prefix$i\_*.tsv -l $analysis_method_id -u $db_user -p $db_password -c -z $db_host -s $results_method_type_id -g $cnv_method_id
 done
