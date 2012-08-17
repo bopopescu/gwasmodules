@@ -71,7 +71,7 @@ def process_function_arguments(keywords, argument_default_dict, error_doc='', cl
 				if error_doc:
 					sys.stderr.write(error_doc)
 				sys.stderr.write('Error: %s is required but %s given.\n'%(argument, default_value))
-				sys.exit(2)
+				sys.exit(5)
 		if argument_type!=None:	#cast to the desired type
 			default_value = argument_type(default_value)
 		if class_to_have_attr:
@@ -108,7 +108,7 @@ def process_options(argv_list, option_default_dict, error_doc=''):
 	import sys
 	if len(argv_list) == 1:
 		print error_doc
-		sys.exit(2)
+		sys.exit(6)
 	option_default_dict[('h', 'help', 0, 'Display this documentation', 0, int)] =0
 	
 	#prepare long_options_list and short_options_str for getopt
@@ -176,6 +176,8 @@ class ProcessOptions(object):
 	
 	def prepare_for_getopt(self, option_default_dict):
 		"""
+		2012.8.17
+			bugfix. for the options that do not have short-option set before hand, the bug assumed all of them need arguments.
 		2008-09-09
 			in the case that short_option is not provided,
 				get the has_argument and description_for_option if they are provided.
@@ -224,7 +226,7 @@ class ProcessOptions(object):
 				options_with_no_short_option.append(option_key)
 				continue
 			
-			if short_option==None or short_option=='':
+			if short_option==None or short_option=='':#2012.8.17 handle these no-short-option options later.
 				options_with_no_short_option.append(option_key)
 				continue
 			#prepare short options
@@ -278,8 +280,12 @@ class ProcessOptions(object):
 			if long_option in long_option2has_argument:
 				sys.stderr.write("Error: long option %s already used.\n"%(long_option))
 				sys.exit(3)
-			long_option2has_argument[long_option] = 1
-			long_options_list.append('%s='%long_option)
+			long_option2has_argument[long_option] = has_argument	#2012.8.17 bugfix. was always 1 before.
+			if has_argument:	#2012.8.17 bugfix. whether to add the = depends on has_argument
+				long_options_list.append('%s='%long_option)
+			else:
+				long_options_list.append('%s'%long_option)
+			#long_options_list.append('%s='%long_option)
 			std_option_default_dict[option_key] = [option_value[0], short_option, has_argument, description_for_option]
 			
 		self.short_options_str  = ''.join(short_options_list)
@@ -368,7 +374,7 @@ class ProcessOptions(object):
 		import sys
 		if len(self.argv_list) == 1:
 			print error_doc
-			sys.exit(2)
+			sys.exit(3)
 		
 		import getopt, traceback
 		opts, args = getopt.getopt(self.argv_list[1:], self.short_options_str, self.long_options_list)
@@ -454,7 +460,7 @@ class ProcessOptions(object):
 					if error_doc:
 						sys.stderr.write(error_doc)
 					sys.stderr.write('Error: %s is required but %s given.\n'%(argument, default_value))
-					sys.exit(2)
+					sys.exit(4)
 			if argument_type!=None and default_value is not None:	#cast to the desired type 2008-10-25 default_value is not None
 				default_value = argument_type(default_value)
 			if class_to_have_attr:
