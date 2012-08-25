@@ -56,6 +56,7 @@ class ConvertYuSNPFormat2Bjarni(object):
 						('output_fname', 1, ): [None, 'o', 1, 'Output Filename'],\
 						('ecotype_table', 1, ): ['stock.ecotype', 'e', 1, 'ecotype Table to get ecotypeid2nativename'],\
 						('array_id_2nd_column', 0, int): [0, 'a', 0, 'whether 2nd column in input_fname is array id or not'],\
+						('snp_id_type', 1, int): [1, 'y', 1, 'type 1: db_id (need db translation); type 2: chr_pos'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
 	def __init__(self, **keywords):
@@ -85,21 +86,22 @@ class ConvertYuSNPFormat2Bjarni(object):
 		delimiter = figureOutDelimiter(self.input_fname, report=self.report)
 		header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname, delimiter=delimiter)
 		
-		#2011-2-27 translate the db_id into chr_pos because the new StrainXSNP dataset uses db_id to identify SNPs.
-		# but if col-id is already chr_pos, it's fine.
-		new_header = header[:2]
-		data_matrix_col_index_to_be_kept = []
-		for i in xrange(2, len(header)):
-			snp_id = header[i]
-			chr_pos = db.get_chr_pos_given_db_id2chr_pos(snp_id,)
-			if chr_pos is not None:
-				data_matrix_col_index_to_be_kept.append(i-2)
-				new_header.append(chr_pos)
-		# to remove no-db_id columns from data matrix
-		import numpy
-		data_matrix = numpy.array(data_matrix)
-		data_matrix = data_matrix[:, data_matrix_col_index_to_be_kept]
-		header = new_header
+		if self.snp_id_type==1:
+			#2011-2-27 translate the db_id into chr_pos because the new StrainXSNP dataset uses db_id to identify SNPs.
+			# but if col-id is already chr_pos, it's fine.
+			new_header = header[:2]
+			data_matrix_col_index_to_be_kept = []
+			for i in xrange(2, len(header)):
+				snp_id = header[i]
+				chr_pos = db.get_chr_pos_given_db_id2chr_pos(snp_id,)
+				if chr_pos is not None:
+					data_matrix_col_index_to_be_kept.append(i-2)
+					new_header.append(chr_pos)
+			# to remove no-db_id columns from data matrix
+			import numpy
+			data_matrix = numpy.array(data_matrix)
+			data_matrix = data_matrix[:, data_matrix_col_index_to_be_kept]
+			header = new_header
 		
 		if self.array_id_2nd_column:
 			snpData = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\

@@ -43,7 +43,7 @@ class ConvertBjarniSNPFormat2Yu(object):
 			import pdb
 			pdb.set_trace()
 		
-		snpsd_ls = dataParsers.parseCSVData(self.input_fname, withArrayIds=self.withArrayIds)
+		snpsd_ls = dataParsers.parseCSVData(self.input_fname, withArrayIds=self.withArrayIds, useDecoder=False)
 		snpData = RawSnpsData_ls2SNPData(snpsd_ls, use_nt2number=1)
 		del snpsd_ls
 		newSnpData = transposeSNPData(snpData)

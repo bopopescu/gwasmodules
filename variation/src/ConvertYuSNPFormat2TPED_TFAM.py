@@ -71,7 +71,7 @@ class ConvertYuSNPFormat2TPED_TFAM(object):
 	option_default_dict = {('input_fname', 1, ): [None, 'i', 1, ],\
 						('output_fname_prefix', 1, ): [None, 'o', 1, 'Output Filename prefix'],\
 						('array_id_2nd_column', 0, int): [0, 'a', 0, 'whether 2nd column in input_fname is array id or not'],\
-						('phenotype_fname', 0, ): [None, 'p', 1, 'phenotype file', ],\
+						('phenotype_fname', 0, ): [None, 'p', 1, 'phenotype file, same number and order of individuals as input_fname', ],\
 						('phenotype_method_id', 0, int): [0, 'y', 1, 'which phenotype',],\
 						('phenotype_is_binary', 0, int): [0, 'e', 1, 'is phenotype binary?',],\
 						('recode12', 0, int):[0, 'd', 0, 'argument from plink. recode the alleles as 1 and 2 (and the missing genotype is 0). '],\
@@ -96,36 +96,41 @@ class ConvertYuSNPFormat2TPED_TFAM(object):
 		initData = Association.readInData(self.phenotype_fname, self.input_fname, phenotype_method_id_ls=[self.phenotype_method_id],\
 								report=self.report, snpAlleleOrdinalConversion=False)	# no ordinal (binary) conversion
 		
-		if initData.phenData:
-			phenData = initData.phenData
-			phenotype_col_index = initData.which_phenotype_ls[0]
-			phenotype_label = phenData.col_id_ls[phenotype_col_index]
-			phenotype_w = csv.writer(open('%s_%s.pheno'%(self.output_fname_prefix, phenotype_label.replace('/', '_')), 'w'), delimiter=' ')
-			tfam_w = csv.writer(open('%s.tfam'%(self.output_fname_prefix), 'w'), delimiter=' ') 
-			no_of_rows = len(phenData.data_matrix)
-			for i in range(no_of_rows):
-				phenotype_value = phenData.data_matrix[i,phenotype_col_index]
-				ecotype_id = initData.snpData.row_id_ls[i][0]
-				if self.array_id_2nd_column:
-					array_id = initData.snpData.row_id_ls[i][1]
-				else:
-					array_id = ecotype_id
-				if numpy.isnan(phenotype_value):
-					phenotype_value = 'NA'
-				phenotype_w.writerow([ecotype_id, array_id, phenotype_value])
-				tfam_w.writerow([ecotype_id, array_id, 0, 0, 1, phenotype_value])
-			del phenotype_w, tfam_w
-		
-		genotype_w = csv.writer(open('%s.tped'%self.output_fname_prefix, 'w'), delimiter=' ')
-		
 		if self.recode12:
 			# 2010-2-28 encode allele as 1,2,... (0 is missing).
 			snpData, allele_index2allele_ls= initData.snpData.convert2Binary(in_major_minor_order=False, NA_notation=0, alleleStartingIndex=1)
 		else:
 			snpData = initData.snpData
+		no_of_rows = len(snpData.data_matrix)
+		
+		tfam_w = csv.writer(open('%s.tfam'%(self.output_fname_prefix), 'w'), delimiter=' ')
+		if initData.phenData:
+			phenData = initData.phenData
+			phenotype_col_index = initData.which_phenotype_ls[0]
+			phenotype_label = phenData.col_id_ls[phenotype_col_index]
+			phenotype_w = csv.writer(open('%s_%s.pheno'%(self.output_fname_prefix, phenotype_label.replace('/', '_')), 'w'), delimiter=' ')
+			#no_of_rows = len(phenData.data_matrix) 
+		for i in range(no_of_rows):
+			if initData.phenData:
+				phenotype_value = phenData.data_matrix[i,phenotype_col_index]
+			else:
+				phenotype_value = 1
+			ecotype_id = initData.snpData.row_id_ls[i][0]
+			if self.array_id_2nd_column:
+				array_id = initData.snpData.row_id_ls[i][1]
+			else:
+				array_id = ecotype_id
+			tfam_w.writerow([1, ecotype_id, 0, 0, 1, phenotype_value])	#1 to make everyone in the same family
+			if numpy.isnan(phenotype_value):
+				phenotype_value = 'NA'
+			if initData.phenData:
+				phenotype_w.writerow([ecotype_id, array_id, phenotype_value])
+		del tfam_w
+		
+		genotype_w = csv.writer(open('%s.tped'%self.output_fname_prefix, 'w'), delimiter=' ')
+		
 		#transpose it
 		newSnpData = transposeSNPData(snpData)
-		
 		no_of_rows = len(newSnpData.data_matrix)
 		no_of_cols = len(newSnpData.data_matrix[0])
 		for i in range(no_of_rows):
@@ -136,8 +141,15 @@ class ConvertYuSNPFormat2TPED_TFAM(object):
 				allele = newSnpData.data_matrix[i][j]
 				if not self.recode12:	# it's in my nucleotide number format.
 					allele = number2nt[allele]
-				row.append(allele)
-				row.append(allele)
+				if allele !='NA':
+					row.append(allele[0])
+					if len(allele)>1:	#2012.8.20 diploid, 2nd allele
+						row.append(allele[1])
+					else:
+						row.append(allele[0])
+				else:
+					row.append("N")	# "N" is plink for missing.
+					row.append("N")
 			genotype_w.writerow(row)
 		del genotype_w
 

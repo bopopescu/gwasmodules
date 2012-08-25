@@ -751,107 +751,104 @@ def parseCSVDataAccessions(datafile, format=1, deliminator=",", missingVal='NA')
 	else:
 		return accessions
 
-#def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2number=0,
-#		returnChromosomes=False, useDecoder=True, filter=1, id=None, marker_type=None):
-#	"""
-#	05/12/08 yh. add argument use_nt2number, to turn nucleotide into numbers. default is not
-#	05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched) check nt2number in 'variation.common' to decoder
-#	05/12/2008 yh. more correct reporting of snp loading counts
-#	05/11/2008 yh. add chromosome. use RawSnpsData directly. ...
-#	06/25/2008 bjv. withArrayIds is now detected, i.e. the argument doesn't matter.	
-#
-#	Parses raw CSV SNPs data files into a RawSnpsData.
-#
-#	format=1: the function return a RawSnpsData object list
-#	format=0: the function return a SnpsData object list
-#	"""
-#
-#	sys.stderr.write("Loading file: %s ... \n" % datafile)
-#	decoder = nt_decoder
-#	decoder[missingVal] = missing_val
-#	positions = [] #list[chr][position_index]
-#	genotypes = [] #list[chr][position_index][acces]
-#	accessions = []
-#
-#	#Reading column data
-#	f = open(datafile, 'r')
-#	lines = f.readlines()
-#	f.close()
-#
-#	chromosomes = []
-#	positionsList = []
-#	snpsList = []
-#	arrayIds = None
-#	line = lines[1].split(deliminator)
-#	i = 0
-#	if line[0] == "Chromosome":
-#		line = lines[i].split(deliminator)
-#		arrayIds = []
-#		for arrayId in line[2:]:
-#			arrayIds.append(arrayId.strip())
-#		i += 1
-#	line = lines[i].split(deliminator)
-#	for acc in line[2:]:
-#		accessions.append(acc.strip())
-#	print "Found", len(accessions), "arrays/strains."
-#	i += 1
-#	line = lines[i].split(deliminator)
-#	newChr = int(line[0])
-#
-#	no_of_headers = i
-#	snpsd_ls = []
-#	while i < len(lines):
-#		chromosomes.append(int(newChr))
-#		oldChr = newChr
-#		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds, id=id)	#05/11/2008 yh. use rawSnpsData
-#		rawSnpsData.snps = []
-#		rawSnpsData.positions = []
-#		rawSnpsData.chromosome = oldChr
-#		while i < len(lines) and newChr == oldChr:
-#			if filter < 1 and random.random() > filter:
-#	  			i += 1
-#				if i < len(lines):
-#					line = lines[i].split(deliminator)
-#					newChr = int(line[0])
-#			       	else:
-#					break
-# 				continue
-#
-#			line = lines[i].split(deliminator)
-#			#print i,":",lines[i]
-#			oldChr = int(line[0])
-#			rawSnpsData.positions.append(int(line[1]))
-#			snp = []
-#			if useDecoder:
-#				for nt in line[2:]:
-#					snp.append(decoder[(nt.strip())])
-#			else:
-#				for nt in line[2:]:
-#					snp.append(nt.strip())
-#			rawSnpsData.snps.append(snp)
-#			i += 1
-#			if i < len(lines):
-#				line = lines[i].split(deliminator)
-#				newChr = int(line[0])
-#			else:
-#				break
-#
-#		sys.stderr.write("Loaded %s of %s SNPs.\n" % (i - no_of_headers, len(lines) - no_of_headers))
-#		#Adding marker
-#		if marker_type:
-#			marker_types = [marker_type] * len(rawSnpsData.snps)
-#			rawSnpsData.marker_types = marker_types
-#		snpsd_ls.append(rawSnpsData)
-#		del rawSnpsData
-#	if format == 0:
-#		print "Converting raw SNPs data to binary SNPs."
-#		for i in range(0, len(chromosomes)):
-#			snpsd_ls[i] = snpsd_ls[i].getSnpsData()
-#	sys.stderr.write("\n")
-#	if returnChromosomes:
-#		return (snpsd_ls, chromosomes)
-#	else:
-#		return snpsd_ls
+def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2number=0,
+		returnChromosomes=False, useDecoder=True, filter=1, id=None, marker_type=None, withArrayIds=False, **keywords):
+	"""
+	05/12/08 yh. add argument use_nt2number, to turn nucleotide into numbers. default is not
+	05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched) check nt2number in 'variation.common' to decoder
+	05/12/2008 yh. more correct reporting of snp loading counts
+	05/11/2008 yh. add chromosome. use RawSnpsData directly. ...
+	06/25/2008 bjv. withArrayIds is now detected, i.e. the argument doesn't matter.	
+
+	Parses raw CSV SNPs data files into a RawSnpsData.
+
+	format=1: the function return a RawSnpsData object list
+	format=0: the function return a SnpsData object list
+	"""
+
+	sys.stderr.write("Loading file: %s ... \n" % datafile)
+	decoder = nt_decoder
+	decoder[missingVal] = missing_val
+	positions = [] #list[chr][position_index]
+	genotypes = [] #list[chr][position_index][acces]
+	accessions = []
+
+	#Reading column data
+	f = open(datafile, 'r')
+	lines = f.readlines()
+	f.close()
+
+	chromosomes = []
+	positionsList = []
+	snpsList = []
+	arrayIds = None
+	i = 0
+	#try on the 2nd line
+	line = lines[1].split(deliminator)
+	if line[0] == "Chromosome":	#this 2nd line is a header too.
+		line = lines[i].split(deliminator)
+		if withArrayIds:
+			arrayIds = []
+			for arrayId in line[2:]:
+				arrayIds.append(arrayId.strip())
+		i += 1
+	#either 1st or 2nd line pending before
+	line = lines[i].split(deliminator)
+	for acc in line[2:]:
+		accessions.append(acc.strip())
+	print "Found", len(accessions), "arrays/strains."
+	i += 1
+	line = lines[i].split(deliminator)
+	newChr = line[0]
+
+	no_of_headers = i
+	sys.stderr.write(" %s headers "%(no_of_headers))
+	snpsd_ls = []
+	no_of_snps = 0
+	while i < len(lines):
+		chromosomes.append(newChr)
+		oldChr = newChr
+		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds, id=id)	#05/11/2008 yh. use rawSnpsData
+		rawSnpsData.snps = []
+		rawSnpsData.positions = []
+		rawSnpsData.chromosome = oldChr
+		while i < len(lines) and newChr == oldChr:
+			line = lines[i].split(deliminator)
+			#print i,":",lines[i]
+			oldChr = line[0]
+			rawSnpsData.positions.append(line[1])
+			snp = []
+			if useDecoder:
+				for nt in line[2:]:
+					snp.append(decoder[(nt.strip())])
+			else:
+				for nt in line[2:]:
+					snp.append(nt.strip())
+			rawSnpsData.snps.append(snp)
+			i += 1
+			if i < len(lines):
+				line = lines[i].split(deliminator)
+				newChr = line[0]
+			else:
+				break
+		
+		#sys.stderr.write("Loaded %s of %s SNPs.\n" % (i - no_of_headers, len(lines) - no_of_headers))
+		#Adding marker
+		if marker_type:
+			marker_types = [marker_type] * len(rawSnpsData.snps)
+			rawSnpsData.marker_types = marker_types
+		snpsd_ls.append(rawSnpsData)
+		no_of_snps += len(rawSnpsData.snps)
+		del rawSnpsData
+	if format == 0:
+		print "Converting raw SNPs data to binary SNPs."
+		for i in range(0, len(chromosomes)):
+			snpsd_ls[i] = snpsd_ls[i].getSnpsData()
+	sys.stderr.write(" %s headers, %s SNPs\n"%(no_of_headers, no_of_snps))
+	if returnChromosomes:
+		return (snpsd_ls, chromosomes)
+	else:
+		return snpsd_ls
 
 
 

@@ -68,7 +68,8 @@ from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOut
 from numpy import linalg
 
 from Kruskal_Wallis import Kruskal_Wallis
-import rpy
+if __name__ == '__main__':
+	import rpy
 from sets import Set
 #from DrawEcotypeOnMap import DrawEcotypeOnMap
 
@@ -1237,7 +1238,7 @@ class Association(Kruskal_Wallis):
 		snpData = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\
 						data_matrix=data_matrix, turn_into_array=1, ignore_2nd_column=ignore_2nd_column)
 		
-		if os.path.isfile(phenotype_fname):	# 2010-2-28 make sure it exists
+		if phenotype_fname and os.path.isfile(phenotype_fname):	# 2010-2-28 make sure it exists
 			header_phen, strain_acc_list_phen, category_list_phen, data_matrix_phen = read_data(phenotype_fname, turn_into_integer=0)
 			if phenotype_method_id_ls and removeUnPhenotypedSNPData:	#2010-4-21
 				snpData = cls.removeUnPhenotypedSNPData(snpData, header_phen, strain_acc_list_phen, data_matrix_phen, phenotype_method_id_ls)
