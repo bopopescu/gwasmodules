@@ -134,7 +134,12 @@ def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None,
 	if no_of_data_points>=max_no_of_data_points:
 		no_of_bins = max(10, min(max_no_of_bins, no_of_data_points/10))
 		n, bins, patches = pylab.hist(data_ls, no_of_bins, log=needLog)
-		pylab.title(title)
+		if title:
+			pylab.title(title)
+		else:
+			title = constructTitleFromDataSummaryStat(data_ls)
+			#title = 'n=%s, mean %.4f, median %.4f'%(len(data_ls), meanValue, medianValue)
+			pylab.title(title)
 		if xlabel_1D is not None:
 			pylab.xlabel(xlabel_1D)
 		if xticks:
@@ -253,7 +258,7 @@ def drawScatter(x_ls, y_ls, fig_fname=None, title=None, xlabel=None, ylabel=None
 	pylab.clf()
 	pylab.plot(x_ls, y_ls, '.')
 	if title is None:
-		title = "%s data points."%(len(x_ls))
+		title = constructTitleFromTwoDataSummaryStat(x_ls, y_ls)
 	pylab.title(title)
 	if xlabel:
 		pylab.xlabel(xlabel)
@@ -263,6 +268,35 @@ def drawScatter(x_ls, y_ls, fig_fname=None, title=None, xlabel=None, ylabel=None
 		pylab.savefig(fig_fname, dpi=dpi)
 	sys.stderr.write("Done.\n")
 
+def constructTitleFromTwoDataSummaryStat(x_ls=None, y_ls=None):
+	"""
+	2012.8.21
+	
+	"""
+	if not y_ls:
+		title = constructTitleFromDataSummaryStat(x_ls)
+	elif x_ls and y_ls:
+		import numpy
+		n = len(x_ls)
+		xMedianValue =  numpy.median(x_ls)
+		yMedianValue =  numpy.median(y_ls)
+		corr = numpy.corrcoef(x_ls, y_ls)[0,1]
+		
+		title = "n=%s, cor=%.3f, xMedian=%.3f, yMedian=%.3f"%(n, corr, xMedianValue, yMedianValue)
+	else:
+		title = ""
+	return title
+
+def constructTitleFromDataSummaryStat(data_ls=None):
+	"""
+	2012.8.17
+	"""
+	import numpy
+	medianValue =  numpy.median(data_ls)
+	meanValue = numpy.mean(data_ls)
+	std = numpy.std(data_ls)
+	title = 'n=%s, mean %.3f, median %.3f, std %.3f'%(len(data_ls), meanValue, medianValue, std)
+	return title
 
 if __name__ == '__main__':
 	#import pdb

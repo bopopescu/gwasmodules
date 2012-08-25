@@ -40,14 +40,16 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2011-7-11
 		"""
+		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath'])
+		#inserted before AbstractWorkflow.__init__()
 		AbstractWorkflow.__init__(self, **keywords)
 		#from pymodule import ProcessOptions
 		#self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 		#												class_to_have_attr=self)
-		self.samtools_path = self.insertHomePath(self.samtools_path, self.home_path)
-		self.picard_path =  self.insertHomePath(self.picard_path, self.home_path)
-		self.gatk_path =  self.insertHomePath(self.gatk_path, self.home_path)
-		self.tabixPath =  self.insertHomePath(self.tabixPath, self.home_path)
+#		self.samtools_path = self.insertHomePath(self.samtools_path, self.home_path)
+#		self.picard_path =  self.insertHomePath(self.picard_path, self.home_path)
+#		self.gatk_path =  self.insertHomePath(self.gatk_path, self.home_path)
+#		self.tabixPath =  self.insertHomePath(self.tabixPath, self.home_path)
 		
 		self.chr_pattern = Genome.chr_pattern
 		self.contig_id_pattern = Genome.contig_id_pattern
@@ -181,7 +183,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		createSequenceDictionaryJava.addPFN(PFN("file://" + self.javaPath, site_handler))
 		executableClusterSizeMultiplierList.append((createSequenceDictionaryJava, 0))
 		
-		DOCWalkerJava = Executable(namespace=namespace, name="DepthOfCoverageWalker", version=version, os=operatingSystem,\
+		DOCWalkerJava = Executable(namespace=namespace, name="DOCWalkerJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		#no clusters_size for this because it could run on a whole bam for hours
 		#DOCWalkerJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
@@ -221,12 +223,12 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		
 		GenotypeCallByCoverage = Executable(namespace=namespace, name="GenotypeCallByCoverage", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
-		GenotypeCallByCoverage.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "GenotypeCallByCoverage.py"), site_handler))
+		GenotypeCallByCoverage.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "mapper/GenotypeCallByCoverage.py"), site_handler))
 		executableClusterSizeMultiplierList.append((GenotypeCallByCoverage, 1))
 		
 		MergeGenotypeMatrix = Executable(namespace=namespace, name="MergeGenotypeMatrix", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
-		MergeGenotypeMatrix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "MergeGenotypeMatrix.py"), site_handler))
+		MergeGenotypeMatrix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "reducer/MergeGenotypeMatrix.py"), site_handler))
 		executableClusterSizeMultiplierList.append((MergeGenotypeMatrix, 1))
 		
 		bgzip_tabix = Executable(namespace=namespace, name="bgzip_tabix", version=version, \
@@ -294,33 +296,29 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		executableClusterSizeMultiplierList.append((tabix,5))
 		
 		#2011.12.21 moved from FilterVCFPipeline.py
-		FilterVCFByDepthJava = Executable(namespace=namespace, name="FilterVCFByDepth", version=version, os=operatingSystem,\
+		FilterVCFByDepthJava = Executable(namespace=namespace, name="FilterVCFByDepthJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		FilterVCFByDepthJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		FilterVCFByDepthJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(FilterVCFByDepthJava)
-		self.FilterVCFByDepthJava = FilterVCFByDepthJava
+		executableClusterSizeMultiplierList.append((FilterVCFByDepthJava, 1 ))
 		
 		#2011.12.21	for OutputVCFSiteStat.py
 		tabixRetrieve = Executable(namespace=namespace, name="tabixRetrieve", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		tabixRetrieve.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/tabixRetrieve.sh"), site_handler))
-		tabixRetrieve.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		self.addExecutable(tabixRetrieve)
-		self.tabixRetrieve = tabixRetrieve
+		executableClusterSizeMultiplierList.append((tabixRetrieve, 1 ))
 		
 		#2012.3.1
 		MergeFiles = Executable(namespace=namespace, name="MergeFiles", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
 		MergeFiles.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "shell/MergeFiles.sh"), site_handler))
-		executableClusterSizeMultiplierList.append((MergeFiles,1 ))
+		executableClusterSizeMultiplierList.append((MergeFiles, 0 ))
 		
 		#2012.7.25
 		MergeVCFReplicateHaplotypesJava= Executable(namespace=namespace, name="MergeVCFReplicateHaplotypesJava", \
 											version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		MergeVCFReplicateHaplotypesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((MergeVCFReplicateHaplotypesJava,1))
+		executableClusterSizeMultiplierList.append((MergeVCFReplicateHaplotypesJava, 0.5))
 		
 		#2012.7.29, moved from CheckTwoVCFOverlapPipeline.py
 		CheckTwoVCFOverlap = Executable(namespace=namespace, name="CheckTwoVCFOverlap", version=version, \
@@ -439,32 +437,38 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		return vcf_convert_job
 	
 	def addBGZIP_tabix_Job(self, workflow=None, bgzip_tabix=None, parentJob=None, inputF=None, outputF=None, \
-							namespace=None, version=None, transferOutput=False, parentJobLs=[], tabixArguments=""):
+							namespace=None, version=None, transferOutput=False, parentJobLs=None, tabixArguments=None,\
+							extraDependentInputLs=None, **keywords):
 		"""
+		2012.8.17 if transferOutput is None, do not register output files as OUTPUT with transfer flag
+			use addGenericJob()
 		2011.12.20
 			pass additional tabix arguments to bgzip_tabix shell script
 		2011-11-4
 		
 		"""
-		bgzip_tabix_job = Job(namespace=getattr(self, 'namespace', namespace), name=bgzip_tabix.name, \
-							version=getattr(self, 'version', version))
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraArgumentList = []
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		
 		tbi_F = File("%s.tbi"%outputF.name)
-		bgzip_tabix_job.addArguments(inputF, outputF)
-		if tabixArguments:
-			bgzip_tabix_job.addArguments(tabixArguments)
-		bgzip_tabix_job.uses(inputF, transfer=False, register=True, link=Link.INPUT)
-		bgzip_tabix_job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		bgzip_tabix_job.uses(tbi_F, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		bgzip_tabix_job.output = outputF
-		bgzip_tabix_job.tbi_F = tbi_F
-		bgzip_tabix_job.outputLs = [outputF, tbi_F] 	#2012.7.30
-		self.addJob(bgzip_tabix_job)
+		key2ObjectForJob['tbi_F'] = tbi_F
+		extraOutputLs.append(tbi_F)
+		# 2012.8.19 add the parentJob to parentJobLs
+		if parentJobLs is None:
+			parentJobLs = []
 		if parentJob:
-			self.depends(parent=parentJob, child=bgzip_tabix_job)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=bgzip_tabix_job)
-		return bgzip_tabix_job
+			parentJobLs.append(parentJob)
+		
+		job = self.addGenericJob(executable=bgzip_tabix, inputFile=inputF, inputArgumentOption="", \
+					outputFile=outputF, outputArgumentOption="", \
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+					transferOutput=transferOutput, \
+					extraArguments=tabixArguments, extraArgumentList=extraArgumentList, job_max_memory=2000,  sshDBTunnel=None, \
+					key2ObjectForJob=key2ObjectForJob, **keywords)
+		return job
 	
 	def addVCFConcatJob(self, workflow=None, concatExecutable=None, parentDirJob=None, outputF=None, \
 							namespace=None, version=None, transferOutput=True, vcf_job_max_memory=500):
@@ -513,34 +517,38 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 
 	def addVCF2MatrixJob(self, workflow=None, executable=None, inputVCF=None, outputFile=None, \
 						refFastaF=None, run_type=3, numberOfReadGroups=10, seqCoverageF=None, \
-						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+						outputDelimiter=None,\
+						parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 						extraArguments=None, job_max_memory=2000, **keywords):
 		"""
+		2012.8.20
+			add argument outputDelimiter and use addGenericJob()
 		2012.5.8
 			executable is GenotypeCallByCoverage
 		"""
-		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
+		
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
 		#2012.5.8 "-n 10" means numberOfReadGroups is 10 but it's irrelevant when "-y 3" (run_type =3, read from vcf without filter)
-		job.addArguments("-i", inputVCF, "-n 10", "-o", outputFile, '-y 3')
+		extraArgumentList = [ "-n 10", '-y 3']
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		
 		if refFastaF:
-			job.addArguments("-e", refFastaF)
-			job.uses(refFastaF, transfer=True, register=True, link=Link.INPUT)
-		if extraArguments:
-			job.addArguments(extraArguments)
+			extraArgumentList.extend(["-e", refFastaF])
+			extraDependentInputLs.append(refFastaF)
 		if seqCoverageF:
-			job.addArguments("-q", seqCoverageF)
-			job.uses(seqCoverageF, transfer=True, register=True, link=Link.INPUT)
-		job.uses(inputVCF, transfer=True, register=True, link=Link.INPUT)
-		job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		job.output = outputFile
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		self.addJob(job)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			if input:
-				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+			extraArgumentList.extend(["-q", seqCoverageF])
+			extraDependentInputLs.append(seqCoverageF)
+		if outputDelimiter:
+			extraArgumentList.append('-u %s'%(outputDelimiter))
+			
+		job = self.addGenericJob(executable=executable, inputFile=inputVCF, inputArgumentOption="-i", \
+					outputFile=outputFile, outputArgumentOption="-o", \
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+					transferOutput=transferOutput, \
+					extraArguments=extraArguments, extraArgumentList=extraArgumentList, job_max_memory=2000,  sshDBTunnel=None, \
+					key2ObjectForJob=key2ObjectForJob, **keywords)
 		return job
 	
 	def addCalculatePairwiseDistanceFromSNPXStrainMatrixJob(self, workflow=None, executable=None, inputFile=None, outputFile=None, \
@@ -607,7 +615,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2011-12.5
 		"""
-		javaMemRequirement = "-Xms128m -Xmx%sm"%job_max_memory
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementObject.memRequirement
+		javaMemRequirement = memRequirementObject.memRequirementInStr
 		refFastaF = refFastaFList[0]
 		job = Job(namespace=self.namespace, name=SelectVariantsJava.name, version=self.version)
 		job.addArguments(javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T SelectVariants", "-R", refFastaF, \
@@ -649,36 +659,49 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	def addCheckTwoVCFOverlapJob(self, workflow=None, executable=None, vcf1=None, vcf2=None, chromosome=None, chrLength=None, \
 					outputF=None, outputFnamePrefix=None, parentJobLs=None, \
 					extraDependentInputLs=None, transferOutput=False, extraArguments=None, job_max_memory=1000, \
-					perSampleMismatchFraction=False, **keywords):
+					perSampleMatchFraction=False, **keywords):
 		"""
+		2012.8.16
+			now perSampleMatchFraction output is in a separate output file.
 		2011.12.9
 		"""
 		if outputF is None and outputFnamePrefix:
-			outputF = File('%s_overlap.tsv'%(outputFnamePrefix))
+			outputF = File('%s.tsv'%(outputFnamePrefix))
 		extraOutputLs = []
-		extraArgumentList = ["-j", vcf2]
+		extraArgumentList = []
+		key2ObjectForJob = {}
+		suffixAndNameTupleList = []	# a list of tuples , in each tuple, 1st element is the suffix. 2nd element is the proper name of the suffix.
+			#job.$nameFile will be the way to access the file.
+			#if 2nd element (name) is missing, suffix[1:].replace('.', '_') is the name (dot replaced by _) 		
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		
+		if vcf2:
+			extraArgumentList.extend(["-j", vcf2])
+			extraDependentInputLs.append(vcf2)
 		if chromosome:
 			extraArgumentList.extend(["-c", chromosome])
 		if chrLength:
 			extraArgumentList.append("-l %s"%(chrLength))
-		if perSampleMismatchFraction:
+		if perSampleMatchFraction and outputFnamePrefix:
 			extraArgumentList.append("-p")
+			suffixAndNameTupleList.append(['_perSample.tsv','perSample'])
 		if outputFnamePrefix:
 			extraArgumentList.extend(['-O', outputFnamePrefix])
-			overlapSitePosF = File('%s_overlapSitePos.tsv'%(outputFnamePrefix))
-			extraOutputLs.append(overlapSitePosF)
+			suffixAndNameTupleList.append(['_overlapSitePos.tsv','overlapSitePos'])
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
-		if extraDependentInputLs is None:
-			extraDependentInputLs = []
-		extraDependentInputLs.append(vcf2)
+
+		self.setupMoreOutputAccordingToSuffixAndNameTupleList(outputFnamePrefix=outputFnamePrefix, suffixAndNameTupleList=suffixAndNameTupleList, \
+													extraOutputLs=extraOutputLs, key2ObjectForJob=key2ObjectForJob)
 		job= self.addGenericJob(executable=executable, inputFile=vcf1, outputFile=outputF, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 						extraOutputLs=extraOutputLs,\
 						transferOutput=transferOutput, \
-						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
-		if outputFnamePrefix:
-			job.overlapSitePosF = overlapSitePosF
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
+						key2ObjectForJob=key2ObjectForJob, **keywords)
+		#if outputFnamePrefix:
+		#	job.overlapSitePosF = overlapSitePosF
 		return job
 	
 	def addFilterVCFByDepthJob(self, workflow=None, FilterVCFByDepthJava=None, genomeAnalysisTKJar=None, \
@@ -1344,7 +1367,7 @@ Contig966       3160    50
 							interval=interval, intervalFnameSignature=intervalFnameSignature, \
 							file=None,\
 							chr=chr, start=originalStartPos,\
-							stop=originalStopPos, jobLs=[])
+							stop=originalStopPos, overlapStart=startPos, overlapStop=stopPos, jobLs=[])
 				chr2IntervalDataLs[chr].append(intervalData)
 				counter += 1
 		sys.stderr.write("%s intervals.\n"%(counter))
@@ -1408,8 +1431,11 @@ Contig966       3160    50
 						debugHaplotypeDistanceFile=None, \
 						debugMajoritySupportFile=None,\
 						refFastaFList=[], parentJobLs=[], extraDependentInputLs=None, transferOutput=False, \
-						extraArguments=None, job_max_memory=2000, **keywords):
+						extraArguments=None, job_max_memory=2000, analysis_type='MergeVCFReplicateHaplotypes',\
+						**keywords):
 		"""
+		2012.8.15
+			add argument analysis_type (could be MergeVCFReplicateHaplotypes, MergeVCFReplicateGenotypeColumns
 		2012.7.25
 			use self.addGenericJob() and moved from AlignmentToTrioCallPipeline.py
 			added "-XX:MaxPermSize=1024m" jvm combat this error:
@@ -1430,7 +1456,7 @@ Contig966       3160    50
 		job_max_memory = memRequirementObject.memRequirement
 		javaMemRequirement = memRequirementObject.memRequirementInStr
 		refFastaF = refFastaFList[0]
-		extraArgumentList = [javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T", "MergeVCFReplicateHaplotypes",\
+		extraArgumentList = [javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T", analysis_type,\
 			"-R", refFastaF, "--variant:VCF", inputF, "--out", outputF,\
 			'--onlyKeepBiAllelicSNP', "--replicateIndividualTag %s"%(replicateIndividualTag)]
 		if debugHaplotypeDistanceFile:

@@ -10,6 +10,7 @@ if test $# -lt 2 ; then
 	echo "FormatType, what type of format. default is $defaultFormatType."
 	echo "	1: BED"
 	echo "	2: tab-delimited, 3-column: chr start stop. coordinates are 1-based. start=stop for SNPs. could be used for vcftools to keep sites."
+	echo "	3: Nam's format: contig:pos ref/alt-allele. 1-based coordinate."
 	exit 1
 fi
 shellDir=`dirname $0`
@@ -30,5 +31,7 @@ for i in `ls $inputFolder/*vcf.gz`; do
 		zcat $i |grep -v ^#|awk -F ' ' '{print $1 "\t" $2-1 "\t" $2}' >> $outputFilename
 	elif test $formatType -eq 2; then
 		zcat $i |grep -v ^#|awk -F ' ' '{print $1 "\t" $2 "\t" $2}' >> $outputFilename
+	elif test $formatType -eq 3; then
+		zcat $i |grep -v ^#|awk -F ' ' '{print $1 ":" $2 "\t" $4"/"$5}' >> $outputFilename
 	fi
 done

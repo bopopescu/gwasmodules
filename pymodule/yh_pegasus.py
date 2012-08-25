@@ -81,8 +81,10 @@ def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, i
 		refFastaFList.append(refFastaF)
 	return refFastaFList
 
-def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_walltime=120, sshDBTunnel=0):
+def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, max_walltime=180, sshDBTunnel=0):
 	"""
+	2012.8.15
+		increase default max_walltime to 180
 	2012.4.16
 		add argument sshDBTunnel.
 			=1: this job needs a ssh tunnel to access psql db on dl324b-1.

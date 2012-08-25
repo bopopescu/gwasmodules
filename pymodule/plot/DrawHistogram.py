@@ -4,7 +4,7 @@ Examples:
 	%s 
 	
 	# 2012.8.6 draw histogram of fraction of heterozygotes per individual.
-	%s -i 10 -s 1 -o /tmp/hetPerMonkey_hist.png
+	%s -M 10 -s 1 -o /tmp/hetPerMonkey_hist.png
 		-W NoOfHet_by_NoOfTotal /tmp/homoHetCountPerSample.tsv
 	
 
@@ -37,22 +37,24 @@ class DrawHistogram(AbstractPlot):
 	option_default_dict = AbstractPlot.option_default_dict
 	option_default_dict.pop(('xColumnHeader', 1, ))
 	option_default_dict.pop(('xColumnPlotLabel', 0, ))
-	
+	option_default_dict.update({
+						('logCount', 0, int): [0, 'l', 0, 'whether to take log on the y-axis of the histogram, the raw count'], \
+							
+							})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
 		AbstractPlot.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
-	def plot(self, x_ls=None, y_ls=None, pdata=None, min_no_of_data_points=10, needLog=False, max_no_of_bins=20, **kwargs):
+	def plot(self, x_ls=None, y_ls=None, pdata=None, min_no_of_data_points=10, max_no_of_bins=30, min_no_of_bins=10, **kwargs):
 		"""
 		2011-8.6
 			get called by the end of fileWalker() for each inputFname.
-			needLog doesn't need to be True. as self.logWhichColumn and self.positiveLog will decide on how to log the y-value.
 		"""
 		no_of_data_points = len(y_ls)
 		if no_of_data_points>=min_no_of_data_points:
-			no_of_bins = max(10, min(max_no_of_bins, no_of_data_points/10))
-			n, bins, patches = pylab.hist(y_ls, no_of_bins, log=needLog)
+			no_of_bins = max(min_no_of_bins, min(max_no_of_bins, no_of_data_points/10))
+			n, bins, patches = pylab.hist(y_ls, bins=no_of_bins, log=self.logCount)
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -77,12 +79,25 @@ class DrawHistogram(AbstractPlot):
 		"""
 		if getattr(self, 'whichColumnPlotLabel', None):
 			pylab.xlabel(self.whichColumnPlotLabel)
+		else:
+			pylab.xlabel(getattr(self, "whichColumnHeader", ""))
 	
 	def handleYLabel(self,):
 		"""
 		2012.8.6
 		"""
 		pass
+	
+	def handleTitle(self,):
+		"""
+		2012.8.16
+		"""
+		if self.title:
+			pylab.title(self.title)
+		else:
+			title = yh_matplotlib.constructTitleFromDataSummaryStat(self.invariantPData.y_ls)
+			pylab.title(title)
+
 	
 if __name__ == '__main__':
 	main_class = DrawHistogram

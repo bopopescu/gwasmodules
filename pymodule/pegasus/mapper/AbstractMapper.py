@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule import SNP
+import re
 
 class AbstractMapper(object):
 	__doc__ = __doc__
@@ -42,9 +43,27 @@ class AbstractMapper(object):
 		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
-		self.inputFnameLs = inputFnameLs
-		self.connectDB()
+		if getattr(self, 'outputFname', None) and hasattr(self,'outputFnamePrefix'):
+			self.outputFnamePrefix = os.path.splitext(self.outputFname)[0]
 		
+		self.inputFnameLs = inputFnameLs
+		if self.inputFnameLs is None:
+			self.inputFnameLs = []
+		
+		if getattr(self, 'inputFname', None):
+			self.inputFnameLs.insert(0, self.inputFname)
+		self.connectDB()
+		#2012.8.14 an expression that searches any character in a string
+		self.p_char = re.compile(r'[a-df-zA-DF-Z\-]$')	#no 'e' or 'E', used in scientific number, add '-' and append '$'
+	
+	def insertHomePath(self, inputPath, home_path):
+		"""
+		2012.8.19 copied from AbstractWorkflow
+		"""
+		if inputPath.find('%s')!=-1:
+			inputPath = inputPath%home_path
+		return inputPath
+	
 	def connectDB(self):
 		"""
 		2012.5.11

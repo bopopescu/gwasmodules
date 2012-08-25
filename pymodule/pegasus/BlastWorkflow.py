@@ -10,6 +10,7 @@ Examples:
 	a common class for pegasus workflows that work on NGS (next-gen sequencing) data
 """
 import sys, os, math
+__doc__ = __doc__%(sys.argv[0],)
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
@@ -101,20 +102,22 @@ class BlastWorkflow(AbstractWorkflow):
 				job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		return job
 	
-	def addBlastWrapperJob(self, executable=None, inputFile=None, outputFile=None, databaseFile=None,\
+	def addBlastWrapperJob(self, executable=None, inputFile=None, outputFile=None, outputFnamePrefix=None, databaseFile=None,\
 						maxNoOfMismatches=None, minNoOfIdentities=None, minIdentityPercentage=None, blastallPath=None, \
 						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
 						extraArguments=None, job_max_memory=2000, **keywords):
 		"""
 		2012.5.24
 		"""
-		extraArgumentList = ['-l %s'%blastallPath, '-d', databaseFile]
+		extraArgumentList = ['-l %s'%blastallPath, '--databaseFname', databaseFile]
+		if outputFnamePrefix:
+			extraArgumentList.append("--outputFnamePrefix %s "%(outputFnamePrefix))
 		if maxNoOfMismatches:
-			extraArgumentList.append('-a %s'%maxNoOfMismatches)
+			extraArgumentList.append('--maxNoOfMismatches %s'%maxNoOfMismatches)
 		if minNoOfIdentities:
-			extraArgumentList.append("-m %s"%(minNoOfIdentities))
+			extraArgumentList.append("--minNoOfIdentities %s"%(minNoOfIdentities))
 		if minIdentityPercentage:
-			extraArgumentList.append("-n %s"%(minIdentityPercentage))
+			extraArgumentList.append("--minIdentityPercentage %s"%(minIdentityPercentage))
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		return self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=outputFile, \
@@ -155,7 +158,7 @@ class BlastWorkflow(AbstractWorkflow):
 			for splitFastaOutput in splitFastaJob.outputList:
 				outputFile = File('%s.tsv'%(splitFastaOutput.name))
 				blastJob = self.addBlastWrapperJob(executable=self.BlastWrapper, inputFile=splitFastaOutput, outputFile=outputFile, \
-								databaseFile=ntDatabaseFile,\
+								outputFnamePrefix=splitFastaOutput.name , databaseFile=ntDatabaseFile,\
 								maxNoOfMismatches=self.maxNoOfMismatches, minNoOfIdentities=self.minNoOfIdentities, \
 								minIdentityPercentage=self.minIdentityPercentage, blastallPath=self.blastallPath, \
 								parentJobLs=[splitFastaJob, makeBlastDBJob], extraDependentInputLs=ntDatabaseFileList, transferOutput=False, \

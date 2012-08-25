@@ -5,13 +5,14 @@ Examples:
 	# cut off 2 layers of folders from the URL (-c2) as the URL has two folders after its top-level URL.
 	%s -I https://xfer.genome.wustl.edu/gxfer3/74079526293008/ -u aufiewisiuch -p uazeiraiquae
 		-o /tmp/workflow.xml -F gxfer3_74079526293008 -j hcondor -l hcondor -C 1 -c2
-
+	%s
 
 2012.6.27
 	a common class for pegasus workflows that work on NGS (next-gen sequencing) data
 
 """
 import sys, os, math
+__doc__ = __doc__%(sys.argv[0], sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))

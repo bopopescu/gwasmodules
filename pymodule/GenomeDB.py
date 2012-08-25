@@ -705,13 +705,21 @@ class OneGenomeData(PassingData):
 		All these data used to be handled by class GenomeDatabase. Previous solution is not good because GenomeDatabase
 			is an umbrella of genome data from different species.
 	"""
-	def __init__(self, db_genome=None, tax_id=3702, **keywords):
+	def __init__(self, db_genome=None, tax_id=3702, maxPseudoChrSize=3000000000, **keywords):
+		"""
+		2012.8.13
+			add argument maxPseudoChrSize, which determines the max pseudo chromosome size (for self.chr_id2cumu_chr_start)
 		#2011-3-25
+		"""
 		self.db_genome = db_genome
 		self._chr_id2size = None
 		self._chr_id2cumu_size = None
 		self._chr_id2cumu_start = None
+		self._chr_id2cumu_chr_start = None	#2012.8.13
+		
 		self.tax_id = tax_id
+		self.maxPseudoChrSize = maxPseudoChrSize
+		
 		self.chr_gap = None
 		self.chr_id_ls = None
 		
@@ -866,6 +874,63 @@ class OneGenomeData(PassingData):
 			self._chr_id2cumu_start[chr_id] = self._chr_id2cumu_start[prev_chr_id] + chr_gap + self.chr_id2size[prev_chr_id]
 		self.chr_id_ls = chr_id_ls
 		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_start)))
+	
+	@property
+	def chr_id2cumu_chr_start(self):
+		"""
+		2012.8.13
+		"""
+		if self._chr_id2cumu_chr_start is None:
+			self.chr_id2cumu_chr_start = (self.maxPseudoChrSize, self.tax_id, self.chr_gap)
+		return self._chr_id2cumu_chr_start
+	
+	@chr_id2cumu_chr_start.setter
+	def chr_id2cumu_chr_start(self, argument_list):
+		"""
+		2012.8.13
+			this structure is slightly different from chr_id2cumu_start.
+				chr_id2cumu_start is for grouping all chromosomes into one giant chromosomes.
+				chr_id2cumu_chr_start is for groupping all chromosomes into several chromosomes,
+					size of each is <= self.maxPseudoChrSize. 
+		"""
+		
+		maxPseudoChrSize, tax_id, chr_gap = argument_list[:3]
+		sys.stderr.write("Getting chr_id2cumu_chr_start for tax-id=%s, chr-gap=%s, maxPseudoChrSize=%s ..."%\
+						(tax_id, chr_gap, maxPseudoChrSize))
+		if self._chr_id2size is None:
+			self.chr_id2size = [tax_id]
+		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
+		if chr_gap==None:
+			chr_size_ls = self.chr_id2size.values()
+			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
+		
+		chr_id_ls = self.chr_id2size.keys()
+		if self.chrOrder==2:
+			size_chr_id_ls = [(value, key) for key, value in self.chr_id2size.iteritems()]
+			size_chr_id_ls.sort()
+			size_chr_id_ls.reverse()
+			chr_id_ls = [row[1] for row in size_chr_id_ls]
+		else:
+			chr_id_ls.sort()
+		first_chr = chr_id_ls[0]
+		newChrID = 1
+		self._chr_id2cumu_chr_start = {first_chr:(newChrID, 0)}	#chr_id_ls might not be continuous integers. so dictionary is better
+			#start from 0.
+		for i in range(1, len(chr_id_ls)):
+			chr_id = chr_id_ls[i]
+			prev_chr_id = chr_id_ls[i-1]
+			prev_new_chr, prev_cumu_start = self._chr_id2cumu_chr_start[prev_chr_id]
+			new_cumu_start = prev_cumu_start + chr_gap + self.chr_id2size[prev_chr_id]
+			if new_cumu_start>=self.maxPseudoChrSize:
+				newChrID += 1	#start a new fake chromosome
+				new_cumu_start =0	#reset
+			else:
+				newChrID = prev_new_chr
+			self._chr_id2cumu_chr_start[chr_id] = (newChrID, new_cumu_start)
+		self.chr_id_ls = chr_id_ls
+		sys.stderr.write("%s chromosomes, last newChrID=%s Done.\n"%(len(self._chr_id2cumu_chr_start), newChrID))
+	
+		
 	
 	@property
 	def cumuSpan2ChrRBDict(self):
@@ -1172,8 +1237,11 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("%s unique genomic spans. Done.\n"%(len(genomeRBDict)))
 		return genomeRBDict
 	
-	def getOneGenomeData(self, tax_id=3702, chr_gap=0, chrOrder=1, sequence_type_id=None):
+	def getOneGenomeData(self, tax_id=3702, chr_gap=0, chrOrder=1, sequence_type_id=None, \
+						maxPseudoChrSize=3000000000, **keywords):
 		"""
+		2012.8.13
+			add argument maxPseudoChrSize, keywords
 		2011-11-21
 			add argument chrOrder (order of chromosomes)
 				1: whatever order in database
@@ -1183,7 +1251,7 @@ class GenomeDatabase(ElixirDB):
 		"""
 		if tax_id not in self.tax_id2genomeData:
 			oneGenomeData = OneGenomeData(db_genome=self, tax_id=tax_id, chr_gap=chr_gap, chrOrder=chrOrder,\
-										sequence_type_id=sequence_type_id)
+										sequence_type_id=sequence_type_id, maxPseudoChrSize=maxPseudoChrSize, **keywords)
 			self.tax_id2genomeData[tax_id] = oneGenomeData
 		return self.tax_id2genomeData.get(tax_id)
 	

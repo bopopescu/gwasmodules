@@ -26,7 +26,9 @@ class ModifyTPED(AbstractMapper):
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict.update({
 						('run_type', 1, int): [1, 'y', 1, 'which run type. 1: modify snp_id (2nd-column) = chr_phyiscalPosition,\
-						2: change chr (1st column) to X (chromosome X, for sex check by plink) , snp_id=X_physicalPosition.', ],\
+		2: snp_id=chr_physicalPosition (original data), chr (1st column) = X (chromosome X, for sex check by plink), pos += positionStartBase.,\
+		3: snp_id=chr_physicalPosition (original data), chr (1st column) = newChr, pos += positionStartBase', ],\
+						('newChr', 0, ): ["1", 'n', 1, 'the new chromosome for the TPED file (replace the old one)'],\
 						('positionStartBase', 0, int): [0, 'p', 1, 'the number to be added to position of every SNP'],\
 						})
 	def __init__(self,  **keywords):
@@ -39,7 +41,8 @@ class ModifyTPED(AbstractMapper):
 		2012.8.9
 		"""
 		chr, snp_id, genetic_distace, physical_distance = row[:4]
-		chr = Genome.getContigIDFromFname(chr)
+		#chr = Genome.getContigIDFromFname(chr)	# 2012.8.16 getting rid of the string part of chromosome ID doesn't help.
+			#   non-human chromosome numbers would still be regarded as 0 by plink.
 		snp_id = '%s_%s'%(chr, physical_distance)
 		new_row = [chr, snp_id, genetic_distace, physical_distance] + row[4:]
 		return new_row
@@ -49,8 +52,10 @@ class ModifyTPED(AbstractMapper):
 		2012.8.9
 		"""
 		chr, snp_id, genetic_distace, physical_distance = row[:4]
+		snp_id = '%s_%s'%(chr, physical_distance)	#the snp_id is the original contig & position
+		#chr = self.newChr	#new chromosome, new position
+		physical_distance = int(physical_distance) + self.positionStartBase
 		chr = "X"
-		snp_id = '%s_%s'%(chr, physical_distance)
 		new_row = [chr, snp_id, genetic_distace, physical_distance] + row[4:]
 		return new_row
 	
@@ -59,10 +64,10 @@ class ModifyTPED(AbstractMapper):
 		2012.8.9
 		"""
 		chr, snp_id, genetic_distace, physical_distance = row[:4]
+		snp_id = '%s_%s'%(chr, physical_distance)	#the snp_id is the original contig & position
+		chr = self.newChr	#new chromosome, new position
 		physical_distance = int(physical_distance) + self.positionStartBase
 		#chr = Genome.getContigIDFromFname(chr)
-		chr = 1	#everything is on one giant chromosome.
-		snp_id = '%s_%s'%(chr, physical_distance)
 		new_row = [chr, snp_id, genetic_distace, physical_distance] + row[4:]
 		return new_row
 	

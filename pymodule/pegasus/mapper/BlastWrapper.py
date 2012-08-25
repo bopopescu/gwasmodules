@@ -12,7 +12,8 @@ Examples:
 
 Description:
 	2012.5.23
-		a wrapper around blastall, parse and filter
+		a wrapper around blastall (blastn after 2012.8.19), parse and filter.
+		accept multiple input files trailing all arguments.
 """
 
 import sys, os, math
@@ -25,13 +26,16 @@ import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from AbstractMapper import AbstractMapper
 from Bio.Blast import NCBIXML, NCBIStandalone
+from Bio.Blast.Applications import NcbiblastnCommandline
+import cStringIO
 
 class BlastWrapper(AbstractMapper):
 	__doc__ = __doc__
 	option_default_dict = AbstractMapper.option_default_dict.copy()
-	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	#option_default_dict.pop(('outputFnamePrefix', 0, ))
 	option_default_dict.update({
 							('blastallPath', 1, ): ['/usr/bin/blastall', 'l', 1, 'path to blastall', ],\
+							#('blastnPath', 1, ): ['%s/bin/ncbi-blast/bin/blastn', 'l', 1, 'path to blastn', ],\
 							('databaseFname', 1, ): ['', 'd', 1, 'filename of the database to blast against, must be indexed', ],\
 							('minNoOfIdentities', 0, int): [None, 'm', 1, 'minimum number of identities between a query and target', ],\
 							('maxNoOfMismatches', 0, int): [None, 'a', 1, 'minimum number of mismatches between a query and target', ],\
@@ -41,20 +45,51 @@ class BlastWrapper(AbstractMapper):
 		"""
 		2012.5.23
 		"""
-		AbstractMapper.__init__(self, **keywords)
-		self.inputFnameLs = inputFnameLs
+		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
+		#self.blastnPath =  self.insertHomePath(self.blastnPath, self.home_path)
+		self.blastallPath =  self.insertHomePath(self.blastallPath, self.home_path)
 	
-	def runBlast(self, inputFname=None, databaseFname=None, outputFname=None, blastallPath=None, minNoOfIdentities=None, \
+	def runBlast(self, inputFname=None, databaseFname=None, outputFname=None, outputFnamePrefix=None, \
+				blastallPath=None, minNoOfIdentities=None, \
 				maxNoOfMismatches=None,\
 				minIdentityPercentage=None, maxNoOfHits=50):
 		"""
+		2012.8.19
+			output xml dump if outputFnamePrefix is given.
 		2012.5.23
+			blastall align_view option values:
+				0 = pairwise,
+				1 = query-anchored showing identities,
+				2 = query-anchored no identities,
+				3 = flat query-anchored, show identities,
+				4 = flat query-anchored, no identities,
+				5 = query-anchored no identities and blunt ends,
+				6 = flat query-anchored, no identities and blunt ends,
+				7 = XML Blast output,
+				8 = tabular, 
+				9 tabular with commresult_handleent lines
+				10 ASN, text
+				11 ASN, binary [Integer]
+				    default = 0
+				    range from 0 to 11
+		
 		"""
 		
 		result_handle, error_info = NCBIStandalone.blastall(blastallPath, "blastn", databaseFname, inputFname, align_view=7)
+		
+		
+		#blastn_cline = NcbiblastnCommandline(cmd=self.blastnPath, query=inputFname, db=databaseFname, evalue=0.001,\
+		#									outfmt=5, out="opuntia.xml")	#outfmt 5 is xml output.
+		
 		#error_info = error_info.read()	#2010-4-14 this read() causes program to hang out forever. ???
 		#if error_info:
 		#	sys.stderr.write("%s"%error_info)
+		if outputFnamePrefix:
+			outf = open('%s.xml'%(outputFnamePrefix), 'w')
+			blastContent = result_handle.read()
+			outf.write(blastContent)
+			outf.close()
+			result_handle = cStringIO.StringIO(blastContent)
 		blast_records = NCBIXML.parse(result_handle)
 		
 		if self.report:
@@ -105,6 +140,7 @@ class BlastWrapper(AbstractMapper):
 			pdb.set_trace()
 			
 		self.runBlast(inputFname=self.inputFname, databaseFname=self.databaseFname, outputFname=self.outputFname, \
+					outputFnamePrefix = self.outputFnamePrefix,\
 					blastallPath=self.blastallPath, minNoOfIdentities=self.minNoOfIdentities, \
 					maxNoOfMismatches=self.maxNoOfMismatches,\
 					minIdentityPercentage=self.minIdentityPercentage)

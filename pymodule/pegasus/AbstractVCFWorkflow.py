@@ -63,10 +63,14 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		"""
 		AbstractNGSWorkflow.registerCommonExecutables(self, workflow)
 	
-	def registerAllInputFiles(self, workflow=None, inputDir=None, input_site_handler=None, checkEmptyVCFByReading=False, pegasusFolderName='',\
-							maxContigID=None, minContigID=None):
+	def registerAllInputFiles(self, workflow=None, inputDir=None, input_site_handler=None, \
+					checkEmptyVCFByReading=False, pegasusFolderName='',\
+					maxContigID=None, minContigID=None, db_vervet=None, needToKnowNoOfLoci=False,
+					minNoOfLoci=None):
 		"""
-		2012.8.23 add maxContigID and minContigID to restrict input
+		2012.8.15 add argument db_vervet, needToKnowNoOfLoci, to get no_of_loci by parsing inputFname and find db-entry...
+			argument minNoOfLoci, only used when it's not None and needToKnowNoOfLoci is True
+		2012.8.10 add maxContigID and minContigID to restrict input
 		2012.7.27 add attribute file to each object in returnData.jobDataLs
 		2012.5.9
 			register the tbi file if it exists
@@ -85,7 +89,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		previous_reported_real_counter = ''
 		for fname in fnameLs:
 			counter += 1
-			inputFname = os.path.join(inputDir, fname)
+			inputFname = os.path.realpath(os.path.join(inputDir, fname))
 			if (maxContigID is not None and maxContigID!=0) or (minContigID is not None and minContigID!=0):
 				try:
 					contigID = int(self.getContigIDFromFname(os.path.basename(fname)))
@@ -103,19 +107,32 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				inputBaseFname = os.path.basename(inputFname)
 				inputF = File(os.path.join(pegasusFolderName, inputBaseFname))
 				inputF.addPFN(PFN("file://" + inputFname, input_site_handler))
+				inputF.absPath = inputFname
 				inputF.abspath = inputFname
-				workflow.addFile(inputF)
-				
-				tbi_F_absPath = "%s.tbi"%inputFname
-				if os.path.isfile(tbi_F_absPath):	#it exists
-					tbi_F = File(os.path.join(pegasusFolderName, "%s.tbi"%inputBaseFname))
-					tbi_F.addPFN(PFN("file://" + tbi_F_absPath, input_site_handler))
-					tbi_F.abspath = tbi_F_absPath
-					workflow.addFile(tbi_F)
-				else:
-					tbi_F = None
-				
-				returnData.jobDataLs.append(PassingData(vcfFile=inputF, jobLs=[], tbi_F=tbi_F, file=inputF))
+				no_of_loci = None
+				if needToKnowNoOfLoci:
+					if db_vervet:
+						genotype_file = db_vervet.parseGenotypeFileGivenDBAffiliatedFilename(filename=inputFname)
+						if genotype_file:
+							no_of_loci = genotype_file.no_of_loci
+					else:
+						#do file parsing
+						pass
+				inputF.noOfLoci = no_of_loci
+				inputF.no_of_loci = no_of_loci
+				if minNoOfLoci is None or (minNoOfLoci and inputF.no_of_loci and  inputF.no_of_loci >minNoOfLoci):
+					workflow.addFile(inputF)
+					
+					tbi_F_absPath = "%s.tbi"%inputFname
+					if os.path.isfile(tbi_F_absPath):	#it exists
+						tbi_F = File(os.path.join(pegasusFolderName, "%s.tbi"%inputBaseFname))
+						tbi_F.addPFN(PFN("file://" + tbi_F_absPath, input_site_handler))
+						tbi_F.abspath = tbi_F_absPath
+						workflow.addFile(tbi_F)
+					else:
+						tbi_F = None
+					inputF.tbi_F = tbi_F
+					returnData.jobDataLs.append(PassingData(vcfFile=inputF, jobLs=[], tbi_F=tbi_F, file=inputF))
 				if real_counter%200==0:
 					sys.stderr.write("%s%s"%('\x08'*len(previous_reported_real_counter), real_counter))
 					previous_reported_real_counter = repr(real_counter)
@@ -127,7 +144,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 							logWhichColumn=True,\
 							posColumnPlotLabel=None, chrLengthColumnLabel=None, chrColumnLabel=None, \
 							minChrLength=1000000, posColumnLabel=None, minNoOfTotal=100,\
-							figureDPI=300, ylim_type=2, samplingRate=0.0001,\
+							figureDPI=300, ylim_type=2, samplingRate=0.0001, logCount=False,\
 							parentJobLs=None, \
 							extraDependentInputLs=None, \
 							extraArguments=None, transferOutput=True, job_max_memory=2000, sshDBTunnel=False, **keywords):
@@ -180,6 +197,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			extraArgumentList.append("-c %s"%(chrLengthColumnLabel))
 		if chrColumnLabel:
 			extraArgumentList.append("-C %s"%(chrColumnLabel))
+		if logCount:
+			extraArgumentList.append("--logCount")
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
@@ -195,3 +214,103 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				if inputFile:
 					job.addArguments(inputFile)
 		return job
+	
+	def getChr2IntervalDataLsBySelectVCFFile(self, vcfFolder=None, noOfSitesPerUnit=5000, noOfOverlappingSites=1000, \
+											folderName=None, parentJobLs= None):
+		"""
+		2012.8.9 update it so that the interval encompassing all lines in one block/unit is known.
+			good for mpileup to only work on that interval and then "bcftools view" select from sites from the block.
+			TODO: offer partitioning by equal-chromosome span, rather than number of sites.
+				Some sites could be in far from each other in one block, which could incur long-running mpileup. goal is to skip these deserts.
+		2012.8.8 bugfix add -1 to the starting number below cuz otherwise it's included in the next block's start
+				blockStopLineNumber = min(startLineNumber+(i+1)*noOfLinesPerUnit-1, stopLineNumber)	
+		2012.8.14
+			1.
+			2. folderName is the relative path of the folder in the pegasus workflow, that holds intervalFname.
+				it'll be created upon file stage-in. no mkdir job for it.
+				
+			get the number of lines in intervalFname.
+			get chr2StartStopDataLsTuple
+			for each chr, split its lines into units  that don't exceed noOfLinesPerUnit
+				add the split job
+				 
+		"""
+		sys.stderr.write("Splitting %s into blocks of %s lines ... "%(intervalFname, noOfLinesPerUnit))
+		#from pymodule import utils
+		#noOfLines = utils.getNoOfLinesInOneFileByWC(intervalFname)
+		chr2StartStopDataLs = {}
+		import csv
+		from pymodule import figureOutDelimiter
+		inf = open(intervalFname)
+		reader = csv.reader(inf, delimiter=figureOutDelimiter(intervalFname))
+		lineNumber = 0
+		previousChromosome = None
+		previousLine = None
+		chromosome = None
+		for row in reader:
+			lineNumber += 1
+			chromosome, start, stop = row[:3]
+			start = int(start)	#0-based, starting base
+			stop = int(stop)	#0-based, stopping base but not inclusive, i.e. [start, stop)
+			
+			if previousLine is None or chromosome!=previousLine.chromosome:	#first line or different chromosome
+				if previousLine is not None and previousLine.chromosome is not None:
+					
+					prevChrLastStartStopData = chr2StartStopDataLs[previousLine.chromosome][-1]
+					if prevChrLastStartStopData.stopLineNumber is None:
+						prevChrLastStartStopData.stopLineNumber = previousLine.lineNumber
+						prevChrLastStartStopData.stopLineStart = previousLine.start
+						prevChrLastStartStopData.stopLineStop = previousLine.stop
+					
+				if chromosome not in chr2StartStopDataLs:
+					StartStopData = PassingData(startLineNumber=lineNumber, startLineStart=start, startLineStop=stop, \
+											stopLineNumber=None, stopLineStart=None, stopLineStop=None)
+					chr2StartStopDataLs[chromosome] = [StartStopData]
+			else:	#same chromosome and not first line
+				lastStartStopData = chr2StartStopDataLs[chromosome][-1]
+				if lastStartStopData.stopLineNumber is None:	#last block hasn't been closed yet.
+					noOfLinesInCurrentBlock = lineNumber - lastStartStopData.startLineNumber +1
+					if noOfLinesInCurrentBlock>=noOfLinesPerUnit:	#time to close it
+						lastStartStopData.stopLineNumber = lineNumber
+						lastStartStopData.stopLineStart = start
+						lastStartStopData.stopLineStop = stop
+				else:	#generate a new block
+					StartStopData = PassingData(startLineNumber=lineNumber, startLineStart=start, startLineStop=stop, \
+											stopLineNumber=None, stopLineStart=None, stopLineStop=None)
+					chr2StartStopDataLs[chromosome].append(StartStopData)
+			previousLine = PassingData(chromosome = chromosome, start=start, stop=stop, lineNumber=lineNumber)
+		#final closure
+		if previousLine is not None:	#intervalFname is not empty
+			lastStartStopData = chr2StartStopDataLs[previousLine.chromosome][-1]
+			if lastStartStopData.stopLineNumber is None:	#last block hasn't been closed yet.
+				#close it regardless of whether it has enough lines in it or not.
+				lastStartStopData.stopLineNumber = previousLine.lineNumber
+				lastStartStopData.stopLineStart = previousLine.start
+				lastStartStopData.stopLineStop = previousLine.stop
+		sys.stderr.write("%s chromosomes out of %s lines.\n"%(len(chr2StartStopDataLs), lineNumber))
+		
+		intervalFile = self.registerOneInputFile(inputFname=intervalFname, folderName=folderName)
+		chr2IntervalDataLs = {}
+		counter = 0
+		for chr, startStopDataLs in chr2StartStopDataLs.iteritems():
+			for startStopData in startStopDataLs:
+				blockStartLineNumber = startStopData.startLineNumber
+				blockStopLineNumber = startStopData.stopLineNumber
+				# 2012.8.9 the large interval that encompasses all BED lines 
+				interval = '%s:%s-%s'%(chr, startStopData.startLineStart, startStopData.stopLineStop)
+				blockIntervalFile = File(os.path.join(folderName, '%s_line_%s_%s_bed.tsv'%(chr, \
+												blockStartLineNumber, blockStopLineNumber)))
+				blockIntervalJob = self.addSelectLineBlockFromFileJob(executable=self.SelectLineBlockFromFile, \
+						inputFile=intervalFile, outputFile=blockIntervalFile,\
+						startLineNumber=blockStartLineNumber, stopLineNumber=blockStopLineNumber, \
+						parentJobLs=parentJobLs, extraDependentInputLs=None, \
+						transferOutput=False, job_max_memory=500)
+				intervalFnameSignature = '%s_%s_%s'%(chr, blockStartLineNumber, blockStopLineNumber)
+				if chr not in chr2IntervalDataLs:
+					chr2IntervalDataLs[chr] = []
+				intervalData = PassingData(file=blockIntervalFile, intervalFnameSignature=intervalFnameSignature, interval=interval,\
+										chr=chr, jobLs=[blockIntervalJob], job=blockIntervalJob)
+				chr2IntervalDataLs[chr].append(intervalData)
+				counter += 1
+		sys.stderr.write("%s intervals and %s SelectLineBlockFromFile jobs.\n"%(counter, counter))
+		return chr2IntervalDataLs

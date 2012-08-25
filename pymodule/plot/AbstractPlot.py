@@ -22,31 +22,23 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
-import csv, random
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter
-from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 import pylab
+import csv, random, numpy
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter,\
+	yh_matplotlib
+from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule.AbstractMatrixFileWalker import AbstractMatrixFileWalker
 
-class AbstractPlot(AbstractMapper):
+class AbstractPlot(AbstractMatrixFileWalker):
 	__doc__ = __doc__
-	option_default_dict = AbstractMapper.option_default_dict.copy()
-	option_default_dict.pop(('inputFname', 1, ))
+	option_default_dict = AbstractMatrixFileWalker.option_default_dict.copy()
 	#option_default_dict.update(AbstractMapper.db_option_dict.copy())
 	option_default_dict.update({
-						('minNoOfTotal', 1, int): [100, 'i', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
 						('title', 0, ): [None, 't', 1, 'title for the figure.'],\
 						('figureDPI', 1, int): [200, 'f', 1, 'dpi for the output figures (png)'],\
 						('formatString', 1, ): ['.', 'm', 1, 'formatString passed to matplotlib plot'],\
-						('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: 0 to max. 2: min to max'],\
-						('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
-						('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
-						('whichColumnHeader', 0, ): ["", 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
+						('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: whatever matplotlib decides. 2: min to max'],\
 						('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
-						('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
-						('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
-				only effective when logWhichColumn is toggled. '],\
-						('valueForNonPositiveYValue', 1, float): [50, 'v', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
-			what yValue should be.'],\
 						('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\
 						('xColumnPlotLabel', 0, ): ['', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
 						('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
@@ -54,24 +46,12 @@ class AbstractPlot(AbstractMapper):
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
-		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)	#self.connectDB() called within its __init__()
+		AbstractMatrixFileWalker.__init__(self, inputFnameLs=inputFnameLs, **keywords)	#self.connectDB() called within its __init__()
 		#if user wants to preserve data in a data structure that is visisble throughout reading different files.
 		# then use this self.invariantPData.
-		self.invariantPData = PassingData()
-		
-	def connectDB(self):
-		"""
-			split out of __init__() so that derived classes could overwrite this function
-		"""
-		pass
+		#AbstractMatrixFileWalker has initialized a structure like below.
+		#self.invariantPData = PassingData()
 	
-	def initiatePassingData(self, ):
-		"""
-		2012.8.2
-			this function gets called in the beginning of each fileWalker() (for each inputFname)
-		"""
-		pdata = PassingData(x_ls = [], y_ls = [], invariantPData=self.invariantPData)
-		return pdata
 	
 	def plot(self, x_ls=None, y_ls=None, pdata=None):
 		"""
@@ -79,22 +59,6 @@ class AbstractPlot(AbstractMapper):
 			get called by the end of fileWalker() for each inputFname.
 		"""
 		pylab.plot(x_ls, y_ls, self.formatString)
-	
-	def handleYValue(self, yValue=None):
-		"""
-		2012.8.2
-		"""
-		yValue = float(yValue)
-		if self.logWhichColumn:
-			if yValue>0:
-				if self.positiveLog:
-					yValue = math.log10(yValue)
-				else:
-					yValue = -math.log10(yValue)
-				
-			else:
-				yValue = self.valueForNonPositiveYValue
-		return yValue
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -117,54 +81,12 @@ class AbstractPlot(AbstractMapper):
 			y_ls.append(yValue)
 			x_ls.append(xValue)
 	
-	def getNumberOfData(self, pdata):
+	def processHeader(self, header=None, pdata=None):
 		"""
-		2012.8.6
+		2012.8.13
+			called everytime the header of an input file is derived in fileWalker()
 		"""
-		return len(pdata.y_ls)
-	
-	def fileWalker(self, inputFname=None, plotFunction=None, processRowFunction=None , run_type=1):
-		"""
-		2012.8.1
-		"""
-		sys.stderr.write("walking through %s ..."%(inputFname))
-		counter =0
-		pdata = self.initiatePassingData()
-		if processRowFunction is None:
-			processRowFunction = self.processRow
-		if plotFunction is None:
-			plotFunction = self.plot
-		try:
-			inf = utils.openGzipFile(inputFname)
-			delimiter = figureOutDelimiter(inputFname)
-			isCSVReader = True
-			if delimiter=='\t' or delimiter==',':
-				reader = csv.reader(inf, delimiter=figureOutDelimiter(inputFname))
-				header = reader.next()
-			else:
-				reader = inf
-				header = inf.readline().strip().split()	#whatever splits them
-				isCSVReader = False
-			col_name2index = getColName2IndexFromHeader(header, skipEmptyColumn=True)
-			pdata.col_name2index = col_name2index
-			
-			for row in reader:
-				if not isCSVReader:
-					row = row.strip().split()
-				if self.samplingRate<1 and self.samplingRate>=0:
-					r = random.random()
-					if r>self.samplingRate:
-						continue
-				processRowFunction(row=row, pdata=pdata)
-				counter += 1
-			if self.getNumberOfData(pdata)>self.minNoOfTotal:
-				plotFunction(pdata.x_ls, pdata.y_ls, pdata=pdata)
-			del reader
-		except:
-			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
-			import traceback
-			traceback.print_exc()
-		sys.stderr.write("%s data.\n"%(counter))
+		pass
 	
 	def handleXLabel(self,):
 		"""
@@ -172,13 +94,28 @@ class AbstractPlot(AbstractMapper):
 		"""
 		if getattr(self, 'xColumnPlotLabel', None):
 			pylab.xlabel(self.xColumnPlotLabel)
-	
+		else:
+			pylab.xlabel(getattr(self, "xColumnHeader", ""))
+		
 	def handleYLabel(self,):
 		"""
 		2012.8.6
 		"""
 		if getattr(self, 'whichColumnPlotLabel', None):
 			pylab.ylabel(self.whichColumnPlotLabel)
+		else:
+			pylab.ylabel(getattr(self, "whichColumnHeader", ""))
+	
+	def handleTitle(self,):
+		"""
+		2012.8.16
+		"""
+		if self.title:
+			pylab.title(self.title)
+		else:
+			title = yh_matplotlib.constructTitleFromTwoDataSummaryStat(self.invariantPData.x_ls, self.invariantPData.y_ls)
+			pylab.title(title)
+
 	
 	def run(self):
 		
@@ -190,10 +127,9 @@ class AbstractPlot(AbstractMapper):
 		
 		for inputFname in self.inputFnameLs:
 			if os.path.isfile(inputFname):
-				self.fileWalker(inputFname, plotFunction=self.plot, run_type=1, processRowFunction=self.processRow)
+				self.fileWalker(inputFname, afterFileFunction=self.plot, run_type=1, processRowFunction=self.processRow)
 		
-		if self.title:
-			pylab.title(self.title)
+		self.handleTitle()
 		self.handleXLabel()
 		self.handleYLabel()
 		

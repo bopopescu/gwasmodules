@@ -14,6 +14,8 @@ Examples:
 	DrawMatrix.py -i ./149CrossMatch_m4_a0.1.tsv -x ./banyan_fs/tmp/149CrossMatch_m4_a0.1.png -s 2 -e ./FreeSerif.ttf -m -u black -o 7000 -c 7000 -t 20 -n
 	
 Description:
+	2012.8.24 also a standalone program that draw matrix into images.
+		If matrix is too big, it'll partition the image into blocks and output each block into one image output.
 	2007-10-23
 	module to draw matrix into an image
 	some functions copied form annot.bin.codense.common and variation.src.common
@@ -26,6 +28,14 @@ Description:
 10-31-05 basic functions to draw images
 """
 import sys,os
+__doc__ = __doc__%()
+
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter, SNPData
+
+
 def get_char_dimension():
 	import Image, ImageDraw
 	im = Image.new('RGB', (50,50))
@@ -583,14 +593,22 @@ class DrawMatrix(object):
 	__doc__ = __doc__
 	option_default_dict = {('font_path', 1, ):['/usr/share/fonts/truetype/freefont/FreeSerif.ttf', 'e', 1, 'path of the font used to draw labels'],\
 							('font_size', 1, int):[20, 's', 1, 'size of font, which determines the size of the whole figure.'],\
-							("input_fname", 1, ): [None, 'i', 1, 'Filename that stores data matrix. 1st two columns are labels for rows. Top row is header.'],\
-							('min_value_non_negative', 0, ):[0, 'm', 0, 'whether minimum value must be >=0 (minus value has special meaning), force min_value=0 if data_matrix gives negative min_value.'],\
-							("fig_fname", 1, ): [None, 'x', 1, 'File name for the figure'],\
+							("input_fname", 1, ): [None, 'i', 1, 'Filename that stores data matrix. 1st two columns are labels for rows. \
+			Top row is header.'],\
+							('min_value_non_negative', 0, ):[0, 'm', 0, 'whether minimum value must be >=0 (minus value has special meaning), \
+			force min_value=0 if data_matrix gives negative min_value.'],\
+							("fig_fname", 1, ): [None, 'x', 1, 'File name prefix for the figure. If matrix is split into multiple blocks, \
+			each block will be output into one file with this prefix and block number.'],\
 							("no_of_ticks", 1, int): [5, 't', 1, 'Number of ticks on the legend'],\
-							("split_legend_and_matrix", 0, ): [0, 'p', 0, 'whether to split legend and matrix into 2 different images or not. Default is to combine them.'],\
+							("split_legend_and_matrix", 0, ): [0, 'p', 0, 'whether to split legend and matrix into 2 different images or not.\
+		Default is to combine them.'],\
 							('super_value_color', 0,): ["red", 'u', 1, 'color for matrix value -2, like "black", or "red" etc.' ],\
-							("col_step_size", 0, int): [200, 'c', 1, 'partition columns into blocks according to this size.'],\
-							("row_step_size", 0, int): [3500, 'o', 1, 'partition rows into blocks according to this size.'],\
+							("blockColUnit", 0, int): [200, 'c', 1, 'If the matrix is too large, it will be split into multiple blocks.\
+			each block is in one output.\
+			this argument controls how many columns per block.'],\
+							("blockRowUnit", 0, int): [3500, 'o', 1, 'If the matrix is too large, it will be split into multiple blocks.\
+			each block is in one output.\
+			this argument controls how many rows per block.'],\
 							("no_grid", 0, ): [0, 'n', 0, 'toggle to remove the grid on top of the whole 2-D structure'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
@@ -599,7 +617,6 @@ class DrawMatrix(object):
 		"""
 		2008-08-29
 		"""
-		from ProcessOptions import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
 	def _drawMatrix(self, data_matrix, row_label_ls, col_label_ls, fig_fname, passParam):
@@ -621,8 +638,8 @@ class DrawMatrix(object):
 		2008-09-10
 			in case chop the whole figure into blocks, swap col_block_index and row_block_index to make row first, column 2nd
 		"""
-		from SNP import read_data
-		from utils import figureOutDelimiter, PassingData
+		from pymodule.SNP import read_data
+		from pymodule.utils import figureOutDelimiter, PassingData
 		delimiter = figureOutDelimiter(self.input_fname)
 		print delimiter
 		header, row_label_ls1, row_label_ls2, data_matrix = read_data(self.input_fname, matrix_data_type=float, delimiter='\t')
@@ -645,25 +662,24 @@ class DrawMatrix(object):
 		passParam = PassingData(value2color_func=value2color_func, im_legend=im_legend, font=font, \
 							split_legend_and_matrix=self.split_legend_and_matrix, no_grid=self.no_grid)
 		
-		if no_of_cols <= self.col_step_size:
+		if no_of_cols <= self.blockColUnit:
 			self._drawMatrix(data_matrix, row_label_ls1, header[2:], self.fig_fname, passParam)
 		else:	#split into blocks
-			no_of_col_blocks = no_of_cols/self.col_step_size+1
-			no_of_row_blocks = no_of_rows/self.row_step_size + 1
+			no_of_col_blocks = no_of_cols/self.blockColUnit+1
+			no_of_row_blocks = no_of_rows/self.blockRowUnit + 1
 			for i in range(no_of_col_blocks):
-				col_start_index = i*self.col_step_size
-				col_end_index = (i+1)*self.col_step_size
+				col_start_index = i*self.blockColUnit
+				col_end_index = (i+1)*self.blockColUnit
 				if col_start_index<no_of_cols:
 					for j in range(no_of_row_blocks):
-						row_start_index = j*self.row_step_size
-						row_end_index = (j+1)*self.row_step_size
+						row_start_index = j*self.blockRowUnit
+						row_end_index = (j+1)*self.blockRowUnit
 						if row_start_index<no_of_rows:
 							fig_fname = '%s_%s_%s.png'%(fig_fname_prefix, j, i)	#row first, column 2nd
 							self._drawMatrix(data_matrix[row_start_index:row_end_index,col_start_index:col_end_index], row_label_ls1[row_start_index:row_end_index], \
 											header[2+col_start_index:2+col_end_index], fig_fname, passParam)
 			
 if __name__ == '__main__':
-	from ProcessOptions import ProcessOptions
 	main_class = DrawMatrix
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	

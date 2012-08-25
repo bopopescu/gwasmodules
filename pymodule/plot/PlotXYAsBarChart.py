@@ -46,6 +46,9 @@ class PlotXYAsBarChart(AbstractPlot):
 			this function gets called in the beginning of each fileWalker() (for each inputFname)
 		"""
 		pdata = PassingData(xValue2yValue={}, x_ls=[], y_ls=[], invariantPData=self.invariantPData)
+		#2012.8.16 pass to global data
+		self.invariantPData.y_ls = pdata.y_ls
+		self.invariantPData.x_ls = pdata.x_ls
 		return pdata
 	
 	def getNumberOfData(self, pdata):
@@ -85,6 +88,7 @@ class PlotXYAsBarChart(AbstractPlot):
 		"""
 		col_name2index = getattr(pdata, 'col_name2index', None)
 		xValue2yValue = getattr(pdata, 'xValue2yValue', None)
+		y_ls = getattr(pdata, 'y_ls', None)
 		if col_name2index and xValue2yValue is not None:
 			if self.whichColumnHeader:
 				whichColumn = col_name2index.get(self.whichColumnHeader, None)
@@ -96,6 +100,7 @@ class PlotXYAsBarChart(AbstractPlot):
 			yValue = float(row[whichColumn])
 			yValue = self.handleYValue(yValue)
 			xValue2yValue[xValue] = yValue
+			y_ls.append(yValue)
 	
 
 if __name__ == '__main__':

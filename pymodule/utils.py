@@ -135,6 +135,8 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', 
 			delimiter_count = line.count(delimiter)
 			if delimiter_count>delimiterData.maxCount:	#2012.8.10 max count
 				delimiterData.delimiterWithMaxCount = delimiter
+				delimiterData.maxCount = delimiter_count	#2012.8.13 bugfix
+			
 				
 		delimiter_chosen = delimiterData.delimiterWithMaxCount
 	if inputIsFileObject:
@@ -590,8 +592,10 @@ def getDateStampedFilename(filename):
 								lastModDatetime.day, suffix)
 	return newFilename
 
-def openGzipFile(inputFname):
+def openGzipFile(inputFname, openMode='r'):
 	"""
+	2012.8.21
+		add argument openMode
 	2012.5.23
 		if suffix is .gz, use gzip to open it
 	"""
@@ -599,9 +603,9 @@ def openGzipFile(inputFname):
 	fname_prefix, fname_suffix = os.path.splitext(inputFname)
 	if fname_suffix=='.gz':
 		import gzip
-		inf = gzip.open(inputFname)
+		inf = gzip.open(inputFname, mode='rb')
 	else:
-		inf = open(inputFname)
+		inf = open(inputFname, openMode)
 	return inf
 
 def comeUpSplitFilename(outputFnamePrefix=None, suffixLength=3, fileOrder=0, filenameSuffix=""):
@@ -707,6 +711,25 @@ def copyFile(srcFilename=None, dstFilename=None, copyCommand="cp -aprL", srcFile
 	else:
 		exitCode = 0
 	return exitCode
+
+def getZScorePvalue(zscore=None, twoSided=False):
+	"""
+	2012.8.22
+		becasue this import wouldn't work. hard to remember:
+	
+			>>> import scipy
+			>>> scipy.stats.norm.sf
+			Traceback (most recent call last):
+			  File "<stdin>", line 1, in <module>
+			AttributeError: 'module' object has no attribute 'stats'
+		
+		zscore could also be a vector (list)
+	"""
+	import scipy.stats as stats
+	pvalue = stats.norm.sf(zscore)
+	if twoSided:
+		pvalue  = pvalue* 2
+	return pvalue
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()

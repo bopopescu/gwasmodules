@@ -29,6 +29,17 @@ number2ab = {0: 'NA',
 number2complement = {-1:-1, 0:0, 1:4, 4:1, 2:3, 3:2}
 #2008-01-06
 nt2complement = {'A':'T', 'T':'A', 'C':'G', 'G':'C'}
+
+def reverseComplement(inputSeqStr=""):
+	"""
+	2012.8.20
+		vast superior to nt2complement
+	"""
+	from Bio.Seq import Seq
+	from Bio.Alphabet import generic_dna
+	my_dna = Seq(inputSeqStr, generic_dna)
+	return my_dna.reverse_complement().tostring()
+
 #2008-05-12	a common NA set
 #from sets import Set
 Set = set	# 2010-4-15
@@ -217,6 +228,8 @@ def get_nt_number2diff_matrix_index(number2nt):
 
 def RawSnpsData_ls2SNPData(rawSnpsData_ls, report=0, use_nt2number=0):
 	"""
+	2012.8.20 bugfix
+		generate snpData in the end.
 	2008-05-19
 		this returns a SNPData in same orientation as rawSnpsData_ls, SNP (row) X Strain (column).
 		apply transposeSNPData after this if another orientation is favored.
@@ -232,26 +245,27 @@ def RawSnpsData_ls2SNPData(rawSnpsData_ls, report=0, use_nt2number=0):
 		sys.stderr.write("Converting RawSnpsData_ls to SNPData ...")
 	from QC_250k import SNPData
 	nt_dict_map = lambda x: nt2number[x]
-	snpData = SNPData(row_id_ls = [], col_id_ls=[], data_matrix=[])
+	row_id_ls = []; col_id_ls=[]; data_matrix=[]
 	for i in range(len(rawSnpsData_ls)):
 		rawSnpsData = rawSnpsData_ls[i]
 		chromosome = rawSnpsData.chromosome
-		for j in range(len(rawSnpsData.positions)):
-			if use_nt2number:
-				data_row = map(nt_dict_map, rawSnpsData.snps[j])
-			else:
-				data_row = rawSnpsData.snps[j]
-			snpData.data_matrix.append(data_row)
-			snpData.row_id_ls.append((chromosome, rawSnpsData.positions[j]))
 		if i==0:	#only need once
 			for j in range(len(rawSnpsData.accessions)):
 				if rawSnpsData.arrayIds:
 					col_id = (rawSnpsData.accessions[j], rawSnpsData.arrayIds[j])
 				else:
 					col_id = rawSnpsData.accessions[j]
-				snpData.col_id_ls.append(col_id)
+				col_id_ls.append(col_id)
+		for j in range(len(rawSnpsData.positions)):
+			if use_nt2number:
+				data_row = map(nt_dict_map, rawSnpsData.snps[j])
+			else:
+				data_row = rawSnpsData.snps[j]
+			data_matrix.append(data_row)
+			row_id_ls.append((chromosome, rawSnpsData.positions[j]))
 	if report:
 		sys.stderr.write("Done.\n")
+	snpData = SNPData(row_id_ls = row_id_ls, col_id_ls=col_id_ls, data_matrix=data_matrix)
 	return snpData
 
 def transposeSNPData(snpData, report=0):
@@ -282,8 +296,9 @@ def transposeSNPData(snpData, report=0):
 	"""
 	newSnpData.row_id_ls = copy.deepcopy(snpData.col_id_ls)
 	newSnpData.col_id_ls = copy.deepcopy(snpData.row_id_ls)
-	newSnpData.strain_acc_list = copy.deepcopy(snpData.strain_acc_list)
-	newSnpData.category_list = copy.deepcopy(snpData.category_list)
+	# 2012.8.20 snpData.strain_acc_list could be 1st column of each entry in snpData.row_id_ls, and thus 1st column of newSnpData.col_id
+	#newSnpData.strain_acc_list = copy.deepcopy(snpData.strain_acc_list)
+	#newSnpData.category_list = copy.deepcopy(snpData.category_list)
 	
 	newSnpData.processRowIDColID()	#2008-12-02	processRowIDColID() after row_id_ls and col_id_ls are given
 	if isinstance(snpData.data_matrix, list):
@@ -621,6 +636,150 @@ def read_data(inputFname, input_alphabet=0, turn_into_integer=1, double_header=0
 	sys.stderr.write("%s rows, %s columns, %s data points. Done.\n"%(no_of_rows, no_of_cols, no_of_data_points))
 	return header, strain_acc_list, category_list, data_matrix
 
+
+def readAdjacencyListDataIntoMatrix(inputFname=None, rowIDHeader=None, colIDHeader=None, rowIDIndex=None, colIDIndex=None, \
+								dataHeader=None, dataIndex=None, hasHeader=True, defaultValue=None, dataConvertDictionary=None,\
+								matrixDefaultDataType=None, asymmetric=False):
+	"""
+	2012.8.24
+		add argument asymmetric,  matrixDefaultDataType, dataConvertDictionary
+		
+		similar to readAdjacencyListDataIntoMatrix() but now the M[i,j]!=M[j,i].
+		return a SNPData
+		
+		i.e.
+			from pymodule import SNP
+			import numpy
+			snpData = SNP.readAdjacencyListDataIntoMatrix(inputFname=inputFname, rowIDHeader='Sample', colIDHeader='SNP', \
+									rowIDIndex=None, colIDIndex=None, \
+									dataHeader='Geno', dataIndex=None, hasHeader=True, defaultValue=0, \
+									dataConvertDictionary=SNP.nt2number, matrixDefaultDataType=numpy.int, asymmetric=True)
+			snpData.tofile(outputFname)
+	"""
+	sys.stderr.write("Reading a matrix out of an adjacency-list based file %s ..."%(inputFname))
+	from pymodule.MatrixFile import MatrixFile
+	from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
+	import numpy
+	if defaultValue is None:
+		defaultValue = numpy.nan
+	
+	reader = MatrixFile(inputFname=inputFname)
+	if hasHeader:
+		header = reader.next()
+		col_name2index = getColName2IndexFromHeader(header)
+		if rowIDIndex is None and rowIDHeader:
+			rowIDIndex = col_name2index.get(rowIDHeader)
+		if colIDIndex is None and colIDHeader:
+			colIDIndex = col_name2index.get(colIDHeader)
+		if dataIndex is None and dataHeader:
+			dataIndex = col_name2index.get(dataHeader)
+	
+	row_id2index  = {}
+	if asymmetric:
+		col_id2index = {}
+	else:
+		col_id2index = row_id2index
+	row_id_ls = []
+	if asymmetric:
+		col_id_ls = []
+	else:
+		col_id_ls = row_id_ls
+	idPair2data = {}
+	counter = 0
+	for row in reader:
+		rowID = row[rowIDIndex]
+		if rowID not in row_id2index:
+			row_id2index[rowID] = len(row_id2index)
+			row_id_ls.append(rowID)
+		colID = row[colIDIndex]
+		if colID not in col_id2index:
+			col_id2index[colID] = len(col_id2index)
+			col_id_ls.append(colID)
+		data = row[dataIndex]
+		if dataConvertDictionary:	#2012.8.24 supply a dictionary here to map
+			data = dataConvertDictionary[data]
+		idPair = (rowID, colID)
+		if idPair in idPair2data:
+			sys.stderr.write("Warning idPair %s already in idPair2data with value=%s. overwritten with new data=%s.\n"%\
+							(repr(idPair), idPair2data.get(idPair), data))
+		idPair2data[idPair] = data
+		counter += 1
+	
+	no_of_rows = len(row_id2index)
+	no_of_cols = len(col_id2index)
+	filledFraction = len(idPair2data)/float((no_of_rows*no_of_cols))
+	
+	sys.stderr.write("%s pairs of data (input number of data=%s). number of unique row ids=%s, col ids=%s. %.3f filled.\n"%\
+					(len(idPair2data), counter, no_of_rows, no_of_cols, filledFraction))
+	if matrixDefaultDataType is None:
+		matrixDefaultDataType = numpy.float32
+	
+	dataMatrix = numpy.zeros([no_of_rows, no_of_cols], dtype=matrixDefaultDataType)
+	dataMatrix[:] = defaultValue
+	for idPair, data in  idPair2data.iteritems():
+		rowID = idPair[0]
+		colID = idPair[1]
+		id1_index = row_id2index.get(rowID)
+		id2_index = col_id2index.get(colID)
+		dataMatrix[id1_index][id2_index] = data
+		if not asymmetric:
+			dataMatrix[id2_index][id1_index] = data
+	
+	maskedMatrix = numpy.ma.array(dataMatrix, mask=numpy.isnan(dataMatrix))
+	return SNPData(row_id_ls=row_id_ls, col_id_ls=col_id_ls, data_matrix=maskedMatrix)
+
+def getKey2ValueFromMatrixLikeFile(inputFname=None, keyHeaderLs=None, valueHeaderLs=None, keyIndexLs=None, valueIndexLs=None, \
+								hasHeader=True, valueDataType=None):
+	"""
+	2012.8.22
+		return a dictionary. key is a tuple of keyHeaderLs. value is conent of valueHeaderLs
+	"""
+	sys.stderr.write("Getting a dictionary out of  %s ..."%(inputFname))
+	from pymodule.MatrixFile import MatrixFile
+	from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
+	import numpy
+	
+	reader = MatrixFile(inputFname=inputFname)
+	if hasHeader:
+		header = reader.next()
+		col_name2index = getColName2IndexFromHeader(header)
+		if keyIndexLs is None and keyHeaderLs:
+			keyIndexLs = []
+			for keyHeader in keyHeaderLs:
+				keyIndexLs.append(col_name2index.get(keyHeader))
+		if valueIndexLs is None and valueHeaderLs:
+			valueIndexLs = []
+			for valueHeader in valueHeaderLs:
+				valueIndexLs.append(col_name2index.get(valueHeader))
+	
+	counter = 0
+	key2Value = {}
+	for row in reader:
+		counter += 1
+		keyLs = []
+		for keyIndex in keyIndexLs:
+			keyLs.append(row[keyIndex])
+		if len(keyLs)>1:
+			key = tuple(keyLs)
+		else:
+			key = keyLs[0]
+		valueLs = []
+		for valueIndex in valueIndexLs:
+			valueLs.append(row[valueIndex])
+		if valueDataType:
+			valueLs = map(valueDataType, valueLs)
+		if len(valueLs)==1:
+			value = valueLs[0]
+		else:
+			value = valueLs
+		if key in key2Value:
+			sys.stderr.write("Warning key %s already in key2Value with value=%s. overwritten with new data=%s.\n"%\
+							(repr(key), key2Value.get(key), repr(value)))
+		key2Value[key] = value
+	sys.stderr.write(" %s data in key2Value.\n"%(len(key2Value)))
+	return key2Value
+
+
 class SNPData(object):
 	"""
 	2009-10-30
@@ -849,6 +1008,61 @@ class SNPData(object):
 			if self.category_list is None:
 				self.category_list = category_list
 		write_data_matrix(self.data_matrix, output_fname, self.header, self.strain_acc_list, self.category_list, **keywords)
+	
+	def PCAOnDataMatrix(self, outputFname=None, noOfPCsToOutput=4):
+		"""
+		2012.8.24
+		"""
+		sys.stderr.write("Carrying out PCA on data_matrix ...")
+		import pca_module
+		from pymodule.PCA import PCA
+		#T, P, explained_var = pca_module.PCA_svd(phenData_trans.data_matrix, standardize=True)
+		T, P, explained_var = PCA.eig(self.data_matrix, normalize=False)	#normalize=True causes missing value in the covariance matrix
+		if outputFname:
+			import csv
+			writer = csv.writer(open(outputFname, 'w'), delimiter='\t')
+			
+			header = ['rowID', 'DummyTime']
+			for i in xrange(noOfPCsToOutput):
+				header.append('PC%s'%(i+1))
+			writer.writerow(header)
+			for i in xrange(min(len(self.row_id_ls), T.shape[0])):
+				row_id = self.row_id_ls[i]
+				if hasattr(T, 'mask'):
+					TVector = T[i, 0:noOfPCsToOutput].tolist()
+				else:
+					TVector = T[i,0:noOfPCsToOutput]
+				data_row = [row_id, '2011'] + TVector
+				writer.writerow(data_row)
+			del writer
+		sys.stderr.write("Done.\n")
+		return PassingData(T=T, P=P, explained_var=explained_var)
+	
+	def reOrderRowsGivenNewRowIDList(self, row_id_ls=None):
+		"""
+		2012.8.24
+		"""
+		snpData = SNPData(row_id_ls=copy.deepcopy(row_id_ls), col_id_ls=copy.deepcopy(self.col_id_ls),\
+						data_matrix=copy.deepcopy(self.data_matrix))
+		for i in xrange(len(row_id_ls)):
+			row_id = row_id_ls[i]
+			
+			oldRowIndex = self.row_id2row_index.get(row_id)
+			snpData.data_matrix[i,:] = self.data_matrix[oldRowIndex, :]
+		return snpData
+
+	def reOrderColsGivenNewCOlIDList(self, col_id_ls=None):
+		"""
+		2012.8.24
+		"""
+		snpData = SNPData(row_id_ls=copy.deepcopy(self.row_id_ls), col_id_ls=copy.deepcopy(col_id_ls), \
+						data_matrix=copy.deepcopy(self.data_matrix))
+		for i in xrange(len(col_id_ls)):
+			col_id = col_id_ls[i]
+			
+			oldColIndex = self.col_id2col_index.get(col_id)
+			snpData.data_matrix[:, i] = self.data_matrix[:, oldColIndex]
+		return snpData
 	
 	@classmethod
 	def removeRowsByMismatchRate(cls, snpData, row_id2NA_mismatch_rate, max_mismatch_rate=1):
@@ -1610,12 +1824,60 @@ class SNPData(object):
 		2010-4-16
 			get one column data given col_name
 		"""
-		col_index = self.col_id2col_index[col_name]
-		data_ls = self.data_matrix[:, col_index]
-		if convert_type is not None:
-			data_ls = map(convert_type, data_ls)
+		return self.getColVectorGivenColID(col_id=col_name, convert_type=convert_type)
+
+	def getColVectorGivenColID(self, col_id=None, convert_type=None):
+		"""
+		2012.8.22
+			similar to getColDataGivenColName, but more robust. the latter is not deleted for backwards compatiblity.
+		"""
+		col_index = self.col_id2col_index.get(col_id)
+		if col_index is not None:
+			data_ls = self.data_matrix[:, col_index]
+			if convert_type is not None:
+				data_ls = map(convert_type, data_ls)
+		else:
+			data_ls = None
 		return data_ls
 	
+	def getRowVectorGivenRowID(self, row_id=None, convert_type=None):
+		"""
+		2012.8.22 row-version of  getColVectorGivenColID()
+		"""
+		row_index = self.row_id2row_index.get(row_id)
+		if row_index is not None:
+			data_ls = self.data_matrix[row_index, :]
+			if convert_type is not None:
+				data_ls = map(convert_type, data_ls)
+		else:
+			data_ls = None
+		return data_ls
+	
+	def getCellDataGivenRowColID(self, row_id=None, col_id=None):
+		"""
+		2012.8.21
+			helper function
+		"""
+		row_index = self.row_id2row_index.get(row_id)
+		col_index = self.col_id2col_index.get(col_id)
+		if row_index is not None and col_index is not None:
+			return self.data_matrix[row_index][col_index]
+		else:
+			return None
+	
+	def setCellDataGivenRowColID(self, row_id=None, col_id=None, data=None):
+		"""
+		2012.8.21
+			helper function
+		"""
+		row_index = self.row_id2row_index.get(row_id)
+		col_index = self.col_id2col_index.get(col_id)
+		if row_index is not None and col_index is not None:
+			self.data_matrix[row_index][col_index] = data
+			return True
+		else:
+			return False
+		
 	def get_kinship_matrix(self):
 		"""
 		2011-4-25
