@@ -74,7 +74,7 @@ class ConvertVCF2BjarniFormat(object):
 			writer.writerow([refName, pos] + data_row)
 		del writer
 	
-	def discoverFromVCFWithoutFilter(self, inputFname, outputFname, **keywords):
+	def convertVCF2BjarniFormat(self, inputFname, outputFname, **keywords):
 		"""
 		#2012.8.20 locus_id2row_index from VCFFile is using (chr, pos) as key, not chr_pos
 			need a conversion in between
@@ -104,7 +104,7 @@ class ConvertVCF2BjarniFormat(object):
 		if outputDir and not os.path.isdir(outputDir):
 			os.makedirs(outputDir)
 		
-		self.discoverFromVCFWithoutFilter(self.inputFname, self.outputFname, \
+		self.convertVCF2BjarniFormat(self.inputFname, self.outputFname, \
 					outputDelimiter=self.outputDelimiter,\
 					report=self.report)
 		
