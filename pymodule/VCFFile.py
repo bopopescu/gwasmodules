@@ -447,6 +447,28 @@ class VCFFile(object):
 						minDepth=self.minDepth)
 			yield vcfRecord
 	
+	def __iter__(self):
+		"""
+		2012.8.25 make itself an iterator
+		"""
+		return self
+	
+	def next(self):
+		"""
+		2012.8.25 make itself an iterator
+		"""
+		try:
+			row = self.reader.next()
+			if not row:
+				raise StopIteration
+			vcfRecord = VCFRecord(row, col_name2index=self.col_name2index, \
+						individual_name2col_index=self.individual_name2col_index, sample_id2index=self.sample_id2index,\
+						col_index_individual_name_ls=self.col_index_individual_name_ls,\
+						minDepth=self.minDepth)
+			return vcfRecord
+		except:
+			raise StopIteration
+	
 	def countHomoHetCallsForEachSampleFromVCF(self):
 		"""
 		2011-11-2
