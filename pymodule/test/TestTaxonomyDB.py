@@ -43,6 +43,7 @@ class TestTaxonomyDB(unittest.TestCase, TaxonomyDB):
 		
 		#1st just db query
 		scientificName = self.getScientificNameGivenTaxID(taxID)
+		sys.stderr.write("Scientific name for %s is %s.\n"%(taxID, scientificName))
 		self.assertEqual(scientificName, "Chlorocebus sabaeus")
 		
 		#2nd cached version
@@ -56,6 +57,7 @@ class TestTaxonomyDB(unittest.TestCase, TaxonomyDB):
 		scientificName = "Chlorocebus sabaeus"
 		#1st just db query
 		taxID = self.getTaxIDGivenScientificName(scientificName)
+		sys.stderr.write("Taxonomy ID for %s is %s.\n"%(scientificName, taxID))
 		self.assertEqual(taxID, 60711)
 		
 		#2nd cached version
