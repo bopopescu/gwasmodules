@@ -194,6 +194,9 @@ class TaxonomyDB(ElixirDB):
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 		self.ncbiTaxDumpFileDelimiter = '\t|\t'
+		
+		self._scientific_name2tax_id = None
+		self._tax_id2scientific_name = None
 	
 	def splitLine(self, line=None):
 		line = line.strip()
@@ -458,6 +461,102 @@ class TaxonomyDB(ElixirDB):
 				self.session.commit()
 			else:
 				self.session.rollback()
+	
+	@property
+	def scientific_name2tax_id(self):
+		"""
+		2012.8.28
+			copied from pymodule/utils.py
+		2012.6.6
+			update it to get table names from TaxonomyDB
+		"""
+		if self._scientific_name2tax_id is None:
+			self.fillUpMapBetweenTaxIDAndScientificName()
+		return self._scientific_name2tax_id
+	
+	def returnTaxIDGivenScientificName(self, scientific_name=None):
+		"""
+		2012.8.28
+			copied from pymodule/utils.py
+		"""
+		return self.scientific_name2tax_id.get(scientific_name)
+	
+	def returnTaxIDGivenSentence(self, sentence=None):
+		"""
+		2012.8.28
+			copied from pymodule/utils.py
+		2008-07-29
+		"""
+		tax_id_to_return = None
+		for scientific_name, tax_id in self.scientific_name2tax_id.iteritems():
+			if sentence.find(scientific_name)>=0:
+				tax_id_to_return = tax_id
+				break
+		return tax_id_to_return
+	
+	def fillUpMapBetweenTaxIDAndScientificName(self):
+		"""
+		2012.8.29
+		"""
+		self._scientific_name2tax_id = {}
+		self._tax_id2scientific_name = {}
+		curs = self.metadata.bind
+		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species'"%(Name.table.name, Node.table.name))
+		#rows = curs.fetchall()
+		for row in rows:
+			scientific_name = row.name_txt
+			tax_id = row.tax_id
+			self._tax_id2scientific_name[tax_id] = scientific_name
+			self._scientific_name2tax_id[scientific_name] = tax_id
+		sys.stderr.write("%s entries in _tax_id2scientific_name. %s entries in _scientific_name2tax_id.\n"%\
+						(len(self._tax_id2scientific_name), len(self._scientific_name2tax_id)))
+
+	@property
+	def tax_id2scientific_name(self):
+		"""
+		2012.8.28
+		"""
+		if self._tax_id2scientific_name is None:
+			self.fillUpMapBetweenTaxIDAndScientificName()
+		return self._tax_id2scientific_name
+	
+	def returnScientificNameGivenTaxID(self, tax_id=None):
+		"""
+		2012.8.28
+			there's a cache involved in the 1st query.
+		"""
+		tax_id2scientific_name = self.tax_id2scientific_name
+		return tax_id2scientific_name.get(tax_id)
+	
+	def getScientificNameGivenTaxID(self, tax_id=None):
+		"""
+		2012.8.28
+			no cache, jsut db query
+		"""
+		curs = self.metadata.bind
+		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species' and n.tax_id=%s"%(Name.table.name, Node.table.name, tax_id))
+		row = rows.fetchone()
+		if row:
+			scientific_name = row.name_txt
+			return scientific_name
+		else:
+			return None
+	
+	def getTaxIDGivenScientificName(self, scientific_name=None):
+		"""
+		2012.8.29
+			no cache, just db query
+		"""
+		curs = self.metadata.bind
+		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species' and n.name_txt='%s'"%(Name.table.name, Node.table.name, scientific_name))
+		row = rows.fetchone()
+		if row:
+			return row.tax_id
+		else:
+			return None
 	
 if __name__ == '__main__':
 	import sys, os, math
