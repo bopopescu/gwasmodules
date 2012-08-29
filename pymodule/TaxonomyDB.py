@@ -501,8 +501,9 @@ class TaxonomyDB(ElixirDB):
 		self._scientific_name2tax_id = {}
 		self._tax_id2scientific_name = {}
 		curs = self.metadata.bind
-		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species'"%(Name.table.name, Node.table.name))
+		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM %s.%s n, %s.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species'"%(self.schema, Name.table.name, \
+															self.schema, Node.table.name))
 		#rows = curs.fetchall()
 		for row in rows:
 			scientific_name = row.name_txt
@@ -535,8 +536,9 @@ class TaxonomyDB(ElixirDB):
 			no cache, jsut db query
 		"""
 		curs = self.metadata.bind
-		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species' and n.tax_id=%s"%(Name.table.name, Node.table.name, tax_id))
+		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM %s.%s n, %s.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species' and n.tax_id=%s"%(self.schema, Name.table.name, \
+																	self.schema, Node.table.name, tax_id))
 		row = rows.fetchone()
 		if row:
 			scientific_name = row.name_txt
@@ -550,8 +552,9 @@ class TaxonomyDB(ElixirDB):
 			no cache, just db query
 		"""
 		curs = self.metadata.bind
-		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species' and n.name_txt='%s'"%(Name.table.name, Node.table.name, scientific_name))
+		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM %s.%s n, %s.%s o where n.name_class='scientific name' \
+				and n.tax_id=o.tax_id and o.rank='species' and n.name_txt='%s'"%(self.schema, Name.table.name,\
+																		self.schema, Node.table.name, scientific_name))
 		row = rows.fetchone()
 		if row:
 			return row.tax_id
