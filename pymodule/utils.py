@@ -189,7 +189,10 @@ def get_gene_id2gene_symbol(curs, tax_id, table='genome.gene', upper_case_gene_s
 	return gene_id2gene_symbol
 
 class FigureOutTaxID(object):
-	__doc__ = "2008-07-29 class to figure out tax_id using postgres database taxonomy schema"
+	__doc__ = """
+	2012.8.28 deprecated. moved to pymodule/TaxonomyDB.py
+	2008-07-29 class to figure out tax_id using postgres database taxonomy schema
+	"""
 	option_default_dict = {('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
 							('dbname', 1, ): ['graphdb', 'd', 1, 'database name', ],\
 							('schema', 1, ): ['taxonomy', 'k', 1, 'database schema name', ],\
@@ -730,6 +733,34 @@ def getZScorePvalue(zscore=None, twoSided=False):
 	if twoSided:
 		pvalue  = pvalue* 2
 	return pvalue
+
+def getNoOfUnitsNeededToCoverN(N=None, s=None, o=None):
+	"""
+	2012.8.25
+		purpose is to figure out how many blocks/units it needs to split N objects into given N.
+		N could also be smaller than s and o (first block).
+		
+		s = noOfSitesPerUnit
+		o = noOfOverlappingSites
+		N = noOfTotalSites
+		n = noOfUnits
+		s*n - o(n-1) = N
+			=> n = (N-o)/(s-o)
+		1. when N <= o, then use N straight.
+		2. same thing for s and o.
+	"""
+	import math
+	if N<=o:
+		numerator = N
+	else:
+		numerator = N-o
+	if s<=o:
+		denominator = s
+	else:
+		denominator = s-o
+	#make sure its bigger than 1.
+	noOfUnits = max(1, math.ceil(numerator/float(denominator)))
+	return int(noOfUnits)
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
