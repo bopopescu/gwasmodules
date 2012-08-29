@@ -497,12 +497,14 @@ class TaxonomyDB(ElixirDB):
 	def fillUpMapBetweenTaxIDAndScientificName(self):
 		"""
 		2012.8.29
+			remove " and o.rank='species'" from the query condition
+		2012.8.29
 		"""
 		self._scientific_name2tax_id = {}
 		self._tax_id2scientific_name = {}
 		curs = self.metadata.bind
 		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM %s.%s n, %s.%s o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species'"%(self.schema, Name.table.name, \
+				and n.tax_id=o.tax_id"%(self.schema, Name.table.name, \
 															self.schema, Node.table.name))
 		#rows = curs.fetchall()
 		for row in rows:
@@ -537,7 +539,7 @@ class TaxonomyDB(ElixirDB):
 		"""
 		curs = self.metadata.bind
 		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM %s.%s n, %s.%s o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species' and n.tax_id=%s"%(self.schema, Name.table.name, \
+				and n.tax_id=o.tax_id and n.tax_id=%s"%(self.schema, Name.table.name, \
 																	self.schema, Node.table.name, tax_id))
 		row = rows.fetchone()
 		if row:
@@ -553,7 +555,7 @@ class TaxonomyDB(ElixirDB):
 		"""
 		curs = self.metadata.bind
 		rows = curs.execute("SELECT n.name_txt, n.tax_id FROM %s.%s n, %s.%s o where n.name_class='scientific name' \
-				and n.tax_id=o.tax_id and o.rank='species' and n.name_txt='%s'"%(self.schema, Name.table.name,\
+				and n.tax_id=o.tax_id and n.name_txt='%s'"%(self.schema, Name.table.name,\
 																		self.schema, Node.table.name, scientific_name))
 		row = rows.fetchone()
 		if row:
