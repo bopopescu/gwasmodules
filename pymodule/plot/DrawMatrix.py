@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 """
 Examples:
-	DrawMatrix.py -i /tmp/149CrossMatch_m3.tsv -x /tmp/149CrossMatch_m3.png -s 5
+	DrawMatrix.py -i /tmp/149CrossMatch_m3.tsv -o /tmp/149CrossMatch_m3.png -s 5
 	
 	#font size=10, use custom font, matrix value is non-negative. only some special negative value is not ignored.
 	#value -2 is colored as black
-	DrawMatrix.py -i ./149CrossMatch_m4_a0.3.tsv -x ./banyan_fs/tmp/149CrossMatch_m4_a0.3.png -s 10 -e ./FreeSerif.ttf -m -u black
+	DrawMatrix.py -i ./149CrossMatch_m4_a0.3.tsv -o ./banyan_fs/tmp/149CrossMatch_m4_a0.3.png -s 10 -e ./FreeSerif.ttf -m -u black
 	
 	#partition rows into 2500-row blocks. Color legend is cut into 10 bands.
-	DrawMatrix.py -i ./149CrossMatch_m4_a0.1.tsv -x ./banyan_fs/tmp/149CrossMatch_m4_a0.1.png -s 10 -e ./FreeSerif.ttf -m -u black -o 2500 -t 10
+	DrawMatrix.py -i ./149CrossMatch_m4_a0.1.tsv -o ./banyan_fs/tmp/149CrossMatch_m4_a0.1.png -s 10 -e ./FreeSerif.ttf -m -u black -x 2500 -t 10
 	
 	#draw the whole matrix into one figure with small font (size=2) and do NOT draw the cell-separating grid.
-	DrawMatrix.py -i ./149CrossMatch_m4_a0.1.tsv -x ./banyan_fs/tmp/149CrossMatch_m4_a0.1.png -s 2 -e ./FreeSerif.ttf -m -u black -o 7000 -c 7000 -t 20 -n
+	DrawMatrix.py -i ./149CrossMatch_m4_a0.1.tsv -o ./banyan_fs/tmp/149CrossMatch_m4_a0.1.png -s 2 -e ./FreeSerif.ttf -m -u black -x 7000 -c 7000 -t 20 -n
 	
 Description:
 	2012.8.24 also a standalone program that draw matrix into images.
@@ -597,7 +597,7 @@ class DrawMatrix(object):
 			Top row is header.'],\
 							('min_value_non_negative', 0, ):[0, 'm', 0, 'whether minimum value must be >=0 (minus value has special meaning), \
 			force min_value=0 if data_matrix gives negative min_value.'],\
-							("fig_fname", 1, ): [None, 'x', 1, 'File name prefix for the figure. If matrix is split into multiple blocks, \
+							("fig_fname", 1, ): [None, 'o', 1, 'File name prefix for the figure. If matrix is split into multiple blocks, \
 			each block will be output into one file with this prefix and block number.'],\
 							("no_of_ticks", 1, int): [5, 't', 1, 'Number of ticks on the legend'],\
 							("split_legend_and_matrix", 0, ): [0, 'p', 0, 'whether to split legend and matrix into 2 different images or not.\
@@ -606,7 +606,7 @@ class DrawMatrix(object):
 							("blockColUnit", 0, int): [200, 'c', 1, 'If the matrix is too large, it will be split into multiple blocks.\
 			each block is in one output.\
 			this argument controls how many columns per block.'],\
-							("blockRowUnit", 0, int): [3500, 'o', 1, 'If the matrix is too large, it will be split into multiple blocks.\
+							("blockRowUnit", 0, int): [3500, 'x', 1, 'If the matrix is too large, it will be split into multiple blocks.\
 			each block is in one output.\
 			this argument controls how many rows per block.'],\
 							("no_grid", 0, ): [0, 'n', 0, 'toggle to remove the grid on top of the whole 2-D structure'],\
