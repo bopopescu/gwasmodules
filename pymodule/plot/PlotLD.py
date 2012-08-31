@@ -60,6 +60,7 @@ class PlotLD(AbstractPlot):
 	
 	def processRow(self, row=None, pdata=None):
 		"""
+		2012.8.31 skip missing data via self.missingDataNotation
 		2012.8.18
 		"""
 		col_name2index = getattr(pdata, 'col_name2index', None)
@@ -81,12 +82,14 @@ class PlotLD(AbstractPlot):
 					if chrLength<self.minChrLength:
 						return
 			if whichColumn is not None and pos1_index is not None and pos2_index is not None:
-				pos1 = int(float(row[pos1_index]))
-				pos2 = int(float(row[pos2_index]))
-				xValue = abs(pos2-pos1)
-				x_ls.append(xValue)
-				yValue = self.handleYValue(row[whichColumn])
-				y_ls.append(yValue)
+				yValue = row[whichColumn]
+				if yValue!=self.missingDataNotation:
+					pos1 = int(float(row[pos1_index]))
+					pos2 = int(float(row[pos2_index]))
+					xValue = abs(pos2-pos1)
+					x_ls.append(xValue)
+					yValue = self.handleYValue(yValue)
+					y_ls.append(yValue)
 	
 	
 if __name__ == '__main__':
