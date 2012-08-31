@@ -58,6 +58,7 @@ class DrawHistogram(AbstractPlot):
 	
 	def processRow(self, row=None, pdata=None):
 		"""
+		2012.8.31 skip missing data via self.missingDataNotation
 		2012.8.2
 			handles each row in each file
 		"""
@@ -69,8 +70,10 @@ class DrawHistogram(AbstractPlot):
 			else:
 				whichColumn = self.whichColumn
 			
-			yValue = self.handleYValue(row[whichColumn])
-			y_ls.append(yValue)
+			yValue = row[whichColumn]
+			if yValue!=self.missingDataNotation:
+				yValue = self.handleYValue(yValue)
+				y_ls.append(yValue)
 	
 	def handleXLabel(self,):
 		"""
