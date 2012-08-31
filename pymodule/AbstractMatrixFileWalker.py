@@ -38,6 +38,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 				only effective when logWhichColumn is toggled. '],\
 						('valueForNonPositiveYValue', 1, float): [50, 'v', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
 			what yValue should be.'],\
+						('missingDataNotation', 0, ): ['NA', '', 1, 'notation for missing data. will be skipped.'],\
 								})
 	#pop in the end after its value is used above
 	option_default_dict.pop(('inputFname', 1, ))
@@ -99,7 +100,9 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			else:
 				whichColumn = None
 			if whichColumn is not None:
-				yValue = self.handleYValue(row[whichColumn])
+				yValue = row[whichColumn]
+				if yValue!=self.missingDataNotation:
+					yValue = self.handleYValue(yValue)
 				row[whichColumn] = yValue
 			if self.invariantPData.writer:
 				self.invariantPData.writer.writerow(row)
