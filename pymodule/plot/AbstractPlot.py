@@ -62,6 +62,8 @@ class AbstractPlot(AbstractMatrixFileWalker):
 	
 	def processRow(self, row=None, pdata=None):
 		"""
+		2012.8.31
+			deal with missing data
 		2012.8.2
 			handles each row in each file
 		"""
@@ -75,11 +77,13 @@ class AbstractPlot(AbstractMatrixFileWalker):
 				whichColumn = self.whichColumn
 			x_index = col_name2index.get(self.xColumnHeader, None)
 			
-			xValue = float(row[x_index])
-			yValue = self.handleYValue(row[whichColumn])
-			
-			y_ls.append(yValue)
-			x_ls.append(xValue)
+			xValue = row[x_index]
+			yValue = row[whichColumn]
+			if yValue!=self.missingDataNotation and xValue!=self.missingDataNotation:
+				xValue = float(xValue)
+				yValue = self.handleYValue(yValue)
+				x_ls.append(xValue)
+				y_ls.append(yValue)
 	
 	def processHeader(self, header=None, pdata=None):
 		"""
