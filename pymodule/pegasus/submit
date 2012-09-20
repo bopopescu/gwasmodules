@@ -5,14 +5,14 @@ set -e
 TOPDIR=`pwd`
 STORAGE_SITE_DEFAULT="local"
 submitOptionDefault="--submit"
-if test $# -lt 3 ; then
+if test $# -lt 2 ; then
 	echo "Please specify local or condorpool as argument. Examples:"
-	echo "  $0 dagFile siteName finalOutputDir [toggleCleanUp] [STORAGE_SITE] [submitFolderName] [submitOption]"
+	echo "  $0 dagFile siteName [finalOutputDir] [toggleCleanUp] [STORAGE_SITE] [submitFolderName] [submitOption]"
 	echo ""
 	echo "Note:"
 	echo "	#. siteName is the running site. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
 	echo ""
-	echo "	#. finalOutputDir is the directory which would contain the final genotype matrix and all files requested to be transferred out. If it doesn't exist, pegasus would create one."
+	echo "	#. finalOutputDir is the directory which would contain the files requested to be transferred out by the end of the workflow. If it doesn't exist, pegasus would create one. Default is dagFile (without first folder if there is one) + year+date+time"
 	echo "	#. toggleCleanUp (value=1 means cleanup, 0 is or any other non-empty string means nocleanup.) is used to change the default submit option ($submitOptionDefault) to --submit or --submit --nocleanup."
 	echo "	#. STORAGE_SITE is the site to which final output is staged to. default is $STORAGE_SITE_DEFAULT."
 	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
@@ -21,7 +21,7 @@ if test $# -lt 3 ; then
 	echo ""
 	echo "Examples:"
 	echo "  #plan & submit and auto-cleanup"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool"
 	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1"
 	echo "  #plan & submit and no cleanup"
 	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 0"
@@ -39,6 +39,16 @@ toggleCleanUp=$4
 STORAGE_SITE=$5
 submitFolderName=$6
 submitOption=$7
+
+
+if [ -z $finalOutputDir ]; then
+	t=`python -c "import time; print time.asctime().split()[3].replace(':', '')"`
+	month=`python -c "import time; print time.asctime().split()[1]"`
+	day=`python -c "import time; print time.asctime().split()[2]"`
+	year=`python -c "import time; print time.asctime().split()[-1]"`
+	finalOutputDir=`python -c "import sys, os; pathLs= os.path.splitext(sys.argv[1])[0].split('/'); n=len(pathLs); print '/'.join(pathLs[-(n-1):])" $dagFile`.$year.$month.$day\T$t;
+	echo Final output will be in $finalOutputDir
+fi
 
 if test -z "$submitFolderName"
 then
@@ -98,10 +108,10 @@ UCLA_CLUSTER_HOME="/u/home/eeskin/polyacti"
 UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
-UCLA_CLUSTER_SCRATCH="/u/scratch/p/polyacti/pegasus"
-#UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
+#UCLA_CLUSTER_SCRATCH="/u/scratch/p/polyacti/pegasus"
+UCLA_CLUSTER_SCRATCH="/u/home/eeskin2/polyacti/NetworkData/scratch"
 #UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
-#if you choose hcondor as storage site, final output is stored in local scratch!! make sure it's in shared storage.
+#if you choose hcondor as storage site, final output is staged out to local scratch!! make sure it's in shared storage.
 UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 UCLA_CLUSTER_PYTHON_DIR="/u/local/python/2.6/"
 UCLA_CLUSTER_R_DIR="/u/local/apps/R/R-2.12.2-gnu/"
