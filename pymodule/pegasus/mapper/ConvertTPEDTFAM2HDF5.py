@@ -6,7 +6,7 @@ Examples:
 	%s -i /Network/Data/250k/db/dataset/call_method_32.tsv -o /tmp/call_32.hdf5
 
 Description:
-	2012.3.1
+	2012.9.6 unfinished. still the copied skeleton from ConvertSNPData2HDF5.py
 
 """
 

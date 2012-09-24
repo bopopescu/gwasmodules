@@ -3,7 +3,7 @@
 Examples:
 	%s 
 	
-	%s  -s 0.01 -o ./LDPlot.png -W "R^2" /tmp/5988_VCF_Contig966.geno.ld
+	%s  -s 0.01 -o ./LDPlot.png -W "R^2" --fitCurve /tmp/5988_VCF_Contig966.geno.ld
 	
 
 Description:
@@ -39,6 +39,7 @@ class PlotLD(AbstractPlot):
 			('chrColumnHeader', 1, ): ['CHR', 'C', 1, 'label of the chromosome column', ],\
 			('minChrLength', 1, int): [1000000, 'L', 1, 'minimum chromosome length for one chromosome to be included', ],\
 			('pos2ColumnHeader', 1, ): ['POS2', 'u', 1, 'label of the 2nd position column, xColumnHeader is the 1st position column', ],\
+#			('fitCurve', 0, ): [0, '', 0, 'toggle to fit an exponential decay function to the data', ],\
 			})
 	#option_default_dict.pop(('outputFname', 1, ))
 	
@@ -56,6 +57,38 @@ class PlotLD(AbstractPlot):
 		"""
 		AbstractPlot.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
+	def plot(self, x_ls=None, y_ls=None, pdata=None):
+		"""
+		2012.9.6 overwrite the ancetral function
+		2011-9-30
+			get called by the end of fileWalker() for each inputFname.
+		"""
+		pylab.plot(x_ls, y_ls, self.formatString, alpha=0.3)
+		#if self.fitCurve:
+		x_ar = numpy.array(x_ls, numpy.float)
+		y_ar = numpy.array(y_ls, numpy.float)
+		#sort x_ar and y_ar must be in the order of x_ar
+		indexOfOrderList = numpy.argsort(x_ar)
+		x_ar = x_ar[indexOfOrderList]
+		y_ar = y_ar[indexOfOrderList]
+		from Bio.Statistics import lowess
+		lowessY = lowess.lowess(x_ar, y_ar)
+		pylab.plot(x_ar, lowessY)
+		"""
+		### error from this code:
+		#	Warning: overflow encountered in multiply
+		#			return a*numpy.exp(-b*x+d) + c
+		
+		from scipy.optimize import curve_fit
+		def func(x, a, b, c, d):
+			return a*numpy.exp(-b*x+d) + c
+		
+		popt, pcov = curve_fit(func, numpy.array(x_ls), numpy.array(y_ls))
+		x_ar = numpy.linspace(0, 1, 25)
+		functor = lambda x: func(x, popt[0], popt[1], popt[2], popt[3])
+		y_ar = map(functor, x_ar)
+		pylab.plot(x_ar, y_ar, 'r-')
+		"""
 	
 	
 	def processRow(self, row=None, pdata=None):

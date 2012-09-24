@@ -10,8 +10,10 @@ from ProcessOptions import  ProcessOptions
 from Pegasus.DAX3 import *
 
 def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, version=None,\
-			parentJobLs=[], extraDependentInputLs=[]):
+			parentJobLs=None, extraDependentInputLs=None):
 	"""
+	2012.9.11
+		make sure that parentJobLs and extraDependentInputLs are not None.
 	2012.3.10
 		add argument parentJobLs, extraDependentInputLs
 	2011-11-28
@@ -19,16 +21,21 @@ def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, versi
 	2011-9-14
 	"""
 	# Add a mkdir job for any directory.
-	mkDirJob = Job(namespace=getattr(workflow, 'namespace', namespace), name=mkdir.name, \
+	job = Job(namespace=getattr(workflow, 'namespace', namespace), name=mkdir.name, \
 				version=getattr(workflow, 'version', version))
-	mkDirJob.addArguments(outputDir)
-	mkDirJob.folder = outputDir	#custom attribute
-	workflow.addJob(mkDirJob)
-	for parentJob in parentJobLs:
-		workflow.depends(parent=parentJob, child=mkDirJob)
-	for input in extraDependentInputLs:
-		mkDirJob.uses(input, transfer=True, register=True, link=Link.INPUT)
-	return mkDirJob
+	job.addArguments(outputDir)
+	job.folder = outputDir	#custom attribute
+	job.output = outputDir	#custom attribute
+	workflow.addJob(job)
+	if parentJobLs:
+		for parentJob in parentJobLs:
+			if parentJob:
+				workflow.depends(parent=parentJob, child=job)
+	if extraDependentInputLs:
+		for input in extraDependentInputLs:
+			if input is not None:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+	return job
 
 def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, input_site_handler='local',\
 						checkAffiliateFileExistence=True, addPicardDictFile=True,\

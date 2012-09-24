@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import subprocess, cStringIO
 import VervetDB
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, utils
 from Pegasus.DAX3 import *
 from AbstractNGSWorkflow import AbstractNGSWorkflow
 
@@ -28,7 +28,37 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		AbstractNGSWorkflow.__init__(self, **keywords)
 		if getattr(self, "inputDir", None):
 			self.inputDir = os.path.abspath(self.inputDir)
+	
+	def addAddVCFFile2DBJob(self, executable=None, inputFile=None, genotypeMethodShortName=None,\
+						logFile=None, format=None, dataDir=None, checkEmptyVCFByReading=None, commit=False, \
+						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+						extraArguments=None, job_max_memory=2000, **keywords):
+		"""
+		2012.8.30 moved from vervet/src/AddVCFFolder2DBWorkflow.py
+		2012.6.27
+		"""
+		extraArgumentList = ['-f', format]
+		if logFile:
+			extraArgumentList.extend(["-l", logFile])
+		if dataDir:
+			extraArgumentList.extend(['-t', dataDir])
+		if checkEmptyVCFByReading:
+			extraArgumentList.extend(['-E'])
+		if genotypeMethodShortName:
+			extraArgumentList.extend(['-s', genotypeMethodShortName, ])
+		if commit:
+			extraArgumentList.append('-c')
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
 		
+		job= self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=None, \
+						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+						extraOutputLs=[logFile],\
+						transferOutput=transferOutput, \
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
+		self.addDBArgumentsToOneJob(job=job, objectWithDBArguments=self)
+		return job
+	
 	def registerExecutables(self, workflow=None):
 		"""
 		"""
@@ -44,19 +74,28 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		site_handler = self.site_handler
 		vervetSrcPath = self.vervetSrcPath
 		
-		executableList = []
-		noClusteringExecutableSet = set()	#2012.8.2 you don't want to cluster for some jobs.
+		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		
-		PlotVCFtoolsStat= Executable(namespace=namespace, name="PlotVCFtoolsStat", version=version, os=operatingSystem, arch=architecture, installed=True)
+		PlotVCFtoolsStat = Executable(namespace=namespace, name="PlotVCFtoolsStat", version=version, os=operatingSystem, arch=architecture, installed=True)
 		PlotVCFtoolsStat.addPFN(PFN("file://" +  os.path.join(self.vervetSrcPath, "plot/PlotVCFtoolsStat.py"), site_handler))
-		executableList.append(PlotVCFtoolsStat)
-		noClusteringExecutableSet.add(PlotVCFtoolsStat)
+		executableClusterSizeMultiplierList.append((PlotVCFtoolsStat, 0))
 		
-		for executable in executableList:
-			if executable not in noClusteringExecutableSet:
-				executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
-			workflow.addExecutable(executable)
-			setattr(workflow, executable.name, executable)
+		SplitVCFFile = Executable(namespace=namespace, name="SplitVCFFile", version=version, os=operatingSystem, arch=architecture, installed=True)
+		SplitVCFFile.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/SplitVCFFile.py"), site_handler))
+		executableClusterSizeMultiplierList.append((SplitVCFFile, 1))
+		
+		#2012.8.30 moved from vervet/src/AddVCFFolder2DBWorkflow.py
+		AddVCFFile2DB = Executable(namespace=namespace, name="AddVCFFile2DB", \
+											version=version, \
+											os=operatingSystem, arch=architecture, installed=True)
+		AddVCFFile2DB.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "db/AddVCFFile2DB.py"), site_handler))
+		executableClusterSizeMultiplierList.append((AddVCFFile2DB, 1))
+		
+		FilterVCFSNPCluster = Executable(namespace=namespace, name="FilterVCFSNPCluster", version=version, os=operatingSystem, arch=architecture, installed=True)
+		FilterVCFSNPCluster.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/FilterVCFSNPCluster.py"), site_handler))
+		executableClusterSizeMultiplierList.append((FilterVCFSNPCluster, 1))
+		
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
 	def registerCommonExecutables(self, workflow=None):
 		"""
@@ -110,16 +149,28 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				inputF.absPath = inputFname
 				inputF.abspath = inputFname
 				no_of_loci = None
+				no_of_individuals = None
 				if needToKnowNoOfLoci:
 					if db_vervet:
 						genotype_file = db_vervet.parseGenotypeFileGivenDBAffiliatedFilename(filename=inputFname)
-						if genotype_file:
+						if genotype_file and inputFname.find(genotype_file.path)>=0:	#2012.9.6 make sure same file
 							no_of_loci = genotype_file.no_of_loci
-					else:
+							no_of_individuals = genotype_file.no_of_individuals
+					if no_of_loci is None:
 						#do file parsing
-						pass
+						from pymodule.VCFFile import VCFFile
+						vcfFile = VCFFile(inputFname=inputFname)
+						counter = 0
+						no_of_loci = 0
+						for vcfRecord in vcfFile:
+							no_of_loci += 1
+						no_of_individuals = len(vcfFile.getSampleIDList())
+						vcfFile.close()
 				inputF.noOfLoci = no_of_loci
 				inputF.no_of_loci = no_of_loci
+				inputF.no_of_individuals = no_of_individuals
+				inputF.noOfIndividuals = no_of_individuals
+				
 				if minNoOfLoci is None or (minNoOfLoci and inputF.no_of_loci and  inputF.no_of_loci >minNoOfLoci):
 					workflow.addFile(inputF)
 					
@@ -132,7 +183,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					else:
 						tbi_F = None
 					inputF.tbi_F = tbi_F
-					returnData.jobDataLs.append(PassingData(vcfFile=inputF, jobLs=[], tbi_F=tbi_F, file=inputF))
+					returnData.jobDataLs.append(PassingData(vcfFile=inputF, jobLs=[], tbi_F=tbi_F, file=inputF, fileLs=[]))
 				if real_counter%200==0:
 					sys.stderr.write("%s%s"%('\x08'*len(previous_reported_real_counter), real_counter))
 					previous_reported_real_counter = repr(real_counter)
@@ -141,7 +192,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 
 	def addPlotVCFtoolsStatJob(self, workflow=None, executable=None, inputFileList=None, outputFnamePrefix=None, \
 							whichColumn=None, whichColumnLabel=None, whichColumnPlotLabel=None, need_svg=False, \
-							logWhichColumn=True,\
+							logWhichColumn=True, positiveLog=False, valueForNonPositiveYValue=-1, \
 							posColumnPlotLabel=None, chrLengthColumnLabel=None, chrColumnLabel=None, \
 							minChrLength=1000000, posColumnLabel=None, minNoOfTotal=100,\
 							figureDPI=300, ylim_type=2, samplingRate=0.0001, logCount=False,\
@@ -149,6 +200,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 							extraDependentInputLs=None, \
 							extraArguments=None, transferOutput=True, job_max_memory=2000, sshDBTunnel=False, **keywords):
 		"""
+		2012.8.31 add argument positiveLog and valueForNonPositiveYValue
 		# whichColumnPlotLabel and posColumnPlotLabel should not contain spaces or ( or ). because they will disrupt shell commandline
 		
 		2012.8.2 moved from vervet/src/CalculateVCFStatPipeline.py
@@ -177,28 +229,34 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			extraDependentInputLs = []
 		if inputFileList:
 			extraDependentInputLs.extend(inputFileList)
-		extraArgumentList = ["-O %s"%outputFnamePrefix, '-m %s'%(minChrLength), '-i %s'%(minNoOfTotal), \
+		extraArgumentList = ["-O %s"%outputFnamePrefix, '-i %s'%(minNoOfTotal), \
 							'-f %s'%(figureDPI), '-y %s'%(ylim_type), '-s %s'%(samplingRate), '-l %s'%(posColumnLabel)]
 		extraOutputLs = [File('%s.png'%(outputFnamePrefix)), File('%s_hist.png'%(outputFnamePrefix))]
 		if need_svg:
 			extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
 		key2ObjectForJob = {}
+		if minChrLength is not None:
+			extraArgumentList.append('-m %s'%(minChrLength))
 		if whichColumnLabel:
-			extraArgumentList.append("-W %s"%(whichColumnLabel))
+			extraArgumentList.append("--whichColumnLabel %s"%(whichColumnLabel))
 		if whichColumn:
-			extraArgumentList.append("-w %s"%(whichColumn))
+			extraArgumentList.append("--whichColumn %s"%(whichColumn))
 		if logWhichColumn:
-			extraArgumentList.append('-g')
+			extraArgumentList.append('--logWhichColumn')
+			if positiveLog:
+				extraArgumentList.append('--positiveLog')
 		if whichColumnPlotLabel:
-			extraArgumentList.append("-D %s"%(whichColumnPlotLabel))
+			extraArgumentList.append("--whichColumnPlotLabel %s"%(whichColumnPlotLabel))
 		if posColumnPlotLabel:
-			extraArgumentList.append("-x %s"%(posColumnPlotLabel))
+			extraArgumentList.append("--posColumnPlotLabel %s"%(posColumnPlotLabel))
 		if chrLengthColumnLabel:
-			extraArgumentList.append("-c %s"%(chrLengthColumnLabel))
+			extraArgumentList.append("--chrLengthColumnLabel %s"%(chrLengthColumnLabel))
 		if chrColumnLabel:
-			extraArgumentList.append("-C %s"%(chrColumnLabel))
+			extraArgumentList.append("--chrColumnLabel %s"%(chrColumnLabel))
 		if logCount:
 			extraArgumentList.append("--logCount")
+		if valueForNonPositiveYValue:
+			extraArgumentList.append("--valueForNonPositiveYValue %s"%(valueForNonPositiveYValue))
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
@@ -213,6 +271,56 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			for inputFile in inputFileList:
 				if inputFile:
 					job.addArguments(inputFile)
+		return job
+	
+	
+	def addSplitVCFFileJob(self, workflow=None, executable=None, inputFile=None, outputFnamePrefix=None, \
+					noOfOverlappingSites=1000, noOfSitesPerUnit=5000, noOfTotalSites=10000, \
+					parentJobLs=None, \
+					extraDependentInputLs=None, \
+					extraArguments=None, transferOutput=True, job_max_memory=2000, sshDBTunnel=False, **keywords):
+		"""
+		2012.8.26
+		"""
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		
+		#turn them into nonnegative	
+		noOfOverlappingSites = abs(noOfOverlappingSites)
+		noOfSitesPerUnit = abs(noOfSitesPerUnit)
+		noOfTotalSites = abs(noOfTotalSites)
+		
+		if noOfSitesPerUnit>noOfTotalSites:
+			noOfSitesPerUnit = noOfTotalSites
+		if noOfOverlappingSites>noOfSitesPerUnit:
+			noOfOverlappingSites = noOfSitesPerUnit
+		key2ObjectForJob = {}
+		extraArgumentList = ["-O %s"%outputFnamePrefix,]
+		extraOutputLs = []
+		if noOfOverlappingSites is not None:
+			extraArgumentList.append('--noOfOverlappingSites %s'%(noOfOverlappingSites))
+		if noOfSitesPerUnit is not None:
+			extraArgumentList.append('--noOfSitesPerUnit %s'%(noOfSitesPerUnit))
+		if noOfTotalSites is not None:
+			extraArgumentList.append('--noOfTotalSites %s'%(noOfTotalSites))			
+		noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=noOfTotalSites, s=noOfSitesPerUnit, o=noOfOverlappingSites)-1)
+		
+		suffixAndNameTupleList = []	# a list of tuples , in each tuple, 1st element is the suffix. 2nd element is the proper name of the suffix.
+			#job.$nameFile will be the way to access the file.
+			#if 2nd element (name) is missing, suffix[1:].replace('.', '_') is the name (dot replaced by _) 
+		for i in xrange(1, noOfUnits+1):
+			suffixAndNameTupleList.append(['_unit%s.vcf'%(i), 'unit%s'%(i)])
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		self.setupMoreOutputAccordingToSuffixAndNameTupleList(outputFnamePrefix=outputFnamePrefix, suffixAndNameTupleList=suffixAndNameTupleList, \
+													extraOutputLs=extraOutputLs, key2ObjectForJob=key2ObjectForJob)
+		
+		job= self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=None, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
+				sshDBTunnel=sshDBTunnel, **keywords)
 		return job
 	
 	def getChr2IntervalDataLsBySelectVCFFile(self, vcfFolder=None, noOfSitesPerUnit=5000, noOfOverlappingSites=1000, \

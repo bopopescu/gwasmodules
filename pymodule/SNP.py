@@ -1459,8 +1459,9 @@ class SNPData(object):
 		return newSnpData
 	
 	@classmethod
-	def keepColsByColID(cls, snpData, col_id_ls):
+	def keepColsByColID(cls, snpData, col_id_ls=None, dataType=num.int8):
 		"""
+		2012.9.1 add argument dataType
 		2010-2-2
 			fix the bug that newSnpData was initiated with an empty col_id_ls, which results in an empty col_id2col_index.
 		2009-05-29
@@ -1472,7 +1473,7 @@ class SNPData(object):
 		
 		no_of_rows = len(snpData.row_id_ls)
 		newSnpData = SNPData(row_id_ls=copy.deepcopy(snpData.row_id_ls), col_id_ls=[])
-		newSnpData.data_matrix = num.zeros([no_of_rows, no_of_cols], num.int8)
+		newSnpData.data_matrix = num.zeros([no_of_rows, no_of_cols], dataType)
 		col_index = 0
 		for j in range(len(snpData.col_id_ls)):
 			col_id = snpData.col_id_ls[j]

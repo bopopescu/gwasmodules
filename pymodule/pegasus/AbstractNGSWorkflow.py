@@ -25,7 +25,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
 						('maxContigID', 0, int): [None, 'x', 1, 'if contig/chromosome(non-sex) ID > this number, it will not be included. If None or 0, no restriction.', ],\
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
-						("contigMaxRankBySize", 1, int): [1, 'N', 1, 'maximum rank number (rank 1=biggest) controls how small a contig to be included in calling'],\
+						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank number (rank 1=biggest) controls how small a contig to be included in calling'],\
 						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank number (rank 1=biggest contig) controls how big a contig to be included in calling'],\
 						("dataDir", 0, ): ["", 't', 1, 'the base directory where all db-affiliated files are stored. \
 									If not given, use the default stored in db.'],\
@@ -35,7 +35,20 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						})
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
+	
+	"""
+	2012.9.18
+		to silence this kind of error messages:
+		
+		##### ERROR
+		##### ERROR MESSAGE:
+				SAM/BAM file SAMFileReader{/u/home/eeskin2/polyacti/NetworkData/scratch/HaplotypeScore/HaplotypeScore_ISQ633_638.2012.Sep.18T110829/individual_alignment/751_634_vs_524_by_2.bam}
+				is malformed: read ends with deletion. Cigar: 6M13I5M9D25M51I10D
 
+	"""
+	defaultGATKArguments = " --unsafe --validation_strictness SILENT --read_filter BadCigar "
+	
+	
 	def __init__(self,  **keywords):
 		"""
 		2011-7-11
@@ -175,8 +188,13 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		BuildBamIndexFilesJava = Executable(namespace=namespace, name="BuildBamIndexFilesJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		BuildBamIndexFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((BuildBamIndexFilesJava, 0))
+		executableClusterSizeMultiplierList.append((BuildBamIndexFilesJava, 0.5))
 		
+		#2012.9.21 same as BuildBamIndexFilesJava, but no clustering
+		IndexMergedBamIndexJava =  Executable(namespace=namespace, name="IndexMergedBamIndexJava", version=version, os=operatingSystem,\
+											arch=architecture, installed=True)
+		IndexMergedBamIndexJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((IndexMergedBamIndexJava, 0))
 		
 		createSequenceDictionaryJava = Executable(namespace=namespace, name="createSequenceDictionaryJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
@@ -285,7 +303,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 										os=operatingSystem, arch=architecture, installed=True)
 		vcftoolsWrapper.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcftoolsWrapper.sh"), site_handler))
 		vcftoolsWrapper.vcftoolsPath = vcftoolsPath
-		executableClusterSizeMultiplierList.append((vcftoolsWrapper,1))
+		executableClusterSizeMultiplierList.append((vcftoolsWrapper, 1))
 		#vcftoolsWrapper.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		#self.addExecutable(vcftoolsWrapper)
 		#self.vcftoolsWrapper = vcftoolsWrapper
@@ -326,13 +344,36 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		CheckTwoVCFOverlap.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "mapper/CheckTwoVCFOverlap.py"), site_handler))
 		executableClusterSizeMultiplierList.append((CheckTwoVCFOverlap, 1))
 		
+		#2012.9.6
+		AppendInfo2SmartPCAOutput = Executable(namespace=namespace, name="AppendInfo2SmartPCAOutput", version=version, \
+										os=operatingSystem, arch=architecture, installed=True)
+		AppendInfo2SmartPCAOutput.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "mapper/AppendInfo2SmartPCAOutput.py"), site_handler))
+		executableClusterSizeMultiplierList.append((AppendInfo2SmartPCAOutput, 0))
+		
+				
+		AddAlignmentFile2DB = Executable(namespace=namespace, name="AddAlignmentFile2DB", version=version, os=operatingSystem,\
+										arch=architecture, installed=True)
+		AddAlignmentFile2DB.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "db/AddAlignmentFile2DB.py"), site_handler))
+		executableClusterSizeMultiplierList.append((AddAlignmentFile2DB, 0))
+		
+		
+		mergeSamFilesJava = Executable(namespace=namespace, name="mergeSamFilesJava", version=version, os=operatingSystem,\
+											arch=architecture, installed=True)
+		mergeSamFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((mergeSamFilesJava, 0))
+		
+		SortSamFilesJava = Executable(namespace=namespace, name="SortSamFilesJava", version=version, os=operatingSystem,\
+											arch=architecture, installed=True)
+		SortSamFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((SortSamFilesJava, 1))
+		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
 	
 	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					inputBamF=None,\
 					parentJobLs=[], namespace='workflow', version='1.0',\
-					stageOutFinalOutput=True, javaMaxMemory=2500,\
+					transferOutput=True, javaMaxMemory=2500,\
 					**keywords):
 		"""
 		 2012.4.12
@@ -358,7 +399,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		index_sam_job.output = baiFile	#2012.3.20
 		index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.INPUT)
 		#index_sam_job.uses(inputBamF, transfer=True, register=True, link=Link.OUTPUT)
-		index_sam_job.uses(baiFile, transfer=stageOutFinalOutput, register=True, link=Link.OUTPUT)
+		index_sam_job.uses(baiFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=job_max_memory)
 		self.addJob(index_sam_job)
 		for parentJob in parentJobLs:
@@ -391,8 +432,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		self.addJob(fastaIndexJob)
 		return fastaIndexJob
 	
-	def addRefFastaDictJob(self, workflow=None, createSequenceDictionaryJava=None, refFastaF=None):
+	def addRefFastaDictJob(self, workflow=None, createSequenceDictionaryJava=None, createSequenceDictionaryJar=None, refFastaF=None):
 		"""
+		2012.9.14 bugfix. add argument createSequenceDictionaryJar
 		2011-11-25
 			# the .dict file is required for GATK
 		"""
@@ -470,22 +512,36 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					key2ObjectForJob=key2ObjectForJob, **keywords)
 		return job
 	
-	def addVCFConcatJob(self, workflow=None, concatExecutable=None, parentDirJob=None, outputF=None, \
-							namespace=None, version=None, transferOutput=True, vcf_job_max_memory=500):
+	def addVCFConcatJob(self, workflow=None, concatExecutable=None, parentDirJob=None, outputF=None, parentJobLs=None, \
+					extraDependentInputLs =None, transferOutput=True, vcf_job_max_memory=500, **keywords):
 		"""
+		2012.8.30
+			use addGenericJob() instead
 		2011-11-5
 		"""
 		#2011-9-22 union of all samtools intervals for one contig
-		vcfConcatJob = Job(namespace=getattr(self, 'namespace', namespace), name=concatExecutable.name, \
-						version=getattr(self, 'version', version))
-		vcfConcatJob.addArguments(outputF)
-		vcfConcatJob.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraArgumentList = []
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		
 		tbi_F = File("%s.tbi"%outputF.name)
-		vcfConcatJob.uses(tbi_F, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		yh_pegasus.setJobProperRequirement(vcfConcatJob, job_max_memory=vcf_job_max_memory)
-		self.addJob(vcfConcatJob)
-		self.depends(parent=parentDirJob, child=vcfConcatJob)
-		return vcfConcatJob
+		key2ObjectForJob['tbi_F'] = tbi_F
+		extraOutputLs.append(tbi_F)
+		# 2012.8.19 add the parentJob to parentJobLs
+		if parentJobLs is None:
+			parentJobLs = []
+		if parentDirJob:
+			parentJobLs.append(parentDirJob)
+		
+		job = self.addGenericJob(executable=concatExecutable, inputFile=None, inputArgumentOption="", \
+					outputFile=outputF, outputArgumentOption="", \
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+					transferOutput=transferOutput, \
+					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=vcf_job_max_memory,  sshDBTunnel=None, \
+					key2ObjectForJob=key2ObjectForJob, **keywords)
+		return job
 	
 	def addVCFSubsetJob(self, workflow=None, executable=None, vcfSubsetPath=None, sampleIDFile=None,\
 					inputVCF=None, outputF=None, \
@@ -624,8 +680,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						"--variant", inputF, "-o ", outputF, "-L %s"%(interval))
 		if extraArguments:
 			job.addArguments(extraArguments)
-		for refFastaFile in refFastaFList:
-			job.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
+		if refFastaFList:
+			for refFastaFile in refFastaFList:
+				job.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
 		job.uses(inputF, transfer=True, register=True, link=Link.INPUT)
 		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		job.output = outputF
@@ -635,9 +692,40 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			for parentJob in parentJobLs:
 				if parentJob:
 					self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		if extraDependentInputLs:
+			for input in extraDependentInputLs:
+				job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		return job
+	
+	def addSelectAlignmentJob(self, executable=None, inputFile=None, \
+							outputFile=None, region=None, parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
+							extraArguments=None, job_max_memory=2000, needBAMIndexJob=True, **keywords):
+		"""
+		2012.9.17 copied from vervet/src/AlignmentReadBaseQualityRecalibrationWorkflow.py
+		2012.6.27
+		"""
+		#select reads that are aligned to one region
+		extraArgumentList = ['view', '-h', "-b", "-u", "-o", outputFile, inputFile, region]	# -b -u forces uncompressed bam output
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		if extraDependentInputLs is None:
+			extraDependentInputLs=[inputFile]
+		else:
+			extraDependentInputLs.append(inputFile)
+		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
+						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+						extraOutputLs=[outputFile],\
+						transferOutput=transferOutput, \
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
+		if needBAMIndexJob:
+			# add the index job on the bam file
+			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
+						BuildBamIndexFilesJar=self.BuildBamIndexFilesJar, \
+						inputBamF=job.output, parentJobLs=[job], \
+						transferOutput=transferOutput, job_max_memory=job_max_memory)
+		else:
+			bamIndexJob = None
+		return job, bamIndexJob
 	
 	def getVCFFileID2path(self, inputDir):
 		"""
@@ -748,7 +836,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	def addFilterJobByvcftools(self, workflow=None, vcftoolsWrapper=None, inputVCFF=None, outputFnamePrefix=None, \
 							snpMisMatchStatFile=None, minMAC=None, minMAF=None, maxSNPMissingRate=None,\
 							perIndividualDepth=False, perIndividualHeterozygosity=False, \
-							perSiteHWE=False, haploLD=False, genoLD=False, minLDr2=0.2, LDWindowByNoOfSites=None,\
+							perSiteHWE=False, haploLD=False, genoLD=False, minLDr2=0, LDWindowByNoOfSites=None,\
 							LDWindowByBP=None, TsTvWindowSize=None, piWindowSize=None, perSitePI=False, \
 							SNPDensityWindowSize=None, calculateMissingNess=False, calculateFreq=False, calculateFreq2=False,\
 							getSiteDepth=False, getSiteMeanDepth=False, getSiteQuality=False,\
@@ -1330,6 +1418,7 @@ Contig966       3160    50
 				if chr not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chr] = []
 				intervalData = PassingData(file=blockIntervalFile, intervalFnameSignature=intervalFnameSignature, interval=interval,\
+										overlapInterval=interval,\
 										chr=chr, jobLs=[blockIntervalJob], job=blockIntervalJob)
 				chr2IntervalDataLs[chr].append(intervalData)
 				counter += 1
@@ -1425,6 +1514,136 @@ Contig966       3160    50
 		for input in extraDependentInputLs:
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		return job
+	
+	def addAddAlignmentFile2DBJob(self, workflow=None, executable=None, inputFile=None, otherInputFileList=None,\
+						individual_alignment_id=None, individual_sequence_id=None,\
+						ref_sequence_id=None, \
+						alignment_method_id=None,\
+						parent_individual_alignment_id=None, \
+						mask_genotype_method_id=None,\
+						individual_sequence_file_raw_id=None,\
+						format=None,\
+						logFile=False, dataDir=None, \
+						parentJobLs=None, \
+						extraDependentInputLs=None, \
+						extraArguments=None, transferOutput=True, \
+						job_max_memory=2000, sshDBTunnel=False, commit=True, **keywords):
+		"""
+		2012.9.20
+			To specify individual_alignment:
+				either individual_alignment_id or (parent_individual_alignment_id + mask_genotype_method_id)
+				or others 
+		"""
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraArgumentList = ['--logFilename', logFile]
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		if otherInputFileList:
+			extraDependentInputLs.extend(otherInputFileList)
+		if logFile:
+			extraOutputLs.append(logFile)
+		if individual_alignment_id:
+			extraArgumentList.append("--individual_alignment_id %s"%(individual_alignment_id))
+		if individual_sequence_id:
+			extraArgumentList.append("--individual_sequence_id %s"%(individual_sequence_id))
+		if ref_sequence_id:
+			extraArgumentList.append("--ref_sequence_id %s"%(ref_sequence_id))
+		if alignment_method_id:
+			extraArgumentList.append("--alignment_method_id %s"%(alignment_method_id))
+		if parent_individual_alignment_id:
+			extraArgumentList.append("--parent_individual_alignment_id %s"%(parent_individual_alignment_id))
+		if mask_genotype_method_id:
+			extraArgumentList.append("--mask_genotype_method_id %s"%(mask_genotype_method_id))
+		if individual_sequence_file_raw_id:
+			extraArgumentList.append("--individual_sequence_file_raw_id %s"%(individual_sequence_file_raw_id))
+		if format:
+			extraArgumentList.append("--format %s"%(format))
+		if dataDir:
+			extraArgumentList.append("--dataDir %s"%(dataDir))
+		if commit:
+			extraArgumentList.append("--commit")
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		job= self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=None, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
+				sshDBTunnel=sshDBTunnel, **keywords)
+		job.logFile = logFile
+		self.addDBArgumentsToOneJob(job=job, objectWithDBArguments=self)
+		
+		#add all input files to the last (after db arguments,) otherwise, it'll mask others (cuz these don't have options).
+		if otherInputFileList:
+			for inputFile in otherInputFileList:
+				if inputFile:
+					job.addArguments(inputFile)
+		return job
+	
+	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
+					java=None, mergeSamFilesJava=None, mergeSamFilesJar=None, \
+					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+					mv=None, parentJobLs=None, namespace='workflow', version='1.0', transferOutput=False,\
+					**keywords):
+		"""
+		2012.9.17 copied from vervet/src/ShortRead2AlignmentPipeline.py
+		2012.7.4 bugfix. add job dependency between alignmentJob and merge_sam_job after all have been added to the workflow.
+		2012.3.29
+			no more threads (only 2 threads at maximum and increase only 20% performance anyway).
+			Some nodes' kernels can't handle threads properly and it leads to process hanging forever.
+		2011-11-15
+			MarkDuplicates will be run after this step. So outputBamFile no longer needs to be transferred out.
+		2011-9-4
+			add argument transferOutput, default=False, which means leave the output files where they are
+		2011-8-28
+			merge alignment
+			index it
+		"""
+		if workflow is None:
+			workflow = self
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=5000, minMemory=2000)
+		job_max_memory = memRequirementObject.memRequirement
+		javaMemRequirement = memRequirementObject.memRequirementInStr
+		namespace = getattr(workflow, 'namespace', namespace)
+		version = getattr(workflow, 'version', version)
+		
+		if len(AlignmentJobAndOutputLs)>1:
+			merge_sam_job = Job(namespace=namespace, name=mergeSamFilesJava.name, version=version)
+			merge_sam_job.addArguments(javaMemRequirement, "-jar", mergeSamFilesJar, 'SORT_ORDER=coordinate', \
+						'ASSUME_SORTED=true', 'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT")
+			# 'USE_THREADING=true', threading might be causing process hanging forever (sleep).
+			merge_sam_job.uses(outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			yh_pegasus.setJobProperRequirement(merge_sam_job, job_max_memory=job_max_memory)
+			workflow.addJob(merge_sam_job)
+			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
+				alignmentJob, alignmentOutput = AlignmentJobAndOutput[:2]
+				merge_sam_job.addArguments('INPUT=', alignmentOutput)
+				merge_sam_job.uses(alignmentOutput, transfer=True, register=True, link=Link.INPUT)
+				workflow.depends(parent=alignmentJob, child=merge_sam_job)
+		else:	#one input file, no samtools merge. use "mv" to rename it instead. should use "cp", then the input would be cleaned by cleaning job.
+			alignmentJob, alignmentOutput = AlignmentJobAndOutputLs[0][:2]
+			merge_sam_job = Job(namespace=namespace, name=mv.name, version=version)
+			merge_sam_job.addArguments(alignmentOutput, outputBamFile)
+			merge_sam_job.uses(alignmentOutput, transfer=True, register=True, link=Link.INPUT)
+			merge_sam_job.uses(outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			workflow.addJob(merge_sam_job)
+			workflow.depends(parent=alignmentJob, child=merge_sam_job)	#2012.7.4
+			sys.stderr.write(" copy (no merge, only one alignment) from %s to %s.\n"%(alignmentOutput.name, outputBamFile.name))
+		#assign output
+		merge_sam_job.output = outputBamFile
+		#2012.9.21
+		if parentJobLs:
+			for parentJob in parentJobLs:
+				workflow.depends(parent=parentJob, child=merge_sam_job)
+						
+		# add the index job on the merged bam file
+		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexFilesJar=BuildBamIndexFilesJar, \
+					inputBamF=outputBamFile,\
+					parentJobLs=[merge_sam_job], namespace=namespace, version=version,\
+					transferOutput=transferOutput, javaMaxMemory=3000)
+		return merge_sam_job, bamIndexJob
+	
 	
 	def addMergeVCFReplicateGenotypeColumnsJob(self, workflow=None, executable=None, genomeAnalysisTKJar=None, \
 						inputF=None, outputF=None, replicateIndividualTag=None, \

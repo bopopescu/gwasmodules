@@ -95,6 +95,9 @@ def setFontAndLabelSize(base_size=9):
 	"""
 	2010-4-14
 		function to change matplotlib font size globally
+		#have to be set in the very beginning of a program, otherwise, no effect.
+		
+		for more additional customization check: http://matplotlib.sourceforge.net/users/customizing.html
 	"""
 	from matplotlib import rcParams
 	rcParams['font.size'] = base_size
@@ -104,6 +107,24 @@ def setFontAndLabelSize(base_size=9):
 	rcParams['axes.titlesize'] = base_size + 2
 	rcParams['xtick.labelsize'] = base_size
 	rcParams['ytick.labelsize'] = base_size
+
+def setDefaultFigureSize(figsize=None):
+	"""
+	2012.9.6
+		function to change matplotlib default figure size globally
+		#have to be set in the very beginning of a program, otherwise, no effect.
+		for more additional customization check: http://matplotlib.sourceforge.net/users/customizing.html
+		
+		below is a different way to changing figure size. not sure how inch translates into pixels.
+			fig = matplotlib.pyplot.gcf()
+			fig.set_size_inches(185, 60)
+		
+		For this figsize (X,Y) if dpi=N, then final dimension is (X*N, Y*N)
+	"""
+	from matplotlib import rcParams
+	if figsize is None:
+		figsize = (10,10)
+	rcParams['figure.figsize'] = figsize
 
 def restoreMatplotlibRCDefaults():
 	"""

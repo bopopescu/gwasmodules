@@ -12,6 +12,7 @@
 #include <ext/hash_map>	//for hash_map
 #include <boost/program_options.hpp>	//for program options
 #include <fstream>
+#include <exception>
 #include <boost/tokenizer.hpp>
 
 #include "armadillo"	//for mean/median calculation

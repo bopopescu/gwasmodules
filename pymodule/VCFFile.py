@@ -29,6 +29,7 @@ diploidGenotypePattern = re.compile(r'([\d.])[|/]([\d.])')
 def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2index, minDepth=1,\
 				dataEntryType=1):
 	"""
+	2012.9.6 turn pos into integer
 	2012.5.10
 		complete representation of one locus
 	2012.1.17
@@ -39,7 +40,7 @@ def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2
 			2: each cell is a dictionary {'GT': base-call, 'DP': depth}
 	"""
 	chr = row[0]
-	pos = row[1]
+	pos = int(row[1])	#2012.9.6 turn pos into integer
 	vcf_locus_id=row[2]
 	quality = row[5]
 	filter=row[6]
@@ -236,7 +237,7 @@ class VCFFile(object):
 						('depthLowerBoundCoeff', 1, float): [1/4., 'O', 1, 'depthLowerBoundCoeff*coverage = minimum read depth multiplier for one base'],\
 						('depthUpperBoundMultiSampleCoeff', 1, float): [3, 'N', 1, 'across n samples, ignore bases where read depth > coverageSum*depthUpperBoundCoeff*multiplier.'],\
 						('seqCoverageFname', 0, ): ['', 'q', 1, 'The sequence coverage file. tab/comma-delimited: individual_sequence.id coverage'],\
-						('minDepth', 1, float): [1, '', 1, 'minimum depth for a call to regarded as non-missing', ],\
+						('minDepth', 0, float): [0, '', 1, 'minimum depth for a call to regarded as non-missing', ],\
 						('defaultCoverage', 1, float): [5, 'd', 1, 'default coverage when coverage is not available for a read group'],\
 						("site_type", 1, int): [1, 's', 1, '1: all sites, 2: variants only'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
@@ -246,6 +247,7 @@ class VCFFile(object):
 	
 	def __init__(self, **keywords):
 		"""
+		2012.9.5 set default minDepth=0
 		2011-9-27
 		"""
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
@@ -283,7 +285,7 @@ class VCFFile(object):
 			self.sampleIDHeader = []	#2012.3.20 a list of column headers (#CHROM)
 			if inputFname[-3:]=='.gz':
 				import gzip
-				self.inf = gzip.open(inputFname)
+				self.inf = gzip.open(inputFname, 'rb')
 			else:
 				self.inf = open(inputFname)
 			self.reader =csv.reader(self.inf, delimiter='\t')
@@ -291,11 +293,16 @@ class VCFFile(object):
 	
 	def initializeOutput(self, outputFname=None):
 		"""
+		2012.9.6 handle gzipped file as well.
 		2012.5.10
 			split out of __init__()
 		"""
-		if self.outputFname:
-			self.outf = open(self.outputFname, 'w')
+		if outputFname:
+			if outputFname[-3:]=='.gz':
+				import gzip
+				self.outf = gzip.open(outputFname, 'wb')
+			else:
+				self.outf = open(outputFname, 'w')
 			self.writer = csv.writer(self.outf, delimiter='\t')
 	
 	def getIndividual2ColIndex(self, header, col_name2index, sampleStartingColumn=9):
@@ -562,6 +569,7 @@ class VCFFile(object):
 		if outf is None:
 			sys.stderr.write("Warning: outf is None. nothing is written out.\n")
 		else:
+			self.locus_id_ls.append(vcfRecord.vcf_locus_id)#2012.9.6
 			data_row = [vcfRecord.chr, vcfRecord.pos, vcfRecord.vcf_locus_id, vcfRecord.refBase, vcfRecord.altBase, \
 					vcfRecord.quality, vcfRecord.filter,\
 					vcfRecord.info, vcfRecord.format] + vcfRecord.row[self.sampleStartingColumn:]

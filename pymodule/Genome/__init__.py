@@ -50,7 +50,7 @@ class fasta_block_iterator:
 			else:
 				self.block += line
 			line = self.inf.readline()
-		if self.block==self.previous_line:
+		if self.block==self.previous_line:	#nothing new into the block
 			raise StopIteration
 
 class LargeFastaFileTraverse:
