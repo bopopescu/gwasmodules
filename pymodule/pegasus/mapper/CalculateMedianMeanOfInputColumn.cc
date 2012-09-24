@@ -43,14 +43,14 @@ void CalculateMedianMeanOfInputColumn::run(){
 	std::string line;
 	size_t bytes_read = 0;
 	std::istream incoming(&input);
-	boost::char_separator<char> sep(" \t,");		//blank or '\t' or ',' is the separator
+	boost::char_separator<char> sep("\t ,");		//blank or '\t' or ',' is the separator
 	typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
 
 	std::getline(incoming, line);
 	//while (incoming.good() && !incoming.eof())
 	statList.set_size(10000, 1);
-	int noOfData = 0;
-	int noOfSampledData = 0;
+	int64_t noOfData = 0;
+	int64_t noOfSampledData = 0;
 	base_generator_type generator(42);
 	//boost::mt19937 generator;
 	boost::uniform_real<> uni_dist(0,1);
@@ -60,20 +60,31 @@ void CalculateMedianMeanOfInputColumn::run(){
 	__gnu_cxx::hash_map<int, int >::iterator modeStatIter = stat2Occurrence.begin();
 
 	double toss;	//random number
+	string statInStr;
 	while (!line.empty()){
 		noOfData++;
 		toss=uni();
 		if (toss<=fractionToSample && noOfSampledData<maxNumberOfSamplings){
-			noOfSampledData ++;
 			tokenizer line_toks(line, sep);
 			tokenizer::iterator tokenizer_iter = line_toks.begin();
 			for (int i=0;i<whichColumn;i++){
+				/*
+				if (tokenizer_iter==line_toks.end()){
+					//2012.9.15 debug purpose
+					std::cerr<< "end of line has been reached before the whichColumn, abort." << std::endl;
+					std::cerr<< "Exception line no. " << noOfData << " has content: " << line <<std::endl;
+					continue;	//end has been reached before whichColumn, abort.
+				}
+				*/
 				++tokenizer_iter;
 			}
+			statInStr = *tokenizer_iter;
+			
+			noOfSampledData ++;
 			if (noOfSampledData>statList.n_elem){
 				statList.reshape(statList.n_elem+10000,1);
 			}
-			string statInStr = *tokenizer_iter;
+			
 			int stat = atoi(statInStr.c_str());
 			//cout<<	stat << endl;
 			//statList <<  atoi(stat.c_str()) << endr;	//endr is not recognized
@@ -96,6 +107,12 @@ void CalculateMedianMeanOfInputColumn::run(){
 				}
 			}
 		}
+		/*
+		if (noOfSampledData>=maxNumberOfSamplings){
+			std::cerr<< "Enough data is sampled. noOfSampledData=" << noOfSampledData << " from " << noOfData << "." << std::endl;
+			break;
+		}
+		*/
 		//bytes_read += line.size();
 		// progress dlg with bytes_read / uncompressed size
 		std::getline(incoming, line);
