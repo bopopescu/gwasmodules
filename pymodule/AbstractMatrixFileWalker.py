@@ -36,7 +36,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 						('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
 						('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
 				only effective when logWhichColumn is toggled. '],\
-						('valueForNonPositiveYValue', 1, float): [50, 'v', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
+						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
 			what yValue should be.'],\
 						('missingDataNotation', 0, ): ['NA', '', 1, 'notation for missing data. will be skipped.'],\
 								})
@@ -49,7 +49,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)	#self.connectDB() called within its __init__()
 		#if user wants to preserve data in a data structure that is visible throughout reading different files.
 		# then use this self.invariantPData.
-		self.invariantPData = PassingData(writer=None, headerOutputted=False, x_ls = [], y_ls = [])
+		self.invariantPData = PassingData(writer=None, headerOutputted=False, x_ls = [], y_ls = [], z_ls=[])
 		
 	def connectDB(self):
 		"""
@@ -68,22 +68,37 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		self.invariantPData.x_ls = pdata.x_ls
 		return pdata
 	
-	
-	def handleYValue(self, yValue=None):
+	def processValue(self, value=None, takeLogarithm=None, positiveLog=None, valueForNonPositiveValue=None):
 		"""
+		2012.10.7
+		"""
+		if positiveLog is None:
+			positiveLog = self.positiveLog
+		if takeLogarithm is None:
+			takeLogarithm = self.logWhichColumn
+		if valueForNonPositiveValue is None:
+			valueForNonPositiveValue = self.valueForNonPositiveYValue
+		
+		value = float(value)
+		if takeLogarithm:
+			if value>0:
+				if positiveLog:
+					value = math.log10(value)
+				else:
+					value = -math.log10(value)
+			else:
+				value = valueForNonPositiveValue
+		return value
+	
+	def handleYValue(self, yValue=None, takeLogarithm=None, positiveLog=None, valueForNonPositiveValue=None, **keywords):
+		"""
+		2012.10.7
+			add argument takeLogarithm, positiveLog, valueForNonPositiveValue
 		2012.8.2
 		"""
-		yValue = float(yValue)
-		if self.logWhichColumn:
-			if yValue>0:
-				if self.positiveLog:
-					yValue = math.log10(yValue)
-				else:
-					yValue = -math.log10(yValue)
-				
-			else:
-				yValue = self.valueForNonPositiveYValue
-		return yValue
+		return self.processValue(value=yValue, takeLogarithm=takeLogarithm, positiveLog=positiveLog, \
+								valueForNonPositiveValue=valueForNonPositiveValue, **keywords)
+		
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -129,7 +144,14 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		2012.8.6
 		"""
 		return len(pdata.y_ls)
-	
+		
+	def afterFileFunction(self, **keywords):
+		"""
+		2012.10.7
+		"""
+		if hasattr(self, 'plot'):
+			return self.plot(**keywords)
+		
 	def fileWalker(self, inputFname=None, afterFileFunction=None, processRowFunction=None , run_type=1):
 		"""
 		2012.8.1
@@ -140,7 +162,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		if processRowFunction is None:
 			processRowFunction = self.processRow
 		if afterFileFunction is None:
-			afterFileFunction = self.plot
+			afterFileFunction = self.afterFileFunction
 		try:
 			inf = utils.openGzipFile(inputFname)
 			delimiter = figureOutDelimiter(inf)
