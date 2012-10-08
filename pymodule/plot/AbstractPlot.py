@@ -13,6 +13,7 @@ Description:
 	2012.8.2
 		abstract class for plot classes, can plot XY scatter/line (pending self.formatString) plot.
 	If you specify --outputFname, make sure its suffix is .png.
+	If "-i ..." is given, it is regarded as one of the input files (plus the ones in trailing arguments). 
 """
 
 import sys, os, math
@@ -97,46 +98,40 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		2012.8.6
 		"""
 		if getattr(self, 'xColumnPlotLabel', None):
-			pylab.xlabel(self.xColumnPlotLabel)
+			xlabel = self.xColumnPlotLabel
 		else:
-			pylab.xlabel(getattr(self, "xColumnHeader", ""))
+			xlabel = getattr(self, "xColumnHeader", "")
+		pylab.xlabel(xlabel)
+		return xlabel
 		
 	def handleYLabel(self,):
 		"""
 		2012.8.6
 		"""
 		if getattr(self, 'whichColumnPlotLabel', None):
-			pylab.ylabel(self.whichColumnPlotLabel)
+			ylabel = self.whichColumnPlotLabel
 		else:
-			pylab.ylabel(getattr(self, "whichColumnHeader", ""))
+			ylabel = getattr(self, "whichColumnHeader", "")
+		pylab.ylabel(ylabel)
+		return ylabel
 	
 	def handleTitle(self,):
 		"""
 		2012.8.16
 		"""
 		if self.title:
-			pylab.title(self.title)
+			title = self.title
 		else:
 			title = yh_matplotlib.constructTitleFromTwoDataSummaryStat(self.invariantPData.x_ls, self.invariantPData.y_ls)
-			pylab.title(title)
+		pylab.title(title)
+		return title
 
-	
-	def run(self):
+	def saveFigure(self, invariantPData=None, **keywords):
+		"""
+		2012.10.7
 		
-		if self.debug:
-			import pdb
-			pdb.set_trace()
-		
-		pylab.clf()
-		
-		for inputFname in self.inputFnameLs:
-			if os.path.isfile(inputFname):
-				self.fileWalker(inputFname, afterFileFunction=self.plot, run_type=1, processRowFunction=self.processRow)
-		
-		self.handleTitle()
-		self.handleXLabel()
-		self.handleYLabel()
-		
+		"""
+		sys.stderr.write("Saving figure ...")
 		if self.outputFnamePrefix:
 			pngOutputFname = '%s.png'%self.outputFnamePrefix
 			svgOutputFname = '%s.svg'%self.outputFnamePrefix
@@ -150,7 +145,26 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		pylab.savefig(pngOutputFname, dpi=self.figureDPI)
 		if self.need_svg:
 			pylab.savefig(svgOutputFname, dpi=self.figureDPI)
-		sys.stderr.write("Done.\n")
+		sys.stderr.write("  .\n")
+	
+	def run(self):
+		
+		if self.debug:
+			import pdb
+			pdb.set_trace()
+		
+		pylab.clf()
+		
+		for inputFname in self.inputFnameLs:
+			if os.path.isfile(inputFname):
+				self.fileWalker(inputFname, afterFileFunction=None, run_type=1, processRowFunction=self.processRow)
+				#afterFileFunction = None means self.plot
+		
+		self.handleTitle()
+		self.handleXLabel()
+		self.handleYLabel()
+		self.saveFigure(invariantPData=self.invariantPData)
+		
 
 if __name__ == '__main__':
 	main_class = AbstractPlot
