@@ -3,15 +3,24 @@
 Examples:
 	%s 
 	
-	%s -o ~/script/vervet/data/194SNPData/isq524CoordinateSNPData_max15Mismatch.tsv
-		-i ~/script/vervet/data/194SNPData/AllSNPData.txt
-		-x ~/script/vervet/data/194SNPData/externalSNPID2ISQ524Coordinate_max15Mismatch.tsv
-		-l /Network/Data/vervet/vervetPipeline/Blast/Blast194SNPFlankAgainst524_15Mismatches.2012.8.17T2334/folderBlast/blast.tsv
-		-S ~/script/vervet/data/194SNPData/AllSNPFlankWithSNPMark.txt
+	%s --newSNPDataOutputFname ~/script/vervet/data/194SNPData/isq524CoordinateSNPData_max15Mismatch.tsv
+		--originalSNPDataFname ~/script/vervet/data/194SNPData/AllSNPData.txt
+		--SNPFlankSequenceFname ~/script/vervet/data/194SNPData/AllSNPFlankWithSNPMark.txt
+		-i Blast/Blast194SNPFlankAgainst524_15Mismatches.2012.8.17T2334/folderBlast/blast.tsv
+		-o ~/script/vervet/data/194SNPData/originalSNPID2ISQ524Coordinate_max15Mismatch.tsv
+		--maxNoOfMismatches 2
+		--minAlignmentSpan 10
+		
 
 Description:
 	2012.8.19
-		given a fasta file of flanking sequences of SNPs, find its new positions on the blast database (new reference)
+		given a fasta file of flanking sequences of polymorphic loci (SNP or SVs).
+		find its new positions on the blast database (new reference).
+		
+		inputFname is BlastWorkflow.py's output: blast SNPFlankSequenceFname (converting [A/C] to A) to a new reference.
+		outputFname is the map between old and new coordinates.
+			originalSNPID, newChr, newRefStart, newRefStop, strand, targetAlignmentSpan.
+		
 """
 
 import sys, os, math
@@ -23,19 +32,23 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, SNP
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
-import numpy
+from pymodule.pegasus.mapper.ExtractFlankingSequenceForVCFLoci import ExtractFlankingSequenceForVCFLoci
+import numpy, re
+
 
 class FindSNPPositionOnNewRefFromFlankingBlastOutput(AbstractMapper):
 	__doc__ = __doc__
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	#option_default_dict.pop(('outputFnamePrefix', 0, ))
 	option_default_dict.update({
-							('SNPFlankSequenceFname', 1, ): ['', 'S', 1, 'in fasta format, with SNP embedded as [A/C]', ],\
-							('blastHitMergeFname', 1, ): ['', 'l', 1, 'BlastWorkflow.py output: blast SNPFlankSequenceFname (converting [A/C] to A) to a new reference', ],\
-							('externalSNPID2RefCoordinateOutputFname', 0, ): [None, 'x', 1, '', ],\
+							('SNPFlankSequenceFname', 0, ): ['', 'S', 1, 'in fasta format, with SNP embedded as [A/C] in sequence.\n\
+	if given, use this to fetch a map between originalSNPID & snpPositionInFlank.', ],\
+							('originalSNPDataFname', 0, ): ['', 'l', 1, 'path to an input tsv/csv, 3-column: Sample SNP Geno.', ],\
+							('newSNPDataOutputFname', 0, ): [None, 'x', 1, 'if given, would be a Strain X Locus Yu format polymorphism file with new coordinates.', ],\
 							('minNoOfIdentities', 0, int): [None, 'm', 1, 'minimum number of identities between a query and target', ],\
 							('maxNoOfMismatches', 0, int): [None, 'a', 1, 'minimum number of mismatches between a query and target', ],\
 							('minIdentityPercentage', 0, float): [None, 'n', 1, 'minimum percentage of identities between a query and target', ],\
+							('minAlignmentSpan', 1, int): [10, '', 1, 'minimum number of bases of the query and target that are involved in the blast alignment', ],\
 							})
 	def __init__(self, inputFnameLs, **keywords):
 		"""
@@ -43,34 +56,84 @@ class FindSNPPositionOnNewRefFromFlankingBlastOutput(AbstractMapper):
 		"""
 		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
-	def convert194SNPDataIntoVervetRefSNPData(self, SNPFlankSequenceFname=None, blastHitMergeFname=None, originalSNPDataFname=None,\
-											externalSNPID2RefCoordinateOutputFname=None, outputFname=None):
+	def getOriginalSNPID2positionInFlank(self, SNPFlankSequenceFname=None):
 		"""
-		2012.8.19
-			outputFname will contain the individual X SNP matrix.
+		2012.10.8
+			split out of findSNPPositionOnNewRefFromFlankingBlastOutput()
+			the snpPositionInFlank is 1-based.
+			add one more variable, locusSpan, in the value of originalSNPID2positionInFlank.
+				=0 for SNPs, =length-1 for other loci.
+			
+			The SNPFlankSequenceFname is in fasta format, with SNP embedded as [A/C] in sequence.
 		"""
-		sys.stderr.write("Deriving externalSNPID2positionInFlank ...\n")
-		externalSNPID2positionInFlank = {}
+		sys.stderr.write("Deriving originalSNPID2positionInFlank from %s ...\n"%(SNPFlankSequenceFname))
+		originalSNPID2positionInFlank = {}
 		from Bio import SeqIO
 		inf = open(SNPFlankSequenceFname, "rU")
 		counter = 0
 		for record in SeqIO.parse(inf, "fasta"):
-			externalSNPID = record.id.split()[0]	#get rid of extra comment
+			originalSNPID = record.id.split()[0]	#get rid of extra comment
 			snpPositionInFlank = record.seq.find('[') + 1
+			refBase = record.seq[snpPositionInFlank]
+			altBase = record.seq[snpPositionInFlank+2]
 			if snpPositionInFlank<=0:
 				sys.stderr.write("Warning, could not find position for snp %s  in the flanking sequence \n"%(record.id))
 			else:
-				externalSNPID2positionInFlank[externalSNPID] = snpPositionInFlank
+				originalSNPID2positionInFlank[originalSNPID] = PassingData(snpPositionInFlank=snpPositionInFlank, locusSpan=0,\
+																refBase=refBase, altBase=altBase)
+				#
 			counter += 1
 		inf.close()
-		sys.stderr.write(" %s/%s SNPs with positions.\n"%(len(externalSNPID2positionInFlank), counter))
+		sys.stderr.write(" %s/%s SNPs with positions.\n"%(len(originalSNPID2positionInFlank), counter))
+		return originalSNPID2positionInFlank
+	
+
+	def parseOriginalLocusID(self, locus_id=None):
+		"""
+		2012.10.8
+			locus_id is in the format of '%s_%s_%s_positionInFlank%s'%(chr, start, stop, flankingLength+1)
+			output of ExtractFlankingSequenceForVCFLoci.py
+		"""
+		search_result = ExtractFlankingSequenceForVCFLoci.sequenceTitlePattern.search(locus_id)
+		chr = None
+		start = None
+		stop = None
+		refBase = None
+		altBase = None
+		positionInFlank = None
+		if search_result:
+			chr = search_result.group(1)
+			start = search_result.group(2)
+			stop = search_result.group(3)
+			refBase = search_result.group(4)
+			altBase = search_result.group(5)
+			positionInFlank = search_result.group(6)
+			
+		return PassingData(chr=chr, start=start, stop=stop, refBase=refBase, altBase=altBase, positionInFlank=positionInFlank)
 		
-		sys.stderr.write("Finding blast reference coordinates for %s SNPs. \n"%(len(externalSNPID2positionInFlank)))
+	
+	def findSNPPositionOnNewRefFromFlankingBlastOutput(self, SNPFlankSequenceFname=None, blastHitResultFname=None, \
+							originalSNPDataFname=None,\
+							originalSNPID2NewRefCoordinateOutputFname=None, newSNPDataOutputFname=None, minAlignmentSpan=10):
+		"""
+		2012.10.8
+			argument minAlignmentSpan: the number of bases involved in the blast query-target alignment
+		2012.8.19
+			newSNPDataOutputFname will contain the individual X SNP matrix.
+		"""
+		if SNPFlankSequenceFname:
+			originalSNPID2positionInFlank = self.getOriginalSNPID2positionInFlank(SNPFlankSequenceFname=SNPFlankSequenceFname)
+		else:
+			originalSNPID2positionInFlank = None
+		
+		sys.stderr.write("Finding blast reference coordinates for SNPs from %s ... \n"%(blastHitResultFname))
 		import csv
 		from pymodule import figureOutDelimiter, getColName2IndexFromHeader
-		reader = csv.reader(open(blastHitMergeFname), delimiter='\t')
+		reader = csv.reader(open(blastHitResultFname), delimiter='\t')
 		header =reader.next()
 		col_name2index = getColName2IndexFromHeader(header)
+		
+		#every coordinate in blastHitResultFname is 1-based.
 		"""
 queryID queryStart      queryEnd        queryLength     targetChr       targetStart     targetStop      targetLength    noOfIdentities  noOfMismatches  identityPercentage
 34804_309       1       417     417     Contig293       2551654 2552070 3001801 413     4       0.9904076738609112
@@ -85,9 +148,10 @@ queryID queryStart      queryEnd        queryLength     targetChr       targetSt
 		targetChrIndex = col_name2index['targetChr']
 		targetStartIndex = col_name2index['targetStart']
 		targetStopIndex = col_name2index['targetStop']
-		externalSNPID2BlastRefCoordinate = {}
+		originalSNPID2BlastRefCoordinateLs = {}
 		counter = 0
 		real_counter = 0
+		queryIDSet= set()
 		for row in reader:
 			queryID = row[queryIDIndex].split()[0]	##get rid of extra comment
 			queryStart = int(row[queryStartIndex])
@@ -97,37 +161,85 @@ queryID queryStart      queryEnd        queryLength     targetChr       targetSt
 			targetStart = int(row[targetStartIndex])
 			targetStop = int(row[targetStopIndex])
 			
-			queryAlnSpan = abs(queryEnd-queryStart) + 1
-			targetAlnSpan = abs(targetStop-targetStart) + 1
-			if queryAlnSpan == targetAlnSpan:
-				if queryID in externalSNPID2positionInFlank:
-					positionInFlank = externalSNPID2positionInFlank.get(queryID)
-					if queryStart >queryEnd:	#could happen. on the opposite strand. targetStart is always bigger than targetstop
-						blastRefPosition =  targetStop - (positionInFlank-queryEnd)
-						strand = -1
+			queryIDSet.add(queryID)
+			
+			queryAlignmentSpan = abs(queryEnd-queryStart) + 1
+			targetAlignmentSpan = abs(targetStop-targetStart) + 1
+			if queryAlignmentSpan == targetAlignmentSpan:
+				if originalSNPID2positionInFlank and queryID in originalSNPID2positionInFlank:
+					parseData = originalSNPID2positionInFlank.get(queryID)
+					locusSpan = parseData.locusSpan
+				else:
+					parseData = self.parseOriginalLocusID(queryID)
+					chr = parseData.chr
+					start = parseData.start
+					stop = parseData.stop
+					if start is not None and stop is not None:
+						stop = int(stop)
+						start = int(start)
+						locusSpan = abs(int(stop)-start)	#length-1
 					else:
-						blastRefPosition =  targetStart + (positionInFlank-queryStart)
-						strand = + 1
-					externalSNPID2BlastRefCoordinate[queryID] = (targetChr, blastRefPosition, strand)
-					real_counter += 1
+						locusSpan = None
+				positionInFlank = parseData.positionInFlank
+				originalRefBase = parseData.refBase
+				originalAltBase = parseData.altBase
+				if positionInFlank is not None and locusSpan is not None:
+					positionInFlank = int(positionInFlank)
+					if targetAlignmentSpan>=minAlignmentSpan and queryAlignmentSpan>=minAlignmentSpan:
+						if queryStart >queryEnd and positionInFlank<queryStart and positionInFlank>queryEnd:
+							#could happen. on the opposite strand. targetStart is always bigger than targetstop
+							#locus must be in the middle of queryStart and queryEnd.
+							newRefStart=  targetStop - (positionInFlank-queryEnd)
+							newRefStop =  targetStart + (queryStart - positionInFlank-locusSpan)
+							strand = -1
+						elif queryStart <queryEnd and positionInFlank>queryStart and positionInFlank<queryEnd:
+							#locus must be in the middle of queryStart and queryEnd.
+							newRefStart =  targetStart + (positionInFlank - queryStart)
+							newRefStop =  targetStop - (queryEnd - positionInFlank-locusSpan)
+							strand = + 1
+						else:
+							newRefStart = None
+							newRefStop = None
+						if newRefStart is not None and newRefStop is not None:
+							if queryID not in originalSNPID2BlastRefCoordinateLs:
+								originalSNPID2BlastRefCoordinateLs[queryID] = []
+							newRefCoordinate = PassingData(newChr=targetChr, newRefStart=newRefStart, newRefStop=newRefStop, \
+														strand=strand, targetAlignmentSpan=targetAlignmentSpan,\
+														queryAlignmentSpan=queryAlignmentSpan,\
+														originalRefBase=originalRefBase, originalAltBase=originalAltBase )
+							originalSNPID2BlastRefCoordinateLs[queryID].append(newRefCoordinate)
+							real_counter += 1
+						
 			counter += 1
 		sys.stderr.write(" from %s blast results. %s/%s SNPs found blast-reference coordinates.\n"%\
-						(counter, real_counter, len(externalSNPID2positionInFlank)))
+						(counter, real_counter, len(queryIDSet)))
 		
-		if externalSNPID2RefCoordinateOutputFname:
-			sys.stderr.write("Outputting %s pairs in externalSNPID2BlastRefCoordinate to %s ..."%\
-							(len(externalSNPID2BlastRefCoordinate), externalSNPID2RefCoordinateOutputFname))
-			writer = csv.writer(open(externalSNPID2RefCoordinateOutputFname, 'w'), delimiter='\t')
-			header = ['externalSNPID', 'targetChr', 'targetPosition']
+		#output the mapping
+		if originalSNPID2NewRefCoordinateOutputFname:
+			no_of_loci_with_1_newRef = 0
+			no_of_loci_with_1Plus_newRef = 0
+			sys.stderr.write("Outputting %s pairs in originalSNPID2BlastRefCoordinateLs to %s ..."%\
+							(len(originalSNPID2BlastRefCoordinateLs), originalSNPID2NewRefCoordinateOutputFname))
+			writer = csv.writer(open(originalSNPID2NewRefCoordinateOutputFname, 'w'), delimiter='\t')
+			header = ['originalSNPID', 'originalRefBase', 'originalAltBase', 'newChr', 'newRefStart', 'newRefStop', 'strand', \
+					'queryAlignmentSpan', 'targetAlignmentSpan']
 			writer.writerow(header)
-			for externalSNPID, blastRefCoordinate in externalSNPID2BlastRefCoordinate.iteritems():
-				targetChr, targetPosition = blastRefCoordinate[:2]
-				data_row = [externalSNPID, targetChr, targetPosition]
-				writer.writerow(data_row)
+			for originalSNPID, blastRefCoordinateLs in originalSNPID2BlastRefCoordinateLs.iteritems():
+				if len(blastRefCoordinateLs)==1:
+					blastRefCoordinate = blastRefCoordinateLs[0]
+					data_row = [originalSNPID, blastRefCoordinate.originalRefBase, blastRefCoordinate.originalAltBase, \
+							blastRefCoordinate.newChr, blastRefCoordinate.newRefStart, blastRefCoordinate.newRefStop, \
+							blastRefCoordinate.strand, blastRefCoordinate.queryAlignmentSpan,
+							blastRefCoordinate.targetAlignmentSpan]
+					writer.writerow(data_row)
+					no_of_loci_with_1_newRef += 1
+				else:
+					no_of_loci_with_1Plus_newRef += 1
 			del writer
-			sys.stderr.write("\n")
+			sys.stderr.write("%s loci found unique new coordinates. %s loci found >1 new coordinates.\n"%\
+							(no_of_loci_with_1_newRef, no_of_loci_with_1Plus_newRef))
 		
-		if originalSNPDataFname and outputFname:
+		if originalSNPDataFname and newSNPDataOutputFname:
 			sys.stderr.write("Converting originalSNPDataFname %s into individual X SNP format ... "%(originalSNPDataFname))
 			"""
 Sample  Geno    SNP
@@ -154,22 +266,26 @@ Sample  Geno    SNP
 			for row in reader:
 				sampleID = row[sampleIndex]
 				genotype = row[genotypeIndex]
-				externalSNPID = row[SNPIDIndex]
-				if externalSNPID in externalSNPID2BlastRefCoordinate:
-					blastRefCoordinate = externalSNPID2BlastRefCoordinate.get(externalSNPID)
-					col_id = '%s_%s'%(blastRefCoordinate[0], blastRefCoordinate[1])
-					strand = blastRefCoordinate[2]
-					if col_id not in col_id2index:
-						col_id2index[col_id] = len(col_id2index)
-						col_id_ls.append(col_id)
-					if sampleID not in row_id2index:
-						row_id2index[sampleID] = len(row_id2index)
-						row_id_ls.append(sampleID)
-					if strand ==-1:
-						genotype = SNP.reverseComplement(genotype)
-					row_index = row_id2index[sampleID]
-					col_index = col_id2index[col_id]
-					row_col_index2genotype[(row_index, col_index)] = genotype
+				originalSNPID = row[SNPIDIndex]
+				if originalSNPID in originalSNPID2BlastRefCoordinateLs:
+					blastRefCoordinateLs = originalSNPID2BlastRefCoordinateLs.get(originalSNPID)
+					if len(blastRefCoordinateLs)==1:
+						blastRefCoordinate = blastRefCoordinateLs[0]
+						col_id = '%s_%s_%s'%(blastRefCoordinate.newChr, blastRefCoordinate.newRefStart, blastRefCoordinate.newRefStop)
+						strand = blastRefCoordinate.strand
+						if col_id not in col_id2index:
+							col_id2index[col_id] = len(col_id2index)
+							col_id_ls.append(col_id)
+						if sampleID not in row_id2index:
+							row_id2index[sampleID] = len(row_id2index)
+							row_id_ls.append(sampleID)
+						if strand ==-1:
+							genotype = SNP.reverseComplement(genotype)
+						row_index = row_id2index[sampleID]
+						col_index = col_id2index[col_id]
+						row_col_index2genotype[(row_index, col_index)] = genotype
+					else:
+						continue
 			data_matrix = numpy.zeros([len(row_id_ls), len(col_id2index)], dtype=numpy.int8)
 			
 			for row_col_index, genotype in row_col_index2genotype.iteritems():
@@ -177,7 +293,7 @@ Sample  Geno    SNP
 				data_matrix[row_index, col_index] = SNP.nt2number[genotype]
 			sys.stderr.write("\n")
 			snpData = SNP.SNPData(row_id_ls=row_id_ls, col_id_ls=col_id_ls, data_matrix=data_matrix)
-			snpData.tofile(outputFname)
+			snpData.tofile(newSNPDataOutputFname)
 				
 			
 		
@@ -189,10 +305,10 @@ Sample  Geno    SNP
 			import pdb
 			pdb.set_trace()
 	
-		self.convert194SNPDataIntoVervetRefSNPData(SNPFlankSequenceFname=self.SNPFlankSequenceFname, \
-						blastHitMergeFname=self.blastHitMergeFname, originalSNPDataFname=self.inputFname,\
-						externalSNPID2RefCoordinateOutputFname=self.externalSNPID2RefCoordinateOutputFname, \
-						outputFname=self.outputFname)
+		self.findSNPPositionOnNewRefFromFlankingBlastOutput(SNPFlankSequenceFname=self.SNPFlankSequenceFname, \
+						blastHitResultFname=self.inputFname, originalSNPDataFname=self.originalSNPDataFname,\
+						originalSNPID2NewRefCoordinateOutputFname=self.outputFname, \
+						newSNPDataOutputFname=self.newSNPDataOutputFname, minAlignmentSpan=self.minAlignmentSpan)
 		
 
 if __name__ == '__main__':

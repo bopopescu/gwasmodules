@@ -41,17 +41,6 @@ class BlastWorkflow(AbstractWorkflow):
 		"""
 		AbstractWorkflow.__init__(self, **keywords)
 	
-	
-	def registerBlastNucleotideDatabaseFile(self, ntDatabaseFname=None, input_site_handler='local'):
-		"""
-		2012.5.23
-		"""
-		return yh_pegasus.registerRefFastaFile(self, ntDatabaseFname, registerAffiliateFiles=True, \
-									input_site_handler=input_site_handler,\
-									checkAffiliateFileExistence=True, addPicardDictFile=False, \
-									affiliateFilenameSuffixLs=['nin', 'nhr', 'nsq'])
-	
-	
 	def getNoOfSequencesFromFasta(self, inputFastaFname=None):
 		"""
 		2012.5.24
@@ -176,10 +165,12 @@ class BlastWorkflow(AbstractWorkflow):
 	
 				
 		
-	def registerCustomExecutables(self):
+	def registerCustomExecutables(self, workflow=None, **keywords):
 		"""
 		2012.5.23
 		"""
+		if workflow is None:
+			workflow = self
 		namespace = self.namespace
 		version = self.version
 		operatingSystem = self.operatingSystem
@@ -187,58 +178,51 @@ class BlastWorkflow(AbstractWorkflow):
 		clusters_size = self.clusters_size
 		site_handler = self.site_handler
 		
-		executableList = []
+		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)		
 		blastall = Executable(namespace=namespace, name="blastall", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		blastall.addPFN(PFN("file://" + os.path.join(self.blastallPath), site_handler))
-		executableList.append(blastall)
+		executableClusterSizeMultiplierList.append((blastall, 0.2))
 		
 		formatdb = Executable(namespace=namespace, name="formatdb", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		formatdb.addPFN(PFN("file://" + os.path.join(self.formatdbPath), site_handler))
-		executableList.append(formatdb)
+		executableClusterSizeMultiplierList.append((formatdb, 0))
 		
 		BlastWrapper = Executable(namespace=namespace, name="BlastWrapper", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		BlastWrapper.addPFN(PFN("file://" + os.path.join(self.pymodulePath, 'pegasus/mapper/BlastWrapper.py'), site_handler))
-		executableList.append(BlastWrapper)
+		executableClusterSizeMultiplierList.append((BlastWrapper, 0.1))
 		
 		SplitFastaFile = Executable(namespace=namespace, name="SplitFastaFile", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		SplitFastaFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, 'pegasus/mapper/SplitFastaFile.py'), site_handler))
-		executableList.append(SplitFastaFile)
+		executableClusterSizeMultiplierList.append((SplitFastaFile, 0.1))
 		
-		for executable in executableList:
-			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
-			self.addExecutable(executable)
-			setattr(self, executable.name, executable)
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+
 	
 	def addMakeBlastDBJob(self, executable=None, inputFile=None, \
-						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+						parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 						extraArguments=None, job_max_memory=500, **keywords):
 		"""
+		2012.10.9 use addGenericJob() instead
 		2012.5.24
 			untested
 		"""
-		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
-		job.addArguments("-i", inputFile, "-p F")
-		if extraArguments:
-			job.addArguments(extraArguments)
-		job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
-		job.outputList = []
+		extraOutputLs = []
 		for suffix in ['.nin', '.nhr', '.nsq']:	#start from 0
 			dbIndexFile = File('%s%s'%(inputFile.name, suffix))
-			job.uses(dbIndexFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			job.outputList.append(dbIndexFile)
-			
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		self.addJob(job)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			if input:
-				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+			extraOutputLs.append(dbIndexFile)
+		
+		extraArgumentList = ["-p F"]
+		job = self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=outputFile, \
+						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+						extraOutputLs=extraOutputLs,\
+						transferOutput=transferOutput, \
+						extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
+						key2ObjectForJob=None,\
+						job_max_memory=job_max_memory)
 		return job
 	
 	def run(self):

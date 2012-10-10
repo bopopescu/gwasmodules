@@ -52,11 +52,19 @@ class BlastWrapper(AbstractMapper):
 	def runBlast(self, inputFname=None, databaseFname=None, outputFname=None, outputFnamePrefix=None, \
 				blastallPath=None, minNoOfIdentities=None, \
 				maxNoOfMismatches=None,\
-				minIdentityPercentage=None, maxNoOfHits=50):
+				minIdentityPercentage=None, maxNoOfHits=10):
 		"""
 		2012.8.19
 			output xml dump if outputFnamePrefix is given.
 		2012.5.23
+		  -p  Program Name [String]
+		  -d  Database [String]
+		    default = nr
+		  -i  Query File [File In]
+		    default = stdin
+		  -e  Expectation value (E) [Real]
+		    default = 10.0
+
 			blastall align_view option values:
 				0 = pairwise,
 				1 = query-anchored showing identities,
@@ -138,7 +146,7 @@ class BlastWrapper(AbstractMapper):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-			
+		
 		self.runBlast(inputFname=self.inputFname, databaseFname=self.databaseFname, outputFname=self.outputFname, \
 					outputFnamePrefix = self.outputFnamePrefix,\
 					blastallPath=self.blastallPath, minNoOfIdentities=self.minNoOfIdentities, \
