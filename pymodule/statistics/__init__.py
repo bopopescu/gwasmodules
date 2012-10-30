@@ -112,3 +112,144 @@ def getZScorePvalue(zscore=None, twoSided=False):
 	if twoSided:
 		pvalue  = pvalue* 2
 	return pvalue
+
+def reOrderListOfListByFirstMember(listOfList=None):
+	"""
+	2012.10.29
+		this function reorders every list in listOfList in ascending order using the values of 1st list of listOfList.
+		And every member of listOfList will be turned into numpy.float array.
+	2012.10.25
+	"""
+	import numpy
+	firstList = listOfList[0]
+	x_ar = numpy.array(firstList, numpy.float)
+	#sort x_ar and y_ar must be in the order of x_ar
+	indexOfOrderList = numpy.argsort(x_ar)
+	returnListOfList = []
+	for ls in listOfList:
+		ar = numpy.array(ls, numpy.float)
+		ar = ar[indexOfOrderList]
+		returnListOfList.append(ar)
+	return PassingData(listOfList=returnListOfList)
+
+def splineFit(x_ls=None, y_ls=None, no_of_steps=100, needReorderData=True):
+	"""
+	2012.10.25
+	http://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.UnivariateSpline.html
+	class scipy.interpolate.UnivariateSpline(x, y, w=None, bbox=[None, None], k=3, s=None)[source]
+		One-dimensional smoothing spline fit to a given set of data points.
+		
+		Fits a spline y=s(x) of degree k to the provided x, y data. s specifies the number of knots by specifying a smoothing condition.
+		
+		Parameters :	
+		x : array_like
+			1-D array of independent input data. Must be increasing.
+		y : array_like
+			1-D array of dependent input data, of the same length as x.
+		w : array_like, optional
+			Weights for spline fitting. Must be positive. If None (default), weights are all equal.
+			bbox : array_like, optional
+			2-sequence specifying the boundary of the approximation interval. If None (default), bbox=[x[0], x[-1]].
+		k : int, optional
+			Degree of the smoothing spline. Must be <= 5.
+		s : float or None, optional
+			Positive smoothing factor used to choose the number of knots. Number of knots will be increased until the smoothing condition is satisfied:
+			sum((w[i]*(y[i]-s(x[i])))**2,axis=0) <= s
+			If None (default), s=len(w) which should be a good value if 1/w[i] is an estimate of the standard deviation of y[i].
+			If 0, spline will interpolate through all data points.
+
+	"""
+	import numpy
+	import scipy.interpolate
+	if needReorderData:
+		sortData = reOrderListOfListByFirstMember(listOfList=[x_ls, y_ls])
+		x_ls = sortData.listOfList[0]
+		y_ls = sortData.listOfList[1]
+	
+	sp = scipy.interpolate.UnivariateSpline(x_ls, y_ls,k=5)
+	step = (x_ls[-1]-x_ls[0])/float(no_of_steps)
+	n_x_ls = numpy.arange(x_ls[0], x_ls[-1], step)
+	n_y_ls = map(sp, n_x_ls)
+	return PassingData(x_ls=n_x_ls, y_ls=n_y_ls)
+
+def movingAverage(listOfList=None, no_of_steps=100, needReorderData=True, reduceType=1, minNoOfTotal=10,\
+				minValueForFraction=0.8):
+	"""
+	2012.10.29
+		a function that calculates moving average of every list in listOfList.
+		stepping is applied to the first member in listOfList.
+		all member lists are of the same length.
+		reduceType
+			1: median
+			2: mean
+			3: fraction that is >=minValueForFraction, only applied to lists after the first one, numpy.median for X
+	2012.10.26
+	"""
+	import numpy
+	if needReorderData:
+		sortData = reOrderListOfListByFirstMember(listOfList=listOfList)
+		listOfList = sortData.listOfList
+	firstList = sortData.listOfList[0]
+	step = (firstList[-1]-firstList[0])/float(no_of_steps)
+	stepIndex2Data = {}
+	noOfLists = len(listOfList)
+	for j in xrange(len(firstList)):
+		x = firstList[j]
+		stepIndex = int(x/step)	#figure which bracket/bag all the data from this column should fall into.
+		if stepIndex not in stepIndex2Data:
+			stepIndex2Data[stepIndex] = PassingData(listOfList=[])
+			for i in xrange(noOfLists):
+				stepIndex2Data[stepIndex].listOfList.append([])
+		#y = y_ls[j]
+		#stepIndex2Data[stepIndex].listOfList[0].append(x)
+		for i in xrange(noOfLists):
+			valueAtThatList = listOfList[i][j]
+			stepIndex2Data[stepIndex].listOfList[i].append(valueAtThatList)
+	
+	stepIndexList = stepIndex2Data.keys()
+	stepIndexList.sort()
+	
+	fractionFunction = lambda ls: sum([a>=minValueForFraction for a in ls])/float(len(ls))
+	reduceType2Function = {1: numpy.median, 2: numpy.mean, 3: fractionFunction}
+	reduceFunction = reduceType2Function.get(reduceType, numpy.median)
+	
+	n_x_ls = []
+	returnListOfList = []
+	for i in xrange(noOfLists):
+		returnListOfList.append([])
+	
+	for stepIndex in stepIndexList:
+		data = stepIndex2Data.get(stepIndex)
+		subListOfList = data.listOfList
+		if len(subListOfList[0])<minNoOfTotal:
+			continue
+		
+		for i in xrange(noOfLists):
+			if i==0 and reduceType==3:
+				_reduceFunction = numpy.median
+			else:
+				_reduceFunction = reduceFunction
+			
+			reduce_value = _reduceFunction(subListOfList[i])
+			returnListOfList[i].append(reduce_value)
+	return PassingData(listOfList=returnListOfList)
+
+
+def calculate7NumberSummaryForOneList(ls, returnObj=None):
+	"""
+	2012.10.29 moved from variation/src/common.py
+	2009-11-25
+		calculate a 7-number summary stats for a given list
+	"""
+	from scipy import stats	# for scoreatpercentile/percentileatscore to get quartiles
+	import numpy
+	if returnObj is None:
+		returnObj = PassingData()
+	returnObj.minimum = numpy.min(ls)
+	returnObj.first_decile = stats.scoreatpercentile(ls, 10)
+	returnObj.lower_quartile = stats.scoreatpercentile(ls, 25)
+	returnObj.median = stats.scoreatpercentile(ls, 50)
+	returnObj.upper_quartile = stats.scoreatpercentile(ls, 75)
+	returnObj.last_decile = stats.scoreatpercentile(ls, 90)
+	returnObj.maximum = numpy.max(ls)
+	return returnObj
