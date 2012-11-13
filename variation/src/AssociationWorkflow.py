@@ -20,13 +20,19 @@ Examples:
 	mpiexec ~/script/variation/src/MpiAssociation.py -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -p ~/panfs/250k/phenotype/phenotype.tsv
 		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y3_pheno.tsv
 		-y3 -w 39-59,80-82,210-212,32-38,65-74,183-186,191-194,260-263,362-380,161-176,264-267,849-947 -n
-
+	
+	#2012.9.28 add --getPublicPhenotype if u want to run association only on published phenotype and its values
+	# -n: --noSNPAlleleOrdinalConversion 
+	# -c: commit, (make sure -c is added, otherwise nothing will be stored in db)
 	%s -A 57,75 -n -c -w 314-351 -a 1,32 -K /Network/Data/250k/db/dataset/call_method_75_K.tsv
-		-o workflow/associationCall57_75Phenotype314_351Analysis1_32.xml -u yh -d stock_250k -z banyan  -j condorpool -l condorpool
+		-o workflow/association/association/Call57_75Phenotype314_351Analysis1_32.xml
+		-u yh -d stock_250k -z banyan  -j condorpool -l condorpool
+		#--getPublicPhenotype
 
 Description:
 	2012.6.5
 		output a workflow that runs Association.py on specified input and imports the result into db.
+		associations already in db will be skipped.
 		
 """
 import sys, os, math
@@ -57,6 +63,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 	option_default_dict.pop(('phenotype_fname', 1, ))
 	
 	option_default_dict.update({
+			('getPublicPhenotype', 0, int):[0, '', 0, 'toggle to get public phenotype only, phenotype_method.access==public and phenotype_avg.ready_for_publication=1'],\
 			('call_method_id_ls', 1, ):[None, 'A', 1, 'Restrict results based on list of call_method_id. Default is no such restriction.'],\
 			('analysis_method_id_ls', 1, ):['1,7', 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
 			('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
@@ -168,15 +175,19 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 	
 	def addOutputPhenotypeJob(self, executable=None, outputFile=None, getRawPhenotypeData=False,\
 						ecotype_table='stock.ecotype', phenotype_method_table='stock_250k.phenotype_method', \
-						phenotype_avg_table='stock_250k.phenotype_avg',\
+						phenotype_avg_table='stock_250k.phenotype_avg', getPublicPhenotype=False,\
 						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
 						extraArguments=None, job_max_memory=2000, sshDBTunnel=None, **keywords):
 		"""
+		2012.9.28
+			add argument getPublicPhenotype
 		2012.6.5
 		"""
 		extraArgumentList = ['-e %s'%(ecotype_table), '-m %s'%(phenotype_method_table), '-q %s'%(phenotype_avg_table)]
 		if getRawPhenotypeData:
 			extraArgumentList.append('-g')
+		if getPublicPhenotype:
+			extraArgumentList.append("--getPublicPhenotype")
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		
@@ -213,9 +224,11 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 	
 	
 	def addJobs(self, db_250k=None, callMethodID2FileObject=None, kinshipFile=None, eigenVectorFile=None, phenotype_method_id_ls=[],\
-			analysis_method_id_ls=[], genotypeFileToGenerateKinship=None, results_directory=None, commit=False, \
+			analysis_method_id_ls=[], genotypeFileToGenerateKinship=None, results_directory=None, getPublicPhenotype=False, commit=False, \
 			transferOutput=True, needSSHDBTunnel=False, outputDirPrefix=""):
 		"""
+		2012.9.28
+			add argument getPublicPhenotype
 		2012.6.5
 		"""
 		sys.stderr.write("Adding association jobs for %s polymorphism data ... "%(len(callMethodID2FileObject)))
@@ -228,7 +241,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		
 		phenotypeFile = File(os.path.join(topOutputDir, 'phenotype.tsv'))
 		outputPhenotypeJob = self.addOutputPhenotypeJob(executable=self.OutputPhenotype, outputFile=phenotypeFile, \
-									getRawPhenotypeData=False, \
+									getRawPhenotypeData=False, getPublicPhenotype=getPublicPhenotype,\
 									parentJobLs=[topOutputDirJob], transferOutput=True, job_max_memory=2000,\
 									sshDBTunnel=needSSHDBTunnel)
 		no_of_jobs += 1
@@ -249,6 +262,13 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 					test_type = analysisMethod.association_test_type
 					if not test_type:
 						sys.stderr.write("Warning: analysisMethod %s has non-None test_type %s. Skip.\n"%(test_type))
+						continue
+					#2012.9.28 not in db
+					rm = db_250k.getResultsMethod(call_method_id=callMethodID, phenotype_method_id=phenotype_method_id, \
+											analysis_method_id=analysis_method_id, \
+											cnv_method_id=None)
+					if rm:
+						sys.stderr.write("Warning: skip association for c=%s, p=%s, a=%s.\n"%(callMethodID, phenotype_method_id, analysis_method_id))
 						continue
 					outputFile = File(os.path.join(topOutputDir, '%s_%s_%s.tsv'%(callMethodID, phenotype_method_id, \
 																				analysis_method_id)))
@@ -324,6 +344,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 					eigenVectorFile=eigenVectorFile, phenotype_method_id_ls=self.phenotype_method_id_ls,\
 					analysis_method_id_ls=self.analysis_method_id_ls, \
 					genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, results_directory=self.results_directory, \
+					getPublicPhenotype=self.getPublicPhenotype,\
 					commit=self.commit, \
 					transferOutput=True, needSSHDBTunnel=self.needSSHDBTunnel, outputDirPrefix="")
 		# Write the DAX to stdout
