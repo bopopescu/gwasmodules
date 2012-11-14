@@ -1,23 +1,26 @@
 #!/usr/bin/env python
 """
 Examples:
-	# 2011-9-29
-	%s -a 525 -f 9 -I 8GenomeVsTop156Contigs_GATK_all_bases/call/ -N 0.0 -c 1
-		-o 8GenomeVsTop156Contigs_GATK_all_bases_maxNA0_minMAF0_het2NA.xml -j condorpool -l condorpool  -u yh -z uclaOffice
-	
-	%s  -a 525 -f 9 -I 8GenomeVsTop156Contigs_GATK_all_bases/call/ -N 0.8 -M0
-		-c 1 -o 8GenomeVsTop156Contigs_GATK_all_bases_maxNA0.8_minMAF0_het2NA.xml -j condorpool -l condorpool  -u yh -z uclaOffice
-	
-	#2012.5.11 on hoffman condor, 5 jobs per cluster (-C5), always need db connection on hcondor (-H)
+	#2012.10.09 on hoffman condor, no clustering (-C0), always need db connection on hcondor (-H)
 	# add -U 0 -Z 3000 if u want to change the partitioning configuration (how many sites in one blast job)
 	%s  -I ~/NetworkData/vervet/db/genotype_file/method_42/
 		--oldRefFastaFname ~/NetworkData/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta
 		--newRefFastaFname ~/NetworkData/vervet/db/individual_sequence/3231_6483ContigsVervetRef1.0.3.fasta
 		--formatdbPath ~/bin/blast/bin/formatdb --blastallPath ~/bin/blast/bin/blastall
-		--maxNoOfMismatches 2 -H -C 5
+		--maxNoOfMismatches 2 -H -C 0
 		-j hcondor -l hcondor -D ~/NetworkData/vervet/db/ -t ~/NetworkData/vervet/db/
-		-u yh -z localhost -o workflow/polymorphism/FindNewRefCoordinates_Method42_vs_3231_maxContigID2.xml
+		-u yh -z localhost -o workflow/polymorphism/FindNewRefCoordinates_Method42_vs_3231_maxContigID2.xml -x 2
 		#-U 0 -Z 3000
+	
+	#2012.10.18 use bwa to align
+	%s -I ~/NetworkData/vervet/db/genotype_file/method_42/ 
+		--oldRefFastaFname ~/NetworkData/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta
+		--newRefFastaFname ~/NetworkData/vervet/db/individual_sequence/3231_6483ContigsVervetRef1.0.3.fasta
+		--maxNoOfMismatches 2 -H -C 4 --no_of_aln_threads 1
+		-j hcondor -l hcondor -D ~/NetworkData/vervet/db/ -t ~/NetworkData/vervet/db/
+		-u yh -z localhost -o workflow/polymorphism/FindNewRefCoordinates_Method42_vs_3231_BWA.xml  --alignmentMethodType 2
+		--intervalSize 40000
+		#--flankingLength 50
 
 Description:
 	2012-10-03
@@ -37,7 +40,7 @@ Description:
          
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0], sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
@@ -46,10 +49,12 @@ from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
 from Pegasus.DAX3 import *
 from pymodule.pegasus.AbstractVCFWorkflow import AbstractVCFWorkflow
 from pymodule.pegasus.BlastWorkflow import BlastWorkflow
+from pymodule.pegasus.ShortRead2AlignmentWorkflow import ShortRead2AlignmentWorkflow
 
-class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWorkflow):
+class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWorkflow, ShortRead2AlignmentWorkflow):
 	__doc__ = __doc__
 	option_default_dict = AbstractVCFWorkflow.option_default_dict.copy()
+	option_default_dict.update(ShortRead2AlignmentWorkflow.alignment_option_dict.copy())
 	option_default_dict.update({
 						('oldRefFastaFname', 1, ): ['', '', 1, 'path to the old reference sequence file (on which input VCF is based)', ],\
 						("formatdbPath", 1, ): ["/usr/bin/formatdb", 'f', 1, 'path to formatdb, index fasta database file'],\
@@ -58,21 +63,28 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 						
 						('minNoOfIdentities', 0, int): [None, '', 1, 'minimum number of identities between a query and target', ],\
 						('maxNoOfMismatches', 0, int): [None, '', 1, 'minimum number of mismatches between a query and target', ],\
-						('minIdentityPercentage', 0, float): [None, '', 1, 'minimum percentage of identities between a query and target', ],\
+						('minIdentityFraction', 0, float): [None, '', 1, 'minimum percentage of identities between a query and target', ],\
 						('flankingLength', 1, int): [24, '', 1, 'number of flanking bases on either side of the locus.\n\
 	length of flanking = 2*flankingLength+locusLength', ],\
 						('minAlignmentSpan', 1, int): [10, '', 1, 'minimum length of alignment in blast', ],\
+						
+						('alignmentMethodType', 1, int): [1, '', 1, 'which alignment program to use: 1 blast, 2 bwa', ],\
+						('maxMissingAlignmentFraction', 1, float): [0.04, '', 1, ' max fraction of missing alignments given 2% uniform base error rate if FLOAT.', ],\
+						('maxNoOfGaps', 1, int): [1, '', 1, 'Maximum number of gap opens', ],\
+						
 						})
 	
 	#2012.9.25 no overlap and make the interval a lot smaller, (for VCF file)
 	option_default_dict[('intervalOverlapSize', 1, int)][0] = 0
-	option_default_dict[('intervalSize', 1, int)][0] = 3000
+	option_default_dict[('intervalSize', 1, int)][0] = 10000
 	
 	def __init__(self,  **keywords):
 		"""
 		2011-7-11
 		"""
 		AbstractVCFWorkflow.__init__(self, **keywords)
+		ShortRead2AlignmentWorkflow.__init__(self, **keywords)
+		
 		self.oldRefFastaFname = os.path.abspath(self.oldRefFastaFname)
 		self.newRefFastaFname = os.path.abspath(self.newRefFastaFname)
 	
@@ -80,29 +92,49 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		"""
 		2012.9.17
 		"""
-		AbstractVCFWorkflow.preReduce(self, workflow=workflow, outputDirPrefix=outputDirPrefix,\
+		returnData = AbstractVCFWorkflow.preReduce(self, workflow=workflow, outputDirPrefix=outputDirPrefix,\
 								passingData=passingData, transferOutput=transferOutput, **keywords)
 		
 		
-		returnData = PassingData(no_of_jobs = 0)
-		returnData.jobDataLs = []
-		self.oldRefFastaFileList = self.registerBlastNucleotideDatabaseFile(self.oldRefFastaFname, \
-							input_site_handler=self.input_site_handler)
-		self.newRefFastaFileList = self.registerBlastNucleotideDatabaseFile(self.newRefFastaFname, \
-							input_site_handler=self.input_site_handler)
+		passingData.oldRefFastaFile = self.registerOneInputFile(workflow=workflow, inputFname=self.oldRefFastaFname, \
+															folderName=self.pegasusFolderName)
+		refIndexJob = None
+		if self.alignmentMethodType==1:	#blast
+			passingData.newRefFastaFileList = self.registerBlastNucleotideDatabaseFile(self.newRefFastaFname, \
+						folderName=self.pegasusFolderName, input_site_handler=self.input_site_handler)
+			if len(passingData.newRefFastaFileList)<4:	#some nt-database index file is missing
+				sys.stderr.write("Adding blast-db-making job ...")
+				refIndexJob = self.addMakeBlastDBJob(executable=self.formatdb,\
+											inputFile=passingData.newRefFastaFileList[0], transferOutput=True)
+				#add the index files
+				passingData.newRefFastaFileList = [passingData.newRefFastaFileList[0]] + refIndexJob.outputList
+				sys.stderr.write(".\n")
+		else:	#bwa
+			passingData.newRefFastaFileList = self.registerBWAIndexFile(refFastaFname=self.newRefFastaFname, \
+												folderName=self.pegasusFolderName, input_site_handler=self.input_site_handler)
+			if len(passingData.newRefFastaFileList)<6:
+				sys.stderr.write("Adding bwa reference index job ...")
+				refIndexJob = self.addBWAReferenceIndexJob(workflow=workflow, refFastaFList=passingData.newRefFastaFileList, \
+					refSequenceBaseCount=3000000000, bwa=workflow.bwa,\
+					transferOutput=True)
+				#add the index files
+				passingData.newRefFastaFileList = [passingData.newRefFastaFileList[0]] + refIndexJob.outputList
+				sys.stderr.write(".\n")
+				
 		
-		if len(self.newRefFastaFileList)<4:	#some nt-database index file is missing
-			sys.stderr.write("Adding blast-db-making job ...")
-			makeBlastDBJob = self.addMakeBlastDBJob(executable=self.formatdb,\
-										inputFile=self.newRefFastaFileList[0], transferOutput=True)
-			#add the index files to the ntDatabaseFileList
-			self.newRefFastaFileList = [self.newRefFastaFileList[0]] + makeBlastDBJob.outputList
-			sys.stderr.write(".\n")
-		else:
-			makeBlastDBJob = None
-		passingData.makeBlastDBJob = makeBlastDBJob
+		
+		passingData.refIndexJob = refIndexJob
 		return returnData
-		
+	
+	def registerCustomJars(self, workflow=None):
+		"""
+		2012.10.18
+		"""
+		#super(FindNewRefCoordinatesGivenVCFFolderWorkflow, self).registerCustomJars(workflow=workflow)
+		AbstractVCFWorkflow.registerCustomJars(self, workflow)
+		ShortRead2AlignmentWorkflow.registerCustomJars(self, workflow)
+		BlastWorkflow.registerCustomJars(self, workflow)
+	
 	def registerCustomExecutables(self, workflow=None):
 		"""
 		2011-11-28
@@ -111,6 +143,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 			workflow=self
 		
 		AbstractVCFWorkflow.registerCustomExecutables(self, workflow)
+		ShortRead2AlignmentWorkflow.registerCustomExecutables(self, workflow)
 		BlastWorkflow.registerCustomExecutables(self, workflow)
 		
 		namespace = workflow.namespace
@@ -139,7 +172,46 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 										site_handler))
 		executableClusterSizeMultiplierList.append((FindSNPPositionOnNewRefFromFlankingBlastOutput, 2))
 		
+		FindSNPPositionOnNewRefFromFlankingBWAOutput = Executable(namespace=namespace, name="FindSNPPositionOnNewRefFromFlankingBWAOutput", \
+											version=version, \
+											os=operatingSystem, arch=architecture, installed=True)
+		FindSNPPositionOnNewRefFromFlankingBWAOutput.addPFN(PFN("file://" + os.path.join(workflow.pymodulePath, \
+														"polymorphism/FindSNPPositionOnNewRefFromFlankingBWAOutput.py"), \
+										site_handler))
+		executableClusterSizeMultiplierList.append((FindSNPPositionOnNewRefFromFlankingBWAOutput, 1))
+		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+	
+	def addFindNewRefCoordinateJob(self, workflow=None, executable=None, inputFile=None, \
+							outputFile=None, maxNoOfMismatches=None, minNoOfIdentities=None, minIdentityFraction=None,\
+							minAlignmentSpan=None,\
+							parentJobLs=None, transferOutput=False, job_max_memory=500,\
+							extraArguments=None, extraArgumentList=None, extraDependentInputLs=None):
+		"""
+		2012.10.14
+		
+		"""
+		if workflow is None:
+			workflow = self
+		# a FindSNPPositionOnNewRefFromFlankingBlastOutput job
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if minAlignmentSpan is not None:
+			extraArgumentList.append('--minAlignmentSpan %s'%(minAlignmentSpan))
+		if maxNoOfMismatches is not None:
+			extraArgumentList.append('--maxNoOfMismatches %s'%(maxNoOfMismatches))
+		if minNoOfIdentities is not None:
+			extraArgumentList.append("--minNoOfIdentities %s"%(minNoOfIdentities))
+		if minIdentityFraction is not None:
+			extraArgumentList.append("--minIdentityFraction %s"%(minIdentityFraction))
+			
+		findNewRefCoordinateJob = self.addAbstractMapperLikeJob(workflow=workflow, \
+					executable=executable, \
+					inputF=inputFile, outputF=outputFile, \
+					parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+					extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
+					extraDependentInputLs=extraDependentInputLs)
+		return findNewRefCoordinateJob
 	
 	def mapEachInterval(self, workflow=None, \
 					VCFFile=None, passingData=None, transferOutput=False, **keywords):
@@ -155,6 +227,8 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 				(replace contig ID , position with the new one's, remove the header part regarding chromosomes or replace it)
 
 		"""
+		if workflow is None:
+			workflow = self
 		
 		returnData = PassingData(no_of_jobs = 0)
 		returnData.jobDataLs = []
@@ -174,43 +248,79 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		
 		outputFnamePrefix = os.path.join(mapDirJob.output, '%s_flankSequence'%(intervalFnamePrefix)) 
 		outputFile = File('%s.fasta'%(outputFnamePrefix))
-		oldRefFastaFile = self.oldRefFastaFileList[0]
-		extraArgumentList = ['--flankingLength %s'%(self.flankingLength), '--refFastaFname', oldRefFastaFile]
+		oldRefFastaFile = passingData.oldRefFastaFile
+		extraArgumentList = ['--flankingLength %s'%(self.flankingLength), '--refFastaFname', oldRefFastaFile,\
+							"--outputFormatType %s"%(self.alignmentMethodType)]
+		# alignmentMethodType 1 => fasta
+		# alignmentMethodType 2 => fastq
 		extractFlankSeqJob = self.addAbstractMapperLikeJob(workflow=workflow, executable=self.ExtractFlankingSequenceForVCFLoci, \
 					inputF=VCFFile, outputF=outputFile, \
 					parentJobLs=[mapDirJob, splitVCFJob], transferOutput=transferOutput, job_max_memory=2000,\
 					extraArguments=None, extraArgumentList=extraArgumentList, extraDependentInputLs=[oldRefFastaFile])
 		
-		# a blast job
-		blastOutputFnamePrefix = '%s_blast'%(outputFnamePrefix)
-		outputFile = File('%s.tsv'%(blastOutputFnamePrefix))
-		newRefFastaFile = self.newRefFastaFileList[0]
-		blastJob = self.addBlastWrapperJob(executable=self.BlastWrapper, inputFile=extractFlankSeqJob.output, \
-										outputFile=outputFile, \
-						outputFnamePrefix=blastOutputFnamePrefix, databaseFile=newRefFastaFile,\
-						maxNoOfMismatches=self.maxNoOfMismatches, minNoOfIdentities=self.minNoOfIdentities, \
-						minIdentityPercentage=self.minIdentityPercentage, blastallPath=self.blastallPath, \
-						parentJobLs=[mapDirJob, extractFlankSeqJob, passingData.makeBlastDBJob], \
-						extraDependentInputLs=self.newRefFastaFileList, \
-						transferOutput=transferOutput, \
-						extraArguments=None, job_max_memory=5000)
-		
-		# a FindSNPPositionOnNewRefFromFlankingBlastOutput job
-		outputFile = File('%s_2NewRefCoordinateMap.tsv'%(outputFnamePrefix))
-		extraArgumentList = ['--minAlignmentSpan %s'%(self.minAlignmentSpan)]
-		if self.maxNoOfMismatches:
-			extraArgumentList.append('--maxNoOfMismatches %s'%(self.maxNoOfMismatches))
-		if self.minNoOfIdentities:
-			extraArgumentList.append("--minNoOfIdentities %s"%(self.minNoOfIdentities))
-		if self.minIdentityPercentage:
-			extraArgumentList.append("--minIdentityPercentage %s"%(self.minIdentityPercentage))
+		if self.alignmentMethodType==1:	#blast
+			# a blast job
+			blastOutputFnamePrefix = '%s_blast'%(outputFnamePrefix)
+			outputFile = File('%s.tsv'%(blastOutputFnamePrefix))
+			newRefFastaFile = passingData.newRefFastaFileList[0]
+			blastJob = self.addBlastWrapperJob(executable=self.BlastWrapper, inputFile=extractFlankSeqJob.output, \
+											outputFile=outputFile, \
+							outputFnamePrefix=blastOutputFnamePrefix, databaseFile=newRefFastaFile,\
+							maxNoOfMismatches=self.maxNoOfMismatches, minNoOfIdentities=self.minNoOfIdentities, \
+							minIdentityPercentage=self.minIdentityFraction, blastallPath=self.blastallPath, \
+							parentJobLs=[mapDirJob, extractFlankSeqJob, passingData.refIndexJob], \
+							extraDependentInputLs=passingData.newRefFastaFileList, \
+							transferOutput=transferOutput, \
+							extraArguments=None, job_max_memory=5000)
 			
-		findNewRefCoordinatesJob = self.addAbstractMapperLikeJob(workflow=workflow, \
-					executable=self.FindSNPPositionOnNewRefFromFlankingBlastOutput, \
-					inputF=blastJob.output, outputF=outputFile, \
-					parentJobLs=[blastJob], transferOutput=transferOutput, job_max_memory=500,\
-					extraArguments=None, extraArgumentList=extraArgumentList, extraDependentInputLs=None)
-		returnData.findNewRefCoordinatesJob = findNewRefCoordinatesJob
+			# a FindSNPPositionOnNewRefFromFlankingBlastOutput job
+			outputFile = File('%s_2NewRefCoordinateMap.tsv'%(outputFnamePrefix))
+			findNewRefCoordinateJob = self.addFindNewRefCoordinateJob(workflow=workflow, executable=self.FindSNPPositionOnNewRefFromFlankingBlastOutput, \
+						inputFile=blastJob.output, outputFile=outputFile, maxNoOfMismatches=self.maxNoOfMismatches, \
+						minNoOfIdentities=self.minNoOfIdentities, minIdentityFraction=self.minIdentityFraction, \
+						minAlignmentSpan=self.minAlignmentSpan, parentJobLs=[blastJob], \
+						transferOutput=transferOutput, job_max_memory=500, extraArguments=None, \
+						extraArgumentList=None)
+			
+		else:	#bwa
+			#fake a fileObjectLs, which contains a single-end read fastq object
+			# db_entry is supposedly a individual_sequence_file object 
+			fileObjectLs = [PassingData(fastqF=extractFlankSeqJob.output, \
+									db_entry=PassingData(quality_score_format='Standard', \
+														individual_sequence=PassingData(sequencer='GA', sequence_type='SR')))]
+			#2012.10.10 fake one
+			alignment_method = PassingData(short_name='bwa-short-read', command='aln')
+			
+			#2012.10.10 individual_alignment is not passed so that ReadGroup addition job is not added in addAlignmentJob()
+			bamIndexJob = self.addAlignmentJob(workflow=workflow, fileObjectLs=fileObjectLs, \
+				refFastaFList=passingData.newRefFastaFileList, bwa=workflow.bwa, \
+				additionalArguments=self.additionalArguments, samtools=workflow.samtools, \
+				refIndexJob=passingData.refIndexJob, parentJobLs=[mapDirJob, extractFlankSeqJob], \
+				alignment_method=alignment_method, \
+				outputDir=mapDirJob.output,\
+				PEAlignmentByBWA=workflow.PEAlignmentByBWA, ShortSEAlignmentByBWA=workflow.ShortSEAlignmentByBWA, \
+				LongSEAlignmentByBWA=workflow.LongSEAlignmentByBWA,\
+				java=workflow.java, SortSamFilesJava=workflow.SortSamFilesJava, SortSamFilesJar=workflow.SortSamFilesJar,\
+				addOrReplaceReadGroupsJava=workflow.addOrReplaceReadGroupsJava, \
+				addOrReplaceReadGroupsJar=workflow.addOrReplaceReadGroupsJar,\
+				no_of_aln_threads=self.no_of_aln_threads,\
+				stampy=workflow.stampy, \
+				maxMissingAlignmentFraction=self.maxMissingAlignmentFraction, maxNoOfGaps=self.maxNoOfGaps, \
+				addBamIndexJob=True, transferOutput = False)[0]
+			
+			alignmentJob = bamIndexJob.parentJobLs[0]
+			# a FindSNPPositionOnNewRefFromFlankingBlastOutput job
+			outputFile = File('%s_2NewRefCoordinateMap.tsv'%(outputFnamePrefix))
+			findNewRefCoordinateJob = self.addFindNewRefCoordinateJob(workflow=workflow, \
+						executable=self.FindSNPPositionOnNewRefFromFlankingBWAOutput, \
+						inputFile=alignmentJob.output, outputFile=outputFile, maxNoOfMismatches=self.maxNoOfMismatches, \
+						minNoOfIdentities=self.minNoOfIdentities, minIdentityFraction=self.minIdentityFraction, \
+						minAlignmentSpan=self.minAlignmentSpan, parentJobLs=[alignmentJob, bamIndexJob], \
+						transferOutput=transferOutput, job_max_memory=500, extraArguments=None, \
+						extraArgumentList=None, extraDependentInputLs=[bamIndexJob.output])
+			
+
+		returnData.findNewRefCoordinateJob = findNewRefCoordinateJob
 		return returnData
 	
 	def reduce(self, workflow=None, passingData=None, reduceEachChromosomeDataLs=None, transferOutput=True, **keywords):
@@ -223,8 +333,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		returnData.jobDataLs = []
 		reduceOutputDirJob = passingData.reduceOutputDirJob
 		
-		fnamePrefix = os.path.join(reduceOutputDirJob.output, 'SNPID2NewCoordinates.tsv')
-		outputFile = File('%s.tsv'%(fnamePrefix))
+		outputFile = File(os.path.join(reduceOutputDirJob.output, 'SNPID2NewCoordinates.tsv'))
 		reduceJob = self.addStatMergeJob(workflow, \
 									statMergeProgram=self.mergeSameHeaderTablesIntoOne, \
 									outputF=outputFile, \
@@ -235,7 +344,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		
 		for mapEachIntervalDataLs in passingData.mapEachIntervalDataLsLs:
 			for mapEachIntervalData in mapEachIntervalDataLs:
-				parentJob = mapEachIntervalData.findNewRefCoordinatesJob
+				parentJob = mapEachIntervalData.findNewRefCoordinateJob
 				self.addInputToStatMergeJob(workflow, statMergeJob=reduceJob, \
 						parentJobLs=[parentJob])
 		
