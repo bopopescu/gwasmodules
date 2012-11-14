@@ -18,7 +18,7 @@ class GeneModel(object):
 		if not hasattr(self, 'gene_commentaries'):
 			self.gene_commentaries = []
 
-class fasta_block_iterator:
+class fasta_block_iterator(object):
 	'''
 	2011-1-5 moved from Transfac.src.transfacdb
 	09-13-05
