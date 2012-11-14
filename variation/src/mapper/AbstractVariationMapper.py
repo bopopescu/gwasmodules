@@ -34,7 +34,7 @@ class AbstractVariationMapper(AbstractMapper):
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('port', 0, ):[None, '', 1, 'database port number'],\
-							('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
+							('data_dir', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
 							('min_MAF', 0, float): [0.1, 'n', 1, 'minimum Minor Allele Frequency.'],\
 							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
 							
