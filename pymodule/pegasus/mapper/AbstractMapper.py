@@ -19,14 +19,15 @@ import re
 class AbstractMapper(object):
 	__doc__ = __doc__
 	db_option_dict = {
-					('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
+					('drivername', 1,):['postgresql', '', 1, 'which type of database? mysql or postgresql', ],\
 					('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
 					('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
 					('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
 					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+					('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 					('port', 0, ):[None, '', 1, 'database port number'],\
-							}
+					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
+					}
 	option_default_dict = {
 						('inputFname', 1, ): ['', 'i', 1, 'input file.', ],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
