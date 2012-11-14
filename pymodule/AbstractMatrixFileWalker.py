@@ -30,27 +30,36 @@ class AbstractMatrixFileWalker(AbstractMapper):
 	option_default_dict.update({
 						('inputFname', 0, ):option_default_dict[('inputFname', 1, )],\
 						('minNoOfTotal', 1, int): [10, 'M', 1, 'minimum no of data from one file for afterFileFunction() to run'],\
+						('maxNoOfTotal', 0, int): [None, '', 1, 'maximum no of data to sample from one file. if not set, no limit.'],\
 						('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
 						('whichColumn', 0, int): [None, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
 						('whichColumnHeader', 0, ): [None, 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
+						
+						('logY', 0, int): [0, '', 0, 'whether to take -log of Y, same as self.logWhichColumn'],\
 						('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
 						('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
 				only effective when logWhichColumn is toggled. '],\
 						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
-			what yValue should be.'],\
-						('missingDataNotation', 0, ): ['NA', '', 1, 'notation for missing data. will be skipped.'],\
+		this is the default final yValue.'],\
+						('missingDataNotation', 0, ): ['NA', '', 1, 'coma-separated list of notations for missing data.\n\
+	missing data will be skipped.'],\
 								})
 	#pop in the end after its value is used above
 	option_default_dict.pop(('inputFname', 1, ))
 	
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
+		2012.10.25 self.missingDataNotation will be processed into a set.
 		"""
 		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)	#self.connectDB() called within its __init__()
 		#if user wants to preserve data in a data structure that is visible throughout reading different files.
 		# then use this self.invariantPData.
 		self.invariantPData = PassingData(writer=None, headerOutputted=False, x_ls = [], y_ls = [], z_ls=[])
-		
+		if self.missingDataNotation:
+			self.missingDataNotation = set(utils.getListOutOfStr(self.missingDataNotation, data_type=str, separator2=None))
+		else:
+			self.missingDataNotation = set()
+	
 	def connectDB(self):
 		"""
 			split out of __init__() so that derived classes could overwrite this function
@@ -70,12 +79,17 @@ class AbstractMatrixFileWalker(AbstractMapper):
 	
 	def processValue(self, value=None, takeLogarithm=None, positiveLog=None, valueForNonPositiveValue=None):
 		"""
+		2012.10.15
+			the default value of takeLogarithm depends on (self.logWhichColumn or self.logY)
 		2012.10.7
 		"""
 		if positiveLog is None:
 			positiveLog = self.positiveLog
 		if takeLogarithm is None:
-			takeLogarithm = self.logWhichColumn
+			if self.logWhichColumn or self.logY:	#2012.10.15
+				takeLogarithm = True
+			else:
+				takeLogarithm = False
 		if valueForNonPositiveValue is None:
 			valueForNonPositiveValue = self.valueForNonPositiveYValue
 		
@@ -102,9 +116,13 @@ class AbstractMatrixFileWalker(AbstractMapper):
 	
 	def processRow(self, row=None, pdata=None):
 		"""
+		2012.10.15
+			return returnValue: 0 if not included or nothing is done on it.
+				1 if included or something is carried out on it.
 		2012.8.2
 			handles each row in each file, here it replaces the yValue
 		"""
+		returnValue = 0
 		col_name2index = getattr(pdata, 'col_name2index', None)
 		y_ls = getattr(pdata, 'y_ls', None)
 		if col_name2index and y_ls is not None:
@@ -116,18 +134,13 @@ class AbstractMatrixFileWalker(AbstractMapper):
 				whichColumn = None
 			if whichColumn is not None:
 				yValue = row[whichColumn]
-				if yValue!=self.missingDataNotation:
+				if yValue not in self.missingDataNotation:
 					yValue = self.handleYValue(yValue)
 				row[whichColumn] = yValue
 			if self.invariantPData.writer:
 				self.invariantPData.writer.writerow(row)
-	
-	def afterFileFunction(self, pdata=None, **keywords):
-		"""
-		2012.8.15
-			executed after the file is read through
-		"""
-		pass
+				returnValue = 1
+		return returnValue
 	
 	def processHeader(self, header=None, pdata=None):
 		"""
@@ -157,7 +170,9 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		2012.8.1
 		"""
 		sys.stderr.write("walking through %s ..."%(inputFname))
-		counter =0
+		counter = 0
+		real_counter = 0
+		noOfSampled = 0
 		pdata = self.initiatePassingData()
 		if processRowFunction is None:
 			processRowFunction = self.processRow
@@ -179,14 +194,20 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			pdata.col_name2index = col_name2index
 			
 			for row in reader:
+				counter += 1
 				if not isCSVReader:
 					row = row.strip().split()
 				if self.samplingRate<1 and self.samplingRate>=0:
 					r = random.random()
 					if r>self.samplingRate:
 						continue
-				processRowFunction(row=row, pdata=pdata)
-				counter += 1
+				rowReturnValue = processRowFunction(row=row, pdata=pdata)
+				if rowReturnValue is None:	#2012.10.15
+					rowReturnValue = 0
+				real_counter += rowReturnValue
+				noOfSampled += 1
+				if self.maxNoOfTotal and real_counter>self.maxNoOfTotal:
+					break
 			if self.getNumberOfData(pdata)>self.minNoOfTotal:
 				afterFileFunction(x_ls=pdata.x_ls, y_ls=pdata.y_ls, pdata=pdata)
 			del reader
@@ -195,8 +216,34 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			import traceback
 			traceback.print_exc()
 			sys.exit(3)
-		sys.stderr.write("%s data.\n"%(counter))
+		if counter>0:
+			fraction = float(noOfSampled)/float(counter)
+		else:
+			fraction = 0
+		sys.stderr.write("%s/%s (%.3f) data sampled. real_counter=%s.\n"%(noOfSampled, counter, fraction, real_counter))
 	
+	def setup(self, **keywords):
+		"""
+		2012.10.25
+			do not open the file if it's a png file
+		2012.10.15
+			run before anything is run
+		"""
+		suffix = os.path.splitext(self.outputFname)[1]
+		if self.outputFname and suffix!='.png':
+			writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
+		else:
+			writer = None
+		#pass it to the invariantPData
+		self.invariantPData.writer = writer
+	
+	def reduce(self, **keywords):
+		"""
+		2012.10.15
+			run after all files have been walked through
+		"""
+		if getattr(self.invariantPData, 'writer', None):
+			del self.invariantPData.writer
 	
 	def run(self):
 		
@@ -204,19 +251,13 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			import pdb
 			pdb.set_trace()
 		
-		if self.outputFname:
-			writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
-		else:
-			writer = None
-		#pass it to the invariantPData
-		self.invariantPData.writer = writer
+		self.setup()
 		
 		for inputFname in self.inputFnameLs:
 			if os.path.isfile(inputFname):
 				self.fileWalker(inputFname, afterFileFunction=self.afterFileFunction, run_type=1, processRowFunction=self.processRow)
-		if writer:
-			del writer
 		
+		self.reduce()
 			
 if __name__ == '__main__':
 	main_class = AbstractMatrixFileWalker
