@@ -17,23 +17,26 @@ import utils
 
 class AbstractDBInteractingClass(object):
 	__doc__ = __doc__
+	db_option_dict = {
+					('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
+					('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
+					('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
+					('schema', 0, ): ['public', 'k', 1, 'database schema name', ],\
+					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
+					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+					('port', 0, ):[None, '', 1, 'database port number. must be non-empty if need ssh tunnel'],\
+					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
+					}
 	option_default_dict = {
-						('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgres', ],\
-						('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
-						('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
-						('schema', 0, ): ['public', 'k', 1, 'database schema name', ],\
-						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-						('port', 0, ):[None, '', 1, 'database port number. must be non-empty if need ssh tunnel'],\
 						('sshTunnelCredential', 0, ): ['', '', 1, 'a ssh credential to allow machine to access db server. \
 										polyacti@login3, yuhuang@hpc-login2. if empty or port is empty, no tunnel', ],\
 						('logFilename', 0, ): [None, '', 1, 'file to contain logs. use it only if this program is at the end of pegasus workflow \
 		and has no output file'],\
-						('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
 						}
-
+	option_default_dict.update(db_option_dict)
+	
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2011-7-11
