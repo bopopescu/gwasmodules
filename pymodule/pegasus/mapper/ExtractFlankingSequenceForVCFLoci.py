@@ -43,6 +43,7 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 						('refFastaFname', 1, ): [None, 'a', 1, 'path to the reference sequence fasta file', ],\
 						('flankingLength', 1, int): [24, '', 1, 'number of flanking bases on either side of the locus.\n\
 	length of flanking = 2*flankingLength+locusLength', ],\
+						('outputFormatType', 1, int): [1, '', 1, 'output format type. 1: fasta, 2: fastq (standard quality=H (72-33) format)'],\
 					})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
@@ -52,8 +53,11 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 	#2012.10.8 a regular expression pattern to parse the title of fasta sequences that are outputted by this program
 	sequenceTitlePattern = 	re.compile(r'^([a-zA-Z0-9]+)_(\d+)_(\d+)_([a-zA-Z\-]*)_([a-zA-Z\-,]*)_positionInFlank(\d+)$')
 
-	def extractFlankingSequence(self, inputFname=None, refFastaFname=None, outputFname=None, flankingLength=24):
+	def extractFlankingSequence(self, inputFname=None, refFastaFname=None, outputFname=None, flankingLength=24,\
+							outputFormatType=1):
 		"""
+		2012.10.10
+			added argument outputFormatType. 1: fasta, 2: fastq
 		2012.10.8
 		"""
 		sys.stderr.write("Extracting flanking sequences of loci from %s, based on ref-sequence of %s ...\n"%\
@@ -73,8 +77,15 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 			flankSeqStop = stopPos + flankingLength
 			flankingSequence = refFastaFile.getSequence(vcfRecord.chr, start=flankSeqStart, stop=flankSeqStop)
 			if flankingSequence:
-				outf.write(">%s\n"%(fastaTitle))
-				outf.write('%s\n'%(flankingSequence))
+				if outputFormatType==1:
+					outf.write(">%s\n"%(fastaTitle))
+					outf.write('%s\n'%(flankingSequence))
+				else:
+					outf.write("@%s\n"%(fastaTitle))
+					outf.write('%s\n'%(flankingSequence))
+					outf.write("+\n")
+					outf.write("%s\n"%('H'*len(flankingSequence)))
+					
 			
 			counter += 1
 		
@@ -93,7 +104,8 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 			pdb.set_trace()
 		
 		self.extractFlankingSequence(inputFname=self.inputFname, refFastaFname=self.refFastaFname, \
-									outputFname=self.outputFname, flankingLength=self.flankingLength)
+									outputFname=self.outputFname, flankingLength=self.flankingLength,\
+									outputFormatType=self.outputFormatType)
 		
 
 if __name__ == '__main__':
