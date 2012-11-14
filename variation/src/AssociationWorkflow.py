@@ -112,27 +112,24 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		clusters_size = self.clusters_size
 		site_handler = self.site_handler
 		
-		executableList = []
+		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		
 		Association = Executable(namespace=namespace, name="Association", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		Association.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "Association.py"), site_handler))
-		executableList.append(Association)
+		executableClusterSizeMultiplierList.append((Association, 0))
 		
 		Results2DB_250k = Executable(namespace=namespace, name="Results2DB_250k", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		Results2DB_250k.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "Results2DB_250k.py"), site_handler))
-		executableList.append(Results2DB_250k)
+		executableClusterSizeMultiplierList.append((Results2DB_250k, 0))
 		
 		OutputPhenotype = Executable(namespace=namespace, name="OutputPhenotype", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		OutputPhenotype.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "OutputPhenotype.py"), site_handler))
-		executableList.append(OutputPhenotype)
+		executableClusterSizeMultiplierList.append((OutputPhenotype, 0))
 		
-		for executable in executableList:
-			#executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
-			self.addExecutable(executable)
-			setattr(self, executable.name, executable)
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
 	def addAssociationJob(self, executable=None, datasetFile=None, phenotypeFile=None, phenotype_method_id=None, \
 						outputFile=None, kinshipFile=None, eigenVectorFile=None, genotypeFileToGenerateKinship=None, test_type=1,\
@@ -199,32 +196,36 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		return job
 	
 	def addResult2DBJob(self, executable=None, inputFile=None, call_method_id=None, phenotype_method_id=None, \
-					analysis_method_id=None, results_directory=None, results_method_type_id=1,\
+					analysis_method_id=None, data_dir=None, results_method_type_id=1,\
 					logFile=None, commit=False,\
-					parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
+					parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 					extraArguments=None, job_max_memory=2000, sshDBTunnel=None, **keywords):
 		"""
+		2012.11.13 expand all short-arguments to become long ones
 		2012.6.5
 		"""
-		extraArgumentList = ['-a %s'%(call_method_id), '-E %s'%(phenotype_method_id), '-l %s'%(analysis_method_id),\
-							'-o %s'%(results_directory), '-s %s'%(results_method_type_id)]
+		extraArgumentList = ['--phenotype_method_id %s'%(phenotype_method_id), \
+							'--analysis_method_id %s'%(analysis_method_id),\
+							'--results_method_type_id %s'%(results_method_type_id)]
+		if call_method_id:
+			extraArgumentList.append('--call_method_id %s'%(call_method_id))
+		if data_dir:
+			extraArgumentList.append('--data_dir %s'%(data_dir))
 		if commit:
-			extraArgumentList.append('-c')
+			extraArgumentList.append('--commit')
 		if logFile:
-			extraArgumentList.extend(["-F", logFile])
-		if extraArguments:
-			extraArgumentList.append(extraArguments)
+			extraArgumentList.extend(["--logFilename", logFile])
 		
-		job = self.addGenericJob(executable=executable, inputFile=inputFile, \
+		job = self.addGenericDBJob(executable=executable, inputFile=inputFile, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, transferOutput=transferOutput, \
-						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
+						extraArgumentList=extraArgumentList, extraArguments=extraArguments,\
+						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
 						**keywords)
-		self.addDBArgumentsToOneJob(job)
 		return job
 	
 	
 	def addJobs(self, db_250k=None, callMethodID2FileObject=None, kinshipFile=None, eigenVectorFile=None, phenotype_method_id_ls=[],\
-			analysis_method_id_ls=[], genotypeFileToGenerateKinship=None, results_directory=None, getPublicPhenotype=False, commit=False, \
+			analysis_method_id_ls=[], genotypeFileToGenerateKinship=None, data_dir=None, getPublicPhenotype=False, commit=False, \
 			transferOutput=True, needSSHDBTunnel=False, outputDirPrefix=""):
 		"""
 		2012.9.28
@@ -284,7 +285,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 																				analysis_method_id)))
 					result2DBJob = self.addResult2DBJob(executable=self.Results2DB_250k, inputFile=associationJob.output, \
 									call_method_id=callMethodID, phenotype_method_id=phenotype_method_id, \
-									analysis_method_id=analysis_method_id, results_directory=results_directory, \
+									analysis_method_id=analysis_method_id, data_dir=data_dir, \
 									results_method_type_id=1,\
 									logFile=logFile, commit=commit,\
 									parentJobLs=[associationJob], transferOutput=transferOutput, \
@@ -305,14 +306,6 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 			import pdb
 			pdb.set_trace()
 		
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
-									hostname=self.hostname, database=self.dbname)
-		db_250k.setup(create_tables=False)
-		db_250k.session.begin()
-		
-		if not self.results_directory:
-			self.results_directory = os.path.join(db_250k.data_dir, 'results')
-			
 		workflow = self.initiateWorkflow()
 		
 		self.registerExecutables()
@@ -340,10 +333,11 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		else:
 			genotypeFileToGenerateKinship = None
 		
-		self.addJobs(db_250k=db_250k, callMethodID2FileObject=callMethodID2FileObject, kinshipFile=kinshipFile, \
+		self.addJobs(db_250k=self.db, callMethodID2FileObject=callMethodID2FileObject, kinshipFile=kinshipFile, \
 					eigenVectorFile=eigenVectorFile, phenotype_method_id_ls=self.phenotype_method_id_ls,\
 					analysis_method_id_ls=self.analysis_method_id_ls, \
-					genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, results_directory=self.results_directory, \
+					genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, \
+					data_dir=self.data_dir, \
 					getPublicPhenotype=self.getPublicPhenotype,\
 					commit=self.commit, \
 					transferOutput=True, needSSHDBTunnel=self.needSSHDBTunnel, outputDirPrefix="")
