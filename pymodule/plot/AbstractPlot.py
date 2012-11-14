@@ -42,7 +42,10 @@ class AbstractPlot(AbstractMatrixFileWalker):
 						('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
 						('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\
 						('xColumnPlotLabel', 0, ): ['', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
+						
+						('logX', 0, int): [0, '', 0, 'whether to take -log of X'],\
 						('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
+						
 						})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
@@ -80,7 +83,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 			
 			xValue = row[x_index]
 			yValue = row[whichColumn]
-			if yValue!=self.missingDataNotation and xValue!=self.missingDataNotation:
+			if yValue not in self.missingDataNotation and xValue not in self.missingDataNotation:
 				xValue = float(xValue)
 				yValue = self.handleYValue(yValue)
 				x_ls.append(xValue)
@@ -146,14 +149,31 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		if self.need_svg:
 			pylab.savefig(svgOutputFname, dpi=self.figureDPI)
 		sys.stderr.write("  .\n")
+
+	def setup(self, **keywords):
+		"""
+		2012.10.15
+			run before anything is run
+		"""
+		AbstractMatrixFileWalker.setup(self, **keywords)
+		pylab.clf()
 	
+	def reduce(self, **keywords):
+		"""
+		2012.10.15
+			run after all files have been walked through
+		"""
+		self.saveFigure(invariantPData=self.invariantPData)
+		#delete self.invariantPData.writer if it exists
+		AbstractMatrixFileWalker.reduce(self, **keywords)
+			
 	def run(self):
 		
 		if self.debug:
 			import pdb
 			pdb.set_trace()
 		
-		pylab.clf()
+		self.setup()
 		
 		for inputFname in self.inputFnameLs:
 			if os.path.isfile(inputFname):
@@ -163,7 +183,8 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		self.handleTitle()
 		self.handleXLabel()
 		self.handleYLabel()
-		self.saveFigure(invariantPData=self.invariantPData)
+		
+		self.reduce()
 		
 
 if __name__ == '__main__':
