@@ -49,7 +49,7 @@ class OutputLociIDOfResultPeakInHDF5(AbstractVariationMapper):
 		db_250k = self.db_250k
 		
 		pd = PassingData(min_MAF=self.min_MAF,\
-							results_directory=self.results_directory, \
+							data_dir=self.data_dir, \
 							need_chr_pos_ls=0,)
 		for peak_id in self.peak_id_ls:
 			result_peak = Stock_250kDB.ResultPeak.get(peak_id)
