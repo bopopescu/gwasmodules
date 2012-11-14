@@ -32,8 +32,6 @@ from pymodule.RBTree import RBDict
 import networkx as nx
 from sqlalchemy import func
 
-import CGAL	#computational geometry algorithm python binding
-
 class DefineAssociationLandscape(object):
 	__doc__ = __doc__
 	option_default_dict = {
@@ -44,7 +42,7 @@ class DefineAssociationLandscape(object):
 						('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-						('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
+						('data_dir', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
 						('result_id_ls', 1, ): [None, 'j', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
 						('neighbor_distance', 0, int): [5000, 'i', 1, "within this distance, a locus that increases the association score \
 									the fastest is chosen as bridge end. outside this distance, whatever the next point is will be picked."],\
@@ -58,6 +56,7 @@ class DefineAssociationLandscape(object):
 						('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
+						('landscapeLocusIDFname', 1, ): ['', '', 1, 'file that contains one-column, snps.id of the gwas landscape'],\
 						}
 	#('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 	#('analysis_method_id_ls', 0, ):['1,7', 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
@@ -101,8 +100,10 @@ class DefineAssociationLandscape(object):
 		return deltaX
 	
 	def findLandscape(self, data_obj_ls=None, neighbor_distance=5000, max_neighbor_distance=20000,\
-					ground_score=0):
+					ground_score=0, landscapeLocusIDFname=None):
 		"""
+		2012.11.12
+			add argument landscapeLocusIDFname
 		2011-4-19
 			add max_neighbor_distance, ground_score
 		2011-4-18
@@ -156,6 +157,20 @@ class DefineAssociationLandscape(object):
 		
 		sys.stderr.write("%s bridges. Done.\n"%(len(bridge_ls)))
 		
+		if landscapeLocusIDFname:
+			#output the data_object.id in bridge_ls to landscapeLocusIDFname
+			outf= open(landscapeLocusIDFname,'w')
+			previous_locus_id = None
+			for bridge in bridge_ls:
+				current_obj = bridge[0]
+				obj_with_fastest_score_increase = bridge[1]
+				if previous_locus_id is None or current_obj.db_id!=previous_locus_id:
+					outf.write("%s\n"%(current_obj.db_id))
+					previous_locus_id = current_obj.db_id
+				if previous_locus_id is None or obj_with_fastest_score_increase.db_id!=previous_locus_id:
+					outf.write("%s\n"%(obj_with_fastest_score_increase.db_id))
+					previous_locus_id = obj_with_fastest_score_increase.db_id
+			del outf
 		returnData = PassingData(bridge_ls=bridge_ls, locusLandscapeNeighborGraph=locusLandscapeNeighborGraph)
 		return returnData
 	
@@ -244,13 +259,14 @@ class DefineAssociationLandscape(object):
 		return data_obj_with_max_value
 	
 	
-	def findPeaks(self, db_250k, locusLandscapeNeighborGraph, bridge_ls=None, data_obj_ls=None, ground_score=0, min_score=4,\
+	def findPeaks(self, db_250k, locusLandscapeNeighborGraph=None, bridge_ls=None, data_obj_ls=None, ground_score=0, min_score=4,\
 				rm=None, result_peak_type=None):
 		"""
 		2012.3.12
 			bugfixing, bounds the peak start  locus and peak stop locus within each connected component (one landscape)
 		2011-4-19
 		"""
+		import CGAL	#computational geometry algorithm python binding
 		no_of_bridges = len(bridge_ls)
 		sys.stderr.write("Finding peaks among the %s bridges ..."%(no_of_bridges))
 		no_of_edges = locusLandscapeNeighborGraph.number_of_edges()
@@ -386,22 +402,6 @@ class DefineAssociationLandscape(object):
 		db_250k.session.flush()
 		sys.stderr.write("%s loci inserted into db. Done.\n"%(no_of_newly_added_loci))
 	
-	def getResultPeakType(self, db_250k, min_MAF=None, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
-		"""
-		2011-4-20
-		"""
-		TableClass = Stock_250kDB.ResultPeakType
-		result_peak_type = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).filter_by(min_score=min_score).\
-			filter_by(neighbor_distance=neighbor_distance).\
-			filter_by(max_neighbor_distance=max_neighbor_distance).first()
-		if result_peak_type is None:
-			result_peak_type = Stock_250kDB.ResultPeakType(min_MAF=min_MAF, min_score=min_score, \
-									neighbor_distance=neighbor_distance, \
-									max_neighbor_distance=max_neighbor_distance)
-			db_250k.session.add(result_peak_type)
-			db_250k.session.flush()
-		return result_peak_type
-	
 	def run(self):
 		"""
 		2011-3-28
@@ -430,7 +430,7 @@ class DefineAssociationLandscape(object):
 		
 		
 		pd = PassingData(min_MAF=self.min_MAF,\
-					results_directory=self.results_directory, \
+					data_dir=self.data_dir, \
 					need_chr_pos_ls=0,)
 		
 		#result_query = db_250k.getResultLs(call_method_id=self.call_method_id, analysis_method_id_ls=self.analysis_method_id_ls, \
@@ -446,18 +446,20 @@ class DefineAssociationLandscape(object):
 		for result_id in result_id_ls:
 			#establish the map from cnv.id from chr_pos
 			rm = Stock_250kDB.ResultsMethod.get(result_id)
-			result_peak_type = self.getResultPeakType(db_250k, min_MAF=self.min_MAF, min_score=self.min_score, \
+			
+			"""
+			#2012.11.12 check to see if ResultLandscape contains this landscape already.
+			result_landscape_type = db_250k.getResultLandscapeType(min_MAF=self.min_MAF, \
 											neighbor_distance=self.neighbor_distance, \
 											max_neighbor_distance=self.max_neighbor_distance)
-			#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
-			query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
+			query = Stock_250kDB.ResultLandscape.query.filter_by(result_landscape_type_id=result_landscape_type.id).filter_by(result_id=rm.id)
 			if query.first():
-				logString = "result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id)
+				logString = "result_id=%s, result_landscape_type_id=%s already exists in ResultLandscape. exit.\n"%(result_id, result_landscape_type.id)
 				if logF:
 					logF.write(logString)
 				sys.stderr.write(logString)
-				sys.exit(0)
-			
+				sys.exit(3)
+			"""
 			
 			if rm.cnv_method_id and not db_250k._cnv_id2chr_pos:
 				db_250k.cnv_id2chr_pos = rm.cnv_method_id
@@ -470,13 +472,25 @@ class DefineAssociationLandscape(object):
 			#if rm.cnv_method_id:	#for cnvs, need to make sure all loci are in db.
 			#	self.addAllDataObjsIntoDb(db_250k, gwr.data_obj_ls)
 			landscapeData = self.findLandscape(gwr.data_obj_ls, neighbor_distance=self.neighbor_distance,\
-										max_neighbor_distance=self.max_neighbor_distance)
+									max_neighbor_distance=self.max_neighbor_distance, \
+									landscapeLocusIDFname=self.landscapeLocusIDFname)
 			"""
 			#2011-4-21 for inspection
 			outputFname = '/tmp/result_%s_landscape.png'%(result_id)
 			self.drawBridgeLs(bridge_ls=landscapeData.bridge_ls, outputFname=outputFname, oneGenomeData=oneGenomeData)
 			"""
 			
+			result_peak_type = db_250k.getResultPeakType(min_MAF=self.min_MAF, min_score=self.min_score, \
+											neighbor_distance=self.neighbor_distance, \
+											max_neighbor_distance=self.max_neighbor_distance)
+			#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
+			query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
+			if query.first():
+				logString = "result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id)
+				if logF:
+					logF.write(logString)
+				sys.stderr.write(logString)
+				sys.exit(0)
 			
 			no_of_peaks = self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
 						ground_score=self.ground_score, min_score=self.min_score, rm=rm, result_peak_type=result_peak_type)
