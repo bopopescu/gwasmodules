@@ -67,7 +67,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 	option_default_dict.pop(('outputFname', 0, ))
 	option_default_dict.pop(('outputFnamePrefix', 0, ))
 	option_default_dict.update({
-						('output_dir',1, ): ['/Network/Data/250k/db/results/', 'o', 1, 'file system storage for the results files. results_method.filename'],\
+						('data_dir',1, ): ['/Network/Data/250k/db/', '', 1, 'file system storage affiliated with db'],\
 						('short_name', 0, ): [None, 'f', 1, 'short name for this result. Must be unique from previous ones. \
 							combining phenotype, data, method is a good one. If not given, will be automatically generated.' ],\
 						('phenotype_method_id',1,int): [None, 'E', 1, 'which phenotype you used, check table phenotype_method'],\
@@ -165,7 +165,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		return marker_pos2snp_id
 	
 	@classmethod
-	def submit_results(cls, db, input_fname, rm, user, output_fname=None):
+	def submit_results(cls, db, input_fname, db_entry, user, output_fname=None):
 		"""
 		2011-2-22
 			Locus are now identified as Snps.id / CNV.id in association result files. (chr, pos) before.
@@ -207,7 +207,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 			sys.stderr.write("Submitting results from %s ..."%(os.path.basename(input_fname)))
 			delimiter = figureOutDelimiter(input_fname)
 			reader = csv.reader(open(input_fname), delimiter=delimiter)
-			rm.original_filename = input_fname
+			db_entry.original_filename = input_fname
 		elif hasattr(input_fname, 'readline') or hasattr(input_fname, 'read'):	#input_fname is not a file name, but direct file object. it could also be <ZPublisher.HTTPRequest.FileUpload instance at 0xa1774f4c>
 			sys.stderr.write("Submitting results from %s on plone ..."%input_fname.filename)
 			cs = csv.Sniffer()
@@ -221,9 +221,9 @@ class Results2DB_250k(AbstractDBInteractingJob):
 			input_fname.seek(0)
 			reader = csv.reader(input_fname, delimiter=delimiter)
 			if getattr(input_fname, 'filename', None):
-				rm.original_filename = getattr(input_fname, 'filename', None)
+				db_entry.original_filename = getattr(input_fname, 'filename', None)
 			else:
-				rm.original_filename = getattr(input_fname, 'name', None)
+				db_entry.original_filename = getattr(input_fname, 'name', None)
 		else:
 			sys.stderr.write("Error: %s is neither a file name nor a file object.\n"%input_fname)
 			sys.exit(4)
@@ -327,7 +327,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 					r = Results(score=score)
 					r.snps = marker
 					del marker
-				r.results_method = rm
+				r.results_method = db_entry
 				session.add(r)
 				del r
 			"""
@@ -340,10 +340,13 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		return True
 	
 	@classmethod
-	def come_up_new_results_filename(cls, output_dir, results_method_id, results_method_type_id,
+	def come_up_new_results_filename(cls, output_dir=None, db_entry_id=None, results_method_type_id=None,
 							call_method_id=None, phenotype_method_id=None,\
-							analysis_method_id=None, cnv_method_id=None):
+							analysis_method_id=None, cnv_method_id=None, extraBitLs=None, suffix='result'):
 		"""
+		2012.11.13 deprecated, use ResultsMethod.constructRelativePath() instead
+		2012.11.13 adjust to handle result_landscape filename as well
+			added extraBitLs
 		2011-2-22
 			add cnv_method_id
 		2010-9-21
@@ -352,26 +355,30 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		2008-05-30
 			to save the filename into db
 		"""
-		output_dir = os.path.join(output_dir, 'type_%s'%results_method_type_id)
+		if results_method_type_id:
+			output_dir = os.path.join(output_dir, 'type_%s'%results_method_type_id)
 		if not os.path.isdir(output_dir):
 			os.makedirs(output_dir)
 		
-		filename_ls = [results_method_id]
+		filename_part_ls = [db_entry_id]
 		if call_method_id is not None:
-			filename_ls.append(call_method_id)
+			filename_part_ls.append(call_method_id)
 		if cnv_method_id is not None:
-			filename_ls.append(cnv_method_id)
+			filename_part_ls.append(cnv_method_id)
 		if phenotype_method_id is not None:
-			filename_ls.append(phenotype_method_id)
+			filename_part_ls.append(phenotype_method_id)
 		if analysis_method_id is not None:
-			filename_ls.append(analysis_method_id)
-		filename_ls = map(str, filename_ls)
-		
-		output_fname = os.path.join(output_dir, '%s_results.tsv'%('_'.join(filename_ls)))
+			filename_part_ls.append(analysis_method_id)
+		if extraBitLs:
+			filename_part_ls.extend(extraBitLs)
+		filename_part_ls = map(str, filename_part_ls)
+		if suffix:
+			filename_part_ls.append(suffix)
+		output_fname = os.path.join(output_dir, '%s.tsv'%('_'.join(filename_part_ls)))
 		return output_fname
 	
 	@classmethod
-	def copyResultsFile(cls, db, input_fname, rm, user, output_fname=None):
+	def copyResultsFile(cls, db, input_fname, db_entry, user, output_fname=None):
 		"""
 		2008-09-30
 			return True
@@ -379,7 +386,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 			similar task to submit_results, but not look into the file, just copy the file
 		"""
 		sys.stderr.write("Copying results from %s ..."%(os.path.basename(input_fname)))
-		rm.original_filename = input_fname
+		db_entry.original_filename = input_fname
 		pipe_f = os.popen('cp %s %s'%(input_fname, output_fname))
 		pipe_f_out = pipe_f.read()
 		if pipe_f_out:
@@ -389,9 +396,9 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		
 	
 	@classmethod
-	def plone_run(cls, db, short_name, phenotype_method_id, call_method_id, data_description, \
+	def add2DB(cls, db, short_name, phenotype_method_id, call_method_id, data_description, \
 				method_description, comment, input_fname, user, results_method_type_id=None, \
-				analysis_method_id=None, results_method_type_short_name=None, output_dir=None, commit=0,\
+				analysis_method_id=None, results_method_type_short_name=None, data_dir=None, commit=0,\
 				cnv_method_id=None):
 		"""
 		2012.6.6
@@ -403,7 +410,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 			deal with the association file format change. locus is now identified by Snps.id or CNV.id
 		2010-5-3
 			becomes classmethod
-			store the json structure of top 10000 SNPs from the rm into db
+			store the json structure of top 10000 SNPs from the db_entry into db
 		2008-09-30
 			don't save results_method into database if bad thing happend when getting data out of the file.
 		2008-09-09
@@ -425,8 +432,6 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		session = db.session
 		session.begin()
 		
-		if not output_dir:
-			output_dir = cls.option_default_dict[('output_dir',1)][0]	#to get default from option_default_dict
 		
 		rmt = ResultsMethodType.get(results_method_type_id)
 		if not rmt and results_method_type_short_name is not None:	#create a new results method type
@@ -465,44 +470,42 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		elif cnv_m:	#2011-2-22
 			query = query.filter_by(cnv_method_id=cnv_m.id)
 		if query.count()>0:
-			rm = query.first()
+			db_entry = query.first()
 			sys.stderr.write("There is already an entry in results_method (id=%s) with same (call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id)=(%s, %s, %s, %s).\n"\
-							%(rm.id, call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id))
+							%(db_entry.id, call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id))
 			sys.exit(3)
 		
 		if not short_name:
 			short_name = '%s_%s_%s_%s_%s'%(am.short_name, pm.short_name, getattr(cm, 'id',0), getattr(cnv_m, 'id',0),\
 										results_method_type_id)
 		
-		rm = ResultsMethod(short_name=short_name, method_description=method_description, \
+		db_entry = ResultsMethod(short_name=short_name, method_description=method_description, \
 				data_description=data_description, comment=comment, created_by=user, locus_type_id=cm.locus_type_id)	#2012.3.9
-		rm.phenotype_method = pm
-		rm.call_method = cm
-		rm.analysis_method = am
-		rm.cnv_method = cnv_m
-		
-		session.add(rm)
+		db_entry.phenotype_method = pm
+		db_entry.call_method = cm
+		db_entry.analysis_method = am
+		db_entry.cnv_method = cnv_m
 		if rmt:
-			rm.results_method_type = rmt
+			db_entry.results_method_type = rmt
+		session.add(db_entry)
 		
-		#2008-05-30 no submit_results() to database
-		#cls.submit_results(db, input_fname, rm, user)
+		
 		
 		session.flush()	#not necessary as no immediate query on the new results after this and commit() would execute this.
 		if commit:
-			rm.filename = cls.come_up_new_results_filename(output_dir, rm.id, rm.results_method_type.id, \
-										call_method_id=getattr(cm, 'id',0), phenotype_method_id=pm.id,\
-										analysis_method_id=am.id, cnv_method_id=getattr(cnv_m, 'id',0))
-			if rm.analysis_method_id==13:
-				return_value = cls.copyResultsFile(db, input_fname, rm, user, rm.filename)
+			db_entry.filename = os.path.join(db.data_dir, db_entry.constructRelativePath(data_dir=data_dir))
+			localAbsPath = os.path.join(data_dir, db_entry.constructRelativePath(data_dir=data_dir))
+			
+			if db_entry.analysis_method_id==13:
+				return_value = cls.copyResultsFile(db, input_fname, db_entry, user=user, output_fname=localAbsPath)
 			else:
-				return_value = cls.submit_results(db, input_fname, rm, user, rm.filename)
+				return_value = cls.submit_results(db, input_fname, db_entry, user=user, output_fname=localAbsPath)
 			if return_value:
-				session.add(rm)
-				# 2010-5-3 store the json structure of top 10000 SNPs from the rm into db
+				session.add(db_entry)
+				# 2010-5-3 store the json structure of top 10000 SNPs from the db_entry into db
 				no_of_top_snps = 10000
-				if rm.analysis_method.min_maf is not None:
-					min_MAF = rm.analysis_method.min_maf
+				if db_entry.analysis_method.min_maf is not None:
+					min_MAF = db_entry.analysis_method.min_maf
 				else:
 					min_MAF = 0
 				try:
@@ -514,9 +517,9 @@ class Results2DB_250k(AbstractDBInteractingJob):
 							db.cnv_id2chr_pos = cnv_m.id
 						db_id2chr_pos = db.cnv_id2chr_pos
 					pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
-					json_data = getOneResultJsonData(rm, db_250k=db, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
+					json_data = getOneResultJsonData(db_entry, db_250k=db, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
 					rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
-					rm_json.result = rm
+					rm_json.result = db_entry
 					rm_json.json_data = json_data
 					session.add(rm_json)
 				except:
@@ -525,7 +528,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 					traceback.print_exc()
 					session.delete(rm_json)
 			else:	#bad thing happend when getting data out of the file. don't save this results_method.
-				session.delete(rm)
+				session.delete(db_entry)
 			session.flush()
 			session.commit()
 			cls.reset_marker_pos2snp_id()
@@ -550,9 +553,9 @@ class Results2DB_250k(AbstractDBInteractingJob):
 		if not os.path.isfile(self.inputFname):
 			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.inputFname))
 			sys.exit(3)
-		self.plone_run(self.db, self.short_name, self.phenotype_method_id, self.call_method_id, self.data_description, \
+		self.add2DB(self.db, self.short_name, self.phenotype_method_id, self.call_method_id, self.data_description, \
 				self.method_description, self.comment, self.inputFname, self.db_user, results_method_type_id=self.results_method_type_id,\
-				analysis_method_id=self.analysis_method_id, output_dir=self.output_dir, commit=self.commit,
+				analysis_method_id=self.analysis_method_id, data_dir=self.data_dir, commit=self.commit,
 				cnv_method_id=self.cnv_method_id)
 		#2012.6.5
 		if self.logFilename:
