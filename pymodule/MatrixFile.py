@@ -46,13 +46,14 @@ class MatrixFile(object):
 			self.isCSVReader = False
 		self.reader = reader
 		self.col_name2index = None
+		self.header = None
 	
 	def constructColName2IndexFromHeader(self):
 		"""
 		2012.8.23
 		"""
-		header = self.next()
-		self.col_name2index = utils.getColName2IndexFromHeader(header)
+		self.header = self.next()
+		self.col_name2index = utils.getColName2IndexFromHeader(self.header)
 	
 	def getColIndexGivenColHeader(self, colHeader=None):
 		"""
