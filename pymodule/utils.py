@@ -264,6 +264,8 @@ def getColName2IndexFromHeader(header, skipEmptyColumn=False):
 
 def getListOutOfStr(list_in_str, data_type=int, separator1=',', separator2='-'):
 	"""
+	2012.10.25
+		if separator2 is None or nothing or 0, it wont' be used.
 	2009-10-28
 		fix a bug,
 			run "start_stop_tup = map(int, start_stop_tup)" after making sure start_stop_tup is of length >1.
@@ -284,7 +286,10 @@ def getListOutOfStr(list_in_str, data_type=int, separator1=',', separator2='-'):
 	for index_anchor in index_anchor_ls:
 		if len(index_anchor)==0:	#nothing there, skip
 			continue
-		start_stop_tup = index_anchor.split(separator2)
+		if separator2:
+			start_stop_tup = index_anchor.split(separator2)
+		else:
+			start_stop_tup = [index_anchor]
 		if len(start_stop_tup)==1:
 			list_to_return.append(data_type(start_stop_tup[0]))
 		elif len(start_stop_tup)>1:
@@ -715,25 +720,6 @@ def copyFile(srcFilename=None, dstFilename=None, copyCommand="cp -aprL", srcFile
 		exitCode = 0
 	return exitCode
 
-def getZScorePvalue(zscore=None, twoSided=False):
-	"""
-	2012.8.22
-		becasue this import wouldn't work. hard to remember:
-	
-			>>> import scipy
-			>>> scipy.stats.norm.sf
-			Traceback (most recent call last):
-			  File "<stdin>", line 1, in <module>
-			AttributeError: 'module' object has no attribute 'stats'
-		
-		zscore could also be a vector (list)
-	"""
-	import scipy.stats as stats
-	pvalue = stats.norm.sf(zscore)
-	if twoSided:
-		pvalue  = pvalue* 2
-	return pvalue
-
 def getNoOfUnitsNeededToCoverN(N=None, s=None, o=None):
 	"""
 	2012.8.25
@@ -761,6 +747,11 @@ def getNoOfUnitsNeededToCoverN(N=None, s=None, o=None):
 	#make sure its bigger than 1.
 	noOfUnits = max(1, math.ceil(numerator/float(denominator)))
 	return int(noOfUnits)
+
+
+#2012.10.5 copied from VervetDB.py
+#used in getattr(individual_site_id_set, '__len__', returnZeroFunc)()
+returnZeroFunc = lambda: 0
 
 if __name__ == '__main__':
 	FigureOutTaxID_ins = FigureOutTaxID()
