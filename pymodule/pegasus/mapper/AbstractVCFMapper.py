@@ -15,8 +15,9 @@ import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.VCFFile import VCFFile
 from pymodule import SNP
+from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 
-class AbstractVCFMapper(object):
+class AbstractVCFMapper(AbstractMapper):
 	__doc__ = __doc__
 	db_option_dict = {
 					('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
@@ -40,10 +41,8 @@ class AbstractVCFMapper(object):
 						}
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
 
-	def __init__(self,  **keywords):
+	def __init__(self,  inputFnameLs=None, **keywords):
 		"""
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
+		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
