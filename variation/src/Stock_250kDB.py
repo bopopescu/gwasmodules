@@ -32,6 +32,7 @@ from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy.schema import ThreadLocalMetaData, MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import and_, or_, not_
+from sqlalchemy import func
 
 from datetime import datetime
 
@@ -45,6 +46,25 @@ __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 #__metadata__ = ThreadLocalMetaData()	#2008-10 not good for pylon
 
 __metadata__ = MetaData()
+
+def supplantFilePathWithNewDataDir(filePath="", oldDataDir=None, newDataDir=None):
+	"""
+	2012.11.13
+		expose the oldDataDir argument
+	2012.3.23
+		in case that the whole /Network/Data/250k/db is stored in a different place (=newDataDir)
+			how to rescale the filePath ( stored in the database tables) to reflect its new path.
+	"""
+	if oldDataDir and newDataDir and oldDataDir!=newDataDir:
+		if filePath.find(oldDataDir)==0:
+			relativePath = filePath[len(oldDataDir)-1:]
+			newPath = os.path.join(newDataDir, relativePath)
+			return newPath
+		else:
+			sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
+			return None
+	else:
+		return filePath
 
 class README(Entity, TableClass):
 	#2008-08-07
@@ -291,6 +311,7 @@ class SnpsContext(Entity):
 
 class CallMethod(Entity):
 	"""
+	2012.10.3 add argument min_maf used to filter low-frequency polymorphic loci
 	2012.3.9
 		add column locus_type
 	2012.2.28
@@ -324,6 +345,7 @@ class CallMethod(Entity):
 	no_of_loci = Field(Integer)	#2012.2.28
 	imputed = Field(Boolean)
 	unique_ecotype = Field(Boolean)
+	min_maf = Field(Float, default=0)	#2012.10.3 used to filter polymorphic loci
 	avg_array_mismatch_rate = Field(Float)
 	filename = Field(String(2024))
 	method_description = Field(String(8000))
@@ -338,6 +360,8 @@ class CallMethod(Entity):
 	using_options(tablename='call_method', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('parent_id', 'accession_set_id', 'locus_type_id'))
+	
+	folderName = 'dataset'
 	
 class PhenotypeMethod(Entity):
 	"""
@@ -479,7 +503,57 @@ class AccessionSet2Ecotype(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('accession_set_id', 'ecotype_id'))
 
-class ResultsMethod(Entity):
+class AbstractTableWithFilename(object):
+	"""
+	2012.11.13 ancestor of ResultsMethod and ResultLandscape
+	"""
+	id = None
+	filename = None
+	folderName = ''
+	
+	def getDateStampedFilename(self, oldDataDir=None, newDataDir=None):
+		"""
+		2012.3.21
+			xxx.tsv => xxx.2012_3_21.tsv
+		"""
+		_filename = self.getFilePath(oldDataDir=oldDataDir, newDataDir=newDataDir)
+		
+		from datetime import datetime
+		lastModDatetime = datetime.fromtimestamp(os.stat(_filename).st_mtime)
+		prefix, suffix = os.path.splitext(_filename)
+		newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
+									lastModDatetime.day, suffix)
+		return newFilename
+	
+	def getFilePath(self, oldDataDir=None, newDataDir=None):
+		"""
+		2012.11.13
+			in case that the whole /Network/Data/250k/db is stored in a different place (=data_dir)
+				how to modify self.filename (stored in the database tables) to reflect its new path.
+		"""
+		return supplantFilePathWithNewDataDir(filePath=self.filename, oldDataDir=oldDataDir, newDataDir=newDataDir)
+	
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+		"""
+		2012.11.13
+		"""
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if data_dir and outputDirRelativePath:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
+		return fileRelativePath
+
+class ResultsMethod(Entity, AbstractTableWithFilename):
 	"""
 	2012.3.7
 		add column locus_type
@@ -516,18 +590,38 @@ class ResultsMethod(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
 										'results_method_type_id', 'analysis_method_id', 'cnv_method_id'))
+	folderName = 'results'
 	
-	def getDateStampedFilename(self):
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
 		"""
-		2012.3.21
-			xxx.tsv => xxx.2012_3_21.tsv
+		2012.11.13
 		"""
-		from datetime import datetime
-		lastModDatetime = datetime.fromtimestamp(os.stat(self.filename).st_mtime)
-		prefix, suffix = os.path.splitext(self.filename)
-		newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
-									lastModDatetime.day, suffix)
-		return newFilename
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if self.results_method_type_id:
+			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.results_method_type_id)
+		if data_dir:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		if self.call_method_id is not None:
+			filename_part_ls.append('call%s'%self.call_method_id)
+		if self.cnv_method_id is not None:
+			filename_part_ls.append('cnv%s'%self.cnv_method_id)
+		if self.phenotype_method_id is not None:
+			filename_part_ls.append('pheno%s'%self.phenotype_method_id)
+		if self.analysis_method_id is not None:
+			filename_part_ls.append('ana%s'%self.analysis_method_id)
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
+		return fileRelativePath
+	
 class ResultsMethodJson(Entity):
 	"""
 	2009-5-4
@@ -545,24 +639,100 @@ class ResultsMethodJson(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('results_id', 'no_of_top_snps', 'min_MAF'))
 
-class ResultLandscape(Entity):
+class ResultLandscape(Entity, AbstractTableWithFilename):
 	"""
+	2012.11.10
+		changed to be a thinned version of ResultsMethod
 	2011-3-28
 		table to store the landscape of association result
 	"""
 	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
-	start_locus = ManyToOne('Snps', colname='start_locus_id', ondelete='CASCADE', onupdate='CASCADE')
-	stop_locus = ManyToOne('Snps', colname='stop_locus_id', ondelete='CASCADE', onupdate='CASCADE')
-	no_of_loci = Field(Integer)	#number of loci in between start_locus and stop_locus
-	neighbor_distance = Field(Integer)
-	comment = Field(Text)
-	created_by = Field(String(128))
-	updated_by = Field(String(128))
+	result_landscape_type = ManyToOne('%s.ResultLandscapeType'%__name__, colname='result_landscape_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_accessions = Field(Integer)	#2012.2.28
+	no_of_loci = Field(Integer)
+	
+	short_name = Field(String(60), unique=True)
+	filename = Field(String(750), unique=True)
+	original_filename = Field(Text)
+	method_description = Field(String(8000))
+	data_description = Field(String(8000))
+	comment = Field(String(8000))
+	phenotype_method = ManyToOne('%s.PhenotypeMethod'%__name__, colname='phenotype_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	results_method_type = ManyToOne('%s.ResultsMethodType'%__name__, colname='results_method_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	cnv_method = ManyToOne("%s.CNVMethod"%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
+	remove_outliers = Field(Integer, default=0)
+	pseudo_heritability = Field(Float)
+	transformation_parameters = Field(String(11))
 	using_options(tablename='result_landscape', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('result_id', 'start_locus_id', 'stop_locus_id', 'neighbor_distance'))
+	using_table_options(UniqueConstraint('result_id', 'result_landscape_type_id'))
+	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
+					'results_method_type_id', 'analysis_method_id', 'cnv_method_id',\
+					'result_landscape_type_id'))
+	folderName = 'result_landscape'
+	
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+		"""
+		2012.11.13
+		"""
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if self.result_landscape_type_id:
+			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.result_landscape_type_id)
+		if data_dir:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		if self.result_id:
+			filename_part_ls.append('result%s'%(self.result_id))
+		if self.result_landscape_type_id:
+			filename_part_ls.append("landscapeType%s"%(self.result_landscape_type_id))
+		if self.call_method_id is not None:
+			filename_part_ls.append('call%s'%self.call_method_id)
+		if self.cnv_method_id is not None:
+			filename_part_ls.append('cnv%s'%self.cnv_method_id)
+		if self.phenotype_method_id is not None:
+			filename_part_ls.append('pheno%s'%self.phenotype_method_id)
+		if self.analysis_method_id is not None:
+			filename_part_ls.append('ana%s'%self.analysis_method_id)
+		if self.results_method_type_id:
+			filename_part_ls.append('resultType%s'%(self.results_method_type_id))
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
+		return fileRelativePath
+
+class ResultLandscapeType(Entity):
+	"""
+	2012.11.12
+		type for ResultLandscape
+	"""
+	short_name = Field(String(30), unique=True)
+	description = Field(Text)
+	min_MAF = Field(Float)
+	neighbor_distance = Field(Integer)
+	max_neighbor_distance = Field(Integer)
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='result_landscape_type', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('min_MAF', 'neighbor_distance', 'max_neighbor_distance'))
 
 class ResultPeak(Entity):
 	"""
@@ -581,7 +751,7 @@ class ResultPeak(Entity):
 	# including the two as well.
 	peak_locus = ManyToOne('%s.Snps'%__name__, colname='peak_locus_id', ondelete='CASCADE', onupdate='CASCADE')
 	peak_score = Field(Float)
-	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='SET NULL', onupdate='CASCADE')
 	comment = Field(Text)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
@@ -796,7 +966,7 @@ class CandidateGeneRankSumTestResultMethodType(Entity):
 										'null_distribution_type_id', 'how_to_handle_rank'))
 
 
-class ResultsByGene(Entity):
+class ResultsByGene(Entity, AbstractTableWithFilename):
 	"""
 	2008-11-14
 		more sensible unique constraints
@@ -885,7 +1055,7 @@ class ContaminantType(Entity):
 	using_options(tablename='contaminant_type', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 
-class ArrayInfo(Entity):
+class ArrayInfo(Entity, AbstractTableWithFilename):
 	"""
 	2009-11-25
 		add array_quartile_ls
@@ -978,7 +1148,7 @@ class ArrayQuartileOutlier(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('array_quartile_id', 'probe_id'))
 
-class CallInfo(Entity):
+class CallInfo(Entity, AbstractTableWithFilename):
 	"""
 	2009-2-2
 		add pc_value_ls
@@ -997,6 +1167,7 @@ class CallInfo(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='call_info', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
+	folderName = 'calls'
 
 class CallQC(Entity):
 	call_info = ManyToOne("%s.CallInfo"%__name__, colname='call_info_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -1715,7 +1886,7 @@ class CNVArrayCall(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('array_id', 'cnv_id', 'cnv_method_id'))
 
-class CNVMethod(Entity):
+class CNVMethod(Entity, AbstractTableWithFilename):
 	"""
 	2012.2.28
 		add column no_of_accessions, no_of_loci
@@ -2251,6 +2422,7 @@ class Stock_250kDB(ElixirDB):
 		self._cnv_method_id = None	#2011-2-24
 		self._chr_pos2snp_id = {}	#2011-2-28
 		self._snp_id2chr_pos = {}	#2011-2-28
+		self._data_dir = None	#2012.11.13
 	
 	def setup(self, create_tables=True):
 		"""
@@ -2268,36 +2440,43 @@ class Stock_250kDB(ElixirDB):
 			(learnt from VervetDB)
 			get the master directory in which all files attached to this db are stored.
 		"""
-		dataDirEntry = README.query.filter_by(title='data_dir').first()
-		if not dataDirEntry or not dataDirEntry.description or not os.path.isdir(dataDirEntry.description):
-			# todo: need to test dataDirEntry.description is writable to the user
-			sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
-			raise
-			return None
-		else:
-			return dataDirEntry.description
-	
-	def reScalePathByNewDataDir(self, filePath="", newDataDir=""):
-		"""
-		2012.3.23
-			in case that the whole /Network/Data/250k/db is stored in a different place (=newDataDir)
-				how to rescale the filePath ( stored in the database tables) to reflect its new path.
-		"""
-		if not newDataDir:	#newDataDir is nothing.
-			return filePath
-		else:
-			oldDataDir = self.data_dir()
-			if filePath.find(oldDataDir)==0:
-				relativePath = filePath[len(oldDataDir)-1:]
-				newPath = os.path.join(newDataDir, relativePath)
-				return newPath
+		if not self._data_dir:
+			dataDirEntry = README.query.filter_by(title='data_dir').first()
+			if not dataDirEntry or not dataDirEntry.description or not os.path.isdir(dataDirEntry.description):
+				# todo: need to test dataDirEntry.description is writable to the user
+				sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
+				raise
+				self._data_dir = None
 			else:
-				sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
-				return None
+				self._data_dir = dataDirEntry.description
+		return self._data_dir
+	
+	def reScalePathByNewDataDir(self, filePath=None, newDataDir=None):
+		"""
+		2012.11.13
+		"""
+		oldDataDir=self.data_dir
+		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
+	
+	def getResultsMethod(self, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
+			cnv_method_id=None, **keywords):
+		"""
+		2012.9.28 for AssociationWorkflow.py
+		"""
+		
+		query = ResultsMethod.query.filter_by(phenotype_method_id=phenotype_method_id).\
+					filter_by(analysis_method_id=analysis_method_id)
+		if call_method_id:
+			query = query.filter_by(call_method_id=call_method_id)
+		if cnv_method_id:
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		rm = query.first()
+		return rm
 	
 	#@classmethod
-	def getGWA(self, call_method_id, phenotype_method_id, analysis_method_id, results_directory=None, min_MAF=0.1, \
-			construct_chr_pos2index=False, pdata=None):
+	def getGWA(self, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
+			results_directory=None, min_MAF=0.1, \
+			construct_chr_pos2index=False, pdata=None, **keywords):
 		"""
 		2012.3.23
 			not a classmethod anymore
@@ -2309,12 +2488,12 @@ class Stock_250kDB(ElixirDB):
 		rm = ResultsMethod.query.filter_by(call_method_id=call_method_id).filter_by(phenotype_method_id=phenotype_method_id).\
 					filter_by(analysis_method_id=analysis_method_id).first()
 		#from GeneListRankTest import GeneListRankTest
-		return self.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=min_MAF, 
-																construct_chr_pos2index=construct_chr_pos2index,\
-																pdata=pdata)
+		return self.getResultMethodContent(rm.id, data_dir=results_directory, min_MAF=min_MAF, 
+												construct_chr_pos2index=construct_chr_pos2index,\
+												pdata=pdata)
 	
 	@classmethod
-	def getSNPMatrix(cls, call_method_id, ignore_2nd_column=True):
+	def getSNPMatrix(cls, call_method_id=None, ignore_2nd_column=True):
 		"""
 		2010-3-14
 			become a classmethod
@@ -3526,9 +3705,11 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
 	
 	#@classmethod
-	def getResultMethodContent(self, results_method_id, results_directory=None, min_MAF=0.1, construct_chr_pos2index=False, \
-						pdata=None, min_value_cutoff=None,):
+	def getResultMethodContent(self, results_method_id, data_dir=None, min_MAF=0.1, construct_chr_pos2index=False, \
+						pdata=None, min_value_cutoff=None, results_directory=None, **keywords):
 		"""
+		2012.11.13
+			argument results_directory is taken over by data_dir
 		2012.3.23
 			results_directory is equivalent to /Network/Data/250k/db/, not /Network/Data/250k/db/results/type_1/ (before).
 			also use self.reScalePathByNewDataDir() to get the updated path.
@@ -3557,6 +3738,9 @@ class Stock_250kDB(ElixirDB):
 		"""
 		#genome_wide_result = getattr(cls, 'genome_wide_result', None)
 		do_log10_transformation = getattr(pdata, 'do_log10_transformation', None)
+		results_directory = getattr(pdata, 'results_directory', results_directory)
+		data_dir = getattr(pdata, 'data_dir', data_dir)
+		
 		rm = ResultsMethod.get(results_method_id)
 		from pymodule import getGenomeWideResultFromFile
 		# 2011-3-21 no more caching
@@ -3566,13 +3750,11 @@ class Stock_250kDB(ElixirDB):
 		if rm.analysis_method_id==13: #Huh -Bjarni
 			sys.stderr.write("Analysis method id=%s is not supported.\n"%rm.analysis_method_id)
 			return None
-		"""
-		if results_directory:	#given a directory where all results are.
-			result_fname = os.path.join(results_directory, os.path.basename(rm.filename))
-		else:
-			result_fname = rm.filename
-		"""
-		result_fname = self.reScalePathByNewDataDir(filePath=rm.filename, newDataDir=results_directory)
+		
+		if data_dir is None and results_directory:
+			data_dir = results_directory
+		
+		result_fname = self.reScalePathByNewDataDir(filePath=rm.filename, newDataDir=data_dir)
 		
 		if do_log10_transformation is None:
 			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
@@ -3704,6 +3886,40 @@ class Stock_250kDB(ElixirDB):
 		if result_peak_type_id is not None:
 			query = query.filter_by(result_peak_type_id=result_peak_type_id)
 		return query
+	
+	def getResultPeakType(self, min_MAF=None, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
+		"""
+		2012.11.20
+			moved from DefineAssociationLandscape.py
+		2011-4-20
+		"""
+		TableClass = ResultPeakType
+		db_entry = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).filter_by(min_score=min_score).\
+			filter_by(neighbor_distance=neighbor_distance).\
+			filter_by(max_neighbor_distance=max_neighbor_distance).first()
+		if db_entry is None:
+			db_entry = TableClass(min_MAF=min_MAF, min_score=min_score, \
+									neighbor_distance=neighbor_distance, \
+									max_neighbor_distance=max_neighbor_distance)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
+	
+	def getResultLandscapeType(self, min_MAF=None, neighbor_distance=None, max_neighbor_distance=None):
+		"""
+		2012.11.20
+		"""
+		TableClass = ResultLandscapeType
+		db_entry = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).\
+			filter_by(neighbor_distance=neighbor_distance).\
+			filter_by(max_neighbor_distance=max_neighbor_distance).first()
+		if db_entry is None:
+			db_entry = TableClass(min_MAF=min_MAF, \
+									neighbor_distance=neighbor_distance, \
+									max_neighbor_distance=max_neighbor_distance)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
 	
 	def constructRBDictFromResultPeak(self, result_id, result_peak_type_id, peakPadding=10000):
 		"""
