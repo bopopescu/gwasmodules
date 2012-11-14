@@ -2,9 +2,9 @@
 """
 
 Examples:
-	OutputPhenotype.py -o /tmp/phenotype.tsv
+	OutputPhenotype.py -o /tmp/phenotype.tsv -z localhost -u yh
 	
-	OutputPhenotype.py -o /tmp/phenotype.tsv -e stock.ecotype_usc
+	OutputPhenotype.py -o /tmp/phenotype.tsv -e stock.ecotype_usc --getPublicPhenotype
 	
 	#get raw (un-transformed) phenotype
 	OutputPhenotype.py -o /tmp/phenotype_g.tsv -g
@@ -29,18 +29,20 @@ from pymodule import process_function_arguments, write_data_matrix, PassingData,
 class OutputPhenotype(object):
 	__doc__ = __doc__
 	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-							('output_fname', 1, ): ['', 'o', 1, 'store the pvalue', ],\
-							('phenotype_avg_table',1, ):['stock_250k.phenotype_avg', 'q', 1,  ],\
-							('phenotype_method_table',1, ):['stock_250k.phenotype_method', 'm', 1, ],\
-							('ecotype_table', 1, ): ['stock.ecotype', 'e', 1, 'ecotype table to get name related to each ecotype', ],\
-							('get_raw_data', 0, int):[0, 'g', 0, 'whether to output raw phenotype data from db or transform according to column transformation_description in phenotype_method table'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+					('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
+					('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
+					('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
+					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
+					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+					('output_fname', 1, ): ['', 'o', 1, 'store the pvalue', ],\
+					('phenotype_avg_table',1, ):['stock_250k.phenotype_avg', 'q', 1,  ],\
+					('phenotype_method_table',1, ):['stock_250k.phenotype_method', 'm', 1, ],\
+					('ecotype_table', 1, ): ['stock.ecotype', 'e', 1, 'ecotype table to get name related to each ecotype', ],\
+					('getPublicPhenotype', 0, int):[0, '', 0, 'toggle to get public phenotype only, phenotype_method.access==public and phenotype_avg.ready_for_publication=1'],\
+					('get_raw_data', 0, int):[0, 'g', 0, 'whether to output raw phenotype data from db or transform according to column transformation_description in phenotype_method table'],\
+					('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+					('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
+					}
 	def __init__(self,  **keywords):
 		"""
 		2008-11-10
@@ -56,8 +58,10 @@ class OutputPhenotype(object):
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 		
 	@classmethod
-	def get_phenotype_method_id_info(cls, curs, phenotype_avg_table, phenotype_method_table ):
+	def get_phenotype_method_id_info(cls, curs=None, phenotype_avg_table=None, phenotype_method_table=None, getPublicPhenotype=False):
 		"""
+		2012.9.28
+			add argument getPublicPhenotype
 		2009-2-2
 			curs could be either MySQLdb cursor or elixirdb.metadata.bind.
 			do two selects in one
@@ -68,8 +72,18 @@ class OutputPhenotype(object):
 		phenotype_method_id2index = {}	#index of the matrix
 		method_id_name_ls = []	#as header for each phenotype
 		phenotype_id_ls = []
-		rows = curs.execute("select m.id, m.short_name, m.transformation_description from %s m, (select distinct method_id from %s) p where m.id=p.method_id order by id"%\
-					(phenotype_method_table, phenotype_avg_table))
+		subQueryToGetDistinctPhenotypeMethodID = "select distinct method_id from %s"%(phenotype_avg_table)
+		if getPublicPhenotype:
+			subQueryToGetDistinctPhenotypeMethodID += " where ready_for_publication=1"
+		phenotypeMethodQuery = "select m.id, m.short_name, m.transformation_description from %s m, (%s) p where m.id=p.method_id "%\
+				(phenotype_method_table, subQueryToGetDistinctPhenotypeMethodID)
+		if getPublicPhenotype:
+			extraConditionSQL = "and m.access='public'"
+		else:
+			extraConditionSQL = ""
+		orderPhenotypeSQL = " order by id "
+		rows = curs.execute(" %s %s %s"%(phenotypeMethodQuery, extraConditionSQL,  orderPhenotypeSQL))
+		
 		is_elixirdb = 1
 		if hasattr(curs, 'fetchall'):	#2009-2-2 this curs is not elixirdb.metadata.bind
 			rows = curs.fetchall()
@@ -101,7 +115,7 @@ class OutputPhenotype(object):
 		return return_data
 	
 	@classmethod
-	def extractPhenotypeIDFromMethodIDName(cls, method_id_name):
+	def extractPhenotypeIDFromMethodIDName(cls, method_id_name=None):
 		"""
 		2010-4-21
 			split out of PlotGroupOfSNPs.findOutWhichPhenotypeColumn()
@@ -119,8 +133,10 @@ class OutputPhenotype(object):
 		return phenotype_method_id
 	
 	@classmethod
-	def get_ecotype_id2info(cls, curs, phenotype_avg_table, ecotype_table):
+	def get_ecotype_id2info(cls, curs=None, phenotype_avg_table=None, ecotype_table=None, getPublicPhenotype=False):
 		"""
+		2012.9.28
+			add argument getPublicPhenotype, 
 		2009-2-2
 			curs could be either MySQLdb cursor or elixirdb.metadata.bind.
 			do two selects in one
@@ -131,8 +147,11 @@ class OutputPhenotype(object):
 		ecotype_id2index = {}	#index of the matrix
 		ecotype_id_ls = []
 		ecotype_name_ls = []
-		rows = curs.execute("select e.id, e.nativename from %s e, (select distinct ecotype_id from %s) p where e.id=p.ecotype_id order by id"%\
-					(ecotype_table, phenotype_avg_table))
+		subQueryToGetDistinctPhenotypeMethodID = "select distinct ecotype_id from %s"%(phenotype_avg_table)
+		if getPublicPhenotype:
+			subQueryToGetDistinctPhenotypeMethodID += " where ready_for_publication=1 "
+		rows = curs.execute("select e.id, e.nativename from %s e, ( %s) p where e.id=p.ecotype_id order by id"%\
+					(ecotype_table, subQueryToGetDistinctPhenotypeMethodID))
 		is_elixirdb = 1
 		if hasattr(curs, 'fetchall'):	#2009-2-2 this curs is not elixirdb.metadata.bind
 			rows = curs.fetchall()
@@ -154,9 +173,11 @@ class OutputPhenotype(object):
 		return ecotype_id2index, ecotype_id_ls, ecotype_name_ls
 	
 	@classmethod
-	def get_matrix(cls, curs, phenotype_avg_table, ecotype_id2index, phenotype_info, get_raw_data=0, \
-				phenotype_method_table='phenotype_method'):
+	def get_matrix(cls, curs=None, phenotype_avg_table=None, ecotype_id2index=None, phenotype_info=None, get_raw_data=0, \
+				phenotype_method_table='phenotype_method', getPublicPhenotype=False):
 		"""
+		2012.9.28
+			add argument getPublicPhenotype
 		2010-1-26
 			Comment out the code inserted on 2009-9-2 (right below), since its purpose is to avoid truncation and 
 				the truncation wasn't due to the value being too small.
@@ -189,8 +210,11 @@ class OutputPhenotype(object):
 		for i in range(len(ecotype_id2index)):
 			data_matrix[i] = ['NA']*len(phenotype_info.phenotype_method_id2index)
 		#data_matrix[:] = numpy.nan
-		rows = curs.execute("select pa.ecotype_id, pa.method_id, pa.value, pm.min_value, pm.stddev from %s pa, %s pm where pm.id=pa.method_id"%\
-						(phenotype_avg_table, phenotype_method_table))
+		query = "select pa.ecotype_id, pa.method_id, pa.value, pm.min_value, pm.stddev from %s pa, %s pm where pm.id=pa.method_id"%\
+				(phenotype_avg_table, phenotype_method_table)
+		if getPublicPhenotype:
+			query += " and pm.access='public' and pa.ready_for_publication=1 "
+		rows = curs.execute(query)
 		is_elixirdb = 1
 		if hasattr(curs, 'fetchall'):	#2009-2-2 this curs is not elixirdb.metadata.bind
 			rows = curs.fetchall()
@@ -241,14 +265,21 @@ class OutputPhenotype(object):
 		return data_matrix
 	
 	@classmethod
-	def getPhenotypeData(cls, curs, phenotype_avg_table=None, phenotype_method_table=None, ecotype_table='stock.ecotype', get_raw_data=1):
+	def getPhenotypeData(cls, curs, phenotype_avg_table=None, phenotype_method_table=None, ecotype_table='stock.ecotype', get_raw_data=1,\
+						getPublicPhenotype=False):
 		"""
+		2012.9.28
+			add argument getPublicPhenotype
 		2009-2-2
 			wrap up all other 3 methods
 		"""
-		phenotype_info = cls.get_phenotype_method_id_info(curs, phenotype_avg_table, phenotype_method_table)
-		ecotype_id2index, ecotype_id_ls, ecotype_name_ls = cls.get_ecotype_id2info(curs, phenotype_avg_table, ecotype_table)
-		data_matrix = cls.get_matrix(curs, phenotype_avg_table, ecotype_id2index, phenotype_info, get_raw_data)
+		phenotype_info = cls.get_phenotype_method_id_info(curs, phenotype_avg_table=phenotype_avg_table, \
+										phenotype_method_table=phenotype_method_table, getPublicPhenotype=getPublicPhenotype)
+		ecotype_id2index, ecotype_id_ls, ecotype_name_ls = cls.get_ecotype_id2info(curs, phenotype_avg_table=phenotype_avg_table,\
+																ecotype_table=ecotype_table, getPublicPhenotype=getPublicPhenotype)
+		data_matrix = cls.get_matrix(curs, phenotype_avg_table, ecotype_id2index=ecotype_id2index, phenotype_info=phenotype_info, \
+								get_raw_data=get_raw_data, phenotype_method_table=phenotype_method_table,\
+								getPublicPhenotype=getPublicPhenotype)
 		pheno_data = SNPData(col_id_ls=phenotype_info.phenotype_id_ls, row_id_ls=ecotype_id_ls, data_matrix=data_matrix)
 		pheno_data.row_label_ls = ecotype_name_ls
 		pheno_data.col_label_ls = phenotype_info.method_id_name_ls
@@ -278,7 +309,8 @@ class OutputPhenotype(object):
 		
 		
 		pheno_data = self.getPhenotypeData(curs, self.phenotype_avg_table, self.phenotype_method_table, \
-										self.ecotype_table, get_raw_data=self.get_raw_data)
+										self.ecotype_table, get_raw_data=self.get_raw_data,\
+										getPublicPhenotype=self.getPublicPhenotype)
 		header = ['ecotype id', 'nativename'] + pheno_data.col_label_ls
 		write_data_matrix(pheno_data.data_matrix, self.output_fname, header, pheno_data.row_id_ls, pheno_data.row_label_ls, \
 						transform_to_numpy=False)
