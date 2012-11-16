@@ -657,7 +657,7 @@ def readAdjacencyListDataIntoMatrix(inputFname=None, rowIDHeader=None, colIDHead
 			snpData.tofile(outputFname)
 	"""
 	sys.stderr.write("Reading a matrix out of an adjacency-list based file %s ..."%(inputFname))
-	from pymodule.MatrixFile import MatrixFile
+	from pymodule import MatrixFile
 	from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
 	import numpy
 	if defaultValue is None:
@@ -735,7 +735,7 @@ def getKey2ValueFromMatrixLikeFile(inputFname=None, keyHeaderLs=None, valueHeade
 		return a dictionary. key is a tuple of keyHeaderLs. value is conent of valueHeaderLs
 	"""
 	sys.stderr.write("Getting a dictionary out of  %s ..."%(inputFname))
-	from pymodule.MatrixFile import MatrixFile
+	from pymodule import MatrixFile
 	from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
 	import numpy
 	
@@ -2588,8 +2588,9 @@ import math
 def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=True,\
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
-							OR_min_max=False):
+							OR_min_max=False, report=True):
 	"""
+	2012.11.15 argument report controls whether getResultMethodContent() will report progress.
 	2011-4-19 no more integer conversion for chromosome & chromosome_request
 	2011-3-21
 		process chromosome, start, stop of pdata in the beginning
@@ -2646,7 +2647,6 @@ def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_tran
 	#A dictionary to understand new headers:
 	header_dict = {}
 	
-	sys.stderr.write("Getting genome wide result from %s ... "%inputFname)
 	construct_chr_pos2index = getattr(pdata, 'construct_chr_pos2index', construct_chr_pos2index)	#2008-09-24
 	construct_data_obj_id2index = getattr(pdata, 'construct_data_obj_id2index', construct_data_obj_id2index)	#2008-10-28 for get_data_obj_by_obj_index()
 	is_4th_col_stop_pos = getattr(pdata, 'is_4th_col_stop_pos', is_4th_col_stop_pos)	#2008-10-14
@@ -2657,6 +2657,7 @@ def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_tran
 	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
 	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
 	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
+	report = getattr(pdata, 'report', report)	#2012.11.15
 	
 	#2011-3-21
 	chromosome_request = getattr(pdata, 'chromosome', None)
@@ -2672,6 +2673,9 @@ def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_tran
 		pass
 	min_MAF_request = getattr(pdata, 'min_MAF', None)
 	min_MAC_request = getattr(pdata, 'min_MAC', None)	#2009-1-29
+	
+	if report:
+		sys.stderr.write("Getting genome wide result from %s ... "%inputFname)
 	
 	gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=construct_chr_pos2index, \
 						construct_data_obj_id2index=construct_data_obj_id2index)
@@ -2809,7 +2813,8 @@ def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_tran
 		no_of_lines += 1
 		
 	del reader
-	sys.stderr.write(" %s results. Done.\n"%(len(gwr.data_obj_ls)))
+	if report:
+		sys.stderr.write(" %s loci.\n"%(len(gwr.data_obj_ls)))
 	return gwr
 
 def cmpStringSNPID(x, y):
