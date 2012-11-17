@@ -1,4 +1,5 @@
 import os, sys
+from utils import getListOutOfStr
 
 def process_function_arguments(keywords, argument_default_dict, error_doc='', class_to_have_attr=None, howto_deal_with_required_none=1, default_value_in_list=0):
 	"""
@@ -469,6 +470,23 @@ class ProcessOptions(object):
 		return ad
 	process_function_arguments = classmethod(process_function_arguments)
 	
+	@classmethod
+	def processListArguments(cls, listArgumentName_data_type_ls=None, emptyContent=[], class_to_have_attr=None):
+		"""
+		2012.10.5 copied from AbstractAlignmentAndVCFWorkflow.py
+		2012.8.15
+		"""
+		listArgumentName2hasContent = {}
+		for listArgumentName, data_type in listArgumentName_data_type_ls:
+			listArgumentValue = getattr(class_to_have_attr, listArgumentName, None)
+			if listArgumentValue:
+				setattr(class_to_have_attr, listArgumentName, getListOutOfStr(listArgumentValue, data_type=data_type))
+				listArgumentName2hasContent[listArgumentName]=True
+			else:
+				setattr(class_to_have_attr, listArgumentName, emptyContent)
+				listArgumentName2hasContent[listArgumentName]=False
+		return listArgumentName2hasContent
+	
 def turn_option_default_dict2argument_default_dict(option_default_dict):
 	"""
 	2008-04-20
@@ -550,3 +568,4 @@ def generate_program_doc(program_name, option_default_dict):
 	program_doc += '\n'.join(argument_list_str_ls)
 	program_doc += '\n'
 	return program_doc
+

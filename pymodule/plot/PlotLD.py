@@ -41,7 +41,7 @@ class PlotLD(AbstractPlot):
 			('pos2ColumnHeader', 1, ): ['POS2', 'u', 1, 'label of the 2nd position column, xColumnHeader is the 1st position column', ],\
 			('maxDist', 0, int): [None, '', 1, 'if given, pairs beyond this distance are tossed.', ],\
 			('minDist', 0, int): [None, '', 1, 'if given, pairs below this distance are tossed.', ],\
-			('movingAverageType', 0, int): [2, '', 1, '1: median within each step, 2: mean, 3: fraction that is >0.8.', ],\
+			('movingAverageType', 0, int): [2, '', 1, '1: median r2 within each step, 2: mean, 3: fraction that is >0.8.', ],\
 #			('fitCurve', 0, ): [0, '', 0, 'toggle to fit an exponential decay function to the data', ],\
 			})
 	option_default_dict[('missingDataNotation', 0, )][0] = '-nan'
@@ -76,6 +76,24 @@ class PlotLD(AbstractPlot):
 		n_y_ls = movingAverageData.listOfList[1]
 		pylab.plot(n_x_ls, n_y_ls, self.formatString)
 		pylab.ylim(ymin=0)
+		
+		
+		#output the reduced x and y
+		if self.outputFnamePrefix:
+			prefix = self.outputFnamePrefix
+		else:
+			prefix = os.path.splitext(self.outputFname)[0]
+		outputFname = '%s.tsv'%(prefix)
+		outf = open(outputFname, 'a')
+		writer = csv.writer(outf, delimiter='\t')
+		header = ['distance', 'reducedR2']
+		writer.writerow(header)
+		for i in xrange(len(n_x_ls)):
+			data_row = [n_x_ls[i], n_y_ls[i]]
+			writer.writerow(data_row)
+		del writer
+		
+		
 		#pylab.ylim(ymax=1.0)
 		#splineFitData = statistics.splineFit(x_ls=x_ls, y_ls=y_ls, no_of_steps=100, needReorderData=True)
 		#pylab.plot(splineFitData.x_ls, splineFitData.y_ls)

@@ -294,7 +294,7 @@ def constructTitleFromTwoDataSummaryStat(x_ls=None, y_ls=None):
 	2012.8.21
 	
 	"""
-	if not y_ls:
+	if not y_ls and x_ls:
 		title = constructTitleFromDataSummaryStat(x_ls)
 	elif x_ls and y_ls:
 		import numpy

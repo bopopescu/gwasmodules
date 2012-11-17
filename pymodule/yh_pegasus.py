@@ -12,6 +12,7 @@ from Pegasus.DAX3 import *
 def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, version=None,\
 			parentJobLs=None, extraDependentInputLs=None):
 	"""
+	2012.10.2, increment workflow.no_of_jobs
 	2012.9.11
 		make sure that parentJobLs and extraDependentInputLs are not None.
 	2012.3.10
@@ -35,13 +36,16 @@ def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, versi
 		for input in extraDependentInputLs:
 			if input is not None:
 				job.uses(input, transfer=True, register=True, link=Link.INPUT)
+	if hasattr(workflow, 'no_of_jobs'):	#2012.10.2
+		workflow.no_of_jobs += 1
 	return job
 
 def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, input_site_handler='local',\
 						checkAffiliateFileExistence=True, addPicardDictFile=True,\
 						affiliateFilenameSuffixLs=['dict', 'fai', 'amb', 'ann', 'bwt', 'pac', 'sa', 'rbwt', 'rpac', 'rsa', \
-												'stidx', 'sthash']):
+						'stidx', 'sthash'], folderName=""):
 	"""
+	2010.10.10 added argument folderName
 	2012.5.23
 		add an argument "addPicardDictFile" to offer user option to exclude this file (i.e. registerBlastNucleotideDatabaseFile)
 	2012.2.24
@@ -58,7 +62,7 @@ def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, i
 	"""
 	refFastaFList = []
 	if registerAffiliateFiles:
-		refFastaF = File(os.path.basename(refFastaFname))	#use relative path, otherwise, it'll go to absolute path
+		refFastaF = File(os.path.join(folderName, os.path.basename(refFastaFname)))	#use relative path, otherwise, it'll go to absolute path
 		# Add it into replica only when needed.
 		refFastaF.addPFN(PFN("file://" + refFastaFname, input_site_handler))
 		workflow.addFile(refFastaF)
@@ -78,13 +82,13 @@ def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, i
 			if checkAffiliateFileExistence and not os.path.isfile(pathToFile):
 				sys.stderr.write("Warning: %s don't exist or not a file on file system. skip registration.\n"%(pathToFile))
 				continue
-			affiliateF = File(os.path.basename(pathToFile))
+			affiliateF = File(os.path.join(folderName, os.path.basename(pathToFile)))
 			#use relative path, otherwise, it'll go to absolute path
 			affiliateF.addPFN(PFN("file://" + pathToFile, input_site_handler))
 			workflow.addFile(affiliateF)
 			refFastaFList.append(affiliateF)
 	else:
-		refFastaF = File(refFastaFname)
+		refFastaF = File(os.path.join(folderName, os.path.basename(refFastaFname)))
 		refFastaFList.append(refFastaF)
 	return refFastaFList
 

@@ -89,6 +89,9 @@ class AbstractWorkflow(ADAG):
 		self.version="1.0"
 		
 		self.commandline = ' '.join(sys.argv)
+		
+		#2012.9.25 global counter
+		self.no_of_jobs = 0
 	
 	def writeXML(self, out):
 		"""
@@ -183,18 +186,12 @@ class AbstractWorkflow(ADAG):
 	
 	def processListArguments(self, listArgumentName_data_type_ls=None, emptyContent=[]):
 		"""
+		2012.10.5
+			moved to ProcessOptions
 		2012.8.15
 		"""
-		listArgumentName2hasContent = {}
-		for listArgumentName, data_type in listArgumentName_data_type_ls:
-			listArgumentValue = getattr(self, listArgumentName, None)
-			if listArgumentValue:
-				setattr(self, listArgumentName, getListOutOfStr(listArgumentValue, data_type=data_type))
-				listArgumentName2hasContent[listArgumentName]=True
-			else:
-				setattr(self, listArgumentName, emptyContent)
-				listArgumentName2hasContent[listArgumentName]=False
-		return listArgumentName2hasContent
+		return ProcessOptions.processListArguments(listArgumentName_data_type_ls=listArgumentName_data_type_ls,\
+									emptyContent=emptyContent, class_to_have_attr=self)
 	
 	def initiateWorkflow(self, workflowName=None):
 		"""
@@ -228,14 +225,14 @@ class AbstractWorkflow(ADAG):
 			inputPath = inputPath%home_path
 		return inputPath
 	
-	def registerJars(self):
+	def registerJars(self, workflow=None):
 		"""
 		2012.5.23
 			register jars to be used in the worflow
 		"""
 		pass
 	
-	def registerCustomJars(self):
+	def registerCustomJars(self, workflow=None):
 		"""
 		2012.5.23
 		"""
@@ -279,6 +276,12 @@ class AbstractWorkflow(ADAG):
 							version=version, os=operatingSystem, arch=architecture, installed=True)
 		mergeSameHeaderTablesIntoOne.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/MergeSameHeaderTablesIntoOne.py"), site_handler))
 		executableClusterSizeMultiplierList.append((mergeSameHeaderTablesIntoOne,0))
+		
+		#2012.10.16 same as above but capital case
+		MergeSameHeaderTablesIntoOne = Executable(namespace=namespace, name="MergeSameHeaderTablesIntoOne", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		MergeSameHeaderTablesIntoOne.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/MergeSameHeaderTablesIntoOne.py"), site_handler))
+		executableClusterSizeMultiplierList.append((MergeSameHeaderTablesIntoOne,0))
 		
 		ReduceMatrixByChosenColumn = Executable(namespace=namespace, name="ReduceMatrixByChosenColumn", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
@@ -434,6 +437,38 @@ class AbstractWorkflow(ADAG):
 		DrawMatrix.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "plot/DrawMatrix.py"), site_handler))
 		executableClusterSizeMultiplierList.append((DrawMatrix, 1))
 		
+		#2012.10.7
+		Draw2DHistogramOfMatrix = Executable(namespace=namespace, name="Draw2DHistogramOfMatrix", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		Draw2DHistogramOfMatrix.addPFN(PFN("file://" + \
+						os.path.join(self.pymodulePath, "plot/Draw2DHistogramOfMatrix.py"), site_handler))
+		executableClusterSizeMultiplierList.append((Draw2DHistogramOfMatrix, 0))
+		
+		calcula = Executable(namespace=namespace, name="calcula", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		calcula.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/CalculatePairwiseDistanceOutOfSNPXStrainMatrix.py"), \
+						site_handler))
+		executableClusterSizeMultiplierList.append((calcula, 0.02))
+		
+		CalculatePairwiseDistanceOutOfSNPXStrainMatrix = Executable(namespace=namespace, name="CalculatePairwiseDistanceOutOfSNPXStrainMatrix", \
+							version=version, os=operatingSystem, arch=architecture, installed=True)
+		CalculatePairwiseDistanceOutOfSNPXStrainMatrix.addPFN(PFN("file://" + \
+						os.path.join(self.pymodulePath, "pegasus/mapper/CalculatePairwiseDistanceOutOfSNPXStrainMatrix.py"), \
+						site_handler))
+		executableClusterSizeMultiplierList.append((CalculatePairwiseDistanceOutOfSNPXStrainMatrix, 0.5))
+		
+		SampleRows = Executable(namespace=namespace, name="SampleRows", version=version, \
+											os=operatingSystem, arch=architecture, installed=True)
+		SampleRows.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "statistics/SampleRows.py"), site_handler))
+		executableClusterSizeMultiplierList.append((SampleRows, 0.5))
+		
+		#this is a reducer
+		EstimateOutliersIn2DData = Executable(namespace=namespace, name="EstimateOutliersIn2DData", version=version, \
+											os=operatingSystem, arch=architecture, installed=True)
+		EstimateOutliersIn2DData.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "statistics/EstimateOutliersIn2DData.py"), site_handler))
+		executableClusterSizeMultiplierList.append((EstimateOutliersIn2DData, 0))
+		
+		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
@@ -455,9 +490,10 @@ class AbstractWorkflow(ADAG):
 			if clusterSize>1:
 				clusteringProf = Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusterSize)
 				if not executable.hasProfile(clusteringProf):	#2012.8.26 check this first
-					executable.addProfile(clusteringProf)
-			self.addExecutable(executable)
-			setattr(self, executable.name, executable)
+					executable.addProfile(clusteringProf)	#removeProfile()
+			if not self.hasExecutable(executable):
+				self.addExecutable(executable)	#removeExecutable() is its counterpart
+				setattr(self, executable.name, executable)
 		
 		
 	
@@ -525,7 +561,7 @@ class AbstractWorkflow(ADAG):
 		for inputFile in inputFileList:
 			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 	
-	def registerOneInputFile(self, workflow=None, inputFname=None, folderName=""):
+	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName=""):
 		"""
 		2012.3.22
 			add abspath attribute to file.
@@ -533,15 +569,35 @@ class AbstractWorkflow(ADAG):
 			add argument folderName, which will put the file in specific pegasus workflow folder
 		2011.12.21
 		"""
+		if workflow is None:
+			workflow = self
+		if input_site_handler is None:
+			input_site_handler = self.input_site_handler
 		file = File(os.path.join(folderName, os.path.basename(inputFname)))
 		file.abspath = os.path.abspath(inputFname)
-		file.absPath = os.path.abspath(inputFname)
-		file.addPFN(PFN("file://" + file.abspath, self.input_site_handler))
-		self.addFile(file)
+		file.absPath = file.abspath
+		file.addPFN(PFN("file://" + file.abspath, input_site_handler))
+		workflow.addFile(file)
 		return file
 	
+		
+	def registerBlastNucleotideDatabaseFile(self, ntDatabaseFname=None, input_site_handler=None, folderName=""):
+		"""
+		2012.10.8
+			moved from BlastWorkflow.py
+		2012.5.23
+		"""
+		if input_site_handler is None:
+			input_site_handler = self.input_site_handler
+		return yh_pegasus.registerRefFastaFile(self, ntDatabaseFname, registerAffiliateFiles=True, \
+									input_site_handler=input_site_handler,\
+									checkAffiliateFileExistence=True, addPicardDictFile=False, \
+									affiliateFilenameSuffixLs=['nin', 'nhr', 'nsq'],\
+									folderName=folderName)
+	
+	
 	def addStatMergeJob(self, workflow=None, statMergeProgram=None, outputF=None, \
-					parentJobLs=None, \
+					parentJobLs=None, extraOutputLs=None,\
 					extraDependentInputLs=None, transferOutput=True, extraArguments=None, \
 					namespace=None, version=None, job_max_memory=1000, **keywords):
 		"""
@@ -558,7 +614,6 @@ class AbstractWorkflow(ADAG):
 			extraDependentInputLs = []
 		
 		extraArgumentList = []
-		extraOutputLs = []
 		key2ObjectForJob = {}
 		
 		if extraArguments:
@@ -574,10 +629,15 @@ class AbstractWorkflow(ADAG):
 							parentJobLs=None, \
 							namespace=None, version=None, extraDependentInputLs=None):
 		"""
+		2012.10.8
+			inputF is optional, if not given, parentJobLs must be given, and parentJobLs[0].output is inputF. 
 		2012.9.12 parentJobLs and extraDependentInputLs could be None
 		2011-11-28
 			moved from CalculateVCFStatPipeline.py
 		"""
+		if inputF is None and parentJobLs is not None:	#2012.10.8
+			parentJob = parentJobLs[0]
+			inputF = parentJob.output
 		statMergeJob.addArguments(inputF)
 		statMergeJob.uses(inputF, transfer=True, register=True, link=Link.INPUT)
 		if extraDependentInputLs:
@@ -588,12 +648,80 @@ class AbstractWorkflow(ADAG):
 			for parentJob in parentJobLs:
 				self.depends(parent=parentJob, child=statMergeJob)
 	
-	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
-					outputFile=None, outputArgumentOption="-o", \
+	def addGenericDBJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
+					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
 					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-					key2ObjectForJob=None, **keywords):
+					key2ObjectForJob=None, objectWithDBArguments=None, **keywords):
 		"""
+		2012.10.6
+			similar to addGenericJob but these are generic jobs that need db-interacting arguments.
+			
+			Argument inputFileList is a list of input files to be added to commandline as the last arguments.
+				they would also be added as the job's dependent input.
+				Difference from extraDependentInputLs: the latter is purely for dependency purpose, not added as input arguments.
+					So if files have been put in inputFileList, then they shouldn't be in extraDependentInputLs.
+		"""
+		#do not pass the inputFileList to addGenericJob() because db arguments need to be added before them. 
+		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
+						inputArgumentOption=inputArgumentOption, outputFile=outputFile, \
+						outputArgumentOption=outputArgumentOption, inputFileList=None, parentJobLs=parentJobLs, \
+						extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+						transferOutput=transferOutput, extraArguments=extraArguments, extraArgumentList=extraArgumentList,\
+						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel, key2ObjectForJob=key2ObjectForJob,\
+						**keywords)
+		if objectWithDBArguments is None:
+			objectWithDBArguments = self
+		self.addDBArgumentsToOneJob(job=job, objectWithDBArguments=objectWithDBArguments)
+				
+		#2012.10.6 add all input files to the last (after db arguments,) otherwise, it'll mask others (cuz these don't have options).
+		if inputFileList:
+			for inputFile in inputFileList:
+				if inputFile:
+					job.addArguments(inputFile)
+					job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+					job.inputLs.append(inputFile)
+		
+		#2012.10.6 set the job.input
+		if getattr(job, 'input', None) is None and job.inputLs:
+			job.input = job.inputLs[0]
+		return job
+		
+	def addJobUse(self, job=None, file=None, transfer=True, register=True, link=None):
+		"""
+		2012.10.18 check whether that file is a use of job already.
+		"""
+		use = Use(file.name, link=link, register=register, transfer=transfer, optional=None, \
+								namespace=job.namespace,\
+								version=job.version, executable=None)	#, size=None
+		if not job.hasUse(use):
+			job.addUse(use)
+	
+	def addJobDependency(self, workflow=None, parentJob=None, childJob=None):
+		"""
+		2012.10.18 check whether that the dependency exists already
+		"""
+		if workflow is None:
+			workflow = self
+		dep = Dependency(parent=parentJob, child=childJob)
+		if not workflow.hasDependency(dep):
+			workflow.addDependency(dep)
+		
+	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
+					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
+					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
+					key2ObjectForJob=None, no_of_cpus=None, max_walltime=None, **keywords):
+		"""
+		2012.10.18
+			add job.parentJobLs to store its parent job(s).
+		2012.10.15
+			add argument parentJob, same as parentJobLs, but just one job
+		2012.10.6
+			add argument inputFileList, which is a list of input files to be added to commandline as the last arguments
+				they would also be added as the job's dependent input.
+				Difference from extraDependentInputLs: the latter is purely for dependency purpose, not added as input arguments.
+					So if files have been put in inputFileList, then they shouldn't be in extraDependentInputLs.
 		2012.8.17 if transferOutput is None, do not register output files as OUTPUT with transfer flag
 		2012.8.2
 			add argument inputArgumentOption, outputArgumentOption so that user 
@@ -614,7 +742,8 @@ class AbstractWorkflow(ADAG):
 			if inputArgumentOption:
 				job.addArguments(inputArgumentOption)
 			job.addArguments(inputFile)
-			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+			self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+			#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 			job.input = inputFile
 			job.inputLs.append(inputFile)
 		if outputFile:
@@ -622,7 +751,8 @@ class AbstractWorkflow(ADAG):
 				job.addArguments(outputArgumentOption)
 			job.addArguments(outputFile)
 			if transferOutput is not None:	#2012.8.17
-				job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+				self.addJobUse(job, file=outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+				#job.uses(outputFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 			job.output = outputFile
 			job.outputLs.append(outputFile)
 		if extraArgumentList:
@@ -631,31 +761,53 @@ class AbstractWorkflow(ADAG):
 		if extraArguments:
 			job.addArguments(extraArguments)
 		
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
+									no_of_cpus=no_of_cpus, max_walltime=max_walltime)
 		workflow.addJob(job)
+		job.parentJobLs = []	#2012.10.18
+		if parentJob:	#2012.10.15
+			self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
+			job.parentJobLs.append(parentJob)
+			#workflow.depends(parent=parentJob, child=job)
 		if parentJobLs:
 			for parentJob in parentJobLs:
 				if parentJob:
-					workflow.depends(parent=parentJob, child=job)
+					self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
+					job.parentJobLs.append(parentJob)
+					#workflow.depends(parent=parentJob, child=job)
 		if extraDependentInputLs:
 			for input in extraDependentInputLs:
 				if input:
-					job.uses(input, transfer=True, register=True, link=Link.INPUT)
+					self.addJobUse(job, file=input, transfer=True, register=True, link=Link.INPUT)
+					#job.uses(input, transfer=True, register=True, link=Link.INPUT)
 					job.inputLs.append(input)
 		if extraOutputLs:
 			for output in extraOutputLs:
 				if output:
 					job.outputLs.append(output)
 					if transferOutput is not None:	#2012.8.17
-						job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+						self.addJobUse(job, file=output, transfer=transferOutput, register=True, link=Link.OUTPUT)
+						#job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		if key2ObjectForJob:
 			for key, object in key2ObjectForJob.iteritems():
 				setattr(job, key, object)	#key should be a string.
+		
+		#2012.10.6 add all input files to the last (after db arguments,) otherwise, it'll mask others (cuz these don't have options).
+		if inputFileList:
+			for inputFile in inputFileList:
+				if inputFile:
+					job.addArguments(inputFile)
+					self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+					#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+					job.inputLs.append(inputFile)
+		#2012.10.9 make sure outputList
+		job.outputList = job.outputLs
 		#2012.7.28 if job.output is not set, set it to the 1st entry of job.outputLs
 		if getattr(job, 'output', None) is None and job.outputLs:
 			job.output = job.outputLs[0]
 		if getattr(job, 'input', None) is None and job.inputLs:
 			job.input = job.inputLs[0]
+		self.no_of_jobs += 1
 		return job
 	
 	def setJobOutputFileTransferFlag(self, job=None, transferOutput=False, outputLs=None):
@@ -688,56 +840,58 @@ class AbstractWorkflow(ADAG):
 		return job
 	
 	def addGzipSubWorkflow(self, workflow=None, inputData=None, transferOutput=True,\
-						outputDirPrefix="", **keywords):
+						outputDirPrefix="", topOutputDirJob=None, report=True, **keywords):
 		"""
 		2012.8.2 bugfix.
 		2012.7.19
 		"""
 		if workflow is None:
 			workflow = self
-		sys.stderr.write("Adding gzip jobs for %s input job data ... "%(len(inputData.jobDataLs)))
-		no_of_jobs= 0
+		if report:
+			sys.stderr.write("Adding gzip jobs for %s input job data ... "%(len(inputData.jobDataLs)))
 		
-		
-		topOutputDir = "%sGzip"%(outputDirPrefix)
-		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
-		no_of_jobs += 1
-		
-		returnData = PassingData()
+		returnData = PassingData(topOutputDirJob=None)
 		returnData.jobDataLs = []
-		for jobData in inputData.jobDataLs:
-			for inputF in jobData.fileList:
-				inputFBaseName = os.path.basename(inputF.name)
-				outputF = File(os.path.join(topOutputDir, '%s.gz'%(inputFBaseName)))
-				key2ObjectForJob = {}
-				extraArgumentList = []
-				#make sure set inputArgumentOption&outputArgumentOption to None, \
-				# otherwise addGenericJob will add "-i" and "-o" in front of it
-				job= self.addGenericJob(workflow=workflow, executable=workflow.gzip, inputFile=inputF,
-							inputArgumentOption=None, outputArgumentOption=None,  outputFile=outputF, \
-							parentJobLs=[topOutputDirJob]+jobData.jobLs, extraDependentInputLs=None, \
-							extraOutputLs=[],\
-							transferOutput=transferOutput, \
-							extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, \
-							job_max_memory=200, **keywords)
-				"""	
-				# 2012.8.2 wrong, because -i and -o will be added in front.
-				abstractMapperJob = self.addAbstractMapperLikeJob(workflow, executable=workflow.gzip, \
-						inputF=None, outputF=outputF, \
-						parentJobLs=[topOutputDirJob]+jobData.jobLs, transferOutput=transferOutput, job_max_memory=200,\
-						extraArguments=None, extraDependentInputLs=[inputF], )
-				"""
-				returnData.jobDataLs.append(PassingData(jobLs=[job], vcfFile=None, file=outputF,\
-										fileList=[outputF]))
-				no_of_jobs += 1
-		sys.stderr.write("%s jobs. Done.\n"%(no_of_jobs))
+		if len(inputData.jobDataLs)>0:
+			if topOutputDirJob is None:
+				topOutputDir = "%sGzip"%(outputDirPrefix)
+				topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
+			
+			returnData.topOutputDirJob = topOutputDirJob
+			for jobData in inputData.jobDataLs:
+				for inputF in jobData.fileList:
+					inputFBaseName = os.path.basename(inputF.name)
+					outputF = File(os.path.join(topOutputDirJob.output, '%s.gz'%(inputFBaseName)))
+					key2ObjectForJob = {}
+					extraArgumentList = []
+					#make sure set inputArgumentOption&outputArgumentOption to None, \
+					# otherwise addGenericJob will add "-i" and "-o" in front of it
+					job= self.addGenericJob(workflow=workflow, executable=workflow.gzip, inputFile=inputF,
+								inputArgumentOption=None, outputArgumentOption=None,  outputFile=outputF, \
+								parentJobLs=[topOutputDirJob]+jobData.jobLs, extraDependentInputLs=None, \
+								extraOutputLs=[],\
+								transferOutput=transferOutput, \
+								extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, \
+								job_max_memory=200, **keywords)
+					"""	
+					# 2012.8.2 wrong, because -i and -o will be added in front.
+					abstractMapperJob = self.addAbstractMapperLikeJob(workflow, executable=workflow.gzip, \
+							inputF=None, outputF=outputF, \
+							parentJobLs=[topOutputDirJob]+jobData.jobLs, transferOutput=transferOutput, job_max_memory=200,\
+							extraArguments=None, extraDependentInputLs=[inputF], )
+					"""
+					returnData.jobDataLs.append(PassingData(jobLs=[job], vcfFile=None, file=outputF,\
+											fileList=[outputF]))
+		if report:
+			sys.stderr.write("no_of_jobs = %s.\n"%(self.no_of_jobs))
 		return returnData
 	
 	def addAbstractMapperLikeJob(self, workflow=None, executable=None, \
 					inputVCF=None, inputF=None, outputF=None, \
-					parentJobLs=[], namespace=None, version=None, transferOutput=True, job_max_memory=200,\
-					extraArguments=None, extraDependentInputLs=[]):
+					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
+					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
 		"""
+		2012.10.8 call addGenericJob() instead
 		2012.7.19
 			moved from AbstractNGSWorkflow to here.
 			add argument inputF. inputVCF is not generic enough.
@@ -745,24 +899,12 @@ class AbstractWorkflow(ADAG):
 		"""
 		if inputF is None:	#2012.7.19
 			inputF = inputVCF
-		#2011-9-22 union of all samtools intervals for one contig
-		job = Job(namespace=getattr(self, 'namespace', namespace), name=executable.name, \
-						version=getattr(self, 'version', version))
-		job.addArguments("-i", inputF, "-o", outputF)
-		
-		if extraArguments:
-			job.addArguments(extraArguments)
-		job.uses(inputF, transfer=True, register=True, link=Link.INPUT)
-		for input in extraDependentInputLs:
-			if input:
-				job.uses(input, transfer=True, register=True, link=Link.INPUT)
-		job.output = outputF
-		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		self.addJob(job)
-		for parentJob in parentJobLs:
-			if parentJob:
-				self.depends(parent=parentJob, child=job)
+		job= self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputF, outputFile=outputF, \
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=None,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=None, \
+				sshDBTunnel=None, job_max_memory=job_max_memory, **keywords)
 		return job
 	
 	def addSelectLineBlockFromFileJob(self, executable=None, inputFile=None, outputFile=None,\
@@ -805,13 +947,17 @@ class AbstractWorkflow(ADAG):
 					outputFnamePrefix=None,
 					whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
 					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=50, \
+					missingDataNotation='-nan',\
 					xColumnPlotLabel=None, chrLengthColumnHeader=None, chrColumnHeader=None, \
-					minChrLength=1000000, xColumnHeader=None, pos2ColumnHeader=None, minNoOfTotal=100,\
+					minChrLength=1000000, xColumnHeader=None, pos2ColumnHeader=None, minNoOfTotal=100, maxNoOfTotal=None,\
 					figureDPI=300, formatString='.', ylim_type=2, samplingRate=0.0001,  need_svg=False, logCount=False, \
+					minDist=None, maxDist=None, movingAverageType=2,\
 					parentJobLs=None, \
 					extraDependentInputLs=None, \
 					extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
 		"""
+		2012.10.25
+			expose argument missingDataNotation, minDist, maxDist
 		2012.8.18
 			use addAbstractPlotJob()
 		2012.8.2 moved from vervet/src/CalculateVCFStatPipeline.py
@@ -851,10 +997,20 @@ class AbstractWorkflow(ADAG):
 			extraArgumentList.append("--chrColumnHeader %s"%(chrColumnHeader))
 		if pos2ColumnHeader:
 			extraArgumentList.append(' --pos2ColumnHeader %s '%(pos2ColumnHeader))
+		if minDist:
+			extraArgumentList.append('--minDist %s'%(minDist))
+		if maxDist:
+			extraArgumentList.append('--maxDist %s'%(maxDist))
+		if maxNoOfTotal:
+			extraArgumentList.append("--maxNoOfTotal %s"%(maxNoOfTotal))
+		if movingAverageType:
+			extraArgumentList.append("--movingAverageType %s"%(movingAverageType))
+		
 		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
 							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, logWhichColumn=logWhichColumn, \
 							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							missingDataNotation=missingDataNotation,\
 							xColumnHeader=xColumnHeader, xColumnPlotLabel=xColumnPlotLabel, \
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=figureDPI, formatString=formatString, ylim_type=ylim_type, samplingRate=samplingRate, need_svg=need_svg, \
@@ -870,12 +1026,15 @@ class AbstractWorkflow(ADAG):
 					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=-1, \
 					missingDataNotation='NA',\
 					xColumnHeader=None, xColumnPlotLabel=None, \
-					minNoOfTotal=100,\
+					minNoOfTotal=100, maxNoOfTotal=None,\
 					figureDPI=300, formatString='.', ylim_type=2, samplingRate=0.001, need_svg=False, \
-					parentJobLs=None, \
+					parentJob=None, parentJobLs=None, \
 					extraDependentInputLs=None, \
-					extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
+					extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, \
+					sshDBTunnel=False, \
+					objectWithDBArguments=None, **keywords):
 		"""
+		2012.10.16 added argument sshDBTunnel, objectWithDBArguments
 		2012.8.31 add argument missingDataNotation
 		#no spaces or parenthesis or any other shell-vulnerable letters in the x or y axis labels (whichColumnPlotLabel, xColumnPlotLabel)
 		2012.8.2
@@ -917,8 +1076,10 @@ class AbstractWorkflow(ADAG):
 				extraOutputLs.append(File('%s.png'%(outputFnamePrefix)))
 				if need_svg:
 					extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
-		if minNoOfTotal:
+		if minNoOfTotal is not None:
 			extraArgumentList.append('--minNoOfTotal %s'%(minNoOfTotal))
+		if maxNoOfTotal:
+			extraArgumentList.append("--maxNoOfTotal %s"%(maxNoOfTotal))
 		if figureDPI:
 			extraArgumentList.append('--figureDPI %s'%(figureDPI))
 		if formatString:
@@ -948,25 +1109,41 @@ class AbstractWorkflow(ADAG):
 			extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
-		#add all input files to the last
-		if inputFileList:
-			extraArgumentList.extend(inputFileList)
-		job= self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, outputFile=outputFile, \
-				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+		
+		if objectWithDBArguments:
+			#if this is given, then it's a db interacting job, and inputFileList is not added into extraArgumentList
+			job = self.addGenericDBJob(workflow=workflow, executable=executable, inputFile=inputFile, outputFile=outputFile, \
+				inputFileList = inputFileList,\
+				parentJob=parentJob, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 				extraOutputLs=extraOutputLs,\
 				transferOutput=transferOutput, \
-				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
+				sshDBTunnel=sshDBTunnel, objectWithDBArguments=objectWithDBArguments, **keywords)
+		else:
+			#add all input files to the last
+			#only for non-db interacting jobs
+			if inputFileList:
+				extraArgumentList.extend(inputFileList)
+			job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, outputFile=outputFile, \
+				parentJob=parentJob, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
+				sshDBTunnel=sshDBTunnel, **keywords)
 		return job
 	
 	def addAbstractMatrixFileWalkerJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
 					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, \
-					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=50, \
+					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=-1, \
 					minNoOfTotal=10,\
-					samplingRate=0.001, \
-					parentJobLs=None, \
-					extraDependentInputLs=None, \
-					extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
+					samplingRate=1, \
+					parentJob=None, parentJobLs=None, \
+					extraDependentInputLs=None, extraArgumentList=None, \
+					extraArguments=None, transferOutput=True,  job_max_memory=2000, sshDBTunnel=False, \
+					objectWithDBArguments=None, **keywords):
 		"""
+		2012.10.16 added argument sshDBTunnel, objectWithDBArguments
+		2012.10.15 added extraArgumentList, parentJob
 		2012.8.15
 			('outputFname', 0, ): [None, 'o', 1, 'output file for the figure.'],\
 			('minNoOfTotal', 1, int): [100, 'i', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
@@ -985,11 +1162,14 @@ class AbstractWorkflow(ADAG):
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
 							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=None, logWhichColumn=logWhichColumn, \
 							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							missingDataNotation=None,\
+							xColumnHeader=None, xColumnPlotLabel=None, \
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=None, formatString=None, ylim_type=None, samplingRate=samplingRate, need_svg=False, \
-							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							parentJob=parentJob, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							extraArgumentList=extraArgumentList,\
 							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \
-							**keywords)
+							sshDBTunnel=sshDBTunnel, objectWithDBArguments=objectWithDBArguments, **keywords)
 	
 	def addDrawHistogramJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
 					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
@@ -1030,8 +1210,49 @@ class AbstractWorkflow(ADAG):
 							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, \
 							logWhichColumn=logWhichColumn, \
 							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							missingDataNotation=None,\
+							xColumnHeader=None, xColumnPlotLabel=None, \
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=figureDPI, formatString=formatString, ylim_type=ylim_type, \
+							samplingRate=samplingRate, need_svg=need_svg, \
+							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \
+							**keywords)
+	
+	def addDraw2DHistogramOfMatrixJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
+				outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
+				positiveLog=False, valueForNonPositiveYValue=-1, \
+				missingDataNotation='NA',\
+				xColumnHeader=None, xColumnPlotLabel=None, \
+				minNoOfTotal=100,\
+				figureDPI=300, formatString='.', samplingRate=0.001, need_svg=False, \
+				zColumnHeader=None, logX=False, logY=False, logZ=False,\
+				parentJobLs=None, \
+				extraDependentInputLs=None, \
+				extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
+		"""
+		2012.10.7
+			
+		"""
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if zColumnHeader:
+			extraArgumentList.append("--zColumnHeader %s"%(zColumnHeader))
+		if logX:
+			extraArgumentList.append("--logX")
+		if logY:
+			extraArgumentList.append("--logY")
+		if logZ:
+			extraArgumentList.append("--logZ")	
+		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
+							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
+							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, \
+							logWhichColumn=None, \
+							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							missingDataNotation=missingDataNotation,\
+							xColumnHeader=xColumnHeader, xColumnPlotLabel=xColumnPlotLabel, \
+							minNoOfTotal=minNoOfTotal, \
+							figureDPI=figureDPI, formatString=formatString, ylim_type=None, \
 							samplingRate=samplingRate, need_svg=need_svg, \
 							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \

@@ -210,17 +210,23 @@ class VCFRecord(object):
 		self.info = returnData.info
 		self.format = returnData.format
 	
-	def getAAF(self):
+	def getAAF(self, useMax=True, defaultValue=0):
 		"""
+		2012.10.5
+			add argument useMax, which determines to return max or min when there are >1 alternative alleles.
+			add argument defaultValue
 		2011.12.16
 		"""
 		frequencyLs = self.info_tag2value.get("AF", self.info_tag2value.get("AF1", None))
 		if frequencyLs is not None:
-			frequencyLs = frequencyLs.split(',')	#if more than one alt alleles, AF is a string separated by ",". then choose the min
+			frequencyLs = frequencyLs.split(',')	#if more than one alt alleles, AF is a string separated by ",".
 			frequencyLs = map(float ,frequencyLs)
-			frequency = min(frequencyLs)
+			if useMax:
+				frequency = max(frequencyLs)
+			else:
+				frequency = min(frequencyLs)
 		else:
-			frequency = -0.1
+			frequency = defaultValue
 		return frequency
 	
 class VCFFile(object):
@@ -269,20 +275,18 @@ class VCFFile(object):
 		
 		self.inf = None
 		self.reader = None
-		self.initializeInput(self.inputFname)
+		self._initializeInput(self.inputFname)
 		
 		self.outf = None
 		self.writer = None
-		self.initializeOutput(self.outputFname)
+		self._initializeOutput(self.outputFname)
 	
-	def initializeInput(self, inputFname=None):
+	def _initializeInput(self, inputFname=None):
 		"""
 		2012.5.10
 			split out of __init__()
 		"""
 		if inputFname:
-			self.metaInfoLs = []	#2012.3.28 anything before the "#CHROM" line. each entry is a raw line content, including '\n'
-			self.sampleIDHeader = []	#2012.3.20 a list of column headers (#CHROM)
 			if inputFname[-3:]=='.gz':
 				import gzip
 				self.inf = gzip.open(inputFname, 'rb')
@@ -291,7 +295,7 @@ class VCFFile(object):
 			self.reader =csv.reader(self.inf, delimiter='\t')
 			self._parseHeader()
 	
-	def initializeOutput(self, outputFname=None):
+	def _initializeOutput(self, outputFname=None):
 		"""
 		2012.9.6 handle gzipped file as well.
 		2012.5.10
@@ -305,12 +309,14 @@ class VCFFile(object):
 				self.outf = open(outputFname, 'w')
 			self.writer = csv.writer(self.outf, delimiter='\t')
 	
-	def getIndividual2ColIndex(self, header, col_name2index, sampleStartingColumn=9):
+	def _getIndividual2ColIndex(self, header, col_name2index=None, sampleStartingColumn=9):
 		"""
+		2012.10.5 add "_" in front of the function name
 		2011-9-27
-			called by parseFile
+			called by other function, not meant for public
 		"""
-		sys.stderr.write("\t Finding all individuals ...")
+		if self.report:
+			sys.stderr.write("\t Finding all individuals ...")
 		no_of_cols = len(header)
 		individual_name2col_index = {}	#individual's column name -> an opened file handler to store genetic data
 		col_index_individual_name_ls = []
@@ -331,9 +337,40 @@ class VCFFile(object):
 		self.individual_name2col_index = individual_name2col_index
 		
 		col_index_individual_name_ls.sort()	#sorted by column index
-		sys.stderr.write("%s individuals added. Done.\n"%(counter))
+		if self.report:
+			sys.stderr.write("%s individuals added. Done.\n"%(counter))
 		return col_index_individual_name_ls
 	
+	def get_col_index_individual_name_ls(self):
+		"""
+		2012.10.5 accessor of self.col_index_individual_name_ls
+			a list of [column-index, individual_name].
+				The individual_name excludes the trailing ".bam" if there is one.
+			The column-index starts from the sampleStartingColumn (=9 usually). 
+		"""
+		return self.col_index_individual_name_ls
+	
+	def getIndividualName2ColIndex(self):
+		"""
+		2012.10.5 public version of _getIndividual2ColIndex()
+			a dictionary between samplID and column-index (which column in the VCF file)
+			
+			difference between sampleID and individual_name
+				the latter excludes the trailing ".bam" if there is one. 
+			
+			The column-index starts from the sampleStartingColumn (=9 usually).
+		"""
+		return self.individual_name2col_index
+	
+	def getSampleID2DataIndex(self):
+		"""
+		2012.10.5 accessor of self.sample_id2index
+			It includes "ref" as index=0.
+			The index is the index of each sample in the variant data_matrix or data_row of VCFRecord.
+			
+		"""
+		
+		return self.sample_id2index
 	
 	def parseFile(self):
 		"""
@@ -402,6 +439,10 @@ class VCFFile(object):
 		2011-11-2
 			this function is run inside __init__()
 		"""
+		self.metaInfoLs = []	#2012.3.28 anything before the "#CHROM" line. each entry is a raw line content, including '\n'
+		self.sampleIDHeader = []	#2012.3.20 a list of column headers (#CHROM)
+		self.sample_id_ls = []
+		
 		self.sample_id2index['ref'] = 0	#ref is at column 0. "ref" must not be equal to any read_group.
 		self.sample_id_ls.append('ref')
 		read_group2coverage = {}	#2011-9-2
@@ -429,7 +470,7 @@ class VCFFile(object):
 				self.headerWithoutHash= row[:]
 				self.headerWithoutHash[0] = 'CHROM'	#discard the #
 				self.col_name2index = getColName2IndexFromHeader(self.headerWithoutHash, skipEmptyColumn=True)
-				self.col_index_individual_name_ls = self.getIndividual2ColIndex(self.headerWithoutHash, self.col_name2index)
+				self.col_index_individual_name_ls = self._getIndividual2ColIndex(self.headerWithoutHash, self.col_name2index)
 				for individual_col_index, individual_name in self.col_index_individual_name_ls:
 					read_group = individual_name.strip()
 					if read_group not in self.sample_id2index:
@@ -476,7 +517,7 @@ class VCFFile(object):
 		except:
 			raise StopIteration
 	
-	def countHomoHetCallsForEachSampleFromVCF(self):
+	def _countHomoHetCallsForEachSampleFromVCF(self):
 		"""
 		2011-11-2
 			given a VCF file, count the number of homo-ref, homo-alt, het calls
@@ -535,6 +576,34 @@ class VCFFile(object):
 		"""
 		return self.sample_id_ls[1:]
 	
+	def getNoOfLoci(self):
+		"""
+		2012.9.25
+			fast way to get the number of loci, no VCF parsing.
+		"""
+		if self.inf is None:
+			return None
+		
+		if len(self.sample_id_ls)==0 and len(self.sampleIDHeader)==0:
+			self._parseHeader()
+		no_of_loci = 0
+		for line in self.inf:
+			no_of_loci += 1
+		self._resetInput()
+		
+		return no_of_loci
+	
+	def _resetInput(self):
+		"""
+		2012.10.5
+			run only to reset this VCFFile object and the read cursor is at the beginning of all VCF records.
+			split out of getNoOfLoci()
+		"""
+		#reset the inf
+		self.inf.seek(0)
+		#run this to move the cursor to where the VCF records start
+		self._parseHeader()
+	
 	def writeMetaAndHeader(self, outf=None):
 		"""
 		2012.5.10
@@ -583,3 +652,21 @@ class VCFFile(object):
 			del self.inf, self.reader
 		if self.outf:
 			del self.outf, self.writer
+	
+	def getLocus2AlternativeAlleleFrequency(self):
+		"""
+		2012.10.5
+			
+			adapted from VariantDiscovery.getContig2Locus2Frequency()
+		
+		"""
+		locus2frequency = {}
+		counter = 0
+		real_counter = 0
+		for vcfRecord in self:
+			current_locus = (vcfRecord.chr, vcfRecord.pos)
+			AAF = vcfRecord.getAAF()
+			locus2frequency[current_locus] = AAF
+		
+		self._resetInput()
+		return locus2frequency

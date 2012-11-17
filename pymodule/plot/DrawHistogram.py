@@ -71,7 +71,7 @@ class DrawHistogram(AbstractPlot):
 				whichColumn = self.whichColumn
 			
 			yValue = row[whichColumn]
-			if yValue!=self.missingDataNotation:
+			if yValue not in self.missingDataNotation:
 				yValue = self.handleYValue(yValue)
 				y_ls.append(yValue)
 	

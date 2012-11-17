@@ -17,4 +17,4 @@ from Genome import GeneModel
 from yh_matplotlib import assignMatPlotlibHueColorToLs, drawName2FCLegend
 from PCA import PCA
 
-from MatrixFile import MatrixFile
+from file.MatrixFile import MatrixFile

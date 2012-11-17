@@ -41,8 +41,6 @@ class Draw2DHistogramOfMatrix(AbstractPlot):
 	option_default_dict.update({
 						
 						('zColumnHeader', 0, ): ["", 'z', 1, 'index of the column to be z-axis'],\
-						('logX', 0, int): [0, '', 0, 'whether to take -log of X'],\
-						('logY', 0, int): [0, '', 0, 'whether to take -log of Y'],\
 						('logZ', 0, int): [0, '', 0, 'whether to take -log of Z'],\
 						})
 	#('columnForX', 1, ): ["", 'x', 1, 'index of the column to be x-axis'],\
@@ -94,7 +92,7 @@ class Draw2DHistogramOfMatrix(AbstractPlot):
 			else:
 				zValue = None
 			
-			if yValue!=self.missingDataNotation and xValue!=self.missingDataNotation:
+			if yValue not in self.missingDataNotation and xValue not in self.missingDataNotation:
 				xValue = self.processValue(value=xValue, takeLogarithm=self.logX, positiveLog=self.positiveLog, \
 										valueForNonPositiveValue=self.valueForNonPositiveYValue)
 				yValue = self.processValue(yValue, takeLogarithm=self.logY, positiveLog=self.positiveLog, \
