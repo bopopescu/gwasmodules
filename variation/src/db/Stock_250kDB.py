@@ -555,6 +555,7 @@ class AbstractTableWithFilename(object):
 
 class ResultsMethod(Entity, AbstractTableWithFilename):
 	"""
+	2012.11.14 added no_of_accessions and no_of_loci
 	2012.3.7
 		add column locus_type
 	2011-2-6
@@ -566,6 +567,8 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 		add unique constraint
 	"""
 	short_name = Field(String(60), unique=True)
+	no_of_accessions = Field(Integer)	#2012.11.14
+	no_of_loci = Field(Integer)
 	filename = Field(String(1000), unique=True)
 	original_filename = Field(Text)
 	method_description = Field(String(8000))
@@ -648,7 +651,7 @@ class ResultLandscape(Entity, AbstractTableWithFilename):
 	"""
 	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
 	result_landscape_type = ManyToOne('%s.ResultLandscapeType'%__name__, colname='result_landscape_type_id', ondelete='CASCADE', onupdate='CASCADE')
-	no_of_accessions = Field(Integer)	#2012.2.28
+	no_of_accessions = Field(Integer)	#2012.11.14
 	no_of_loci = Field(Integer)
 	
 	short_name = Field(String(60), unique=True)
@@ -2488,7 +2491,7 @@ class Stock_250kDB(ElixirDB):
 		rm = ResultsMethod.query.filter_by(call_method_id=call_method_id).filter_by(phenotype_method_id=phenotype_method_id).\
 					filter_by(analysis_method_id=analysis_method_id).first()
 		#from GeneListRankTest import GeneListRankTest
-		return self.getResultMethodContent(rm.id, data_dir=results_directory, min_MAF=min_MAF, 
+		return self.getResultMethodContent(result_id=rm.id, data_dir=results_directory, min_MAF=min_MAF, 
 												construct_chr_pos2index=construct_chr_pos2index,\
 												pdata=pdata)
 	
@@ -3704,12 +3707,13 @@ class Stock_250kDB(ElixirDB):
 			self._cnv_id2chr_pos[key] = value
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
 	
-	#@classmethod
-	def getResultMethodContent(self, results_method_id, data_dir=None, min_MAF=0.1, construct_chr_pos2index=False, \
-						pdata=None, min_value_cutoff=None, results_directory=None, **keywords):
+	def getResultMethodContent(self, result_id=None, data_dir=None, min_MAF=0.1, construct_chr_pos2index=False, \
+						pdata=None, min_value_cutoff=None, results_directory=None, result_landscape=None,\
+						result_method=None, **keywords):
 		"""
 		2012.11.13
 			argument results_directory is taken over by data_dir
+			restructure the code so that it could fetch ResultLandscape
 		2012.3.23
 			results_directory is equivalent to /Network/Data/250k/db/, not /Network/Data/250k/db/results/type_1/ (before).
 			also use self.reScalePathByNewDataDir() to get the updated path.
@@ -3736,49 +3740,70 @@ class Stock_250kDB(ElixirDB):
 		2008-08-13
 			split from getGeneID2MostSignificantHit()
 		"""
-		#genome_wide_result = getattr(cls, 'genome_wide_result', None)
-		do_log10_transformation = getattr(pdata, 'do_log10_transformation', None)
-		results_directory = getattr(pdata, 'results_directory', results_directory)
-		data_dir = getattr(pdata, 'data_dir', data_dir)
-		
-		rm = ResultsMethod.get(results_method_id)
-		from pymodule import getGenomeWideResultFromFile
-		# 2011-3-21 no more caching
-		#if genome_wide_result is not None and genome_wide_result.results_id==rm.id:
-		#	return genome_wide_result
-		
-		if rm.analysis_method_id==13: #Huh -Bjarni
-			sys.stderr.write("Analysis method id=%s is not supported.\n"%rm.analysis_method_id)
-			return None
-		
-		if data_dir is None and results_directory:
-			data_dir = results_directory
-		
-		result_fname = self.reScalePathByNewDataDir(filePath=rm.filename, newDataDir=data_dir)
-		
-		if do_log10_transformation is None:
-			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
-			if hasattr(rm, 'analysis_method'):
-					if rm.analysis_method.smaller_score_more_significant==1:
-						do_log10_transformation = True
-					else:
-						do_log10_transformation = False
-			else:
-				return None
 		if pdata is None:
 			pdata = PassingData()
+		#genome_wide_result = getattr(cls, 'genome_wide_result', None)
+		do_log10_transformation = getattr(pdata, 'do_log10_transformation', None)
+		
+		results_directory = getattr(pdata, 'results_directory', results_directory)
+		data_dir = getattr(pdata, 'data_dir', data_dir)
+		if not data_dir and results_directory:
+			data_dir = results_directory
 		
 		#2011-3-21 assign min_MAF to pdata only when pdata.min_MAF is None or doesn't exist.
 		min_MAF_request = getattr(pdata, 'min_MAF', None)
 		if min_MAF_request is None:
 			pdata.min_MAF = min_MAF
+		
 		if not hasattr(pdata, 'construct_chr_pos2index'):	#if pdata doesn't have construct_chr_pos2index defined. otherwise, pdata overrides the option.
 			pdata.construct_chr_pos2index = construct_chr_pos2index
+		
+		if result_method:
+			db_entry = result_method
+		elif result_landscape:
+			db_entry = result_landscape
+		elif result_id:
+			db_entry = ResultsMethod.get(result_id)
+		
+		from pymodule import getGenomeWideResultFromFile
+		# 2011-3-21 no more caching
+		#if genome_wide_result is not None and genome_wide_result.results_id==db_entry.id:
+		#	return genome_wide_result
+		
+		if db_entry.analysis_method_id==13: #Huh -Bjarni
+			sys.stderr.write("Analysis method id=%s is not supported.\n"%db_entry.analysis_method_id)
+			return None
+		
+		result_fname = self.reScalePathByNewDataDir(filePath=db_entry.filename, newDataDir=data_dir)
+		
+		if do_log10_transformation is None:
+			#based on the analysis method id, whether do -log() or not. it'll affect the later step of taking maximum pvalue out of SNPs associated with one gene
+			if hasattr(db_entry, 'analysis_method'):
+					if db_entry.analysis_method.smaller_score_more_significant==1:
+						do_log10_transformation = True
+					else:
+						do_log10_transformation = False
+			else:
+				return None
+		
 		if os.path.isfile(result_fname):
+			#2012.11.14 fetching the proper locus ID translation dictionary
+			if db_entry.call_method_id:
+				db_id2chr_pos = self.snp_id2chr_pos
+			elif db_entry.cnv_method_id:
+				if self._cnv_method_id!=db_entry.cnv_method_id:
+					self.cnv_id2chr_pos = db_entry.cnv_method_id
+					self._cnv_method_id = db_entry.cnv_method_id
+				db_id2chr_pos = self.cnv_id2chr_pos
+			pdata.db_id2chr_pos = db_id2chr_pos
+			
 			genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
 													pdata=pdata, min_value_cutoff=min_value_cutoff)
-			genome_wide_result.results_id = rm.id
-			genome_wide_result.rm = rm	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
+			genome_wide_result.db_entry_id = db_entry.id
+			genome_wide_result.db_entry = db_entry	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
+			#2012.11.14 for backwards compatibility
+			genome_wide_result.results_id = db_entry.id
+			genome_wide_result.rm = db_entry	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
 		else:
 			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
 			genome_wide_result = None
@@ -3903,6 +3928,27 @@ class Stock_250kDB(ElixirDB):
 									max_neighbor_distance=max_neighbor_distance)
 			self.session.add(db_entry)
 			self.session.flush()
+		return db_entry
+	
+	def getResultLandscape(self, result_id=None, result_landscape_type_id=None, \
+						call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
+						cnv_method_id=None, **keywords):
+		"""
+		2012.11.14 way to query ResultLandscape
+		"""
+		
+		query = ResultLandscape.query.filter_by(result_landscape_type_id=result_landscape_type_id)
+		if result_id:
+			query = query.filter_by(result_id=result_id)
+		if phenotype_method_id:
+			query = query.filter_by(phenotype_method_id=phenotype_method_id)
+		if analysis_method_id:
+			query = query.filter_by(analysis_method_id=analysis_method_id)
+		if call_method_id:
+			query = query.filter_by(call_method_id=call_method_id)
+		if cnv_method_id:
+			query = query.filter_by(cnv_method_id=cnv_method_id)
+		db_entry = query.first()
 		return db_entry
 	
 	def getResultLandscapeType(self, min_MAF=None, neighbor_distance=None, max_neighbor_distance=None):

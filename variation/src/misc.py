@@ -9293,6 +9293,34 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 	"""
 	
 	
+	@classmethod
+	def putCallMethodAccessions2AccessionSetTable(cls, db_250k=None, call_method_id=None):
+		"""
+		2012.9.28
+		"""
+		sys.stderr.write("Putting accessions from call-method %s into db as a new accession-set ..."%(call_method_id))
+		import Stock_250kDB 
+		accession_set = Stock_250kDB.AccessionSet(short_name='callMethod%s'%(call_method_id))
+		db_250k.session.add(accession_set)
+		
+		snpData = db_250k.getSNPMatrix(call_method_id=call_method_id, ignore_2nd_column=True)
+		counter = 0
+		for row_id in snpData.row_id_ls:
+			ecotype_id = int(row_id)
+			accessionSet2ecotype = Stock_250kDB.AccessionSet2Ecotype(ecotype_id=ecotype_id)
+			accessionSet2ecotype.accession_set = accession_set
+			db_250k.session.add(accessionSet2ecotype)
+			counter += 1
+		db_250k.session.flush()
+		db_250k.session.commit()
+		sys.stderr.write("%s accessions in set %s.\n"%(accession_set.id))
+	
+	"""
+		#2012.9.28
+		DB250k.putCallMethodAccessions2AccessionSetTable(db_250k=db_250k, call_method_id = 32)
+		sys.exit(0)
+	"""
+	
 class CNV(object):
 	class GWA(object):
 		"""
@@ -21115,6 +21143,10 @@ class Main(object):
 		#import MySQLdb
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
+		
+		#2012.9.28
+		DB250k.putCallMethodAccessions2AccessionSetTable(db_250k=db_250k, call_method_id = 32)
+		sys.exit(0)
 		
 
 #2007-03-05 common codes to initiate database connection

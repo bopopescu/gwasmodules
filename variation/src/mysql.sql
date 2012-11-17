@@ -528,3 +528,14 @@ create or replace view view_result_peak_summary as select p.result_peak_type_id,
     r.analysis_method_id,
     p.no_of_peaks from view_result_peak_count as p, 
     results_method r where r.id=p.result_id order by result_peak_type_id, call_method_id, phenotype_method_id, analysis_method_id;
+
+-- 2012.9.28 update phenotype_method.no_of_accessions
+begin;
+update phenotype_method p , (select method_id, count(distinct ecotype_id) as count from phenotype_avg group by method_id) as a
+	set p.no_of_accessions=a.count where a.method_id=p.id;
+commit;
+
+-- 2012.9.28 update mean/stddev of phenotype_method
+update phenotype_method, (select method_id, stddev(value) as std, min(value) as minv from phenotype_avg
+group by method_id) as newt set phenotype_method.min_value=newt.minv, phenotype_method.stddev=newt.std
+where phenotype_method.id=newt.method_id;

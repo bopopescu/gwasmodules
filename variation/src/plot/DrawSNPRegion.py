@@ -509,7 +509,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 					pd.db_id2chr_pos = db_250k.cnv_id2chr_pos
 				elif rm.call_method_id:
 					pd.db_id2chr_pos = db_250k.snp_id2chr_pos
-				#gwr = db_250k.getResultMethodContent(rm.id, pdata=pd)
+				#genome_wide_result = db_250k.getResultMethodContent(rm.id, pdata=pd)
 				genome_wide_result = db_250k.getResultMethodContent(rm.id, results_directory=results_directory, min_MAF=0, \
 												construct_chr_pos2index=True, pdata=pd)
 				analysis_method_id2gwr[rm.analysis_method_id] = genome_wide_result
@@ -601,7 +601,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 							32:'#87CEFA'}	#lightskyblue: #87CEFA	R=135 G=206	B=250 ACCESS=16436871
 	
 	# 2010-2-2 cls.analysis_method_id2name is deprecated in this program.
-	# 	the analysis method name is now retrieved directly from db (gwr.rm.analysis_method.short_name)
+	# 	the analysis method name is now retrieved directly from db (genome_wide_result.rm.analysis_method.short_name)
 	analysis_method_id2name = {1:'KW',
 							2:'FisherExact',
 							5:'Margarita',
@@ -612,8 +612,10 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 							19:'LM_with_PC1_34'}
 	
 	@classmethod
-	def getXY(cls, snps_within_this_region, analysis_method_id2gwr=None, analysis_method_id=None, LD_info=None, which_LD_statistic=2):
+	def getXY(cls, snps_within_this_region=None, genome_wide_result=None,\
+			analysis_method_id2gwr=None, analysis_method_id=None, LD_info=None, which_LD_statistic=2):
 		"""
+		2012.11.14 modernizes it so that PlotAssociationLocus.py could use it.
 		2012.3.7
 		2008-10-1
 			return LD value (with regard to the center SNP)
@@ -622,9 +624,9 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		"""
 		x_ls = []
 		y_ls = []
-		if analysis_method_id is not None:
-			gwr = analysis_method_id2gwr[analysis_method_id]
-		elif LD_info is None:	#2008-10-01
+		if genome_wide_result is None and analysis_method_id and analysis_method_id2gwr:
+			genome_wide_result = analysis_method_id2gwr[analysis_method_id]
+		if genome_wide_result is None and LD_info is None:	#2008-10-01
 			return x_ls, y_ls
 		
 		if analysis_method_id2gwr and 1 in analysis_method_id2gwr:
@@ -634,8 +636,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		else:
 			ref_gwr = None
 		for chr_pos in snps_within_this_region.chr_pos_ls:
-			if analysis_method_id is not None:
-				data_obj = gwr.get_data_obj_by_chr_pos(chr_pos[0], chr_pos[1], stopPosition=chr_pos[2])	#2012.3.7
+			if genome_wide_result:
+				data_obj = genome_wide_result.get_data_obj_by_chr_pos(chr_pos[0], chr_pos[1], stopPosition=chr_pos[2])	#2012.3.7
 			else:	#2008-10-1 fake a data_obj for LD
 				chr_pos1 = (snps_within_this_region.center_snp.chromosome, snps_within_this_region.center_snp.position)
 				chr_pos2 = chr_pos
@@ -655,7 +657,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 			if data_obj is not None:
 				x_ls.append(chr_pos[1])
 				if (analysis_method_id==5 or analysis_method_id==6) and ref_gwr:
-					value = (data_obj.value-gwr.min_value)/(gwr.max_value-gwr.min_value)*(ref_gwr.max_value-ref_gwr.min_value)
+					value = (data_obj.value-genome_wide_result.min_value)/(genome_wide_result.max_value-genome_wide_result.min_value)*(ref_gwr.max_value-ref_gwr.min_value)
 				else:
 					value = data_obj.value
 				y_ls.append(value)
@@ -687,14 +689,14 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		pscatter_ls = []
 		legend_ls = []
 		for analysis_method_id in analysis_method_id_ls:
-			gwr = analysis_method_id2gwr[analysis_method_id]
+			genome_wide_result = analysis_method_id2gwr[analysis_method_id]
 			x_ls, y_ls = cls.getXY(snps_within_this_region, analysis_method_id2gwr, analysis_method_id)
 			if x_ls and y_ls:
 				pscatter = axe_pvalue.scatter(x_ls, y_ls, s=4, linewidth=0.6, \
 											edgecolor=cls.analysis_method_id2color.get(analysis_method_id, 'b'), facecolor='none', alpha=1)
 				
 				#legend_ls.append(cls.analysis_method_id2name[analysis_method_id])
-				legend_ls.append(gwr.rm.analysis_method.short_name)	# 2010-2-2 get the analysis method name from db
+				legend_ls.append(genome_wide_result.rm.analysis_method.short_name)	# 2010-2-2 get the analysis method name from db
 				pscatter_ls.append(pscatter)
 		if LD_info and draw_LD_relative_to_center_SNP:	#draw LD with regard to the center SNP
 			x_ls, y_ls = cls.getXY(snps_within_this_region, LD_info=LD_info, which_LD_statistic=which_LD_statistic)
@@ -841,11 +843,12 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				param_data.no_of_genes_drawn += 1
 	
 	@classmethod
-	def drawGeneModel(cls, ax, snps_within_this_region, gene_annotation, candidate_gene_set=None, gene_width=1.0, \
+	def drawGeneModel(cls, ax, region=None, gene_annotation=None, candidate_gene_set=None, gene_width=1.0, \
 					gene_position_cycle=4, base_y_value=1, gene_box_text_gap=100, label_gene=0, rotate_xy=False,\
 					chr_id2cumu_size=None, chr_id2size=None, chr_gap=None, artist_obj_id2artist_gene_id_ls=None,\
 					gene_id2artist_object_id=None, drawGeneOnTheBoundary=True):
 		"""
+		2012.11.14 rename snps_within_this_region to region (3 attributes, chromosome, start, stop)
 		2009-4-30
 			handle chr,pos,offset in snps_within_this_region.chr_pos_ls by ignoring the offset bit
 		2008-12-22
@@ -859,8 +862,8 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		"""
 		sys.stderr.write("\t Drawing gene model  ...")
 		#2012.3.8 use the user-indicated span, rather than boundary of polymorphism loci
-		left_chr, left_pos = snps_within_this_region.chromosome, snps_within_this_region.start
-		right_chr, right_pos = snps_within_this_region.chromosome, snps_within_this_region.stop
+		left_chr, left_pos = region.chromosome, region.start
+		right_chr, right_pos = region.chromosome, region.stop
 		left_chr = str(left_chr)
 		right_chr = str(right_chr)
 		param_data = PassingData(gene_id2model=gene_annotation.gene_id2model, candidate_gene_set=candidate_gene_set, \
@@ -1149,7 +1152,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 			if not genome_wide_result:
 				sys.stderr.write("No genome association results for phenotype_method_id=%s, analysis_method_id=%s. Take a random one out of analysis_method_id2gwr.\n"%\
 							(phenotype_method_id, 1))
-				genome_wide_result = analysis_method_id2gwr.values()[0]	#take random gwr
+				genome_wide_result = analysis_method_id2gwr.values()[0]	#take random genome_wide_result
 			if snp_matrix_data_type==1:
 				chr_pos_ls = []
 			elif snp_matrix_data_type==3:

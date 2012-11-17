@@ -43,7 +43,7 @@ import Stock_250kDB
 from pymodule import figureOutDelimiter, PassingData
 
 import sqlalchemy as sql
-from common import getOneResultJsonData
+from variation.src.common import getOneResultJsonData
 from pymodule.pegasus.mapper.AbstractDBInteractingJob import AbstractDBInteractingJob
 
 """

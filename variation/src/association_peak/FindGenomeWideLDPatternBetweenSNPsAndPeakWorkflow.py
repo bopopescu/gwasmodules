@@ -121,7 +121,7 @@ class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflo
 		
 		DrawManhattanPlotForLDInHDF5 = Executable(namespace=namespace, name="DrawManhattanPlotForLDInHDF5", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		DrawManhattanPlotForLDInHDF5.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "mapper/DrawManhattanPlotForLDInHDF5.py"), \
+		DrawManhattanPlotForLDInHDF5.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "plot/DrawManhattanPlotForLDInHDF5.py"), \
 									site_handler))
 		DrawManhattanPlotForLDInHDF5.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		workflow.addExecutable(DrawManhattanPlotForLDInHDF5)

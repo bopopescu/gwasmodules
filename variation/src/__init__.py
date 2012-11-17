@@ -20,3 +20,5 @@ from sets import Set
 #import networkx as nx
 #from pymodule import importNumericArray, ProcessOptions, SNPData, write_data_matrix, read_data, TwoSNPData
 #num = importNumericArray()
+
+from db import Stock_250kDB

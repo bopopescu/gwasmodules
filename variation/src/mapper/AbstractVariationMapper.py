@@ -27,19 +27,19 @@ class AbstractVariationMapper(AbstractMapper):
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict.pop(('inputFname', 1, ))
 	option_default_dict.update({
-							('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+							('drivername', 1,):['mysql', '', 1, 'which type of database? mysql or postgres', ],\
 							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
 							('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
 							('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+							('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 							('port', 0, ):[None, '', 1, 'database port number'],\
-							('data_dir', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
-							('min_MAF', 0, float): [0.1, 'n', 1, 'minimum Minor Allele Frequency.'],\
+							('data_dir', 0, ):[None, '', 1, 'The results directory. Default is None. use the one given by db.'],\
+							('min_MAF', 0, float): [0.1, '', 1, 'minimum Minor Allele Frequency.'],\
 							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
 							
 							})
-	def __init__(self, inputFnameLs, **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
 		AbstractMapper.__init__(self, **keywords)
