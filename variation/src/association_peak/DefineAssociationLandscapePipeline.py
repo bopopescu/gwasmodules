@@ -106,7 +106,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		
 		DefineAssociationLandscape = Executable(namespace=namespace, name="DefineAssociationLandscape", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		DefineAssociationLandscape.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "DefineAssociationLandscape.py"), site_handler))
+		DefineAssociationLandscape.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "association_peak/DefineAssociationLandscape.py"), site_handler))
 		executableClusterSizeMultiplierList.append((DefineAssociationLandscape, 0.8))
 		
 		ResultLandscape2DB = Executable(namespace=namespace, name="ResultLandscape2DB", version=version, \

@@ -113,7 +113,7 @@ class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflo
 		
 		OutputLociIDOfResultPeakInHDF5 = Executable(namespace=namespace, name="OutputLociIDOfResultPeakInHDF5", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		OutputLociIDOfResultPeakInHDF5.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "mapper/OutputLociIDOfResultPeakInHDF5.py"), \
+		OutputLociIDOfResultPeakInHDF5.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "association_peak/OutputLociIDOfResultPeakInHDF5.py"), \
 									site_handler))
 		OutputLociIDOfResultPeakInHDF5.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		workflow.addExecutable(OutputLociIDOfResultPeakInHDF5)

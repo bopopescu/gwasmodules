@@ -116,17 +116,17 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		
 		Association = Executable(namespace=namespace, name="Association", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		Association.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "Association.py"), site_handler))
+		Association.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "association/Association.py"), site_handler))
 		executableClusterSizeMultiplierList.append((Association, 0))
 		
 		Results2DB_250k = Executable(namespace=namespace, name="Results2DB_250k", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		Results2DB_250k.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "Results2DB_250k.py"), site_handler))
+		Results2DB_250k.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "db/Results2DB_250k.py"), site_handler))
 		executableClusterSizeMultiplierList.append((Results2DB_250k, 0))
 		
 		OutputPhenotype = Executable(namespace=namespace, name="OutputPhenotype", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		OutputPhenotype.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "OutputPhenotype.py"), site_handler))
+		OutputPhenotype.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "db/output/OutputPhenotype.py"), site_handler))
 		executableClusterSizeMultiplierList.append((OutputPhenotype, 0))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
