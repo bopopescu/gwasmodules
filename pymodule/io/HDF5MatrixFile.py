@@ -27,9 +27,9 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule.ProcessOptions import  ProcessOptions
 from pymodule import utils, figureOutDelimiter
-from pymodule import MatrixFile
+from pymodule.ProcessOptions import  ProcessOptions
+from pymodule.io.MatrixFile import MatrixFile
 import csv
 import h5py
 import numpy
@@ -48,6 +48,8 @@ class HDF5GroupWrapper(object):
 			self._readInData()
 		elif self.openMode =='w':
 			self._createDatasetSkeletonForOneGroup(h5Group=self.h5Group, dtype=self.dataMatrixDtype)
+		
+		self.newWrite = True	#a flag used to control whether it's first time to write stuff (first time=set whole matrix)
 
 	def _createDatasetSkeletonForOneGroup(self, h5Group=None, dtype=None):
 		"""
@@ -117,8 +119,13 @@ class HDF5GroupWrapper(object):
 								(s, t, m, n))
 				sys.exit(3)
 			else:
-				self.dataMatrix.resize((s+m, n))
-				self.dataMatrix[s:s+m] = dataMatrix
+				if self.newWrite:	#defaultData in self.dataMatrix is of shape (1,0)
+					self.dataMatrix.resize((m, n))
+					self.dataMatrix[0:m] = dataMatrix
+				else:
+					self.dataMatrix.resize((s+m, n))
+					self.dataMatrix[s:s+m] = dataMatrix
+				self.newWrite = False
 
 	def _appendID(self, idDataset=None, idValue=None):
 		"""
@@ -228,7 +235,7 @@ class HDF5MatrixFile(MatrixFile):
 		self.numericGroup = HDF5GroupWrapper(self.hdf5File[self.numericGroupName], openMode=self.openMode,\
 											dataMatrixDtype=self.dtype)
 		self.strGroup = HDF5GroupWrapper(self.hdf5File[self.strGroupName], openMode=self.openMode, \
-										dataMatrixDtype=self.dtype)
+										dataMatrixDtype=str_type)
 		self._setupCombinedColumnIDMapper()
 		
 	def _setupCombinedColumnIDMapper(self,):
@@ -237,7 +244,7 @@ class HDF5MatrixFile(MatrixFile):
 			the strGroup is arranged after numericGroup.
 		"""
 		self.combinedColID2ColIndex = {}
-		colIDList = self.numericGroup.colIDList + self.strGroup.colIDList
+		colIDList = list(self.numericGroup.colIDList) + list(self.strGroup.colIDList)
 		for colID in colIDList:
 			if colID in self.combinedColID2ColIndex:
 				sys.stderr.write("Error: column ID %s already used in column %s.\n"%(colID, self.combinedColID2ColIndex.get(colID)))
@@ -252,7 +259,7 @@ class HDF5MatrixFile(MatrixFile):
 		"""
 		return self.combinedColID2ColIndex.get(colHeader)
 	
-	def getColIndex(self, colID=None, groupObject=None):
+	def _getColIndex(self, colID=None, groupObject=None):
 		"""
 		
 		"""
@@ -261,7 +268,7 @@ class HDF5MatrixFile(MatrixFile):
 		
 		return groupObject.getColIndex(colID=colID)
 	
-	def getRowIndex(self, rowID=None, groupObject=None):
+	def _getRowIndex(self, rowID=None, groupObject=None):
 		"""
 		"""
 		if groupObject is None:
@@ -271,22 +278,22 @@ class HDF5MatrixFile(MatrixFile):
 	def getNumericColIndex(self, colID=None):
 		"""
 		"""
-		return self.getColIndex(colID=colID, groupObject=self.numericGroup)
+		return self._getColIndex(colID=colID, groupObject=self.numericGroup)
 	
 	def getNumericRowIndex(self, rowID=None):
 		"""
 		"""
-		return self.getRowIndex(rowID=rowID, groupObject=self.numericGroup)
+		return self._getRowIndex(rowID=rowID, groupObject=self.numericGroup)
 	
 	def getStrColIndex(self, colID=None):
 		"""
 		"""
-		return self.getColIndex(colID=colID, groupObject=self.strGroup)
+		return self._getColIndex(colID=colID, groupObject=self.strGroup)
 	
 	def getStrRowIndex(self, rowID=None):
 		"""
 		"""
-		return self.getRowIndex(rowID=rowID, groupObject=self.strGroup)
+		return self._getRowIndex(rowID=rowID, groupObject=self.strGroup)
 	
 	def getCellDataGivenRowColID(self, rowID=None, colID=None, groupObject=None):
 		"""
