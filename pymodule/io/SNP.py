@@ -6,9 +6,10 @@
 import os, sys
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-from ProcessOptions import  ProcessOptions
-from utils import dict_map, importNumericArray, figureOutDelimiter, PassingData
+from pymodule.ProcessOptions import  ProcessOptions
+from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData
 import copy
+from pymodule.db import TableClass
 
 num = importNumericArray()
 numpy = num
@@ -2046,7 +2047,6 @@ class SNPData(object):
 			data = SNPData(row_id_key_set,row_id_hash_func,col_id_key_set,col_id_hash_func,keywords)
 		return data
 		
-from db import TableClass
 class GenomeWideResults(TableClass):
 	genome_wide_result_ls = None
 	genome_wide_result_obj_id2index = None
@@ -2532,6 +2532,10 @@ class DataObject(object):
 		self.comment = None
 		for key, value in keywords.iteritems():
 			setattr(self, key, value)
+		
+		#2012.11.18 convenient purpose
+		self.start = self.position
+		self.stop = self.stop_position
 	
 	def __cmp__(self, other):
 		"""

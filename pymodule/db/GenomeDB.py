@@ -31,7 +31,7 @@ from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy import and_, or_, not_
 from pymodule import PassingData	#2012.3.26 "from utils import PassingData" won't work because no module named "utils" exists outside pymodule (!=pymodule.utils). 
 
-from db import ElixirDB
+from pymodule.db import ElixirDB
 
 __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 #__metadata__ = ThreadLocalMetaData() #2008-11-04 not good for pylon

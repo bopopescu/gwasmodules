@@ -20,10 +20,10 @@ class AbstractDBInteractingClass(object):
 	db_option_dict = {
 					('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
 					('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
-					('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
-					('schema', 0, ): ['public', 'k', 1, 'database schema name', ],\
+					('dbname', 1, ): ['vervetdb', '', 1, 'database name', ],\
+					('schema', 0, ): ['public', '', 1, 'database schema name', ],\
 					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+					('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 					('port', 0, ):[None, '', 1, 'database port number. must be non-empty if need ssh tunnel'],\
 					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
 					}
@@ -49,6 +49,11 @@ class AbstractDBInteractingClass(object):
 		#2012.7.4 keep track of all the source&destination files, used by moveNewISQFileIntoDBStorage()
 		self.srcFilenameLs = []
 		self.dstFilenameLs = []
+		#2012.11.18
+		if getattr(self, "logFilename", None):
+			self.logF = open(self.logFilename, 'w')
+		else:
+			self.logF = None
 	
 	def connectDB(self):
 		"""
@@ -85,17 +90,30 @@ class AbstractDBInteractingClass(object):
 		"""
 		sys.exit(exitCode)
 	
-	def outputLogMessage(self, logMessage=None, logFilename=None):
+	def outputLogMessage(self, logMessage=None, logFilename=None, logF=None):
 		"""
+		2012.11.18
+			1. do not close _logF
+			2. use self.logF if None available.
+			3. append to logFilename if the latter is given.
 		2012.7.17
 		"""
-		if logFilename is None:
-			logFilename = self.logFilename
-		if logFilename:
-			outf = open(logFilename, 'w')
-			outf.write(logMessage)
-			outf.close()
+		_logF = None
+		if logF is None:
+			if logFilename:
+				_logF = open(logFilename, 'a')
+			elif self.logF:
+				_logF = self.logF
+		if _logF:
+			_logF.write(logMessage)
 	
+	def closeLogF(self):
+		"""
+		2012.11.18
+		"""
+		if getattr(self, 'logF', None):
+			self.logF.close()
+		
 	def run(self):
 		pass
 	

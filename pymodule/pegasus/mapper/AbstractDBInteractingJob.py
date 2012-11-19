@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
-from pymodule.AbstractDBInteractingClass import AbstractDBInteractingClass
+from pymodule import AbstractMapper
+from pymodule import AbstractDBInteractingClass
 
 class AbstractDBInteractingJob(AbstractDBInteractingClass):
 	__doc__ = __doc__
@@ -30,7 +30,7 @@ class AbstractDBInteractingJob(AbstractDBInteractingClass):
 	option_default_dict.update({
 							('logFilename', 0, ): [None, '', 1, 'file to contain logs. use it only when this job is at the end of pegasus workflow \
 					and has no other output file. Because otherwise, pegasus optimization will get rid of this job (no output file, why need it?)'],\
-							('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
+							('commit', 0, int):[0, '', 0, 'commit db transaction'],\
 							})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""

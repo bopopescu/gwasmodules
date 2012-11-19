@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule import SNP
+from pymodule.io import SNP
 import re
 
 class AbstractMapper(object):

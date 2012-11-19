@@ -3,8 +3,11 @@
 2011-8-28
 	class to store functions related to next-gen sequencing
 """
+import os, sys
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import os, sys, csv, re
-import utils
+from pymodule import utils
 
 def getPEInputFiles(input_dir, isPE=True):
 	"""

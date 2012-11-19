@@ -14,7 +14,7 @@ import sys, os, csv, traceback
 
 from sets import Set
 from SNP import get_nt_number2diff_matrix_index, nt2number, number2nt, NA_set, SNPData
-from utils import importNumericArray
+from pymodule.utils import importNumericArray
 num = importNumericArray()
 
 class QualityControl(object):

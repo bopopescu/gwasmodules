@@ -7,9 +7,9 @@
 import os, sys
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-from ProcessOptions import  ProcessOptions
+from pymodule.ProcessOptions import  ProcessOptions
+from pymodule.utils import PassingData
 import copy
-from utils import PassingData
 import numpy
 
 def listSubsets(element_ls, subset_size=None):

@@ -8,8 +8,8 @@
 import os, sys
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-from ProcessOptions import  ProcessOptions
-from utils import dict_map, importNumericArray, figureOutDelimiter, PassingData
+from pymodule.ProcessOptions import  ProcessOptions
+from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData
 import copy
 import pysam
 

@@ -6,7 +6,6 @@
 import os, sys
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-from ProcessOptions import  ProcessOptions
 from Pegasus.DAX3 import *
 
 def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, version=None,\
