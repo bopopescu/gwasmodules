@@ -6,10 +6,14 @@
 import os, sys
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+import copy, csv, math
+import re
 from pymodule.ProcessOptions import  ProcessOptions
-from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData
-import copy
+from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData, getColName2IndexFromHeader
 from pymodule.db import TableClass
+from pymodule.io.HDF5MatrixFile import HDF5MatrixFile
+
+pa_has_characters = re.compile(r'[a-zA-Z_]')
 
 num = importNumericArray()
 numpy = num
@@ -2110,18 +2114,22 @@ class GenomeWideResult(object):
 	"""
 	data_obj_ls = None
 	data_obj_id2index = None
+	
 	name = None
 	results_method_id = None
 	results_method = None
 	min_value = None
 	max_value = None
+	
 	chr_pos2index = None
 	construct_data_obj_id2index = None	#True if get_data_obj_by_obj_id() is desired.
+	construct_locus_db_id2index = None	#2012.11.20 True if get_data_obj_by_db_id() is desired.
 	construct_chr_pos2index = None	#True if get_data_obj_by_chr_pos() is desired.
 	argsort_data_obj_ls = None
 	chr2no_of_snps = None
 	
-	def __init__(self, construct_data_obj_id2index=True, construct_chr_pos2index=False, name=None, base_value = 0):
+	def __init__(self, construct_data_obj_id2index=True, construct_chr_pos2index=False, construct_locus_db_id2index=False,\
+				name=None, base_value = 0):
 		"""
 		2009-4-24
 		2008-10-30
@@ -2130,12 +2138,17 @@ class GenomeWideResult(object):
 		"""
 		self.construct_data_obj_id2index = construct_data_obj_id2index	#True if get_data_obj_by_obj_id() is desired.
 		self.construct_chr_pos2index = construct_chr_pos2index	#True if get_data_obj_by_chr_pos() is desired.
+		self.construct_locus_db_id2index = construct_locus_db_id2index	#2012.11.20 
 		self.name = name
 		self.base_value = base_value
 		self.chr2min_max_pos = {}
 		# 2010-3-9 initialize these two here
 		self.data_obj_ls = []	#list and dictionary are crazy references.
 		self.data_obj_id2index = {}
+		
+		#2012.11.20
+		self.locus_db_id2index = {}
+		
 	
 	def __len__(self):
 		"""
@@ -2147,13 +2160,39 @@ class GenomeWideResult(object):
 		else:
 			return None
 	
-	def get_data_obj_by_obj_id(self, obj_id):
-		return self.data_obj_ls[self.data_obj_id2index[obj_id]]
+	def get_data_obj_index_by_locus_db_id(self, locus_db_id=None):
+		"""
+		2012.11.20
+		"""
+		return self.locus_db_id2index.get(locus_db_id)
 	
-	def get_data_obj_by_obj_index(self, obj_index):
-		return self.data_obj_ls[obj_index]
+	def get_data_obj_by_locus_db_id(self, locus_db_id=None):
+		"""
+		2012.11.20
+		"""
+		obj_index = self.locus_db_id2index.get(locus_db_id)
+		return self.get_data_obj_by_obj_index(obj_index)
 	
-	def get_data_obj_by_chr_pos(self, chromosome, position=None, stopPosition=None):
+	def get_data_obj_by_obj_id(self, obj_id=None):
+		"""
+		2012.11.19
+			use get()
+		"""
+		obj_index = self.data_obj_id2index.get(obj_id)
+		return self.get_data_obj_by_obj_index(obj_index)
+	
+	def get_data_obj_by_obj_index(self, obj_index=None):
+		"""
+		2012.11.19
+			use get()
+		"""
+		if obj_index >=0 and obj_index<len(self.data_obj_ls):
+			data_obj = self.data_obj_ls[obj_index]
+		else:
+			data_obj = None
+		return data_obj
+	
+	def get_data_obj_by_chr_pos(self, chromosome=None, position=None, stopPosition=None):
 		"""
 		2012.3.7
 			add argument stopPosition
@@ -2165,11 +2204,12 @@ class GenomeWideResult(object):
 			return None
 		else:
 			obj_index = self.chr_pos2index.get((chromosome, position, stopPosition))
-			if obj_index is not None:
-				return self.data_obj_ls[obj_index]
+			return self.get_data_obj_by_obj_index(obj_index)
 	
 	def add_one_data_obj(self, data_obj, chr_pos2index=None):
 		"""
+		2012.11.20 assign value to data_obj.index
+			deal with construct_locus_db_id2index
 		2012.3.7
 			add data_obj.stopPosition into the chr_pos key
 		2009-4-24 update self.chr2min_max_pos
@@ -2188,6 +2228,8 @@ class GenomeWideResult(object):
 		else:
 			data_obj_index = len(self.data_obj_ls)
 			self.data_obj_ls.append(data_obj)
+		#2012.11.20 add an index attribute to data_obj
+		data_obj.index = data_obj_index
 		
 		if self.construct_data_obj_id2index:	#2008-10-21
 			if self.data_obj_id2index == None:
@@ -2199,6 +2241,16 @@ class GenomeWideResult(object):
 			chr_pos = (data_obj.chromosome, data_obj.position, data_obj.stopPosition)	#2012.3.7 add data_obj.stopPosition
 			if chr_pos not in self.chr_pos2index:
 				self.chr_pos2index[chr_pos] = data_obj_index
+			else:
+				sys.stderr.write("Warning: chr_pos key %s already in self.chr_pos2index with index=%s.\n"%\
+								(repr(chr_pos), self.chr_pos2index.get(chr_pos)))
+		if self.construct_locus_db_id2index:	#2012.11.20
+			locus_db_id = data_obj.db_id
+			if locus_db_id not in self.locus_db_id2index:
+				self.locus_db_id2index[locus_db_id] = data_obj_index
+			else:
+				sys.stderr.write("Warning: locus_db_id key %s already in self.locus_db_id2index with index=%s.\n"%\
+								(locus_db_id, self.locus_db_id2index.get(locus_db_id)))
 		if self.min_value is None or data_obj.value<self.min_value:
 			self.min_value = data_obj.value
 		if self.max_value is None or data_obj.value>self.max_value:
@@ -2219,7 +2271,7 @@ class GenomeWideResult(object):
 			if data_obj.position>self.chr2min_max_pos[data_obj.chromosome][1]:
 				self.chr2min_max_pos[data_obj.chromosome][1]=data_obj.position
 	
-	def get_data_obj_at_given_rank(self, rank):
+	def get_data_obj_at_given_rank(self, rank=None):
 		"""
 		2009-2-18
 			if rank is beyond reach, return None
@@ -2233,7 +2285,7 @@ class GenomeWideResult(object):
 		else:
 			return self.data_obj_ls[self.argsort_data_obj_ls[-rank]]	#value bigger, rank smaller
 	
-	def get_data_obj_index_given_rank(self, rank):
+	def get_data_obj_index_given_rank(self, rank=None):
 		"""
 		2009-2-18
 			if rank is beyond reach, return None
@@ -2497,6 +2549,77 @@ class GenomeWideResult(object):
 		del d1, f1
 		sys.stderr.write(" %s data points\n"%(len(self.data_obj_ls)))
 	
+	def _extractOutputRowFromDataObject(self, data_obj=None):
+		"""
+		"""
+		row = (data_obj.db_id, data_obj.chromosome, data_obj.start, data_obj.stop, data_obj.value, \
+									data_obj.mac, data_obj.maf)
+		return row
+	
+	def outputInHDF5MatrixFile(self, writer=None, filename=None, groupName='association', closeFile = True):
+		"""
+		2012.11.19
+			output it into an HDF5MatrixFile file
+		"""
+		sys.stderr.write("Dumping association result into %s (HDF5 format) ..."%(filename))
+		#each number below is counting bytes, not bits
+		dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
+		headerList = [row[0] for row in dtypeList]
+		dtype = numpy.dtype(dtypeList)
+		if writer is None and filename:
+			writer = HDF5MatrixFile(filename, openMode='w', dtype=dtype, firstGroupName=groupName)
+			writer.writeHeader(headerList)
+			groupObject = writer.getGroupObject(groupName=groupName)
+		elif writer:
+			groupObject = writer.createNewGroup(groupName=groupName, dtype=dtype)
+			groupObject.setColIDList(headerList)
+		else:
+			sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
+			sys.exit(3)
+		
+		cellList = []
+		for data_obj in self.data_obj_ls:
+			dataTuple = self._extractOutputRowFromDataObject(data_obj=data_obj)
+			cellList.append(dataTuple)
+		
+		if groupObject is None:
+			sys.stderr.write("Error: groupObject (name=%s) is None. could not write.\n"%(groupName))
+			sys.exit(3)
+		groupObject.writeCellList(cellList)
+		if closeFile:
+			writer.close()
+		sys.stderr.write("%s objects.\n"%(len(cellList)))
+		return writer
+	
+	def reIndexDataObjecs(self):
+		"""
+		2012.11.20 need to run this after data_obj_ls is sorted and you plan to use any index
+		"""
+		self.data_obj_id2index = {}
+		self.chr_pos2index = {}
+		self.locus_db_id2index = {}
+		for i in xrange(len(self.data_obj_ls)):
+			data_obj = self.data_obj_ls[i]
+			data_obj_index = i
+			data_obj.index = i
+			if self.construct_data_obj_id2index:	#2008-10-21
+				self.data_obj_id2index[id(data_obj)] = data_obj_index
+			if self.construct_chr_pos2index:	#2008-09-24
+				chr_pos = (data_obj.chromosome, data_obj.position, data_obj.stopPosition)	#2012.3.7 add data_obj.stopPosition
+				if chr_pos not in self.chr_pos2index:
+					self.chr_pos2index[chr_pos] = data_obj_index
+				else:
+					sys.stderr.write("Warning: chr_pos key %s already in self.chr_pos2index with index=%s.\n"%\
+									(repr(chr_pos), self.chr_pos2index.get(chr_pos)))
+			if self.construct_locus_db_id2index:
+				locus_db_id = data_obj.db_id
+				if locus_db_id not in self.locus_db_id2index:
+					self.locus_db_id2index[locus_db_id] = data_obj_index
+				else:
+					sys.stderr.write("Warning: locus_db_id key %s already in self.locus_db_id2index with index=%s.\n"%\
+									(locus_db_id, self.locus_db_id2index.get(locus_db_id)))
+
 class DataObject(object):
 	"""
 	2009-1-7
@@ -2536,6 +2659,7 @@ class DataObject(object):
 		#2012.11.18 convenient purpose
 		self.start = self.position
 		self.stop = self.stop_position
+		self.index = None
 	
 	def __cmp__(self, other):
 		"""
@@ -2585,9 +2709,6 @@ def cmpDataObjByChrPos(x, y):
 	"""
 	return cmp((x.chromosome, x.position), (y.chromosome, y.position))
 
-import re
-pa_has_characters = re.compile(r'[a-zA-Z_]')
-import math
 
 def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=True,\
@@ -2686,11 +2807,9 @@ def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_tran
 	gwr.data_obj_ls = []	#list and dictionary are crazy references.
 	gwr.data_obj_id2index = {}
 	genome_wide_result_id = id(gwr)
-	import csv
 	delimiter = figureOutDelimiter(inputFname)
 	reader = csv.reader(open(inputFname), delimiter=delimiter)
 	no_of_lines = 0
-	from utils import getColName2IndexFromHeader
 	col_name2index = {}
 	header = []
 	for row in reader:
@@ -2873,3 +2992,145 @@ class SNPInfo(object):
 		else:
 			alleles = None
 		return alleles
+
+
+def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
+							construct_chr_pos2index=False, construct_data_obj_id2index=False, construct_locus_db_id2index=False,\
+							chr_pos2index=None, max_value_cutoff=None, \
+							OR_min_max=False, report=True, groupName='association', **keywords):
+	"""
+	2012.11.19 similar to getGenomeWideResultFromFile, but instead the input is a HDF5MatrixFile format.
+	"""
+	
+	#A dictionary to understand new headers:
+	header_dict = {}
+	
+	construct_chr_pos2index = getattr(pdata, 'construct_chr_pos2index', construct_chr_pos2index)	#2008-09-24
+	construct_data_obj_id2index = getattr(pdata, 'construct_data_obj_id2index', construct_data_obj_id2index)	#2008-10-28 for get_data_obj_by_obj_index()
+	chr_pos2index = getattr(pdata, 'chr_pos2index', chr_pos2index)	#2008-10-21
+	db_id2chr_pos = getattr(pdata, 'db_id2chr_pos', None)	#2011-2-24
+	score_for_0_pvalue = getattr(pdata, 'score_for_0_pvalue', 50)
+	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(inputFname))
+	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
+	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
+	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
+	report = getattr(pdata, 'report', report)	#2012.11.15
+	
+	#2011-3-21
+	chromosome_request = getattr(pdata, 'chromosome', None)
+	start_request = getattr(pdata, 'start', None)
+	try:
+		start_request = float(start_request)	#passed from web interface functions is of str type
+	except:
+		pass
+	stop_request = getattr(pdata, 'stop', None)
+	try:
+		stop_request = float(stop_request)	#passed from web interface functions is of str type. int('12384.84') results in failure.
+	except:
+		pass
+	min_MAF_request = getattr(pdata, 'min_MAF', None)
+	min_MAC_request = getattr(pdata, 'min_MAC', None)	#2009-1-29
+	
+	if report:
+		sys.stderr.write("Getting genome wide result from %s ... "%inputFname)
+	
+	gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=construct_chr_pos2index, \
+						construct_data_obj_id2index=construct_data_obj_id2index, \
+						construct_locus_db_id2index=construct_locus_db_id2index)
+	gwr.data_obj_ls = []	#list and dictionary are crazy references.
+	gwr.data_obj_id2index = {}
+	genome_wide_result_id = id(gwr)
+	
+	reader = HDF5MatrixFile(inputFname, openMode='r')
+	associationGroupObject = reader.getGroupObject(groupName=groupName)
+	locusIDColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='locus_id')
+	chrColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='chromosome')
+	startColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='start')
+	stopColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='stop')
+	scoreColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='score')
+	MACColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='MAC')
+	MAFColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='MAF')
+	
+	no_of_lines = 0
+	for row in associationGroupObject:
+		#2011-3-10 initialize all variables
+		column_6 = None	#it's genotype_var_perc probably
+		rest_of_row = []
+		#no type cast, all straight from HDF5
+		
+		db_id = row[locusIDColIndex]
+		chromosome = row[chrColIndex]	#2011-4-19 no more integer conversion for chromosome.
+		start_pos = row[startColIndex]
+		stop_pos = row[stopColIndex]
+		
+		if db_id2chr_pos:	#2012.11.19 correct chromosome, start_pos, stop_pos based on this dictionary
+			if db_id in db_id2chr_pos:
+				chr_pos = db_id2chr_pos.get(db_id)
+				if len(chr_pos)>=2:
+					chromosome, start_pos = chr_pos[:2]
+				if len(chr_pos)>=3:
+					stop_pos = chr_pos[2]
+		
+		score = row[scoreColIndex]
+		MAC = row[MACColIndex]
+		MAF = row[MAFColIndex]
+		if chromosome_request!=None and chromosome!=chromosome_request:
+			continue
+		if start_request!=None and start_pos<start_request:
+			continue
+		if stop_request!=None and start_pos>stop_request:
+			continue
+		if min_MAF_request!=None and MAF!=None and MAF<min_MAF_request:	#MAF too small
+			continue
+		if min_MAC_request!=None and MAC!=None and MAC<min_MAC_request:	#2009-1-29 MAC too small
+			continue
+		if do_log10_transformation:
+			if score<=0:
+				sys.stderr.write("score <=0. can't do log10. row is %s. assign %s to it.\n"%(repr(row), score_for_0_pvalue))
+				#continue
+				score = score_for_0_pvalue
+			else:
+				score = -math.log10(score)
+		
+		# 2009-10-27 procedure to decide whether to include the data point or not
+		include_the_data_point = False	# default is False
+		if min_value_cutoff is not None and max_value_cutoff is not None:	# both are specified. check OR_min_max.
+			if OR_min_max:	# condition is OR
+				if score>=min_value_cutoff or score<=max_value_cutoff:
+					include_the_data_point = True
+			else:	# condition is AND
+				if score>=min_value_cutoff and score<=max_value_cutoff:
+					include_the_data_point = True
+			
+		elif min_value_cutoff is not None and score>=min_value_cutoff:
+			include_the_data_point = True
+		elif max_value_cutoff is not None and score<=max_value_cutoff:
+			include_the_data_point = True
+		elif min_value_cutoff is None and max_value_cutoff is None:	# both are not specified.
+			include_the_data_point = True
+		if include_the_data_point and chr_pos_map:	#2010-10-13
+			if stop_pos is not None:
+				key = (chromosome, start_pos, stop_pos)
+			else:
+				key = (chromosome, start_pos,)
+			new_chr_start_stop = chr_pos_map.get(key)
+			if new_chr_start_stop is None:
+				include_the_data_point = False	# skip this point
+			else:
+				chromosome, start_pos = new_chr_start_stop[:2]
+				if len(new_chr_start_stop)>2:
+					stop_pos = new_chr_start_stop[2]
+		if include_the_data_point:
+			data_obj = DataObject(db_id=db_id, chromosome=chromosome, position=start_pos, stop_position=stop_pos, value =score,
+								maf=MAF, mac=MAC)
+			data_obj.genome_wide_result_id = genome_wide_result_id
+			data_obj.genome_wide_result_name = gwr.name
+			gwr.add_one_data_obj(data_obj, chr_pos2index)
+		
+		no_of_lines += 1
+	
+	reader.close()
+	del reader
+	if report:
+		sys.stderr.write(" %s loci.\n"%(len(gwr.data_obj_ls)))
+	return gwr
