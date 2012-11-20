@@ -24,7 +24,7 @@ from io import SNP
 from io import NextGenSeq
 from io.MatrixFile import MatrixFile
 from io.SNP import write_data_matrix, read_data, SNPData, GenomeWideResults, GenomeWideResult, DataObject, getGenomeWideResultFromFile,\
-	nt2number, number2nt, SNPInfo, number2single_char_nt
+	nt2number, number2nt, SNPInfo, number2single_char_nt, getGenomeWideResultFromHDF5MatrixFile
 from io.TwoSNPData import TwoSNPData, QualityControl
 from io.HDF5MatrixFile import HDF5MatrixFile 
 from io.BamFile import BamFile
