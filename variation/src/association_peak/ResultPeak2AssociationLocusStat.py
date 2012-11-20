@@ -23,7 +23,6 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule import SNPData, SNP
-#from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 from variation.src import Stock_250kDB
 import networkx as nx
@@ -42,10 +41,11 @@ class ResultPeak2AssociationLocusStat(AbstractVariationMapper):
 							('result_peak_type_id_ls', 1, ): ['', 's', 1, 'list of result peak type IDs, in this order:\
 								snp-KW-gwas,snp-EMMA-gwas,deletion-KW-gwas,deletion-EMMA-gwas', ],\
 							})
-	def __init__(self, inputFnameLs, **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
-		AbstractVariationMapper.__init__(self, inputFnameLs, **keywords)
+		AbstractVariationMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
+		
 		self.phenotype_id_ls = getListOutOfStr(self.phenotype_id_ls, data_type=int)
 		self.phenotype_id_ls.sort()
 		self.result_peak_type_id_ls = getListOutOfStr(self.result_peak_type_id_ls, data_type=int)
