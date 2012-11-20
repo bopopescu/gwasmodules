@@ -2,18 +2,16 @@
 """
 
 Examples:
-	# define landscape for result 4634 and others
-	%s -z banyan -u yh -j 4634 -c
+	# define landscape for result 5566 and others
+	%s -z banyan -u yh -j 5566 -o /tmp/5566_association_landscape.h5
 	
-	# set the minimum score to 5
-	%s -z banyan -u yh -j 4634 -c -f 5
-	
+	%s
 Description:
-	Program to find the landscape/peaks of a genome wide association result.
-	It fills data into db table ResultPeak, but not table ResultLandscape.
+	2012.11.20 This program finds the landscape of a genome wide association result and outputs them in HDF5.
+	The output contains 2 HDF5 groups. One is "association", the input association result.
+		Second is "landscape", the bridge_ls of the landscape.
+	This program is upstream of AssociationLandscape2Peak.py
 	
-	Results fetched by combination of (call_method_id, analysis_method_id_ls, phenotype_method_id_ls)
-		will be added to result_id_ls.
 
 """
 import sys, os, math
@@ -22,42 +20,24 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import time, csv, getopt
-import warnings, traceback
-from pymodule import ProcessOptions, PassingData, GenomeDB
-import Stock_250kDB
-from pymodule import SNP, getListOutOfStr, yh_matplotlib, PassingData
-from pymodule.db import formReadmeObj
-from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-from pymodule.RBTree import RBDict
+import warnings, traceback, numpy
 import networkx as nx
-from sqlalchemy import func
+from pymodule import ProcessOptions, PassingData, GenomeDB
+from pymodule import SNP, getListOutOfStr, yh_matplotlib, PassingData, HDF5MatrixFile
+from variation.src import Stock_250kDB
+from variation.src import AbstractVariationMapper
 
-class DefineAssociationLandscape(object):
+class DefineAssociationLandscape(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = {
-						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-						('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
-						('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
-						('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
-						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-						('data_dir', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
-						('result_id_ls', 1, ): [None, 'j', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
-						('neighbor_distance', 0, int): [5000, 'i', 1, "within this distance, a locus that increases the association score \
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.update({
+						('result_id', 1, int): [None, 'j', 1, 'comma or dash-separated list of result ids, i.e. 3431-3438,4041'],\
+						('neighbor_distance', 0, int): [5000, '', 1, "within this distance, a locus that increases the association score \
 									the fastest is chosen as bridge end. outside this distance, whatever the next point is will be picked."],\
 						('max_neighbor_distance', 0, int): [20000, 'm', 1, "beyond this distance, no bridge would be formed."],\
-						('min_MAF', 0, float): [0.1, 'n', 1, 'minimum Minor Allele Frequency.'],\
-						('min_score', 0, float): [4, 'f', 1, 'minimum score to call a peak'],\
-						('ground_score', 0, float): [0, 's', 1, 'minimum score possible in this test'],\
 						('tax_id', 1, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
-						('logFilename', 0, ): [None, '', 1, 'file to contain logs. use it only if this program is at the end of pegasus workflow'],\
-						('output_fname', 0, ): [None, 'o', 1, 'if given, output the landscape result.'],\
-						('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
-						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
-						('landscapeLocusIDFname', 1, ): ['', '', 1, 'file that contains one-column, snps.id of the gwas landscape'],\
-						}
+						})
+	#('landscapeLocusIDFname', 1, ): ['', '', 1, 'file that contains one-column, snps.id of the gwas landscape'],\
 	#('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 	#('analysis_method_id_ls', 0, ):['1,7', 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
 	#("phenotype_method_id_ls", 0, ): [None, 'e', 1, 'comma/dash-separated phenotype_method id list, like 1,3-7. Default is all.'],\
@@ -66,27 +46,7 @@ class DefineAssociationLandscape(object):
 		"""
 		2008-08-19
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
-	
-		if getattr(self, 'result_id_ls', None):
-			self.result_id_ls = getListOutOfStr(self.result_id_ls, data_type=int)
-			self.result_id_ls.sort()
-		else:
-			self.result_id_ls = []
-		"""
-		if getattr(self, 'analysis_method_id_ls', None):
-			self.analysis_method_id_ls = getListOutOfStr(self.analysis_method_id_ls, data_type=int)
-			self.analysis_method_id_ls.sort()
-		else:
-			self.analysis_method_id_ls = []
-		if getattr(self, 'phenotype_method_id_ls', None):
-			self.phenotype_method_id_ls = getListOutOfStr(self.phenotype_method_id_ls, data_type=int)
-			self.phenotype_method_id_ls.sort()
-		else:
-			self.phenotype_method_id_ls = []
-		"""
+		AbstractVariationMapper.__init__(self, **keywords)
 	
 	def getXDistanceBetweenTwoDataObjs(self, current_obj=None, next_obj=None):
 		"""
@@ -100,10 +60,10 @@ class DefineAssociationLandscape(object):
 		return deltaX
 	
 	def findLandscape(self, data_obj_ls=None, neighbor_distance=5000, max_neighbor_distance=20000,\
-					ground_score=0, landscapeLocusIDFname=None):
+					ground_score=0):
 		"""
 		2012.11.12
-			add argument landscapeLocusIDFname
+			add argument outputFname
 		2011-4-19
 			add max_neighbor_distance, ground_score
 		2011-4-18
@@ -155,26 +115,44 @@ class DefineAssociationLandscape(object):
 			else:
 				start_index = start_index+1	#no bridge is built. at chromosome boundary or beyond the max allowable distance.
 		
-		sys.stderr.write("%s bridges. Done.\n"%(len(bridge_ls)))
-		
-		if landscapeLocusIDFname:
-			#output the data_object.id in bridge_ls to landscapeLocusIDFname
-			outf= open(landscapeLocusIDFname,'w')
-			previous_locus_id = None
-			for bridge in bridge_ls:
-				current_obj = bridge[0]
-				obj_with_fastest_score_increase = bridge[1]
-				if previous_locus_id is None or current_obj.db_id!=previous_locus_id:
-					outf.write("%s\n"%(current_obj.db_id))
-					previous_locus_id = current_obj.db_id
-				if previous_locus_id is None or obj_with_fastest_score_increase.db_id!=previous_locus_id:
-					outf.write("%s\n"%(obj_with_fastest_score_increase.db_id))
-					previous_locus_id = obj_with_fastest_score_increase.db_id
-			del outf
+		sys.stderr.write("%s bridges.\n"%(len(bridge_ls)))
 		returnData = PassingData(bridge_ls=bridge_ls, locusLandscapeNeighborGraph=locusLandscapeNeighborGraph)
 		return returnData
 	
-	def drawBridgeChromosomalLengthHist(self, bridge_ls):
+	
+	def outputLandscape(self, bridge_ls=None, outputFname=None, writer=None, closeFile=False, groupName='landscape'):
+		"""
+		2012.11.18
+		"""
+		sys.stderr.write("Outputting the %s bridges from the landscape ..."%(len(bridge_ls)))
+		#output the data_object.id in bridge_ls to outputFname
+		#each number below is counting bytes, not bits
+		dtypeList = [('start_locus_id','i8'),('stop_locus_id', 'i8'), ('no_of_loci','i8'), ('deltaX', 'i8')]
+		headerList = [row[0] for row in dtypeList]
+		dtype = numpy.dtype(dtypeList)
+		if writer:
+			groupObject = writer.createNewGroup(groupName=groupName, dtype=dtype)
+			groupObject.setColIDList(headerList)
+		elif outputFname:
+			writer = HDF5MatrixFile(outputFname, openMode='w', dtype=dtype, firstGroupName=groupName)
+			writer.writeHeader(headerList)
+			groupObject = writer.getGroupObject(groupName=groupName)
+		
+		previous_locus_id = None
+		cellList = []
+		for bridge in bridge_ls:
+			current_obj = bridge[0]
+			obj_with_fastest_score_increase = bridge[1]
+			no_of_loci, deltaX = bridge[2:4]
+			dataTuple = (current_obj.db_id, obj_with_fastest_score_increase.db_id, no_of_loci, deltaX)
+			cellList.append(dataTuple)
+		groupObject.writeCellList(cellList)
+		if closeFile:
+			writer.close()
+			del writer
+		sys.stderr.write("\n")
+	
+	def drawBridgeChromosomalLengthHist(self, bridge_ls=None):
 		"""
 		2011-4-18
 		"""
@@ -240,168 +218,6 @@ class DefineAssociationLandscape(object):
 		pylab.savefig(outputFname, dpi=300)
 		sys.stderr.write("Done.\n")
 	
-	def findPeakDataObjWithinPeak(self, data_obj_ls=[], connected_component_node_list=[], peak_start_data_obj=None, \
-							peak_stop_data_obj=None):
-		"""
-		2011-4-20
-			given a peak starting from peak_start_data_obj and ending at peak_stop_data_obj, which locus in the middle
-			has the maximum score. return the first one if there are multiple ones.
-		"""
-		data_obj_with_max_value = None
-		for i in xrange(1, len(connected_component_node_list)-1):
-			data_obj_index = connected_component_node_list[i]
-			if data_obj_index>=peak_start_data_obj.index and data_obj_index<=peak_stop_data_obj.index:
-				data_obj = data_obj_ls[data_obj_index]
-				if data_obj_with_max_value is None:
-					data_obj_with_max_value = data_obj
-				elif data_obj.value>data_obj_with_max_value.value:
-					data_obj_with_max_value=data_obj
-		return data_obj_with_max_value
-	
-	
-	def findPeaks(self, db_250k, locusLandscapeNeighborGraph=None, bridge_ls=None, data_obj_ls=None, ground_score=0, min_score=4,\
-				rm=None, result_peak_type=None):
-		"""
-		2012.3.12
-			bugfixing, bounds the peak start  locus and peak stop locus within each connected component (one landscape)
-		2011-4-19
-		"""
-		import CGAL	#computational geometry algorithm python binding
-		no_of_bridges = len(bridge_ls)
-		sys.stderr.write("Finding peaks among the %s bridges ..."%(no_of_bridges))
-		no_of_edges = locusLandscapeNeighborGraph.number_of_edges()
-		if no_of_edges!=no_of_bridges:
-			sys.stderr.write("Warning: number of edges % in the graph is different from the number of bridges %s.\n"%\
-							(no_of_edges, no_of_bridges))
-		cc_list = nx.connected_components(locusLandscapeNeighborGraph)
-		no_of_peaks = 0
-		for cc in cc_list:
-			peak_start_data_obj = None
-			cc.sort()	#each node is identified by index in data_obj_ls
-			cc_start_obj_index = cc[0]
-			cc_stop_obj_index = cc[-1]
-			cc.insert(0, -1)	#-1 is fake index. standing for the ground point
-			cc.append(-1)	#-1 is fake index. standing for the ground point in the end
-			no_of_nodes = len(cc)
-			no_of_loci_in_cc = cc_stop_obj_index - cc_start_obj_index + 1	#2012.3.13
-			
-			for i in xrange(no_of_nodes-1):
-				start_data_obj_index = cc[i]
-				stop_data_obj_index = cc[i+1]
-				if start_data_obj_index!=-1:
-					start_data_obj = data_obj_ls[start_data_obj_index]
-				else:
-					start_data_obj = None
-				bridge_x_start = getattr(start_data_obj, 'stopPosition', None)	#failsafe if start_data_obj is None.
-				bridge_y_start = getattr(start_data_obj, 'value', None)
-				if stop_data_obj_index!=-1:
-					stop_data_obj = data_obj_ls[stop_data_obj_index]
-				else:
-					stop_data_obj = None
-				bridge_x_stop = getattr(stop_data_obj, 'position', None)
-				bridge_y_stop = getattr(stop_data_obj, 'value', None)
-				
-				if bridge_x_start is None:	#start_data_obj_index is -1
-					bridge_x_start = bridge_x_stop
-					bridge_y_start = ground_score
-				if bridge_x_stop is None:	#stop_data_obj_index is -1
-					bridge_x_stop = bridge_x_start
-					bridge_y_stop = ground_score
-				
-				p1 = CGAL.Kernel.Point_2(bridge_x_start, bridge_y_start)
-				p2 = CGAL.Kernel.Point_2(bridge_x_stop, bridge_y_stop)
-				segment = CGAL.Kernel.Segment_2(p1, p2)
-				
-				cutoff_segment = CGAL.Kernel.Segment_2(CGAL.Kernel.Point_2(bridge_x_start, min_score),\
-										CGAL.Kernel.Point_2(bridge_x_stop, min_score))
-				intersection_point = CGAL.intersectionPointOfTwoSegments(segment, cutoff_segment)
-				if hasattr(intersection_point, 'is_degenerate'):
-					pass	#it's an empty segment. no intersection.
-				else:
-					if peak_start_data_obj is None:
-						#there is an intersection, but no starting obj for this potential peak.
-						# so find this starting object first.
-						locus_index = stop_data_obj.index	#backwards starting from the stop_data_obj (which could not be None)
-						# start_data_obj could be None.
-						while locus_index>=0 and locus_index>=cc_start_obj_index:	#2012.3.12 within the cc.
-							data_obj = data_obj_ls[locus_index]
-							
-							#2011-10-11 bugfix
-								#this data_obj could be a single-position locus (SNP) which doesn't have stopPosition defined.
-							stop_position = data_obj.stopPosition	#same as getattr(data_obj, 'stopPosition', getattr(data_obj, 'position'))
-							
-							if stop_position<intersection_point.x():
-								break
-							locus_index -= 1
-						peak_start_data_obj = data_obj_ls[locus_index+1]	#the loop breaks after the outside locus has been reached.
-						peak_start_data_obj.peak_start = intersection_point.x()	#record the peak starting position
-					else:
-						#intersection exists again.
-						# this should be the ending position for the peak, now find the ending object (peak_stop_data_obj).
-						locus_index = start_data_obj.index	#forward starting from the start_data_obj (which could not be None)
-						# start_data_obj could contain something.
-						while locus_index<=cc_stop_obj_index:	#2012.3.12 bounded by the last object in the cc
-							data_obj = data_obj_ls[locus_index]
-							start_position = getattr(data_obj, 'position')
-							if start_position>intersection_point.x():
-								break
-							locus_index += 1
-						peak_stop_data_obj = data_obj_ls[locus_index-1]
-						no_of_loci = peak_stop_data_obj.index - peak_start_data_obj.index + 1
-						if no_of_loci>no_of_loci_in_cc:
-							sys.stderr.write("Error: no_of_loci of a peak, %s, could not be larger than no_of_loci within its landscape: %s.\n"%\
-											(no_of_loci, no_of_loci_in_cc))
-							#import pdb
-							#pdb.set_trace()
-							sys.exit(4)
-						peak_data_obj = self.findPeakDataObjWithinPeak(data_obj_ls=data_obj_ls, connected_component_node_list=cc, \
-												peak_start_data_obj=peak_start_data_obj, peak_stop_data_obj=peak_stop_data_obj)
-						result_peak = Stock_250kDB.ResultPeak(result_id = rm.id, chromosome=peak_start_data_obj.chromosome,\
-								start=peak_start_data_obj.peak_start, stop=intersection_point.x(), no_of_loci=no_of_loci, \
-								peak_score=peak_data_obj.value)
-						if rm.cnv_method_id:
-							# 2011-4-21 assuming locus might not be in db.
-							result_peak.start_locus = self.getLocusBasedOnDataObj(db_250k, peak_start_data_obj)
-							result_peak.stop_locus = self.getLocusBasedOnDataObj(db_250k, peak_stop_data_obj)
-							result_peak.peak_locus = self.getLocusBasedOnDataObj(db_250k, peak_data_obj)
-						elif rm.call_method_id:
-							# 2011-4-21 assuming all relevant loci are in db.
-							result_peak.start_locus_id = peak_start_data_obj.db_id
-							result_peak.stop_locus_id = peak_stop_data_obj.db_id
-							result_peak.peak_locus_id = peak_data_obj.db_id
-						
-						result_peak.result_peak_type = result_peak_type
-						
-						db_250k.session.add(result_peak)
-						peak_start_data_obj = None	#reset for the next peak
-						no_of_peaks += 1
-			db_250k.session.flush()
-			#subgraph = nx.subgraph(locusLandscapeNeighborGraph, cc)
-		sys.stderr.write("%s peaks.\n"%(no_of_peaks))
-		return no_of_peaks
-	
-	def getLocusBasedOnDataObj(self, db_250k, data_obj):
-		"""
-		2011-4-21
-			based on attributes of data_obj (class SNP.DataObject), fetch/create a locus.
-		"""
-		return db_250k.getSNP(chromosome=data_obj.chromosome, start=data_obj.position, stop=data_obj.stop_position)
-	
-	def addAllDataObjsIntoDb(self, db_250k, data_obj_ls): 
-		'''
-		2011-4-21
-			call getLocusBasedOnDataObj() to make sure all loci are in db now.
-			not used now since all data_obj's corresponding loci are stored in db.
-		'''
-		sys.stderr.write("Adding %s data objs into table Snps as loci ..."%(len(data_obj_ls)))
-		no_of_newly_added_loci = 0
-		for data_obj in data_obj_ls:
-			locus = self.getLocusBasedOnDataObj(db_250k, data_obj)
-			if not locus.id:	#if it's new , their id should be None.
-				no_of_newly_added_loci += 1
-		db_250k.session.flush()
-		sys.stderr.write("%s loci inserted into db. Done.\n"%(no_of_newly_added_loci))
-	
 	def run(self):
 		"""
 		2011-3-28
@@ -412,10 +228,7 @@ class DefineAssociationLandscape(object):
 			import pdb
 			pdb.set_trace()
 		
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
-									hostname=self.hostname, database=self.dbname)
-		db_250k.setup(create_tables=False)
-		db_250k.session.begin()
+		db_250k = self.db_250k
 		
 		"""
 		#2011-10-12 below commented out because only required for drawing
@@ -433,80 +246,29 @@ class DefineAssociationLandscape(object):
 					data_dir=self.data_dir, \
 					need_chr_pos_ls=0,)
 		
-		#result_query = db_250k.getResultLs(call_method_id=self.call_method_id, analysis_method_id_ls=self.analysis_method_id_ls, \
-		#				phenotype_method_id_ls=self.phenotype_method_id_ls)
-		result_id_ls = self.result_id_ls
-		#for result in result_query:
-		#	result_id_ls.append(result.id)
+		rm = Stock_250kDB.ResultsMethod.get(self.result_id)
 		
-		if self.logFilename:
-			logF = open(self.logFilename, 'w')
-		else:
-			logF = None
-		for result_id in result_id_ls:
-			#establish the map from cnv.id from chr_pos
-			rm = Stock_250kDB.ResultsMethod.get(result_id)
-			
-			"""
-			#2012.11.12 check to see if ResultLandscape contains this landscape already.
-			result_landscape_type = db_250k.getResultLandscapeType(min_MAF=self.min_MAF, \
-											neighbor_distance=self.neighbor_distance, \
-											max_neighbor_distance=self.max_neighbor_distance)
-			query = Stock_250kDB.ResultLandscape.query.filter_by(result_landscape_type_id=result_landscape_type.id).filter_by(result_id=rm.id)
-			if query.first():
-				logString = "result_id=%s, result_landscape_type_id=%s already exists in ResultLandscape. exit.\n"%(result_id, result_landscape_type.id)
-				if logF:
-					logF.write(logString)
-				sys.stderr.write(logString)
-				sys.exit(3)
-			"""
-			
-			if rm.cnv_method_id and not db_250k._cnv_id2chr_pos:
-				db_250k.cnv_id2chr_pos = rm.cnv_method_id
-				pd.db_id2chr_pos = db_250k.cnv_id2chr_pos
-			elif rm.call_method_id:
-				pd.db_id2chr_pos = db_250k.snp_id2chr_pos
-			
-			gwr = db_250k.getResultMethodContent(result_id, pdata=pd)
-			gwr.data_obj_ls.sort(cmp=SNP.cmpDataObjByChrPos)
-			#if rm.cnv_method_id:	#for cnvs, need to make sure all loci are in db.
-			#	self.addAllDataObjsIntoDb(db_250k, gwr.data_obj_ls)
-			landscapeData = self.findLandscape(gwr.data_obj_ls, neighbor_distance=self.neighbor_distance,\
-									max_neighbor_distance=self.max_neighbor_distance, \
-									landscapeLocusIDFname=self.landscapeLocusIDFname)
-			"""
-			#2011-4-21 for inspection
-			outputFname = '/tmp/result_%s_landscape.png'%(result_id)
-			self.drawBridgeLs(bridge_ls=landscapeData.bridge_ls, outputFname=outputFname, oneGenomeData=oneGenomeData)
-			"""
-			
-			result_peak_type = db_250k.getResultPeakType(min_MAF=self.min_MAF, min_score=self.min_score, \
-											neighbor_distance=self.neighbor_distance, \
-											max_neighbor_distance=self.max_neighbor_distance)
-			#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
-			query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
-			if query.first():
-				logString = "result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id)
-				if logF:
-					logF.write(logString)
-				sys.stderr.write(logString)
-				sys.exit(0)
-			
-			no_of_peaks = self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
-						ground_score=self.ground_score, min_score=self.min_score, rm=rm, result_peak_type=result_peak_type)
-			"""
-			#2011-4-21 to check how far things are from each other.
-			#self.drawBridgeChromosomalLengthHist(bridge_ls)
-			"""
-			if logF:
-				logF.write("Result %s has %s peaks.\n"%(result_id, no_of_peaks))
-			
-		db_250k.session.flush()
-		if self.commit:
-			db_250k.session.commit()
+		if rm.cnv_method_id and not db_250k._cnv_id2chr_pos:
+			db_250k.cnv_id2chr_pos = rm.cnv_method_id
+			pd.db_id2chr_pos = db_250k.cnv_id2chr_pos
+		elif rm.call_method_id:
+			pd.db_id2chr_pos = db_250k.snp_id2chr_pos
 		
-		if logF:
-			logF.close()
+		gwr = db_250k.getResultMethodContent(self.result_id, pdata=pd)
+		gwr.data_obj_ls.sort(cmp=SNP.cmpDataObjByChrPos)
+		writer = gwr.outputInHDF5MatrixFile(filename=self.outputFname, closeFile=False)
+		
+		landscapeData = self.findLandscape(gwr.data_obj_ls, neighbor_distance=self.neighbor_distance,\
+								max_neighbor_distance=self.max_neighbor_distance)
+		
+		self.outputLandscape(bridge_ls=landscapeData.bridge_ls, writer=writer, closeFile=True)
+		"""
+		#2011-4-21 for inspection
+		outputFname = '/tmp/result_%s_landscape.png'%(result_id)
+		self.drawBridgeLs(bridge_ls=landscapeData.bridge_ls, outputFname=outputFname, oneGenomeData=oneGenomeData)
+		"""
+		
+		self.closeLogF()
 		
 	
 if __name__ == '__main__':
