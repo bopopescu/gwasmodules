@@ -29,18 +29,16 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv, stat, getopt, re
 import traceback, gc, subprocess
-from variation.src.Stock_250kDB import Results, ResultsMethod, PhenotypeMethod, CallMethod, \
-	ResultsMethodType, AnalysisMethod, ResultsMethodJson
-from variation.src import Stock_250kDB
 from pymodule import figureOutDelimiter, PassingData
-from pymodule.MatrixFile import MatrixFile
-
+from pymodule import MatrixFile
+from pymodule import AbstractDBInteractingJob
+from variation.src import Stock_250kDB
+from Stock_250kDB import Results, ResultsMethod, PhenotypeMethod, CallMethod, \
+	ResultsMethodType, AnalysisMethod, ResultsMethodJson
 from variation.src.common import getOneResultJsonData
-from pymodule.pegasus.mapper.AbstractDBInteractingJob import AbstractDBInteractingJob
-from variation.src.Results2DB_250k import Results2DB_250k
+from variation.src.db.Results2DB_250k import Results2DB_250k
 
-
-class ResultLandscape2DB(Results2DB_250k):
+class AssociationLandscape2DB(Results2DB_250k):
 	__doc__ = __doc__
 	option_default_dict = Results2DB_250k.option_default_dict.copy()
 	option_default_dict.update({
@@ -60,9 +58,6 @@ class ResultLandscape2DB(Results2DB_250k):
 		"""
 		Results2DB_250k.__init__(self, **keywords)
 		
-		from pymodule import ProcessOptions
-		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
-	
 	def add2DB(self, db=None, inputFname=None, result=None, result_landscape_type=None, \
 			call_method_id=None, cnv_method_id=None, phenotype_method_id=None, \
 			analysis_method_id=None, results_method_type_id=None, \
@@ -226,14 +221,11 @@ class ResultLandscape2DB(Results2DB_250k):
 				data_dir=self.data_dir, commit=self.commit, comment=self.comment, user=self.db_user)
 		
 		#2012.6.5
-		if self.logFilename:
-			logFile = open(self.logFilename, 'w')
-			logFile.write("submission done.\n")
-			logFile.close()
+		self.outputLogMessage("submission done.\n")
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
-	main_class = ResultLandscape2DB
+	main_class = AssociationLandscape2DB
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	
 	instance = main_class(**po.long_option2value)
