@@ -22,13 +22,14 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv, random
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from io.MatrixFile import MatrixFile
+from io.HDF5MatrixFile import HDF5MatrixFile
 
 class AbstractMatrixFileWalker(AbstractMapper):
 	__doc__ = __doc__
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	#option_default_dict.update(AbstractMapper.db_option_dict.copy())
 	option_default_dict.update({
-						('inputFname', 0, ):option_default_dict[('inputFname', 1, )],\
 						('minNoOfTotal', 1, int): [10, 'M', 1, 'minimum no of data from one file for afterFileFunction() to run'],\
 						('maxNoOfTotal', 0, int): [None, '', 1, 'maximum no of data to sample from one file. if not set, no limit.'],\
 						('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
@@ -43,9 +44,8 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		this is the default final yValue.'],\
 						('missingDataNotation', 0, ): ['NA', '', 1, 'coma-separated list of notations for missing data.\n\
 	missing data will be skipped.'],\
-								})
-	#pop in the end after its value is used above
-	option_default_dict.pop(('inputFname', 1, ))
+						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: HDF5MatrixFile.'],\
+						})
 	
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
@@ -179,24 +179,21 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		if afterFileFunction is None:
 			afterFileFunction = self.afterFileFunction
 		try:
-			inf = utils.openGzipFile(inputFname)
-			delimiter = figureOutDelimiter(inf)
-			isCSVReader = True
-			if delimiter=='\t' or delimiter==',':
-				reader = csv.reader(inf, delimiter=delimiter)
-				header = reader.next()
+			if self.inputFileFormat==1:
+				reader = MatrixFile(inputFname)
 			else:
-				reader = inf
-				header = inf.readline().strip().split()	#whatever splits them
-				isCSVReader = False
+				reader = HDF5MatrixFile(inputFname, openMode='r')
+			
+			col_name2index = reader.constructColName2IndexFromHeader()
+			header = reader.getHeader()
+			
+			#output the header to the output file if necessary 
 			self.processHeader(header=header, pdata=pdata) #2012.8.13
-			col_name2index = getColName2IndexFromHeader(header, skipEmptyColumn=True)
+			pdata.reader = reader
 			pdata.col_name2index = col_name2index
 			
 			for row in reader:
 				counter += 1
-				if not isCSVReader:
-					row = row.strip().split()
 				if self.samplingRate<1 and self.samplingRate>=0:
 					r = random.random()
 					if r>self.samplingRate:
@@ -208,7 +205,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 				noOfSampled += 1
 				if self.maxNoOfTotal and real_counter>self.maxNoOfTotal:
 					break
-			if self.getNumberOfData(pdata)>self.minNoOfTotal:
+			if self.getNumberOfData(pdata)>=self.minNoOfTotal:
 				afterFileFunction(x_ls=pdata.x_ls, y_ls=pdata.y_ls, pdata=pdata)
 			del reader
 		except:
