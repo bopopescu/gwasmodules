@@ -25,15 +25,15 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
 import csv
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
-from pymodule import yh_matplotlib, GenomeDB
 import numpy, random, pylab
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
+from pymodule import yh_matplotlib
 from AbstractPlot import AbstractPlot
 
-class PlotXYAsBarChart(AbstractPlot):
+class PlotYAsBar(AbstractPlot):
 	__doc__ = __doc__
 #						
-	option_default_dict = AbstractPlot.option_default_dict
+	option_default_dict = AbstractPlot.option_default_dict.copy()
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
@@ -99,12 +99,12 @@ class PlotXYAsBarChart(AbstractPlot):
 			xValue = float(row[x_index])
 			yValue = float(row[whichColumn])
 			yValue = self.handleYValue(yValue)
-			xValue2yValue[xValue] = yValue
+			xValue2yValueLs[xValue] = yValue
 			y_ls.append(yValue)
 	
 
 if __name__ == '__main__':
-	main_class = PlotXYAsBarChart
+	main_class = PlotYAsBar
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	instance = main_class(po.arguments, **po.long_option2value)
 	instance.run()
