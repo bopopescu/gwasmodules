@@ -55,7 +55,11 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		# then use this self.invariantPData.
 		#AbstractMatrixFileWalker has initialized a structure like below.
 		#self.invariantPData = PassingData()
-	
+		#2012.11.22
+		self.xMin = None
+		self.xMax = None
+		self.yMin = None
+		self.yMax = None
 	
 	def plot(self, x_ls=None, y_ls=None, pdata=None):
 		"""
@@ -89,10 +93,78 @@ class AbstractPlot(AbstractMatrixFileWalker):
 				x_ls.append(xValue)
 				y_ls.append(yValue)
 	
+	def setGlobalExtremeVariable(self, extremeVariableName=None, givenExtremeValue=None, extremeType=1):
+		"""
+		2012.11.22
+			extremeType:
+				1: min
+				2: max
+			
+		"""
+		if givenExtremeValue is not None:
+			extremeVariable = getattr(self, extremeVariableName)
+			if extremeVariable is None:
+				setattr(self, extremeVariableName, givenExtremeValue)
+			else:
+				if extremeType==1:	#replace a min variable
+					if givenExtremeValue<extremeVariable:
+						setattr(self, extremeVariableName, givenExtremeValue)
+				else:	#set a max variable
+					if givenExtremeValue>extremeVariable:
+						setattr(self, extremeVariableName, givenExtremeValue)
+	
+	def setGlobalMinVariable(self, extremeVariableName=None, givenExtremeValue=None):
+		"""
+		2012.11.22
+		"""
+		self.setGlobalExtremeVariable(extremeVariableName=extremeVariableName, givenExtremeValue=givenExtremeValue, \
+									extremeType=1)
+	
+	def setGlobalMaxVariable(self, extremeVariableName=None, givenExtremeValue=None):
+		"""
+		2012.11.22
+		"""
+		self.setGlobalExtremeVariable(extremeVariableName=extremeVariableName, givenExtremeValue=givenExtremeValue, \
+									extremeType=2)
+		
 	def processHeader(self, header=None, pdata=None):
 		"""
 		2012.8.13
 			called everytime the header of an input file is derived in fileWalker()
+		"""
+		pass
+	
+	def _handleXLim(self,):
+		"""
+		2012.11.22
+			could be used by descendants, but not called by default
+		"""
+		if self.xMin is not None and self.xMax is not None:
+			delta = abs(self.xMax-self.xMin)/10.0
+			if delta<=0:
+				delta = 0.5
+			pylab.xlim(xmin=self.xMin-delta, xmax=self.xMax+delta)
+		
+	def _handleYLim(self,):
+		"""
+		2012.11.22
+			could be used by descendants, but not called by default
+		"""
+		if self.yMin is not None and self.yMax is not None:
+			delta = abs(self.yMax-self.yMin)/10.0
+			if delta<=0:
+				delta = 0.5
+			pylab.ylim(ymin=self.yMin-delta, ymax=self.yMax+delta)
+	
+	def handleXLim(self,):
+		"""
+		2012.11.22
+		"""
+		pass
+		
+	def handleYLim(self,):
+		"""
+		2012.11.22
 		"""
 		pass
 	
@@ -183,7 +255,8 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		self.handleTitle()
 		self.handleXLabel()
 		self.handleYLabel()
-		
+		self.handleXLim()
+		self.handleYLim()
 		self.reduce()
 		
 
