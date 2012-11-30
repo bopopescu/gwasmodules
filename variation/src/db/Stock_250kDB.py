@@ -3799,11 +3799,7 @@ class Stock_250kDB(ElixirDB):
 			
 			genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
 													pdata=pdata, min_value_cutoff=min_value_cutoff)
-			genome_wide_result.db_entry_id = db_entry.id
-			genome_wide_result.db_entry = db_entry	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
-			#2012.11.14 for backwards compatibility
-			genome_wide_result.results_id = db_entry.id
-			genome_wide_result.rm = db_entry	# 2010-2-2 add the db object "rm" to genome_wide_result to make other db info accessible
+			genome_wide_result.setResultMethod(rm=db_entry)
 		else:
 			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
 			genome_wide_result = None
@@ -3976,8 +3972,8 @@ class Stock_250kDB(ElixirDB):
 		2011-10-16
 		"""
 		sys.stderr.write("Constructing RBDict for peaks from result %s, (peak type %s) ..."%(result_id, result_peak_type_id))
-		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from pymodule.RBTree import RBDict
+		from pymodule import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		from pymodule import RBDict
 		result_peakRBDict = RBDict()
 		result_peakRBDict.result_id = result_id	#2012.6.22
 		result_peakRBDict.result_peak_type_id = result_peak_type_id	#2012.6.22
