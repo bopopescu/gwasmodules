@@ -16,92 +16,38 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import time, csv, getopt
-import warnings, traceback, numpy
-from pymodule import ProcessOptions, PassingData
+import numpy
+import CGAL	#computational geometry algorithm python binding
+import networkx as nx
+from pymodule import ProcessOptions, PassingData, PassingDataList
 from pymodule import HDF5MatrixFile
 from pymodule import getGenomeWideResultFromHDF5MatrixFile, AbstractMapper
-import networkx as nx
-from variation.src import Stock_250kDB
-from DefineAssociationLandscape import DefineAssociationLandscape
-import CGAL	#computational geometry algorithm python binding
+from pymodule import yhio
+from variation.src import AbstractVariationMapper
 
-class AssociationLandscape2Peak(DefineAssociationLandscape):
+class AssociationLandscape2Peak(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = DefineAssociationLandscape.option_default_dict.copy()
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
 	#get rid of db-related options
-	for option_key in AbstractMapper.db_option_dict:
-		option_default_dict.pop(option_key)
+	ProcessOptions.removeCertainOptions(option_default_dict=option_default_dict, option_dict_to_remove=AbstractMapper.db_option_dict)
+	#option_default_dict.pop(('min_MAF', 0, float))
+	my_option_dict = {
+					('min_score', 0, float): [4, 'f', 1, 'minimum score to call a peak'],\
+					('ground_score', 0, float): [0, 's', 1, 'minimum score possible in this test'],\
+					}
+	option_default_dict.update(my_option_dict.copy())
 	
-	option_default_dict.update({
-						('min_score', 0, float): [4, 'f', 1, 'minimum score to call a peak'],\
-						('ground_score', 0, float): [0, 's', 1, 'minimum score possible in this test'],\
-						
-						})
-	
-	def __init__(self,  **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2008-08-19
 		"""
-		DefineAssociationLandscape.__init__(self, **keywords)
+		AbstractVariationMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
 	def connectDB(self):
+		"""
+		2012.11.20 no db connection required
+		"""
 		pass
-	
-	def readLandscape(self, inputFname=None, neighbor_distance=5000,\
-					max_neighbor_distance=20000, min_MAF=0.10):
-		"""
-		2012.11.19
-			the inputFname is output of DefineAssociationLandscape.py
-		"""
-		pdata = PassingData(min_MAF=min_MAF)
-		genome_wide_result = getGenomeWideResultFromHDF5MatrixFile(inputFname=inputFname, \
-							min_value_cutoff=None, do_log10_transformation=False, pdata=pdata,\
-							construct_chr_pos2index=False, construct_data_obj_id2index=False, \
-							construct_locus_db_id2index=True,\
-							report=True)
-		data_obj_ls = genome_wide_result.data_obj_ls
-		
-		sys.stderr.write("Reading landscape from %s ..."%(inputFname))
-		current_obj = None
-		bridge_ls = []
-		start_index = 0	#starting index in each step of bridge building
-		locusLandscapeNeighborGraph = nx.Graph()
-		
-		reader = HDF5MatrixFile(inputFname, openMode='r')
-		landscapeGroupObject = reader.getGroupObject(groupName='landscape')
-		start_locus_id_index = landscapeGroupObject.getColIndexGivenColHeader('start_locus_id')
-		stop_locus_id_index = landscapeGroupObject.getColIndexGivenColHeader('stop_locus_id')
-		no_of_loci_index = landscapeGroupObject.getColIndexGivenColHeader('no_of_loci')
-		deltaX_index = landscapeGroupObject.getColIndexGivenColHeader('deltaX')
-		
-		for row in landscapeGroupObject:
-			start_locus_id = row[start_locus_id_index]
-			stop_locus_id = row[stop_locus_id_index]
-			no_of_loci = row[no_of_loci_index]
-			deltaX = row[deltaX_index]
-			
-			start_obj = genome_wide_result.get_data_obj_by_locus_db_id(start_locus_id)
-			stop_obj = genome_wide_result.get_data_obj_by_locus_db_id(stop_locus_id)
-			
-			bridge_ls.append([start_obj, stop_obj, no_of_loci, deltaX])
-			
-			source_index = start_obj.index
-			#genome_wide_result.get_data_obj_index_by_locus_db_id(start_locus_id)
-			target_index = stop_obj.index
-			
-			locusLandscapeNeighborGraph.add_edge(source_index, target_index, \
-										weight=None)
-			locusLandscapeNeighborGraph[source_index][target_index]['no_of_loci'] = no_of_loci
-			locusLandscapeNeighborGraph[source_index][target_index]['deltaX'] = deltaX
-			
-		del reader
-		
-		sys.stderr.write("%s bridges.\n"%(len(bridge_ls)))
-		returnData = PassingData(bridge_ls=bridge_ls, locusLandscapeNeighborGraph=locusLandscapeNeighborGraph,\
-								genome_wide_result=genome_wide_result)
-		return returnData
-		
 	
 	def findPeakDataObjWithinPeak(self, data_obj_ls=[], connected_component_node_list=[], peak_start_data_obj=None, \
 							peak_stop_data_obj=None):
@@ -122,7 +68,7 @@ class AssociationLandscape2Peak(DefineAssociationLandscape):
 		return data_obj_with_max_value
 	
 	def findPeaks(self, locusLandscapeNeighborGraph=None, bridge_ls=None, data_obj_ls=None, \
-				ground_score=0, min_score=4, result_id=None):
+				ground_score=0, min_score=4):
 		"""
 		2012.3.12
 			bugfixing, bounds the peak start  locus and peak stop locus within each connected component (one landscape)
@@ -136,7 +82,7 @@ class AssociationLandscape2Peak(DefineAssociationLandscape):
 							(no_of_edges, no_of_bridges))
 		cc_list = nx.connected_components(locusLandscapeNeighborGraph)
 		no_of_peaks = 0
-		result_peak_ls = []
+		association_peak_ls = []
 		for cc in cc_list:
 			peak_start_data_obj = None
 			cc.sort()	#each node is identified by index in data_obj_ls
@@ -224,60 +170,22 @@ class AssociationLandscape2Peak(DefineAssociationLandscape):
 							sys.exit(4)
 						peak_data_obj = self.findPeakDataObjWithinPeak(data_obj_ls=data_obj_ls, connected_component_node_list=cc, \
 												peak_start_data_obj=peak_start_data_obj, peak_stop_data_obj=peak_stop_data_obj)
-						result_peak = Stock_250kDB.ResultPeak(result_id = result_id, chromosome=peak_start_data_obj.chromosome,\
-								start=peak_start_data_obj.peak_start, stop=intersection_point.x(), no_of_loci=no_of_loci, \
-								peak_score=peak_data_obj.value, \
-								start_locus_id=peak_start_data_obj.db_id, \
-								stop_locus_id=peak_stop_data_obj.db_id, peak_locus_id= peak_data_obj.db_id)
-						result_peak_ls.append(result_peak)
+						association_peak = PassingDataList()	#assigning each value separately imposes an order in which they appear in the PassingDataList.
+						#which would determine the order when sorting a list of PassingDataList.
+						association_peak.chromosome=peak_start_data_obj.chromosome
+						association_peak.start=peak_start_data_obj.peak_start
+						association_peak.stop=intersection_point.x()
+						association_peak.no_of_loci=no_of_loci
+						association_peak.peak_score=peak_data_obj.value
+						association_peak.start_locus_id=peak_start_data_obj.db_id
+						association_peak.stop_locus_id=peak_stop_data_obj.db_id
+						association_peak.peak_locus_id= peak_data_obj.db_id
+						association_peak_ls.append(association_peak)
 						peak_start_data_obj = None	#reset for the next peak
 						no_of_peaks += 1
 			#subgraph = nx.subgraph(locusLandscapeNeighborGraph, cc)
 		sys.stderr.write("%s peaks.\n"%(no_of_peaks))
-		return result_peak_ls
-	
-	def outputPeakInHDF5(self, result_peak_ls=None, filename=None, writer=None, groupName='association_peak', closeFile=True):
-		"""
-		2012.11.20
-		"""
-		sys.stderr.write("Dumping association peaks into %s (HDF5 format) ..."%(filename))
-		#each number below is counting bytes, not bits
-		dtypeList = [('result_id','i8'), ('start_locus_id','i8'), ('stop_locus_id','i8'), \
-					('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
-					('no_of_loci', 'i8'), ('peak_locus_id', 'i8'), ('peak_score', 'f8')]
-		headerList = [row[0] for row in dtypeList]
-		dtype = numpy.dtype(dtypeList)
-		if writer is None and filename:
-			writer = HDF5MatrixFile(filename, openMode='w', dtype=dtype, firstGroupName=groupName)
-			writer.writeHeader(headerList)
-			groupObject = writer.getGroupObject(groupName=groupName)
-		elif writer:
-			groupObject = writer.createNewGroup(groupName=groupName, dtype=dtype)
-			groupObject.setColIDList(headerList)
-		else:
-			sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
-			sys.exit(3)
-		#add neighbor_distance, max_neighbor_distance, min_MAF, min_score, ground_score as attributes
-		groupObject.addAttribute(name='min_MAF', value=self.min_MAF, overwrite=True)
-		groupObject.addAttribute(name='neighbor_distance', value=self.neighbor_distance, overwrite=True)
-		groupObject.addAttribute(name='max_neighbor_distance', value=self.max_neighbor_distance, overwrite=True)
-		groupObject.addAttribute(name='min_score', value=self.min_score, overwrite=True)
-		groupObject.addAttribute(name='ground_score', value=self.ground_score, overwrite=True)
-		cellList = []
-		for result_peak in result_peak_ls:
-			dataTuple = (result_peak.result_id, result_peak.start_locus_id, result_peak.stop_locus_id, \
-						result_peak.chromosome, result_peak.start, result_peak.stop, result_peak.no_of_loci,\
-						result_peak.peak_locus_id, result_peak.peak_score)
-			cellList.append(dataTuple)
-		
-		if groupObject is None:
-			sys.stderr.write("Error: groupObject (name=%s) is None. could not write.\n"%(groupName))
-			sys.exit(3)
-		groupObject.writeCellList(cellList)
-		if closeFile:
-			writer.close()
-		sys.stderr.write("%s objects.\n"%(len(cellList)))
-		return writer
+		return association_peak_ls
 
 	
 	def run(self):
@@ -291,13 +199,25 @@ class AssociationLandscape2Peak(DefineAssociationLandscape):
 			pdb.set_trace()
 		
 		
-		landscapeData = self.readLandscape(inputFname=self.inputFname, neighbor_distance=self.neighbor_distance,\
-								max_neighbor_distance=self.max_neighbor_distance)
+		landscapeData = yhio.Association.getAssociationLandscapeDataFromHDF5File(inputFname=self.inputFname, associationGroupName='association', \
+					landscapeGroupName='landscape', min_MAF=self.min_MAF)
 		genome_wide_result = landscapeData.genome_wide_result
-		result_peak_ls = self.findPeaks(landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, \
+		association_peak_ls = self.findPeaks(landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, \
 									data_obj_ls=genome_wide_result.data_obj_ls, \
-					ground_score=self.ground_score, min_score=self.min_score, result_id=self.result_id)
-		self.outputPeakInHDF5(result_peak_ls=result_peak_ls, filename=self.outputFname, closeFile=True)
+					ground_score=self.ground_score, min_score=self.min_score)
+		attributeDict = {'result_id':genome_wide_result.result_id, \
+					'call_method_id':getattr(landscapeData, 'call_method_id', None),\
+					'cnv_method_id':getattr(landscapeData, 'cnv_method_id', None),\
+					'phenotype_method_id':getattr(landscapeData, 'phenotype_method_id', None),\
+					'analysis_method_id':getattr(landscapeData, 'analysis_method_id', None),\
+					'min_MAF':landscapeData.min_MAF, \
+					'neighbor_distance':landscapeData.neighbor_distance, \
+					'max_neighbor_distance':landscapeData.max_neighbor_distance, \
+					'min_score':self.min_score,\
+					'ground_score':self.ground_score}
+		yhio.Association.outputAssociationPeakInHDF5(association_peak_ls=association_peak_ls, filename=self.outputFname, \
+							groupName='association_peak', closeFile=True,\
+							attributeDict=attributeDict)
 		
 
 if __name__ == '__main__':
