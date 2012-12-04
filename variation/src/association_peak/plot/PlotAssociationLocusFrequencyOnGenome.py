@@ -49,6 +49,10 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 	option_default_dict[('inputFileFormat', 0, int)][0] = 2
 	option_default_dict[('minNoOfTotal', 1, int)][0] = 1
 	option_default_dict[('defaultFigureWidth', 1, float)][0] = 80
+	option_default_dict[('ymargin', 0, float)][0] = 0.1
+	option_default_dict[('xmargin', 0, float)][0] = 0.02
+	option_default_dict[('plotLeft', 0, float)][0] = 0.02
+	option_default_dict[('plotRight', 0, float)][0] = 0.98
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
@@ -184,6 +188,17 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		
 		PlotAssociationLocusFrequencyVsAssociationThreshold.setup(self, **keywords)
 
+	def handleYLim(self,):
+		"""
+		2012.12.4 set the Y-axis in a more readable format.
+		"""
+		#self._handleYLim()	#set ylim according to ymin and ymax
+		originalYMin, originalYMax = pylab.ylim()
+		pylab.ylim(ymin=0.9, ymax=originalYMax)	#set ymin to 0.9 (= 9x10^-1).	setting it to 0 will eliminate the Y-axis frame (0 is no good for logarithm scale). 
+		#pass
+		#pylab.gca().margins(x=0.1, y=0.1)	#this is within the plotting area, set the padding on the x and y-direction.
+		#no the padding outside the plot, which is set through "pylab.axes([-0.1, -0.1, 1.2, 1.2], frameon=False)"
+		
 if __name__ == '__main__':
 	main_class = PlotAssociationLocusFrequencyOnGenome
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
