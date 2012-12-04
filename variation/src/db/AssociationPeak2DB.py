@@ -88,23 +88,23 @@ class AssociationPeak2DB(Results2DB_250k):
 		2012.11.13
 		"""
 		
-								result_peak = Stock_250kDB.ResultPeak(result_id = rm.id, chromosome=peak_start_data_obj.chromosome,\
+								association_peak = Stock_250kDB.AssociationPeak(result_id = rm.id, chromosome=peak_start_data_obj.chromosome,\
 								start=peak_start_data_obj.peak_start, stop=intersection_point.x(), no_of_loci=no_of_loci, \
 								peak_score=peak_data_obj.value)
 						if rm.cnv_method_id:
 							# 2011-4-21 assuming locus might not be in db.
-							result_peak.start_locus = self.getLocusBasedOnDataObj(db_250k, peak_start_data_obj)
-							result_peak.stop_locus = self.getLocusBasedOnDataObj(db_250k, peak_stop_data_obj)
-							result_peak.peak_locus = self.getLocusBasedOnDataObj(db_250k, peak_data_obj)
+							association_peak.start_locus = self.getLocusBasedOnDataObj(db_250k, peak_start_data_obj)
+							association_peak.stop_locus = self.getLocusBasedOnDataObj(db_250k, peak_stop_data_obj)
+							association_peak.peak_locus = self.getLocusBasedOnDataObj(db_250k, peak_data_obj)
 						elif rm.call_method_id:
 							# 2011-4-21 assuming all relevant loci are in db.
-							result_peak.start_locus_id = peak_start_data_obj.db_id
-							result_peak.stop_locus_id = peak_stop_data_obj.db_id
-							result_peak.peak_locus_id = peak_data_obj.db_id
+							association_peak.start_locus_id = peak_start_data_obj.db_id
+							association_peak.stop_locus_id = peak_stop_data_obj.db_id
+							association_peak.peak_locus_id = peak_data_obj.db_id
 						
-						result_peak.result_peak_type = result_peak_type
+						association_peak.association_peak_type = association_peak_type
 						
-						db_250k.session.add(result_peak)
+						db_250k.session.add(association_peak)
 						peak_start_data_obj = None	#reset for the next peak
 						no_of_peaks += 1
 			db_250k.session.flush()
@@ -132,19 +132,19 @@ class AssociationPeak2DB(Results2DB_250k):
 		
 		result = Stock_250kDB.ResultsMethod.get(self.result_id)
 		
-		result_peak_type = db_250k.getResultPeakType(min_MAF=self.min_MAF, min_score=self.min_score, \
+		association_peak_type = db_250k.getAssociationPeakType(min_MAF=self.min_MAF, min_score=self.min_score, \
 											neighbor_distance=self.neighbor_distance, \
 											max_neighbor_distance=self.max_neighbor_distance)
-		#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
-		query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
+		#2011-10-12 check to see if AssociationPeak contains the peaks from this result already.
+		query = Stock_250kDB.AssociationPeak.query.filter_by(association_peak_type_id=association_peak_type.id).filter_by(result_id=rm.id)
 		if query.first():
-			logString = "result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id)
+			logString = "result_id=%s, association_peak_type_id=%s already exists in AssociationPeak. exit.\n"%(result_id, association_peak_type.id)
 			self.outputLogMessage(logString)
 			sys.stderr.write(logString)
 			sys.exit(0)
 		
 		no_of_peaks = self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
-					ground_score=self.ground_score, min_score=self.min_score, rm=rm, result_peak_type=result_peak_type)
+					ground_score=self.ground_score, min_score=self.min_score, rm=rm, association_peak_type=association_peak_type)
 		"""
 		#2011-4-21 to check how far things are from each other.
 		#self.drawBridgeChromosomalLengthHist(bridge_ls)
