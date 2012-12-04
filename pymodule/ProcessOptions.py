@@ -475,6 +475,10 @@ class ProcessOptions(object):
 		"""
 		2012.10.5 copied from AbstractAlignmentAndVCFWorkflow.py
 		2012.8.15
+		i.e.:
+			listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int), \
+								("site_id_ls", int), ('country_id_ls', int), ('tax_id_ls', int)]
+			listArgumentName2hasContent = ProcessOptions.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
 		"""
 		listArgumentName2hasContent = {}
 		for listArgumentName, data_type in listArgumentName_data_type_ls:
@@ -486,6 +490,17 @@ class ProcessOptions(object):
 				setattr(class_to_have_attr, listArgumentName, emptyContent)
 				listArgumentName2hasContent[listArgumentName]=False
 		return listArgumentName2hasContent
+	
+	@classmethod
+	def removeCertainOptions(cls, option_default_dict=None, option_dict_to_remove=None):
+		"""
+		2012.11.20
+			convenient function for removing set of options (option_dict_to_remove)
+		"""
+		for option_key in option_dict_to_remove:
+			if option_key in option_default_dict:
+				option_default_dict.pop(option_key)
+		
 	
 def turn_option_default_dict2argument_default_dict(option_default_dict):
 	"""

@@ -178,6 +178,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PERL5LIB">$CONDOR_HOME_DIR/$VCF_PERL5LIB</profile>
 		<profile namespace="env" key="HOME" >$CONDOR_HOME_DIR</profile>
 		<profile namespace="env" key="PATH" >$CONDOR_HOME_DIR/bin:$PATH</profile>
+		<profile namespace="env" key="PYTHONPATH">$PYTHONPATH:$PEGASUS_HOME/lib/pegasus/python</profile>
 	</site>
 	<site  handle="hcondor" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>

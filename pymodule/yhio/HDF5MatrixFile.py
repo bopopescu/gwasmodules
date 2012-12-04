@@ -41,6 +41,15 @@ Description:
 			writer.close()
 			del writer
 		
+		
+		#each number below is counting bytes, not bits
+		dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
+		if writer is None and filename:
+			writer = HDF5MatrixFile(filename, openMode='w', dtypeList=dtypeList, firstGroupName=groupName)
+			groupObject = writer.getGroupObject(groupName=groupName)
+		elif writer:
+			groupObject = writer.createNewGroup(groupName=groupName, dtypeList=dtypeList)
 """
 
 import sys, os, math
@@ -48,13 +57,12 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-
-from pymodule import utils, figureOutDelimiter
-from pymodule.ProcessOptions import  ProcessOptions
-from pymodule.io.MatrixFile import MatrixFile
 import csv
 import h5py
 import numpy
+from pymodule.utils import PassingData, PassingDataList
+from pymodule.ProcessOptions import  ProcessOptions
+from pymodule.yhio.MatrixFile import MatrixFile
 varLenStrType = h5py.new_vlen(str)
 
 class HDF5GroupWrapper(object):
@@ -132,6 +140,10 @@ class HDF5GroupWrapper(object):
 		self.rowIDList = self.h5Group[self.rowIDListDSName]
 		self.colIDList = self.h5Group[self.colIDListDSName]
 		self._processRowIDColID()
+		#pass the HDF5Group attributes to this object itself, it ran into "can't set attribute error".
+		# conflict with existing property
+		#for attributeName, attributeValue in self.h5Group.attrs.iteritems():
+		#	object.__setattr__(self, attributeName, attributeValue)
 	
 	def _processRowIDColID(self):
 		"""
@@ -172,7 +184,7 @@ class HDF5GroupWrapper(object):
 				self.dataMatrix[s:s+m] = dataMatrix
 			self.newWrite = False
 	
-	def writeCellList(self, cellList):
+	def writeCellList(self, cellList=None):
 		"""
 		2012.11.19
 			call self.extendDataMatrix()
@@ -263,13 +275,17 @@ class HDF5GroupWrapper(object):
 		"""
 		2012.11.19 part of faking as a file object
 		"""
-		
+		pdata = PassingDataList()
 		if self.rowIndexCursor<self.dataMatrix.shape[0]:
 			row = self.dataMatrix[self.rowIndexCursor]
+			for colID in self.colIDList:	#iteration over colIDList is in the same order as the ascending order of colIndex
+				#but iteration over self.colID2colIndex is not in the same order as the ascending order of colIndex
+				colIndex = self.colID2colIndex.get(colID)
+				setattr(pdata, colID, row[colIndex])
 			self.rowIndexCursor += 1
 		else:
 			raise StopIteration
-		return row
+		return pdata
 	
 	def reset(self):
 		"""
@@ -284,7 +300,7 @@ class HDF5GroupWrapper(object):
 		"""
 		return self.colID2colIndex.get(colHeader)
 	
-	def addAttribute(self, name=None, value=None, overwrite=False):
+	def addAttribute(self, name=None, value=None, overwrite=True):
 		"""
 		
 		"""
@@ -296,13 +312,61 @@ class HDF5GroupWrapper(object):
 				return False
 		else:
 			self.h5Group.attrs[name] = value
+		#pass the HDF5Group attributes to this object itself , it ran into "can't set attribute error". conflict with existing property
+		#object.__setattr__(self, name, value)
+		#setattr(self, name, value)
 		return True
 	
-	def getAttribute(self, name=None):
-		return self.h5Group.attrs.get(name)
+	def getAttribute(self, name=None, defaultValue=None):
+		return self.h5Group.attrs.get(name, defaultValue)
 	
 	def getAttributes(self):
 		return self.h5Group.attrs
+	
+	def getListAttributeInStr(self, name=None):
+		"""
+		2012.11.22
+			this attribute must be a list or array
+		"""
+		attr_in_str = ''
+		attributeValue = self.getAttribute(name=name)
+		if attributeValue is not None and type(attributeValue)==numpy.ndarray:
+			if hasattr(attributeValue, '__len__') and attributeValue.size>0:
+				ls = map(str, attributeValue)
+				attr_in_str = ','.join(ls)
+		return attr_in_str
+	
+	def addObjectAttributeToSet(self, attributeName=None, setVariable=None):
+		"""
+		2012.12.3
+		2012.11.22
+			do not add an attribute to the set if it's not available or if it's none
+		"""
+		attributeValue = self.getAttribute(attributeName, None)
+		if attributeValue is not None and setVariable is not None:
+			setVariable.add(attributeValue)
+		return setVariable
+	
+	def addObjectListAttributeToSet(self, attributeName=None, setVariable=None):
+		"""
+		2012.12.3
+		2012.12.2 bugfix
+		2012.11.23
+		"""
+		attributeValue = self.getAttribute(attributeName, None)
+		flag = False
+		if type(attributeValue)==numpy.ndarray:	#"if attributeValue" fails for numpy array
+			if hasattr(attributeValue, '__len__') and attributeValue.size>0:
+				flag = True
+		elif attributeValue or attributeValue == 0:
+			flag = True
+		if flag and setVariable is not None:
+			if type(attributeValue)==str:
+				attributeValueList = getListOutOfStr(attributeValue, data_type=data_type, separator1=',', separator2='-')
+			else:
+				attributeValueList = attributeValue
+			setVariable |= set(list(attributeValueList))
+		return setVariable
 
 class HDF5MatrixFile(MatrixFile):
 	varLenStrType = varLenStrType	#convenient for outside program to access this variable length string type
@@ -311,7 +375,8 @@ class HDF5MatrixFile(MatrixFile):
 	option_default_dict.update({
 							('firstGroupName', 0, ): [None, '', 1, "name for the first group, default is $groupNamePrefix\0."],\
 							('groupNamePrefix', 0, ): ['group', '', 1, "prefix for all group's names"],\
-							('dtype', 0, ): ['f', '', 1, 'data type in the first group to be created. candidates are i, f8, etc.'],\
+							('dtypeList', 0, ): [None, '', 1, "data type list for a compound dtype. It overwrites dtype. i.e. a list of i.e. ('start','i8')"],\
+							('dtype', 0, ): [None, '', 1, 'data type in the first group to be created. candidates are i, f8, etc.'],\
 							('compression', 0, ): ['gzip', '', 1, 'the compression engine for all underlying datasets, gzip, szip, lzf'],\
 							('compression_opts', 0, ): [None, '', 1, 'option for the compression engine, gzip level, or tuple for szip'],\
 							})
@@ -321,6 +386,8 @@ class HDF5MatrixFile(MatrixFile):
 		if not self.inputFname:
 			self.inputFname = inputFname
 		
+		self.header = None
+		self.combinedColIDList = None	#same as header
 		self.combinedColID2ColIndex = None
 		
 		self.hdf5File = h5py.File(self.inputFname, self.openMode)
@@ -330,14 +397,19 @@ class HDF5MatrixFile(MatrixFile):
 		if self.openMode=='r':
 			self._readInData()
 		elif self.openMode=='w':
-			self.createNewGroup(groupName=self.firstGroupName, dtype=self.dtype)
+			self.createNewGroup(groupName=self.firstGroupName, dtype=self.dtype, dtypeList=self.dtypeList)
 		
 		self.rowIndexCursor = 0	#2012.11.16 for iteration
 	
-	def createNewGroup(self, groupName=None, dtype=None):
+	def createNewGroup(self, groupName=None, dtype=None, dtypeList=None):
 		"""
+		2012.11.20 add argument dtypeList
 		2012.11.19
 		"""
+		colIDList = None
+		if dtypeList:
+			colIDList = [row[0] for row in dtypeList]
+			dtype = numpy.dtype(dtypeList)
 		if dtype is None:
 			dtype = self.dtype
 		if groupName is None:
@@ -347,6 +419,8 @@ class HDF5MatrixFile(MatrixFile):
 		groupObject = HDF5GroupWrapper(h5Group=self.hdf5File.create_group(groupName), \
 								newGroup=True, dataMatrixDtype=dtype, \
 								compression=self.compression, compression_opts=self.compression_opts)
+		if colIDList:
+			groupObject.setColIDList(colIDList)
 		self._appendNewGroup(groupObject)
 		return groupObject
 	
@@ -388,6 +462,8 @@ class HDF5MatrixFile(MatrixFile):
 		2012.11.16
 		"""
 		self.combinedColID2ColIndex = {}
+		self.header = []
+		self.combinedColIDList = self.header
 		for groupObject in self.h5GroupList:
 			colIDList = groupObject.colIDList
 			for colID in colIDList:
@@ -396,6 +472,13 @@ class HDF5MatrixFile(MatrixFile):
 					sys.exit(3)
 				else:
 					self.combinedColID2ColIndex[colID] = len(self.combinedColID2ColIndex)
+					self.header.append(colID)
+	
+	def constructColName2IndexFromHeader(self):
+		"""
+		2012.11.22 overwrite parent function
+		"""
+		return self.combinedColID2ColIndex
 	
 	def getColIndexGivenColHeader(self, colHeader=None):
 		"""
@@ -449,6 +532,7 @@ class HDF5MatrixFile(MatrixFile):
 		"""
 		
 		row = None
+		pdata = PassingDataList()
 		for groupObject in self.h5GroupList:
 			if self.rowIndexCursor<groupObject.dataMatrix.shape[0]:
 				if row is None:
@@ -456,10 +540,15 @@ class HDF5MatrixFile(MatrixFile):
 				else:
 					rowAppend = groupObject.dataMatrix[self.rowIndexCursor]
 					row += list(rowAppend)
-			self.rowIndexCursor += 1
-		else:
-			raise StopIteration
-		return row
+			else:
+				raise StopIteration
+			for colID  in self.header:	#iteration over header is in the same order as the ascending order of colIndex
+				#but iteration over self.colID2colIndex is not in the same order as the ascending order of colIndex
+				colIndex = self.combinedColID2ColIndex.get(colID)
+				if colIndex < len(row):
+					setattr(pdata, colID, row[colIndex])
+		self.rowIndexCursor += 1
+		return pdata
 	
 	def close(self):
 		self.hdf5File.close()
@@ -504,6 +593,35 @@ class HDF5MatrixFile(MatrixFile):
 		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
 		groupObject.setRowIDList(rowIDList=rowIDList)
 	
+	def addAttribute(self, name=None, value=None, overwrite=True, groupIndex=None, groupName=None):
+		"""
+		2012.11.28 find the groupObject and let it do the job
+		"""
+		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
+		return groupObject.addAttribute(name=name, value=value, overwrite=overwrite)
+	
+	def getAttribute(self, name=None, defaultValue=None, groupIndex=None, groupName=None):
+		"""
+		2012.11.28
+		"""
+		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
+		return groupObject.getAttribute(name=name, defaultValue=defaultValue)
+	
+	def getAttributes(self, groupIndex=None, groupName=None):
+		"""
+		2012.11.28
+		"""
+		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
+		return groupObject.getAttributes()
+	
+	def getListAttributeInStr(self, name=None, groupIndex=None, groupName=None):
+		"""
+		2012.11.22
+			this attribute must be a list or array
+		"""
+		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
+		return groupObject.getListAttributeInStr(name=name)
+	
 	def run(self):
 		"""
 		"""
@@ -511,7 +629,24 @@ class HDF5MatrixFile(MatrixFile):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		
+
+def addAttributeDictToHDF5GroupObject(groupObject=None, attributeDict=None):
+	"""
+	2012.11.22 convenient function
+		attributeValue could not be high-level python objects, such as list, set.
+		numpy.array could replace list.
+	"""
+	if groupObject and attributeDict:
+		for attributeName, attributeValue in attributeDict.iteritems():
+			doItOrNot = False
+			if type(attributeValue)==numpy.ndarray:
+				if hasattr(attributeValue, '__len__') and attributeValue.size>0:
+					doItOrNot = True
+			elif attributeValue or attributeValue == 0:	#empty array will be ignored but not 0
+				doItOrNot = True
+			if doItOrNot:
+				groupObject.addAttribute(name=attributeName, value=attributeValue)
+	
 
 if __name__ == '__main__':
 	main_class = HDF5MatrixFile

@@ -67,14 +67,13 @@ class PlotYAsBar(AbstractPlot):
 		xValue_list.sort()
 		yValue_list = [xValue2yValue[item] for item in xValue_list]
 		
-		rects_ls = []
-		
 		#width = 0.75/len(yValue_list)	#these are for multi-series of bar charts.
 		#c = color_ls[i%len(color_ls)]
 		c = color_ls[0]
 		ind = numpy.array(xValue_list)
-		rects = pylab.bar(ind, yValue_list, width=width, bottom=0, color=c, log=False, **kwargs)
-		rects_ls.append(rects)
+		plotObject = pylab.bar(ind, yValue_list, width=width, bottom=0, color=c, log=False, **kwargs)
+		self.plotObjectLs.append(plotObject)
+		self.plotObjectLegendLs.append(os.path.basename(pdata.filename))
 		
 		#if len(rects_ls)==2:
 		#	pylab.legend( (rects_ls[0][0], rects_ls[1][0]), ('version 0', 'version 1') )
@@ -97,8 +96,9 @@ class PlotYAsBar(AbstractPlot):
 			x_index = col_name2index.get(self.xColumnHeader, None)
 			
 			xValue = float(row[x_index])
+			xValue = self.processValue(xValue, processType=self.logX)
 			yValue = float(row[whichColumn])
-			yValue = self.handleYValue(yValue)
+			yValue = self.processValue(yValue, processType=self.logY)
 			xValue2yValueLs[xValue] = yValue
 			y_ls.append(yValue)
 	

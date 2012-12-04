@@ -160,8 +160,9 @@ class PlotLD(AbstractPlot):
 						return
 					if self.maxDist and xValue>self.maxDist:
 						return
+					xValue = self.processValue(xValue, processType=self.logX)
 					x_ls.append(xValue)
-					yValue = self.handleYValue(yValue)
+					yValue = self.processValue(yValue, processType=self.logY)
 					y_ls.append(yValue)
 		return 1
 	

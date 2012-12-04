@@ -28,7 +28,7 @@ import csv, random, numpy
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter,\
 	yh_matplotlib
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
-from pymodule.AbstractMatrixFileWalker import AbstractMatrixFileWalker
+from pymodule.yhio.AbstractMatrixFileWalker import AbstractMatrixFileWalker
 
 class AbstractPlot(AbstractMatrixFileWalker):
 	__doc__ = __doc__
@@ -43,8 +43,15 @@ class AbstractPlot(AbstractMatrixFileWalker):
 						('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\
 						('xColumnPlotLabel', 0, ): ['', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
 						
-						('logX', 0, int): [0, '', 0, 'whether to take -log of X'],\
+						('logX', 0, int): [0, '', 1, 'value 0: nothing; 1: log(X), 2: -log(X)'],\
+						('xScaleLog', 0, int): [0, '', 1, 'regarding the x-axis scale. 0: nothing; 1: scale of log(10), 2: scale of log(2),\
+	if this is non-zero, then logX is better off. otherwise mess up the data'],\
+						('yScaleLog', 0, int): [0, '', 1, 'regarding the y-axis scale. 0: nothing; 1: scale of log(10), 2: scale of log(2),\
+	if this is non-zero, then logY is better off. otherwise data will be messed up.'],\
 						('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
+						('defaultFontLabelSize', 1, int): [12, '', 1, 'default font & label size on the plot'], \
+						('defaultFigureWidth', 1, float): [10, '', 1, 'default figure width in the pedigree plot'], \
+						('defaultFigureHeight', 1, float): [10, '', 1, 'default figure height in the pedigree plot'], \
 						
 						})
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -60,13 +67,33 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		self.xMax = None
 		self.yMin = None
 		self.yMax = None
+		#2012.11.25 for legend
+		self.plotObjectLs = []
+		self.plotObjectLegendLs = []
+		
+		yh_matplotlib.setFontAndLabelSize(self.defaultFontLabelSize)
+		yh_matplotlib.setDefaultFigureSize((self.defaultFigureWidth, self.defaultFigureHeight))
 	
-	def plot(self, x_ls=None, y_ls=None, pdata=None):
+	def addPlotLegend(self, plotObject=None, legend=None, pdata=None, **keywords):
+		"""
+		2012.11.25
+		"""
+		self.plotObjectLs.append(plotObject)
+		self.plotObjectLegendLs.append(legend)
+	
+	def plot(self, x_ls=None, y_ls=None, pdata=None, **keywords):
 		"""
 		2011-9-30
 			get called by the end of fileWalker() for each inputFname.
 		"""
-		pylab.plot(x_ls, y_ls, self.formatString)
+		plotObject = pylab.plot(x_ls, y_ls, self.formatString)[0]
+		self.addPlotLegend(plotObject=plotObject, legend=os.path.basename(pdata.filename), pdata=pdata)
+		
+		self.setGlobalMinVariable(extremeVariableName='xMin', givenExtremeValue=min(x_ls))
+		self.setGlobalMaxVariable(extremeVariableName='xMax', givenExtremeValue=max(x_ls))
+		self.setGlobalMinVariable(extremeVariableName='yMin', givenExtremeValue=min(y_ls))
+		self.setGlobalMaxVariable(extremeVariableName='yMax', givenExtremeValue=max(y_ls))
+	
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -88,8 +115,9 @@ class AbstractPlot(AbstractMatrixFileWalker):
 			xValue = row[x_index]
 			yValue = row[whichColumn]
 			if yValue not in self.missingDataNotation and xValue not in self.missingDataNotation:
-				xValue = float(xValue)
-				yValue = self.handleYValue(yValue)
+				xValue = self.processValue(xValue, processType=self.logX, valueForNonPositiveValue=self.valueForNonPositiveYValue)
+				yValue = self.processValue(yValue, processType=self.logY, \
+							valueForNonPositiveValue=self.valueForNonPositiveYValue)
 				x_ls.append(xValue)
 				y_ls.append(yValue)
 	
@@ -200,13 +228,40 @@ class AbstractPlot(AbstractMatrixFileWalker):
 			title = yh_matplotlib.constructTitleFromTwoDataSummaryStat(self.invariantPData.x_ls, self.invariantPData.y_ls)
 		pylab.title(title)
 		return title
-
+	
+	def changeFigureScaleToLog(self, xScaleLog=None, yScaleLog=None):
+		"""
+		2012.11.24
+			not used in default mode
+		"""
+		
+		if xScaleLog is None:
+			xScaleLog = self.xScaleLog
+		if yScaleLog is None:
+			yScaleLog = self.yScaleLog
+		if xScaleLog==1:	#only change the axis into log-scale if it's positive log
+			pylab.gca().set_xscale('log', basex=10)
+		elif xScaleLog==2:
+			pylab.gca().set_xscale('log', basex=2)
+		
+		if yScaleLog==1:	#only change the axis into log-scale if it's positive log
+			pylab.gca().set_yscale('log', basey=10)
+		elif yScaleLog==2:
+			pylab.gca().set_yscale('log', basey=2)
+		
 	def saveFigure(self, invariantPData=None, **keywords):
 		"""
+		2012.11.24
 		2012.10.7
-		
 		"""
 		sys.stderr.write("Saving figure ...")
+		
+		self.changeFigureScaleToLog()
+		
+		if self.plotObjectLegendLs and self.plotObjectLs:
+			#add the legend
+			pylab.legend(self.plotObjectLs, self.plotObjectLegendLs, shadow = True)
+		
 		if self.outputFnamePrefix:
 			pngOutputFname = '%s.png'%self.outputFnamePrefix
 			svgOutputFname = '%s.svg'%self.outputFnamePrefix

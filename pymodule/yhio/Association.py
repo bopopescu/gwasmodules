@@ -9,8 +9,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import numpy
 import networkx as nx
 from pymodule.utils import PassingData
-from pymodule.io.HDF5MatrixFile import HDF5MatrixFile
-from pymodule.io.SNP import getGenomeWideResultFromHDF5MatrixFile
+from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToHDF5GroupObject
+from pymodule.yhio.SNP import getGenomeWideResultFromHDF5MatrixFile
 
 
 def getAssociationLandscapeDataFromHDF5File(inputFname=None, associationGroupName='association', \
@@ -34,7 +34,9 @@ def getAssociationLandscapeDataFromHDF5File(inputFname=None, associationGroupNam
 	locusLandscapeNeighborGraph = nx.Graph()
 	reader = HDF5MatrixFile(inputFname, openMode='r')
 	landscapeGroupObject = reader.getGroupObject(groupName=landscapeGroupName)
+	returnData.HDF5AttributeNameLs = []
 	for attributeName, value in landscapeGroupObject.getAttributes().iteritems():
+		returnData.HDF5AttributeNameLs.append(attributeName)
 		setattr(returnData, attributeName, value)
 	
 	for row in landscapeGroupObject:
@@ -64,7 +66,7 @@ def getAssociationLandscapeDataFromHDF5File(inputFname=None, associationGroupNam
 	return returnData
 
 def outputAssociationLandscapeInHDF5(bridge_ls=None, outputFname=None, writer=None, closeFile=False, groupName='landscape',\
-							result_id='', min_MAF='', neighbor_distance='', max_neighbor_distance=''):
+							attributeDict=None,):
 	"""
 	2012.11.18
 	"""
@@ -80,10 +82,7 @@ def outputAssociationLandscapeInHDF5(bridge_ls=None, outputFname=None, writer=No
 	else:
 		sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
 		sys.exit(3)
-	groupObject.addAttribute(name='result_id', value=result_id)
-	groupObject.addAttribute(name='min_MAF', value=min_MAF)
-	groupObject.addAttribute(name='neighbor_distance', value=neighbor_distance, overwrite=True)
-	groupObject.addAttribute(name='max_neighbor_distance', value=max_neighbor_distance, overwrite=True)
+	addAttributeDictToHDF5GroupObject(groupObject=groupObject, attributeDict=attributeDict)
 	
 	previous_locus_id = None
 	cellList = []
@@ -105,16 +104,18 @@ def constructAssociationPeakRBDictFromHDF5File(inputFname=None, peakPadding=1000
 		similar to Stock_250kDB.constructRBDictFromResultPeak(), but from HDF5MatrixFile-like file
 	"""
 	from pymodule.algorithm.RBTree import RBDict
-	from pymodule.io.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+	from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 	
 	sys.stderr.write("Constructing association-peak RBDict from HDF5 file %s, (peakPadding=%s) ..."%(inputFname, peakPadding))
 	reader = HDF5MatrixFile(inputFname, openMode='r')
 	associationPeakRBDict = RBDict()
 	associationPeakRBDict.result_id = None	#2012.6.22
 	associationPeakRBDict.peakPadding = peakPadding
+	associationPeakRBDict.HDF5AttributeNameLs = []
 	
 	groupObject = reader.getGroupObject(groupName=groupName)
 	for attributeName, value in groupObject.getAttributes().iteritems():
+		associationPeakRBDict.HDF5AttributeNameLs.append(attributeName)
 		setattr(associationPeakRBDict, attributeName, value)
 	
 	counter = 0
@@ -133,8 +134,7 @@ def constructAssociationPeakRBDictFromHDF5File(inputFname=None, peakPadding=1000
 
 
 def outputAssociationPeakInHDF5(association_peak_ls=None, filename=None, writer=None, groupName='association_peak', closeFile=True,\
-							result_id='', min_MAF='', neighbor_distance='', max_neighbor_distance='', min_score='',\
-							ground_score=''):
+							attributeDict=None,):
 	"""
 	2012.11.20
 	"""
@@ -152,13 +152,10 @@ def outputAssociationPeakInHDF5(association_peak_ls=None, filename=None, writer=
 		sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
 		sys.exit(3)
 	#add neighbor_distance, max_neighbor_distance, min_MAF, min_score, ground_score as attributes
-	groupObject.addAttribute(name='result_id', value=result_id)
-	groupObject.addAttribute(name='min_MAF', value=min_MAF)
-	groupObject.addAttribute(name='neighbor_distance', value=neighbor_distance, overwrite=True)
-	groupObject.addAttribute(name='max_neighbor_distance', value=max_neighbor_distance, overwrite=True)
-	groupObject.addAttribute(name='min_score', value=min_score, overwrite=True)
-	groupObject.addAttribute(name='ground_score', value=ground_score, overwrite=True)
+	addAttributeDictToHDF5GroupObject(groupObject=groupObject, attributeDict=attributeDict)
 	cellList = []
+	#2012.11.28 sort it
+	association_peak_ls.sort()
 	for association_peak in association_peak_ls:
 		dataTuple = (association_peak.start_locus_id, association_peak.stop_locus_id, \
 					association_peak.chromosome, association_peak.start, association_peak.stop, association_peak.no_of_loci,\
@@ -175,9 +172,42 @@ def outputAssociationPeakInHDF5(association_peak_ls=None, filename=None, writer=
 	return writer
 
 
-def outputAssociationLociInHDF5(associationLocusList=None, filename=None, writer=None, groupName='association_locus', closeFile=True,\
-					min_MAF='', neighbor_distance='', max_neighbor_distance='', min_score='',\
-					ground_score='', min_overlap_ratio='', peakPadding=''):
+def constructAssociationLocusRBDictFromHDF5File(inputFname=None, locusPadding=0, groupName='association_locus'):
+	"""
+	2012.11.25
+		similar to constructAssociationPeakRBDictFromHDF5File
+	"""
+	from pymodule.algorithm.RBTree import RBDict
+	from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+	
+	sys.stderr.write("Constructing association-locus RBDict from HDF5 file %s, (locusPadding=%s) ..."%(inputFname, locusPadding))
+	reader = HDF5MatrixFile(inputFname, openMode='r')
+	associationLocusRBDict = RBDict()
+	associationLocusRBDict.locusPadding = locusPadding
+	associationLocusRBDict.HDF5AttributeNameLs = []
+	groupObject = reader.getGroupObject(groupName=groupName)
+	for attributeName, value in groupObject.getAttributes().iteritems():
+		associationLocusRBDict.HDF5AttributeNameLs.append(attributeName)
+		setattr(associationLocusRBDict, attributeName, value)
+	
+	counter = 0
+	real_counter = 0
+	for row in groupObject:
+		counter += 1
+		segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
+						span_ls=[max(1, row.start - locusPadding), row.stop + locusPadding], \
+						min_reciprocal_overlap=1, no_of_peaks=row.no_of_peaks, \
+						no_of_results=row.no_of_results, connectivity=row.connectivity)
+						#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
+		if segmentKey not in associationLocusRBDict:
+			associationLocusRBDict[segmentKey] = []
+		associationLocusRBDict[segmentKey].append(row)
+	sys.stderr.write("%s peaks in %s spans.\n"%(counter, len(associationLocusRBDict)))
+	return associationLocusRBDict
+
+def outputAssociationLociInHDF5(associationLocusList=None, filename=None, writer=None, groupName='association_locus', \
+					closeFile=True,\
+					attributeDict=None):
 	"""
 	2012.11.20
 	"""
@@ -195,14 +225,10 @@ def outputAssociationLociInHDF5(associationLocusList=None, filename=None, writer
 		sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
 		sys.exit(3)
 	#add neighbor_distance, max_neighbor_distance, min_MAF, min_score, ground_score as attributes
-	groupObject.addAttribute(name='min_MAF', value=min_MAF)
-	groupObject.addAttribute(name='neighbor_distance', value=neighbor_distance)
-	groupObject.addAttribute(name='max_neighbor_distance', value=max_neighbor_distance)
-	groupObject.addAttribute(name='min_score', value=min_score)
-	groupObject.addAttribute(name='ground_score', value=ground_score)
-	groupObject.addAttribute(name='min_overlap_ratio', value=min_overlap_ratio)
-	groupObject.addAttribute(name='peakPadding', value=peakPadding)
+	addAttributeDictToHDF5GroupObject(groupObject=groupObject, attributeDict=attributeDict)
 	cellList = []
+	#2012.11.28 sort it
+	associationLocusList.sort()
 	for associationLocus in associationLocusList:
 		dataTuple = (associationLocus.chromosome, associationLocus.start, associationLocus.stop, associationLocus.no_of_peaks,\
 					associationLocus.connectivity, associationLocus.no_of_results)

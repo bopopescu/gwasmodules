@@ -7,11 +7,11 @@
 import os, sys, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-from pymodule.ProcessOptions import ProcessOptions
-from pymodule.io.SNP import GenomeWideResult, DataObject
-from pymodule.utils import getColName2IndexFromHeader, dict_map, importNumericArray, figureOutDelimiter, PassingData
 import fileinput
 import numpy
+from pymodule.ProcessOptions import ProcessOptions
+from pymodule.yhio.SNP import GenomeWideResult, DataObject
+from pymodule.utils import getColName2IndexFromHeader, dict_map, importNumericArray, figureOutDelimiter, PassingData
 
 def get_overlap_ratio(span1_ls, span2_ls):
 	"""
@@ -90,8 +90,10 @@ class CNVSegmentBinarySearchTreeKey(object):
 		self.start = self.span_ls[0]
 		if len(self.span_ls)>1:
 			self.stop = self.span_ls[1]
+			self.span = abs(self.stop-self.start)
 		else:
 			self.stop = self.start
+			self.span = 0
 		
 		for key, value in keywords.iteritems():	#2010-8-2
 			setattr(self, key, value)
@@ -223,6 +225,12 @@ class CNVSegmentBinarySearchTreeKey(object):
 		2009-12-13
 		"""
 		return "chromosome: %s, span_ls: %s"%(self.chromosome, repr(self.span_ls))
+	
+	def getKey(self):
+		"""
+		2012.11.20 return a tuple that is dictionary-able.
+		"""
+		return (self.chromosome, self.start, self.stop)
 
 
 class SegmentTreeNodeKey(CNVSegmentBinarySearchTreeKey):

@@ -593,7 +593,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			fastaDictJob = self.addRefFastaDictJob(workflow, createSequenceDictionaryJava=createSequenceDictionaryJava, \
 												refFastaF=refFastaF)
 			refFastaDictF = fastaDictJob.refFastaDictF
-			self.no_of_jobs += 1
 		else:
 			fastaDictJob = None
 			refFastaDictF = None
@@ -601,7 +600,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		if needFastaIndexJob and refFastaF:
 			fastaIndexJob = self.addRefFastaFaiIndexJob(workflow, samtools=samtools, refFastaF=refFastaF)
 			refFastaIndexF = fastaIndexJob.refFastaIndexF
-			self.no_of_jobs += 1
 		else:
 			fastaIndexJob = None
 			refFastaIndexF = None

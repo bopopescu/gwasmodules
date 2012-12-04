@@ -14,37 +14,25 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from ProcessOptions import ProcessOptions
 import utils
+from pegasus.mapper.AbstractMapper import AbstractMapper
 
-class AbstractDBInteractingClass(object):
+class AbstractDBInteractingClass(AbstractMapper):
 	__doc__ = __doc__
-	db_option_dict = {
-					('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
-					('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
-					('dbname', 1, ): ['vervetdb', '', 1, 'database name', ],\
-					('schema', 0, ): ['public', '', 1, 'database schema name', ],\
-					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-					('db_passwd', 1, ): [None, '', 1, 'database password', ],\
-					('port', 0, ):[None, '', 1, 'database port number. must be non-empty if need ssh tunnel'],\
-					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
-					}
+	
+	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict = {
 						('sshTunnelCredential', 0, ): ['', '', 1, 'a ssh credential to allow machine to access db server. \
 										polyacti@login3, yuhuang@hpc-login2. if empty or port is empty, no tunnel', ],\
 						('logFilename', 0, ): [None, '', 1, 'file to contain logs. use it only if this program is at the end of pegasus workflow \
 		and has no output file'],\
-						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
 						}
-	option_default_dict.update(db_option_dict)
+	option_default_dict.update(AbstractMapper.db_option_dict)
 	
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2011-7-11
 		"""
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
-		self.inputFnameLs = inputFnameLs
-		self.connectDB()
+		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 		
 		#2012.7.4 keep track of all the source&destination files, used by moveNewISQFileIntoDBStorage()
 		self.srcFilenameLs = []

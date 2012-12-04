@@ -84,9 +84,14 @@ RBTree.py contains an internal Distutils-based installer; just run:
 -------------------------------------------------------------------------------
 
 """
+import sys, os, math
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
 __version__ = "1.6"
 
 import string, math
+from pymodule.utils import PassingData
 
 BLACK = 0
 RED = 1
@@ -537,7 +542,80 @@ class RBTree(object):
 					current = current.right
 
 		return None
+	
+	def findFirstAncestralNodeSmallerThanCurrent(self, current=None,):
+		"""
+		2012.11.28
+			find the first ancestral branch which is the right branch
+		"""
+		parent = current.parent
+		nodeToReturn = None
+		while parent:
+			if current == parent.right:
+				nodeToReturn = parent
+				break
+			current = parent
+			parent = parent.parent
+		return nodeToReturn
+	
+	def findFirstAncestralNodeBiggerThanCurrent(self, current=None,):
+		"""
+		2012.11.28
+			find the first ancestral branch which is the right branch
+		"""
+		parent = current.parent
+		nodeToReturn = None
+		while parent:
+			if current == parent.left:
+				nodeToReturn = parent
+				break
+			current = parent
+			parent = parent.parent
+		return nodeToReturn
+	
+	def findClosestNode(self, key=None):
+		"""
+		2012.11.28
+			given the key, find the exact matching node or
+				the one/two nodes that are closest to the key.
+			The return structure is either None or PassingData(smallerNode=, biggerNode=).
+		"""
+		#******************************
+		#  find node containing data
+		#******************************
 
+		# we aren't interested in the value, we just
+		# want the TypeError raised if appropriate
+		hash(key)
+		
+		current = self.root
+		
+		objectToReturn = None	#default, find nothing
+		
+		while current != self.sentinel:
+			# GJB added comparison function feature
+			# slightly improved by JCG: don't assume that ==
+			# is the same as self.__cmp(..) == 0
+			rc = self.__cmp(key, current.key)
+			if rc == 0:
+				objectToReturn = PassingData(smallerNode=current, biggerNode=current)
+				break
+			else:
+				parent = current.parent
+				if rc < 0:	#to the left of current
+					if current.left ==self.sentinel:
+						objectToReturn = PassingData(smallerNode=self.findFirstAncestralNodeSmallerThanCurrent(current), \
+													biggerNode=current)
+						break
+					current = current.left
+				else:	#to the right of current
+					if current.right == self.sentinel:
+						objectToReturn = PassingData(smallerNode=current, \
+													biggerNode=self.findFirstAncestralNodeBiggerThanCurrent(current))
+						break
+					current = current.right
+		return objectToReturn
+	
 	def traverseTree(self, f):
 		if self.root == self.sentinel:
 			return

@@ -93,6 +93,7 @@ def autoLabelBarChartWithHeight(axe, rects):
 
 def setFontAndLabelSize(base_size=9):
 	"""
+	2012.12.3 make the legend & axes.title font size 1.4 X base_size
 	2010-4-14
 		function to change matplotlib font size globally
 		#have to be set in the very beginning of a program, otherwise, no effect.
@@ -100,13 +101,13 @@ def setFontAndLabelSize(base_size=9):
 		for more additional customization check: http://matplotlib.sourceforge.net/users/customizing.html
 	"""
 	from matplotlib import rcParams
-	rcParams['font.size'] = base_size
-	rcParams['legend.fontsize'] = base_size
+	rcParams['font.size'] = base_size	#default is 12
+	rcParams['legend.fontsize'] = int(base_size*1.6)	#default is large 
 	#rcParams['text.fontsize'] = 6	#deprecated. use font.size instead
-	rcParams['axes.labelsize'] = base_size
-	rcParams['axes.titlesize'] = base_size + 2
-	rcParams['xtick.labelsize'] = base_size
-	rcParams['ytick.labelsize'] = base_size
+	rcParams['axes.labelsize'] = base_size	#default is medium
+	rcParams['axes.titlesize'] = int(base_size*1.6)	#default is large 
+	rcParams['xtick.labelsize'] = base_size	#default is medium
+	rcParams['ytick.labelsize'] = base_size	#default is medium
 
 def setDefaultFigureSize(figsize=None):
 	"""
@@ -134,9 +135,10 @@ def restoreMatplotlibRCDefaults():
 	import matplotlib
 	matplotlib.rcdefaults()
 
-def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None, max_no_of_data_points=50, needLog=False, \
+def drawHist(data_ls=None, title=None, xlabel_1D=None, xticks=None, outputFname=None, min_no_of_data_points=50, needLog=False, \
 			dpi=200, max_no_of_bins=20, **kwargs):
 	"""
+	2012.11.27 rename max_no_of_data_points to min_no_of_data_points
 	2012.8.6 argument min_no_of_bins renamed to max_no_of_bins, which is actually what it does.
 	2011-11-28
 		add argument min_no_of_bins
@@ -152,7 +154,7 @@ def drawHist(data_ls, title=None, xlabel_1D=None, xticks=None, outputFname=None,
 	#ax = pylab.axes()
 	#ax = fig.gca()
 	no_of_data_points = len(data_ls)
-	if no_of_data_points>=max_no_of_data_points:
+	if no_of_data_points>=min_no_of_data_points:
 		no_of_bins = max(10, min(max_no_of_bins, no_of_data_points/10))
 		n, bins, patches = pylab.hist(data_ls, no_of_bins, log=needLog)
 		if title:

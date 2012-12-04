@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule.io.VCFFile import VCFFile
-from pymodule.io import SNP
+from pymodule.yhio.VCFFile import VCFFile
+from pymodule.yhio import SNP
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 
 class AbstractVCFMapper(AbstractMapper):

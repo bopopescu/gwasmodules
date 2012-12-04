@@ -65,6 +65,13 @@ class MatrixFile(object):
 		"""
 		self.header = self.next()
 		self.col_name2index = utils.getColName2IndexFromHeader(self.header)
+		return self.col_name2index
+	
+	def getHeader(self):
+		"""
+		2012.11.22
+		"""
+		return self.header
 	
 	def getColIndexGivenColHeader(self, colHeader=None):
 		"""

@@ -442,6 +442,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		fastaIndexJob.refFastaIndexF = refFastaIndexF
 		yh_pegasus.setJobProperRequirement(fastaIndexJob, job_max_memory=1000)
 		self.addJob(fastaIndexJob)
+		self.no_of_jobs += 1
 		return fastaIndexJob
 	
 	def addRefFastaDictJob(self, workflow=None, createSequenceDictionaryJava=None, createSequenceDictionaryJar=None, refFastaF=None):
@@ -461,6 +462,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		yh_pegasus.setJobProperRequirement(fastaDictJob, job_max_memory=1000)
 		fastaDictJob.refFastaDictF = refFastaDictF
 		self.addJob(fastaDictJob)
+		self.no_of_jobs += 1
 		return fastaDictJob
 	
 	def addRefFastaJobDependency(self, workflow=None, job=None, refFastaF=None, fastaDictJob=None, refFastaDictF=None, fastaIndexJob = None, refFastaIndexF = None):

@@ -41,7 +41,7 @@ class Draw2DHistogramOfMatrix(AbstractPlot):
 	option_default_dict.update({
 						
 						('zColumnHeader', 0, ): ["", 'z', 1, 'index of the column to be z-axis'],\
-						('logZ', 0, int): [0, '', 0, 'whether to take -log of Z'],\
+						('logZ', 0, int): [0, '', 1, 'value 0: nothing; 1: log(), 2: -log()'],\
 						})
 	#('columnForX', 1, ): ["", 'x', 1, 'index of the column to be x-axis'],\
 	#('columnForY', 1, ): ["", 'y', 1, 'index of the column to be y-axis'],\
@@ -93,12 +93,12 @@ class Draw2DHistogramOfMatrix(AbstractPlot):
 				zValue = None
 			
 			if yValue not in self.missingDataNotation and xValue not in self.missingDataNotation:
-				xValue = self.processValue(value=xValue, takeLogarithm=self.logX, positiveLog=self.positiveLog, \
+				xValue = self.processValue(value=xValue, processType=self.logX, \
 										valueForNonPositiveValue=self.valueForNonPositiveYValue)
-				yValue = self.processValue(yValue, takeLogarithm=self.logY, positiveLog=self.positiveLog, \
+				yValue = self.processValue(yValue, processType=self.logY, \
 										valueForNonPositiveValue=self.valueForNonPositiveYValue)
 				if zValue is not None:
-					zValue = self.processValue(zValue, takeLogarithm=self.logZ, positiveLog=self.positiveLog, \
+					zValue = self.processValue(zValue, processType=self.logZ, \
 										valueForNonPositiveValue=self.valueForNonPositiveYValue)
 				else:
 					zValue = 1	#just a counter

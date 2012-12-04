@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from pymodule import ProcessOptions, getListOutOfStr, PassingData
-from pymodule.io import NextGenSeq
+from pymodule.yhio import NextGenSeq
 from pymodule.pegasus import yh_pegasus
 from Pegasus.DAX3 import *
 from Pegasus import DAX3
@@ -340,9 +340,9 @@ class AbstractWorkflow(ADAG):
 		PlotLD.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "plot/PlotLD.py"), site_handler))
 		executableClusterSizeMultiplierList.append((PlotLD, 0))
 		
-		PlotXYAsBarChart = Executable(namespace=namespace, name="PlotXYAsBarChart", version=version, os=operatingSystem, arch=architecture, installed=True)
-		PlotXYAsBarChart.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "plot/PlotXYAsBarChart.py"), site_handler))
-		executableClusterSizeMultiplierList.append((PlotXYAsBarChart, 0))
+		PlotYAsBar = Executable(namespace=namespace, name="PlotYAsBar", version=version, os=operatingSystem, arch=architecture, installed=True)
+		PlotYAsBar.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "plot/PlotYAsBar.py"), site_handler))
+		executableClusterSizeMultiplierList.append((PlotYAsBar, 0))
 		
 		DrawHistogram = Executable(namespace=namespace, name="DrawHistogram", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
@@ -631,24 +631,32 @@ class AbstractWorkflow(ADAG):
 							parentJobLs=None, \
 							namespace=None, version=None, extraDependentInputLs=None):
 		"""
+		i.e. :	self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
 		2012.10.8
 			inputF is optional, if not given, parentJobLs must be given, and parentJobLs[0].output is inputF. 
 		2012.9.12 parentJobLs and extraDependentInputLs could be None
 		2011-11-28
 			moved from CalculateVCFStatPipeline.py
 		"""
+		if workflow is None:
+			workflow = self
 		if inputF is None and parentJobLs is not None:	#2012.10.8
 			parentJob = parentJobLs[0]
 			inputF = parentJob.output
-		statMergeJob.addArguments(inputF)
-		statMergeJob.uses(inputF, transfer=True, register=True, link=Link.INPUT)
+		if inputF:
+			isAdded = self.addJobUse(statMergeJob, file=inputF, transfer=True, register=True, link=Link.INPUT)
+			if isAdded:
+				statMergeJob.addArguments(inputF)
+		
 		if extraDependentInputLs:
-			for input in extraDependentInputLs:
-				if input:
-					statMergeJob.uses(input, transfer=True, register=True, link=Link.INPUT)
+			for inputFile in extraDependentInputLs:
+				if inputFile:
+					isAdded = self.addJobUse(statMergeJob, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+		
 		if parentJobLs:
 			for parentJob in parentJobLs:
-				self.depends(parent=parentJob, child=statMergeJob)
+				self.addJobDependency(parentJob=parentJob, childJob=statMergeJob)
+	
 	
 	def addGenericDBJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
@@ -680,9 +688,10 @@ class AbstractWorkflow(ADAG):
 		if inputFileList:
 			for inputFile in inputFileList:
 				if inputFile:
-					job.addArguments(inputFile)
-					job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
-					job.inputLs.append(inputFile)
+					isAdded = self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+					if isAdded:	#2012.11.21
+						job.addArguments(inputFile)
+						job.inputLs.append(inputFile)
 		
 		#2012.10.6 set the job.input
 		if getattr(job, 'input', None) is None and job.inputLs:
@@ -696,8 +705,11 @@ class AbstractWorkflow(ADAG):
 		use = Use(file.name, link=link, register=register, transfer=transfer, optional=None, \
 								namespace=job.namespace,\
 								version=job.version, executable=None)	#, size=None
-		if not job.hasUse(use):
+		if job.hasUse(use):
+			return False
+		else:
 			job.addUse(use)
+			return True
 	
 	def addJobDependency(self, workflow=None, parentJob=None, childJob=None):
 		"""
@@ -708,6 +720,9 @@ class AbstractWorkflow(ADAG):
 		dep = Dependency(parent=parentJob, child=childJob)
 		if not workflow.hasDependency(dep):
 			workflow.addDependency(dep)
+			return True
+		else:
+			return False
 		
 	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
@@ -744,7 +759,7 @@ class AbstractWorkflow(ADAG):
 			if inputArgumentOption:
 				job.addArguments(inputArgumentOption)
 			job.addArguments(inputFile)
-			self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+			isAdded = self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
 			#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 			job.input = inputFile
 			job.inputLs.append(inputFile)
@@ -774,15 +789,17 @@ class AbstractWorkflow(ADAG):
 		if parentJobLs:
 			for parentJob in parentJobLs:
 				if parentJob:
-					self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
-					job.parentJobLs.append(parentJob)
+					isAdded = self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
+					if isAdded:
+						job.parentJobLs.append(parentJob)
 					#workflow.depends(parent=parentJob, child=job)
 		if extraDependentInputLs:
 			for input in extraDependentInputLs:
 				if input:
-					self.addJobUse(job, file=input, transfer=True, register=True, link=Link.INPUT)
+					isAdded = self.addJobUse(job, file=input, transfer=True, register=True, link=Link.INPUT)
 					#job.uses(input, transfer=True, register=True, link=Link.INPUT)
-					job.inputLs.append(input)
+					if isAdded:
+						job.inputLs.append(input)
 		if extraOutputLs:
 			for output in extraOutputLs:
 				if output:
@@ -799,9 +816,10 @@ class AbstractWorkflow(ADAG):
 			for inputFile in inputFileList:
 				if inputFile:
 					job.addArguments(inputFile)
-					self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+					isAdded = self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
 					#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
-					job.inputLs.append(inputFile)
+					if isAdded:
+						job.inputLs.append(inputFile)
 		#2012.10.9 make sure outputList
 		job.outputList = job.outputLs
 		#2012.7.28 if job.output is not set, set it to the 1st entry of job.outputLs
@@ -947,8 +965,8 @@ class AbstractWorkflow(ADAG):
 	
 	def addPlotLDJob(self, workflow=None, executable=None, inputFile=None, inputFileList=None, outputFile=None, \
 					outputFnamePrefix=None,
-					whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
-					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=50, \
+					whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, title=None, \
+					logY=None, valueForNonPositiveYValue=-1, \
 					missingDataNotation='-nan',\
 					xColumnPlotLabel=None, chrLengthColumnHeader=None, chrColumnHeader=None, \
 					minChrLength=1000000, xColumnHeader=None, pos2ColumnHeader=None, minNoOfTotal=100, maxNoOfTotal=None,\
@@ -1010,10 +1028,10 @@ class AbstractWorkflow(ADAG):
 		
 		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
-							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, logWhichColumn=logWhichColumn, \
-							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, \
+							logY=logY, valueForNonPositiveYValue=valueForNonPositiveYValue, \
 							missingDataNotation=missingDataNotation,\
-							xColumnHeader=xColumnHeader, xColumnPlotLabel=xColumnPlotLabel, \
+							xColumnHeader=xColumnHeader, xColumnPlotLabel=xColumnPlotLabel, title=title, \
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=figureDPI, formatString=formatString, ylim_type=ylim_type, samplingRate=samplingRate, need_svg=need_svg, \
 							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
@@ -1025,17 +1043,20 @@ class AbstractWorkflow(ADAG):
 	
 	def addAbstractPlotJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
 					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
-					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=-1, \
+					logX=None, logY=None, valueForNonPositiveYValue=-1, \
+					xScaleLog=0, yScaleLog=0, \
 					missingDataNotation='NA',\
-					xColumnHeader=None, xColumnPlotLabel=None, \
+					xColumnHeader=None, xColumnPlotLabel=None, title=None, \
 					minNoOfTotal=100, maxNoOfTotal=None,\
 					figureDPI=300, formatString='.', ylim_type=2, samplingRate=0.001, need_svg=False, \
+					inputFileFormat=None, outputFileFormat=None,\
 					parentJob=None, parentJobLs=None, \
 					extraDependentInputLs=None, \
 					extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, \
 					sshDBTunnel=False, \
 					objectWithDBArguments=None, **keywords):
 		"""
+		2012.12.3 added argument title, logX, logY
 		2012.10.16 added argument sshDBTunnel, objectWithDBArguments
 		2012.8.31 add argument missingDataNotation
 		#no spaces or parenthesis or any other shell-vulnerable letters in the x or y axis labels (whichColumnPlotLabel, xColumnPlotLabel)
@@ -1050,9 +1071,7 @@ class AbstractWorkflow(ADAG):
 			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
 			('whichColumnHeader', 0, ): ["", 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
 			('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
-			('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
-			('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
-				only effective when logWhichColumn is toggled. '],\
+			('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: -log(Y), 2: log(Y). replacing self.logWhichColumn.'],\
 			('valueForNonPositiveYValue', 1, float): [50, '', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
 					what yValue should be.'],\
 			('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\
@@ -1060,6 +1079,8 @@ class AbstractWorkflow(ADAG):
 			('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
 			
 		"""
+		extraOutputLs = []
+		key2ObjectForJob = {}
 		if executable is None:
 			executable = self.AbstractPlot
 		if extraDependentInputLs is None:
@@ -1068,10 +1089,7 @@ class AbstractWorkflow(ADAG):
 			extraDependentInputLs.extend(inputFileList)
 		if extraArgumentList is None:
 			extraArgumentList = []
-		if xColumnHeader:
-			extraArgumentList.append('--xColumnHeader %s'%(xColumnHeader))
-		extraOutputLs = []
-		key2ObjectForJob = {}
+		
 		if outputFnamePrefix:
 			extraArgumentList.append('--outputFnamePrefix %s'%(outputFnamePrefix))
 			if outputFile is None:
@@ -1090,20 +1108,34 @@ class AbstractWorkflow(ADAG):
 			extraArgumentList.append('--ylim_type %s'%(ylim_type))
 		if samplingRate is not None:
 			extraArgumentList.append('--samplingRate %s'%(samplingRate))
+		
+		if xColumnHeader:
+			extraArgumentList.append('--xColumnHeader %s'%(xColumnHeader))
+		if xColumnPlotLabel:
+			extraArgumentList.append("--xColumnPlotLabel %s"%(xColumnPlotLabel))
 		if whichColumnHeader:
 			extraArgumentList.append("--whichColumnHeader %s"%(whichColumnHeader))
 		if whichColumn:
 			extraArgumentList.append("--whichColumn %s"%(whichColumn))
-		if logWhichColumn:
-			extraArgumentList.append('--logWhichColumn')
-			if positiveLog:
-				extraArgumentList.append('--positiveLog')
 		if whichColumnPlotLabel:
 			extraArgumentList.append("--whichColumnPlotLabel %s"%(whichColumnPlotLabel))
-		if xColumnPlotLabel:
-			extraArgumentList.append("--xColumnPlotLabel %s"%(xColumnPlotLabel))
+		if title:
+			extraArgumentList.append("--title %s"%(title))
+		if logX:
+			extraArgumentList.append("--logX %s"%(logX))
+		if logY:
+			extraArgumentList.append('--logY %s'%(logY))
+		if xScaleLog:
+			extraArgumentList.append("--xScaleLog %s"%(xScaleLog))
+		if yScaleLog:
+			extraArgumentList.append("--yScaleLog %s"%(yScaleLog))
+		
 		if valueForNonPositiveYValue:
 			extraArgumentList.append("--valueForNonPositiveYValue %s"%(valueForNonPositiveYValue))
+		if inputFileFormat:
+			extraArgumentList.append("--inputFileFormat %s"%(inputFileFormat))
+		if outputFileFormat:
+			extraArgumentList.append("--outputFileFormat %s"%(outputFileFormat))
 		if need_svg:
 			extraArgumentList.append('--need_svg')
 			if not outputFnamePrefix:
@@ -1136,14 +1168,16 @@ class AbstractWorkflow(ADAG):
 	
 	def addAbstractMatrixFileWalkerJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
 					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, \
-					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=-1, \
+					logY=None, valueForNonPositiveYValue=-1, \
 					minNoOfTotal=10,\
 					samplingRate=1, \
+					inputFileFormat=None, outputFileFormat=None,\
 					parentJob=None, parentJobLs=None, \
 					extraDependentInputLs=None, extraArgumentList=None, \
 					extraArguments=None, transferOutput=True,  job_max_memory=2000, sshDBTunnel=False, \
 					objectWithDBArguments=None, **keywords):
 		"""
+		2012.11.25 more arguments, logY, inputFileFormat, outputFileFormat
 		2012.10.16 added argument sshDBTunnel, objectWithDBArguments
 		2012.10.15 added extraArgumentList, parentJob
 		2012.8.15
@@ -1162,8 +1196,9 @@ class AbstractWorkflow(ADAG):
 		"""
 		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
-							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=None, logWhichColumn=logWhichColumn, \
-							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=None, \
+							logY=logY, \
+							valueForNonPositiveYValue=valueForNonPositiveYValue, \
 							missingDataNotation=None,\
 							xColumnHeader=None, xColumnPlotLabel=None, \
 							minNoOfTotal=minNoOfTotal, \
@@ -1175,10 +1210,10 @@ class AbstractWorkflow(ADAG):
 	
 	def addDrawHistogramJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
 					outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
-					logWhichColumn=False, positiveLog=False, valueForNonPositiveYValue=50, \
+					logY=None, valueForNonPositiveYValue=-1, missingDataNotation='NA', title=None, \
 					minNoOfTotal=10,\
 					figureDPI=100, formatString='.', ylim_type=2, samplingRate=0.001, need_svg=False, \
-					logCount=False,\
+					logCount=False, inputFileFormat=None, \
 					parentJobLs=None, \
 					extraDependentInputLs=None, \
 					extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
@@ -1210,29 +1245,30 @@ class AbstractWorkflow(ADAG):
 		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
 							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, \
-							logWhichColumn=logWhichColumn, \
-							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
-							missingDataNotation=None,\
-							xColumnHeader=None, xColumnPlotLabel=None, \
+							logY=logY, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							missingDataNotation=missingDataNotation,\
+							xColumnHeader=None, xColumnPlotLabel=None, title=title, \
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=figureDPI, formatString=formatString, ylim_type=ylim_type, \
 							samplingRate=samplingRate, need_svg=need_svg, \
+							inputFileFormat=inputFileFormat,\
 							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \
 							**keywords)
 	
 	def addDraw2DHistogramOfMatrixJob(self, workflow=None, executable=None, inputFileList=None, inputFile=None, outputFile=None, \
 				outputFnamePrefix=None, whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, \
-				positiveLog=False, valueForNonPositiveYValue=-1, \
+				logX=False, logY=False, logZ=False, valueForNonPositiveYValue=-1, \
 				missingDataNotation='NA',\
 				xColumnHeader=None, xColumnPlotLabel=None, \
 				minNoOfTotal=100,\
 				figureDPI=300, formatString='.', samplingRate=0.001, need_svg=False, \
-				zColumnHeader=None, logX=False, logY=False, logZ=False,\
+				zColumnHeader=None, \
 				parentJobLs=None, \
 				extraDependentInputLs=None, \
 				extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
 		"""
+		2012.11.28 change logX, logY, logZ
 		2012.10.7
 			
 		"""
@@ -1240,17 +1276,12 @@ class AbstractWorkflow(ADAG):
 			extraArgumentList = []
 		if zColumnHeader:
 			extraArgumentList.append("--zColumnHeader %s"%(zColumnHeader))
-		if logX:
-			extraArgumentList.append("--logX")
-		if logY:
-			extraArgumentList.append("--logY")
 		if logZ:
-			extraArgumentList.append("--logZ")	
+			extraArgumentList.append("--logZ %s"%(logZ))
 		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
 							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, \
-							logWhichColumn=None, \
-							positiveLog=positiveLog, valueForNonPositiveYValue=valueForNonPositiveYValue, \
+							logX=logX, logY=logY, valueForNonPositiveYValue=valueForNonPositiveYValue, \
 							missingDataNotation=missingDataNotation,\
 							xColumnHeader=xColumnHeader, xColumnPlotLabel=xColumnPlotLabel, \
 							minNoOfTotal=minNoOfTotal, \

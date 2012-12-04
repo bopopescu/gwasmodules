@@ -58,15 +58,7 @@ class DrawVCFtoolsHWEHetFractionHistogram(DrawHistogram):
 			yValue = float(noOfHet/float(noOfTotal))
 		else:
 			yValue = -1
-		if self.logWhichColumn:
-			if yValue>0:
-				if self.positiveLog:
-					yValue = math.log10(yValue)
-				else:
-					yValue = -math.log10(yValue)
-				
-			else:
-				yValue = self.valueForNonPositiveYValue
+		yValue = self.processValue(yValue, processType=self.logY)
 		return yValue
 	
 	

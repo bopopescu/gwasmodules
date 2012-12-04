@@ -11,7 +11,7 @@ import re
 from pymodule.ProcessOptions import  ProcessOptions
 from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData, getColName2IndexFromHeader
 from pymodule.db import TableClass
-from pymodule.io.HDF5MatrixFile import HDF5MatrixFile
+from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToHDF5GroupObject
 
 pa_has_characters = re.compile(r'[a-zA-Z_]')
 
@@ -2115,9 +2115,16 @@ class GenomeWideResult(object):
 	data_obj_ls = None
 	data_obj_id2index = None
 	
-	name = None
-	results_method_id = None
+	name = ''
+	results_method_id = ''
+	result_id = ''
+	db_entry_id = ''
+	results_id = ''
+	
 	results_method = None
+	db_entry = None
+	rm = None
+	
 	min_value = None
 	max_value = None
 	
@@ -2556,8 +2563,9 @@ class GenomeWideResult(object):
 									data_obj.mac, data_obj.maf)
 		return row
 	
-	def outputInHDF5MatrixFile(self, writer=None, filename=None, groupName='association', closeFile = True):
+	def outputInHDF5MatrixFile(self, writer=None, filename=None, groupName='association', closeFile = True, attributeDict=None):
 		"""
+		2012.11.22 added attributeDict
 		2012.11.19
 			output it into an HDF5MatrixFile file
 		"""
@@ -2565,19 +2573,20 @@ class GenomeWideResult(object):
 		#each number below is counting bytes, not bits
 		dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
 					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
-		headerList = [row[0] for row in dtypeList]
-		dtype = numpy.dtype(dtypeList)
 		if writer is None and filename:
-			writer = HDF5MatrixFile(filename, openMode='w', dtype=dtype, firstGroupName=groupName)
-			writer.writeHeader(headerList)
+			writer = HDF5MatrixFile(filename, openMode='w', dtypeList=dtypeList, firstGroupName=groupName)
 			groupObject = writer.getGroupObject(groupName=groupName)
 		elif writer:
-			groupObject = writer.createNewGroup(groupName=groupName, dtype=dtype)
-			groupObject.setColIDList(headerList)
+			groupObject = writer.createNewGroup(groupName=groupName, dtypeList=dtypeList)
 		else:
 			sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
 			sys.exit(3)
 		
+		addAttributeDictToHDF5GroupObject(groupObject=groupObject, attributeDict=attributeDict)
+		if self.results_method_id:
+			groupObject.addAttribute(name='result_id', value=self.results_method_id)
+		if self.name:
+			groupObject.addAttribute(name='name', value=self.name)
 		cellList = []
 		for data_obj in self.data_obj_ls:
 			dataTuple = self._extractOutputRowFromDataObject(data_obj=data_obj)
@@ -2619,7 +2628,26 @@ class GenomeWideResult(object):
 				else:
 					sys.stderr.write("Warning: locus_db_id key %s already in self.locus_db_id2index with index=%s.\n"%\
 									(locus_db_id, self.locus_db_id2index.get(locus_db_id)))
-
+	
+	def setResultID(self, result_id=None):
+		"""
+		2012.11.20
+			some are  for backwards compatibility
+		"""
+		self.results_method_id = result_id
+		self.result_id = result_id
+		self.db_entry_id = result_id
+		self.results_id = result_id
+	
+	def setResultMethod(self, rm=None):
+		"""
+		2012.11.20
+		"""
+		self.results_method = rm
+		self.rm = rm
+		self.db_entry = rm
+		self.setResultID(rm.id)
+	
 class DataObject(object):
 	"""
 	2009-1-7
@@ -2710,7 +2738,7 @@ def cmpDataObjByChrPos(x, y):
 	return cmp((x.chromosome, x.position), (y.chromosome, y.position))
 
 
-def getGenomeWideResultFromFile(inputFname, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
+def getGenomeWideResultFromFile(inputFname=None, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=True,\
 							is_4th_col_stop_pos=False, chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False, report=True):
@@ -3043,13 +3071,10 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 	
 	reader = HDF5MatrixFile(inputFname, openMode='r')
 	associationGroupObject = reader.getGroupObject(groupName=groupName)
-	locusIDColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='locus_id')
-	chrColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='chromosome')
-	startColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='start')
-	stopColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='stop')
-	scoreColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='score')
-	MACColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='MAC')
-	MAFColIndex = associationGroupObject.getColIndexGivenColHeader(colHeader='MAF')
+	
+	for attributeName, value in associationGroupObject.getAttributes().iteritems():
+		setattr(gwr, attributeName, value)
+	gwr.setResultID(associationGroupObject.getAttribute('result_id'))
 	
 	no_of_lines = 0
 	for row in associationGroupObject:
@@ -3058,10 +3083,10 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 		rest_of_row = []
 		#no type cast, all straight from HDF5
 		
-		db_id = row[locusIDColIndex]
-		chromosome = row[chrColIndex]	#2011-4-19 no more integer conversion for chromosome.
-		start_pos = row[startColIndex]
-		stop_pos = row[stopColIndex]
+		db_id = row.locus_id
+		chromosome = row.chromosome	#2011-4-19 no more integer conversion for chromosome.
+		start_pos = row.start
+		stop_pos = row.stop
 		
 		if db_id2chr_pos:	#2012.11.19 correct chromosome, start_pos, stop_pos based on this dictionary
 			if db_id in db_id2chr_pos:
@@ -3071,9 +3096,9 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 				if len(chr_pos)>=3:
 					stop_pos = chr_pos[2]
 		
-		score = row[scoreColIndex]
-		MAC = row[MACColIndex]
-		MAF = row[MAFColIndex]
+		score = row.score
+		MAC = row.MAC
+		MAF = row.MAF
 		if chromosome_request!=None and chromosome!=chromosome_request:
 			continue
 		if start_request!=None and start_pos<start_request:

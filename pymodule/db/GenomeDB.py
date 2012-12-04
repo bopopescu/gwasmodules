@@ -29,9 +29,12 @@ from sqlalchemy.schema import ThreadLocalMetaData, MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy import and_, or_, not_
-from pymodule import PassingData	#2012.3.26 "from utils import PassingData" won't work because no module named "utils" exists outside pymodule (!=pymodule.utils). 
-
+from pymodule.utils import PassingData	#2012.3.26 "from utils import PassingData" won't work because no module named "utils" exists outside pymodule (!=pymodule.utils). 
+from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey
+from pymodule.algorithm.RBTree import RBDict
 from pymodule.db import ElixirDB
+from pymodule.Genome import GeneModel	#2010-9-21 although "from Genome import GeneModel" works,
+			#it causes problem in cPickle.load() because Genome is not directly visible outside.
 
 __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 #__metadata__ = ThreadLocalMetaData() #2008-11-04 not good for pylon
@@ -711,6 +714,8 @@ class OneGenomeData(PassingData):
 			add argument maxPseudoChrSize, which determines the max pseudo chromosome size (for self.chr_id2cumu_chr_start)
 		#2011-3-25
 		"""
+		#PassingData.__init__(self)
+		
 		self.db_genome = db_genome
 		self._chr_id2size = None
 		self._chr_id2cumu_size = None
@@ -1006,7 +1011,7 @@ class GenomeDatabase(ElixirDB):
 			simplified further by moving db-common lines to ElixirDB
 		2008-07-09
 		"""
-		from ProcessOptions import ProcessOptions
+		from pymodule.ProcessOptions import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 		if self.debug:
 			import pdb
@@ -1031,13 +1036,9 @@ class GenomeDatabase(ElixirDB):
 			construct a data structure to hold whole-genome annotation of genes
 		"""
 		sys.stderr.write("Getting gene_id2model and chr_id2gene_id_ls ...\n")
-		from pymodule.Genome import GeneModel	#2010-9-21 although "from Genome import GeneModel" works,
-			#it causes problem in cPickle.load() because Genome is not directly visible outside.	
 		gene_id2model = {}
 		chr_id2gene_id_ls = {}
 		
-		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey
-		from pymodule.RBTree import RBDict
 		
 		geneSpanRBDict = RBDict()
 		
@@ -1126,8 +1127,6 @@ class GenomeDatabase(ElixirDB):
 		2010-8-17
 		"""
 		sys.stderr.write("Creating a RBDict for all genes from organism %s ... \n"%tax_id)
-		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from RBTree import RBDict
 		genomeRBDict = RBDict()
 		genomeRBDict.genePadding = max_distance	#2012.3.19
 		query = Gene.query.filter_by(tax_id=tax_id).filter(Gene.start!=None).\
@@ -1218,8 +1217,6 @@ class GenomeDatabase(ElixirDB):
 		2011-3-10
 		"""
 		sys.stderr.write("Dealing with genomeRBDict ...")
-		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from RBTree import RBDict
 		import cPickle
 		if genomeRBDictPickleFname:
 			if os.path.isfile(genomeRBDictPickleFname):	#if this file is already there, suggest to un-pickle it.

@@ -93,7 +93,10 @@ class PlotBoxPlot(AbstractPlot):
 		#c = color_ls[i%len(color_ls)]
 		#pylab.boxplot(y2DList, positions=xValueList)	#this changes the x-location of the box plot
 		noOfBoxPlotsNow = len(self.boxPlotXLabelList)
-		pylab.boxplot(y2DList, positions=range(noOfBoxPlotsBefore, noOfBoxPlotsNow))
+		plotObject = pylab.boxplot(y2DList, positions=range(noOfBoxPlotsBefore, noOfBoxPlotsNow))
+		
+		#2012.11.25 no legend
+		#self.addPlotLegend(plotObject=plotObject, legend=os.path.basename(pdata.filename), pdata=pdata)
 		
 		self.setGlobalMinVariable(extremeVariableName='xMin', givenExtremeValue=0)
 		self.setGlobalMaxVariable(extremeVariableName='xMax', givenExtremeValue=noOfBoxPlotsNow-1)
@@ -114,8 +117,9 @@ class PlotBoxPlot(AbstractPlot):
 			x_index = col_name2index.get(self.xColumnHeader, None)
 			
 			xValue = float(row[x_index])
+			xValue = self.processValue(xValue, processType=self.logX)
 			yValue = float(row[whichColumn])
-			yValue = self.handleYValue(yValue)
+			yValue = self.processValue(yValue, processType=self.logY)
 			if xValue not in xValue2yValueLs:
 				xValue2yValueLs[xValue] = []
 			xValue2yValueLs[xValue].append(yValue)

@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv, random
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
-from io.MatrixFile import MatrixFile
-from io.HDF5MatrixFile import HDF5MatrixFile
+from pymodule.yhio.MatrixFile import MatrixFile
+from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile
 
 class AbstractMatrixFileWalker(AbstractMapper):
 	__doc__ = __doc__
@@ -35,16 +35,12 @@ class AbstractMatrixFileWalker(AbstractMapper):
 						('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
 						('whichColumn', 0, int): [None, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
 						('whichColumnHeader', 0, ): [None, 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
-						
-						('logY', 0, int): [0, '', 0, 'whether to take -log of Y, same as self.logWhichColumn'],\
-						('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take -log of the whichColumn'],\
-						('positiveLog', 0, int): [0, 'p', 0, 'toggle to take log, rather than -log(), \
-				only effective when logWhichColumn is toggled. '],\
-						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
-		this is the default final yValue.'],\
+						('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: log(), 2: -log(). replacing self.logWhichColumn.'],\
+						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'default value when log-transformation fails (when value is negative)'],\
 						('missingDataNotation', 0, ): ['NA', '', 1, 'coma-separated list of notations for missing data.\n\
 	missing data will be skipped.'],\
 						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: HDF5MatrixFile.'],\
+						('outputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: HDF5MatrixFile.'],\
 						})
 	
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -55,7 +51,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		#if user wants to preserve data in a data structure that is visible throughout reading different files.
 		# then use this self.invariantPData.
 		self.invariantPData = PassingData(writer=None, headerOutputted=False, x_ls = [], y_ls = [], z_ls=[])
-		if self.missingDataNotation:
+		if getattr(self, 'missingDataNotation', None):
 			self.missingDataNotation = set(utils.getListOutOfStr(self.missingDataNotation, data_type=str, separator2=None))
 		else:
 			self.missingDataNotation = set()
@@ -65,6 +61,13 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			split out of __init__() so that derived classes could overwrite this function
 		"""
 		pass
+	
+	def preFileFunction(self, **keywords):
+		"""
+		2012.11.23
+		"""
+		if hasattr(self, 'initiatePassingData'):
+			return self.initiatePassingData(**keywords)
 	
 	def initiatePassingData(self, ):
 		"""
@@ -77,42 +80,58 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		self.invariantPData.x_ls = pdata.x_ls
 		return pdata
 	
-	def processValue(self, value=None, takeLogarithm=None, positiveLog=None, valueForNonPositiveValue=None):
+	def processValue(self, value=None, processType=None, valueForNonPositiveValue=None, **keywords):
 		"""
+		2012.11.282 change positiveLog to processType
+			processType 0: nothing; 1: log(), 2: -log().
 		2012.10.15
 			the default value of takeLogarithm depends on (self.logWhichColumn or self.logY)
 		2012.10.7
 		"""
-		if positiveLog is None:
-			positiveLog = self.positiveLog
-		if takeLogarithm is None:
-			if self.logWhichColumn or self.logY:	#2012.10.15
-				takeLogarithm = True
-			else:
-				takeLogarithm = False
 		if valueForNonPositiveValue is None:
 			valueForNonPositiveValue = self.valueForNonPositiveYValue
-		
 		value = float(value)
-		if takeLogarithm:
+		if processType is not None and processType>=1:
 			if value>0:
-				if positiveLog:
+				if processType==1:
 					value = math.log10(value)
-				else:
+				elif processType==2:
 					value = -math.log10(value)
 			else:
 				value = valueForNonPositiveValue
 		return value
 	
-	def handleYValue(self, yValue=None, takeLogarithm=None, positiveLog=None, valueForNonPositiveValue=None, **keywords):
+	def handleYValue(self, yValue=None, processType=None, valueForNonPositiveValue=None, **keywords):
 		"""
+		2012.11.28 change positiveLog to processType
 		2012.10.7
 			add argument takeLogarithm, positiveLog, valueForNonPositiveValue
 		2012.8.2
 		"""
-		return self.processValue(value=yValue, takeLogarithm=takeLogarithm, positiveLog=positiveLog, \
-								valueForNonPositiveValue=valueForNonPositiveValue, **keywords)
-		
+		return self.processValue(value=yValue, processType=processType, \
+						valueForNonPositiveValue=valueForNonPositiveValue, **keywords)
+	
+	def processHeader(self, header=None, pdata=None, dtypeList=None):
+		"""
+		2012.11.22
+		2012.8.13
+			called right after the header of an input file is derived in fileWalker()
+		"""
+		if not self.invariantPData.headerOutputted:
+			if self.outputFileFormat==1:
+				if self.invariantPData.writer and header:
+					self.invariantPData.writer.writerow(header)
+			elif self.outputFileFormat==2:	#for HDF5MatrixFile 
+				if not dtypeList and header:	#generate a dtypeList based on header
+					dtypeList = []
+					for colID in header:
+						dtypeList.append((colID, HDF5MatrixFile.varLenStrType))
+				#dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+				#	('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
+				writer = HDF5MatrixFile(self.outputFname, openMode='w', dtypeList=dtypeList)
+				self.invariantPData.writer = writer
+		self.invariantPData.headerOutputted = True
+	
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -135,22 +154,12 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			if whichColumn is not None:
 				yValue = row[whichColumn]
 				if yValue not in self.missingDataNotation:
-					yValue = self.handleYValue(yValue)
+					yValue = self.processValue(yValue, processType=self.logY, valueForNonPositiveValue=self.valueForNonPositiveYValue)
 				row[whichColumn] = yValue
 			if self.invariantPData.writer:
 				self.invariantPData.writer.writerow(row)
 				returnValue = 1
 		return returnValue
-	
-	def processHeader(self, header=None, pdata=None):
-		"""
-		2012.8.13
-			called everytime the header of an input file is derived in fileWalker()
-		"""
-		if self.invariantPData.writer and not self.invariantPData.headerOutputted:
-			self.invariantPData.writer.writerow(header)
-			self.invariantPData.headerOutputted = True
-	
 	
 	def getNumberOfData(self, pdata):
 		"""
@@ -164,22 +173,27 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		"""
 		if hasattr(self, 'plot'):
 			return self.plot(**keywords)
-		
-	def fileWalker(self, inputFname=None, afterFileFunction=None, processRowFunction=None , run_type=1):
+	
+	
+	def fileWalker(self, inputFname=None, preFileFunction=None, afterFileFunction=None, processRowFunction=None , run_type=1):
 		"""
+		2012.11.23 added argument preFileFunction
+		2012.11.22 inputFileFormat==2, support HDF5MatrixFile
 		2012.8.1
 		"""
 		sys.stderr.write("walking through %s ..."%(inputFname))
 		counter = 0
 		real_counter = 0
 		noOfSampled = 0
-		pdata = self.initiatePassingData()
+		if preFileFunction is None:
+			preFileFunction = self.preFileFunction
+		pdata = preFileFunction()
 		if processRowFunction is None:
 			processRowFunction = self.processRow
 		if afterFileFunction is None:
 			afterFileFunction = self.afterFileFunction
 		try:
-			if self.inputFileFormat==1:
+			if self.inputFileFormat==1:	#2012.11.22 support HDF5MatrixFile
 				reader = MatrixFile(inputFname)
 			else:
 				reader = HDF5MatrixFile(inputFname, openMode='r')
@@ -191,6 +205,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			self.processHeader(header=header, pdata=pdata) #2012.8.13
 			pdata.reader = reader
 			pdata.col_name2index = col_name2index
+			pdata.filename = inputFname
 			
 			for row in reader:
 				counter += 1
@@ -221,16 +236,20 @@ class AbstractMatrixFileWalker(AbstractMapper):
 	
 	def setup(self, **keywords):
 		"""
+		2012.11.22
 		2012.10.25
 			do not open the file if it's a png file
 		2012.10.15
 			run before anything is run
 		"""
-		suffix = os.path.splitext(self.outputFname)[1]
-		if self.outputFname and suffix!='.png':
-			writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
-		else:
-			writer = None
+		writer = None
+		if self.outputFileFormat==1:
+			suffix = os.path.splitext(self.outputFname)[1]
+			if self.outputFname and suffix!='.png':
+				writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
+		else:	#HDF5MatrixFile
+			#can't generate HDF5MatrixFile, because it needs dtypeList
+			pass
 		#pass it to the invariantPData
 		self.invariantPData.writer = writer
 	

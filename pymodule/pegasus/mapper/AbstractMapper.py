@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule.io import SNP
+from pymodule.yhio import SNP
 import re
 
 class AbstractMapper(object):
@@ -21,15 +21,15 @@ class AbstractMapper(object):
 	db_option_dict = {
 					('drivername', 1,):['postgresql', '', 1, 'which type of database? mysql or postgresql', ],\
 					('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
-					('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
-					('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
+					('dbname', 1, ): ['vervetdb', '', 1, 'database name', ],\
+					('schema', 0, ): [None, '', 1, 'database schema name', ],\
 					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 					('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 					('port', 0, ):[None, '', 1, 'database port number'],\
 					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
 					}
 	option_default_dict = {
-						('inputFname', 1, ): ['', 'i', 1, 'input file.', ],\
+						('inputFname', 0, ): ['', 'i', 1, 'input file.', ],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
 						('outputFname', 0, ): [None, 'o', 1, 'output file'],\
 						('outputFnamePrefix', 0, ): [None, 'O', 1, 'output filename prefix (optional).'],\

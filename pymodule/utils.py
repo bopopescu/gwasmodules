@@ -1,4 +1,4 @@
-import os, sys, csv, re
+import os, sys, csv, re, numpy
 
 def dict_map(dict, ls, type=1):
 	"""
@@ -27,11 +27,12 @@ def dict_map(dict, ls, type=1):
 	
 	return new_list
 
-class PassingData(object):
+class PassingData(list, object):
 	"""
 	05/09/08
 		a class to hold any data structure
 	"""
+	
 	def __init__(self, **keywords):
 		"""
 		2008-5-12
@@ -39,20 +40,174 @@ class PassingData(object):
 		"""
 		for argument_key, argument_value in keywords.iteritems():
 			setattr(self, argument_key, argument_value)
-	
+			#setattr(self, argument_key, argument_value)
+		
 	def __str__(self):
 		"""
 		2010-6-17
 			a string-formatting function
 		"""
 		return_ls = []
-		for attribute_name in dir(self):
-			if attribute_name.find('__')==0:	#ignore the 
+		for attributeName in dir(self):
+			if attributeName.find('__')==0:	#ignore the 
 				continue
-			return_ls.append("%s = %s"%(attribute_name, getattr(self, attribute_name, None)))
-		
+			value = getattr(self, attributeName, None)
+			return_ls.append("%s = %s"%(attributeName, value))
+			
 		return ", ".join(return_ls)
+
+class PassingDataList(list, object):
+	"""
+	2012.11.24
+		could be accessed as a list as well.
+		The sorting of these objects will be based on the variables that were put into the list.
+		list has to be ahead of object as parental class, otherwise
+			"TypeError: Error when calling the metaclass basesCannot create a 
+				consistent method resolution order (MRO) for bases list, object"
+		a list needs these methods.
+			http://snipplr.com/view.php?codeview&id=6626
+			http://docs.python.org/2/reference/datamodel.html#sequence-types
+	05/09/08
+		a class to hold any data structure
+	"""
+	
+	def __init__(self, **keywords):
+		"""
+		2012.11.24
+		2008-5-12
+			add keyword handling
+		"""
+		object.__setattr__(self, 'attributeName2Index', {})
+		#watch: self (list) may contains items not recorded in attributeName2Index. 
 		
+		for argument_key, argument_value in keywords.iteritems():
+			setattr(self, argument_key, argument_value)
+			#setattr(self, argument_key, argument_value)
+		
+	def __str__(self):
+		"""
+		2010-6-17
+			a string-formatting function
+		"""
+		return_ls = []
+		try:
+			for attributeName, index in self.attributeName2Index.iteritems():
+				value = self[index]
+				#if attribute_name.find('__')==0:	#ignore the 
+				#	continue
+				#value = getattr(self, attributeName, None)
+				return_ls.append("%s = %s"%(attributeName, value))
+		except AttributeError:
+			for attributeName in dir(self):
+				if attributeName.find('__')==0:	#ignore the 
+					continue
+				value = getattr(self, attributeName, None)
+				return_ls.append("%s = %s"%(attributeName, value))
+			
+		return ", ".join(return_ls)
+	
+	def __getattribute__(self, name):
+		"""
+		2012.11.24
+		"""
+		try:
+			returnAttr = object.__getattribute__(self, name)
+		except AttributeError:
+			attributeName2Index = object.__getattribute__(self, 'attributeName2Index')
+			index = attributeName2Index.get(name, None)
+			if index is not None:
+				returnAttr =  self.__getitem__(index)
+			else:
+				returnAttr = None
+		return returnAttr
+	
+	def __setattr__(self, name, value):
+		"""
+		2012.11.24
+		"""
+		try:
+			attributeName2Index = object.__getattribute__(self, 'attributeName2Index')
+			attributeName2Index[name] = len(self)
+			self.append(value)
+		except AttributeError:
+			object.__setattr__(self, name, value)
+	
+	def __delattr__(self, name):
+		"""
+		2012.11.24
+		"""
+		try:
+			attributeName2Index = object.__getattribute__(self, 'attributeName2Index')
+			index = attributeName2Index.get(name, None)
+			if index is not None:
+				del attributeName2Index[name]
+				list.__delitem__(self, index)
+				#self.pop(index)
+		except AttributeError:
+			object.__delattr__(self, name)
+	
+	def __delitem__(self, indexToDelete):
+		"""
+		2012.11.24
+		
+		"""
+		list.__delitem__(self, indexToDelete)
+		try:
+			attributeName2Index = object.__getattribute__(self, 'attributeName2Index')
+			attributeToBeDeleted = None		
+			for attributeName, index in attributeName2Index.iteritems():
+				if index==indexToDelete:
+					attributeToBeDeleted = attributeName
+					break
+			if attributeToBeDeleted is not None:
+				del attributeName2Index[attributeToBeDeleted]
+		except AttributeError:
+			pass
+	
+	# Mutable sequences only, provide the Python list methods.
+	#def append(self, item):
+	#	pass
+	
+	def count(self, item):
+		list.count(self, item)
+	
+	def index(self,item):
+		list.index(self, item)
+	
+	#def extend(self,other):
+	#	pass
+	
+	def insert(self,item):
+		"""
+		disable
+		"""
+		pass
+	
+	def pop(self, index=None):
+		"""
+		"""
+		if index is None:
+			index = self.__len__()-1	#the last one by default
+		self.__delitem__(indexToDelete=index)
+	
+	def remove(self,item):
+		"""	
+		disable	
+		"""
+		pass
+	
+	def reverse(self):
+		"""
+		disable
+		"""
+		pass
+	
+	def sort(self):
+		"""
+		disable
+		"""
+		pass
+	
 def importNumericArray():
 	"""
 	2008-07-09
@@ -262,7 +417,7 @@ def getColName2IndexFromHeader(header, skipEmptyColumn=False):
 		col_name2index[column_name] = i
 	return col_name2index
 
-def getListOutOfStr(list_in_str, data_type=int, separator1=',', separator2='-'):
+def getListOutOfStr(list_in_str=None, data_type=int, separator1=',', separator2='-'):
 	"""
 	2012.10.25
 		if separator2 is None or nothing or 0, it wont' be used.
@@ -297,6 +452,18 @@ def getListOutOfStr(list_in_str, data_type=int, separator1=',', separator2='-'):
 			list_to_return += range(start_stop_tup[0], start_stop_tup[1]+1)
 	list_to_return = map(data_type, list_to_return)	#2008-10-27
 	return list_to_return
+
+def getStrOutOfList(ls, separator=','):
+	"""
+	2012.11.25 reverse of getListOutOfStr
+	"""
+	firstElement = ls[0]
+	if type(firstElement)!=str:
+		ls_str = map(str, ls)
+	else:
+		ls_str = ls
+	return separator.join(ls_str)
+
 
 def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
 	"""
@@ -358,10 +525,11 @@ def getGeneIDSetGivenAccVer(acc_ver, gene_symbol2gene_id_set, noUpperCase=0):
 	return gene_id_set
 
 
-def calGreatCircleDistance(lat1, lon1, lat2, lon2, earth_radius=6372.795):
+def calGreatCircleDistance(lat1=None, lon1=None, lat2=None, lon2=None, earth_radius=6372.795):
 	"""
 	2009-4-18
 		copied from CreatePopulation.cal_great_circle_distance()
+		distance in km
 	2007-06-17 copied from 2007-07-11
 	http://en.wikipedia.org/wiki/Great-circle_distance
 	"""
@@ -747,6 +915,39 @@ def getNoOfUnitsNeededToCoverN(N=None, s=None, o=None):
 	#make sure its bigger than 1.
 	noOfUnits = max(1, math.ceil(numerator/float(denominator)))
 	return int(noOfUnits)
+
+def addObjectAttributeToSet(objectVariable=None, attributeName=None, setVariable=None):
+	"""
+	2012.11.22
+		do not add an attribute to the set if it's not available or if it's none
+	"""
+	attributeValue = getattr(objectVariable, attributeName, None)
+	if attributeValue is not None and setVariable is not None:
+		setVariable.add(attributeValue)
+	return setVariable
+
+def addObjectListAttributeToSet(objectVariable=None, attributeName=None, setVariable=None, data_type=int):
+	"""
+	2012.12.2 bugfix
+	2012.11.23
+	"""
+	attributeValue = getattr(objectVariable, attributeName, None)
+	flag = False
+	if type(attributeValue)==numpy.ndarray:	#"if attributeValue" fails for numpy array
+		if hasattr(attributeValue, '__len__') and attributeValue.size>0:
+			flag = True
+	elif attributeValue or attributeValue == 0:
+		flag = True
+	if flag and setVariable is not None:
+		if type(attributeValue)==list or type(attributeValue)==tuple or type(attributeValue)==numpy.ndarray or type(attributeValue)==set:
+			attributeValueList = attributeValue
+		elif type(attributeValue)==str:
+			attributeValueList = getListOutOfStr(attributeValue, data_type=data_type, separator1=',', separator2='-')
+		else:
+			attributeValueList = getListOutOfStr(attributeValue, data_type=data_type, separator1=',', separator2='-')
+			#attributeValueList = attributeValue
+		setVariable |= set(list(attributeValueList))
+	return setVariable
 
 
 #2012.10.5 copied from VervetDB.py

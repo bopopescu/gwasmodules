@@ -38,7 +38,8 @@ class DrawHistogram(AbstractPlot):
 	option_default_dict.pop(('xColumnHeader', 1, ))
 	option_default_dict.pop(('xColumnPlotLabel', 0, ))
 	option_default_dict.update({
-						('logCount', 0, int): [0, 'l', 0, 'whether to take log on the y-axis of the histogram, the raw count'], \
+						('logCount', 0, int): [0, 'l', 0, 'whether to take log on the y-axis of the histogram, the raw count. \
+						similar effect to yScaleLog'], \
 							
 							})
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -55,6 +56,8 @@ class DrawHistogram(AbstractPlot):
 		if no_of_data_points>=min_no_of_data_points:
 			no_of_bins = max(min_no_of_bins, min(max_no_of_bins, no_of_data_points/10))
 			n, bins, patches = pylab.hist(y_ls, bins=no_of_bins, log=self.logCount)
+			self.addPlotLegend(plotObject=patches[0], legend=os.path.basename(pdata.filename), pdata=pdata)
+		
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -72,7 +75,7 @@ class DrawHistogram(AbstractPlot):
 			
 			yValue = row[whichColumn]
 			if yValue not in self.missingDataNotation:
-				yValue = self.handleYValue(yValue)
+				yValue = self.processValue(value=yValue, processType=self.logY)
 				y_ls.append(yValue)
 	
 	def handleXLabel(self,):
@@ -101,7 +104,6 @@ class DrawHistogram(AbstractPlot):
 			title = yh_matplotlib.constructTitleFromDataSummaryStat(self.invariantPData.y_ls)
 			pylab.title(title)
 
-	
 if __name__ == '__main__':
 	main_class = DrawHistogram
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

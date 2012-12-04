@@ -17,6 +17,28 @@ from sqlalchemy.orm import mapper, relation
 from sqlalchemy.orm import scoped_session, sessionmaker
 from elixir import using_table_options
 
+
+def supplantFilePathWithNewDataDir(filePath="", oldDataDir=None, newDataDir=None):
+	"""
+	2012.11.13
+		expose the oldDataDir argument
+	2012.3.23
+		in case that the whole /Network/Data/250k/db is stored in a different place (=newDataDir)
+			how to rescale the filePath ( stored in the database tables) to reflect its new path.
+		Stock_250kDB stores absolute path for each file.
+		This function helps to adjust that path.
+	"""
+	if oldDataDir and newDataDir and oldDataDir!=newDataDir:
+		if filePath.find(oldDataDir)==0:
+			relativePath = filePath[len(oldDataDir)-1:]
+			newPath = os.path.join(newDataDir, relativePath)
+			return newPath
+		else:
+			sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
+			return None
+	else:
+		return filePath
+
 class TableClass(object):
 	using_table_options(mysql_engine='InnoDB')
 	"""
@@ -40,6 +62,63 @@ class TableClass(object):
 			return_ls.append("%s = %s"%(attribute_name, getattr(self, attribute_name, None)))
 		
 		return ", ".join(return_ls)
+
+class AbstractTableWithFilename(object):
+	"""
+	2012.11.13 ancestor of ResultsMethod and AssociationLandscape, and other tables that store paths to files on harddisk.
+	"""
+	id = None
+	path = None
+	filename = None
+	folderName = ''
+	
+	def getDateStampedFilename(self, oldDataDir=None, newDataDir=None):
+		"""
+		2012.3.21
+			xxx.tsv => xxx.2012_3_21.tsv
+		"""
+		_filename = self.getFilePath(oldDataDir=oldDataDir, newDataDir=newDataDir)
+		
+		from datetime import datetime
+		lastModDatetime = datetime.fromtimestamp(os.stat(_filename).st_mtime)
+		prefix, suffix = os.path.splitext(_filename)
+		newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
+									lastModDatetime.day, suffix)
+		return newFilename
+	
+	def getFilePath(self, oldDataDir=None, newDataDir=None):
+		"""
+		2012.11.13
+			in case that the whole /Network/Data/250k/db is stored in a different place (=data_dir)
+				how to modify self.filename (stored in the database tables) to reflect its new path.
+		"""
+		if self.filename:
+			filePath = self.filename
+		elif self.path:
+			filePath = self.path
+		else:
+			filePath = None
+		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
+	
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+		"""
+		2012.11.13
+		"""
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if data_dir and outputDirRelativePath:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
+		return fileRelativePath
 
 class Database(object):
 	__doc__ = __doc__
