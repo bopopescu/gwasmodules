@@ -19,11 +19,10 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import time, csv, getopt
-import warnings, traceback, numpy
+import traceback, numpy
 import networkx as nx
 from pymodule import ProcessOptions, PassingData, GenomeDB
-from pymodule import SNP, getListOutOfStr, yh_matplotlib, PassingData, HDF5MatrixFile
+from pymodule import SNP, yh_matplotlib, HDF5MatrixFile, yhio
 from variation.src import Stock_250kDB
 from variation.src import AbstractVariationMapper
 
@@ -35,7 +34,7 @@ class DefineAssociationLandscape(AbstractVariationMapper):
 						('neighbor_distance', 0, int): [5000, '', 1, "within this distance, a locus that increases the association score \
 									the fastest is chosen as bridge end. outside this distance, whatever the next point is will be picked."],\
 						('max_neighbor_distance', 0, int): [20000, 'm', 1, "beyond this distance, no bridge would be formed."],\
-						('tax_id', 1, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
+						('tax_id', 0, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
 						})
 	#('landscapeLocusIDFname', 1, ): ['', '', 1, 'file that contains one-column, snps.id of the gwas landscape'],\
 	#('call_method_id', 0, int):[None, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
@@ -118,39 +117,6 @@ class DefineAssociationLandscape(AbstractVariationMapper):
 		sys.stderr.write("%s bridges.\n"%(len(bridge_ls)))
 		returnData = PassingData(bridge_ls=bridge_ls, locusLandscapeNeighborGraph=locusLandscapeNeighborGraph)
 		return returnData
-	
-	
-	def outputLandscape(self, bridge_ls=None, outputFname=None, writer=None, closeFile=False, groupName='landscape'):
-		"""
-		2012.11.18
-		"""
-		sys.stderr.write("Outputting the %s bridges from the landscape ..."%(len(bridge_ls)))
-		#output the data_object.id in bridge_ls to outputFname
-		#each number below is counting bytes, not bits
-		dtypeList = [('start_locus_id','i8'),('stop_locus_id', 'i8'), ('no_of_loci','i8'), ('deltaX', 'i8')]
-		headerList = [row[0] for row in dtypeList]
-		dtype = numpy.dtype(dtypeList)
-		if writer:
-			groupObject = writer.createNewGroup(groupName=groupName, dtype=dtype)
-			groupObject.setColIDList(headerList)
-		elif outputFname:
-			writer = HDF5MatrixFile(outputFname, openMode='w', dtype=dtype, firstGroupName=groupName)
-			writer.writeHeader(headerList)
-			groupObject = writer.getGroupObject(groupName=groupName)
-		
-		previous_locus_id = None
-		cellList = []
-		for bridge in bridge_ls:
-			current_obj = bridge[0]
-			obj_with_fastest_score_increase = bridge[1]
-			no_of_loci, deltaX = bridge[2:4]
-			dataTuple = (current_obj.db_id, obj_with_fastest_score_increase.db_id, no_of_loci, deltaX)
-			cellList.append(dataTuple)
-		groupObject.writeCellList(cellList)
-		if closeFile:
-			writer.close()
-			del writer
-		sys.stderr.write("\n")
 	
 	def drawBridgeChromosomalLengthHist(self, bridge_ls=None):
 		"""
@@ -256,12 +222,21 @@ class DefineAssociationLandscape(AbstractVariationMapper):
 		
 		gwr = db_250k.getResultMethodContent(self.result_id, pdata=pd)
 		gwr.data_obj_ls.sort(cmp=SNP.cmpDataObjByChrPos)
-		writer = gwr.outputInHDF5MatrixFile(filename=self.outputFname, closeFile=False)
+		#gwr.setResultID(self.result_id)	#already done in db_250k.getResultMethodContent()
+		attributeDict = {'result_id':self.result_id, 'min_MAF':self.min_MAF,\
+				'call_method_id': rm.call_method_id, 'cnv_method_id': rm.cnv_method_id, \
+				'phenotype_method_id':rm.phenotype_method_id, 'analysis_method_id':rm.analysis_method_id}
+		writer = gwr.outputInHDF5MatrixFile(filename=self.outputFname, closeFile=False, attributeDict=attributeDict)
 		
 		landscapeData = self.findLandscape(gwr.data_obj_ls, neighbor_distance=self.neighbor_distance,\
 								max_neighbor_distance=self.max_neighbor_distance)
 		
-		self.outputLandscape(bridge_ls=landscapeData.bridge_ls, writer=writer, closeFile=True)
+		attributeDict = {'result_id':self.result_id, 'min_MAF':self.min_MAF,\
+				'neighbor_distance':self.neighbor_distance, 'max_neighbor_distance':self.max_neighbor_distance, \
+				'call_method_id': rm.call_method_id, 'cnv_method_id': rm.cnv_method_id, \
+				'phenotype_method_id':rm.phenotype_method_id, 'analysis_method_id':rm.analysis_method_id}
+		yhio.Association.outputAssociationLandscapeInHDF5(bridge_ls=landscapeData.bridge_ls, writer=writer, closeFile=True, \
+							groupName='landscape', attributeDict=attributeDict)
 		"""
 		#2011-4-21 for inspection
 		outputFname = '/tmp/result_%s_landscape.png'%(result_id)
