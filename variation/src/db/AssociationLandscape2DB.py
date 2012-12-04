@@ -58,7 +58,7 @@ class AssociationLandscape2DB(Results2DB_250k):
 		"""
 		Results2DB_250k.__init__(self, **keywords)
 		
-	def add2DB(self, db=None, inputFname=None, result=None, result_landscape_type=None, \
+	def add2DB(self, db=None, inputFname=None, result=None, association_landscape_type=None, \
 			call_method_id=None, cnv_method_id=None, phenotype_method_id=None, \
 			analysis_method_id=None, results_method_type_id=None, \
 			no_of_loci = None, \
@@ -99,33 +99,33 @@ class AssociationLandscape2DB(Results2DB_250k):
 			sys.exit(3)
 		
 		#2012.11.13 check if it's in db already
-		query = Stock_250kDB.ResultLandscape.query.filter_by(result_id=result.id).\
-			filter_by(result_landscape_type_id=result_landscape_type.id)
+		query = Stock_250kDB.AssociationLandscape.query.filter_by(result_id=result.id).\
+			filter_by(association_landscape_type_id=association_landscape_type.id)
 		if query.count()>0:
 			db_entry = query.first()
-			sys.stderr.write("There is already an entry in result_landscape (id=%s) with same (result_id, result_landscape_type_id)=(%s, %s).\n"\
-							%(db_entry.id, db_entry.result_id, result_landscape_type.id))
+			sys.stderr.write("There is already an entry in association_landscape (id=%s) with same (result_id, association_landscape_type_id)=(%s, %s).\n"\
+							%(db_entry.id, db_entry.result_id, association_landscape_type.id))
 			sys.exit(3)
 		#2012.11.13 check if it's in db already
-		query = Stock_250kDB.ResultLandscape.query.filter_by(phenotype_method_id=pm.id).\
+		query = Stock_250kDB.AssociationLandscape.query.filter_by(phenotype_method_id=pm.id).\
 			filter_by(analysis_method_id=am.id).filter_by(results_method_type_id=rmt.id).\
-			filter_by(result_landscape_type_id=result_landscape_type.id)
+			filter_by(association_landscape_type_id=association_landscape_type.id)
 		if cm:	#2011-2-22
 			query = query.filter_by(call_method_id=cm.id)
 		elif cnv_m:	#2011-2-22
 			query = query.filter_by(cnv_method_id=cnv_m.id)
 		if query.count()>0:
 			db_entry = query.first()
-			sys.stderr.write("There is already an entry in result_landscape (id=%s) with same \
-	(call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id, result_landscape_type_id)=(%s, %s, %s, %s, %s).\n"\
+			sys.stderr.write("There is already an entry in association_landscape (id=%s) with same \
+	(call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id, association_landscape_type_id)=(%s, %s, %s, %s, %s).\n"\
 							%(db_entry.id, call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id, \
-							result_landscape_type.id))
+							association_landscape_type.id))
 			sys.exit(3)
 		
 		short_name = '%s_%s_%s_%s_%s_%s'%(am.short_name, pm.short_name, getattr(cm, 'id',0), getattr(cnv_m, 'id',0),\
-										results_method_type_id, result_landscape_type.id)
+										results_method_type_id, association_landscape_type.id)
 		
-		db_entry = Stock_250kDB.ResultLandscape(short_name=short_name, \
+		db_entry = Stock_250kDB.AssociationLandscape(short_name=short_name, \
 											locus_type_id=cm.locus_type_id, no_of_loci=no_of_loci,\
 											comment=comment, created_by=user)	#2012.3.9
 		db_entry.phenotype_method = pm
@@ -133,7 +133,7 @@ class AssociationLandscape2DB(Results2DB_250k):
 		db_entry.analysis_method = am
 		db_entry.cnv_method = cnv_m
 		db_entry.result = result
-		db_entry.result_landscape_type = result_landscape_type
+		db_entry.association_landscape_type = association_landscape_type
 		db_entry.results_method_type = rmt
 		session.add(db_entry)
 		
@@ -208,13 +208,13 @@ class AssociationLandscape2DB(Results2DB_250k):
 		
 		result = Stock_250kDB.ResultsMethod.get(self.result_id)
 		
-		result_landscape_type = self.db.getResultLandscapeType(min_MAF=self.min_MAF, \
+		association_landscape_type = self.db.getAssociationLandscapeType(min_MAF=self.min_MAF, \
 											neighbor_distance=self.neighbor_distance, \
 											max_neighbor_distance=self.max_neighbor_distance)
 		
 		
 		#add the extracted association result into db
-		self.add2DB(db=self.db, inputFname=self.outputFname, result=result, result_landscape_type=result_landscape_type, \
+		self.add2DB(db=self.db, inputFname=self.outputFname, result=result, association_landscape_type=association_landscape_type, \
 				call_method_id=result.call_method_id, cnv_method_id=result.cnv_method_id, phenotype_method_id=result.phenotype_method_id, \
 				analysis_method_id=result.analysis_method_id, results_method_type_id=result.results_method_type_id, \
 				no_of_loci=no_of_loci,\
