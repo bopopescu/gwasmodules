@@ -37,7 +37,7 @@ from sqlalchemy import func
 from datetime import datetime
 
 from pymodule import SNPData, PassingData
-from pymodule.db import ElixirDB, TableClass
+from pymodule.db import ElixirDB, TableClass, supplantFilePathWithNewDataDir, AbstractTableWithFilename
 import os
 import hashlib 
 
@@ -47,24 +47,6 @@ __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 
 __metadata__ = MetaData()
 
-def supplantFilePathWithNewDataDir(filePath="", oldDataDir=None, newDataDir=None):
-	"""
-	2012.11.13
-		expose the oldDataDir argument
-	2012.3.23
-		in case that the whole /Network/Data/250k/db is stored in a different place (=newDataDir)
-			how to rescale the filePath ( stored in the database tables) to reflect its new path.
-	"""
-	if oldDataDir and newDataDir and oldDataDir!=newDataDir:
-		if filePath.find(oldDataDir)==0:
-			relativePath = filePath[len(oldDataDir)-1:]
-			newPath = os.path.join(newDataDir, relativePath)
-			return newPath
-		else:
-			sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
-			return None
-	else:
-		return filePath
 
 class README(Entity, TableClass):
 	#2008-08-07
@@ -503,55 +485,6 @@ class AccessionSet2Ecotype(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('accession_set_id', 'ecotype_id'))
 
-class AbstractTableWithFilename(object):
-	"""
-	2012.11.13 ancestor of ResultsMethod and ResultLandscape
-	"""
-	id = None
-	filename = None
-	folderName = ''
-	
-	def getDateStampedFilename(self, oldDataDir=None, newDataDir=None):
-		"""
-		2012.3.21
-			xxx.tsv => xxx.2012_3_21.tsv
-		"""
-		_filename = self.getFilePath(oldDataDir=oldDataDir, newDataDir=newDataDir)
-		
-		from datetime import datetime
-		lastModDatetime = datetime.fromtimestamp(os.stat(_filename).st_mtime)
-		prefix, suffix = os.path.splitext(_filename)
-		newFilename = '%s.%s_%s_%s%s'%(prefix, lastModDatetime.year, lastModDatetime.month,\
-									lastModDatetime.day, suffix)
-		return newFilename
-	
-	def getFilePath(self, oldDataDir=None, newDataDir=None):
-		"""
-		2012.11.13
-			in case that the whole /Network/Data/250k/db is stored in a different place (=data_dir)
-				how to modify self.filename (stored in the database tables) to reflect its new path.
-		"""
-		return supplantFilePathWithNewDataDir(filePath=self.filename, oldDataDir=oldDataDir, newDataDir=newDataDir)
-	
-	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
-		"""
-		2012.11.13
-		"""
-		if not subFolder:
-			subFolder = self.folderName
-		outputDirRelativePath = subFolder
-		if data_dir and outputDirRelativePath:
-			#make sure the final output folder is created. 
-			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
-			if not os.path.isdir(outputDirAbsPath):
-				os.makedirs(outputDirAbsPath)
-		
-		filename_part_ls = []
-		if self.id:
-			filename_part_ls.append(self.id)
-		filename_part_ls = map(str, filename_part_ls)
-		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
-		return fileRelativePath
 
 class ResultsMethod(Entity, AbstractTableWithFilename):
 	"""
@@ -642,7 +575,7 @@ class ResultsMethodJson(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('results_id', 'no_of_top_snps', 'min_MAF'))
 
-class ResultLandscape(Entity, AbstractTableWithFilename):
+class AssociationLandscape(Entity, AbstractTableWithFilename):
 	"""
 	2012.11.10
 		changed to be a thinned version of ResultsMethod
@@ -650,23 +583,16 @@ class ResultLandscape(Entity, AbstractTableWithFilename):
 		table to store the landscape of association result
 	"""
 	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
-	result_landscape_type = ManyToOne('%s.ResultLandscapeType'%__name__, colname='result_landscape_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	association_landscape_type = ManyToOne('%s.AssociationLandscapeType'%__name__, colname='association_landscape_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	no_of_accessions = Field(Integer)	#2012.11.14
 	no_of_loci = Field(Integer)
 	
 	short_name = Field(String(60), unique=True)
-	filename = Field(String(750), unique=True)
+	path = Field(String(750), unique=True)
 	original_filename = Field(Text)
 	method_description = Field(String(8000))
 	data_description = Field(String(8000))
 	comment = Field(String(8000))
-	phenotype_method = ManyToOne('%s.PhenotypeMethod'%__name__, colname='phenotype_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	results_method_type = ManyToOne('%s.ResultsMethodType'%__name__, colname='results_method_type_id', ondelete='CASCADE', onupdate='CASCADE')
-	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	cnv_method = ManyToOne("%s.CNVMethod"%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -675,13 +601,10 @@ class ResultLandscape(Entity, AbstractTableWithFilename):
 	remove_outliers = Field(Integer, default=0)
 	pseudo_heritability = Field(Float)
 	transformation_parameters = Field(String(11))
-	using_options(tablename='result_landscape', metadata=__metadata__, session=__session__)
+	using_options(tablename='association_landscape', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('result_id', 'result_landscape_type_id'))
-	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
-					'results_method_type_id', 'analysis_method_id', 'cnv_method_id',\
-					'result_landscape_type_id'))
-	folderName = 'result_landscape'
+	using_table_options(UniqueConstraint('result_id', 'association_landscape_type_id'))
+	folderName = 'association_landscape'
 	
 	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
 		"""
@@ -690,8 +613,8 @@ class ResultLandscape(Entity, AbstractTableWithFilename):
 		if not subFolder:
 			subFolder = self.folderName
 		outputDirRelativePath = subFolder
-		if self.result_landscape_type_id:
-			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.result_landscape_type_id)
+		if self.association_landscape_type_id:
+			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.association_landscape_type_id)
 		if data_dir:
 			#make sure the final output folder is created. 
 			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
@@ -703,26 +626,16 @@ class ResultLandscape(Entity, AbstractTableWithFilename):
 			filename_part_ls.append(self.id)
 		if self.result_id:
 			filename_part_ls.append('result%s'%(self.result_id))
-		if self.result_landscape_type_id:
-			filename_part_ls.append("landscapeType%s"%(self.result_landscape_type_id))
-		if self.call_method_id is not None:
-			filename_part_ls.append('call%s'%self.call_method_id)
-		if self.cnv_method_id is not None:
-			filename_part_ls.append('cnv%s'%self.cnv_method_id)
-		if self.phenotype_method_id is not None:
-			filename_part_ls.append('pheno%s'%self.phenotype_method_id)
-		if self.analysis_method_id is not None:
-			filename_part_ls.append('ana%s'%self.analysis_method_id)
-		if self.results_method_type_id:
-			filename_part_ls.append('resultType%s'%(self.results_method_type_id))
+		if self.association_landscape_type_id:
+			filename_part_ls.append("type%s"%(self.association_landscape_type_id))
 		filename_part_ls = map(str, filename_part_ls)
-		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
 		return fileRelativePath
 
-class ResultLandscapeType(Entity):
+class AssociationLandscapeType(Entity):
 	"""
 	2012.11.12
-		type for ResultLandscape
+		type for AssociationLandscape
 	"""
 	short_name = Field(String(30), unique=True)
 	description = Field(Text)
@@ -733,18 +646,71 @@ class ResultLandscapeType(Entity):
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
-	using_options(tablename='result_landscape_type', metadata=__metadata__, session=__session__)
+	using_options(tablename='association_landscape_type', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('min_MAF', 'neighbor_distance', 'max_neighbor_distance'))
 
-class ResultPeak(Entity):
+class GenomeWideAssociationPeak(Entity, AbstractTableWithFilename):
 	"""
+	2012.11.29 genome-wide version of AssociationPeak. stored in HDF5 file
+	"""
+	result = ManyToOne('%s.ResultsMethod'%__name__, colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
+	association_landscape = ManyToOne('%s.AssociationLandscape'%__name__, colname='association_landscape_id', ondelete='CASCADE', onupdate='CASCADE')
+	association_peak_type = ManyToOne('%s.AssociationPeakType'%__name__, colname='association_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_peaks = Field(Integer)	#number of loci in between stop_locus of start_bridge and start_locus of stop_bridge,
+	path = Field(String(750), unique=True)
+	original_filename = Field(Text)
+	comment = Field(Text)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='genome_wide_association_peak', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('result_id', 'association_landscape_id', 'association_peak_type_id'))
+	
+	folderName = 'genome_wide_association_peak'
+	
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+		"""
+		2012.11.29
+		"""
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if self.association_peak_type_id:
+			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.association_peak_type_id)
+		if data_dir:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		if self.result_id:
+			filename_part_ls.append('result%s'%(self.result_id))
+		if self.association_landscape_id:
+			filename_part_ls.append("landscape%s"%(self.association_landscape_id))
+		if self.association_peak_type_id:
+			filename_part_ls.append("type%s"%(self.association_peak_type_id))
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
+		return fileRelativePath
+
+
+class AssociationPeak(Entity):
+	"""
+	2012.11.29 overhaul
 	2012.6.22 add column association_locus
 	2011-4-19
 		table to store the peaks of association result
 	"""
 	result = ManyToOne('%s.ResultsMethod'%__name__, colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
-	result_peak_type = ManyToOne('%s.ResultPeakType'%__name__, colname='result_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	association_peak_type = ManyToOne('%s.AssociationPeakType'%__name__, colname='association_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	genome_wide_association_peak = ManyToOne('%s.GenomeWideAssociationPeak'%__name__, \
+									colname='genome_wide_association_peak_id', ondelete='CASCADE', onupdate='CASCADE')
 	chromosome = Field(String(256))
 	start = Field(Integer)
 	stop = Field(Integer)
@@ -754,63 +720,22 @@ class ResultPeak(Entity):
 	# including the two as well.
 	peak_locus = ManyToOne('%s.Snps'%__name__, colname='peak_locus_id', ondelete='CASCADE', onupdate='CASCADE')
 	peak_score = Field(Float)
-	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='SET NULL', onupdate='CASCADE')
 	comment = Field(Text)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
-	using_options(tablename='result_peak', metadata=__metadata__, session=__session__)
+	using_options(tablename='association_peak', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('result_id', 'result_peak_type_id', 'chromosome', 'start', 'stop'))
+	using_table_options(UniqueConstraint('genome_wide_association_peak_id', 'result_id', 'association_peak_type_id', 'chromosome', 'start', 'stop'))
 
 
-class AssociationLocus(Entity):
-	#2012.6.22
-	chromosome = Field(String(256))
-	start = Field(Integer)
-	stop = Field(Integer)
-	threshold = Field(Float)
-	connectivity = Field(Float)
-	no_of_peaks = Field(Integer)
-	comment = Field(Text)
-	result_peak_ls = OneToMany("%s.ResultPeak"%(__name__))
-	created_by = Field(String(128))
-	updated_by = Field(String(128))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
-	using_options(tablename='association_locus', metadata=__metadata__, session=__session__)
-	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('chromosome', 'start', 'stop', 'threshold'))
-
-
-class AssociationLocusStat(Entity):
-	#2012.6.22
-	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='CASCADE', onupdate='CASCADE')
-	no_of_phenotypes = Field(Integer)
-	biology_category = ManyToOne("%s.BiologyCategory"%__name__, colname='biology_category_id', ondelete='CASCADE', onupdate='CASCADE')
-	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	result_peak_type = ManyToOne('%s.ResultPeakType'%__name__, colname='result_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
-	#result_peak_type_id = Field(Integer)
-	comment = Field(Text)
-	created_by = Field(String(128))
-	updated_by = Field(String(128))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
-	using_options(tablename='association_locus_stat', metadata=__metadata__, session=__session__)
-	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('association_locus_id', 'biology_category_id', 'call_method_id', 'analysis_method_id', \
-										'result_peak_type_id'))
-
-
-
-class ResultPeakType(Entity):
+class AssociationPeakType(Entity):
 	"""
 	2012.2.15
 		add field, min_MAF
 	2011-4-19
-		type for ResultPeak
+		type for AssociationPeak
 	"""
 	short_name = Field(String(30), unique=True)
 	description = Field(Text)
@@ -822,35 +747,219 @@ class ResultPeakType(Entity):
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
-	using_options(tablename='result_peak_type', metadata=__metadata__, session=__session__)
+	using_options(tablename='association_peak_type', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('min_MAF', 'min_score', 'neighbor_distance', 'max_neighbor_distance'))
 
-class ResultPeakOverlap(Entity):
-	"""
-	2012.2.22
-		
-	"""
+"""
+class AssociationPeakOverlap(Entity):
+	##2012.2.22
 	result1 = ManyToOne('ResultsMethod', colname='result1_id', ondelete='CASCADE', onupdate='CASCADE')
 	result2 = ManyToOne('ResultsMethod', colname='result2_id', ondelete='CASCADE', onupdate='CASCADE')
 	
-	result1_peak_type = ManyToOne('ResultPeakType', colname='result1_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
-	result2_peak_type = ManyToOne('ResultPeakType', colname='result2_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	association1_peak_type = ManyToOne('AssociationPeakType', colname='association1_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	association2_peak_type = ManyToOne('AssociationPeakType', colname='association2_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	peak_padding = Field(Integer)	#this is the extension of peak width in checking peak overlap to accommodate LD
 	
-	no_of_result1_peaks = Field(Integer)
-	no_of_result2_peaks = Field(Integer)
-	no_of_result1_peaks_in_result2 = Field(Integer)
-	no_of_result2_peaks_in_result1 = Field(Integer)
+	no_of_association1_peaks = Field(Integer)
+	no_of_association2_peaks = Field(Integer)
+	no_of_association1_peaks_in_result2 = Field(Integer)
+	no_of_association2_peaks_in_result1 = Field(Integer)
 	
 	comment = Field(Text)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
-	using_options(tablename='result_peak_overlap', metadata=__metadata__, session=__session__)
+	using_options(tablename='association_peak_overlap', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('result1_id', 'result2_id', 'result1_peak_type_id', 'result2_peak_type_id', 'peak_padding'))
+	using_table_options(UniqueConstraint('result1_id', 'result2_id', 'association1_peak_type_id', 'association2_peak_type_id', 'peak_padding'))
+"""
+
+class GenomeWideAssociationLocus(Entity, AbstractTableWithFilename):
+	"""
+	2012.11.29
+	"""
+	no_of_loci = Field(Integer)
+	total_no_of_results = Field(Integer)
+	path = Field(String(750), unique=True)	#stores all the peaks
+	original_filename = Field(Text)
+	comment = Field(Text)
+	association_locus_type = ManyToOne('%s.AssociationLocusType'%__name__, colname='association_locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	#association_peak_ls = OneToMany("%s.AssociationPeak"%(__name__))
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='genome_wide_association_locus', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('association_locus_type_id'))
+
+	folderName = 'genome_wide_association_locus'
+	
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+		"""
+		2012.11.29
+		"""
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if self.association_locus_type_id:
+			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.association_locus_type_id)
+		if data_dir:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		if self.association_locus_type_id:
+			filename_part_ls.append("type%s"%(self.association_locus_type_id))
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
+		return fileRelativePath
+
+class AssociationLocus(Entity):
+	"""
+	2012.11.29
+	#2012.6.22
+	"""
+	genome_wide_association_locus = ManyToOne('%s.GenomeWideAssociationLocus'%__name__, colname='genome_wide_association_locus_id', \
+											ondelete='CASCADE', onupdate='CASCADE')
+	chromosome = Field(String(256))
+	start = Field(Integer)
+	stop = Field(Integer)
+	connectivity = Field(Float)
+	no_of_peaks = Field(Integer)
+	no_of_results = Field(Integer)
+	path = Field(String(750), unique=True)	#stores all the peaks
+	original_filename = Field(Text)
+	comment = Field(Text)
+	association_locus_type = ManyToOne('%s.AssociationLocusType'%__name__, colname='association_locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	#association_peak_ls = OneToMany("%s.AssociationPeak"%(__name__))
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_locus', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('genome_wide_association_locus_id', 'chromosome', 'start', 'stop', 'association_locus_type_id'))
+	
+	folderName = 'association_locus'
+	
+	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+		"""
+		2012.12.4
+		"""
+		if not subFolder:
+			subFolder = self.folderName
+		outputDirRelativePath = subFolder
+		if self.association_locus_type_id:
+			outputDirRelativePath = os.path.join(outputDirRelativePath, 'type_%s'%self.association_locus_type_id)
+		if data_dir:
+			#make sure the final output folder is created. 
+			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
+			if not os.path.isdir(outputDirAbsPath):
+				os.makedirs(outputDirAbsPath)
+		
+		filename_part_ls = []
+		if self.id:
+			filename_part_ls.append(self.id)
+		if self.association_locus_type_id:
+			filename_part_ls.append("type%s"%(self.association_locus_type_id))
+		if self.chromosome:
+			filename_part_ls.append("chr%s"%(self.chromosome))
+		if self.start:
+			filename_part_ls.append(self.start)
+		if self.stop:
+			filename_part_ls.append(self.stop)
+		filename_part_ls = map(str, filename_part_ls)
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
+		return fileRelativePath
+
+class AssociationLocusType(Entity):
+	"""
+	2012.11.29
+	"""
+	short_name = Field(String(30), unique=True)
+	description = Field(Text)
+	min_MAF = Field(Float)
+	min_score = Field(Float)
+	neighbor_distance = Field(Integer)
+	max_neighbor_distance = Field(Integer)
+	min_overlap_ratio = Field(Float)
+	min_connectivity = Field(Float)
+	
+	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	call_method_id_ls = Field(Text)
+	analysis_method_id_ls = Field(Text)
+	phenotype_method_id_ls = Field(Text)
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_locus_type', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('min_MAF', 'min_score', 'neighbor_distance', 'max_neighbor_distance',\
+										'min_overlap_ratio', 'call_method_id_ls', 'analysis_method_id_ls',\
+										'phenotype_method_id_ls'))
+
+"""
+
+class AssociationLocusStat(Entity):
+	#2012.6.22
+	association_locus = ManyToOne('%s.AssociationLocus'%__name__, colname='association_locus_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_phenotypes = Field(Integer)
+	biology_category = ManyToOne("%s.BiologyCategory"%__name__, colname='biology_category_id', ondelete='CASCADE', onupdate='CASCADE')
+	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	association_peak_type = ManyToOne('%s.AssociationPeakType'%__name__, colname='association_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	#association_peak_type_id = Field(Integer)
+	comment = Field(Text)
+	created_by = Field(String(128))
+	updated_by = Field(String(128))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_locus_stat', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('association_locus_id', 'biology_category_id', 'call_method_id', 'analysis_method_id', \
+										'association_peak_type_id'))
+
+
+class AssociationOverlappingType(Entity):
+	#2009-11-30 	add column no_of_methods = number of association methods involved in this overlapping type
+	#2009-11-2
+	short_name = Field(String(200), unique=True)
+	no_of_methods = Field(Integer)
+	description = Field(String(8000))
+	comment = Field(String(8000))
+	analysis_method_ls = ManyToMany("AnalysisMethod", tablename='overlapping_type2method', ondelete='CASCADE', onupdate='CASCADE')
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_overlapping_type', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+
+class AssociationOverlappingStat(Entity):
+	#2009-11-2
+	call_method = ManyToOne('CallMethod', colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	phenotype_method = ManyToOne('PhenotypeMethod', colname='phenotype_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	no_of_top_snps = Field(Integer)
+	no_of_overlapping_snps = Field(Integer)
+	overlapping_type = ManyToOne('AssociationOverlappingType', colname='overlapping_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	created_by = Field(String(200))
+	updated_by = Field(String(200))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='association_overlapping_stat', metadata=__metadata__, session=__session__)
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', 'overlapping_type_id', 'no_of_top_snps'))
+"""
+
 
 class Results(Entity):
 	"""
@@ -2149,44 +2258,6 @@ class SequenceFragment2Probe(Entity):
 	using_options(tablename='sequence_fragment2probe', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('sequence_fragment_id', 'probe_id', 'fragment_start', 'fragment_stop'))
-
-
-
-class AssociationOverlappingType(Entity):
-	"""
-	2009-11-30
-		add column no_of_methods = number of association methods involved in this overlapping type
-	2009-11-2
-		
-	"""
-	short_name = Field(String(200), unique=True)
-	no_of_methods = Field(Integer)
-	description = Field(String(8000))
-	comment = Field(String(8000))
-	analysis_method_ls = ManyToMany("AnalysisMethod", tablename='overlapping_type2method', ondelete='CASCADE', onupdate='CASCADE')
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
-	using_options(tablename='association_overlapping_type', metadata=__metadata__, session=__session__)
-	using_table_options(mysql_engine='InnoDB')
-
-class AssociationOverlappingStat(Entity):
-	"""
-	2009-11-2
-	"""
-	call_method = ManyToOne('CallMethod', colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	phenotype_method = ManyToOne('PhenotypeMethod', colname='phenotype_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	no_of_top_snps = Field(Integer)
-	no_of_overlapping_snps = Field(Integer)
-	overlapping_type = ManyToOne('AssociationOverlappingType', colname='overlapping_type_id', ondelete='CASCADE', onupdate='CASCADE')
-	created_by = Field(String(200))
-	updated_by = Field(String(200))
-	date_created = Field(DateTime, default=datetime.now)
-	date_updated = Field(DateTime)
-	using_options(tablename='association_overlapping_stat', metadata=__metadata__, session=__session__)
-	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', 'overlapping_type_id', 'no_of_top_snps'))
 
 """
 #2008-10-29 'results_gene2type' automatically generated by ManyToMany is sub-optimal because it uses MyIAM engine and doesn't allow foreign key.
@@ -3708,12 +3779,12 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
 	
 	def getResultMethodContent(self, result_id=None, data_dir=None, min_MAF=0.1, construct_chr_pos2index=False, \
-						pdata=None, min_value_cutoff=None, results_directory=None, result_landscape=None,\
+						pdata=None, min_value_cutoff=None, results_directory=None, association_landscape=None,\
 						result_method=None, **keywords):
 		"""
 		2012.11.13
 			argument results_directory is taken over by data_dir
-			restructure the code so that it could fetch ResultLandscape
+			restructure the code so that it could fetch AssociationLandscape
 		2012.3.23
 			results_directory is equivalent to /Network/Data/250k/db/, not /Network/Data/250k/db/results/type_1/ (before).
 			also use self.reScalePathByNewDataDir() to get the updated path.
@@ -3760,8 +3831,8 @@ class Stock_250kDB(ElixirDB):
 		
 		if result_method:
 			db_entry = result_method
-		elif result_landscape:
-			db_entry = result_landscape
+		elif association_landscape:
+			db_entry = association_landscape
 		elif result_id:
 			db_entry = ResultsMethod.get(result_id)
 		
@@ -3894,27 +3965,27 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("%s phenotypes.\n"%(len(phenotype_method_ls)))
 		return phenotype_method_ls
 	
-	def getResultPeakList(self, result_id_ls=[], result_peak_type_id=None):
+	def getAssociationPeakList(self, result_id_ls=[], association_peak_type_id=None):
 		"""
 		2012.3.10
-			return a list of result_peak objects + unique biology categories
+			return a list of association_peak objects + unique biology categories
 			
 		"""
-		sys.stderr.write("Filtering a list of %s results by checking ResultPeak (result_peak_type_id=%s)..."%(len(result_id_ls), \
-																							result_peak_type_id))
-		TableClass = ResultPeak
+		sys.stderr.write("Filtering a list of %s results by checking AssociationPeak (association_peak_type_id=%s)..."%(len(result_id_ls), \
+																							association_peak_type_id))
+		TableClass = AssociationPeak
 		query = TableClass.query.filter(TableClass.result_id.in_(result_id_ls))
-		if result_peak_type_id is not None:
-			query = query.filter_by(result_peak_type_id=result_peak_type_id)
+		if association_peak_type_id is not None:
+			query = query.filter_by(association_peak_type_id=association_peak_type_id)
 		return query
 	
-	def getResultPeakType(self, min_MAF=None, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
+	def getAssociationPeakType(self, min_MAF=None, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
 		"""
 		2012.11.20
 			moved from DefineAssociationLandscape.py
 		2011-4-20
 		"""
-		TableClass = ResultPeakType
+		TableClass = AssociationPeakType
 		db_entry = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).filter_by(min_score=min_score).\
 			filter_by(neighbor_distance=neighbor_distance).\
 			filter_by(max_neighbor_distance=max_neighbor_distance).first()
@@ -3926,14 +3997,14 @@ class Stock_250kDB(ElixirDB):
 			self.session.flush()
 		return db_entry
 	
-	def getResultLandscape(self, result_id=None, result_landscape_type_id=None, \
+	def getAssociationLandscape(self, result_id=None, association_landscape_type_id=None, \
 						call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
 						cnv_method_id=None, **keywords):
 		"""
-		2012.11.14 way to query ResultLandscape
+		2012.11.14 way to query AssociationLandscape
 		"""
 		
-		query = ResultLandscape.query.filter_by(result_landscape_type_id=result_landscape_type_id)
+		query = AssociationLandscape.query.filter_by(association_landscape_type_id=association_landscape_type_id)
 		if result_id:
 			query = query.filter_by(result_id=result_id)
 		if phenotype_method_id:
@@ -3947,11 +4018,11 @@ class Stock_250kDB(ElixirDB):
 		db_entry = query.first()
 		return db_entry
 	
-	def getResultLandscapeType(self, min_MAF=None, neighbor_distance=None, max_neighbor_distance=None):
+	def getAssociationLandscapeType(self, min_MAF=None, neighbor_distance=None, max_neighbor_distance=None):
 		"""
 		2012.11.20
 		"""
-		TableClass = ResultLandscapeType
+		TableClass = AssociationLandscapeType
 		db_entry = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).\
 			filter_by(neighbor_distance=neighbor_distance).\
 			filter_by(max_neighbor_distance=max_neighbor_distance).first()
@@ -3963,55 +4034,55 @@ class Stock_250kDB(ElixirDB):
 			self.session.flush()
 		return db_entry
 	
-	def constructRBDictFromResultPeak(self, result_id, result_peak_type_id, peakPadding=10000):
+	def constructRBDictFromAssociationPeak(self, result_id, association_peak_type_id, peakPadding=10000):
 		"""
 		2012.6.24
-			add attributes to result_peakRBDict 
+			add attributes to association_peakRBDict 
 		2012.3.19
 			moved from variation.src.TwoGWASPeakOverlap
 		2011-10-16
 		"""
-		sys.stderr.write("Constructing RBDict for peaks from result %s, (peak type %s) ..."%(result_id, result_peak_type_id))
+		sys.stderr.write("Constructing RBDict for peaks from result %s, (peak type %s) ..."%(result_id, association_peak_type_id))
 		from pymodule import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		from pymodule import RBDict
-		result_peakRBDict = RBDict()
-		result_peakRBDict.result_id = result_id	#2012.6.22
-		result_peakRBDict.result_peak_type_id = result_peak_type_id	#2012.6.22
-		result_peakRBDict.peakPadding = peakPadding
-		query = ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id)
+		association_peakRBDict = RBDict()
+		association_peakRBDict.result_id = result_id	#2012.6.22
+		association_peakRBDict.association_peak_type_id = association_peak_type_id	#2012.6.22
+		association_peakRBDict.peakPadding = peakPadding
+		query = AssociationPeak.query.filter_by(result_id=result_id).filter_by(association_peak_type_id=association_peak_type_id)
 		counter = 0
 		real_counter = 0
 		for row in query:
 			counter += 1
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
 							span_ls=[max(1, row.start - peakPadding), row.stop + peakPadding], \
-							min_reciprocal_overlap=1, result_peak_id=row.id)
+							min_reciprocal_overlap=1, association_peak_id=row.id)
 							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
-			if segmentKey not in result_peakRBDict:
-				result_peakRBDict[segmentKey] = []
-			result_peakRBDict[segmentKey].append(row)
+			if segmentKey not in association_peakRBDict:
+				association_peakRBDict[segmentKey] = []
+			association_peakRBDict[segmentKey].append(row)
 		sys.stderr.write("%s peaks. Done.\n"%counter)
-		return result_peakRBDict
+		return association_peakRBDict
 	
-	def filterResultIDLsBasedOnResultPeak(self, result_id_ls, result_peak_type_id=None):
+	def filterResultIDLsBasedOnAssociationPeak(self, result_id_ls, association_peak_type_id=None):
 		"""
 		2012.3.22
 			moved from PairwiseGWASPeakOverlapPipeline.py
 		2011-10-17
-			return a list of ResultsMethod.id that have entries in ResultPeak with result_peak_type_id
+			return a list of ResultsMethod.id that have entries in AssociationPeak with association_peak_type_id
 		"""
-		sys.stderr.write("Filtering a list of %s results by checking ResultPeak (result_peak_type_id=%s)..."%(len(result_id_ls), \
-																							result_peak_type_id))
+		sys.stderr.write("Filtering a list of %s results by checking AssociationPeak (association_peak_type_id=%s)..."%(len(result_id_ls), \
+																							association_peak_type_id))
 		new_result_id_ls = []
 		for result_id in result_id_ls:
-			firstPeak = ResultPeak.query.filter_by(result_id=result_id).filter_by(result_peak_type_id=result_peak_type_id).first()
+			firstPeak = AssociationPeak.query.filter_by(result_id=result_id).filter_by(association_peak_type_id=association_peak_type_id).first()
 			if firstPeak:
 				new_result_id_ls.append(result_id)
 		sys.stderr.write(" %s entries left.\n"%(len(new_result_id_ls)))
 		return new_result_id_ls
 	
 	def getAssociationLocus(self, chromosome=None, start=None, stop=None, no_of_peaks=None, connectivity=None,\
-						threshold=None, result_peak_ls=None):
+						threshold=None, association_peak_ls=None):
 		"""
 		2012.6.28
 		"""
@@ -4021,7 +4092,7 @@ class Stock_250kDB(ElixirDB):
 		if not association_locus:
 			association_locus = AssociationLocus(chromosome=chromosome, start=start, stop=stop, threshold=threshold,\
 							no_of_peaks=no_of_peaks, connectivity=connectivity)
-			association_locus.result_peak_ls = result_peak_ls
+			association_locus.association_peak_ls = association_peak_ls
 			self.session.add(association_locus)
 			#self.session.flush()
 		return association_locus
