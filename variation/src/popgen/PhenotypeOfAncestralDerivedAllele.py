@@ -24,10 +24,10 @@ else:   #32bit
 import time, csv, getopt
 import warnings, traceback
 from pymodule import SNPData, PassingData
-from pymodule.SNP import number2complement
+from pymodule import number2complement
+from variation.src import Stock_250kDB
 from variation.src.common import number2nt, nt2number
-import Stock_250kDB
-from GeneListRankTest import GeneListRankTest
+from variation.src.enrichment.GeneListRankTest import GeneListRankTest
 
 """
 2008-09-19

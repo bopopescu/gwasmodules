@@ -36,16 +36,15 @@ else:   #32bit
 
 import csv, stat, getopt, re
 import traceback, gc, subprocess
-from Stock_250kDB import Results, ResultsMethod, PhenotypeMethod, CallMethod, \
-	ResultsMethodType, AnalysisMethod, ResultsMethodJson
-from Stock_250kDB import Snps as SNPs
-import Stock_250kDB
 from pymodule import figureOutDelimiter, PassingData
 
 import sqlalchemy as sql
 from variation.src.common import getOneResultJsonData
-from pymodule.pegasus.mapper.AbstractDBInteractingJob import AbstractDBInteractingJob
-
+from variation.src import Stock_250kDB
+from Stock_250kDB import Results, ResultsMethod, PhenotypeMethod, CallMethod, \
+	ResultsMethodType, AnalysisMethod, ResultsMethodJson
+from Stock_250kDB import Snps as SNPs
+from variation.src import AbstractVariationMapper
 """
 2008-04-16 temporarily put here
 	-s ...,	short_name*	give a short name of what you did. try to incorporate method, genotype data and phenotype data
@@ -53,7 +52,7 @@ from pymodule.pegasus.mapper.AbstractDBInteractingJob import AbstractDBInteracti
 	-a ...,	data_description*	which data you used
 """
 
-class Results2DB_250k(AbstractDBInteractingJob):
+class Results2DB_250k(AbstractVariationMapper):
 	__doc__ = __doc__	#use documentation in the beginning of the file as this class's doc
 	"""
 	('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
@@ -63,11 +62,10 @@ class Results2DB_250k(AbstractDBInteractingJob):
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 	"""
-	option_default_dict = AbstractDBInteractingJob.option_default_dict.copy()
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
 	option_default_dict.pop(('outputFname', 0, ))
 	option_default_dict.pop(('outputFnamePrefix', 0, ))
 	option_default_dict.update({
-						('data_dir',1, ): ['/Network/Data/250k/db/', '', 1, 'file system storage affiliated with db'],\
 						('short_name', 0, ): [None, 'f', 1, 'short name for this result. Must be unique from previous ones. \
 							combining phenotype, data, method is a good one. If not given, will be automatically generated.' ],\
 						('phenotype_method_id',1,int): [None, 'E', 1, 'which phenotype you used, check table phenotype_method'],\
@@ -93,7 +91,7 @@ class Results2DB_250k(AbstractDBInteractingJob):
 			use ProcessOptions, newer option handling class
 		2008-04-16
 		"""
-		AbstractDBInteractingJob.__init__(self, inputFnameLs=None, **keywords)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 		
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)

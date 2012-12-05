@@ -29,7 +29,7 @@ from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2In
 from pymodule import yh_matplotlib
 
 
-class PlotResultPeakOverlap(object):
+class PlotAssociationPeakOverlap(object):
 	__doc__ = __doc__
 	option_default_dict = {('outputFnamePrefix', 1, ): [None, 'o', 1, 'output filename prefix for all figures.'],\
 						('title', 0, ): [None, 't', 1, 'title for the figure.'],\
@@ -142,7 +142,7 @@ class PlotResultPeakOverlap(object):
 		
 
 if __name__ == '__main__':
-	main_class = PlotResultPeakOverlap
+	main_class = PlotAssociationPeakOverlap
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	instance = main_class(po.arguments, **po.long_option2value)
 	instance.run()

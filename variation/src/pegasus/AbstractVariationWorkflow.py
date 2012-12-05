@@ -8,10 +8,11 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq
+import re
 from Pegasus.DAX3 import *
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
 from pymodule.pegasus.AbstractWorkflow import AbstractWorkflow
-import Stock_250kDB
+from variation.src import Stock_250kDB
 
 class AbstractVariationWorkflow(AbstractWorkflow):
 	__doc__ = __doc__
@@ -21,16 +22,15 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
 						('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
-						('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
-						('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
+						('genome_dbname', 1, ): ['genome', '', 1, 'genome database name', ],\
+						('schema', 0, ): ['', '', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+						('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 						('port', 0, ):[None, '', 1, 'database port number'],\
+						('commit', 0, int):[0, 'c', 0, 'commit db transaction (individual_alignment and/or individual_alignment.path'],\
 						
 						('data_dir', 0, ):[None, 't', 1, 'The top folder of db-affiliated storage. If not given, use db.data_dir.'],\
-						
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
-						
 						("variationSrcPath", 1, ): ["%s/script/variation/src", 'S', 1, 'variation source code folder'],\
 						})
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
@@ -44,7 +44,6 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 		self.variationSrcPath = self.insertHomePath(self.variationSrcPath, self.home_path)
 		self.tabixPath =  self.insertHomePath(self.tabixPath, self.home_path)
 		
-		import re
 		self.chr_pattern = re.compile(r'(\w+\d+).*')
 		self.contig_id_pattern = re.compile(r'Contig(\d+).*')
 		
@@ -79,9 +78,8 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 		variationSrcPath = self.variationSrcPath
 		vervetSrcPath = self.vervetSrcPath
 		
-		executableList = []
+		#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
+		executableClusterSizeMultiplierList = []
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
-		for executable in executableList:
-			executable.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.clusters_size))
-			self.addExecutable(executable)
-			setattr(self, executable.name, executable)
+		

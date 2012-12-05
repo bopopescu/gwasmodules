@@ -43,21 +43,21 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import matplotlib as mpl; mpl.use("Agg")	#to avoid popup and collapse in X11-disabled environment
 import time, csv, cPickle
 import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, SNPData, read_data,\
-	assignMatPlotlibHueColorToLs, drawName2FCLegend
-from pymodule.SNP import number2complement
-import Stock_250kDB, StockDB
-from sets import Set
-from GeneListRankTest import GeneListRankTest	#GeneListRankTest.getGeneList()
-
-from matplotlib.patches import Polygon, CirclePolygon, Ellipse, Wedge
 import pylab
 import ImageColor
 import numpy
-from Association import Association
-from PhenotypeOfAncestralDerivedAllele import PhenotypeOfAncestralDerivedAllele
-from common import get_chr_id2size, get_chr_id2cumu_size, getEcotypeInfo
-from OutputPhenotype import OutputPhenotype
+from sets import Set
+from matplotlib.patches import Polygon, CirclePolygon, Ellipse, Wedge
+from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, SNPData, read_data,\
+	assignMatPlotlibHueColorToLs, drawName2FCLegend
+from pymodule import number2complement
+from pymodule.algorithm	import pca_module
+from variation.src import Stock_250kDB, StockDB
+from variation.src.enrichment.GeneListRankTest import GeneListRankTest	#GeneListRankTest.getGeneList()
+from variation.src.association.Association import Association
+from variation.src.popgen.PhenotypeOfAncestralDerivedAllele import PhenotypeOfAncestralDerivedAllele
+from variation.src.common import get_chr_id2size, get_chr_id2cumu_size, getEcotypeInfo
+from variation.src.db.output.OutputPhenotype import OutputPhenotype
 
 class PlotGroupOfSNPs(GeneListRankTest):
 	__doc__ = __doc__
@@ -979,7 +979,6 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		sys.stderr.write("Getting  StrainID2PCAPosInfo ... ")
 		StrainID2PCAPosInfo = PassingData()
 		if explained_var is None or T is None:
-			import pca_module
 			T, P, explained_var = pca_module.PCA_svd(subSNPData.data_matrix, standardize=False)
 		#import PCA
 		#T, P, explained_var = PCA.eig(subSNPData.data_matrix)	#2008-11-30 try the PCA from pymodule
@@ -1022,7 +1021,6 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		"""
 		sys.stderr.write("Getting  SNPID2PCAPosInfo ... ")
 		SNPID2PCAPosInfo = PassingData()
-		import pca_module
 		T, P, explained_var = pca_module.PCA_svd(numpy.transpose(subSNPData.data_matrix), standardize=False)
 		#T[:,0] and T[:,1] are new positions corresponding to PC1 and PC2
 		if sortObjByPCA_value:

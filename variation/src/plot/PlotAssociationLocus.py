@@ -33,13 +33,13 @@ import numpy, random, pylab
 from pymodule.plot.AbstractPlot import AbstractPlot
 from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 from variation.src import Stock_250kDB
-from variation.src.DrawSNPRegion import DrawSNPRegion, SNPPassingData
+from variation.src.plot.DrawSNPRegion import DrawSNPRegion, SNPPassingData
 from variation.src.common import getEcotypeInfo
-from variation.src.Kruskal_Wallis import Kruskal_Wallis
+from variation.src.association.Kruskal_Wallis import Kruskal_Wallis
 
 class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion):
 	__doc__ = __doc__
-	option_default_dict = AbstractPlot.option_default_dict
+	option_default_dict = AbstractPlot.option_default_dict.copy()
 	option_default_dict[('whichColumnPlotLabel', 0, )][0] = '#SNPs in 100kb window'
 	option_default_dict[('whichColumn', 0, int)][0] = 3
 	option_default_dict[('xColumnPlotLabel', 0, )][0] = 'position'
@@ -49,7 +49,7 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 	option_default_dict.update({
 						('association_locus_id', 1, int): [None, '', 1, 'AssociationLocus.id'],\
 						('locusExtensionDistance', 1, int): [5000, '', 1, 'in drawing association landscape of one locus, how far to extend on each end'],\
-						('result_landscape_type_id', 1, int): [1, '', 1, 'what kind of gwas landscape'],\
+						('association_landscape_type_id', 1, int): [1, '', 1, 'what kind of gwas landscape'],\
 						
 						('snpInfoPickleFname', 0, ): ['', '', 1, 'The file to contain pickled SNPInfo.'],\
 						('snp_matrix_fname', 0, ): ['', 'I', 1, 'genotype matrix. Strain X SNP format.', ],\
@@ -344,7 +344,7 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 			pylab.show()
 		sys.stderr.write("Done.\n")
 	
-	def loadDataStructure(self, db_250k=None, association_locus_id=None, result_landscape_type_id=None, \
+	def loadDataStructure(self, db_250k=None, association_locus_id=None, association_landscape_type_id=None, \
 						locusExtensionDistance=5000,\
 						data_dir=None, list_type_id_list=None, gene_annotation_pickleFname=None, \
 						snpInfoPickleFname=None, locus_type_id=1, snp_matrix_fname=None, snp_matrix_data_type=None, \
@@ -352,26 +352,26 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 		"""
 		2012.11.14
 		"""
-		sys.stderr.write("Fetching GWAS landscape for association-locus %s, landscape type %s ..."%(association_locus_id, result_landscape_type_id))
+		sys.stderr.write("Fetching GWAS landscape for association-locus %s, landscape type %s ..."%(association_locus_id, association_landscape_type_id))
 		# fetch the associationLocus
 		associationLocus = Stock_250kDB.AssociationLocus.get(association_locus_id)
-		resultLandscapeType = Stock_250kDB.ResultLandscapeType.get(result_landscape_type_id)
+		associationLandscapeType = Stock_250kDB.AssociationLandscapeType.get(association_landscape_type_id)
 		
 		# fetch all result-peaks
 		landscape_gwr_ls = []
 		# fetch landscape within this interval
 		start = max(1, associationLocus.start-locusExtensionDistance)
 		stop = associationLocus.stop + locusExtensionDistance
-		pd = PassingData(min_MAF=resultLandscapeType.min_MAF, data_dir=data_dir, \
+		pd = PassingData(min_MAF=associationLandscapeType.min_MAF, data_dir=data_dir, \
 						need_chr_pos_ls=0, chromosome=associationLocus.chromosome, \
 						start=start, stop=stop, report=False)	#report controls whether getResultMethodContent() will report progress.
-		result_landscape_id_set = set()
+		association_landscape_id_set = set()
 		
-		for result_peak in associationLocus.result_peak_ls:
-			result_landscape = db_250k.getResultLandscape(result_id=result_peak.result_id, result_landscape_type_id=resultLandscapeType.id)
-			if result_landscape and result_landscape.id not in result_landscape_id_set:
-				result_landscape_id_set.add(result_landscape.id)
-				genome_wide_result = db_250k.getResultMethodContent(result_landscape=result_landscape, data_dir=data_dir, \
+		for association_peak in associationLocus.association_peak_ls:
+			association_landscape = db_250k.getAssociationLandscape(result_id=association_peak.result_id, association_landscape_type_id=associationLandscapeType.id)
+			if association_landscape and association_landscape.id not in association_landscape_id_set:
+				association_landscape_id_set.add(association_landscape.id)
+				genome_wide_result = db_250k.getResultMethodContent(association_landscape=association_landscape, data_dir=data_dir, \
 												construct_chr_pos2index=True, pdata=pd)
 				landscape_gwr_ls.append(genome_wide_result)
 				sys.stderr.write(" %s%s "%('\x08'*80, len(landscape_gwr_ls)))
@@ -421,7 +421,7 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 			phenData = None
 			ecotype_info = None
 		
-		return_data = PassingData(associationLocus=associationLocus, resultLandscapeType=resultLandscapeType, \
+		return_data = PassingData(associationLocus=associationLocus, associationLandscapeType=associationLandscapeType, \
 								landscape_gwr_ls=landscape_gwr_ls, \
 								gene_annotation=gene_annotation, snp_info=snp_info, LD_info=LD_info, \
 								candidate_gene_set=candidate_gene_set, snpData=snpData, phenData=phenData,\
@@ -437,7 +437,7 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 		self.setup()
 		
 		pdata = self.loadDataStructure(db_250k=self.db_250k, association_locus_id=self.association_locus_id, \
-						result_landscape_type_id=self.result_landscape_type_id, \
+						association_landscape_type_id=self.association_landscape_type_id, \
 						locusExtensionDistance=self.locusExtensionDistance,\
 						data_dir=self.data_dir, list_type_id_list=self.list_type_id_list, \
 						gene_annotation_pickleFname=self.gene_annotation_pickleFname, \

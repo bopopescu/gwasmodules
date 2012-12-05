@@ -38,8 +38,6 @@ Description:
 import sys, os, math
 __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
-from sqlalchemy.types import LargeBinary
-
 #bit_number = math.log(sys.maxint)/math.log(2)
 #if bit_number>40:	   #64bit
 #	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
@@ -48,12 +46,11 @@ from sqlalchemy.types import LargeBinary
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
 from Pegasus.DAX3 import *
-import Stock_250kDB
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
 from Association import Association
-from AbstractVariationWorkflow import AbstractVariationWorkflow
+from variation.src.pegasus.AbstractVariationWorkflow import AbstractVariationWorkflow
+from variation.src import Stock_250kDB
 
 class AssociationWorkflow(AbstractVariationWorkflow):
 	__doc__ = __doc__

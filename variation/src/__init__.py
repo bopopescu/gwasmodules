@@ -21,4 +21,12 @@ from sets import Set
 #from pymodule import importNumericArray, ProcessOptions, SNPData, write_data_matrix, read_data, TwoSNPData
 #num = importNumericArray()
 
-from db import Stock_250kDB
+from db import Stock_250kDB, StockDB
+
+#2012.11.18
+from mapper.AbstractVariationMapper import AbstractVariationMapper
+#2012.11.18
+from pegasus.AbstractVariationWorkflow import AbstractVariationWorkflow
+#2012.11.18 DefineAssociationLandscapePipeline has to be after AbstractVariationWorkflow
+# because it's derived from AbstractVariationWorkflow.
+from association_peak.DefineAssociationLandscapePipeline import DefineAssociationLandscapePipeline

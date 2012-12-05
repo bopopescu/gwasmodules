@@ -17,7 +17,7 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule.SNP import ab2number, number2ab, NA_set, nt2number, \
+from pymodule.yhio.SNP import ab2number, number2ab, NA_set, nt2number, \
 	number2nt, number2color, nt_number_matching_matrix, get_nt_number2diff_matrix_index,\
 	RawSnpsData_ls2SNPData, transposeSNPData, SNPData2RawSnpsData_ls
 from pymodule import PassingData

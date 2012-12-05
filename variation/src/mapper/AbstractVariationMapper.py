@@ -19,34 +19,38 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule import AbstractMapper, AbstractDBInteractingJob
 from variation.src import Stock_250kDB
 
-class AbstractVariationMapper(AbstractMapper):
+class AbstractVariationMapper(AbstractDBInteractingJob):
 	__doc__ = __doc__
-	option_default_dict = AbstractMapper.option_default_dict.copy()
-	option_default_dict.pop(('inputFname', 1, ))
+	option_default_dict = AbstractDBInteractingJob.option_default_dict.copy()
 	option_default_dict.update({
+							('data_dir', 0, ):[None, '', 1, 'The results directory. Default is None. use the one given by db.'],\
 							('drivername', 1,):['mysql', '', 1, 'which type of database? mysql or postgres', ],\
 							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
-							('schema', 0, ): ['', 'k', 1, 'database schema name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, '', 1, 'database password', ],\
-							('port', 0, ):[None, '', 1, 'database port number'],\
-							('data_dir', 0, ):[None, '', 1, 'The results directory. Default is None. use the one given by db.'],\
+							('dbname', 1, ): ['stock_250k', '', 1, 'stock_250k database name', ],\
 							('min_MAF', 0, float): [0.1, '', 1, 'minimum Minor Allele Frequency.'],\
-							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
-							
 							})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
-		AbstractMapper.__init__(self, **keywords)
-		self.inputFnameLs = inputFnameLs
+		AbstractDBInteractingJob.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 		
-		
+	def connectDB(self):
+		"""
+		2012.11.18
+		"""
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
 									hostname=self.hostname, database=self.dbname, schema=self.schema, port=self.port)
 		db_250k.setup(create_tables=False)
 		self.db_250k = db_250k
+	
+	def run(self):
+		pass
+	
+if __name__ == '__main__':
+	main_class = AbstractVariationMapper
+	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
+	instance = main_class(**po.long_option2value)
+	instance.run()

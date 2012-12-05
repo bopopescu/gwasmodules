@@ -48,8 +48,8 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 						('cnv_method2_id', 0, int):[None, 'q', 1, 'Restrict result 2 to this cnv_method.'],\
 						('analysis_method1_id', 1, int):[1, 'a', 1, 'Restrict result 1 to this analysis_method'],\
 						('analysis_method2_id', 1, int):[1, 'A', 1, 'Restrict result 2 to this analysis_method'],\
-						("result1_peak_type_id", 1, int): [None, 'x', 1, 'PeakType for result1'],\
-						("result2_peak_type_id", 1, int): [None, 'X', 1, 'PeakType for result2'],\
+						("association1_peak_type_id", 1, int): [None, 'x', 1, 'PeakType for result1'],\
+						("association2_peak_type_id", 1, int): [None, 'X', 1, 'PeakType for result2'],\
 						})
 	
 	def __init__(self,  **keywords):
@@ -108,9 +108,9 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 		for result in result2_query:
 			result2_id_ls.append(result.id)
 		
-		#make sure the entries with (result_id, self.result_peak_type_id) exists in ResultPeak
-		result1_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result1_id_ls, self.result1_peak_type_id)
-		result2_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result2_id_ls, self.result2_peak_type_id)
+		#make sure the entries with (result_id, self.association_peak_type_id) exists in AssociationPeak
+		result1_id_ls = db_250k.filterResultIDLsBasedOnAssociationPeak(result1_id_ls, self.association1_peak_type_id)
+		result2_id_ls = db_250k.filterResultIDLsBasedOnAssociationPeak(result2_id_ls, self.association2_peak_type_id)
 		
 		phenotype_method_id2result1_id = self.getPhenotypeMethodId2ResultID(result1_id_ls)
 		phenotype_method_id2result2_id = self.getPhenotypeMethodId2ResultID(result2_id_ls)
@@ -138,10 +138,10 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 		overlapPlotDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=overlapPlotDir)
 		
 		outputFnamePrefix = os.path.join(overlapPlotDir, 'cm%s_cnvM%s_am%s_peakType%s_vs_cm%s_cnvM%s_am%s_peakType%s_biologyCategory%s_overlapPeak'%\
-								(self.call_method1_id, self.cnv_method1_id, self.analysis_method1_id, self.result1_peak_type_id, \
-								self.call_method2_id, self.cnv_method2_id, self.analysis_method2_id, self.result2_peak_type_id, \
+								(self.call_method1_id, self.cnv_method1_id, self.analysis_method1_id, self.association1_peak_type_id, \
+								self.call_method2_id, self.cnv_method2_id, self.analysis_method2_id, self.association2_peak_type_id, \
 								self.biology_category_id))
-		plotResultPeakOverlapJob = slef.addPlotPeakOverlapJob(workflow, executable=workflow.plotResultPeakOverlapJob, \
+		plotAssociationPeakOverlapJob = slef.addPlotPeakOverlapJob(workflow, executable=workflow.plotAssociationPeakOverlapJob, \
 							outputFnamePrefix=outputFnamePrefix, \
 							parentJobLs=[overlapPlotDirJob], job_max_memory=100, job_max_walltime = 60, \
 							extraDependentInputLs=[], \
@@ -156,7 +156,7 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 		for phenotype_method_id, result_id_pair in phenotype_method_id2result_id_pair.iteritems():
 			result1_id = result_id_pair[0]
 			result2_id = result_id_pair[1]
-			outputFnamePrefix = 'result_%s_vs_%s_peak_type_%s_vs_%s'%(result1_id, result2_id, self.result1_peak_type_id, self.result2_peak_type_id)
+			outputFnamePrefix = 'result_%s_vs_%s_peak_type_%s_vs_%s'%(result1_id, result2_id, self.association1_peak_type_id, self.association2_peak_type_id)
 			outputF = File(os.path.join(overlapStatDir, '%s.tsv'%(outputFnamePrefix)))
 			
 			if no_of_input==0:	#add one random input, otherwise replica catalog error occurs
@@ -168,8 +168,8 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 			
 			no_of_input += 1
 			gwasPeakOverlapJob = self.addGWASPeakOverlapJob(workflow, executable=workflow.twoGWASPeakOverlap, \
-							result1_id=result1_id, result2_id=result2_id, result1_peak_type_id=self.result1_peak_type_id, \
-							result2_peak_type_id=self.result2_peak_type_id, peak_padding=self.peak_padding, \
+							result1_id=result1_id, result2_id=result2_id, association1_peak_type_id=self.association1_peak_type_id, \
+							association2_peak_type_id=self.association2_peak_type_id, peak_padding=self.peak_padding, \
 							outputF=outputF, \
 							commit=1, results_directory=None, logFile=None, \
 							parentJobLs=[overlapStatDirJob], job_max_memory=100, job_max_walltime = 60, \
@@ -180,7 +180,7 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 			self.addInputToStatMergeJob(workflow, statMergeJob=peakOverlapStatMergeJob, \
 									inputF=outputF, parentJobLs=[gwasPeakOverlapJob])
 			"""
-			self.addInputToStatMergeJob(workflow, statMergeJob=plotResultPeakOverlapJob, inputF=outputF, \
+			self.addInputToStatMergeJob(workflow, statMergeJob=plotAssociationPeakOverlapJob, inputF=outputF, \
 							parentJobLs=[gwasPeakOverlapJob])
 			"""
 			

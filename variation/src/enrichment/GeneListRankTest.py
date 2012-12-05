@@ -46,14 +46,15 @@ else:   #32bit
 
 import time, csv, cPickle
 import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, importNumericArray
-from Stock_250kDB import Stock_250kDB, Snps, SnpsContext, ResultsMethod, GeneList, CandidateGeneRankSumTestResult, \
-	ResultsByGene, CandidateGeneRankSumTestResultMethod, CandidateGeneRankSumTestResultMethodType
-from Results2DB_250k import Results2DB_250k
-from pymodule import getGenomeWideResultFromFile
-from sets import Set
-from pymodule.db import TableClass
 import random
+from sets import Set
+from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, importNumericArray
+from pymodule import getGenomeWideResultFromFile
+from pymodule.db import TableClass
+from variation.src.db.Stock_250kDB import Stock_250kDB, Snps, SnpsContext, ResultsMethod, GeneList, CandidateGeneRankSumTestResult, \
+	ResultsByGene, CandidateGeneRankSumTestResultMethod, CandidateGeneRankSumTestResultMethodType
+from variation.src.db.Results2DB_250k import Results2DB_250k
+
 
 num = importNumericArray()
 numpy = num

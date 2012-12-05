@@ -54,7 +54,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 						('call_method_id', 0, int):[None, 'E', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 						('cnv_method_id', 0, int):[None, 'c', 1, 'Restrict results based on this cnv_method. Default is no such restriction.'],\
 						('analysis_method_id_ls', 0, ):[1, 'a', 1, 'Restrict results based on these analysis_methods. coma or dash-separated list'],\
-						('result_peak_type_id', 1, int): [None, 'x', 1, 'peak type id for result peaks'],\
+						('association_peak_type_id', 1, int): [None, 'x', 1, 'peak type id for result peaks'],\
 						})
 	
 	def __init__(self,  **keywords):
@@ -99,16 +99,16 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		workflow.addExecutable(twoGWASPeakOverlap)
 		workflow.twoGWASPeakOverlap = twoGWASPeakOverlap
 		
-		plotResultPeakOverlap = Executable(namespace=namespace, name="PlotResultPeakOverlap", version=version, \
+		PlotAssociationPeakOverlap = Executable(namespace=namespace, name="PlotAssociationPeakOverlap", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		plotResultPeakOverlap.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "plot/PlotResultPeakOverlap.py"), site_handler))
-		plotResultPeakOverlap.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		workflow.addExecutable(plotResultPeakOverlap)
-		workflow.plotResultPeakOverlap = plotResultPeakOverlap
+		PlotAssociationPeakOverlap.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "plot/PlotAssociationPeakOverlap.py"), site_handler))
+		PlotAssociationPeakOverlap.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		workflow.addExecutable(PlotAssociationPeakOverlap)
+		workflow.plotAssociationPeakOverlap = PlotAssociationPeakOverlap
 	
 	def addGWASPeakOverlapJob(self, workflow, executable=None, \
-							result1_id=None, result2_id=None, result1_peak_type_id=None, \
-							result2_peak_type_id=None, peak_padding=None, outputF=None, \
+							result1_id=None, result2_id=None, association1_peak_type_id=None, \
+							association2_peak_type_id=None, peak_padding=None, outputF=None, \
 							commit=0, results_directory=None, logFile=None, \
 							parentJobLs=[], job_max_memory=100, job_max_walltime = 60, \
 							extraDependentInputLs=[], \
@@ -123,7 +123,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		job.addArguments("-v", self.drivername, "-z", self.hostname, "-d", self.dbname, \
 						"-u", self.db_user, "-p", self.db_passwd,\
 						"-i", repr(int(result1_id)), "-j", repr(int(result2_id)), \
-						"-x", repr(result1_peak_type_id), "-y", repr(result2_peak_type_id), \
+						"-x", repr(association1_peak_type_id), "-y", repr(association2_peak_type_id), \
 						"-e", repr(peak_padding), "-o", outputF)
 		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		if commit:
@@ -159,9 +159,9 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		
 		job.addArguments("-o", outputFnamePrefix)
 		
-		job.uses(File("%s_hist_of_fraction_of_result1_peaks_in_result2.png"%outputFnamePrefix), \
+		job.uses(File("%s_hist_of_fraction_of_association1_peaks_in_result2.png"%outputFnamePrefix), \
 							transfer=True, register=True, link=Link.OUTPUT)
-		job.uses(File("%s_hist_of_fraction_of_result2_peaks_in_result1.png"%outputFnamePrefix), \
+		job.uses(File("%s_hist_of_fraction_of_association2_peaks_in_result1.png"%outputFnamePrefix), \
 							transfer=True, register=True, link=Link.OUTPUT)
 		job.uses(File("%s_hist_of_fraction_of_recurrent_peaks_in_combined.png"%outputFnamePrefix), \
 							transfer=True, register=True, link=Link.OUTPUT)
@@ -211,8 +211,8 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		for result in result_query:
 			result_id_ls.append(result.id)
 		
-		#make sure the entries with (result_id, self.result_peak_type_id) exists in ResultPeak
-		result_id_ls = db_250k.filterResultIDLsBasedOnResultPeak(result_id_ls, self.result_peak_type_id)
+		#make sure the entries with (result_id, self.association_peak_type_id) exists in AssociationPeak
+		result_id_ls = db_250k.filterResultIDLsBasedOnAssociationPeak(result_id_ls, self.association_peak_type_id)
 		
 		# Create a abstract dag
 		workflow = self.initiateWorkflow()
@@ -228,8 +228,8 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 		analysis_method_id_ls = map(str, self.analysis_method_id_ls)
 		outputFnamePrefix = os.path.join(overlapPlotDir, 'callMethod%s_cnvMethod%s_analysisMethod%s_biologyCategory%s_peakType%s_overlapPeak'%\
 								(self.call_method_id, self.cnv_method_id, '_'.join(analysis_method_id_ls), self.biology_category_id,\
-								self.result_peak_type_id))
-		plotResultPeakOverlapJob = self.addPlotPeakOverlapJob(workflow, executable=workflow.plotResultPeakOverlap, \
+								self.association_peak_type_id))
+		plotAssociationPeakOverlapJob = self.addPlotPeakOverlapJob(workflow, executable=workflow.plotAssociationPeakOverlap, \
 							outputFnamePrefix=outputFnamePrefix, \
 							parentJobLs=[overlapPlotDirJob], job_max_memory=100, job_max_walltime = 60, \
 							extraDependentInputLs=[], \
@@ -241,7 +241,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 			for j in range(i+1, len(result_id_ls)):
 				result1_id = result_id_ls[i]
 				result2_id = result_id_ls[j]
-				outputFnamePrefix = 'result_%s_vs_%s_peak_type_%s'%(result1_id, result2_id, self.result_peak_type_id)
+				outputFnamePrefix = 'result_%s_vs_%s_peak_type_%s'%(result1_id, result2_id, self.association_peak_type_id)
 				outputF = File(os.path.join(overlapStatDir, '%s.tsv'%(outputFnamePrefix)))
 				if no_of_input==0:	#add one random input, otherwise replica catalog error occurs
 					rm1 = Stock_250kDB.ResultsMethod.get(result1_id)
@@ -252,8 +252,8 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 				
 				no_of_input += 1
 				gwasPeakOverlapJob = self.addGWASPeakOverlapJob(workflow, executable=workflow.twoGWASPeakOverlap, \
-							result1_id=result1_id, result2_id=result2_id, result1_peak_type_id=self.result_peak_type_id, \
-							result2_peak_type_id=self.result_peak_type_id, peak_padding=self.peak_padding, \
+							result1_id=result1_id, result2_id=result2_id, association1_peak_type_id=self.association_peak_type_id, \
+							association2_peak_type_id=self.association_peak_type_id, peak_padding=self.peak_padding, \
 							outputF=outputF, \
 							commit=1, results_directory=None, logFile=None, \
 							parentJobLs=[overlapStatDirJob], job_max_memory=100, job_max_walltime = 60, \
@@ -261,7 +261,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 							transferOutput=True)
 				counter += 1
 				
-				self.addInputToStatMergeJob(workflow, statMergeJob=plotResultPeakOverlapJob, inputF=outputF, \
+				self.addInputToStatMergeJob(workflow, statMergeJob=plotAssociationPeakOverlapJob, inputF=outputF, \
 							parentJobLs=[gwasPeakOverlapJob])
 		
 		sys.stderr.write("%s gwas peak overlap jobs.\n"%(counter))

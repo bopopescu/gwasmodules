@@ -95,37 +95,35 @@ class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflo
 		clusters_size = workflow.clusters_size
 		site_handler = workflow.site_handler
 		
+		#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
+		executableClusterSizeMultiplierList = []
+		
 		FindMaxLDBetweenPeakAndEachLocus = Executable(namespace=namespace, name="FindMaxLDBetweenPeakAndEachLocus", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		FindMaxLDBetweenPeakAndEachLocus.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/FindMaxLDBetweenPeakAndEachLocus"), \
 									site_handler))
-		FindMaxLDBetweenPeakAndEachLocus.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		workflow.addExecutable(FindMaxLDBetweenPeakAndEachLocus)
-		workflow.FindMaxLDBetweenPeakAndEachLocus = FindMaxLDBetweenPeakAndEachLocus
+		executableClusterSizeMultiplierList.append((FindMaxLDBetweenPeakAndEachLocus, 0.3))
+		
 		
 		MergeTwoLocusCorrelationHDF5 = Executable(namespace=namespace, name="MergeTwoLocusCorrelationHDF5", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		MergeTwoLocusCorrelationHDF5.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/MergeTwoLocusCorrelationHDF5.py"), \
 									site_handler))
-		MergeTwoLocusCorrelationHDF5.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		workflow.addExecutable(MergeTwoLocusCorrelationHDF5)
-		workflow.MergeTwoLocusCorrelationHDF5 = MergeTwoLocusCorrelationHDF5
+		executableClusterSizeMultiplierList.append((MergeTwoLocusCorrelationHDF5, 0.3))
 		
 		OutputLociIDOfResultPeakInHDF5 = Executable(namespace=namespace, name="OutputLociIDOfResultPeakInHDF5", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		OutputLociIDOfResultPeakInHDF5.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "association_peak/OutputLociIDOfResultPeakInHDF5.py"), \
 									site_handler))
-		OutputLociIDOfResultPeakInHDF5.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		workflow.addExecutable(OutputLociIDOfResultPeakInHDF5)
-		workflow.OutputLociIDOfResultPeakInHDF5 = OutputLociIDOfResultPeakInHDF5
+		executableClusterSizeMultiplierList.append((OutputLociIDOfResultPeakInHDF5, 0.3))
 		
 		DrawManhattanPlotForLDInHDF5 = Executable(namespace=namespace, name="DrawManhattanPlotForLDInHDF5", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		DrawManhattanPlotForLDInHDF5.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "plot/DrawManhattanPlotForLDInHDF5.py"), \
 									site_handler))
-		DrawManhattanPlotForLDInHDF5.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		workflow.addExecutable(DrawManhattanPlotForLDInHDF5)
-		workflow.DrawManhattanPlotForLDInHDF5 = DrawManhattanPlotForLDInHDF5
+		executableClusterSizeMultiplierList.append((DrawManhattanPlotForLDInHDF5, 0.4))
+		
+		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
 	def addOutputLociIDOfResultPeakInHDF5Job(self, workflow, executable=None, peak_id=None, outputFile=None,\
 					parentJobLs=[], extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
@@ -259,10 +257,12 @@ class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflo
 		return maxLDJob
 		
 	
-	def addJobs(self, workflow, result_peak_ls=None, inputData=None, datasetName=None, chunkSize=None, pegasusFolderName=""):
+	def addJobs(self, workflow=None, result_peak_ls=None, inputData=None, datasetName=None, chunkSize=None, pegasusFolderName=""):
 		"""
 		2012.3.3
 		"""
+		if workflow is None:
+			workflow = self
 		
 		returnJobData = PassingData()
 		
@@ -304,7 +304,7 @@ class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflo
 														transferOutput=False, extraArguments=None, \
 														job_max_memory=200)
 				no_of_jobs += 1
-				peakCorrelationFile = File(os.path.join(outputDirJob.folder, 'maxCorrelationBetweenFstLociAndPeak%s.h5'%(peak.id)))
+				peakCorrelationFile = File(os.path.join(outputDirJob.folder, 'maxCorrelationBetweenFirstLociAndPeak%s.h5'%(peak.id)))
 				maxLDJob = self.mapMaxLDJobsGivenInputData(workflow, inputData=inputData, datasetName=datasetName, peak_id=peak.id, \
 								peakLociH5File=peakLociOutputJob.output, outputFile=peakCorrelationFile, outputDirJob=outputDirJob, \
 								chunkSize=chunkSize, parentJobLs=[peakLociOutputJob], extraDependentInputLs=[], transferOutput=True, extraArguments=None, \

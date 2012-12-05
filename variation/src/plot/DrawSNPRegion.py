@@ -85,26 +85,24 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import time, csv, cPickle
 import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, read_data, SNPData, SNPInfo, SNP
-from pymodule.Genome import GeneModel
-import Stock_250kDB
 import matplotlib; matplotlib.use("Agg")	#to avoid popup and collapse in X11-disabled environment
 import matplotlib as mpl
-from GeneListRankTest import GeneListRankTest	#GeneListRankTest.getGeneList()
-from PlotGroupOfSNPs import PlotGroupOfSNPs
-
-from matplotlib.patches import Polygon, CirclePolygon
 import pylab
-from pymodule.yh_matplotlib_artists import ExonIntronCollection
 import ImageColor
 import numpy, StringIO
-from pymodule.latex import outputMatrixInLatexTable
-from pymodule.latex import outputFigureInLatex
-from common import getEcotypeInfo
-from Kruskal_Wallis import Kruskal_Wallis
-
-from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-from pymodule.RBTree import RBDict
+from matplotlib.patches import Polygon, CirclePolygon
+from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, read_data, SNPData, SNPInfo, SNP
+from pymodule import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+from pymodule import RBDict
+from pymodule.Genome import GeneModel
+from pymodule.plot.yh_matplotlib_artists import ExonIntronCollection
+from pymodule import outputMatrixInLatexTable
+from pymodule import outputFigureInLatex
+from variation.src import Stock_250kDB
+from variation.src.enrichment.GeneListRankTest import GeneListRankTest	#GeneListRankTest.getGeneList()
+from variation.src.common import getEcotypeInfo
+from variation.src.association.Kruskal_Wallis import Kruskal_Wallis
+from PlotGroupOfSNPs import PlotGroupOfSNPs
 
 class LD_statistic(object):
 	"""

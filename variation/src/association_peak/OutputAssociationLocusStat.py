@@ -26,30 +26,46 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
+import numpy
+import networkx as nx
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule import SNPData, SNP
 #from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+from pymodule import RBDict
+from pymodule import yh_matplotlib, GenomeDB, utils
 from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 from variation.src import Stock_250kDB
-import networkx as nx
-from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-from pymodule.RBTree import RBDict
-import numpy
-from pymodule import yh_matplotlib, GenomeDB, utils
 
-from ResultPeak2AssociationLocusStat import ResultPeak2AssociationLocusStat
+from AssociationPeak2AssociationLocus import AssociationPeak2AssociationLocus
 
-class OutputAssociationLocusStat(ResultPeak2AssociationLocusStat):
+class OutputAssociationLocusStat(AssociationPeak2AssociationLocus):
 	__doc__ = __doc__
-	option_default_dict = ResultPeak2AssociationLocusStat.option_default_dict.copy()
+	option_default_dict = AssociationPeak2AssociationLocus.option_default_dict.copy()
+	option_default_dict.update(AssociationPeak2AssociationLocus.db_option_dict)
+	option_default_dict.update({
+							('call_method_id_ls', 1, ): ['', 'l', 1, 'loci from these peaks will be outputted', ],\
+							('analysis_method_id_ls', 1, ): ['1,32', 'a', 1, 'loci from these peaks will be outputted', ],\
+							('phenotype_id_ls', 1, ): ['', 'i', 1, 'loci from these peaks will be outputted', ],\
+							('min_overlap_ratio', 1, float): ['0.05', 'm', 1, 'minimum overlap ratio, overlap length/total' ],\
+							('result_peak_type_id_ls', 1, ): ['', 's', 1, 'list of result peak type IDs, in this order:\
+								snp-KW-gwas,snp-EMMA-gwas,deletion-KW-gwas,deletion-EMMA-gwas', ],\
+							})
 	def __init__(self, inputFnameLs, **keywords):
 		"""
 		"""
-		ResultPeak2AssociationLocusStat.__init__(self, inputFnameLs, **keywords)
+		AssociationPeak2AssociationLocus.__init__(self, inputFnameLs, **keywords)
+		
+		self.call_method_id_ls = getListOutOfStr(self.call_method_id_ls, data_type=int)
+		self.analysis_method_id_ls = getListOutOfStr(self.analysis_method_id_ls, data_type=int)
+		self.phenotype_id_ls = getListOutOfStr(self.phenotype_id_ls, data_type=int)
+		self.phenotype_id_ls.sort()
+		self.result_peak_type_id_ls = getListOutOfStr(self.result_peak_type_id_ls, data_type=int)
+		
 		self.phenotype_id_set = set(self.phenotype_id_ls)
 		self.call_method_id_set = set(self.call_method_id_ls)
 		self.analysis_method_id_set = set(self.analysis_method_id_ls)
 	
+	connectDB = AbstractVariationMapper.connectDB
 	def run(self):
 		"""
 		"""
