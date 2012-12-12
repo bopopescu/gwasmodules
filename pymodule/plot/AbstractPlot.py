@@ -36,7 +36,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 	#option_default_dict.update(AbstractMapper.db_option_dict.copy())
 	option_default_dict.update({
 						('title', 0, ): [None, 't', 1, 'title for the figure.'],\
-						('figureDPI', 1, int): [200, 'f', 1, 'dpi for the output figures (png)'],\
+						('figureDPI', 1, int): [200, 'f', 1, 'dpi, dots per inch, for the output figures (png)'],\
 						('formatString', 1, ): ['.', 'm', 1, 'formatString passed to matplotlib plot'],\
 						('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: whatever matplotlib decides. 2: min to max'],\
 						('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
@@ -50,8 +50,14 @@ class AbstractPlot(AbstractMatrixFileWalker):
 	if this is non-zero, then logY is better off. otherwise data will be messed up.'],\
 						('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
 						('defaultFontLabelSize', 1, int): [12, '', 1, 'default font & label size on the plot'], \
-						('defaultFigureWidth', 1, float): [10, '', 1, 'default figure width in the pedigree plot'], \
-						('defaultFigureHeight', 1, float): [10, '', 1, 'default figure height in the pedigree plot'], \
+						('defaultFigureWidth', 1, float): [10, '', 1, 'default figure width (in inch) in the pedigree plot'], \
+						('defaultFigureHeight', 1, float): [10, '', 1, 'default figure height (in inch) in the pedigree plot'], \
+						('xmargin', 0, float): [0, '', 1, 'this is margin within the plotting area. how far data points should be away from axis. 0-1.0'], \
+						('ymargin', 0, float): [0, '', 1, 'this is margin within the plotting area. how far data points should be away from axis. 0-1.0'], \
+						('plotLeft', 0, float): [0.1, '', 1, 'the left side of the subplots of the figure'], \
+						('plotRight', 0, float): [0.9, '', 1, 'the right side of the subplots of the figure'], \
+						('plotBottom', 0, float): [0.1, '', 1, ' the bottom of the subplots of the figure'], \
+						('plotTop', 0, float): [0.9, '', 1, ' the top of the subplots of the figure'], \
 						
 						})
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -73,7 +79,8 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		
 		yh_matplotlib.setFontAndLabelSize(self.defaultFontLabelSize)
 		yh_matplotlib.setDefaultFigureSize((self.defaultFigureWidth, self.defaultFigureHeight))
-	
+		yh_matplotlib.setPlotDimension(left=self.plotLeft, right=self.plotRight, bottom=self.plotBottom, top=self.plotTop)
+
 	def addPlotLegend(self, plotObject=None, legend=None, pdata=None, **keywords):
 		"""
 		2012.11.25
@@ -162,7 +169,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		"""
 		pass
 	
-	def _handleXLim(self,):
+	def _handleXLim(self, **keywords):
 		"""
 		2012.11.22
 			could be used by descendants, but not called by default
@@ -173,30 +180,31 @@ class AbstractPlot(AbstractMatrixFileWalker):
 				delta = 0.5
 			pylab.xlim(xmin=self.xMin-delta, xmax=self.xMax+delta)
 		
-	def _handleYLim(self,):
+	def _handleYLim(self, **keywords):
 		"""
 		2012.11.22
 			could be used by descendants, but not called by default
 		"""
 		if self.yMin is not None and self.yMax is not None:
+			originalYMin, originalYMax = pylab.ylim()
 			delta = abs(self.yMax-self.yMin)/10.0
 			if delta<=0:
 				delta = 0.5
 			pylab.ylim(ymin=self.yMin-delta, ymax=self.yMax+delta)
 	
-	def handleXLim(self,):
+	def handleXLim(self, **keywords):
 		"""
 		2012.11.22
 		"""
 		pass
 		
-	def handleYLim(self,):
+	def handleYLim(self, **keywords):
 		"""
 		2012.11.22
 		"""
 		pass
 	
-	def handleXLabel(self,):
+	def handleXLabel(self, **keywords):
 		"""
 		2012.8.6
 		"""
@@ -207,7 +215,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		pylab.xlabel(xlabel)
 		return xlabel
 		
-	def handleYLabel(self,):
+	def handleYLabel(self, **keywords):
 		"""
 		2012.8.6
 		"""
@@ -218,7 +226,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		pylab.ylabel(ylabel)
 		return ylabel
 	
-	def handleTitle(self,):
+	def handleTitle(self, **keywords):
 		"""
 		2012.8.16
 		"""
@@ -255,8 +263,10 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		2012.10.7
 		"""
 		sys.stderr.write("Saving figure ...")
-		
+		#2012.12.4 change scale
 		self.changeFigureScaleToLog()
+		#2012.12.4 change margin
+		self.setMargins()
 		
 		if self.plotObjectLegendLs and self.plotObjectLs:
 			#add the legend
@@ -293,7 +303,16 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		self.saveFigure(invariantPData=self.invariantPData)
 		#delete self.invariantPData.writer if it exists
 		AbstractMatrixFileWalker.reduce(self, **keywords)
-			
+	
+	def setMargins(self):
+		"""
+		2012.12.4
+		"""
+		if self.xmargin is not None:
+			pylab.gca().set_xmargin(self.xmargin)
+		if self.ymargin is not None:
+			pylab.gca().set_ymargin(self.ymargin)
+	
 	def run(self):
 		
 		if self.debug:
