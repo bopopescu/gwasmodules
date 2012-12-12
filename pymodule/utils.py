@@ -27,7 +27,7 @@ def dict_map(dict, ls, type=1):
 	
 	return new_list
 
-class PassingData(list, object):
+class PassingData(object):
 	"""
 	05/09/08
 		a class to hold any data structure
@@ -59,8 +59,20 @@ class PassingData(list, object):
 class PassingDataList(list, object):
 	"""
 	2012.11.24
-		could be accessed as a list as well.
-		The sorting of these objects will be based on the variables that were put into the list.
+		Could be accessed as a list as well.
+		The position of each individual attribute in this list is based on the order in which the variables are put into the list.
+		i.e.
+			association_peak = PassingDataList()
+			association_peak.chromosome=peak_start_data_obj.chromosome
+			association_peak.start=peak_start_data_obj.peak_start
+			association_peak.stop=intersection_point.x()
+			association_peak[0] == association_peak.chromosome	#this is True
+		
+		But if you assign everything in the initialization, the order is not guaranteed. i.e.
+			association_peak = PassingDataList(chromosome=peak_start_data_obj.chromosome, start=peak_start_data_obj.peak_start,\
+				stop=intersection_point.x(), start_locus_id=1)
+			association_peak[0] == association_peak.chromosome	#not sure. the order of arguments is not preserved inside __init__(**keywords).
+		
 		list has to be ahead of object as parental class, otherwise
 			"TypeError: Error when calling the metaclass basesCannot create a 
 				consistent method resolution order (MRO) for bases list, object"
