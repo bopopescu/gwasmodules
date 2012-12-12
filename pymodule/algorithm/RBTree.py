@@ -603,13 +603,13 @@ class RBTree(object):
 			else:
 				parent = current.parent
 				if rc < 0:	#to the left of current
-					if current.left ==self.sentinel:
+					if current.left ==self.sentinel:#but there is no more left
 						objectToReturn = PassingData(smallerNode=self.findFirstAncestralNodeSmallerThanCurrent(current), \
 													biggerNode=current)
 						break
 					current = current.left
 				else:	#to the right of current
-					if current.right == self.sentinel:
+					if current.right == self.sentinel:	#but there is no more right
 						objectToReturn = PassingData(smallerNode=current, \
 													biggerNode=self.findFirstAncestralNodeBiggerThanCurrent(current))
 						break
