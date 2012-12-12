@@ -259,6 +259,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			run after all files have been walked through
 		"""
 		if getattr(self.invariantPData, 'writer', None):
+			self.invariantPData.writer.close()
 			del self.invariantPData.writer
 	
 	def run(self):
