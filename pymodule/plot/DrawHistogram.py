@@ -55,7 +55,7 @@ class DrawHistogram(AbstractPlot):
 		no_of_data_points = len(y_ls)
 		if no_of_data_points>=min_no_of_data_points:
 			no_of_bins = max(min_no_of_bins, min(max_no_of_bins, no_of_data_points/10))
-			n, bins, patches = pylab.hist(y_ls, bins=no_of_bins, log=self.logCount)
+			n, bins, patches = pylab.hist(y_ls, bins=no_of_bins, log=self.logCount, alpha=0.6)
 			self.addPlotLegend(plotObject=patches[0], legend=os.path.basename(pdata.filename), pdata=pdata)
 		
 	
