@@ -125,10 +125,13 @@ class HDF5GroupWrapper(object):
 			dtype = self.dataMatrixDtype
 		self.dataMatrix = h5Group.create_dataset(self.dataMatrixDSName, shape=(1,), dtype=dtype, \
 										maxshape=(None, ), compression=self.compression, compression_opts=self.compression_opts)
+		self.dataMatrix.resize((0,))	#by default it contains one "null" data point.
 		self.rowIDList = h5Group.create_dataset(self.rowIDListDSName, shape=(1,), dtype=varLenStrType, maxshape=(None,),\
 											compression=self.compression, compression_opts=self.compression_opts)
+		self.rowIDList.resize((0,))
 		self.colIDList = h5Group.create_dataset(self.colIDListDSName, shape=(1,), dtype=varLenStrType, maxshape=(None,),\
 											compression=self.compression, compression_opts=self.compression_opts)
+		self.colIDList.resize((0,))
 		self.rowID2rowIndex = {}
 		self.colID2colIndex = {}
 	
@@ -367,6 +370,19 @@ class HDF5GroupWrapper(object):
 				attributeValueList = attributeValue
 			setVariable |= set(list(attributeValueList))
 		return setVariable
+	
+	def close(self):
+		"""
+		2012.12.4
+			deprecated. dimension set to 0 upon creation.
+			resize the data matrix to zero if it's in write mode and self.newWrite is still True
+		"""
+		if self.newGroup and self.newWrite:	#in write mode and no writing has happened.
+			self.dataMatrix.resize((0,))
+			#or you can delete it
+			#del self.h5Group[self.dataMatrixDSName]
+			#self.h5Group.delete_dataset( ...
+	
 
 class HDF5MatrixFile(MatrixFile):
 	varLenStrType = varLenStrType	#convenient for outside program to access this variable length string type
@@ -551,6 +567,9 @@ class HDF5MatrixFile(MatrixFile):
 		return pdata
 	
 	def close(self):
+		"""
+		#2012.12.4 close the group objects first
+		"""
 		self.hdf5File.close()
 		del self.hdf5File
 	
