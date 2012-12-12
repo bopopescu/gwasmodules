@@ -40,6 +40,8 @@ def getAssociationLandscapeDataFromHDF5File(inputFname=None, associationGroupNam
 		setattr(returnData, attributeName, value)
 	
 	for row in landscapeGroupObject:
+		if row.start_locus_id==0:	#empty data. happens when inputFname contains no valid landscape, but one default null data point.
+			continue
 		start_locus_id = row.start_locus_id
 		stop_locus_id = row.stop_locus_id
 		no_of_loci = row.no_of_loci
@@ -121,6 +123,8 @@ def constructAssociationPeakRBDictFromHDF5File(inputFname=None, peakPadding=1000
 	counter = 0
 	real_counter = 0
 	for row in groupObject:
+		if not row.chromosome:	#empty chromosome, which happens when inputFname contains no valid peaks, but the default null peak (only one).
+			continue
 		counter += 1
 		segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
 						span_ls=[max(1, row.start - peakPadding), row.stop + peakPadding], \
@@ -140,8 +144,8 @@ def outputAssociationPeakInHDF5(association_peak_ls=None, filename=None, writer=
 	"""
 	sys.stderr.write("Dumping association peaks into %s (HDF5 format) ..."%(filename))
 	#each number below is counting bytes, not bits
-	dtypeList = [('start_locus_id','i8'), ('stop_locus_id','i8'), \
-				('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+	dtypeList = [('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+				('start_locus_id','i8'), ('stop_locus_id','i8'), \
 				('no_of_loci', 'i8'), ('peak_locus_id', 'i8'), ('peak_score', 'f8')]
 	if writer is None and filename:
 		writer = HDF5MatrixFile(filename, openMode='w', dtypeList=dtypeList, firstGroupName=groupName)
@@ -157,8 +161,9 @@ def outputAssociationPeakInHDF5(association_peak_ls=None, filename=None, writer=
 	#2012.11.28 sort it
 	association_peak_ls.sort()
 	for association_peak in association_peak_ls:
-		dataTuple = (association_peak.start_locus_id, association_peak.stop_locus_id, \
-					association_peak.chromosome, association_peak.start, association_peak.stop, association_peak.no_of_loci,\
+		dataTuple = (association_peak.chromosome, association_peak.start, association_peak.stop, \
+					association_peak.start_locus_id, association_peak.stop_locus_id, \
+					association_peak.no_of_loci,\
 					association_peak.peak_locus_id, association_peak.peak_score)
 		cellList.append(dataTuple)
 	
@@ -193,6 +198,8 @@ def constructAssociationLocusRBDictFromHDF5File(inputFname=None, locusPadding=0,
 	counter = 0
 	real_counter = 0
 	for row in groupObject:
+		if not row.chromosome:	#empty chromosome, which happens when inputFname contains no valid locus, but the default null locus (only one).
+			continue
 		counter += 1
 		segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
 						span_ls=[max(1, row.start - locusPadding), row.stop + locusPadding], \
@@ -209,6 +216,17 @@ def outputAssociationLociInHDF5(associationLocusList=None, filename=None, writer
 					closeFile=True,\
 					attributeDict=None):
 	"""
+	2012.12.10
+		for each locus, output the association peaks that fall into the locus.
+			for each association peak, include result-id, phenotype id, peak-score, start-locus,
+				chromosome
+				start
+				stop
+				start_locus
+				stop_locus
+				no_of_loci
+				peak_locus
+				peak_score
 	2012.11.20
 	"""
 	sys.stderr.write("Dumping association loci into %s (HDF5 format) ..."%(filename))
