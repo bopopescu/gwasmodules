@@ -127,6 +127,33 @@ def setDefaultFigureSize(figsize=None):
 		figsize = (10,10)
 	rcParams['figure.figsize'] = figsize
 
+def setPlotDimension(left=0.1, right=0.9, bottom=0.1, top=0.9):
+	"""
+	2012.12.4
+	
+	for more additional customization check: http://matplotlib.sourceforge.net/users/customizing.html
+		
+	# The figure subplot parameters.  All dimensions are a fraction of the
+	# figure width or height
+	#figure.subplot.left    : 0.125  # the left side of the subplots of the figure
+	#figure.subplot.right   : 0.9    # the right side of the subplots of the figure
+	#figure.subplot.bottom  : 0.1    # the bottom of the subplots of the figure
+	#figure.subplot.top     : 0.9    # the top of the subplots of the figure
+	#figure.subplot.wspace  : 0.2    # the amount of width reserved for blank space between subplots
+	#figure.subplot.hspace  : 0.2    # the amount of height reserved for white space between subplots
+	
+	could also be in set as 
+		axe_pvalue = pylab.axes([-0.1, -0.1, 1.2, 1.2], frameon=False)	#left gap, bottom gap, width, height.
+		pylab.figure(axe_pvalue.figure.number)
+	"""
+	from matplotlib import rcParams
+	rcParams['figure.subplot.left'] = left
+	rcParams['figure.subplot.right'] = right
+	rcParams['figure.subplot.bottom'] = bottom
+	rcParams['figure.subplot.top'] = top
+	
+
+
 def restoreMatplotlibRCDefaults():
 	"""
 	2010-4-14
