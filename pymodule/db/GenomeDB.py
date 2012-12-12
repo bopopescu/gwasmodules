@@ -720,10 +720,13 @@ class OneGenomeData(PassingData):
 		self._chr_id2size = None
 		self._chr_id2cumu_size = None
 		self._chr_id2cumu_start = None
-		self._chr_id2cumu_chr_start = None	#2012.8.13
+		self._chr_id2cumu_chr_start = None	#2012.8.13 the key is chromosome ID.
+		# the value is (pseudoChromosomeID, cumuStart).
+		# This data structure is used to re-organize the old chromosomes into new/pseudo chromosomes.
+		# The max length of each pseudo chromosome is <=self.maxPseudoChrSize. 
 		
 		self.tax_id = tax_id
-		self.maxPseudoChrSize = maxPseudoChrSize
+		self.maxPseudoChrSize = maxPseudoChrSize	#2012.8.13
 		
 		self.chr_gap = None
 		self.chr_id_ls = None
