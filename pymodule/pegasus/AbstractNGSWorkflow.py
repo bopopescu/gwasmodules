@@ -1529,12 +1529,12 @@ Contig966       3160    50
 		2012.4.3
 		"""
 		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
-		job.addArguments("-v", self.drivername, "-z", self.hostname, "-d", self.dbname, \
-						"-u", self.db_user, "-p", self.db_passwd)
+		job.addArguments("--drivername", self.drivername, "--hostname", self.hostname, "--dbname", self.dbname, \
+						"--db_user", self.db_user, "--db_passwd", self.db_passwd)
 		if extraArguments:
 			job.addArguments(extraArguments)
 		if commit:
-			job.addArguments("-c")
+			job.addArguments("--commit")
 		if logFile:
 			job.addArguments("--logFilename", logFile)
 			job.uses(logFile, transfer=transferOutput, register=True, link=Link.OUTPUT)

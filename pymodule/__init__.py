@@ -26,13 +26,17 @@ from yhio.MatrixFile import MatrixFile
 from yhio.SNP import write_data_matrix, read_data, SNPData, GenomeWideResults, GenomeWideResult, DataObject, getGenomeWideResultFromFile,\
 	nt2number, number2nt, number2complement, SNPInfo, number2single_char_nt, getGenomeWideResultFromHDF5MatrixFile
 from yhio.TwoSNPData import TwoSNPData, QualityControl
-from yhio.HDF5MatrixFile import HDF5MatrixFile 
+from yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToYHTableInHDF5Group
+from yhio.YHPyTable import YHPyTable
+from yhio.Association import AssociationPyTable
+from yhio.AssociationLandscape import AssociationLandscapePyTable 
+from yhio.AssociationPeak import AssociationPeakPyTable
+
 #from yhio.BamFile import BamFile
 from yhio.VCFFile import VCFFile, VCFRecord
 from yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 from yhio.AbstractMatrixFileWalker import AbstractMatrixFileWalker
-from yhio.latex import outputMatrixInLatexTable
-from yhio.latex import outputFigureInLatex
+from yhio.latex import outputMatrixInLatexTable, outputFigureInLatex
 
 from Genome import GeneModel
 

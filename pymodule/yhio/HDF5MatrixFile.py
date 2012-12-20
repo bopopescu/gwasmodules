@@ -13,43 +13,43 @@ Description:
 		reader = HDF5MatrixFile(filename, openMode='r')
 		for row in reader:
 			...
-		groupObject = reader.getGroupObject(groupName=groupName)
-		for row in groupObject:
+		tableObject = reader.getTableObject(tableName=tableName)
+		for row in tableObject:
 			...
 		
-		dtypeList = [('locus_id','i8'),('chr', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+		rowDefinition = [('locus_id','i8'),('chr', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
 					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
-		headerList = [row[0] for row in dtypeList]
-		dtype = numpy.dtype(dtypeList)
+		headerList = [row[0] for row in rowDefinition]
+		dtype = numpy.dtype(rowDefinition)
 		
 		writer = HDF5MatrixFile(inputFname=filename, openMode='w', dtype=dtype)
 		writer = HDF5MatrixFile(filename, openMode='w', dtype=dtype)
 		
 		if writer:
-			groupObject = writer.createNewGroup(groupName=groupName, dtype=dtype)
-			groupObject.setColIDList(headerList)
+			tableObject = writer.createNewTable(tableName=tableName, dtype=dtype)
+			tableObject.setColIDList(headerList)
 		elif outputFname:
-			writer = HDF5MatrixFile(outputFname, openMode='w', dtype=dtype, firstGroupName=groupName)
+			writer = HDF5MatrixFile(outputFname, openMode='w', dtype=dtype, tableName=tableName)
 			writer.writeHeader(headerList)
-			groupObject = writer.getGroupObject(groupName=groupName)
+			tableObject = writer.getTableObject(tableName=tableName)
 		cellList = []
 		for data_obj in self.data_obj_ls:
 			dataTuple = self._extractOutputRowFromDataObject(data_obj=data_obj)
 			cellList.append(dataTuple)
-		groupObject.writeCellList(cellList)
+		tableObject.writeCellList(cellList)
 		if closeFile:
 			writer.close()
 			del writer
 		
 		
 		#each number below is counting bytes, not bits
-		dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+		rowDefinition = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
 					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
 		if writer is None and filename:
-			writer = HDF5MatrixFile(filename, openMode='w', dtypeList=dtypeList, firstGroupName=groupName)
-			groupObject = writer.getGroupObject(groupName=groupName)
+			writer = HDF5MatrixFile(filename, openMode='w', rowDefinition=rowDefinition, tableName=tableName)
+			tableObject = writer.getTableObject(tableName=tableName)
 		elif writer:
-			groupObject = writer.createNewGroup(groupName=groupName, dtypeList=dtypeList)
+			tableObject = writer.createNewTable(tableName=tableName, rowDefinition=rowDefinition)
 """
 
 import sys, os, math
@@ -65,7 +65,7 @@ from pymodule.ProcessOptions import  ProcessOptions
 from pymodule.yhio.MatrixFile import MatrixFile
 varLenStrType = h5py.new_vlen(str)
 
-class HDF5GroupWrapper(object):
+class YHTableInHDF5Group(object):
 	option_default_dict = {
 							('h5Group', 0, ): [None, '', 1, "the h5py group ojbect."],\
 							('newGroup', 1, int): [0, '', 1, "whether this is a new group or an existing group in a file"],\
@@ -171,7 +171,7 @@ class HDF5GroupWrapper(object):
 		self.rowID2rowIndex = rowID2rowIndex
 		self.colID2colIndex = colID2colIndex
 	
-	def extendDataMatrix(self, dataMatrix=None):
+	def extendDataMatrix(self, dataMatrix=None, **keywords):
 		"""
 		2012.11.16
 			dataMatrix has to be 2D
@@ -187,12 +187,12 @@ class HDF5GroupWrapper(object):
 				self.dataMatrix[s:s+m] = dataMatrix
 			self.newWrite = False
 	
-	def writeCellList(self, cellList=None):
+	def writeCellList(self, cellList=None, **keywords):
 		"""
 		2012.11.19
 			call self.extendDataMatrix()
 		"""
-		self.extendDataMatrix(dataMatrix=cellList)
+		self.extendDataMatrix(dataMatrix=cellList, **keywords)
 	
 	def _appendID(self, idDataset=None, idValue=None):
 		"""
@@ -389,10 +389,10 @@ class HDF5MatrixFile(MatrixFile):
 	__doc__ = __doc__
 	option_default_dict = MatrixFile.option_default_dict.copy()
 	option_default_dict.update({
-							('firstGroupName', 0, ): [None, '', 1, "name for the first group, default is $groupNamePrefix\0."],\
-							('groupNamePrefix', 0, ): ['group', '', 1, "prefix for all group's names"],\
-							('dtypeList', 0, ): [None, '', 1, "data type list for a compound dtype. It overwrites dtype. i.e. a list of i.e. ('start','i8')"],\
-							('dtype', 0, ): [None, '', 1, 'data type in the first group to be created. candidates are i, f8, etc.'],\
+							('tableName', 0, ): [None, '', 1, "name for the first table, default is $tableNamePrefix\0."],\
+							('tableNamePrefix', 0, ): ['table', '', 1, "prefix for all table's names"],\
+							('rowDefinition', 0, ): [None, '', 1, "data type list for a compound dtype. It overwrites dtype. i.e. a list of i.e. ('start','i8')"],\
+							('dtype', 0, ): [None, '', 1, 'data type in the first table to be created. candidates are i, f8, etc.'],\
 							('compression', 0, ): ['gzip', '', 1, 'the compression engine for all underlying datasets, gzip, szip, lzf'],\
 							('compression_opts', 0, ): [None, '', 1, 'option for the compression engine, gzip level, or tuple for szip'],\
 							})
@@ -407,70 +407,70 @@ class HDF5MatrixFile(MatrixFile):
 		self.combinedColID2ColIndex = None
 		
 		self.hdf5File = h5py.File(self.inputFname, self.openMode)
-		self.h5GroupList = []
-		self.groupName2Index = {}
+		self.h5TableList = []
+		self.tableName2Index = {}
 		
 		if self.openMode=='r':
 			self._readInData()
 		elif self.openMode=='w':
-			self.createNewGroup(groupName=self.firstGroupName, dtype=self.dtype, dtypeList=self.dtypeList)
+			self.createNewTable(tableName=self.tableName, dtype=self.dtype, rowDefinition=self.rowDefinition)
 		
 		self.rowIndexCursor = 0	#2012.11.16 for iteration
 	
-	def createNewGroup(self, groupName=None, dtype=None, dtypeList=None):
+	def createNewTable(self, tableName=None, dtype=None, rowDefinition=None):
 		"""
-		2012.11.20 add argument dtypeList
+		2012.11.20 add argument rowDefinition
 		2012.11.19
 		"""
 		colIDList = None
-		if dtypeList:
-			colIDList = [row[0] for row in dtypeList]
-			dtype = numpy.dtype(dtypeList)
+		if rowDefinition:
+			colIDList = [row[0] for row in rowDefinition]
+			dtype = numpy.dtype(rowDefinition)
 		if dtype is None:
 			dtype = self.dtype
-		if groupName is None:
-			groupName = self.getNewGroupName()
-		elif groupName in self.groupName2Index:	#use itself as prefix
-			groupName = self.getNewGroupName(groupNamePrefix=groupName)
-		groupObject = HDF5GroupWrapper(h5Group=self.hdf5File.create_group(groupName), \
+		if tableName is None:
+			tableName = self._getNewTableName()
+		elif tableName in self.tableName2Index:	#use itself as prefix
+			tableName = self._getNewTableName(tableNamePrefix=tableName)
+		tableObject = YHTableInHDF5Group(h5Group=self.hdf5File.create_group(tableName), \
 								newGroup=True, dataMatrixDtype=dtype, \
 								compression=self.compression, compression_opts=self.compression_opts)
 		if colIDList:
-			groupObject.setColIDList(colIDList)
-		self._appendNewGroup(groupObject)
-		return groupObject
+			tableObject.setColIDList(colIDList)
+		self._appendNewTable(tableObject)
+		return tableObject
 	
-	def _appendNewGroup(self, groupObject=None):
-		if groupObject:
-			groupName = groupObject.name
-			if groupName in self.groupName2Index:
-				sys.stderr.write("ERROR, group %s already in self.groupName2Index, index=%s.\n"%(groupName,\
-																			self.groupName2Index.get(groupName)))
+	def _appendNewTable(self, tableObject=None):
+		if tableObject:
+			tableName = tableObject.name
+			if tableName in self.tableName2Index:
+				sys.stderr.write("ERROR, table %s already in self.tableName2Index, index=%s.\n"%(tableName,\
+																			self.tableName2Index.get(tableName)))
 				sys.exit(3)
-			self.groupName2Index[groupName] = len(self.groupName2Index)
-			self.h5GroupList.append(groupObject)
+			self.tableName2Index[tableName] = len(self.tableName2Index)
+			self.h5TableList.append(tableObject)
 	
-	def getNewGroupName(self, groupNamePrefix=None):
+	def _getNewTableName(self, tableNamePrefix=None):
 		"""
 		2012.11.19
 		"""
-		if not groupNamePrefix:
-			groupNamePrefix = self.groupNamePrefix
-		i = len(self.h5GroupList)
-		groupName = "%s%s"%(groupNamePrefix, i)
-		while groupName in self.groupName2Index:	#stop until a unique name shows up
+		if not tableNamePrefix:
+			tableNamePrefix = self.tableNamePrefix
+		i = len(self.h5TableList)
+		tableName = "%s%s"%(tableNamePrefix, i)
+		while tableName in self.tableName2Index:	#stop until a unique name shows up
 			i += 1
-			groupName = "%s%s"%(groupNamePrefix, i)
-		return groupName
+			tableName = "%s%s"%(tableNamePrefix, i)
+		return tableName
 	
 	def _readInData(self):
 		"""
 		2012.11.16
 		"""
-		for groupName, h5Group in self.hdf5File.iteritems():
-			groupObject = HDF5GroupWrapper(h5Group=h5Group, newGroup=False,\
+		for tableName, h5Group in self.hdf5File.iteritems():
+			tableObject = YHTableInHDF5Group(h5Group=h5Group, newGroup=False,\
 										dataMatrixDtype=self.dtype)
-			self._appendNewGroup(groupObject)
+			self._appendNewTable(tableObject)
 		self._setupCombinedColumnIDMapper()
 		
 	def _setupCombinedColumnIDMapper(self,):
@@ -480,8 +480,8 @@ class HDF5MatrixFile(MatrixFile):
 		self.combinedColID2ColIndex = {}
 		self.header = []
 		self.combinedColIDList = self.header
-		for groupObject in self.h5GroupList:
-			colIDList = groupObject.colIDList
+		for tableObject in self.h5TableList:
+			colIDList = tableObject.colIDList
 			for colID in colIDList:
 				if colID in self.combinedColID2ColIndex:
 					sys.stderr.write("Error: column ID %s already used in column %s.\n"%(colID, self.combinedColID2ColIndex.get(colID)))
@@ -503,40 +503,40 @@ class HDF5MatrixFile(MatrixFile):
 		"""
 		return self.combinedColID2ColIndex.get(colHeader)
 	
-	def getGroupObject(self, groupIndex=None, groupName=None):
+	def getTableObject(self, tableIndex=None, tableName=None):
 		"""
 		"""
-		groupObject = None
-		if groupIndex is not None:
-			groupObject = self.h5GroupList[groupIndex]
-		elif groupName:
-			if groupName[0]!='/':	#bugfix, add root in front if not there.
-				groupName = '/'+groupName
-			groupIndex = self.groupName2Index.get(groupName)
-			if groupIndex is not None:
-				groupObject = self.h5GroupList[groupIndex]
-		else:	#return first group
-			groupObject = self.h5GroupList[0]
-		return groupObject
+		tableObject = None
+		if tableIndex is not None:
+			tableObject = self.h5TableList[tableIndex]
+		elif tableName:
+			if tableName[0]!='/':	#bugfix, add root in front if not there.
+				tableName = '/'+tableName
+			tableIndex = self.tableName2Index.get(tableName)
+			if tableIndex is not None:
+				tableObject = self.h5TableList[tableIndex]
+		else:	#return first table
+			tableObject = self.h5TableList[0]
+		return tableObject
 	
-	def getColIndex(self, colID=None, groupIndex=None, groupName=None):
+	def getColIndex(self, colID=None, tableIndex=None, tableName=None):
 		"""
 		
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.getColIndex(colID=colID)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.getColIndex(colID=colID)
 	
-	def getRowIndex(self, rowID=None, groupIndex=None, groupName=None):
+	def getRowIndex(self, rowID=None, tableIndex=None, tableName=None):
 		"""
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.getRowIndex(rowID=rowID)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.getRowIndex(rowID=rowID)
 	
-	def getCellDataGivenRowColID(self, rowID=None, colID=None, groupIndex=None, groupName=None):
+	def getCellDataGivenRowColID(self, rowID=None, colID=None, tableIndex=None, tableName=None):
 		"""
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.getCellDataGivenRowColID(rowID=rowID, colID=colID)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.getCellDataGivenRowColID(rowID=rowID, colID=colID)
 	
 	def __iter__(self):
 		return self
@@ -549,12 +549,12 @@ class HDF5MatrixFile(MatrixFile):
 		
 		row = None
 		pdata = PassingDataList()
-		for groupObject in self.h5GroupList:
-			if self.rowIndexCursor<groupObject.dataMatrix.shape[0]:
+		for tableObject in self.h5TableList:
+			if self.rowIndexCursor<tableObject.dataMatrix.shape[0]:
 				if row is None:
-					row = list(groupObject.dataMatrix[self.rowIndexCursor])
+					row = list(tableObject.dataMatrix[self.rowIndexCursor])
 				else:
-					rowAppend = groupObject.dataMatrix[self.rowIndexCursor]
+					rowAppend = tableObject.dataMatrix[self.rowIndexCursor]
 					row += list(rowAppend)
 			else:
 				raise StopIteration
@@ -568,78 +568,78 @@ class HDF5MatrixFile(MatrixFile):
 	
 	def close(self):
 		"""
-		#2012.12.4 close the group objects first
+		#2012.12.4 close the table objects first
 		"""
 		self.hdf5File.close()
 		del self.hdf5File
 	
-	def writeHeader(self, headerList=None, groupIndex=None, groupName=None):
+	def writeHeader(self, headerList=None, tableIndex=None, tableName=None):
 		"""
 		2012.11.16
-			only the first group
+			only the first table
 		"""
-		self.setColIDList(colIDList=headerList, groupIndex=groupIndex, groupName=groupName)
+		self.setColIDList(colIDList=headerList, tableIndex=tableIndex, tableName=tableName)
 	
-	def writeOneCell(self, oneCell=None, groupIndex=None, groupName=None):
+	def writeOneCell(self, oneCell=None, tableIndex=None, tableName=None):
 		"""
 		2012.11.19
 			mimic csv's writerow()
 			each cell must be a tuple (readable only). list is not acceptable. 
 			it's not very efficient as it's resizing the dataMatrix all the time.
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		groupObject.extendDataMatrix(dataMatrix=[oneCell])
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		tableObject.extendDataMatrix(dataMatrix=[oneCell])
 
-	def writeCellList(self, cellList=None, groupIndex=None, groupName=None):
+	def writeCellList(self, cellList=None, tableIndex=None, tableName=None):
 		"""
 		2012.11.18
 			for bulk writing. more efficient.
 			each cell must be a tuple (readable only). list is not acceptable. 
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		groupObject.extendDataMatrix(dataMatrix=cellList)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		tableObject.extendDataMatrix(dataMatrix=cellList)
 	
 	
-	def setColIDList(self, colIDList=None, groupIndex=None, groupName=None):
+	def setColIDList(self, colIDList=None, tableIndex=None, tableName=None):
 		"""
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		groupObject.setColIDList(colIDList=colIDList)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		tableObject.setColIDList(colIDList=colIDList)
 		
-	def setRowIDList(self, rowIDList=None, groupIndex=None, groupName=None):
+	def setRowIDList(self, rowIDList=None, tableIndex=None, tableName=None):
 		"""
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		groupObject.setRowIDList(rowIDList=rowIDList)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		tableObject.setRowIDList(rowIDList=rowIDList)
 	
-	def addAttribute(self, name=None, value=None, overwrite=True, groupIndex=None, groupName=None):
+	def addAttribute(self, name=None, value=None, overwrite=True, tableIndex=None, tableName=None):
 		"""
-		2012.11.28 find the groupObject and let it do the job
+		2012.11.28 find the tableObject and let it do the job
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.addAttribute(name=name, value=value, overwrite=overwrite)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.addAttribute(name=name, value=value, overwrite=overwrite)
 	
-	def getAttribute(self, name=None, defaultValue=None, groupIndex=None, groupName=None):
+	def getAttribute(self, name=None, defaultValue=None, tableIndex=None, tableName=None):
 		"""
 		2012.11.28
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.getAttribute(name=name, defaultValue=defaultValue)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.getAttribute(name=name, defaultValue=defaultValue)
 	
-	def getAttributes(self, groupIndex=None, groupName=None):
+	def getAttributes(self, tableIndex=None, tableName=None):
 		"""
 		2012.11.28
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.getAttributes()
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.getAttributes()
 	
-	def getListAttributeInStr(self, name=None, groupIndex=None, groupName=None):
+	def getListAttributeInStr(self, name=None, tableIndex=None, tableName=None):
 		"""
 		2012.11.22
 			this attribute must be a list or array
 		"""
-		groupObject = self.getGroupObject(groupIndex=groupIndex, groupName=groupName)
-		return groupObject.getListAttributeInStr(name=name)
+		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
+		return tableObject.getListAttributeInStr(name=name)
 	
 	def run(self):
 		"""
@@ -649,13 +649,13 @@ class HDF5MatrixFile(MatrixFile):
 			import pdb
 			pdb.set_trace()
 
-def addAttributeDictToHDF5GroupObject(groupObject=None, attributeDict=None):
+def addAttributeDictToYHTableInHDF5Group(tableObject=None, attributeDict=None):
 	"""
 	2012.11.22 convenient function
 		attributeValue could not be high-level python objects, such as list, set.
 		numpy.array could replace list.
 	"""
-	if groupObject and attributeDict:
+	if tableObject is not None and attributeDict is not None:
 		for attributeName, attributeValue in attributeDict.iteritems():
 			doItOrNot = False
 			if type(attributeValue)==numpy.ndarray:
@@ -664,7 +664,7 @@ def addAttributeDictToHDF5GroupObject(groupObject=None, attributeDict=None):
 			elif attributeValue or attributeValue == 0:	#empty array will be ignored but not 0
 				doItOrNot = True
 			if doItOrNot:
-				groupObject.addAttribute(name=attributeName, value=attributeValue)
+				tableObject.addAttribute(name=attributeName, value=attributeValue)
 	
 
 if __name__ == '__main__':

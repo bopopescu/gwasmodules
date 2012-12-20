@@ -16,10 +16,21 @@ from sqlalchemy import Table, create_engine
 from sqlalchemy.orm import mapper, relation
 from sqlalchemy.orm import scoped_session, sessionmaker
 from elixir import using_table_options
-
+from pymodule import utils
 
 def supplantFilePathWithNewDataDir(filePath="", oldDataDir=None, newDataDir=None):
 	"""
+	2012.12.15 argument filePath could be relative path and return join(newDataDir, filePath). oldDataDir is ignored.
+		So it could handle both Stock_250kDB (absolute path) and VervetDB (relative path)'s path
+		i.e. 
+		supplantFilePathWithNewDataDir(filePath='genotype_file/method_31/32093_VCF_26356_VCF_24680_VCF_Contig900.subset.vcf.gz',\
+			newDataDir='/Network/Data/vervet/db')
+		is same as:
+			supplantFilePathWithNewDataDir(filePath='genotype_file/method_31/32093_VCF_26356_VCF_24680_VCF_Contig900.subset.vcf.gz',\
+				oldDataDir='/Network/Data/vervet/db', newDataDir='/Network/Data/vervet/db')
+		for absolute path:
+			supplantFilePathWithNewDataDir(filePath='/Network/Data/250k/db/results/type_1/16_results.tsv',\
+				oldDataDir='/Network/Data/250k/db', newDataDir='~/NetworkData/250k/db') 
 	2012.11.13
 		expose the oldDataDir argument
 	2012.3.23
@@ -28,16 +39,23 @@ def supplantFilePathWithNewDataDir(filePath="", oldDataDir=None, newDataDir=None
 		Stock_250kDB stores absolute path for each file.
 		This function helps to adjust that path.
 	"""
-	if oldDataDir and newDataDir and oldDataDir!=newDataDir:
-		if filePath.find(oldDataDir)==0:
-			relativePath = filePath[len(oldDataDir)-1:]
-			newPath = os.path.join(newDataDir, relativePath)
-			return newPath
-		else:
-			sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
-			return None
-	else:
-		return filePath
+	if newDataDir:
+		newDataDir = os.path.expanduser(newDataDir)
+	
+	newFilePath = filePath
+	if filePath:
+		if filePath[0]=='/':	#input is in absolute path.
+			if oldDataDir and newDataDir and oldDataDir!=newDataDir:
+				if filePath.find(oldDataDir)==0:
+					relativePath = filePath[len(oldDataDir)-1:]
+					newFilePath = os.path.join(newDataDir, relativePath)
+				else:
+					sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
+					newFilePath = None
+		else:	#relative path
+			if newDataDir:
+				newFilePath = os.path.join(newDataDir, filePath)
+	return newFilePath
 
 class TableClass(object):
 	using_table_options(mysql_engine='InnoDB')
@@ -68,8 +86,14 @@ class AbstractTableWithFilename(object):
 	2012.11.13 ancestor of ResultsMethod and AssociationLandscape, and other tables that store paths to files on harddisk.
 	"""
 	id = None
+	short_name = None
+	
 	path = None
 	filename = None
+	original_path = None
+	md5sum = None	# unique=True
+	file_size = None	#2012.7.12
+	
 	folderName = ''
 	
 	def getDateStampedFilename(self, oldDataDir=None, newDataDir=None):
@@ -100,7 +124,7 @@ class AbstractTableWithFilename(object):
 			filePath = None
 		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
 	
-	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+	def constructRelativePath(self, data_dir=None, subFolder=None, sourceFilename=None, **keywords):
 		"""
 		2012.11.13
 		"""
@@ -119,6 +143,12 @@ class AbstractTableWithFilename(object):
 		filename_part_ls = map(str, filename_part_ls)
 		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
 		return fileRelativePath
+	
+	def getShortName(self):
+		"""
+		2012.12.15
+		"""
+		pass
 
 class Database(object):
 	__doc__ = __doc__
@@ -288,8 +318,27 @@ class ElixirDB(object):
 		"""
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		if self.echo_pool:	#2010-9-19 passing echo_pool to create_engine() causes error. all pool log disappeared.
+			#2010-9-19 Set up a specific logger with our desired output level
+			import logging
+			#import logging.handlers
+			logging.basicConfig()
+			#LOG_FILENAME = '/tmp/sqlalchemy_pool_log.out'
+			my_logger = logging.getLogger('sqlalchemy.pool')
+	
+			# Add the log message handler to the logger
+			#handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=1000000, backupCount=5)
+			# create formatter
+			#formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+			# add formatter to handler
+			#handler.setFormatter(formatter)
+			#my_logger.addHandler(handler)
+			my_logger.setLevel(logging.DEBUG)
 		
-		self.setup_engine()
+		#self.setup_engine()	#2012.12.18 it needs __metadata__ , __session__ from each db-definition file itself
+		self.READMEClass = None	#2012.12.18 required to figure out data_dir
+		self._data_dir = None	#2012.11.13
+		
 		
 	def setup_engine(self, metadata=None, session=None, entities=[]):
 		"""
@@ -323,6 +372,229 @@ class ElixirDB(object):
 				password=self.password, host=self.hostname,
 				port=self.port, database=self.database)
 	_url = property(_url)
+	
+	@property
+	def data_dir(self):
+		"""
+		2012.3.23
+			(learnt from VervetDB)
+			get the master directory in which all files attached to this db are stored.
+		"""
+		if not self._data_dir:
+			if self.READMEClass:
+				dataDirEntry = self.READMEClass.query.filter_by(title='data_dir').first()
+				if not dataDirEntry or not dataDirEntry.description or not os.path.isdir(dataDirEntry.description):
+					# todo: need to test dataDirEntry.description is writable to the user
+					sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
+					raise
+					self._data_dir = None
+				else:
+					self._data_dir = dataDirEntry.description
+		return self._data_dir
+	
+	def updateDBEntryMD5SUM(self, db_entry=None, data_dir=None, absPath=None):
+		"""
+		2012.12.15 moved from VervetDB
+		2012.7.13
+			if absPath is given, take that , rather than construct it from data_dir and db_entry.path
+		"""
+		from pymodule import utils
+		if data_dir is None:
+			data_dir = self.data_dir
+		
+		if hasattr(db_entry, 'path') and db_entry.path:
+			db_entry_path = db_entry.path
+		elif hasattr(db_entry, 'filename') and db_entry.filename:
+			db_entry_path = db_entry.filename
+		else:
+			db_entry_path = None
+		if not absPath and db_entry_path:
+			absPath = supplantFilePathWithNewDataDir(filePath=db_entry_path, oldDataDir=self.data_dir,\
+													newDataDir=data_dir)
+		
+		if absPath and not os.path.isfile(absPath):
+			sys.stderr.write("Warning: file %s doesn't exist.\n"%(absPath))
+			return
+		md5sum = utils.get_md5sum(absPath)
+		if db_entry.md5sum is  not None and db_entry.md5sum!=md5sum:
+			sys.stderr.write("WARNING: The new md5sum %s is not same as the existing md5sum %s.\n"%(md5sum, db_entry.md5sum))
+		db_entry.md5sum = md5sum
+		self.session.add(db_entry)
+		self.session.flush()
+	"""
+	#2012.7.14 update the md5sum for the existing db entries
+		TableClass = VervetDB.IndividualAlignment
+		TableClass = VervetDB.IndividualSequenceFile
+		for db_entry in TableClass.query:
+			if db_entry.md5sum is None:
+				absPath = os.path.join(db_vervet.data_dir, db_entry.path)
+				if db_entry.path and os.path.isfile(absPath):
+					sys.stderr.write("md5sum on %s ... "%(db_entry.path))
+					db_vervet.updateDBEntryMD5SUM(db_entry=db_entry, absPath=absPath)
+					sys.stderr.write("\n")
+		db_vervet.session.flush()
+		db_vervet.session.commit()
+		sys.exit(0)
+	"""
+	def updateDBEntryPathFileSize(self, db_entry=None, data_dir=None, absPath=None):
+		"""
+		2012.12.15 moved from VervetDB
+		2012.7.13
+			if absPath is given, take that , rather than construct it from data_dir and db_entry.path
+		"""
+		from pymodule import utils
+		if data_dir is None:
+			data_dir = self.data_dir
+		
+		if hasattr(db_entry, 'path') and db_entry.path:
+			db_entry_path = db_entry.path
+		elif hasattr(db_entry, 'filename') and db_entry.filename:
+			db_entry_path = db_entry.filename
+		else:
+			db_entry_path = None
+		if not absPath and db_entry_path:
+			absPath = supplantFilePathWithNewDataDir(filePath=db_entry_path, oldDataDir=self.data_dir,\
+													newDataDir=data_dir)
+			#absPath = os.path.join(data_dir, db_entry.path)
+		if absPath and not os.path.isfile(absPath):
+			sys.stderr.write("Warning: file %s doesn't exist.\n"%(absPath))
+			return
+		file_size = utils.getFileOrFolderSize(absPath)
+		if db_entry.file_size is not None and file_size!=db_entry.file_size:
+			sys.stderr.write("Warning: the new file size %s doesn't match the old one %s.\n"%(file_size, db_entry.file_size))
+		db_entry.file_size = file_size
+		self.session.add(db_entry)
+		self.session.flush()
+	
+	def moveFileIntoDBAffiliatedStorage(self, db_entry=None, filename=None, inputDir=None, outputDir=None, \
+									dstFilename=None,\
+								relativeOutputDir=None, shellCommand='cp -rL', srcFilenameLs=None, dstFilenameLs=None,\
+								constructRelativePathFunction=None):
+		"""
+			filename (required): relative path of input file
+			inputDir (required): where 'filename' is from
+			outputDir (required): where the output file will be 
+			dstFilename: the absolute path of where the output file will be.
+				if set to None (usually), then it'll be constructed on the fly. First 
+					either through constructRelativePathFunction()
+					or use join(relativeOutputDir, '%s_%s'%(db_entry.id, filename))
+					or '%s_%s'%(db_entry.id, filename)
+			
+			relativeOutputDir: used for construct dstFilename if constructRelativePathFunction() is not there.
+			constructRelativePathFunction: similar function of relativeOutputDir.
+			 	used to construct relative path of output file.
+			if neither relativeOutputDir nor constructRelativePathFunction is available, relative path is ='%s_%s'%(db_entry.id, filename).
+				relative path is used to set db_entry.path when the latter is None.
+			
+			srcFilenameLs, dstFilenameLs: optional. two lists used to store the absolute path of input and output files.
+				used in case rollback is needed.
+
+			 	
+		2012.12.15 moved from VervetDB. i.e.:
+			inputFileBasename = os.path.basename(self.inputFname)
+			relativePath = genotypeFile.constructRelativePath(sourceFilename=inputFileBasename)
+			exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
+									inputDir=os.path.split(self.inputFname)[0], dstFilename=os.path.join(self.dataDir, relativePath), \
+									relativeOutputDir=None, shellCommand='cp -rL', \
+									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
+									constructRelativePathFunction=genotypeFile.constructRelativePath)
+			#same as this
+			#exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
+			#						inputDir=os.path.split(self.inputFname)[0], \
+			#						outputDir=self.dataDir, \
+			#						relativeOutputDir=None, shellCommand='cp -rL', \
+			#						srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
+			#						constructRelativePathFunction=genotypeFile.constructRelativePath)
+									
+			if exitCode!=0:
+				sys.stderr.write("Error: moveFileIntoDBAffiliatedStorage() exits with %s code.\n"%(exitCode))
+				session.rollback()
+				self.cleanUpAndExitOnFailure(exitCode=exitCode)
+		
+		2012.8.30 add argument dstFilename, which if given , overwrites outputDir
+		2012.7.18 -L of cp meant "always follow symbolic links in SOURCE".
+		2012.7.13 copied from RegisterAndMoveSplitSequenceFiles.moveNewISQFileIntoDBStorage()
+			filename could be a folder.
+		2012.7.4
+			add srcFilename and dstFilename into given arguments (srcFilenameLs, dstFilenameLs) for later undo
+		2012.6.8
+			return non-zero if failure in move or destination file already exists
+		2012.2.10
+			this function moves a file to a db-affiliated storage path
+			relativeOutputDir is the path part (in relative path) of db_entry.path = os.path.split(db_entry.path)[0]
+		"""
+		exitCode = 0
+		if constructRelativePathFunction is not None:
+			newPath = constructRelativePathFunction(db_entry=db_entry, sourceFilename=filename)
+			newfilename = os.path.basename(newPath)
+		elif relativeOutputDir:
+			newfilename = '%s_%s'%(db_entry.id, filename)
+			newPath = os.path.join(relativeOutputDir, newfilename)
+		else:
+			newfilename = '%s_%s'%(db_entry.id, filename)
+			newPath = newfilename
+		
+		if db_entry.path!=newPath:
+			db_entry.path = newPath
+			try:
+				self.session.add(db_entry)
+				self.session.flush()
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+				exitCode = 4
+				return exitCode
+		
+		srcFilename = os.path.join(inputDir, filename)
+		if dstFilename is None:	#2012.8.30
+			dstFilename = os.path.join(outputDir, newfilename)
+		if os.path.isfile(dstFilename):
+			sys.stderr.write("Error: destination %s already exits.\n"%(dstFilename))
+			exitCode = 2
+		else:
+			#21012.12.15 create folder if not existent
+			dstFolder = os.path.split(dstFilename)[0]
+			if not os.path.isdir(dstFolder):
+				os.makedirs(dstFolder)
+			#move the file
+			commandline = '%s %s %s'%(shellCommand, srcFilename, dstFilename)
+			return_data = utils.runLocalCommand(commandline, report_stderr=True, report_stdout=True)
+			if srcFilenameLs is not None:
+				srcFilenameLs.append(srcFilename)
+			if dstFilenameLs is not None:
+				dstFilenameLs.append(dstFilename)
+			if hasattr(db_entry, 'md5sum') and getattr(db_entry, 'md5sum', None) is None:	#2012.7.14 has this attribute but it's None
+				try:
+					self.updateDBEntryMD5SUM(db_entry=db_entry, absPath=dstFilename)
+				except:
+					self.session.delete(db_entry)
+					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+					exitCode = 2
+					return exitCode
+			if return_data.stderr_content:
+				#something wrong. abort
+				sys.stderr.write("commandline %s failed: %s\n"%(commandline, return_data.stderr_content))
+				#remove the db entry
+				self.session.delete(db_entry)
+				self.session.flush()
+				exitCode = 3
+				return exitCode
+			if hasattr(db_entry, 'file_size') and db_entry.file_size is None:
+				try:
+					self.updateDBEntryPathFileSize(db_entry=db_entry, absPath=dstFilename)
+				except:
+					self.session.delete(db_entry)
+					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+					exitCode = 2
+					return exitCode
+			else:
+				exitCode = 0
+		return exitCode
 	
 	"""
 	def session(self):

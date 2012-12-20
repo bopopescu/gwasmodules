@@ -11,7 +11,7 @@ import re
 from pymodule.ProcessOptions import  ProcessOptions
 from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData, getColName2IndexFromHeader
 from pymodule.db import TableClass
-from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToHDF5GroupObject
+from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToYHTableInHDF5Group
 
 pa_has_characters = re.compile(r'[a-zA-Z_]')
 
@@ -2558,48 +2558,61 @@ class GenomeWideResult(object):
 	
 	def _extractOutputRowFromDataObject(self, data_obj=None):
 		"""
+		2012.12.18
+			add genotype_var_perc
 		"""
 		row = (data_obj.db_id, data_obj.chromosome, data_obj.start, data_obj.stop, data_obj.value, \
-									data_obj.mac, data_obj.maf)
+									data_obj.mac, data_obj.maf, data_obj.genotype_var_perc)
 		return row
 	
-	def outputInHDF5MatrixFile(self, writer=None, filename=None, groupName='association', closeFile = True, attributeDict=None):
+	def outputInHDF5MatrixFile(self, writer=None, filename=None, tableName='association', closeFile = True, attributeDict=None,\
+							outputFileType=1):
 		"""
+		2012.12.16 added argument outputFileType
+			1: PyTablesMatrixFile
+			2: HDF5MatrixFile
 		2012.11.22 added attributeDict
 		2012.11.19
 			output it into an HDF5MatrixFile file
 		"""
 		sys.stderr.write("Dumping association result into %s (HDF5 format) ..."%(filename))
 		#each number below is counting bytes, not bits
-		dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
-					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
+		if outputFileType==1:
+			from pymodule.yhio.Association import AssociationPyTable
+			rowDefinition  = AssociationPyTable
+			OutputFileClass = AssociationPyTable
+		else:
+			rowDefinition = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8'), ('genotype_var_perc', 'f8')]
+			OutputFileClass = HDF5MatrixFile
 		if writer is None and filename:
-			writer = HDF5MatrixFile(filename, openMode='w', dtypeList=dtypeList, firstGroupName=groupName)
-			groupObject = writer.getGroupObject(groupName=groupName)
+			writer = OutputFileClass(filename, openMode='w', rowDefinition=rowDefinition, tableName=tableName)
+			tableObject = writer.getTableObject(tableName=tableName)
 		elif writer:
-			groupObject = writer.createNewGroup(groupName=groupName, dtypeList=dtypeList)
+			tableObject = writer.createNewTable(tableName=tableName, rowDefinition=rowDefinition)
 		else:
 			sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
 			sys.exit(3)
 		
-		addAttributeDictToHDF5GroupObject(groupObject=groupObject, attributeDict=attributeDict)
+		addAttributeDictToYHTableInHDF5Group(tableObject=tableObject, attributeDict=attributeDict)
 		if self.results_method_id:
-			groupObject.addAttribute(name='result_id', value=self.results_method_id)
+			tableObject.addAttribute(name='result_id', value=self.results_method_id)
 		if self.name:
-			groupObject.addAttribute(name='name', value=self.name)
+			tableObject.addAttribute(name='name', value=self.name)
 		cellList = []
 		for data_obj in self.data_obj_ls:
 			dataTuple = self._extractOutputRowFromDataObject(data_obj=data_obj)
 			cellList.append(dataTuple)
 		
-		if groupObject is None:
-			sys.stderr.write("Error: groupObject (name=%s) is None. could not write.\n"%(groupName))
+		if tableObject is None:
+			sys.stderr.write("Error: tableObject (name=%s) is None. could not write.\n"%(tableName))
 			sys.exit(3)
-		groupObject.writeCellList(cellList)
+		tableObject.writeCellList(cellList)
 		if closeFile:
 			writer.close()
 		sys.stderr.write("%s objects.\n"%(len(cellList)))
 		return writer
+	
 	
 	def reIndexDataObjecs(self):
 		"""
@@ -3022,11 +3035,14 @@ class SNPInfo(object):
 		return alleles
 
 
-def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
+def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=False, construct_locus_db_id2index=False,\
 							chr_pos2index=None, max_value_cutoff=None, \
-							OR_min_max=False, report=True, groupName='association', **keywords):
+							OR_min_max=False, report=True, tableName='association', inputFileType=1, **keywords):
 	"""
+	2012.12.16 added argument inputFileType
+			1: AssociationPyTable
+			2: HDF5MatrixFile
 	2012.11.19 similar to getGenomeWideResultFromFile, but instead the input is a HDF5MatrixFile format.
 	"""
 	
@@ -3038,7 +3054,10 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 	chr_pos2index = getattr(pdata, 'chr_pos2index', chr_pos2index)	#2008-10-21
 	db_id2chr_pos = getattr(pdata, 'db_id2chr_pos', None)	#2011-2-24
 	score_for_0_pvalue = getattr(pdata, 'score_for_0_pvalue', 50)
-	gwr_name = getattr(pdata, 'gwr_name', os.path.basename(inputFname))
+	if inputFname:
+		gwr_name = getattr(pdata, 'gwr_name', os.path.basename(inputFname))
+	else:
+		gwr_name = getattr(pdata, 'gwr_name', reader.getAttribute('name'))
 	max_value_cutoff = getattr(pdata, 'max_value_cutoff', max_value_cutoff)	# 2009-10-27
 	OR_min_max = getattr(pdata, 'OR_min_max', OR_min_max)	# 2009-10-27
 	chr_pos_map = getattr(pdata, 'chr_pos_map', None)	#2010-10-13
@@ -3069,24 +3088,29 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 	gwr.data_obj_id2index = {}
 	genome_wide_result_id = id(gwr)
 	
-	reader = HDF5MatrixFile(inputFname, openMode='r')
-	associationGroupObject = reader.getGroupObject(groupName=groupName)
+	if reader is None:
+		if inputFileType==1:
+			from pymodule.yhio.Association import AssociationPyTable
+			reader = AssociationPyTable(inputFname, openMode='r')
+		else:
+			reader = HDF5MatrixFile(inputFname, openMode='r')
+	associationTableObject = reader.getTableObject(tableName=tableName)
 	
-	for attributeName, value in associationGroupObject.getAttributes().iteritems():
+	for attributeName, value in associationTableObject.getAttributes().iteritems():
 		setattr(gwr, attributeName, value)
-	gwr.setResultID(associationGroupObject.getAttribute('result_id'))
+	gwr.setResultID(associationTableObject.getAttribute('result_id'))
 	
 	no_of_lines = 0
-	for row in associationGroupObject:
+	for row in associationTableObject:
 		#2011-3-10 initialize all variables
 		column_6 = None	#it's genotype_var_perc probably
 		rest_of_row = []
 		#no type cast, all straight from HDF5
 		
-		db_id = row.locus_id
-		chromosome = row.chromosome	#2011-4-19 no more integer conversion for chromosome.
-		start_pos = row.start
-		stop_pos = row.stop
+		db_id = row['locus_id']
+		chromosome = row['chromosome']	#2011-4-19 no more integer conversion for chromosome.
+		start_pos = row['start']
+		stop_pos = row['stop']
 		
 		if db_id2chr_pos:	#2012.11.19 correct chromosome, start_pos, stop_pos based on this dictionary
 			if db_id in db_id2chr_pos:
@@ -3096,9 +3120,10 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 				if len(chr_pos)>=3:
 					stop_pos = chr_pos[2]
 		
-		score = row.score
-		MAC = row.MAC
-		MAF = row.MAF
+		score = row['score']
+		MAC = row['MAC']
+		MAF = row['MAF']
+		genotype_var_perc = row['genotype_var_perc']
 		if chromosome_request!=None and chromosome!=chromosome_request:
 			continue
 		if start_request!=None and start_pos<start_request:
@@ -3147,15 +3172,15 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, min_value_cutoff=None
 					stop_pos = new_chr_start_stop[2]
 		if include_the_data_point:
 			data_obj = DataObject(db_id=db_id, chromosome=chromosome, position=start_pos, stop_position=stop_pos, value =score,
-								maf=MAF, mac=MAC)
+								maf=MAF, mac=MAC, genotype_var_perc=genotype_var_perc)
 			data_obj.genome_wide_result_id = genome_wide_result_id
 			data_obj.genome_wide_result_name = gwr.name
 			gwr.add_one_data_obj(data_obj, chr_pos2index)
 		
 		no_of_lines += 1
 	
-	reader.close()
-	del reader
+	if inputFname:
+		reader.close()
 	if report:
 		sys.stderr.write(" %s loci.\n"%(len(gwr.data_obj_ls)))
 	return gwr

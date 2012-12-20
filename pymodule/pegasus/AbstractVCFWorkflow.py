@@ -42,21 +42,22 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
 						extraArguments=None, job_max_memory=2000, **keywords):
 		"""
+		2012.12.12 use extended argument name
 		2012.10.6 use addGenericDBJob() instead of addGenericJob()
 		2012.8.30 moved from vervet/src/AddVCFFolder2DBWorkflow.py
 		2012.6.27
 		"""
-		extraArgumentList = ['-f', format]
+		extraArgumentList = ['--format', format]
 		if logFile:
-			extraArgumentList.extend(["-l", logFile])
+			extraArgumentList.extend(["--logFilename", logFile])
 		if dataDir:
-			extraArgumentList.extend(['-t', dataDir])
+			extraArgumentList.extend(['--dataDir', dataDir])
 		if checkEmptyVCFByReading:
-			extraArgumentList.extend(['-E'])
+			extraArgumentList.extend(['--checkEmptyVCFByReading'])
 		if genotypeMethodShortName:
-			extraArgumentList.extend(['-s', genotypeMethodShortName, ])
+			extraArgumentList.extend(['--genotypeMethodShortName', genotypeMethodShortName, ])
 		if commit:
-			extraArgumentList.append('-c')
+			extraArgumentList.append('--commit')
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		
