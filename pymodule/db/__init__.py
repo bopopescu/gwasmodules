@@ -148,7 +148,14 @@ class AbstractTableWithFilename(object):
 		"""
 		2012.12.15
 		"""
-		pass
+		return None
+	
+	def setShortName(self):
+		"""
+		2012.12.28
+		"""
+		self.short_name = self.getShortName()
+		
 
 class Database(object):
 	__doc__ = __doc__
