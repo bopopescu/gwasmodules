@@ -10,13 +10,13 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 import tables
-from tables import *
+from tables import UInt64Col, Float64Col, StringCol
 import numpy
 from pymodule.utils import PassingData, PassingDataList
 from pymodule.ProcessOptions import ProcessOptions
-from pymodule.yhio.YHPyTable import YHPyTable
+from pymodule.yhio.YHPyTables import YHTable, YHFile, castPyTablesRowIntoPassingData
 
-class AssociationPeakPyTable(YHPyTable):
+class AssociationPeakTable(tables.IsDescription):
 	id = UInt64Col(pos=0)
 	chromosome = StringCol(64, pos=1)	#64 byte-long
 	start = UInt64Col(pos=2)
@@ -26,40 +26,47 @@ class AssociationPeakPyTable(YHPyTable):
 	no_of_loci = UInt64Col(pos=6)
 	peak_locus_id = UInt64Col(pos=7)
 	peak_score = Float64Col(pos=8)
+
+class AssociationPeakTableFile(YHFile):
+
 	"""
 	usage examples:
 	
-		peakPyTable = AssociationPeakPyTable(self.outputFname, openMode='w')
-		peakPyTable.addAttributeDict(attributeDict)
-		peakPyTable.appendAssociationPeak(association_peak_ls=association_peak_ls)
+		peakFile = AssociationPeakTableFile(self.outputFname, openMode='w')
+		peakFile.addAttributeDict(attributeDict)
+		peakFile.appendAssociationPeak(association_peak_ls=association_peak_ls)
 		
 		#for read-only
-		peakPyTable = AssociationPeakPyTable(inputFname, openMode='r')
-		rbDict = peakPyTable.associationPeakRBDict
+		peakFile = AssociationPeakTableFile(inputFname, openMode='r', peakPadding=0)
+		rbDict = peakFile.associationPeakRBDict
 	"""
 	def __init__(self, inputFname=None, openMode='r', \
-				groupName=None, tableName='association_peak',\
-				description=None,
-				title='', filters=None, rowDefinition=None,\
-				expectedrows=512000, genome_wide_result=None, **keywords):
-		YHPyTable.__init__(self, inputFname=inputFname, openMode=openMode, \
-				groupName=groupName, tableName=tableName,\
-				description=description,
-				title=title, filters=filters,
-				expectedrows=expectedrows, **keywords)
-
+				tableName='association_peak', groupNamePrefix='group', tableNamePrefix='table',\
+				filters=None, peakPadding=0, \
+				**keywords):
+		
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=None, filters=filters, debug=0, report=0)
+		
+		self.peakPadding = peakPadding
 		self.associationPeakRBDict = None
 		if openMode=='r':
-			self._constructAssociationPeakRBDictFromHDF5File()
+			self.associationPeakTable = self.getTableObject()
+			self._constructAssociationPeakRBDict(tableObject=self.associationPeakTable)
+		elif openMode == 'w':
+			self.associationPeakTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationPeakTable,\
+												expectedrows=50000)
 
-	def _constructAssociationPeakRBDictFromHDF5File(self):
+	def _constructAssociationPeakRBDict(self, tableObject=None):
 		"""
 		2012.11.12
 			similar to Stock_250kDB.constructRBDictFromResultPeak(), but from HDF5MatrixFile-like file
 		"""
 		from pymodule.algorithm.RBTree import RBDict
 		from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		
+		if tableObject is None:
+			tableObject = self.associationPeakTable
 		sys.stderr.write("Constructing association-peak RBDict from HDF5 file %s, (peakPadding=%s) ..."%(self.inputFname, self.peakPadding))
 		associationPeakRBDict = RBDict()
 		associationPeakRBDict.result_id = None	#2012.6.22
@@ -72,7 +79,7 @@ class AssociationPeakPyTable(YHPyTable):
 		
 		counter = 0
 		real_counter = 0
-		for row in self:
+		for row in tableObject:
 			if not row['chromosome']:	#empty chromosome, which happens when inputFname contains no valid peaks, but the default null peak (only one).
 				continue
 			counter += 1
@@ -85,10 +92,11 @@ class AssociationPeakPyTable(YHPyTable):
 			else:
 				sys.stderr.write("Warning: segmentKey of %s already in associationPeakRBDict with this row: %s.\n"%\
 								(row, associationPeakRBDict[segmentKey][0]))
-			associationPeakRBDict[segmentKey].append(row)
+			associationPeakRBDict[segmentKey].append(castPyTablesRowIntoPassingData(row))	#row is a pointer to the current row.
 		sys.stderr.write("%s peaks in %s spans.\n"%(counter, len(associationPeakRBDict)))
 		
 		self.associationPeakRBDict = associationPeakRBDict
+		return self.associationPeakRBDict
 	
 	def appendAssociationPeak(self, association_peak_ls=None):
 		"""
@@ -104,7 +112,7 @@ class AssociationPeakPyTable(YHPyTable):
 						association_peak.start_locus_id, association_peak.stop_locus_id, \
 						association_peak.no_of_loci,\
 						association_peak.peak_locus_id, association_peak.peak_score)
-			self.writeOneCell(dataTuple)
+			self.associationPeakTable.writeOneCell(dataTuple)
 		self.flush()
 		sys.stderr.write(" \n")
 	

@@ -10,13 +10,13 @@ import numpy
 import networkx as nx
 from pymodule.utils import PassingData
 from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToYHTableInHDF5Group
-from pymodule.yhio.YHPyTable import YHPyTable
+from pymodule.yhio.YHPyTables import YHTable, YHFile
 from pymodule.yhio.SNP import getGenomeWideResultFromHDF5MatrixFile
 
 import tables
-from tables import *
+from tables import UInt64Col, Float64Col, StringCol
 
-class AssociationPyTable(YHPyTable):
+class AssociationTable(tables.IsDescription):
 	"""
 	2012.12.18 pytable class to store the genome-wide association result
 	"""
@@ -29,24 +29,28 @@ class AssociationPyTable(YHPyTable):
 	MAC = UInt64Col(pos=6)
 	MAF = Float64Col(pos=7)
 	genotype_var_perc = Float64Col(pos=8)
+
+class AssociationTableFile(YHFile):
 	#no beta0, beta1, beta2
 	def __init__(self, inputFname=None, openMode='r', \
-				groupName=None, tableName='association',\
-				description=None,
-				title='', filters=None, rowDefinition=None,\
-				expectedrows=512000, min_MAF=0.1, **keywords):
-		YHPyTable.__init__(self, inputFname=inputFname, openMode=openMode, \
-				groupName=groupName, tableName=tableName,\
-				description=description,
-				title=title, filters=filters,
-				expectedrows=expectedrows, **keywords)
+				tableName='association', groupNamePrefix='group', tableNamePrefix='table',\
+				filters=None,\
+				min_MAF=0.1, **keywords):
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=None, filters=filters, debug=0, report=0)
 		
 		self.min_MAF = min_MAF
 		self.genome_wide_result = None
-		if openMode=='r' or openMode=='a':
-			self._readInGWR(min_MAF=self.min_MAF)
+		self.associationTable = None
+		if openMode=='r':
+			self.associationTable = self.getTableObject(tableName=self.tableName)
+			self._readInGWR(min_MAF=self.min_MAF, tableObject=self.associationTable)
+		elif openMode=='w':
+			self.associationTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationTable, \
+											expectedrows=300000)
 	
-	def _readInGWR(self, inputFname=None, tableName=None, min_MAF=None, ):
+	def _readInGWR(self, inputFname=None, tableName=None, min_MAF=None, tableObject=None):
 		"""
 		"""
 		if inputFname is None:
@@ -56,11 +60,12 @@ class AssociationPyTable(YHPyTable):
 		if min_MAF is None:
 			min_MAF = self.min_MAF
 		pdata = PassingData(min_MAF=min_MAF)
-		self.genome_wide_result = getGenomeWideResultFromHDF5MatrixFile(reader=self, \
+		self.genome_wide_result = getGenomeWideResultFromHDF5MatrixFile(reader=self, tableName=tableName, tableObject=tableObject,\
 							min_value_cutoff=None, do_log10_transformation=False, pdata=pdata,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=False, \
 							construct_locus_db_id2index=True,\
-							report=True, tableName=tableName)
+							report=True)
+		return self.genome_wide_result
 
 def getAssociationLandscapeDataFromHDF5File(inputFname=None, associationTableName='association', \
 										landscapeTableName='landscape', min_MAF=0.1):

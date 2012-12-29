@@ -55,9 +55,17 @@ class PassingData(object):
 			return_ls.append("%s = %s"%(attributeName, value))
 			
 		return ", ".join(return_ls)
+	
+	def __getitem__(self, key):
+		"""
+		2012.12.20 enable it to work like a dictionary
+			i.e. pdata.chromosome or pdata['chromosome'] is equivalent if attribute 0 is chromosome.
+		"""
+		return self.__getattribute__(key)
 
 class PassingDataList(list, object):
 	"""
+	2012.12.20 could access value/attributes as a dictionary due to __getitem__(self, key)
 	2012.11.24
 		Could be accessed as a list as well.
 		The position of each individual attribute in this list is based on the order in which the variables are put into the list.
@@ -176,6 +184,18 @@ class PassingDataList(list, object):
 		except AttributeError:
 			pass
 	
+	def __getitem__(self, index_or_key):
+		"""
+		2012.12.20 enable it to retrieve item using either index or attributeName (like a dictionary)
+			i.e. pdata[0] or pdata['chromosome'] is equivalent if attribute 0 is chromosome.
+		"""
+		if type(index_or_key)==int:
+			return list.__getitem__(self, index_or_key)
+		else:
+			attributeName2Index = object.__getattribute__(self, 'attributeName2Index')
+			index = attributeName2Index.get(index_or_key, None)
+			return list.__getitem__(self, index)
+		
 	# Mutable sequences only, provide the Python list methods.
 	#def append(self, item):
 	#	pass
@@ -278,18 +298,18 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', 
 	cs = csv.Sniffer()
 	inputIsFileObject = False
 	import gzip
-	if isinstance(input_fname, str) and os.path.isfile(input_fname):
+	if (isinstance(input_fname, str) or isinstance(input_fname, unicode)) and os.path.isfile(input_fname):
 		inf = open(input_fname)
 	elif isinstance(input_fname, file) or isinstance(input_fname, gzip.GzipFile) :	#could be a file/gzip-file object
 		inf = input_fname
 		inputIsFileObject = True
-	elif isinstance(input_fname, str) and not os.path.isfile(input_fname):	#it's the input
+	elif (isinstance(input_fname, str) or isinstance(input_fname, unicode)) and not os.path.isfile(input_fname):	#it's the input
 		import StringIO
 		inf = StringIO.StringIO(input_fname)
 	else:
 		import sys
 		sys.stderr.write("Error: %s is neither a file name nor a file object. But try 'open' anyway.\n"%input_fname)
-		return None
+		inf = open(input_fname)
 	if getattr(inf, 'readline', None) is not None and use_sniff:	#2008-01-08 don't use cs.sniff unless the user specifies it. 
 		#	sniff gives you unexpected delimiter when it's a single-column.
 		line = inf.readline()
@@ -476,6 +496,45 @@ def getStrOutOfList(ls, separator=','):
 		ls_str = ls
 	return separator.join(ls_str)
 
+def getSuccinctStrOutOfList(ls, step=1, separator=','):
+	"""
+	2012.12.21 use , and - to represent a list of numbers in fewest possible characters
+		step controls the order of numbers.
+		separator separates between different spans or singletons.
+		like 1,2,3,4,7 => 1-4,7.
+	"""
+	import copy
+	ls_copy = copy.deepcopy(ls)
+	ls_copy.sort()
+	spanStartValue = None
+	#ls_copy[0]
+	spanStopValue = None
+	span_tuple_ls = []
+	for i in xrange(len(ls_copy)):
+		if spanStartValue is None:
+			spanStartValue = ls_copy[i]
+			spanStopValue = spanStartValue
+		else:
+			previousValue = ls_copy[i-1]
+			newValue = ls_copy[i]
+			if newValue == (previousValue + step):
+				spanStopValue = newValue	#increase the spanStopValue
+			else:	#more than the step
+				spanStopValue = previousValue
+				if spanStartValue==spanStopValue:	#singleton
+					span_tuple_ls.append(str(spanStartValue))
+				else:
+					span_tuple_ls.append('%s-%s'%(spanStartValue, spanStopValue))
+				spanStartValue = newValue
+				spanStopValue = newValue
+	#handle the last span
+	if spanStopValue is None:
+		spanStopValue = ls_copy[-1]
+	if spanStartValue==spanStopValue:	#singleton
+		span_tuple_ls.append(str(spanStartValue))
+	else:
+		span_tuple_ls.append('%s-%s'%(spanStartValue, spanStopValue))
+	return separator.join(span_tuple_ls)
 
 def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
 	"""

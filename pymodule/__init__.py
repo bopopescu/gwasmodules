@@ -27,10 +27,11 @@ from yhio.SNP import write_data_matrix, read_data, SNPData, GenomeWideResults, G
 	nt2number, number2nt, number2complement, SNPInfo, number2single_char_nt, getGenomeWideResultFromHDF5MatrixFile
 from yhio.TwoSNPData import TwoSNPData, QualityControl
 from yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToYHTableInHDF5Group
-from yhio.YHPyTable import YHPyTable
-from yhio.Association import AssociationPyTable
-from yhio.AssociationLandscape import AssociationLandscapePyTable 
-from yhio.AssociationPeak import AssociationPeakPyTable
+from yhio.YHPyTables import YHTable, YHFile, YHSingleTableFile, castPyTablesRowIntoPassingData
+from yhio.Association import AssociationTable, AssociationTableFile
+from yhio.AssociationLandscape import AssociationLandscapeTable, AssociationLandscapeTableFile  
+from yhio.AssociationPeak import AssociationPeakTable, AssociationPeakTableFile
+from yhio.AssociationLocus import AssociationLocusTable, AssociationLocus2PeakTable, AssociationLocusTableFile
 
 #from yhio.BamFile import BamFile
 from yhio.VCFFile import VCFFile, VCFRecord

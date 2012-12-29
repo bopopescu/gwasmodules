@@ -262,7 +262,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		2012.11.24
 		2012.10.7
 		"""
-		sys.stderr.write("Saving figure ...")
+		sys.stderr.write("Saving figure ")
 		#2012.12.4 change scale
 		self.changeFigureScaleToLog()
 		#2012.12.4 change margin
@@ -282,6 +282,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 			sys.stderr.write("could not get outputFnamePrefix from self.outputFnamePrefix %s or self.outputFname %s.\n"%\
 							(self.outputFnamePrefix, self.outputFname))
 			sys.exit(1)
+		sys.stderr.write("to %s ..."%(pngOutputFname))
 		pylab.savefig(pngOutputFname, dpi=self.figureDPI)
 		if self.need_svg:
 			pylab.savefig(svgOutputFname, dpi=self.figureDPI)

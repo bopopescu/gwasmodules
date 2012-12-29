@@ -296,6 +296,13 @@ class YHTableInHDF5Group(object):
 		"""
 		self.rowIndexCursor = 0
 	
+	def constructColName2IndexFromHeader(self):
+		"""
+		2012.11.22 added so that YHSingleTableFile could be used as HDF5MatrixFile
+		"""
+		return self.colID2colIndex
+	
+	
 	def getColIndexGivenColHeader(self, colHeader=None):
 		"""
 		2012.11.15
@@ -319,6 +326,12 @@ class YHTableInHDF5Group(object):
 		#object.__setattr__(self, name, value)
 		#setattr(self, name, value)
 		return True
+	
+	def addAttributeDict(self, attributeDict=None):
+		"""
+		2012.12.18
+		"""
+		addAttributeDictToYHTableInHDF5Group(tableObject=self, attributeDict=attributeDict)
 	
 	def getAttribute(self, name=None, defaultValue=None):
 		return self.h5Group.attrs.get(name, defaultValue)
@@ -389,7 +402,7 @@ class HDF5MatrixFile(MatrixFile):
 	__doc__ = __doc__
 	option_default_dict = MatrixFile.option_default_dict.copy()
 	option_default_dict.update({
-							('tableName', 0, ): [None, '', 1, "name for the first table, default is $tableNamePrefix\0."],\
+							('tableName', 0, ): [None, '', 1, "name for the first table, default is $tableNamePrefix\0. "],\
 							('tableNamePrefix', 0, ): ['table', '', 1, "prefix for all table's names"],\
 							('rowDefinition', 0, ): [None, '', 1, "data type list for a compound dtype. It overwrites dtype. i.e. a list of i.e. ('start','i8')"],\
 							('dtype', 0, ): [None, '', 1, 'data type in the first table to be created. candidates are i, f8, etc.'],\
@@ -407,8 +420,8 @@ class HDF5MatrixFile(MatrixFile):
 		self.combinedColID2ColIndex = None
 		
 		self.hdf5File = h5py.File(self.inputFname, self.openMode)
-		self.h5TableList = []
-		self.tableName2Index = {}
+		self.tableObjectList = []
+		self.tablePath2Index = {}
 		
 		if self.openMode=='r':
 			self._readInData()
@@ -430,8 +443,6 @@ class HDF5MatrixFile(MatrixFile):
 			dtype = self.dtype
 		if tableName is None:
 			tableName = self._getNewTableName()
-		elif tableName in self.tableName2Index:	#use itself as prefix
-			tableName = self._getNewTableName(tableNamePrefix=tableName)
 		tableObject = YHTableInHDF5Group(h5Group=self.hdf5File.create_group(tableName), \
 								newGroup=True, dataMatrixDtype=dtype, \
 								compression=self.compression, compression_opts=self.compression_opts)
@@ -442,13 +453,13 @@ class HDF5MatrixFile(MatrixFile):
 	
 	def _appendNewTable(self, tableObject=None):
 		if tableObject:
-			tableName = tableObject.name
-			if tableName in self.tableName2Index:
-				sys.stderr.write("ERROR, table %s already in self.tableName2Index, index=%s.\n"%(tableName,\
-																			self.tableName2Index.get(tableName)))
+			tableName = tableObject.name	##the tableName preceds with "/"
+			if tableName in self.tablePath2Index:	 
+				sys.stderr.write("ERROR, table %s already in self.tablePath2Index, index=%s.\n"%(tableName,\
+																			self.tablePath2Index.get(tableName)))
 				sys.exit(3)
-			self.tableName2Index[tableName] = len(self.tableName2Index)
-			self.h5TableList.append(tableObject)
+			self.tablePath2Index[tableName] = len(self.tablePath2Index)
+			self.tableObjectList.append(tableObject)
 	
 	def _getNewTableName(self, tableNamePrefix=None):
 		"""
@@ -456,9 +467,9 @@ class HDF5MatrixFile(MatrixFile):
 		"""
 		if not tableNamePrefix:
 			tableNamePrefix = self.tableNamePrefix
-		i = len(self.h5TableList)
+		i = len(self.tableObjectList)
 		tableName = "%s%s"%(tableNamePrefix, i)
-		while tableName in self.tableName2Index:	#stop until a unique name shows up
+		while "/"+tableName in self.tablePath2Index:	#stop until a unique name shows up
 			i += 1
 			tableName = "%s%s"%(tableNamePrefix, i)
 		return tableName
@@ -480,7 +491,7 @@ class HDF5MatrixFile(MatrixFile):
 		self.combinedColID2ColIndex = {}
 		self.header = []
 		self.combinedColIDList = self.header
-		for tableObject in self.h5TableList:
+		for tableObject in self.tableObjectList:
 			colIDList = tableObject.colIDList
 			for colID in colIDList:
 				if colID in self.combinedColID2ColIndex:
@@ -508,15 +519,15 @@ class HDF5MatrixFile(MatrixFile):
 		"""
 		tableObject = None
 		if tableIndex is not None:
-			tableObject = self.h5TableList[tableIndex]
+			tableObject = self.tableObjectList[tableIndex]
 		elif tableName:
 			if tableName[0]!='/':	#bugfix, add root in front if not there.
 				tableName = '/'+tableName
-			tableIndex = self.tableName2Index.get(tableName)
+			tableIndex = self.tablePath2Index.get(tableName)
 			if tableIndex is not None:
-				tableObject = self.h5TableList[tableIndex]
+				tableObject = self.tableObjectList[tableIndex]
 		else:	#return first table
-			tableObject = self.h5TableList[0]
+			tableObject = self.tableObjectList[0]
 		return tableObject
 	
 	def getColIndex(self, colID=None, tableIndex=None, tableName=None):
@@ -549,7 +560,7 @@ class HDF5MatrixFile(MatrixFile):
 		
 		row = None
 		pdata = PassingDataList()
-		for tableObject in self.h5TableList:
+		for tableObject in self.tableObjectList:
 			if self.rowIndexCursor<tableObject.dataMatrix.shape[0]:
 				if row is None:
 					row = list(tableObject.dataMatrix[self.rowIndexCursor])
@@ -618,6 +629,12 @@ class HDF5MatrixFile(MatrixFile):
 		"""
 		tableObject = self.getTableObject(tableIndex=tableIndex, tableName=tableName)
 		return tableObject.addAttribute(name=name, value=value, overwrite=overwrite)
+	
+	def addAttributeDict(self, attributeDict=None, tableObject=None):
+		if tableObject is None:
+			tableObject = self.getTableObject()
+		
+		addAttributeDictToYHTableInHDF5Group(tableObject=tableObject, attributeDict=attributeDict)
 	
 	def getAttribute(self, name=None, defaultValue=None, tableIndex=None, tableName=None):
 		"""

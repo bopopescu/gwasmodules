@@ -339,6 +339,10 @@ class ElixirDB(object):
 		self.READMEClass = None	#2012.12.18 required to figure out data_dir
 		self._data_dir = None	#2012.11.13
 		
+		if hasattr(self, 'debug') and self.debug:
+			import pdb
+			pdb.set_trace()
+		
 		
 	def setup_engine(self, metadata=None, session=None, entities=[]):
 		"""
@@ -356,6 +360,35 @@ class ElixirDB(object):
 		metadata.bind = create_engine(self._url, pool_recycle=self.pool_recycle, echo=self.sql_echo)	#, convert_unicode=True, encoding="utf8")
 		self.metadata = metadata
 		self.session = session
+		#2012.12.28
+		self.cleanUpMetadatas()
+	
+	def cleanUpMetadatas(self):
+		"""
+		2012.12.28 because GenomeDB, TaxonomyDB are by default imported into the namespace through pymodule all the time
+			their unbound metadata is automatically added into elixir's metadatas variable.
+			which caused this error if create_tables=True:
+			
+				  File "/home/crocea/script/variation/src/db/Stock_250kDB.py", line 2582, in setup
+				    setup_all(create_tables=create_tables)      #create_tables=True causes setup_all to call elixir.create_all(), which in turn calls me
+				tadata.create_all()
+				  File "/usr/local/lib/python2.7/dist-packages/elixir/__init__.py", line 98, in setup_all
+				    create_all(*args, **kwargs)
+				  File "/usr/local/lib/python2.7/dist-packages/elixir/__init__.py", line 76, in create_all
+				    md.create_all(*args, **kwargs)
+				  File "/usr/local/lib/python2.7/dist-packages/sqlalchemy/schema.py", line 2560, in create_all
+				    bind = _bind_or_error(self)
+				  File "/usr/local/lib/python2.7/dist-packages/sqlalchemy/schema.py", line 3176, in _bind_or_error
+				    raise exc.UnboundExecutionError(msg)
+				sqlalchemy.exc.UnboundExecutionError: The MetaData is not bound to an Engine or Connection.  Execution can not proceed without a databas
+				e to execute against.  Either execute with an explicit connection or assign the MetaData's .bind to enable implicit execution.
+		"""
+		import elixir
+		newMetadatas = set()
+		for md in elixir.metadatas:
+			if md.bind is not None:
+				newMetadatas.add(md)
+		elixir.metadatas = newMetadatas
 	
 	def setup(self, create_tables=True):
 		"""
@@ -469,7 +502,7 @@ class ElixirDB(object):
 	def moveFileIntoDBAffiliatedStorage(self, db_entry=None, filename=None, inputDir=None, outputDir=None, \
 									dstFilename=None,\
 								relativeOutputDir=None, shellCommand='cp -rL', srcFilenameLs=None, dstFilenameLs=None,\
-								constructRelativePathFunction=None):
+								constructRelativePathFunction=None, data_dir=None):
 		"""
 			filename (required): relative path of input file
 			inputDir (required): where 'filename' is from
@@ -488,7 +521,8 @@ class ElixirDB(object):
 			
 			srcFilenameLs, dstFilenameLs: optional. two lists used to store the absolute path of input and output files.
 				used in case rollback is needed.
-
+			
+			data_dir: the top-level folder where all the db-affiliated file storage is. for constructRelativePathFunction 
 			 	
 		2012.12.15 moved from VervetDB. i.e.:
 			inputFileBasename = os.path.basename(self.inputFname)
@@ -497,14 +531,14 @@ class ElixirDB(object):
 									inputDir=os.path.split(self.inputFname)[0], dstFilename=os.path.join(self.dataDir, relativePath), \
 									relativeOutputDir=None, shellCommand='cp -rL', \
 									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
-									constructRelativePathFunction=genotypeFile.constructRelativePath)
+									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
 			#same as this
 			#exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
 			#						inputDir=os.path.split(self.inputFname)[0], \
 			#						outputDir=self.dataDir, \
 			#						relativeOutputDir=None, shellCommand='cp -rL', \
 			#						srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
-			#						constructRelativePathFunction=genotypeFile.constructRelativePath)
+			#						constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
 									
 			if exitCode!=0:
 				sys.stderr.write("Error: moveFileIntoDBAffiliatedStorage() exits with %s code.\n"%(exitCode))
@@ -525,7 +559,7 @@ class ElixirDB(object):
 		"""
 		exitCode = 0
 		if constructRelativePathFunction is not None:
-			newPath = constructRelativePathFunction(db_entry=db_entry, sourceFilename=filename)
+			newPath = constructRelativePathFunction(db_entry=db_entry, sourceFilename=filename, data_dir=data_dir)
 			newfilename = os.path.basename(newPath)
 		elif relativeOutputDir:
 			newfilename = '%s_%s'%(db_entry.id, filename)
@@ -548,7 +582,7 @@ class ElixirDB(object):
 		
 		srcFilename = os.path.join(inputDir, filename)
 		if dstFilename is None:	#2012.8.30
-			dstFilename = os.path.join(outputDir, newfilename)
+			dstFilename = os.path.join(outputDir, newPath)
 		if os.path.isfile(dstFilename):
 			sys.stderr.write("Error: destination %s already exits.\n"%(dstFilename))
 			exitCode = 2

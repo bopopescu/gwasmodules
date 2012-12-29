@@ -857,7 +857,6 @@ class SNPData(object):
 		2009-12-11
 			add 2 arguments (row_id_key_set and row_id_hash_func) to be passed to read_data()
 		"""
-		from __init__ import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self, howto_deal_with_required_none=2)
 		#read it from file
@@ -2565,9 +2564,10 @@ class GenomeWideResult(object):
 									data_obj.mac, data_obj.maf, data_obj.genotype_var_perc)
 		return row
 	
-	def outputInHDF5MatrixFile(self, writer=None, filename=None, tableName='association', closeFile = True, attributeDict=None,\
+	def outputInHDF5MatrixFile(self, writer=None, filename=None, tableName='association', tableObject=None, closeFile = True, attributeDict=None,\
 							outputFileType=1):
 		"""
+		2012.12.21 added argument tableObject, which has precedence over writer, filename, tableName
 		2012.12.16 added argument outputFileType
 			1: PyTablesMatrixFile
 			2: HDF5MatrixFile
@@ -2578,21 +2578,22 @@ class GenomeWideResult(object):
 		sys.stderr.write("Dumping association result into %s (HDF5 format) ..."%(filename))
 		#each number below is counting bytes, not bits
 		if outputFileType==1:
-			from pymodule.yhio.Association import AssociationPyTable
-			rowDefinition  = AssociationPyTable
-			OutputFileClass = AssociationPyTable
+			from pymodule.yhio.Association import AssociationTable, AssociationTableFile
+			rowDefinition  = AssociationTable
+			OutputFileClass = AssociationTableFile
 		else:
 			rowDefinition = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
 					('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8'), ('genotype_var_perc', 'f8')]
 			OutputFileClass = HDF5MatrixFile
-		if writer is None and filename:
-			writer = OutputFileClass(filename, openMode='w', rowDefinition=rowDefinition, tableName=tableName)
-			tableObject = writer.getTableObject(tableName=tableName)
-		elif writer:
-			tableObject = writer.createNewTable(tableName=tableName, rowDefinition=rowDefinition)
-		else:
-			sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
-			sys.exit(3)
+		if tableObject is None:
+			if writer is None and filename:
+				writer = OutputFileClass(filename, openMode='w', rowDefinition=rowDefinition, tableName=tableName)
+				tableObject = writer.getTableObject(tableName=tableName)
+			elif writer:
+				tableObject = writer.createNewTable(tableName=tableName, rowDefinition=rowDefinition)
+			else:
+				sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
+				sys.exit(3)
 		
 		addAttributeDictToYHTableInHDF5Group(tableObject=tableObject, attributeDict=attributeDict)
 		if self.results_method_id:
@@ -2608,7 +2609,7 @@ class GenomeWideResult(object):
 			sys.stderr.write("Error: tableObject (name=%s) is None. could not write.\n"%(tableName))
 			sys.exit(3)
 		tableObject.writeCellList(cellList)
-		if closeFile:
+		if closeFile and writer is not None:
 			writer.close()
 		sys.stderr.write("%s objects.\n"%(len(cellList)))
 		return writer
@@ -3035,13 +3036,14 @@ class SNPInfo(object):
 		return alleles
 
 
-def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, min_value_cutoff=None, do_log10_transformation=False, pdata=None,\
+def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableName='association', tableObject=None, min_value_cutoff=None, \
+										do_log10_transformation=False, pdata=None,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=False, construct_locus_db_id2index=False,\
 							chr_pos2index=None, max_value_cutoff=None, \
-							OR_min_max=False, report=True, tableName='association', inputFileType=1, **keywords):
+							OR_min_max=False, report=True, inputFileType=1, **keywords):
 	"""
 	2012.12.16 added argument inputFileType
-			1: AssociationPyTable
+			1: AssociationTableFile
 			2: HDF5MatrixFile
 	2012.11.19 similar to getGenomeWideResultFromFile, but instead the input is a HDF5MatrixFile format.
 	"""
@@ -3088,13 +3090,16 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, min_valu
 	gwr.data_obj_id2index = {}
 	genome_wide_result_id = id(gwr)
 	
-	if reader is None:
-		if inputFileType==1:
-			from pymodule.yhio.Association import AssociationPyTable
-			reader = AssociationPyTable(inputFname, openMode='r')
-		else:
-			reader = HDF5MatrixFile(inputFname, openMode='r')
-	associationTableObject = reader.getTableObject(tableName=tableName)
+	if tableObject:
+		associationTableObject = tableObject
+	else:
+		if reader is None:
+			if inputFileType==1:
+				from pymodule.yhio.Association import AssociationTableFile
+				reader = AssociationTableFile(inputFname, openMode='r')
+			else:
+				reader = HDF5MatrixFile(inputFname, openMode='r')
+		associationTableObject = reader.getTableObject(tableName=tableName)
 	
 	for attributeName, value in associationTableObject.getAttributes().iteritems():
 		setattr(gwr, attributeName, value)
@@ -3179,7 +3184,7 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, min_valu
 		
 		no_of_lines += 1
 	
-	if inputFname:
+	if inputFname and reader is not None:
 		reader.close()
 	if report:
 		sys.stderr.write(" %s loci.\n"%(len(gwr.data_obj_ls)))

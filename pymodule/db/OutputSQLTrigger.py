@@ -77,9 +77,10 @@ create trigger update_%s before update on %s
 class OutputSQLTrigger(object):
 	__doc__ = __doc__
 	option_default_dict = {('type', 1, int):[1, 'y', 1, 'which type of database? mysql (2) or postgres (1)', ],\
-							('table_names', 1, ): [None, 'i', 1, 'coma-separated names of the table', ],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						('table_names', 1, ): [None, 'i', 1, 'coma-separated names of the table', ],\
+						('schema', 0, ): [None, 'k', 1, 'set the search_path for psql. only for postgresql.', ],\
+						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
 	def __init__(self,  **keywords):
 		"""
 		2008-07-27
@@ -103,6 +104,8 @@ class OutputSQLTrigger(object):
 		"""
 		2008-07-27
 		"""
+		if self.type==1 and self.schema:
+			print "set search_path to %s;"%(self.schema)
 		for table_name in self.table_names:
 			self.printTriggerDict[self.type](table_name)
 

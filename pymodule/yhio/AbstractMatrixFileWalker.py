@@ -24,6 +24,7 @@ from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getCol
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 from pymodule.yhio.MatrixFile import MatrixFile
 from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile
+from pymodule.yhio.YHPyTables import YHFile
 
 class AbstractMatrixFileWalker(AbstractMapper):
 	__doc__ = __doc__
@@ -31,6 +32,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 	#option_default_dict.update(AbstractMapper.db_option_dict.copy())
 	option_default_dict.update({
 						('minNoOfTotal', 1, int): [10, 'M', 1, 'minimum no of data from one file for afterFileFunction() to run'],\
+						('h5TableName', 0, ): [None, '', 1, 'table name in the input file if inputFileFormat is 2'],\
 						('maxNoOfTotal', 0, int): [None, '', 1, 'maximum no of data to sample from one file. if not set, no limit.'],\
 						('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
 						('whichColumn', 0, int): [None, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
@@ -39,8 +41,8 @@ class AbstractMatrixFileWalker(AbstractMapper):
 						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'default value when log-transformation fails (when value is negative)'],\
 						('missingDataNotation', 0, ): ['NA', '', 1, 'coma-separated list of notations for missing data.\n\
 	missing data will be skipped.'],\
-						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: HDF5MatrixFile.'],\
-						('outputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: HDF5MatrixFile.'],\
+						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; '],\
+						('outputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile.'],\
 						})
 	
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -111,7 +113,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		return self.processValue(value=yValue, processType=processType, \
 						valueForNonPositiveValue=valueForNonPositiveValue, **keywords)
 	
-	def processHeader(self, header=None, pdata=None, dtypeList=None):
+	def processHeader(self, header=None, pdata=None, rowDefinition=None):
 		"""
 		2012.11.22
 		2012.8.13
@@ -121,14 +123,21 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			if self.outputFileFormat==1:
 				if self.invariantPData.writer and header:
 					self.invariantPData.writer.writerow(header)
-			elif self.outputFileFormat==2:	#for HDF5MatrixFile 
-				if not dtypeList and header:	#generate a dtypeList based on header
-					dtypeList = []
+			elif self.outputFileFormat==2:
+				if not rowDefinition and header:	#generate a rowDefinition based on header
+					rowDefinition = []
 					for colID in header:
-						dtypeList.append((colID, HDF5MatrixFile.varLenStrType))
-				#dtypeList = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+						rowDefinition.append((colID, 's2000'))
+				writer = YHFile(self.outputFname, openMode='w', rowDefinition=rowDefinition)
+				self.invariantPData.writer = writer
+			else:	#for HDF5MatrixFile
+				if not rowDefinition and header:	#generate a rowDefinition based on header
+					rowDefinition = []
+					for colID in header:
+						rowDefinition.append((colID, HDF5MatrixFile.varLenStrType))
+				#rowDefinition = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
 				#	('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
-				writer = HDF5MatrixFile(self.outputFname, openMode='w', dtypeList=dtypeList)
+				writer = HDF5MatrixFile(self.outputFname, openMode='w', rowDefinition=rowDefinition)
 				self.invariantPData.writer = writer
 		self.invariantPData.headerOutputted = True
 	
@@ -195,7 +204,9 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		try:
 			if self.inputFileFormat==1:	#2012.11.22 support HDF5MatrixFile
 				reader = MatrixFile(inputFname)
-			else:
+			elif self.inputFileFormat==2:	#2012.12.20
+				reader = YHFile(inputFname, openMode='r', tableName=self.h5TableName)
+			else:	#2012.11.22
 				reader = HDF5MatrixFile(inputFname, openMode='r')
 			
 			col_name2index = reader.constructColName2IndexFromHeader()

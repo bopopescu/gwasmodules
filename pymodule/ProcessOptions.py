@@ -464,7 +464,7 @@ class ProcessOptions(object):
 					sys.exit(4)
 			if argument_type!=None and default_value is not None:	#cast to the desired type 2008-10-25 default_value is not None
 				default_value = argument_type(default_value)
-			if class_to_have_attr:
+			if class_to_have_attr is not None:
 				setattr(class_to_have_attr, argument, default_value)
 			ad[argument] = default_value
 		return ad

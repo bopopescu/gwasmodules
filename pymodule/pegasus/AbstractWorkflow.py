@@ -698,6 +698,37 @@ class AbstractWorkflow(ADAG):
 			job.input = job.inputLs[0]
 		return job
 		
+	def addGenericFile2DBJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
+					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
+					data_dir=None, logFile=None, commit=False,\
+					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
+					key2ObjectForJob=None, objectWithDBArguments=None, **keywords):
+		"""
+		2012.12.21 a generic wrapper for jobs that "inserting" data (from file) into database
+		"""
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if extraOutputLs is None:
+			extraOutputLs = []
+		
+		if data_dir:
+			extraArgumentList.append('--data_dir %s'%(data_dir))
+		if commit:
+			extraArgumentList.append('--commit')
+		if logFile:
+			extraArgumentList.extend(["--logFilename", logFile])
+			extraOutputLs.append(logFile)
+		#do not pass the inputFileList to addGenericJob() because db arguments need to be added before them. 
+		job = self.addGenericDBJob(workflow=workflow, executable=executable, inputFile=inputFile, \
+						inputArgumentOption=inputArgumentOption, outputFile=outputFile, \
+						outputArgumentOption=outputArgumentOption, inputFileList=inputFileList, parentJobLs=parentJobLs, \
+						extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+						transferOutput=transferOutput, extraArguments=extraArguments, extraArgumentList=extraArgumentList,\
+						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel, key2ObjectForJob=key2ObjectForJob,\
+						objectWithDBArguments=objectWithDBArguments, **keywords)
+		return job
+	
 	def addJobUse(self, job=None, file=None, transfer=True, register=True, link=None):
 		"""
 		2012.10.18 check whether that file is a use of job already.

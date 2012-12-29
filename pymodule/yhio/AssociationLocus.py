@@ -10,42 +10,70 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 import tables
-from tables import *
+from tables import UInt64Col, StringCol, Float64Col
 import numpy
 from pymodule.utils import PassingData, PassingDataList
 from pymodule.ProcessOptions import  ProcessOptions
-from pymodule.yhio.YHPyTable import YHPyTable
-from AssociationPeak import AssociationPeakPyTable
+from pymodule.yhio.YHPyTables import YHTable, YHFile, castPyTablesRowIntoPassingData
+from AssociationPeak import AssociationPeakTable
 
-class AssociationLocusPyTable(YHPyTable):
+class AssociationLocusTable(tables.IsDescription):
 	id = UInt64Col(pos=0)
 	chromosome = StringCol(64, pos=1)	#64 byte-long
 	start = UInt64Col(pos=2)
 	stop = UInt64Col(pos=3)
-	
 	no_of_peaks = UInt64Col(pos=3)
 	connectivity = Float64Col(pos=4)
 	no_of_results = UInt64Col(pos=5)
-	phenotype_id_list = UInt64Col(shape=(1000,), pos=6)
-	
-	association_peak = AssociationPeakPyTable()
-	
-	
-	def __init__(self, inputFname=None, openMode='r', \
-				groupName=None, tableName='association_locus',\
-				description=None,
-				title='', filters=None, rowDefinition=None,\
-				expectedrows=512000, genome_wide_result=None, **keywords):
-		YHPyTable.__init__(self, inputFname=inputFname, openMode=openMode, \
-				groupName=groupName, tableName=tableName,\
-				description=description,
-				title=title, filters=filters,
-				expectedrows=expectedrows, **keywords)
+	phenotype_id_ls_in_str = StringCol(1000, pos=6)
 
-		if openMode=='r':
-			self._constructLandscapeGraph(tableName=self.tableName, genome_wide_result=self.genome_wide_result)
+class AssociationLocus2PeakTable(tables.IsDescription):
+	id = UInt64Col(pos=0)
+	association_locus_id = UInt64Col(pos=1)
+	association_peak = AssociationPeakTable()
+
+
+class AssociationLocusTableFile(YHFile):
+
+	"""
+	usage examples:
 	
-	def constructAssociationLocusRBDictFromHDF5File(inputFname=None, locusPadding=0, tableName='association_locus'):
+		associationLocusTableFile = AssociationLocusTableFile(self.outputFname, openMode='w')
+		associationLocusTableFile.addAttributeDict(attributeDict)
+		associationLocusTableFile.appendAssociationPeak(association_peak_ls=association_peak_ls)
+		
+		#for read-only
+		associationLocusTableFile = AssociationLocusTableFile(inputFname, openMode='r')
+		rbDict = associationLocusTableFile.associationLocusRBDict
+		
+		associationLocusTableFile = AssociationLocusTableFile(inputFname, openMode='r', constructLocusRBDict=False)	#don't need it
+		call_method_id_ls = associationLocusTableFile.getAttribute('call_method_id_ls')
+	"""
+	def __init__(self, inputFname=None, openMode='r', \
+				tableName='association_locus', groupNamePrefix='group', tableNamePrefix='table',\
+				filters=None, locus2PeakTableName='association_locus2peak', locusPadding=0, constructLocusRBDict=True,\
+				**keywords):
+		
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=None, filters=filters, debug=0, report=0)
+		
+		self.locus2PeakTableName = locus2PeakTableName
+		self.locusPadding = locusPadding
+		self.associationLocusRBDict = None
+		if openMode=='r':
+			self.associationLocusTable = self.getTableObject(tableName=self.tableName)
+			self.associationLocus2PeakTable = self.getTableObject(tableName=self.locus2PeakTableName)
+			if constructLocusRBDict:
+				self.associationLocusRBDict = self._constructAssociationLocusRBDict(tableObject=self.associationLocusTable, locusPadding=self.locusPadding)
+		elif openMode == 'w':
+			self.associationLocusTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationLocusTable,\
+													expectedrows=50000)
+			self.associationLocus2PeakTable = self.createNewTable(tableName=self.locus2PeakTableName, \
+													rowDefinition=AssociationLocus2PeakTable, expectedrows=500000)
+
+	
+	def _constructAssociationLocusRBDict(self, tableObject=None, locusPadding=0):
 		"""
 		2012.11.25
 			similar to constructAssociationPeakRBDictFromHDF5File
@@ -53,19 +81,21 @@ class AssociationLocusPyTable(YHPyTable):
 		from pymodule.algorithm.RBTree import RBDict
 		from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		
-		sys.stderr.write("Constructing association-locus RBDict from HDF5 file %s, (locusPadding=%s) ..."%(inputFname, locusPadding))
-		reader = HDF5MatrixFile(inputFname, openMode='r')
+		sys.stderr.write("Constructing association-locus RBDict (locusPadding=%s) ..."%(locusPadding))
+		if tableObject is None:
+			tableObject = self.associationLocusTable
 		associationLocusRBDict = RBDict()
 		associationLocusRBDict.locusPadding = locusPadding
 		associationLocusRBDict.HDF5AttributeNameLs = []
-		tableObject = reader.getTableObject(tableName=tableName)
+		
 		for attributeName, value in tableObject.getAttributes().iteritems():
 			associationLocusRBDict.HDF5AttributeNameLs.append(attributeName)
 			setattr(associationLocusRBDict, attributeName, value)
 		
 		counter = 0
 		real_counter = 0
-		for row in tableObject:
+		for rowPointer in tableObject:
+			row = castPyTablesRowIntoPassingData(rowPointer)
 			if not row.chromosome:	#empty chromosome, which happens when inputFname contains no valid locus, but the default null locus (only one).
 				continue
 			counter += 1
@@ -78,9 +108,10 @@ class AssociationLocusPyTable(YHPyTable):
 				associationLocusRBDict[segmentKey] = []
 			associationLocusRBDict[segmentKey].append(row)
 		sys.stderr.write("%s peaks in %s spans.\n"%(counter, len(associationLocusRBDict)))
+		self.associationLocusRBDict = associationLocusRBDict
 		return associationLocusRBDict
 	
-	def appendAssociationLoci(associationLocusList=None):
+	def appendAssociationLoci(self, associationLocusList=None):
 		"""
 		2012.12.10
 			for each locus, output the association peaks that fall into the locus.
@@ -97,34 +128,28 @@ class AssociationLocusPyTable(YHPyTable):
 					* peak-score
 		2012.11.20
 		"""
-		sys.stderr.write("Dumping %s association loci into %s (HDF5 format) ..."%(len(associationLocusList), self.inputFname))
-		#each number below is counting bytes, not bits
-		rowDefinition = [('chromosome', HDF5MatrixFile.varLenStrType), \
-					('start','i8'), ('stop', 'i8'), \
-					('no_of_peaks', 'i8'), ('connectivity', 'f8'), ('no_of_results', 'i8')]
-		if writer is None and filename:
-			writer = HDF5MatrixFile(filename, openMode='w', rowDefinition=rowDefinition, tableName=tableName)
-			tableObject = writer.getTableObject(tableName=tableName)
-		elif writer:
-			tableObject = writer.createNewTable(tableName=tableName, rowDefinition=rowDefinition)
-		else:
-			sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
-			sys.exit(3)
+		sys.stderr.write("Saving %s association loci into file %s ..."%(len(associationLocusList), self.inputFname))
 		#add neighbor_distance, max_neighbor_distance, min_MAF, min_score, ground_score as attributes
-		addAttributeDictToYHTableInHDF5Group(tableObject=tableObject, attributeDict=attributeDict)
-		cellList = []
 		#2012.11.28 sort it
 		associationLocusList.sort()
 		for associationLocus in associationLocusList:
 			dataTuple = (associationLocus.chromosome, associationLocus.start, associationLocus.stop, associationLocus.no_of_peaks,\
-						associationLocus.connectivity, associationLocus.no_of_results)
-			cellList.append(dataTuple)
-		
-		if tableObject is None:
-			sys.stderr.write("Error: tableObject (name=%s) is None. could not write.\n"%(tableName))
-			sys.exit(3)
-		tableObject.writeCellList(cellList)
-		if closeFile:
-			writer.close()
-		sys.stderr.write("%s objects.\n"%(len(cellList)))
-		return writer
+						associationLocus.connectivity, associationLocus.no_of_results, associationLocus.phenotype_id_ls_in_str)
+			self.associationLocusTable.writeOneCell(dataTuple)
+			associationLocus2PeakTableRow = self.associationLocus2PeakTable.row
+			for association_peak in associationLocus.association_peak_ls:
+				self.associationLocus2PeakTable.no_of_rows += 1
+				associationLocus2PeakTableRow['id'] = self.associationLocus2PeakTable.no_of_rows
+				associationLocus2PeakTableRow['association_locus_id'] = self.associationLocusTable.no_of_rows
+				associationLocus2PeakTableRow['association_peak/id'] = association_peak['id']
+				associationLocus2PeakTableRow['association_peak/chromosome'] = association_peak['chromosome']
+				associationLocus2PeakTableRow['association_peak/start'] = association_peak['start']
+				associationLocus2PeakTableRow['association_peak/stop'] = association_peak['stop']
+				associationLocus2PeakTableRow['association_peak/start_locus_id'] = association_peak['start_locus_id']
+				associationLocus2PeakTableRow['association_peak/stop_locus_id'] = association_peak['stop_locus_id']
+				associationLocus2PeakTableRow['association_peak/no_of_loci'] = association_peak['no_of_loci']
+				associationLocus2PeakTableRow['association_peak/peak_locus_id'] = association_peak['peak_locus_id']
+				associationLocus2PeakTableRow['association_peak/peak_score'] = association_peak['peak_score']
+				associationLocus2PeakTableRow.append()
+				#self.associationLocus2PeakTable.writeOneCell(oneCell, cellType=3)	#doesn't work. nested type shows up as one column in colnames.
+		sys.stderr.write("\n")
