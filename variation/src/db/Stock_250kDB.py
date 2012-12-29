@@ -318,9 +318,9 @@ class CallMethod(Entity):
 	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	min_oligo_call_prob = Field(Float)
 	max_array_mismatch_rate = Field(Float)
-	max_array_NA_rate = Field(Float)
+	max_array_na_rate = Field(Float)
 	max_snp_mismatch_rate = Field(Float)
-	max_snp_NA_rate = Field(Float)
+	max_snp_na_rate = Field(Float)
 	npute_window_size = Field(Integer)
 	no_of_accessions = Field(Integer)	#2012.2.28
 	no_of_loci = Field(Integer)	#2012.2.28
