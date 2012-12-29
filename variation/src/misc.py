@@ -4,8 +4,11 @@ Examples:
 	# enter debug mode
 	misc.py -b
 	
-	# change the db connection setting 
-	misc.py -z localhost -u yh
+	# connect to mysql stock_250k db 
+	%s -z localhost -u yh
+	
+	# connect to postgresql stock_250k schema
+	%s -d vervetdb -k stock_250k -z uclaOffice -v postgresql -u yh
 	
 Description:
 	It's a file with all sorts of classes that haven't gone on to be independent.
@@ -13,6 +16,7 @@ Description:
 	All those classes are manually chosen to be run in Main.run().
 """
 import os, sys, numpy
+__doc__ = __doc__%(sys.argv[0], sys.argv[0],)
 
 class DisplaySNPMatrix(object):
 	"""
@@ -9162,6 +9166,71 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 	
 	"""
 	
+	@classmethod
+	def updateResultsMethodNoOfAccessions(cls, db_250k=None, call_method_id_ls_str="", analysis_method_id_ls_str="", \
+						phenotype_method_id_ls_str="", commit=False, updateType=1):
+		"""
+		2012.12.28 added argument updateType. 1: no_of_accessions; 2: no_of_loci
+		2012.12.18
+			need to see the sample size of association results
+		"""
+		sys.stderr.write("updateType %s .. \n"%(updateType))
+		if commit:
+			pass
+		else:
+			# begin the session but without commit
+			db_250k.session.begin()
+		from pymodule import getListOutOfStr
+		from variation.src import Stock_250kDB
+		#from Stock_250kDB import ResultsMethodJson, ResultsMethod
+		TableClass = Stock_250kDB.ResultsMethod
+		query = TableClass.query
+		call_method_id_ls = getListOutOfStr(call_method_id_ls_str, data_type=int)
+		if call_method_id_ls:
+			query = query.filter(TableClass.call_method_id.in_(call_method_id_ls))
+		analysis_method_id_ls = getListOutOfStr(analysis_method_id_ls_str, data_type=int)
+		if analysis_method_id_ls:
+			query = query.filter(TableClass.analysis_method_id.in_(analysis_method_id_ls))
+		phenotype_method_id_ls = getListOutOfStr(phenotype_method_id_ls_str, data_type=int)
+		if phenotype_method_id_ls:
+			query = query.filter(TableClass.phenotype_method_id.in_(phenotype_method_id_ls))
+		
+		if updateType==1:
+			query = query.filter(TableClass.no_of_accessions==None)	#no_of_accessions is null
+		elif updateType==2:
+			query = query.filter(TableClass.no_of_loci==None)	#no_of_loci is null
+		
+		no_of_total = query.count()
+		count = 0
+		for rm in query:
+			count += 1
+			if rm.filename and os.path.isfile(rm.filename):
+				sys.stderr.write("\t %s/%s, %s-%s-%s "%(count, no_of_total, rm.call_method_id, \
+												rm.analysis_method_id, rm.phenotype_method_id))
+				if updateType==1:
+					rm.no_of_accessions = rm.calculateNoOfAccessionsFromFile()
+				else:
+					rm.no_of_loci = rm.calculateNoOfLociFromFile()
+				db_250k.session.add(rm)
+			sys.stderr.write("\n")
+		if commit:
+			db_250k.session.flush()
+			db_250k.session.commit()
+		else:
+			pass
+			#db_250k.session.commit()
+	
+	"""
+		#2012.12.18
+		DB250k.updateResultsMethodNoOfAccessions(db_250k, call_method_id_ls_str='32', analysis_method_id_ls_str='1', \
+			phenotype_method_id_ls_str='', commit=True)
+		sys.exit(0)
+	
+		#2012.12.18
+		DB250k.updateResultsMethodNoOfAccessions(db_250k, call_method_id_ls_str='4-80', analysis_method_id_ls_str='', \
+									phenotype_method_id_ls_str='', commit=True, updateType=1)
+		sys.exit(0)
+	"""
 	@classmethod
 	def updateProbeChrPosToTAIR9(cls, db_250k, input_fname, min_no_of_matches=25):
 		"""
@@ -21134,7 +21203,7 @@ class Main(object):
 			debug =False
 		
 		
-		import Stock_250kDB
+		from variation.src import Stock_250kDB
 		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
 						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
 		db_250k.setup(create_tables=False)
@@ -21144,10 +21213,10 @@ class Main(object):
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
 		
-		#2012.9.28
-		DB250k.putCallMethodAccessions2AccessionSetTable(db_250k=db_250k, call_method_id = 32)
+		#2012.12.18
+		DB250k.updateResultsMethodNoOfAccessions(db_250k, call_method_id_ls_str='4-80', analysis_method_id_ls_str='', \
+									phenotype_method_id_ls_str='', commit=True, updateType=2)
 		sys.exit(0)
-		
 
 #2007-03-05 common codes to initiate database connection
 import sys, os, math

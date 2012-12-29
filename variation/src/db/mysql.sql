@@ -521,9 +521,14 @@ create or replace view view_array_quartile as select a.id as array_id,
     and aq.array_id=a.id 
     order by maternal_nativename, paternal_nativename, start_probe_id, array_id;
 
--- 2012.6.22 view the number of peaks per association result
-create or replace view view_result_peak_count as select result_peak_type_id, result_id, count(id) as no_of_peaks from result_peak 
-    group by result_peak_type_id, result_id; 
+-- 2012.12.25 view the number of peaks per association result
+create or replace view view_genome_wide_association_peak_count as select g.result_id, 
+    g.association_peak_type_id, y.min_score, g.no_of_peaks, 
+    r.call_method_id, r.phenotype_method_id, r.analysis_method_id, r.no_of_accessions
+    from results_method r, genome_wide_association_peak g, association_peak_type y where r.id=g.result_id
+    and y.id=g.association_peak_type_id
+    order by association_peak_type_id, call_method_id, phenotype_method_id, analysis_method_id;
+
 create or replace view view_result_peak_summary as select p.result_peak_type_id, r.call_method_id, r.cnv_method_id, r.phenotype_method_id, 
     r.analysis_method_id,
     p.no_of_peaks from view_result_peak_count as p, 
@@ -532,7 +537,7 @@ create or replace view view_result_peak_summary as select p.result_peak_type_id,
 -- 2012.9.28 update phenotype_method.no_of_accessions
 begin;
 update phenotype_method p , (select method_id, count(distinct ecotype_id) as count from phenotype_avg group by method_id) as a
-	set p.no_of_accessions=a.count where a.method_id=p.id;
+    set p.no_of_accessions=a.count where a.method_id=p.id;
 commit;
 
 -- 2012.9.28 update mean/stddev of phenotype_method

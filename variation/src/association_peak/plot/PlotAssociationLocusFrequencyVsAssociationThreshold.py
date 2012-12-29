@@ -30,7 +30,7 @@ import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
 import csv
 import numpy, random, pylab
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
-from pymodule import yh_matplotlib, utils
+from pymodule import yh_matplotlib, utils, castPyTablesRowIntoPassingData
 from pymodule.plot.AbstractPlot import AbstractPlot
 #from variation.src.plot.PlotAssociationLocus import PlotAssociationLocus
 
@@ -92,16 +92,18 @@ class PlotAssociationLocusFrequencyVsAssociationThreshold(AbstractPlot):
 		y_ls = getattr(pdata, 'y_ls', None)
 		
 		reader = getattr(pdata, 'reader', None)
-		groupObject =reader.getGroupObject()
+		tableObject =reader.getTableObject()
 		
-		xValue = getattr(row, self.xColumnHeader, None)
-		yValue = getattr(row, self.whichColumnHeader, None)
+		xValue = row[self.xColumnHeader]
+		yValue = row[self.whichColumnHeader]
 		xValue = self.processValue(value=xValue, processType=self.logX)
 		yValue = self.processValue(value=yValue, processType=self.logY)
 		
 		x_ls.append(xValue)
 		y_ls.append(yValue)
 		
+		if self.inputFileFormat==2:	#for YHFile, row is a pointer, getattr(row, attributeName) won't work. 
+			row = castPyTablesRowIntoPassingData(row)
 		#add call/phenotype/analysis/min_overlap_ratio/total_no_of_results into self set.
 		utils.addObjectListAttributeToSet(objectVariable=row, attributeName='call_method_id_ls', \
 									setVariable=self.call_method_id_set, data_type=int)

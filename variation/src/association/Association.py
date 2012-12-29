@@ -68,9 +68,12 @@ from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOut
 from numpy import linalg
 
 from Kruskal_Wallis import Kruskal_Wallis
+from variation.src.db.output.OutputPhenotype import OutputPhenotype
+
 if __name__ == '__main__':
 	import rpy
 from sets import Set
+from pymodule import pca_module
 #from DrawEcotypeOnMap import DrawEcotypeOnMap
 
 
@@ -707,7 +710,7 @@ class Association(Kruskal_Wallis):
 		2010-4-23
 			split out of getCholeskyInverseData()
 		"""
-		if os.path.isfile(kinship_fname):
+		if kinship_fname and os.path.isfile(kinship_fname):
 			kinshipData = SNPData(input_fname=kinship_fname, ignore_2nd_column=1, \
 								matrix_data_type=float, turn_into_array=1)
 		else:
@@ -741,7 +744,6 @@ class Association(Kruskal_Wallis):
 		sys.stderr.write("Creating individual-to-line incidence matrix ...")
 		no_of_replicates = len(individualID_ls)
 		no_of_lines = len(lineID_ls)
-		import numpy
 		Z = numpy.zeros([no_of_replicates, no_of_lines], numpy.int8)	# incidence matrix
 		no_of_replicates_with_line = 0
 		for i in range(no_of_replicates):
@@ -1180,7 +1182,6 @@ class Association(Kruskal_Wallis):
 		sys.stderr.write("Removing un-phenotyped ecotypes from the SNP data ...")
 		phenData = SNPData(header=header_phen, strain_acc_list=strain_acc_list_phen, data_matrix=data_matrix_phen)
 		if phenotype_method_id_ls:
-			from OutputPhenotype import OutputPhenotype
 			which_phenotype_ls = phenData.getColIndexLsGivenQuerySet(Set(phenotype_method_id_ls), \
 												colIDHashFunction=OutputPhenotype.extractPhenotypeIDFromMethodIDName)
 		else:	#if not available, take all phenotypes
@@ -1258,7 +1259,6 @@ class Association(Kruskal_Wallis):
 			PC_matrix = PC_data.PC_matrix
 		else:
 			if test_type==4:	#eigen_vector_fname not given for this test_type. calcualte PCs.
-				import pca_module
 				T, P, explained_var = pca_module.PCA_svd(snpData.data_matrix, standardize=False)
 				PC_matrix = T
 			else:
@@ -1266,7 +1266,6 @@ class Association(Kruskal_Wallis):
 		
 		if phenData:	# 2010-2-28 make sure it exists
 			if phenotype_method_id_ls:
-				from OutputPhenotype import OutputPhenotype
 				which_phenotype_ls = phenData.getColIndexLsGivenQuerySet(Set(phenotype_method_id_ls), \
 																	colIDHashFunction=OutputPhenotype.extractPhenotypeIDFromMethodIDName)
 			else:	#if not available, take all phenotypes

@@ -3,7 +3,8 @@
 Examples:
 	%s 
 	
-	%s  -o /tmp/count_association_locus.h5 /tmp/association_locus_overlap_9.h5 /tmp/association_locus_overlap_5.h5
+	%s  -o /tmp/count_association_locus.h5 /Network/Data/250k/db/genome_wide_association_locus/type_1/15_251results_call75_ana1_type1.h5
+		/Network/Data/250k/db/genome_wide_association_locus/type_3/11_251results_call75_ana1_type3.h5
 
 Description:
 	2012.11.22
@@ -19,11 +20,27 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
 import pylab
 import csv, random, numpy
+import tables
+from tables import UInt64Col, Float64Col, StringCol
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter,\
-	yh_matplotlib, HDF5MatrixFile
+	yh_matplotlib, YHFile
 from pymodule import AbstractMapper
 from pymodule import AbstractMatrixFileWalker
 
+class CountAssociationLocusTable(tables.IsDescription):
+	"""
+	2012.12.24 new PyTables-based table definition
+	"""
+	id = UInt64Col(pos=0)
+	min_score = Float64Col(pos=1)
+	min_overlap_ratio = Float64Col(pos=2)
+	total_no_of_results = UInt64Col(pos=3)
+	no_of_association_loci = UInt64Col(pos=4)
+	call_method_id_ls = StringCol(1000, pos=5)
+	cnv_method_id_ls = StringCol(1000, pos=6)
+	phenotype_method_id_ls = StringCol(1000, pos=7)
+	analysis_method_id_ls  = StringCol(1000, pos=8)
+	
 class CountAssociationLocus(AbstractMatrixFileWalker):
 	__doc__ = __doc__
 	option_default_dict = AbstractMatrixFileWalker.option_default_dict.copy()
@@ -43,15 +60,13 @@ class CountAssociationLocus(AbstractMatrixFileWalker):
 		AbstractMatrixFileWalker.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 		#self.connectDB() called within its __init__()
 	
-	def processHeader(self, header=None, pdata=None):
+	def processHeader(self, pdata=None, **keywords):
 		"""
-		called right after the header of an input file is derived in fileWalker()
+		2012.12.24 use YHFile
+		2012.11.22 called right after the header of an input file is derived in fileWalker()
+		
 		"""
-		dtypeList = [('min_score', 'f8'), ('min_overlap_ratio', 'f8'), ('total_no_of_results', 'i8'),\
-					('no_of_association_loci', 'i8'), ('call_method_id_ls', HDF5MatrixFile.varLenStrType),\
-					('cnv_method_id_ls', HDF5MatrixFile.varLenStrType), ('phenotype_method_id_ls', HDF5MatrixFile.varLenStrType),\
-					('analysis_method_id_ls', HDF5MatrixFile.varLenStrType)]
-		AbstractMatrixFileWalker.processHeader(self, pdata=pdata, dtypeList=dtypeList)
+		AbstractMatrixFileWalker.processHeader(self, pdata=pdata, rowDefinition=CountAssociationLocusTable)
 	
 	def fileWalker(self, inputFname=None, afterFileFunction=None, processRowFunction=None , run_type=1, **keywords):
 		"""
@@ -65,21 +80,21 @@ class CountAssociationLocus(AbstractMatrixFileWalker):
 		if afterFileFunction is None:
 			afterFileFunction = self.afterFileFunction
 		try:
-			reader = HDF5MatrixFile(inputFname, openMode='r')
+			reader = YHFile(inputFname, openMode='r')
 			#output the header to the output file if necessary 
 			self.processHeader(pdata=pdata) #2012.8.13
 			
-			firstGroupObject = reader.getGroupObject()
-			no_of_association_loci = firstGroupObject.dataMatrix.shape[0]
+			firstTableObject = reader.getTableObject()
+			no_of_association_loci = firstTableObject.nrows
 			
-			dataTuple = (firstGroupObject.getAttribute('min_score', -1.0), \
-						firstGroupObject.getAttribute('min_overlap_ratio', -1.0),\
-						firstGroupObject.getAttribute('total_no_of_results', 1),\
+			dataTuple = (firstTableObject.getAttribute('min_score', -1.0), \
+						firstTableObject.getAttribute('min_overlap_ratio', -1.0),\
+						firstTableObject.getAttribute('total_no_of_results', 1),\
 						no_of_association_loci,
-						firstGroupObject.getListAttributeInStr('call_method_id_ls'),\
-						firstGroupObject.getListAttributeInStr('cnv_method_id_ls'),\
-						firstGroupObject.getListAttributeInStr('phenotype_method_id_ls'),\
-						firstGroupObject.getListAttributeInStr('analysis_method_id_ls'),\
+						firstTableObject.getListAttributeInStr('call_method_id_ls'),\
+						firstTableObject.getListAttributeInStr('cnv_method_id_ls'),\
+						firstTableObject.getListAttributeInStr('phenotype_method_id_ls'),\
+						firstTableObject.getListAttributeInStr('analysis_method_id_ls'),\
 						)
 			self.invariantPData.writer.writeCellList([dataTuple])
 			del reader

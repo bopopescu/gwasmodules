@@ -59,15 +59,15 @@ class BoxPlotAssociationLocusAttributeVsOverlapThreshold(PlotBoxPlot):
 		y_ls = getattr(pdata, 'y_ls', None)
 		
 		reader = getattr(pdata, 'reader', None)
-		groupObject =reader.getGroupObject()
-		xValue = groupObject.getAttribute('min_overlap_ratio')
+		tableObject =reader.getTableObject()
+		xValue = tableObject.getAttribute('min_overlap_ratio')
 		if xValue2yValueLs is not None:
 			#if self.whichColumnHeader:
 			#	whichColumn = col_name2index.get(self.whichColumnHeader, None)
 			#else:
 			#	whichColumn = self.whichColumn
 			xValue = self.processValue(xValue, processType=self.logX)
-			yValue = getattr(row, self.whichColumnHeader, None)
+			yValue = row[self.whichColumnHeader]
 			yValue = self.processValue(yValue, processType=self.logY)
 			if xValue not in xValue2yValueLs:
 				xValue2yValueLs[xValue] = []

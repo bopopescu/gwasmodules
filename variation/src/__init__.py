@@ -21,7 +21,7 @@ from sets import Set
 #from pymodule import importNumericArray, ProcessOptions, SNPData, write_data_matrix, read_data, TwoSNPData
 #num = importNumericArray()
 
-from db import Stock_250kDB, StockDB
+from db import Stock_250kDB, StockDB, AtDB
 
 #2012.11.18
 from mapper.AbstractVariationMapper import AbstractVariationMapper

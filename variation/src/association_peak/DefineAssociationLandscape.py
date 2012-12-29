@@ -3,7 +3,9 @@
 
 Examples:
 	# define landscape for result 5566 and others
-	%s -z banyan -u yh -j 5566 -o /tmp/5566_association_landscape.h5
+	%s  -o  association_min_score_5.0/call_75_analysis_1_min_score_5.0_min_overlap_0.5_result_5371_landscape.h5 
+		--result_id 5371 --neighbor_distance 5000 --max_neighbor_distance 20000 --min_MAF 0.1 --tax_id 3702
+		--data_dir /Network/Data/250k/db/ --drivername mysql --hostname banyan --dbname stock_250k --db_user yh --db_passwd secret
 	
 	%s
 Description:
@@ -22,7 +24,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import traceback, numpy
 import networkx as nx
 from pymodule import ProcessOptions, PassingData, GenomeDB
-from pymodule import SNP, yh_matplotlib, HDF5MatrixFile, yhio
+from pymodule import SNP, yh_matplotlib, yhio
+from pymodule import AssociationLandscapeTableFile
 from variation.src import Stock_250kDB
 from variation.src import AbstractVariationMapper
 
@@ -101,7 +104,7 @@ class DefineAssociationLandscape(AbstractVariationMapper):
 					break
 			if obj_with_fastest_score_increase is not None:
 				no_of_loci = obj_with_fastest_score_increase.index - current_obj.index - 1
-				bridge_ls.append([current_obj, obj_with_fastest_score_increase, no_of_loci, deltaX])
+				bridge_ls.append([current_obj, obj_with_fastest_score_increase, no_of_loci, deltaX, deltaY])
 				source_index = current_obj.index
 				target_index = obj_with_fastest_score_increase.index
 				locusLandscapeNeighborGraph.add_edge(source_index, target_index, \
@@ -225,18 +228,23 @@ class DefineAssociationLandscape(AbstractVariationMapper):
 		#gwr.setResultID(self.result_id)	#already done in db_250k.getResultMethodContent()
 		attributeDict = {'result_id':self.result_id, 'min_MAF':self.min_MAF,\
 				'call_method_id': rm.call_method_id, 'cnv_method_id': rm.cnv_method_id, \
-				'phenotype_method_id':rm.phenotype_method_id, 'analysis_method_id':rm.analysis_method_id}
-		writer = gwr.outputInHDF5MatrixFile(filename=self.outputFname, closeFile=False, attributeDict=attributeDict)
+				'phenotype_method_id':rm.phenotype_method_id, 'analysis_method_id':rm.analysis_method_id,\
+				'no_of_accessions': rm.no_of_accessions}
+		landscapeFile = AssociationLandscapeTableFile(self.outputFname, openMode='w')
+		
+		writer = gwr.outputInHDF5MatrixFile(tableObject=landscapeFile.associationTable, attributeDict=attributeDict)
 		
 		landscapeData = self.findLandscape(gwr.data_obj_ls, neighbor_distance=self.neighbor_distance,\
 								max_neighbor_distance=self.max_neighbor_distance)
 		
-		attributeDict = {'result_id':self.result_id, 'min_MAF':self.min_MAF,\
-				'neighbor_distance':self.neighbor_distance, 'max_neighbor_distance':self.max_neighbor_distance, \
-				'call_method_id': rm.call_method_id, 'cnv_method_id': rm.cnv_method_id, \
-				'phenotype_method_id':rm.phenotype_method_id, 'analysis_method_id':rm.analysis_method_id}
-		yhio.Association.outputAssociationLandscapeInHDF5(bridge_ls=landscapeData.bridge_ls, writer=writer, closeFile=True, \
-							groupName='landscape', attributeDict=attributeDict)
+		attributeDict.update({'neighbor_distance':self.neighbor_distance, \
+							'max_neighbor_distance':self.max_neighbor_distance, \
+							})
+		
+		landscapeFile.associationLandscapeTable.addAttributeDict(attributeDict)
+		landscapeFile.appendAssociationLandscapeBridgeList(bridge_ls=landscapeData.bridge_ls)
+		#yhio.Association.outputAssociationLandscapeInHDF5(bridge_ls=landscapeData.bridge_ls, writer=writer, closeFile=True, \
+		#					tableName='landscape', attributeDict=attributeDict)
 		"""
 		#2011-4-21 for inspection
 		outputFname = '/tmp/result_%s_landscape.png'%(result_id)

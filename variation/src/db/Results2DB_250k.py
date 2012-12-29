@@ -41,9 +41,6 @@ from pymodule import figureOutDelimiter, PassingData
 import sqlalchemy as sql
 from variation.src.common import getOneResultJsonData
 from variation.src import Stock_250kDB
-from Stock_250kDB import Results, ResultsMethod, PhenotypeMethod, CallMethod, \
-	ResultsMethodType, AnalysisMethod, ResultsMethodJson
-from Stock_250kDB import Snps as SNPs
 from variation.src import AbstractVariationMapper
 """
 2008-04-16 temporarily put here
@@ -96,16 +93,6 @@ class Results2DB_250k(AbstractVariationMapper):
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
-	def connectDB(self):
-		"""
-		2012.6.5
-			overwrite the parent class
-		"""
-		self.db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema,\
-				port=self.port)
-		self.db.setup(create_tables=False)
-		
 	
 	def check_if_phenotype_method_id_in_db(self, curs, phenotype_method_table, phenotype_method_id):
 		"""
@@ -163,7 +150,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		return marker_pos2snp_id
 	
 	@classmethod
-	def submit_results(cls, db, input_fname, db_entry, user, output_fname=None):
+	def copyAndReformatResultFile(cls, db, inputFname=None, db_entry=None, user=None, output_fname=None):
 		"""
 		2011-2-22
 			Locus are now identified as Snps.id / CNV.id in association result files. (chr, pos) before.
@@ -178,7 +165,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		2008-08-19
 			add original_filename to ResultsMethod
 		2008-07-16
-			if input_fname is neither file name nor file object, exit the program
+			if inputFname is neither file name nor file object, exit the program
 			better handling of the column_4th and its header
 		2008-07-16
 			if it's 4-column, the last one is MAF.
@@ -188,7 +175,7 @@ class Results2DB_250k(AbstractVariationMapper):
 				dump the file onto file system storage if output_fname is given
 				db submission is too slow
 		2008-05-26
-			input_fname from plone is not file object although it has file object interface.
+			inputFname from plone is not file object although it has file object interface.
 		2008-05-26
 			csv.Sniffer() can't figure out delimiter if '\n' is in the string, use own dumb function figureOutDelimiter()
 		2008-05-25
@@ -196,34 +183,34 @@ class Results2DB_250k(AbstractVariationMapper):
 			use marker id in results table
 		2008-05-24
 			figure out delimiter automatically
-			input_fname could be a file object (from plone)
+			inputFname could be a file object (from plone)
 			phenotype method doesn't go with results anymore. it goes with results_method
 		2008-04-28
 			changed to use Stock_250kDatabase (SQLAlchemy) to do db submission
 		"""
-		if isinstance(input_fname, str) and os.path.isfile(input_fname):
-			sys.stderr.write("Submitting results from %s ..."%(os.path.basename(input_fname)))
-			delimiter = figureOutDelimiter(input_fname)
-			reader = csv.reader(open(input_fname), delimiter=delimiter)
-			db_entry.original_filename = input_fname
-		elif hasattr(input_fname, 'readline') or hasattr(input_fname, 'read'):	#input_fname is not a file name, but direct file object. it could also be <ZPublisher.HTTPRequest.FileUpload instance at 0xa1774f4c>
-			sys.stderr.write("Submitting results from %s on plone ..."%input_fname.filename)
+		if (isinstance(inputFname, str) or isinstance(inputFname, unicode)) and os.path.isfile(inputFname):
+			sys.stderr.write("Submitting results from %s ..."%(os.path.basename(inputFname)))
+			delimiter = figureOutDelimiter(inputFname)
+			reader = csv.reader(open(inputFname), delimiter=delimiter)
+			db_entry.original_filename = inputFname
+		elif hasattr(inputFname, 'readline') or hasattr(inputFname, 'read'):	#inputFname is not a file name, but direct file object. it could also be <ZPublisher.HTTPRequest.FileUpload instance at 0xa1774f4c>
+			sys.stderr.write("Submitting results from %s on plone ..."%inputFname.filename)
 			cs = csv.Sniffer()
-			input_fname.seek(0)	#it's already read by plone to put int data['input_fname'], check results2db_250k.py
-			if getattr(input_fname, 'readline', None) is not None:
-				test_line = input_fname.readline()
+			inputFname.seek(0)	#it's already read by plone to put int data['inputFname'], check results2db_250k.py
+			if getattr(inputFname, 'readline', None) is not None:
+				test_line = inputFname.readline()
 				delimiter = cs.sniff(test_line).delimiter
 			else:
-				test_line = input_fname.read(200)
+				test_line = inputFname.read(200)
 				delimiter = figureOutDelimiter(test_line)	#counting is a safer solution. if test_line include '\n', cs.sniff() won't figure it out.
-			input_fname.seek(0)
-			reader = csv.reader(input_fname, delimiter=delimiter)
-			if getattr(input_fname, 'filename', None):
-				db_entry.original_filename = getattr(input_fname, 'filename', None)
+			inputFname.seek(0)
+			reader = csv.reader(inputFname, delimiter=delimiter)
+			if getattr(inputFname, 'filename', None):
+				db_entry.original_filename = getattr(inputFname, 'filename', None)
 			else:
-				db_entry.original_filename = getattr(input_fname, 'name', None)
+				db_entry.original_filename = getattr(inputFname, 'name', None)
 		else:
-			sys.stderr.write("Error: %s is neither a file name nor a file object.\n"%input_fname)
+			sys.stderr.write("Error: %s is neither a file name nor a file object.\n"%inputFname)
 			sys.exit(4)
 		
 		if output_fname:
@@ -298,6 +285,8 @@ class Results2DB_250k(AbstractVariationMapper):
 					data_row.append(column_4th)
 				if column_5th is not None:
 					data_row.append(column_5th)
+					if db_entry.no_of_accessions is None:	#calculate the no_of_accessions based on MAC/MAF
+						db_entry.no_of_accessions = int(round(float(column_5th)/float(column_4th)))
 				if column_6 is not None:
 					data_row.append(column_6)
 				if rest_of_row:
@@ -376,16 +365,16 @@ class Results2DB_250k(AbstractVariationMapper):
 		return output_fname
 	
 	@classmethod
-	def copyResultsFile(cls, db, input_fname, db_entry, user, output_fname=None):
+	def copyResultsFile(cls, db, inputFname, db_entry, user, output_fname=None):
 		"""
 		2008-09-30
 			return True
 		2008-09-09
-			similar task to submit_results, but not look into the file, just copy the file
+			similar task to copyAndReformatResultFile, but not look into the file, just copy the file
 		"""
-		sys.stderr.write("Copying results from %s ..."%(os.path.basename(input_fname)))
-		db_entry.original_filename = input_fname
-		pipe_f = os.popen('cp %s %s'%(input_fname, output_fname))
+		sys.stderr.write("Copying results from %s ..."%(os.path.basename(inputFname)))
+		db_entry.original_filename = inputFname
+		pipe_f = os.popen('cp %s %s'%(inputFname, output_fname))
 		pipe_f_out = pipe_f.read()
 		if pipe_f_out:
 			sys.stderr.write("\tcp output: %s\n"%pipe_f_out)
@@ -394,11 +383,12 @@ class Results2DB_250k(AbstractVariationMapper):
 		
 	
 	@classmethod
-	def add2DB(cls, db, short_name, phenotype_method_id, call_method_id, data_description, \
-				method_description, comment, input_fname, user, results_method_type_id=None, \
+	def add2DB(cls, db=None, short_name=None, phenotype_method_id=None, call_method_id=None, data_description=None, \
+				method_description=None, comment=None, inputFname=None, user=None, results_method_type_id=None, \
 				analysis_method_id=None, results_method_type_short_name=None, data_dir=None, commit=0,\
 				cnv_method_id=None):
 		"""
+		2012.12.28 overhaul
 		2012.6.6
 			pass db to getOneResultJsonData()
 		2012.3.9
@@ -420,7 +410,7 @@ class Results2DB_250k(AbstractVariationMapper):
 			new analysis_method_id is added to results_method.
 		2008-05-30
 			go to output_dir
-			drop submit_results()
+			drop copyAndReformatResultFile()
 			use store_file()
 		2008-05-26
 			add results_method_type_id and results_method_type_short_name
@@ -431,75 +421,54 @@ class Results2DB_250k(AbstractVariationMapper):
 		session.begin()
 		
 		
-		rmt = ResultsMethodType.get(results_method_type_id)
+		rmt = Stock_250kDB.ResultsMethodType.get(results_method_type_id)
 		if not rmt and results_method_type_short_name is not None:	#create a new results method type
-			rmt = ResultsMethodType(short_name=results_method_type_short_name)
+			rmt = Stock_250kDB.ResultsMethodType(short_name=results_method_type_short_name)
 			session.add(rmt)
 		
 		if not rmt:
 			sys.stderr.write("No results method type available for results_method_type_id=%s.\n"%results_method_type_id)
 			sys.exit(3)
 		
-		pm = PhenotypeMethod.query.get(phenotype_method_id)
-		if not pm:
-			sys.stderr.write("No phenotype method available for phenotype_method_id=%s.\n"%phenotype_method_id)
-			sys.exit(3)
 		if call_method_id:	#2012.6.6
-			cm = CallMethod.query.get(call_method_id)
+			cm = Stock_250kDB.CallMethod.query.get(call_method_id)
+			locus_type_id = cm.locus_type_id
 		else:
 			cm = None
-		if cnv_method_id:	#2012.6.6 this could None
-			cnv_m = Stock_250kDB.CNVMethod.get(cnv_method_id)
-		else:
-			cnv_m = None
-		if not cm and not cnv_m:
-			sys.stderr.write("Neither call method (%s) nor cnv method (%s) available.\n"%(call_method_id, cnv_method_id))
-			sys.exit(3)
+			locus_type_id = None
 		
-		am = AnalysisMethod.query.get(analysis_method_id)
-		if not am:
-			sys.stderr.write("No analysis method available for analysis_method_id=%s.\n"%analysis_method_id)
-			sys.exit(3)
-		
-		query = ResultsMethod.query.filter_by(phenotype_method_id=pm.id).\
-			filter_by(analysis_method_id=am.id).filter_by(results_method_type_id=rmt.id)
-		if cm:	#2011-2-22
-			query = query.filter_by(call_method_id=cm.id)
-		elif cnv_m:	#2011-2-22
-			query = query.filter_by(cnv_method_id=cnv_m.id)
-		if query.count()>0:
-			db_entry = query.first()
+		db_entry = db.checkResultsMethod(call_method_id=call_method_id, phenotype_method_id=phenotype_method_id, \
+										analysis_method_id=analysis_method_id, \
+			cnv_method_id=cnv_method_id, accession_set_id=None, results_method_type_id=results_method_type_id)
+		if db_entry:
 			sys.stderr.write("There is already an entry in results_method (id=%s) with same (call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id)=(%s, %s, %s, %s).\n"\
 							%(db_entry.id, call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id))
-			sys.exit(3)
+			sys.exit(0)
 		
-		if not short_name:
-			short_name = '%s_%s_%s_%s_%s'%(am.short_name, pm.short_name, getattr(cm, 'id',0), getattr(cnv_m, 'id',0),\
-										results_method_type_id)
+		db_entry = db.getResultsMethod(data_dir=data_dir, call_method_id=call_method_id, phenotype_method_id=phenotype_method_id, \
+									analysis_method_id=analysis_method_id, \
+			cnv_method_id=cnv_method_id, accession_set_id=None, results_method_type_id=results_method_type_id,\
+			method_description=method_description, no_of_accessions=None, \
+			no_of_loci=None, filename=None, original_filename=inputFname, \
+			data_description=data_description, comment=comment, created_by=user, locus_type_id=locus_type_id)	#2012.3.9
 		
-		db_entry = ResultsMethod(short_name=short_name, method_description=method_description, \
-				data_description=data_description, comment=comment, created_by=user, locus_type_id=cm.locus_type_id)	#2012.3.9
-		db_entry.phenotype_method = pm
-		db_entry.call_method = cm
-		db_entry.analysis_method = am
-		db_entry.cnv_method = cnv_m
-		if rmt:
-			db_entry.results_method_type = rmt
-		session.add(db_entry)
-		
-		
-		
-		session.flush()	#not necessary as no immediate query on the new results after this and commit() would execute this.
 		if commit:
 			db_entry.filename = os.path.join(db.data_dir, db_entry.constructRelativePath(data_dir=data_dir))
 			localAbsPath = os.path.join(data_dir, db_entry.constructRelativePath(data_dir=data_dir))
 			
+			self.srcFilenameLs.append(inputFname)
+			self.dstFilenameLs.append(localAbsPath)
 			if db_entry.analysis_method_id==13:
-				return_value = cls.copyResultsFile(db, input_fname, db_entry, user=user, output_fname=localAbsPath)
+				return_value = cls.copyResultsFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
 			else:
-				return_value = cls.submit_results(db, input_fname, db_entry, user=user, output_fname=localAbsPath)
+				return_value = cls.copyAndReformatResultFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
 			if return_value:
 				session.add(db_entry)
+				if db_entry.file_size is None:
+					db.updateDBEntryPathFileSize(db_entry=db_entry, data_dir=data_dir)
+				if db_entry.md5sum is None:
+					db.updateDBEntryMD5SUM(db_entry=db_entry, data_dir=data_dir)
+				
 				# 2010-5-3 store the json structure of top 10000 SNPs from the db_entry into db
 				no_of_top_snps = 10000
 				if db_entry.analysis_method.min_maf is not None:
@@ -508,15 +477,15 @@ class Results2DB_250k(AbstractVariationMapper):
 					min_MAF = 0
 				try:
 					#2011-2-24
-					if cm:	#call method, snp dataset
+					if call_method_id:	#call method, snp dataset
 						db_id2chr_pos = db.snp_id2chr_pos
-					elif cnv_m:
-						if db._cnv_method_id!=cnv_m.id:
-							db.cnv_id2chr_pos = cnv_m.id
+					elif cnv_method_id:
+						if db._cnv_method_id!=cnv_method_id:
+							db.cnv_id2chr_pos = cnv_method_id
 						db_id2chr_pos = db.cnv_id2chr_pos
 					pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
 					json_data = getOneResultJsonData(db_entry, db_250k=db, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
-					rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
+					rm_json = Stock_250kDB.ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
 					rm_json.result = db_entry
 					rm_json.json_data = json_data
 					session.add(rm_json)
@@ -527,12 +496,14 @@ class Results2DB_250k(AbstractVariationMapper):
 					session.delete(rm_json)
 			else:	#bad thing happend when getting data out of the file. don't save this results_method.
 				session.delete(db_entry)
+				sys.stderr.write("Error: copy file from %s to %s failed.\n"%(inputFname, localAbsPath ))
+				session.rollback()
+				self.cleanUpAndExitOnFailure(exitCode=3)
 			session.flush()
 			session.commit()
-			cls.reset_marker_pos2snp_id()
 		else:	#default is also rollback(). to demonstrate good programming
 			session.rollback()
-			cls.reset_marker_pos2snp_id()
+		cls.reset_marker_pos2snp_id()
 	
 	def run(self):
 		"""
@@ -545,21 +516,20 @@ class Results2DB_250k(AbstractVariationMapper):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		
+				
 		#db = Stock_250kDatabase(username=self.user,
 		#		   password=self.passwd, hostname=self.hostname, database=self.dbname)
 		if not os.path.isfile(self.inputFname):
 			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.inputFname))
 			sys.exit(3)
-		self.add2DB(self.db, self.short_name, self.phenotype_method_id, self.call_method_id, self.data_description, \
-				self.method_description, self.comment, self.inputFname, self.db_user, results_method_type_id=self.results_method_type_id,\
+		self.add2DB(db=self.db_250k, short_name=self.short_name, phenotype_method_id=self.phenotype_method_id, \
+				call_method_id=self.call_method_id, data_description=self.data_description, \
+				method_description=self.method_description, comment=self.comment, inputFname=self.inputFname, user=self.db_user,
+				results_method_type_id=self.results_method_type_id,\
 				analysis_method_id=self.analysis_method_id, data_dir=self.data_dir, commit=self.commit,
 				cnv_method_id=self.cnv_method_id)
 		#2012.6.5
-		if self.logFilename:
-			logFile = open(self.logFilename, 'w')
-			logFile.write("submission done.\n")
-			logFile.close()
+		self.outputLogMessage("submission done.\n")
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions

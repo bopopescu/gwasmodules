@@ -11,21 +11,12 @@ Examples:
 	%s -q 57 -A 20 -a 7 -f 3 -o call57cnv20analysis7MinScore3.xml -u yh -z banyan -c -B condorpool -D condorpool
 	#ditto but analysis method 32
 	%s -q 57 -A 20 -a 32 -f 3 -o call57cnv20analysis32MinScore3.xml -u yh  -z banyan -c -B condorpool -D condorpool
-
-	mpiexec ~/script/variation/src/MpiAssociation.py -i ~/panfs/250k/dataset/call_method_17_test.tsv
-		-p ~/panfs/250k/phenotype.tsv -o ~/panfs/250k/association_results/call_method_17_test_y3.tsv -y3 -w 187-190,210-221
-
-
-	#2010-8-8 association on CNV. watch the "-n" argument
-	mpiexec ~/script/variation/src/MpiAssociation.py -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -p ~/panfs/250k/phenotype/phenotype.tsv
-		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y3_pheno.tsv
-		-y3 -w 39-59,80-82,210-212,32-38,65-74,183-186,191-194,260-263,362-380,161-176,264-267,849-947 -n
 	
 	#2012.9.28 add --getPublicPhenotype if u want to run association only on published phenotype and its values
 	# -n: --noSNPAlleleOrdinalConversion 
 	# -c: commit, (make sure -c is added, otherwise nothing will be stored in db)
 	%s -A 57,75 -n -c -w 314-351 -a 1,32 -K /Network/Data/250k/db/dataset/call_method_75_K.tsv
-		-o workflow/association/association/Call57_75Phenotype314_351Analysis1_32.xml
+		-o workflow/Association/associationCall57_75Phenotype314_351Analysis1_32.xml
 		-u yh -d stock_250k -z banyan  -j condorpool -l condorpool
 		#--getPublicPhenotype
 
@@ -262,7 +253,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 						sys.stderr.write("Warning: analysisMethod %s has non-None test_type %s. Skip.\n"%(test_type))
 						continue
 					#2012.9.28 not in db
-					rm = db_250k.getResultsMethod(call_method_id=callMethodID, phenotype_method_id=phenotype_method_id, \
+					rm = db_250k.checkResultsMethod(call_method_id=callMethodID, phenotype_method_id=phenotype_method_id, \
 											analysis_method_id=analysis_method_id, \
 											cnv_method_id=None)
 					if rm:
@@ -312,7 +303,10 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		for call_method_id in self.call_method_id_ls:
 			callMethod = Stock_250kDB.CallMethod.get(call_method_id)
 			if callMethod and callMethod.filename:
-				datasetFile = self.registerOneInputFile(inputFname=callMethod.filename, folderName=self.pegasusFolderName)
+				datasetFile = self.registerOneInputFile(inputFname=supplantFilePathWithNewDataDir(filePath=callMethod.filename, \
+																		oldDataDir=self.db_250k.data_dir, \
+																		newDataDir=self.data_dir), \
+													folderName=self.pegasusFolderName)
 				callMethodID2FileObject[callMethod.id] = datasetFile
 			else:
 				sys.stderr.write("WARNING: call method %s has no db entry or its .filename is empty.\n"%(call_method_id))
@@ -330,7 +324,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		else:
 			genotypeFileToGenerateKinship = None
 		
-		self.addJobs(db_250k=self.db, callMethodID2FileObject=callMethodID2FileObject, kinshipFile=kinshipFile, \
+		self.addJobs(db_250k=self.db_250k, callMethodID2FileObject=callMethodID2FileObject, kinshipFile=kinshipFile, \
 					eigenVectorFile=eigenVectorFile, phenotype_method_id_ls=self.phenotype_method_id_ls,\
 					analysis_method_id_ls=self.analysis_method_id_ls, \
 					genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, \

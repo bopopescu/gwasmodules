@@ -12,49 +12,35 @@ Examples:
 		--drivername mysql --hostname banyan --dbname stock_250k --db_user yh
 	
 Description:
-	2012.11.12 This program would submit landscape of association results into database.
+	2012.12.21 This program submits association peak file from one association result into database (table GenomeWideAssociationPeak).
+		not table AssociationTeak.
+		The corresponding association landscape has to be in the database already.
 	
 """
 import sys, os, math
 __doc__ = __doc__%(sys.argv[0], )
-"""
-bit_number = math.log(sys.maxint)/math.log(2)
-if bit_number>40:       #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
-else:   #32bit
-"""
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv, stat, getopt, re
 import traceback, gc, subprocess
 from pymodule import figureOutDelimiter, PassingData
-from pymodule import MatrixFile
-from pymodule import AbstractDBInteractingJob
-from variation.src.common import getOneResultJsonData
-from variation.src.db.Results2DB_250k import Results2DB_250k
+from pymodule import AssociationPeakTableFile
 from variation.src import Stock_250kDB
+from AssociationLandscape2DB import AssociationLandscape2DB
 
-class AssociationPeak2DB(Results2DB_250k):
+class AssociationPeak2DB(AssociationLandscape2DB):
 	__doc__ = __doc__
-	option_default_dict = Results2DB_250k.option_default_dict.copy()
+	option_default_dict = AssociationLandscape2DB.option_default_dict.copy()
 	option_default_dict.update({
-						('landscapeLocusIDFname', 1, ): ['', '', 1, 'file that contains one-column, snps.id,'],\
-						('result_id', 1, int): [None, '', 1, "ResultsMethod.id of the association result from which the landscape is derived."],\
-						('neighbor_distance', 0, int): [5000, '', 1, "within this distance, a locus that increases the association score \
-									the fastest is chosen as bridge end. outside this distance, whatever the next point is will be picked."],\
-						('max_neighbor_distance', 0, int): [20000, '', 1, "beyond this distance, no bridge would be formed."],\
-						('min_MAF', 0, float): [0.1, '', 1, 'minimum Minor Allele Frequency.'],\
-						('outputFname', 1, ): [None, 'o', 1, 'this output file stores the reduced gwas (landscape-only).'],\
-						
+						('min_score', 0, float): [3, '', 1, 'minimum score to cut an association landscape into peaks, -log(pvalue).'],\
 						})
 	
 	def __init__(self, **keywords):
 		"""
 		2012.11.12
 		"""
-		Results2DB_250k.__init__(self, **keywords)
+		AssociationLandscape2DB.__init__(self, **keywords)
 	
 	def getLocusBasedOnDataObj(self, db_250k, data_obj):
 		"""
@@ -78,16 +64,57 @@ class AssociationPeak2DB(Results2DB_250k):
 		db_250k.session.flush()
 		sys.stderr.write("%s loci inserted into db. Done.\n"%(no_of_newly_added_loci))
 	
-	def add2DB(self, db_250k=None, inputFname=None, result=None, result_landscape_type=None, \
-			call_method_id=None, cnv_method_id=None, phenotype_method_id=None, \
-			analysis_method_id=None, results_method_type_id=None, \
-			no_of_loci = None, \
+	def add2DB(self, db=None, inputFname=None, result=None, association_landscape=None, \
+			association_peak_type=None, \
 			data_dir=None, commit=0,\
-			comment=None, user=None):
+			comment=None, db_user=None):
 		"""
-		2012.11.13
+		2012.12.21
 		"""
 		
+		session = db.session
+		session.begin()
+		
+		
+		#2012.11.13 check if it's in db already
+		db_entry = db.checkGenomeWideAssociationPeak(result_id=result.id, \
+										association_landscape_id=association_landscape.id, \
+										association_peak_type_id=association_peak_type.id)
+		if db_entry:
+			sys.stderr.write("Warning: genome-wide association-peak of (result=%s, landscape %s, peak-type %s) already in db.\n"%\
+							(result.id, association_landscape.id, association_peak_type.id))
+			sys.exit(3)
+		else:
+			peakFile = AssociationPeakTableFile(inputFname, openMode='r')
+			no_of_peaks = peakFile.nrows
+			peakFile.close()
+			db_entry = db.getGenomeWideAssociationPeak(result_id=result.id, \
+								association_landscape_id=association_landscape.id,\
+								association_peak_type_id=association_peak_type.id,\
+								no_of_peaks = no_of_peaks,\
+								original_path=os.path.abspath(inputFname), comment=comment, created_by=db_user)
+		
+		
+		if commit:
+			inputFileBasename = os.path.basename(inputFname)
+			#moveFileIntoDBAffiliatedStorage() will also set db_entry.path
+			exitCode = db.moveFileIntoDBAffiliatedStorage(db_entry=db_entry, filename=inputFileBasename, \
+									inputDir=os.path.split(inputFname)[0], \
+									outputDir=data_dir,\
+									relativeOutputDir=None, shellCommand='cp -rL', \
+									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
+									constructRelativePathFunction=db_entry.constructRelativePath, data_dir=data_dir)
+			
+			if exitCode!=0:
+				sys.stderr.write("Error: moveFileIntoDBAffiliatedStorage() exits with %s code.\n"%(exitCode))
+				session.rollback()
+				self.cleanUpAndExitOnFailure(exitCode=exitCode)
+			
+			session.flush()
+			session.commit()
+		else:	#default is also rollback(). to demonstrate good programming
+			session.rollback()
+		"""
 								association_peak = Stock_250kDB.AssociationPeak(result_id = rm.id, chromosome=peak_start_data_obj.chromosome,\
 								start=peak_start_data_obj.peak_start, stop=intersection_point.x(), no_of_loci=no_of_loci, \
 								peak_score=peak_data_obj.value)
@@ -110,10 +137,8 @@ class AssociationPeak2DB(Results2DB_250k):
 			db_250k.session.flush()
 			#subgraph = nx.subgraph(locusLandscapeNeighborGraph, cc)
 		sys.stderr.write("%s peaks.\n"%(no_of_peaks))
-		
-		db_250k.session.flush()
-		if self.commit:
-			db_250k.session.commit()
+		"""
+	
 	def run(self):
 		"""
 		2012.11.12
@@ -126,37 +151,33 @@ class AssociationPeak2DB(Results2DB_250k):
 			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.inputFname))
 			sys.exit(3)
 		
-		#extract full data from an old association result file (snps.id in landscapeLocusIDFname) and generate a new one
-		no_of_loci = self.reduceAssociationResult(inputFname=self.inputFname, landscapeLocusIDFname=self.landscapeLocusIDFname, \
-									outputFname=self.outputFname)
+		peakFile = AssociationPeakTableFile(self.inputFname, openMode='r')
+		result_id = peakFile.getAttribute('result_id')
+		peakFile.close()
+		result = Stock_250kDB.ResultsMethod.get(result_id)
 		
-		result = Stock_250kDB.ResultsMethod.get(self.result_id)
-		
-		association_peak_type = db_250k.getAssociationPeakType(min_MAF=self.min_MAF, min_score=self.min_score, \
+		association_landscape_type = self.db_250k.getAssociationLandscapeType(min_MAF=self.min_MAF, \
 											neighbor_distance=self.neighbor_distance, \
 											max_neighbor_distance=self.max_neighbor_distance)
-		#2011-10-12 check to see if AssociationPeak contains the peaks from this result already.
-		query = Stock_250kDB.AssociationPeak.query.filter_by(association_peak_type_id=association_peak_type.id).filter_by(result_id=rm.id)
-		if query.first():
-			logString = "result_id=%s, association_peak_type_id=%s already exists in AssociationPeak. exit.\n"%(result_id, association_peak_type.id)
-			self.outputLogMessage(logString)
-			sys.stderr.write(logString)
-			sys.exit(0)
 		
-		no_of_peaks = self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
-					ground_score=self.ground_score, min_score=self.min_score, rm=rm, association_peak_type=association_peak_type)
+		association_peak_type = self.db_250k.getAssociationPeakType(association_landscape_type_id=association_landscape_type.id, \
+															min_score=self.min_score)
+	
+		association_landscape = self.db_250k.checkAssociationLandscape(result_id=result.id, \
+								association_landscape_type_id=association_landscape_type.id)
+		if not association_landscape:
+			sys.stderr.write("Error, landscape for result_id=%s, association_landscape_type_id=%s not in db.\n"%\
+							(result.id, association_landscape_type.id))
+			sys.exit(2)
+		
 		"""
 		#2011-4-21 to check how far things are from each other.
 		#self.drawBridgeChromosomalLengthHist(bridge_ls)
 		"""
-		self.outputLogMessage("Result %s has %s peaks.\n"%(result_id, no_of_peaks))
-		
-		#add the extracted association result into db
-		self.add2DB(db=self.db, inputFname=self.outputFname, result=result, result_landscape_type=result_landscape_type, \
-				call_method_id=result.call_method_id, cnv_method_id=result.cnv_method_id, phenotype_method_id=result.phenotype_method_id, \
-				analysis_method_id=result.analysis_method_id, results_method_type_id=result.results_method_type_id, \
-				no_of_loci=no_of_loci,\
-				data_dir=self.data_dir, commit=self.commit, comment=self.comment, user=self.db_user)
+		self.add2DB(db=self.db_250k, inputFname=self.inputFname, result=result, association_landscape=association_landscape, \
+			association_peak_type=association_peak_type, \
+			data_dir=self.data_dir, commit=self.commit,\
+			comment=None, db_user=self.db_user)
 		
 		#2012.6.5
 		self.outputLogMessage("submission done.\n")

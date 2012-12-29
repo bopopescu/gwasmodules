@@ -96,8 +96,8 @@ from pymodule import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_rati
 from pymodule import RBDict
 from pymodule.Genome import GeneModel
 from pymodule.plot.yh_matplotlib_artists import ExonIntronCollection
-from pymodule import outputMatrixInLatexTable
-from pymodule import outputFigureInLatex
+from pymodule import outputMatrixInLatexTable, outputFigureInLatex
+from pymodule import RBTree, RBDict, RBTreeIter, RBList, RBNode
 from variation.src import Stock_250kDB
 from variation.src.enrichment.GeneListRankTest import GeneListRankTest	#GeneListRankTest.getGeneList()
 from variation.src.common import getEcotypeInfo
@@ -430,7 +430,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 			
 		2008-09-24
 		"""
-		from transfac.src import GenomeDB
+		from pymodule import GenomeDB
 		if cls_with_db_args is None:
 			cls_with_db_args = cls
 		db = GenomeDB.GenomeDatabase(drivername=cls_with_db_args.drivername, username=cls_with_db_args.db_user,
@@ -456,7 +456,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		2008-10-01
 			similar to dealLD_info()
 		"""
-		sys.stderr.write("Dealing with gene_annotation ...")
+		sys.stderr.write("Dealing with gene_annotation %s ..." %(gene_annotation_picklef))
 		if gene_annotation_picklef:
 			if os.path.isfile(gene_annotation_picklef):	#if this file is already there, suggest to un-pickle it.
 				from pymodule import utils	#2012.3.26 "utils" has to be present for cPickle.load() to work
@@ -465,10 +465,14 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 				del picklef
 			else:	#if the file doesn't exist, but the filename is given, pickle into it
 				gene_annotation = cls.getGeneAnnotation(tax_id=tax_id, cls_with_db_args=cls_with_db_args)	#min_gap is 2 X min_distance + a few more bases
-				if os.access(gene_annotation_picklef, os.W_OK):	# 2010-4-20 make sure the file is writable
+				try: #os.access(gene_annotation_picklef, os.W_OK):	# 2010-4-20 make sure the file is writable
 					picklef = open(gene_annotation_picklef, 'w')
 					cPickle.dump(gene_annotation, picklef, -1)
 					picklef.close()
+				except:
+					sys.stderr.write('Except while trying to pickle gene_annotation to a file: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
 		else:
 			gene_annotation = cls.getGeneAnnotation(tax_id=tax_id, cls_with_db_args=cls_with_db_args)
 		sys.stderr.write(" %s genes.\n"%(len(gene_annotation.gene_id2model)))

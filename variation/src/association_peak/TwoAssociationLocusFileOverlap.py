@@ -21,12 +21,24 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
 import pylab
 import csv, random, numpy
+import tables
+from tables import UInt64Col, Float64Col, StringCol
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter,\
-	yh_matplotlib, HDF5MatrixFile
+	yh_matplotlib, HDF5MatrixFile, YHFile
 from pymodule import RBDict, CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-from pymodule import yhio
+from pymodule import yhio, AssociationLocusTableFile
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 from CountAssociationLocus import CountAssociationLocus
+
+class TwoAssociationLocusOverlapTable(tables.IsDescription):
+	"""
+	2012.12.24 new PyTables-based table definition
+	"""
+	id = UInt64Col(pos=0)
+	chromosome = StringCol(64, pos=1)
+	start = UInt64Col(pos=2)
+	stop = UInt64Col(pos=3)
+	fractionCoveredByAssociation2 = Float64Col(pos=4)
 
 class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 	__doc__ = __doc__
@@ -55,9 +67,7 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 			if self.outputFname and suffix!='.png':
 				writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
 		else:	#HDF5MatrixFile
-			dtypeList = [('chromosome', HDF5MatrixFile.varLenStrType), \
-						('start', 'i8'), ('stop', 'i8'), ('fractionCoveredByAssociation2', 'f8')]
-			writer = HDF5MatrixFile(self.outputFname, openMode='w', dtypeList=dtypeList)
+			writer = YHFile(self.outputFname, openMode='w', rowDefinition=TwoAssociationLocusOverlapTable)
 		self.writer = writer
 		
 	def fileWalker(self, inputFname=None, afterFileFunction=None, processRowFunction=None , run_type=1, **keywords):
@@ -72,9 +82,12 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 		if afterFileFunction is None:
 			afterFileFunction = self.afterFileFunction
 		try:
-			rbDict = yhio.Association.constructAssociationLocusRBDictFromHDF5File(inputFname=inputFname, \
-										locusPadding=self.locusPadding, groupName='association_locus')
+			associationLocusTableFile = AssociationLocusTableFile(inputFname, openMode='r')
+			rbDict = associationLocusTableFile.associationLocusRBDict
+			#rbDict = yhio.Association.constructAssociationLocusRBDictFromHDF5File(inputFname=inputFname, \
+			#							locusPadding=self.locusPadding, tableName='association_locus')
 			self.associationLocusRBDictList.append(rbDict)
+			associationLocusTableFile.close()
 			
 			counter += 1
 			real_counter += 1

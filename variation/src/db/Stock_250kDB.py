@@ -14,16 +14,16 @@ Description:
 import sys, os, math
 from sqlalchemy.types import LargeBinary
 
-bit_number = math.log(sys.maxint)/math.log(2)
-if bit_number>40:       #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
-else:   #32bit
-	sys.path.insert(0, os.path.expanduser('~/lib/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+#bit_number = math.log(sys.maxint)/math.log(2)
+#if bit_number>40:       #64bit
+#	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
+#	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
+#else:   #32bit
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from sqlalchemy.engine.url import URL
-from elixir import Unicode, DateTime, String, Integer, UnicodeText, Text, Boolean, Float, Binary, Enum
+from elixir import Unicode, DateTime, String, BigInteger, Integer, UnicodeText, Text, Boolean, Float, Binary, Enum
 from elixir import Entity, Field, using_options, using_table_options
 from elixir import OneToMany, ManyToOne, ManyToMany
 from elixir import setup_all, session, metadata, entities
@@ -36,10 +36,9 @@ from sqlalchemy import func
 
 from datetime import datetime
 
-from pymodule import SNPData, PassingData
+from pymodule import SNPData, PassingData, figureOutDelimiter
 from pymodule.db import ElixirDB, TableClass, supplantFilePathWithNewDataDir, AbstractTableWithFilename
-import os
-import hashlib 
+import hashlib, csv
 
 
 __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
@@ -488,6 +487,7 @@ class AccessionSet2Ecotype(Entity):
 
 class ResultsMethod(Entity, AbstractTableWithFilename):
 	"""
+	2012.12.27 added field accession_set_id
 	2012.11.14 added no_of_accessions and no_of_loci
 	2012.3.7
 		add column locus_type
@@ -513,6 +513,7 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	transformation_method = ManyToOne('%s.TransformationMethod'%__name__, colname='transformation_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	cnv_method = ManyToOne("%s.CNVMethod"%__name__, colname='cnv_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	accession_set = ManyToOne('%s.AccessionSet'%__name__, colname='accession_set_id', ondelete='SET NULL', onupdate='CASCADE')
 	locus_type = ManyToOne('%s.LocusType'%__name__, colname='locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	rm_json = OneToMany('%s.ResultsMethodJson'%__name__)
 	created_by = Field(String(200))
@@ -522,14 +523,18 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 	remove_outliers = Field(Integer, default=0)
 	pseudo_heritability = Field(Float)
 	transformation_parameters = Field(String(11))
+	md5sum = Field(Text)	# unique=True
+	file_size = Field(BigInteger)	#2012.7.12
 	using_options(tablename='results_method', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('call_method_id', 'phenotype_method_id', \
-										'results_method_type_id', 'analysis_method_id', 'cnv_method_id'))
+										'results_method_type_id', 'analysis_method_id', 'cnv_method_id',\
+										'accession_set_id'))
 	folderName = 'results'
 	
 	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
 		"""
+		2012.12.27 accession_set_id is part of filename.
 		2012.11.13
 		"""
 		if not subFolder:
@@ -554,10 +559,69 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 			filename_part_ls.append('pheno%s'%self.phenotype_method_id)
 		if self.analysis_method_id is not None:
 			filename_part_ls.append('ana%s'%self.analysis_method_id)
+		if self.accession_set_id is not None:
+			filename_part_ls.append('set%s'%(self.accession_set_id))
 		filename_part_ls = map(str, filename_part_ls)
 		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
 		return fileRelativePath
 	
+	def calculateNoOfAccessionsFromFile(self, data_dir=None, absPath=None):
+		"""
+		2012.12.18
+			use MAC & MAF to figure out no_of_accessions
+		"""
+		if absPath is None:
+			absPath = supplantFilePathWithNewDataDir(filePath=self.filename, oldDataDir=None, newDataDir=data_dir)
+		if absPath and os.path.isfile(absPath):
+			try:
+				delimiter = figureOutDelimiter(absPath)
+				reader = csv.reader(open(absPath), delimiter=delimiter)
+				header = reader.next()
+				row = reader.next()
+				if len(row)>=5:
+					MAF = float(row[3])
+					MAC = float(row[4])
+					self.no_of_accessions = int(round(MAC/MAF))
+				del reader
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+		return self.no_of_accessions
+
+	def calculateNoOfLociFromFile(self, data_dir=None, absPath=None):
+		"""
+		2012.12.28 count the number of lines.
+		"""
+		if absPath is None:
+			absPath = supplantFilePathWithNewDataDir(filePath=self.filename, oldDataDir=None, newDataDir=data_dir)
+		if absPath and os.path.isfile(absPath):
+			try:
+				delimiter = figureOutDelimiter(absPath)
+				reader = csv.reader(open(absPath), delimiter=delimiter)
+				header = reader.next()
+				no_of_loci = 0
+				for row in reader:
+					no_of_loci += 1
+				self.no_of_loci = no_of_loci
+				del reader
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+		return self.no_of_loci
+	
+	def getShortName(self):
+		"""
+		2012.12.28
+		"""
+		short_name = None
+		if self.analysis_method and self.phenotype_method:
+			short_name = '%s_%s_%s_%s_accession%s_y%s'%(self.analysis_method.short_name, self.phenotype_method.short_name, \
+							getattr(self.call_method, 'id',0), getattr(self.cnv_method, 'id',0), self.accession_set_id,\
+							self.results_method_type_id)
+		return short_name
+		
 class ResultsMethodJson(Entity):
 	"""
 	2009-5-4
@@ -585,28 +649,25 @@ class AssociationLandscape(Entity, AbstractTableWithFilename):
 	result = ManyToOne('ResultsMethod', colname='result_id', ondelete='CASCADE', onupdate='CASCADE')
 	association_landscape_type = ManyToOne('%s.AssociationLandscapeType'%__name__, colname='association_landscape_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	no_of_accessions = Field(Integer)	#2012.11.14
-	no_of_loci = Field(Integer)
+	no_of_bridges = Field(Integer)	#2012.12.18
 	
 	short_name = Field(String(60), unique=True)
 	path = Field(String(750), unique=True)
-	original_filename = Field(Text)
-	method_description = Field(String(8000))
-	data_description = Field(String(8000))
+	original_path = Field(Text)
+	md5sum = Field(Text)	# unique=True
+	file_size = Field(BigInteger)	#2012.7.12
 	comment = Field(String(8000))
 	
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
-	remove_outliers = Field(Integer, default=0)
-	pseudo_heritability = Field(Float)
-	transformation_parameters = Field(String(11))
 	using_options(tablename='association_landscape', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('result_id', 'association_landscape_type_id'))
 	folderName = 'association_landscape'
 	
-	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
+	def constructRelativePath(self, data_dir=None, subFolder=None, sourceFilename=None, **keywords):
 		"""
 		2012.11.13
 		"""
@@ -625,13 +686,29 @@ class AssociationLandscape(Entity, AbstractTableWithFilename):
 		if self.id:
 			filename_part_ls.append(self.id)
 		if self.result_id:
-			filename_part_ls.append('result%s'%(self.result_id))
+			filename_part_ls.append('result%s_call%s_ana%s_pheno%s'%(self.result_id, self.result.call_method_id,\
+														self.result.analysis_method_id, self.result.phenotype_method_id))
 		if self.association_landscape_type_id:
 			filename_part_ls.append("type%s"%(self.association_landscape_type_id))
 		filename_part_ls = map(str, filename_part_ls)
 		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
 		return fileRelativePath
-
+	
+	def getShortName(self):
+		"""
+		2012.12.15
+		"""
+		short_name = None
+		if self.result and self.association_landscape_type:
+			am = self.result.analysis_method
+			pm = self.result.phenotype_method
+			cm = self.result.call_method
+			cnv_m = self.result.cnv_method
+			results_method_type = self.result.results_method_type
+			short_name = 'call%s_cnv%s_%s_%s_%s_%s'%(getattr(cm, 'id',0), getattr(cnv_m, 'id',0), am.short_name, pm.short_name, \
+										results_method_type.id, self.association_landscape_type.id)
+		return short_name
+	
 class AssociationLandscapeType(Entity):
 	"""
 	2012.11.12
@@ -650,6 +727,15 @@ class AssociationLandscapeType(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('min_MAF', 'neighbor_distance', 'max_neighbor_distance'))
 
+	def getShortName(self):
+		"""
+		2012.12.15
+		"""
+		short_name = None
+		if self.min_MAF is not None and self.neighbor_distance is not None and self.max_neighbor_distance is not None:
+			short_name = 'min_MAF_%s_neighbor_%s_max_neigh_%s'%(self.min_MAF, self.neighbor_distance, self.max_neighbor_distance)
+		return short_name
+
 class GenomeWideAssociationPeak(Entity, AbstractTableWithFilename):
 	"""
 	2012.11.29 genome-wide version of AssociationPeak. stored in HDF5 file
@@ -659,7 +745,10 @@ class GenomeWideAssociationPeak(Entity, AbstractTableWithFilename):
 	association_peak_type = ManyToOne('%s.AssociationPeakType'%__name__, colname='association_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	no_of_peaks = Field(Integer)	#number of loci in between stop_locus of start_bridge and start_locus of stop_bridge,
 	path = Field(String(750), unique=True)
-	original_filename = Field(Text)
+	original_path = Field(Text)
+	md5sum = Field(Text)	# unique=True
+	file_size = Field(BigInteger)	#2012.7.12
+	
 	comment = Field(Text)
 	created_by = Field(String(128))
 	updated_by = Field(String(128))
@@ -738,18 +827,18 @@ class AssociationPeakType(Entity):
 		type for AssociationPeak
 	"""
 	short_name = Field(String(30), unique=True)
+	association_landscape_type = ManyToOne('%s.AssociationLandscapeType'%__name__, \
+										colname='association_landscape_type_id', ondelete='CASCADE', onupdate='CASCADE')	
 	description = Field(Text)
-	min_MAF = Field(Float)
 	min_score = Field(Float)
-	neighbor_distance = Field(Integer)
-	max_neighbor_distance = Field(Integer)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
 	using_options(tablename='association_peak_type', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('min_MAF', 'min_score', 'neighbor_distance', 'max_neighbor_distance'))
+	using_table_options(UniqueConstraint('min_score', 'association_landscape_type_id'))
+
 
 """
 class AssociationPeakOverlap(Entity):
@@ -779,11 +868,22 @@ class AssociationPeakOverlap(Entity):
 class GenomeWideAssociationLocus(Entity, AbstractTableWithFilename):
 	"""
 	2012.11.29
+		it has 3 extra columns: file_size, original_path, md5sum, inherited from AbstractTableWithFilename.
 	"""
 	no_of_loci = Field(Integer)
 	total_no_of_results = Field(Integer)
+	
+	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
+	call_method_id_ls = Field(String(50))	#length has to be constrained , otherwise, unique key won't be possible
+	analysis_method_id_ls = Field(String(50))
+	phenotype_method_id_ls = Field(String(600))
+	
 	path = Field(String(750), unique=True)	#stores all the peaks
-	original_filename = Field(Text)
+	original_path = Field(Text)
+	md5sum = Field(Text)	# unique=True
+	file_size = Field(BigInteger)	#2012.7.12
+	
 	comment = Field(Text)
 	association_locus_type = ManyToOne('%s.AssociationLocusType'%__name__, colname='association_locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	#association_peak_ls = OneToMany("%s.AssociationPeak"%(__name__))
@@ -793,8 +893,10 @@ class GenomeWideAssociationLocus(Entity, AbstractTableWithFilename):
 	date_updated = Field(DateTime)
 	using_options(tablename='genome_wide_association_locus', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('association_locus_type_id'))
-
+	using_table_options(UniqueConstraint('association_locus_type_id', 'call_method_id', 'call_method_id_ls', \
+										'analysis_method_id', 'analysis_method_id_ls', \
+										'phenotype_method_id_ls'))
+	
 	folderName = 'genome_wide_association_locus'
 	
 	def constructRelativePath(self, data_dir=None, subFolder=None, **keywords):
@@ -815,6 +917,12 @@ class GenomeWideAssociationLocus(Entity, AbstractTableWithFilename):
 		filename_part_ls = []
 		if self.id:
 			filename_part_ls.append(self.id)
+		if self.total_no_of_results:
+			filename_part_ls.append("%sresults"%(self.total_no_of_results))
+		if self.call_method:
+			filename_part_ls.append("call%s"%(self.call_method.id))
+		if self.analysis_method:
+			filename_part_ls.append('ana%s'%(self.analysis_method.id))
 		if self.association_locus_type_id:
 			filename_part_ls.append("type%s"%(self.association_locus_type_id))
 		filename_part_ls = map(str, filename_part_ls)
@@ -834,8 +942,12 @@ class AssociationLocus(Entity):
 	connectivity = Field(Float)
 	no_of_peaks = Field(Integer)
 	no_of_results = Field(Integer)
+	
 	path = Field(String(750), unique=True)	#stores all the peaks
-	original_filename = Field(Text)
+	original_path = Field(Text)
+	md5sum = Field(Text)	# unique=True
+	file_size = Field(BigInteger)	#2012.7.12
+	
 	comment = Field(Text)
 	association_locus_type = ManyToOne('%s.AssociationLocusType'%__name__, colname='association_locus_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	#association_peak_ls = OneToMany("%s.AssociationPeak"%(__name__))
@@ -884,28 +996,21 @@ class AssociationLocusType(Entity):
 	2012.11.29
 	"""
 	short_name = Field(String(30), unique=True)
+	association_peak_type = ManyToOne('%s.AssociationPeakType'%__name__, colname='association_peak_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	description = Field(Text)
-	min_MAF = Field(Float)
-	min_score = Field(Float)
-	neighbor_distance = Field(Integer)
-	max_neighbor_distance = Field(Integer)
 	min_overlap_ratio = Field(Float)
 	min_connectivity = Field(Float)
-	
-	call_method = ManyToOne('%s.CallMethod'%__name__, colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	analysis_method = ManyToOne('%s.AnalysisMethod'%__name__, colname='analysis_method_id', ondelete='CASCADE', onupdate='CASCADE')
-	call_method_id_ls = Field(Text)
-	analysis_method_id_ls = Field(Text)
-	phenotype_method_id_ls = Field(Text)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
 	using_options(tablename='association_locus_type', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('min_MAF', 'min_score', 'neighbor_distance', 'max_neighbor_distance',\
-										'min_overlap_ratio', 'call_method_id_ls', 'analysis_method_id_ls',\
-										'phenotype_method_id_ls'))
+	using_table_options(UniqueConstraint('association_peak_type_id', 'min_overlap_ratio', 'min_connectivity'))
+	#using_table_options(UniqueConstraint('min_MAF', 'min_score', 'neighbor_distance', 'max_neighbor_distance',\
+	#									'min_overlap_ratio', 'call_method_id', 'call_method_id_ls', \
+	#									'analysis_method_id', 'analysis_method_id_ls', \
+	#									'phenotype_method_id_ls'))
 
 """
 
@@ -1279,6 +1384,7 @@ class CallInfo(Entity, AbstractTableWithFilename):
 	date_updated = Field(DateTime)
 	using_options(tablename='call_info', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
+	
 	folderName = 'calls'
 
 class CallQC(Entity):
@@ -2469,34 +2575,19 @@ class Stock_250kDB(ElixirDB):
 			__metadata__.bind = create_engine(self._url, pool_recycle=self.pool_recycle)
 		2008-07-09
 		"""
+		"""
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 												class_to_have_attr=self)
-		
-		if self.echo_pool:	#2010-9-19 passing echo_pool to create_engine() causes error. all pool log disappeared.
-			#2010-9-19 Set up a specific logger with our desired output level
-			import logging
-			#import logging.handlers
-			logging.basicConfig()
-			#LOG_FILENAME = '/tmp/sqlalchemy_pool_log.out'
-			my_logger = logging.getLogger('sqlalchemy.pool')
-	
-			# Add the log message handler to the logger
-			#handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=1000000, backupCount=5)
-			# create formatter
-			#formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-			# add formatter to handler
-			#handler.setFormatter(formatter)
-			#my_logger.addHandler(handler)
-			my_logger.setLevel(logging.DEBUG)
+		"""
+		ElixirDB.__init__(self, **keywords)
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 		
-		
+		self.READMEClass = README	#2012.12.18 required to figure out data_dir
 		self._cnv_id2chr_pos = {}	#2011-2-24
 		self._cnv_method_id = None	#2011-2-24
 		self._chr_pos2snp_id = {}	#2011-2-28
 		self._snp_id2chr_pos = {}	#2011-2-28
-		self._data_dir = None	#2012.11.13
 	
 	def setup(self, create_tables=True):
 		"""
@@ -2507,24 +2598,6 @@ class Stock_250kDB(ElixirDB):
 		#2008-08-26 setup_all() would setup other databases as well if they also appear in the program. Seperate this to be envoked after initialization
 		# to ensure the metadata of other databases is setup properly.
 	
-	@property
-	def data_dir(self, ):
-		"""
-		2012.3.23
-			(learnt from VervetDB)
-			get the master directory in which all files attached to this db are stored.
-		"""
-		if not self._data_dir:
-			dataDirEntry = README.query.filter_by(title='data_dir').first()
-			if not dataDirEntry or not dataDirEntry.description or not os.path.isdir(dataDirEntry.description):
-				# todo: need to test dataDirEntry.description is writable to the user
-				sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
-				raise
-				self._data_dir = None
-			else:
-				self._data_dir = dataDirEntry.description
-		return self._data_dir
-	
 	def reScalePathByNewDataDir(self, filePath=None, newDataDir=None):
 		"""
 		2012.11.13
@@ -2532,20 +2605,71 @@ class Stock_250kDB(ElixirDB):
 		oldDataDir=self.data_dir
 		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
 	
-	def getResultsMethod(self, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
-			cnv_method_id=None, **keywords):
+	def checkResultsMethod(self, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
+			cnv_method_id=None, accession_set_id=None, results_method_type_id=None):
 		"""
-		2012.9.28 for AssociationWorkflow.py
+		2012.12.28
 		"""
-		
 		query = ResultsMethod.query.filter_by(phenotype_method_id=phenotype_method_id).\
-					filter_by(analysis_method_id=analysis_method_id)
+					filter_by(analysis_method_id=analysis_method_id).filter_by(accession_set_id=accession_set_id)
 		if call_method_id:
 			query = query.filter_by(call_method_id=call_method_id)
 		if cnv_method_id:
 			query = query.filter_by(cnv_method_id=cnv_method_id)
+		if results_method_type_id:
+			query = query.filter_by(results_method_type_id=results_method_type_id)
 		rm = query.first()
 		return rm
+	
+	def getResultsMethod(self, data_dir=None, short_name=None, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
+			cnv_method_id=None, accession_set_id=None, no_of_accessions=None, \
+			no_of_loci=None, filename=None, original_filename=None, method_description=None,\
+			data_description=None, locus_type_id=None, \
+			results_method_type_id=None, transformation_method_id=None, \
+			remove_outliers=None, pseudo_heritability=None, transformation_parameters=None, \
+			**keywords):
+		"""
+		2012.12.28 the checking function goes into checkResultsMethod
+		2012.9.28 for AssociationWorkflow.py
+		"""
+		db_entry = self.checkResultsMethod(call_method_id=call_method_id, phenotype_method_id=phenotype_method_id,\
+									analysis_method_id=analysis_method_id, cnv_method_id=cnv_method_id, \
+									accession_set_id=accession_set_id, results_method_type_id=results_method_type_id)
+		if not db_entry:
+			if original_filename:
+				original_filename = os.path.abspath(original_filename)
+			db_entry = ResultsMethod(short_name=short_name, call_method_id=call_method_id, phenotype_method_id=phenotype_method_id,\
+							analysis_method_id=analysis_method_id, cnv_method_id=cnv_method_id, \
+							accession_set_id=accession_set_id, no_of_accessions=no_of_accessions, \
+							no_of_loci=no_of_loci, filename=filename, \
+							original_filename=original_filename, method_description=method_description, \
+							data_description=data_description,\
+							locus_type_id=locus_type_id, results_method_type_id=results_method_type_id, \
+							transformation_method_id =transformation_method_id, remove_outliers=remove_outliers, \
+							pseudo_heritability=pseudo_heritability,\
+							transformation_parameters=transformation_parameters, **keywords)
+			self.session.add(db_entry)
+			self.session.flush()
+			flushAgain= False
+			if original_filename:
+				if db_entry.no_of_accessions is None:
+					db_entry.calculateNoOfAccessionsFromFile(data_dir=data_dir, absPath=original_filename)
+				if db_entry.no_of_loci is None:
+					db_entry.calculateNoOfLociFromFile(data_dir=data_dir, absPath=original_filename)
+				flushAgain  = True
+			if db_entry.filename:
+				if db_entry.file_size is None:
+					self.updateDBEntryPathFileSize(db_entry=db_entry, data_dir=data_dir)
+				if db_entry.md5sum is None:
+					self.updateDBEntryMD5SUM(db_entry=db_entry, data_dir=data_dir)
+			if not db_entry.short_name:
+				db_entry.setShortName()
+				flushAgain  = True
+			if flushAgain:
+				self.session.add(db_entry)
+				self.session.flush()
+				
+		return db_entry
 	
 	#@classmethod
 	def getGWA(self, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
@@ -3979,43 +4103,118 @@ class Stock_250kDB(ElixirDB):
 			query = query.filter_by(association_peak_type_id=association_peak_type_id)
 		return query
 	
-	def getAssociationPeakType(self, min_MAF=None, min_score=None, neighbor_distance=None, max_neighbor_distance=None):
+	def getAssociationPeakType(self, association_landscape_type_id=None, min_score=None):
 		"""
 		2012.11.20
 			moved from DefineAssociationLandscape.py
 		2011-4-20
 		"""
 		TableClass = AssociationPeakType
-		db_entry = TableClass.query.filter(func.abs(TableClass.min_MAF-min_MAF)<0.00001).filter_by(min_score=min_score).\
-			filter_by(neighbor_distance=neighbor_distance).\
-			filter_by(max_neighbor_distance=max_neighbor_distance).first()
+		db_entry = TableClass.query.filter(func.abs(TableClass.min_score-min_score)<0.00001).\
+			filter_by(association_landscape_type_id=association_landscape_type_id).first()
 		if db_entry is None:
-			db_entry = TableClass(min_MAF=min_MAF, min_score=min_score, \
-									neighbor_distance=neighbor_distance, \
-									max_neighbor_distance=max_neighbor_distance)
+			db_entry = TableClass(association_landscape_type_id=association_landscape_type_id, min_score=min_score)
 			self.session.add(db_entry)
 			self.session.flush()
 		return db_entry
 	
-	def getAssociationLandscape(self, result_id=None, association_landscape_type_id=None, \
-						call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
-						cnv_method_id=None, **keywords):
+	def checkGenomeWideAssociationPeak(self, result_id=None, association_landscape_id=None, \
+						association_peak_type_id=None, **keywords):
 		"""
-		2012.11.14 way to query AssociationLandscape
+		2012.12.21 check whether one GenomeWideAssociationPeak is in db or not.
 		"""
 		
-		query = AssociationLandscape.query.filter_by(association_landscape_type_id=association_landscape_type_id)
-		if result_id:
-			query = query.filter_by(result_id=result_id)
-		if phenotype_method_id:
-			query = query.filter_by(phenotype_method_id=phenotype_method_id)
-		if analysis_method_id:
-			query = query.filter_by(analysis_method_id=analysis_method_id)
-		if call_method_id:
-			query = query.filter_by(call_method_id=call_method_id)
-		if cnv_method_id:
-			query = query.filter_by(cnv_method_id=cnv_method_id)
+		query = GenomeWideAssociationPeak.query.filter_by(association_landscape_id=association_landscape_id).\
+			filter_by(result_id=result_id).filter_by(association_peak_type_id=association_peak_type_id)
 		db_entry = query.first()
+		if db_entry:
+			return db_entry
+		else:
+			return None
+	
+	def getGenomeWideAssociationPeak(self, data_dir=None, result_id=None, association_landscape_id=None, \
+						association_peak_type_id=None, no_of_peaks=None, \
+						original_path=None, **keywords):
+		"""
+		2012.12.21
+			first check whether a duplicate AssociationLandscape already exists, if not create one.
+			keywords could include other fields of table AssociationLandscape
+		way to query&create AssociationLandscape
+		
+		i.e. 
+				db_entry = db.getGenomeWideAssociationPeak(result_id=result.id, \
+								association_landscape_id=association_landscape.id,\
+								association_peak_type_id=association_peak_type.id,\
+								no_of_peaks = no_of_peaks,\
+								original_path=os.path.abspath(inputFname), comment=comment, created_by=db_user)
+		"""
+		db_entry = self.checkGenomeWideAssociationPeak(result_id=result_id, association_landscape_id=association_landscape_id,\
+													association_peak_type_id=association_peak_type_id)
+		if not db_entry:
+			if original_path:
+				original_path = os.path.abspath(original_path)
+			db_entry = GenomeWideAssociationPeak(association_landscape_id=association_landscape_id, result_id=result_id,\
+										association_peak_type_id=association_peak_type_id, no_of_peaks=no_of_peaks, \
+										original_path=original_path, **keywords)
+			self.session.add(db_entry)
+			self.session.flush()
+			if db_entry.path and db_entry.file_size is None:
+				self.updateDBEntryPathFileSize(db_entry=db_entry, data_dir=data_dir)
+			if db_entry.path and db_entry.md5sum is None:
+				self.updateDBEntryMD5SUM(db_entry=db_entry, data_dir=data_dir)
+		return db_entry
+	
+	def checkAssociationLandscape(self, result_id=None, association_landscape_type_id=None, \
+						**keywords):
+		"""
+		2012.12.15 check whether one AssociationLandscape is in db or not.
+		"""
+		
+		query = AssociationLandscape.query.filter_by(association_landscape_type_id=association_landscape_type_id).\
+			filter_by(result_id=result_id)
+		db_entry = query.first()
+		if db_entry:
+			return db_entry
+		else:
+			return None
+	
+	def getAssociationLandscape(self, data_dir=None, result_id=None, association_landscape_type_id=None, \
+						short_name=None, no_of_accessions=None, no_of_loci=None,\
+						original_path=None, **keywords):
+		"""
+		2012.12.15
+			first check whether a duplicate AssociationLandscape already exists, if not create one.
+			keywords could include other fields of table AssociationLandscape
+		2012.11.14 way to query & create AssociationLandscape
+		
+		i.e.
+				db_entry = db.getAssociationLandscape(result_id=result.id, \
+								association_landscape_type_id=association_landscape_type.id,\
+								no_of_accessions = no_of_accessions,\
+								no_of_bridges = no_of_bridges,\
+								original_path=os.path.abspath(inputFname), comment=comment, created_by=db_user)
+		"""
+		db_entry = self.checkAssociationLandscape(result_id=result_id, association_landscape_type_id=association_landscape_type_id)
+		if not db_entry:
+			if original_path:
+				original_path = os.path.abspath(original_path)
+			db_entry = AssociationLandscape(association_landscape_type_id=association_landscape_type_id, result_id=result_id,\
+										short_name=short_name, no_of_accessions=no_of_accessions, no_of_loci=no_of_loci,\
+										original_path=original_path, **keywords)
+			self.session.add(db_entry)
+			self.session.flush()
+			flushAgain = False
+			if not db_entry.short_name:
+				db_entry.setShortName()
+				flushAgain = True
+			if db_entry.path and db_entry.file_size is None:
+				self.updateDBEntryPathFileSize(db_entry=db_entry, data_dir=data_dir)
+			if db_entry.path and db_entry.md5sum is None:
+				self.updateDBEntryMD5SUM(db_entry=db_entry, data_dir=data_dir)
+			
+			if flushAgain:
+				self.session.add(db_entry)
+				self.session.flush()
 		return db_entry
 	
 	def getAssociationLandscapeType(self, min_MAF=None, neighbor_distance=None, max_neighbor_distance=None):
@@ -4030,6 +4229,8 @@ class Stock_250kDB(ElixirDB):
 			db_entry = TableClass(min_MAF=min_MAF, \
 									neighbor_distance=neighbor_distance, \
 									max_neighbor_distance=max_neighbor_distance)
+			if not db_entry.short_name:
+				db_entry.short_name = db_entry.getShortName()
 			self.session.add(db_entry)
 			self.session.flush()
 		return db_entry
@@ -4080,6 +4281,84 @@ class Stock_250kDB(ElixirDB):
 				new_result_id_ls.append(result_id)
 		sys.stderr.write(" %s entries left.\n"%(len(new_result_id_ls)))
 		return new_result_id_ls
+	
+	def getAssociationLocusType(self, association_peak_type_id=None, min_overlap_ratio=None, min_connectivity=None):
+		"""
+		2012.12.21
+		"""
+		TableClass = AssociationLocusType
+		query = TableClass.query.filter(func.abs(TableClass.min_overlap_ratio-min_overlap_ratio)<0.00001).\
+			filter_by(association_peak_type_id=association_peak_type_id)
+		if min_connectivity is not None:
+			query = query.filter(func.abs(TableClass.min_connectivity-min_connectivity)<0.00001)
+		db_entry = query.first()
+		if db_entry is None:
+			db_entry = TableClass(association_peak_type_id=association_peak_type_id, \
+								min_overlap_ratio=min_overlap_ratio, min_connectivity=min_connectivity)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
+	
+	def checkGenomeWideAssociationLocus(self, association_locus_type_id=None, call_method_id=None, analysis_method_id=None, call_method_id_ls=None,\
+						analysis_method_id_ls=None, phenotype_method_id_ls=None, **keywords):
+		"""
+		2012.12.21 check whether one GenomeWideAssociationLocus is in db or not.
+		"""
+		
+		query = GenomeWideAssociationLocus.query.filter_by(association_locus_type_id=association_locus_type_id)
+		if call_method_id is not None:
+			query = query.filter_by(call_method_id=call_method_id)
+		if analysis_method_id is not None:
+			query = query.filter_by(analysis_method_id=analysis_method_id)
+		if call_method_id_ls:
+			query = query.filter_by(call_method_id_ls=call_method_id_ls)
+		if analysis_method_id_ls:
+			query = query.filter_by(analysis_method_id_ls=analysis_method_id_ls)
+		if phenotype_method_id_ls:
+			query = query.filter_by(phenotype_method_id_ls=phenotype_method_id_ls)
+		
+		db_entry = query.first()
+		if db_entry:
+			return db_entry
+		else:
+			return None
+	
+	def getGenomeWideAssociationLocus(self, data_dir=None, \
+						association_locus_type_id=None, no_of_loci =None, total_no_of_results=None, \
+						call_method_id=None, analysis_method_id=None, call_method_id_ls=None,\
+						analysis_method_id_ls=None, phenotype_method_id_ls=None, original_path=None, **keywords):
+		"""
+		2012.12.21
+			first check whether a duplicate already exists, if not create one.
+			keywords could include other fields of table GenomeWideAssociationLocus
+			call_method_id_ls, analysis_method_id_ls, phenotype_method_id_ls are all in string format
+			
+		way to query&create GenomeWideAssociationLocus
+		
+		i.e. 
+		"""
+		db_entry = self.checkGenomeWideAssociationLocus(association_locus_type_id=association_locus_type_id,\
+								call_method_id=call_method_id, analysis_method_id=analysis_method_id,\
+								call_method_id_ls=call_method_id_ls,\
+								analysis_method_id_ls=analysis_method_id_ls,\
+								phenotype_method_id_ls=phenotype_method_id_ls)
+		
+		if not db_entry:
+			if original_path:
+				original_path = os.path.abspath(original_path)
+			db_entry = GenomeWideAssociationLocus(association_locus_type_id=association_locus_type_id, \
+								no_of_loci=no_of_loci, total_no_of_results=total_no_of_results,\
+								original_path=original_path, call_method_id=call_method_id, analysis_method_id=analysis_method_id,\
+								call_method_id_ls=call_method_id_ls,\
+								analysis_method_id_ls=analysis_method_id_ls,\
+								phenotype_method_id_ls=phenotype_method_id_ls, **keywords)
+			self.session.add(db_entry)
+			self.session.flush()
+			if db_entry.path and db_entry.file_size is None:
+				self.updateDBEntryPathFileSize(db_entry=db_entry, data_dir=data_dir)
+			if db_entry.path and db_entry.md5sum is None:
+				self.updateDBEntryMD5SUM(db_entry=db_entry, data_dir=data_dir)
+		return db_entry
 	
 	def getAssociationLocus(self, chromosome=None, start=None, stop=None, no_of_peaks=None, connectivity=None,\
 						threshold=None, association_peak_ls=None):

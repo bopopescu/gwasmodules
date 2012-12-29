@@ -5,7 +5,8 @@ Examples:
 	%s
 	
 	# set the minimum score to 4
-	%s -i /tmp/5566_association.h5  --min_score 4 -o /tmp/5566_association_peak.h5 --result_id 5566
+	%s  -i  association_min_score_5.0/call_75_analysis_1_min_score_5.0_min_overlap_0.5_result_5371_landscape.h5
+		-o  association_min_score_5.0/call_75_analysis_1_min_score_5.0_min_overlap_0.5_result_5371_peak.h5  --min_score 5.0 --ground_score 0.0
 	
 Description:
 	2012.11.18 this program derives association peak from association landscape (output of DefineAssociationLandscape.py)
@@ -22,7 +23,7 @@ import networkx as nx
 from pymodule import ProcessOptions, PassingData, PassingDataList
 from pymodule import HDF5MatrixFile
 from pymodule import getGenomeWideResultFromHDF5MatrixFile, AbstractMapper
-from pymodule import yhio
+from pymodule import yhio, AssociationTableFile, AssociationLandscapeTableFile, AssociationPeakTableFile
 from variation.src import AbstractVariationMapper
 
 class AssociationLandscape2Peak(AbstractVariationMapper):
@@ -198,26 +199,31 @@ class AssociationLandscape2Peak(AbstractVariationMapper):
 			import pdb
 			pdb.set_trace()
 		
-		
-		landscapeData = yhio.Association.getAssociationLandscapeDataFromHDF5File(inputFname=self.inputFname, associationGroupName='association', \
-					landscapeGroupName='landscape', min_MAF=self.min_MAF)
-		genome_wide_result = landscapeData.genome_wide_result
-		association_peak_ls = self.findPeaks(landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, \
+		associationLandscapeFile = AssociationLandscapeTableFile(self.inputFname, openMode='r')
+		landscapeTable = associationLandscapeFile.associationLandscapeTable
+		#landscapeData = yhio.Association.getAssociationLandscapeDataFromHDF5File(inputFname=self.inputFname, associationTableName='association', \
+		#			landscapeTableName='landscape', min_MAF=self.min_MAF)
+		genome_wide_result = associationLandscapeFile.genome_wide_result
+		association_peak_ls = self.findPeaks(associationLandscapeFile.locusLandscapeNeighborGraph, bridge_ls=associationLandscapeFile.bridge_ls, \
 									data_obj_ls=genome_wide_result.data_obj_ls, \
 					ground_score=self.ground_score, min_score=self.min_score)
 		attributeDict = {'result_id':genome_wide_result.result_id, \
-					'call_method_id':getattr(landscapeData, 'call_method_id', None),\
-					'cnv_method_id':getattr(landscapeData, 'cnv_method_id', None),\
-					'phenotype_method_id':getattr(landscapeData, 'phenotype_method_id', None),\
-					'analysis_method_id':getattr(landscapeData, 'analysis_method_id', None),\
-					'min_MAF':landscapeData.min_MAF, \
-					'neighbor_distance':landscapeData.neighbor_distance, \
-					'max_neighbor_distance':landscapeData.max_neighbor_distance, \
+					'call_method_id':landscapeTable.getAttribute('call_method_id', None),\
+					'cnv_method_id':landscapeTable.getAttribute('cnv_method_id', None),\
+					'phenotype_method_id':landscapeTable.getAttribute('phenotype_method_id', None),\
+					'analysis_method_id':landscapeTable.getAttribute('analysis_method_id', None),\
+					'min_MAF':landscapeTable.getAttribute('min_MAF'), \
+					'neighbor_distance':landscapeTable.getAttribute('neighbor_distance'), \
+					'max_neighbor_distance':landscapeTable.getAttribute('max_neighbor_distance'), \
 					'min_score':self.min_score,\
 					'ground_score':self.ground_score}
-		yhio.Association.outputAssociationPeakInHDF5(association_peak_ls=association_peak_ls, filename=self.outputFname, \
-							groupName='association_peak', closeFile=True,\
-							attributeDict=attributeDict)
+		
+		peakPyTable = AssociationPeakTableFile(self.outputFname, openMode='w')
+		peakPyTable.addAttributeDict(attributeDict)
+		peakPyTable.appendAssociationPeak(association_peak_ls=association_peak_ls)
+		#yhio.Association.outputAssociationPeakInHDF5(association_peak_ls=association_peak_ls, filename=self.outputFname, \
+		#					tableName='association_peak', closeFile=True,\
+		#					attributeDict=attributeDict)
 		
 
 if __name__ == '__main__':

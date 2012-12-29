@@ -33,26 +33,20 @@ import csv
 import numpy, random, pylab
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
 from pymodule import yh_matplotlib, utils, GenomeDB
+from pymodule.plot.PlotGenomeWideData import PlotGenomeWideData
 from PlotAssociationLocusFrequencyVsAssociationThreshold import PlotAssociationLocusFrequencyVsAssociationThreshold
-
-class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssociationThreshold):
+class PlotAssociationLocusFrequencyOnGenome(PlotGenomeWideData, PlotAssociationLocusFrequencyVsAssociationThreshold):
 	__doc__ = __doc__
 	#						
 	option_default_dict = PlotAssociationLocusFrequencyVsAssociationThreshold.option_default_dict.copy()
 	option_default_dict.update(PlotAssociationLocusFrequencyVsAssociationThreshold.db_option_dict.copy())
+	option_default_dict.update(PlotGenomeWideData.option_default_dict.copy())
+	
 	# change
 	option_default_dict[('xColumnHeader', 1, )][0] = 'start'
 	option_default_dict[('xColumnPlotLabel', 0, )][0] = 'genome position'
 	option_default_dict[('whichColumnHeader', 0, )][0] = 'no_of_results'
 	option_default_dict[('whichColumnPlotLabel', 0, )][0] = 'numberOfResults'
-	# change default of file-format
-	option_default_dict[('inputFileFormat', 0, int)][0] = 2
-	option_default_dict[('minNoOfTotal', 1, int)][0] = 1
-	option_default_dict[('defaultFigureWidth', 1, float)][0] = 80
-	option_default_dict[('ymargin', 0, float)][0] = 0.1
-	option_default_dict[('xmargin', 0, float)][0] = 0.02
-	option_default_dict[('plotLeft', 0, float)][0] = 0.02
-	option_default_dict[('plotRight', 0, float)][0] = 0.98
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
@@ -64,6 +58,7 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		2012.11.23
 		"""
 		pdata = PlotAssociationLocusFrequencyVsAssociationThreshold.preFileFunction(self, **keywords)
+		pdata.chr2xy_ls = {}		
 		pdata.widthList = []
 		#reset these attributes
 		pdata.min_score_set = set()
@@ -74,12 +69,14 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		2012.8.2
 			handles each row in each file
 		"""
-		if not row.chromosome:	#2012.12.3 ignore rows with empty chromosomes (stopgap bugfix, )
+		if not row['chromosome']:	#2012.12.3 ignore rows with empty chromosomes (stopgap bugfix, )
 			return
+		PlotGenomeWideData.processRow(self, row=row, pdata=pdata)
 		
 		reader = getattr(pdata, 'reader', None)
-		groupObject =reader.getGroupObject()
+		tableObject =reader.getTableObject()
 		
+		"""
 		xValue = getattr(row, self.xColumnHeader, None)	#start position
 		stopPosition = row.stop
 		width = abs(stopPosition - xValue)
@@ -91,36 +88,36 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		yValue = getattr(row, self.whichColumnHeader, None)	#no_of_results
 		yValue = self.processValue(value=yValue, processType=self.logY)
 		
-		
 		pdata.x_ls.append(xValue)
 		pdata.y_ls.append(yValue)
 		pdata.widthList.append(width)
+		"""
 		
 		#add call/phenotype/analysis/min_overlap_ratio/total_no_of_results into self set.
-		groupObject.addObjectListAttributeToSet(attributeName='call_method_id_ls', \
+		tableObject.addObjectListAttributeToSet(attributeName='call_method_id_ls', \
 									setVariable=self.call_method_id_set)
-		groupObject.addObjectListAttributeToSet(attributeName='phenotype_method_id_ls', \
+		tableObject.addObjectListAttributeToSet(attributeName='phenotype_method_id_ls', \
 									setVariable=self.phenotype_method_id_set)
-		groupObject.addObjectListAttributeToSet(attributeName='analysis_method_id_ls', \
+		tableObject.addObjectListAttributeToSet(attributeName='analysis_method_id_ls', \
 									setVariable=self.analysis_method_id_set)
-		groupObject.addObjectAttributeToSet(attributeName='min_overlap_ratio', \
+		tableObject.addObjectAttributeToSet(attributeName='min_overlap_ratio', \
 									setVariable=self.min_overlap_ratio_set)
-		groupObject.addObjectAttributeToSet(attributeName='min_score', \
+		tableObject.addObjectAttributeToSet(attributeName='min_score', \
 									setVariable=self.min_score_set)
-		groupObject.addObjectAttributeToSet(attributeName='total_no_of_results', \
+		tableObject.addObjectAttributeToSet(attributeName='total_no_of_results', \
 									setVariable=self.total_no_of_results_set)
 		
-		groupObject.addObjectListAttributeToSet(attributeName='call_method_id_ls', \
+		tableObject.addObjectListAttributeToSet(attributeName='call_method_id_ls', \
 									setVariable=pdata.call_method_id_set)
-		groupObject.addObjectListAttributeToSet(attributeName='phenotype_method_id_ls', \
+		tableObject.addObjectListAttributeToSet(attributeName='phenotype_method_id_ls', \
 									setVariable=pdata.phenotype_method_id_set)
-		groupObject.addObjectListAttributeToSet(attributeName='analysis_method_id_ls', \
+		tableObject.addObjectListAttributeToSet(attributeName='analysis_method_id_ls', \
 									setVariable=pdata.analysis_method_id_set)
-		groupObject.addObjectAttributeToSet(attributeName='min_overlap_ratio', \
+		tableObject.addObjectAttributeToSet(attributeName='min_overlap_ratio', \
 									setVariable=pdata.min_overlap_ratio_set)
-		groupObject.addObjectAttributeToSet(attributeName='min_score', \
+		tableObject.addObjectAttributeToSet(attributeName='min_score', \
 									setVariable=pdata.min_score_set)
-		groupObject.addObjectAttributeToSet(attributeName='total_no_of_results', \
+		tableObject.addObjectAttributeToSet(attributeName='total_no_of_results', \
 									setVariable=pdata.total_no_of_results_set)
 		return 1
 	
@@ -134,9 +131,12 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		else:
 			phenotype_method_id_ls = list(self.phenotype_method_id_set)
 			no_of_phenotypes = len(phenotype_method_id_ls)
-			title = 'min_overlap %s, min_score %s, #results %s, #phenotypes %s'%(utils.getStrOutOfList(list(self.min_overlap_ratio_set)),\
-						utils.getStrOutOfList(list(self.min_score_set)),\
-						utils.getStrOutOfList(list(self.total_no_of_results_set)), no_of_phenotypes)
+			title = 'call %s, analysis %s, min_overlap %s, min_score %s, #results %s, #phenotypes %s'%\
+					(utils.getStrOutOfList(list(self.call_method_id_set)),\
+					utils.getStrOutOfList(list(self.analysis_method_id_set)),\
+					utils.getStrOutOfList(list(self.min_overlap_ratio_set)),\
+					utils.getStrOutOfList(list(self.min_score_set)),\
+					utils.getStrOutOfList(list(self.total_no_of_results_set)), no_of_phenotypes)
 			#title = yh_matplotlib.constructTitleFromTwoDataSummaryStat(self.invariantPData.x_ls, self.invariantPData.y_ls)
 		pylab.title(title)
 		return title
@@ -145,6 +145,8 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		"""
 		2011-9-30
 			get called by the end of fileWalker() for each inputFname.
+		"""
+		PlotGenomeWideData.plot(self, x_ls=x_ls, y_ls=y_ls, pdata=pdata)
 		"""
 		#handle the color properly
 		association_group_key = (list(pdata.call_method_id_set)[0], list(pdata.analysis_method_id_set)[0])
@@ -167,26 +169,17 @@ class PlotAssociationLocusFrequencyOnGenome(PlotAssociationLocusFrequencyVsAssoc
 		self.plotObjectLs.append(plotObject)
 		#add call_method & analysis method into legend
 		self.plotObjectLegendLs.append(label)
-		
-		#PlotAssociationLocusFrequencyVsAssociationThreshold.plot(self, x_ls=x_ls, y_ls=y_ls, pdata=pdata)
-	
+		"""
 	
 	def setup(self, **keywords):
 		"""
 		2012.10.15
 			run before anything is run
 		"""
-		#without commenting out db_vervet connection code. schema "genome" wont' be default path.
-		db_genome = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
-						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema="genome")
-		db_genome.setup(create_tables=False)
-		#chrOrder=1 is to order chromosomes alphabetically
-		oneGenomeData = db_genome.getOneGenomeData(tax_id=3702, chr_gap=0, chrOrder=1, sequence_type_id=1)
-		chr_id2cumu_start = oneGenomeData.chr_id2cumu_start
-		
-		self.chr_id2cumu_start = chr_id2cumu_start
+		PlotGenomeWideData.setup(self, **keywords)
 		
 		PlotAssociationLocusFrequencyVsAssociationThreshold.setup(self, **keywords)
+	
 
 	def handleYLim(self,):
 		"""

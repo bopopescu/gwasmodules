@@ -108,10 +108,20 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		AssociationLandscape2Peak.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "association_peak/AssociationLandscape2Peak.py"), site_handler))
 		executableClusterSizeMultiplierList.append((AssociationLandscape2Peak, 0.2))
 		
+		AssociationPeak2DB = Executable(namespace=namespace, name="AssociationPeak2DB", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		AssociationPeak2DB.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "db/AssociationPeak2DB.py"), site_handler))
+		executableClusterSizeMultiplierList.append((AssociationPeak2DB, 0.5))
+		
 		AssociationPeak2AssociationLocus = Executable(namespace=namespace, name="AssociationPeak2AssociationLocus", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		AssociationPeak2AssociationLocus.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "association_peak/AssociationPeak2AssociationLocus.py"), site_handler))
 		executableClusterSizeMultiplierList.append((AssociationPeak2AssociationLocus, 0))
+		
+		AssociationLocus2DB = Executable(namespace=namespace, name="AssociationLocus2DB", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		AssociationLocus2DB.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "db/AssociationLocus2DB.py"), site_handler))
+		executableClusterSizeMultiplierList.append((AssociationLocus2DB, 0.4))
 		
 		CountAssociationLocus = Executable(namespace=namespace, name="CountAssociationLocus", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
@@ -124,7 +134,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 	def addDefineLandscapeJob(self, workflow=None, executable=None, \
 							result_id=None, neighbor_distance=None, max_neighbor_distance=None,\
 							min_MAF=None, tax_id=None, \
-							data_dir=None, logFile=None, landscapeOutputFile=None,\
+							data_dir=None, logFile=None, landscapeOutputFile=None, \
 							parentJobLs=None, job_max_memory=100, job_max_walltime = 60, sshDBTunnel=None,\
 							extraDependentInputLs=None, \
 							transferOutput=False, **keywords):
@@ -142,19 +152,21 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		if logFile:
 			extraArgumentList.extend(["--logFilename", logFile])
 			extraOutputLs.append(logFile)
+		key2ObjectForJob = {}
+		
 		job = self.addGenericDBJob(workflow=workflow, executable=executable, inputFile=None, \
 					outputFile=landscapeOutputFile, \
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
 					transferOutput=transferOutput, \
 					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
 					sshDBTunnel=sshDBTunnel, max_walltime=job_max_walltime,\
-					key2ObjectForJob=None, objectWithDBArguments=self, **keywords)
+					key2ObjectForJob=key2ObjectForJob, objectWithDBArguments=self, **keywords)
 		return job
 	
 	def addAssociationLandscape2PeakJob(self, workflow=None, executable=None, \
-				inputFile=None, outputFile=None, min_score=None, ground_score=None, \
+				inputFile=None, outputFile=None,  min_score=None, ground_score=None, \
 				parentJobLs=None, job_max_memory=100, job_max_walltime = 60, \
-				extraDependentInputLs=None, \
+				extraDependentInputLs=None, extraArguments=None, \
 				transferOutput=False, **keywords):
 		"""
 		2012.11.21
@@ -162,17 +174,21 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 			
 		"""
 		extraArgumentList = []
+		key2ObjectForJob = {}
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
 		if min_score is not None:
 			extraArgumentList.append("--min_score %s"%(min_score))
 		if ground_score is not None:
 			extraArgumentList.append("--ground_score %s"%(ground_score))
+		
 		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
 					outputFile=outputFile, \
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					transferOutput=transferOutput, \
-					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
+					extraArguments=extraArguments, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
 					max_walltime=job_max_walltime,\
-					key2ObjectForJob=None, **keywords)
+					key2ObjectForJob=key2ObjectForJob, **keywords)
 		return job
 	
 	def addAssociationPeak2LocusJob(self, workflow=None, executable=None, \
@@ -224,45 +240,30 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		return job
 	
 	def addAssociationLandscape2DBJob(self, executable=None, inputFile=None, result_id=None, \
-					call_method_id=None, phenotype_method_id=None, \
-					analysis_method_id=None, results_method_type_id=1, data_dir=None, \
+					outputFile=None, data_dir=None, logFile=None, commit=False,\
 					neighbor_distance=None, max_neighbor_distance=None, min_MAF=None, \
-					landscapeLocusIDFile=None, logFile=None, outputFile=None, commit=False,\
 					parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 					extraArguments=None, job_max_memory=2000, sshDBTunnel=None, **keywords):
 		"""
 		2012.11.13
 		"""
-		extraArgumentList = ['--result_id %s'%(result_id), \
-							'--phenotype_method_id %s'%(phenotype_method_id), \
-							'--analysis_method_id %s'%(analysis_method_id), \
-							'--results_method_type_id %s'%(results_method_type_id), \
-							'--neighbor_distance %s'%(neighbor_distance),\
+		extraArgumentList = ['--neighbor_distance %s'%(neighbor_distance),\
 							'--max_neighbor_distance %s'%(max_neighbor_distance), \
 							'--min_MAF %s'%(min_MAF)]
+		if result_id:
+			extraArgumentList.append('--result_id %s'%(result_id))
 		extraOutputLs = []
-		if call_method_id:
-			extraArgumentList.append('--call_method_id %s'%(call_method_id))
-		if data_dir:
-			extraArgumentList.append('--data_dir %s'%(data_dir))
-		if commit:
-			extraArgumentList.append('--commit')
-		if logFile:
-			extraArgumentList.extend(["--logFilename", logFile])
-			extraOutputLs.append(logFile)
 		
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
-		if landscapeLocusIDFile:
-			extraArgumentList.extend(['--landscapeLocusIDFname', landscapeLocusIDFile])
-			extraDependentInputLs.append(landscapeLocusIDFile)
 		
-		job = self.addGenericDBJob(executable=executable, inputFile=inputFile, outputFile=outputFile,\
-						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
-						extraOutputLs=extraOutputLs, transferOutput=transferOutput, \
-						extraArgumentList=extraArgumentList, extraArguments=extraArguments, \
-						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
-						**keywords)
+		job = self.addGenericFile2DBJob(executable=executable, inputFile=inputFile, outputFile=outputFile,\
+					data_dir=data_dir, logFile=logFile, commit=commit,\
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=extraOutputLs, transferOutput=transferOutput, \
+					extraArgumentList=extraArgumentList, extraArguments=extraArguments, \
+					job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel, objectWithDBArguments=self,\
+					**keywords)
 		return job
 	
 	def run(self):
@@ -278,7 +279,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 					data_dir=self.data_dir, \
 					need_chr_pos_ls=0,)
 		
-		result_query = self.db.getResultLs(analysis_method_id_ls=self.analysis_method_id_ls, \
+		result_query = self.db_250k.getResultLs(analysis_method_id_ls=self.analysis_method_id_ls, \
 						phenotype_method_id_ls=self.phenotype_method_id_ls, call_method_id_ls=self.call_method_id_ls,\
 						cnv_method_id=self.cnv_method_id)
 		result_id_ls = self.result_id_ls
@@ -295,14 +296,14 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		topOutputDir = "%sAssociationLandscape"%(self.pegasusFolderName)
 		topOutputDirJob = yh_pegasus.addMkDirJob(workflow=self, mkdir=self.mkdirWrap, outputDir=topOutputDir)
 		
-		resultLandscapeType = self.db.getResultLandscapeType(min_MAF=self.min_MAF, \
+		resultLandscapeType = self.db_250k.getResultLandscapeType(min_MAF=self.min_MAF, \
 									neighbor_distance=self.neighbor_distance, \
 									max_neighbor_distance=self.max_neighbor_distance)
 		
 		for result_id in result_id_ls:
 			result = Stock_250kDB.ResultsMethod.get(result_id)
 			
-			associationResultFile = self.registerOneInputFile(inputFname=result.getFilePath(oldDataDir=self.db.data_dir, newDataDir=self.data_dir), \
+			associationResultFile = self.registerOneInputFile(inputFname=result.getFilePath(oldDataDir=self.db_250k.data_dir, newDataDir=self.data_dir), \
 												folderName=self.pegasusFolderName)
 			logFile = File(os.path.join(topOutputDirJob.output, 'Result%s_LandscapeType%s.log'%\
 									(result_id, resultLandscapeType.id)))
@@ -319,17 +320,15 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 							parentJobLs=[topOutputDirJob], sshDBTunnel=self.needSSHDBTunnel,\
 							transferOutput=False)
 			
-			outputFile = File(os.path.join(topOutputDirJob.output, 'Result%s_LandscapeType%s_ReducedGWAS.tsv'%\
+			logFile = File(os.path.join(topOutputDirJob.output, 'Result%s_LandscapeType%s_log.tsv'%\
 										(result_id, resultLandscapeType.id)))
-			landscape2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLandscape2DB, inputFile=associationResultFile, \
-						result_id=result_id, call_method_id=result.call_method_id, \
-						phenotype_method_id=result.phenotype_method_id, analysis_method_id=result.analysis_method_id, \
-						results_method_type_id=result.results_method_type_id, \
-						data_dir=self.data_dir,\
+			landscape2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLandscape2DB, inputFile=defineLandscapeJob.output, \
+						result_id=result_id, \
+						data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
+						min_MAF=self.min_MAF, \
 						neighbor_distance=self.neighbor_distance, max_neighbor_distance=self.max_neighbor_distance, \
-						min_MAF=self.min_MAF, landscapeLocusIDFile=landscapeOutputFile, \
-						outputFile=outputFile, commit=self.commit, parentJobLs=[topOutputDirJob, defineLandscapeJob], \
-						extraDependentInputLs=None, transferOutput=True, job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
+						parentJobLs=[topOutputDirJob, defineLandscapeJob], \
+						extraDependentInputLs=None, transferOutput=True, extraArguments=None, job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
 			
 			#add landscape -> peak job
 			outputFile = File('%s_peak.h5'%(outputFnamePrefix))

@@ -30,99 +30,94 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv, stat, getopt, re
 import traceback, gc, subprocess
 from pymodule import figureOutDelimiter, PassingData
-from pymodule import MatrixFile
-from pymodule import AbstractDBInteractingJob
-from variation.src.common import getOneResultJsonData
-from variation.src.db.Results2DB_250k import Results2DB_250k
+from pymodule import AssociationLocusTableFile, utils
 from variation.src import Stock_250kDB
-
-class AssociationLocus2DB(Results2DB_250k):
+from AssociationPeak2DB import AssociationPeak2DB
+ 
+class AssociationLocus2DB(AssociationPeak2DB):
 	__doc__ = __doc__
-	option_default_dict = Results2DB_250k.option_default_dict.copy()
+	option_default_dict = AssociationPeak2DB.option_default_dict.copy()
 	option_default_dict.update({
-						('landscapeLocusIDFname', 1, ): ['', '', 1, 'file that contains one-column, snps.id,'],\
-						('result_id', 1, int): [None, '', 1, "ResultsMethod.id of the association result from which the landscape is derived."],\
-						('neighbor_distance', 0, int): [5000, '', 1, "within this distance, a locus that increases the association score \
-									the fastest is chosen as bridge end. outside this distance, whatever the next point is will be picked."],\
-						('max_neighbor_distance', 0, int): [20000, '', 1, "beyond this distance, no bridge would be formed."],\
-						('min_MAF', 0, float): [0.1, '', 1, 'minimum Minor Allele Frequency.'],\
-						('outputFname', 1, ): [None, 'o', 1, 'this output file stores the reduced gwas (landscape-only).'],\
-						
-						})
+			('min_connectivity', 0, float): [None, '', 1, "minimum connectivity of any peak graph connected component, not used."],\
+			('min_overlap_ratio', 0, float): [0.5, '', 1, 'minimum overlap ratio between two peaks for them to merge. overlap length/total'],\
+			})
 	
 	def __init__(self, **keywords):
 		"""
 		2012.11.12
 		"""
-		Results2DB_250k.__init__(self, **keywords)
+		AssociationPeak2DB.__init__(self, **keywords)
 	
-	def getLocusBasedOnDataObj(self, db_250k, data_obj):
-		"""
-		2011-4-21
-			based on attributes of data_obj (class SNP.DataObject), fetch/create a locus.
-		"""
-		return db_250k.getSNP(chromosome=data_obj.chromosome, start=data_obj.position, stop=data_obj.stop_position)
-	
-	def addAllDataObjsIntoDb(self, db_250k, data_obj_ls): 
-		'''
-		2011-4-21
-			call getLocusBasedOnDataObj() to make sure all loci are in db now.
-			not used now since all data_obj's corresponding loci are stored in db.
-		'''
-		sys.stderr.write("Adding %s data objs into table Snps as loci ..."%(len(data_obj_ls)))
-		no_of_newly_added_loci = 0
-		for data_obj in data_obj_ls:
-			locus = self.getLocusBasedOnDataObj(db_250k, data_obj)
-			if not locus.id:	#if it's new , their id should be None.
-				no_of_newly_added_loci += 1
-		db_250k.session.flush()
-		sys.stderr.write("%s loci inserted into db. Done.\n"%(no_of_newly_added_loci))
-	
-	def add2DB(self, db_250k=None, inputFname=None, result=None, result_landscape_type=None, \
-			call_method_id=None, cnv_method_id=None, phenotype_method_id=None, \
-			analysis_method_id=None, results_method_type_id=None, \
-			no_of_loci = None, \
+	def add2DB(self, db=None, inputFname=None, association_locus_type=None, \
 			data_dir=None, commit=0,\
-			comment=None, user=None):
+			comment=None, db_user=None):
 		"""
-		2012.11.13
+		2012.12.21
 		"""
 		
-		sys.stderr.write("Discovering association loci ...")
-		cc_graph_list = nx.connected_component_subgraphs(resultPeakGraph)
-		counter = 0
-		for cc_graph in cc_graph_list:
-			#calculate connectivity of this component
-			ne = cc_graph.number_of_edges()
-			nn = cc_graph.number_of_nodes()
-			if nn>1:
-				connectivity = ne/float(nn*(nn-1)/2)
-			else:
-				connectivity = 1
-			start_ls = []
-			stop_ls = []
-			result_peak_ls = []
-			#get span of each node, then take median of all its start/stop
-			for n in cc_graph:
-				span = resultPeakGraph.node[n]['span']
-				start_ls.append(span[0])
-				stop_ls.append(span[1])
-				result_peak = Stock_250kDB.ResultPeak.get(n)
-				result_peak_ls.append(result_peak)
-			median_start = numpy.median(start_ls)
-			median_stop = numpy.median(stop_ls)
-			no_of_peaks = nn
+		session = db.session
+		session.begin()
+		
+		associationLocusTableFile = AssociationLocusTableFile(inputFname, openMode='r', constructLocusRBDict=False)	#don't need it
+		call_method_id_ls = associationLocusTableFile.getAttribute('call_method_id_ls')
+		if len(call_method_id_ls)==1:	#only assign singular call_method_id when there is only one call method
+			call_method_id = call_method_id_ls[0]
+		else:
+			call_method_id = None
+		analysis_method_id_ls = associationLocusTableFile.getAttribute('analysis_method_id_ls')
+		if len(analysis_method_id_ls)==1:
+			analysis_method_id = analysis_method_id_ls[0]
+		else:
+			analysis_method_id = None
+		phenotype_method_id_ls_str = utils.getSuccinctStrOutOfList(associationLocusTableFile.getAttribute('phenotype_method_id_ls'))
+		total_no_of_results = associationLocusTableFile.getAttribute('total_no_of_results')
+		no_of_loci = associationLocusTableFile.getTableObject().nrows
+		
+		associationLocusTableFile.close()
+		
+		call_method_id_ls_str = utils.getSuccinctStrOutOfList(call_method_id_ls)
+		analysis_method_id_ls_str = utils.getSuccinctStrOutOfList(analysis_method_id_ls)
+		#2012.11.13 check if it's in db already
+		db_entry = db.checkGenomeWideAssociationLocus(association_locus_type_id=association_locus_type.id,\
+								call_method_id=call_method_id, analysis_method_id=analysis_method_id,\
+								call_method_id_ls=call_method_id_ls_str,\
+								analysis_method_id_ls=analysis_method_id_ls_str,\
+								phenotype_method_id_ls=phenotype_method_id_ls_str)
+		if db_entry:
+			sys.stderr.write("Warning: genome-wide association-locus of (association_locus_type_id %s, call %s, analysis %s, phenotype %s) already in db.\n"%\
+							(association_locus_type.id, call_method_id_ls_str, analysis_method_id_ls_str, phenotype_method_id_ls_str))
+			sys.exit(3)
+		else:
 			
-			association_locus = db_250k.getAssociationLocus(chromosome=result_peak.chromosome, start=median_start, stop=median_stop, \
-										no_of_peaks=nn, connectivity=connectivity,\
-						threshold=min_overlap_ratio, result_peak_ls=result_peak_ls)
-			counter += 1
-		sys.stderr.write("%s association loci added into db.\n"%(counter))
+			db_entry = db.getGenomeWideAssociationLocus(association_locus_type_id=association_locus_type.id,\
+								no_of_loci=no_of_loci, total_no_of_results=total_no_of_results, \
+								call_method_id=call_method_id, analysis_method_id=analysis_method_id,\
+								call_method_id_ls=call_method_id_ls_str,\
+								analysis_method_id_ls=analysis_method_id_ls_str,\
+								phenotype_method_id_ls=phenotype_method_id_ls_str,
+								original_path=os.path.abspath(inputFname), comment=comment, created_by=db_user)
 		
-		db_250k.session.flush()
-		if self.commit:
-			db_250k.session.commit()
-
+		
+		if commit:
+			inputFileBasename = os.path.basename(inputFname)
+			#moveFileIntoDBAffiliatedStorage() will also set db_entry.path
+			exitCode = db.moveFileIntoDBAffiliatedStorage(db_entry=db_entry, filename=inputFileBasename, \
+									inputDir=os.path.split(inputFname)[0], \
+									outputDir=data_dir,\
+									relativeOutputDir=None, shellCommand='cp -rL', \
+									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
+									constructRelativePathFunction=db_entry.constructRelativePath, data_dir=data_dir)
+			
+			if exitCode!=0:
+				sys.stderr.write("Error: moveFileIntoDBAffiliatedStorage() exits with %s code.\n"%(exitCode))
+				session.rollback()
+				self.cleanUpAndExitOnFailure(exitCode=exitCode)
+			
+			session.flush()
+			session.commit()
+		else:	#default is also rollback(). to demonstrate good programming
+			session.rollback()
+	
 	def run(self):
 		"""
 		2012.11.12
@@ -134,42 +129,30 @@ class AssociationLocus2DB(Results2DB_250k):
 		if not os.path.isfile(self.inputFname):
 			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.inputFname))
 			sys.exit(3)
-		
-		#extract full data from an old association result file (snps.id in landscapeLocusIDFname) and generate a new one
-		no_of_loci = self.reduceAssociationResult(inputFname=self.inputFname, landscapeLocusIDFname=self.landscapeLocusIDFname, \
-									outputFname=self.outputFname)
-		
-		result = Stock_250kDB.ResultsMethod.get(self.result_id)
-		
-		result_peak_type = db_250k.getResultPeakType(min_MAF=self.min_MAF, min_score=self.min_score, \
+				
+		association_landscape_type = self.db_250k.getAssociationLandscapeType(min_MAF=self.min_MAF, \
 											neighbor_distance=self.neighbor_distance, \
 											max_neighbor_distance=self.max_neighbor_distance)
-		#2011-10-12 check to see if ResultPeak contains the peaks from this result already.
-		query = Stock_250kDB.ResultPeak.query.filter_by(result_peak_type_id=result_peak_type.id).filter_by(result_id=rm.id)
-		if query.first():
-			logString = "result_id=%s, result_peak_type_id=%s already exists in ResultPeak. exit.\n"%(result_id, result_peak_type.id)
-			self.outputLogMessage(logString)
-			sys.stderr.write(logString)
-			sys.exit(0)
 		
-		no_of_peaks = self.findPeaks(db_250k, landscapeData.locusLandscapeNeighborGraph, bridge_ls=landscapeData.bridge_ls, data_obj_ls=gwr.data_obj_ls, \
-					ground_score=self.ground_score, min_score=self.min_score, rm=rm, result_peak_type=result_peak_type)
+		association_peak_type = self.db_250k.getAssociationPeakType(association_landscape_type_id=association_landscape_type.id, \
+															min_score=self.min_score)
+		
+		association_locus_type = self.db_250k.getAssociationLocusType(association_peak_type_id=association_peak_type.id, \
+									min_overlap_ratio=self.min_overlap_ratio, \
+									min_connectivity=self.min_connectivity)
+			
 		"""
 		#2011-4-21 to check how far things are from each other.
 		#self.drawBridgeChromosomalLengthHist(bridge_ls)
 		"""
-		self.outputLogMessage("Result %s has %s peaks.\n"%(result_id, no_of_peaks))
-		
-		#add the extracted association result into db
-		self.add2DB(db=self.db, inputFname=self.outputFname, result=result, result_landscape_type=result_landscape_type, \
-				call_method_id=result.call_method_id, cnv_method_id=result.cnv_method_id, phenotype_method_id=result.phenotype_method_id, \
-				analysis_method_id=result.analysis_method_id, results_method_type_id=result.results_method_type_id, \
-				no_of_loci=no_of_loci,\
-				data_dir=self.data_dir, commit=self.commit, comment=self.comment, user=self.db_user)
+		self.add2DB(db=self.db_250k, inputFname=self.inputFname, association_locus_type=association_locus_type, \
+			data_dir=self.data_dir, commit=self.commit,\
+			comment=None, db_user=self.db_user)
 		
 		#2012.6.5
 		self.outputLogMessage("submission done.\n")
 		self.closeLogF()
+
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
