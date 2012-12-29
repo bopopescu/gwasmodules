@@ -19,11 +19,11 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 	option_default_dict = AbstractWorkflow.option_default_dict.copy()
 	
 	option_default_dict.update({
-						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-						('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
-						('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
+						('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgres', ],\
+						('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
+						('dbname', 1, ): ['vervetdb', 'd', 1, 'stock_250k database name', ],\
 						('genome_dbname', 1, ): ['genome', '', 1, 'genome database name', ],\
-						('schema', 0, ): ['', '', 1, 'database schema name', ],\
+						('schema', 0, ): ['stock_250k', '', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 						('port', 0, ):[None, '', 1, 'database port number'],\

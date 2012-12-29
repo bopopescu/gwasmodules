@@ -16,7 +16,7 @@ Examples:
 	# -n: --noSNPAlleleOrdinalConversion 
 	# -c: commit, (make sure -c is added, otherwise nothing will be stored in db)
 	%s -A 57,75 -n -c -w 314-351 -a 1,32 -K /Network/Data/250k/db/dataset/call_method_75_K.tsv
-		-o workflow/Association/associationCall57_75Phenotype314_351Analysis1_32.xml
+		-o dags/Association/associationCall57_75Phenotype314_351Analysis1_32.xml
 		-u yh -d stock_250k -z banyan  -j condorpool -l condorpool
 		#--getPublicPhenotype
 

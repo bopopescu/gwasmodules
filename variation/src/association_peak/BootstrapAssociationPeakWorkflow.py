@@ -16,7 +16,7 @@ Examples:
 	#ditto but analysis method 1,32
 	%s  --call_method_id_ls 57,75 --analysis_method_id_ls 1,32 --min_score_ls 3,4,5 --min_overlap_ratio_ls 0.05,0.20,0.50,0.80
 		--phenotype_method_id_ls 1-35,39-48,57-82,158-159,161-179,182-186,272-283,314-351,362-380,418-589
-		-o workflow/BootstrapAssociationPeak/Bootstrap_call57_75_ana_1_32_min_score_3_4_5_min_overlap_0.05_0.2_0.5_0.8.xml
+		-o dags/BootstrapAssociationPeak/Bootstrap_call57_75_ana_1_32_min_score_3_4_5_min_overlap_0.05_0.2_0.5_0.8.xml
 		-u yh  --db_passwd secret -z banyan -j condorpool -l condorpool
 
 Description:
