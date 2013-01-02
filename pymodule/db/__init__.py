@@ -47,7 +47,9 @@ def supplantFilePathWithNewDataDir(filePath="", oldDataDir=None, newDataDir=None
 		if filePath[0]=='/':	#input is in absolute path.
 			if oldDataDir and newDataDir and oldDataDir!=newDataDir:
 				if filePath.find(oldDataDir)==0:
-					relativePath = filePath[len(oldDataDir)-1:]
+					relativePath = filePath[len(oldDataDir):]
+					if relativePath[0]=='/':	#2012.12.28 have to remove the initial "/" otherwise os.path.join() won't work
+						relativePath = relativePath[1:]
 					newFilePath = os.path.join(newDataDir, relativePath)
 				else:
 					sys.stderr.write("Warning: %s doesn't include old data dir %s. Return Nothing.\n"%(filePath, oldDataDir))
@@ -423,7 +425,7 @@ class ElixirDB(object):
 		if not self._data_dir:
 			if self.READMEClass:
 				dataDirEntry = self.READMEClass.query.filter_by(title='data_dir').first()
-				if not dataDirEntry or not dataDirEntry.description or not os.path.isdir(dataDirEntry.description):
+				if not dataDirEntry or not dataDirEntry.description:
 					# todo: need to test dataDirEntry.description is writable to the user
 					sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
 					raise
@@ -431,6 +433,21 @@ class ElixirDB(object):
 				else:
 					self._data_dir = dataDirEntry.description
 		return self._data_dir
+	
+	def getProperTableName(self, tableClass=None):
+		"""
+		2012.12.31 helper function to add schema in front of tablename.
+		"""
+		tableName = tableClass.table.name
+		return self.appendSchemaToTableName(tableName)
+	
+	def appendSchemaToTableName(self, tableName=None):
+		"""
+		2012.12.31 helper function to add schema in front of tablename.
+		"""
+		if self.drivername.find('postgres')>=0 and self.schema:
+			tableName = '%s.%s'%(self.schema, tableName)
+		return tableName
 	
 	def updateDBEntryMD5SUM(self, db_entry=None, data_dir=None, absPath=None):
 		"""
