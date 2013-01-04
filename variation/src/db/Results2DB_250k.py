@@ -71,7 +71,7 @@ class Results2DB_250k(AbstractVariationMapper):
 						('method_description', 0, ): [None, 'm', 1, 'Describe your method and what type of score, association (-log or not), recombination etc.'],\
 						('results_method_type_id', 1, int): [1, 's', 1, 'which type of method. field id in table results_method_type. 1="association"',],\
 						('analysis_method_id', 1, int): [None, 'l', 1, ''],\
-						('cnv_method_id', 0, int): [0, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
+						('cnv_method_id', 0, int): [None, 'g', 1, 'for CNV association results, need this cnv_method_id'],\
 						('comment',0, ): [None, 't', 1, 'Anything more worth for other people to know?'],\
 						})
 	
@@ -120,21 +120,20 @@ class Results2DB_250k(AbstractVariationMapper):
 		
 	marker_pos2snp_id = None
 	is_new_marker_added = False	#2008-05-26 flag whether new markers were generated. to check after commit/rollback
-	@classmethod
-	def reset_marker_pos2snp_id(cls):
+	
+	def reset_marker_pos2snp_id(self):
 		"""
 		2008-05-27
-			set "cls.is_new_marker_added = False"
+			set "self.is_new_marker_added = False"
 		2008-05-26
 			after commit or rollback in plone, session is closed and those new marker objects are gone. need to reset everything.
 		"""
-		if cls.is_new_marker_added:
-			del cls.marker_pos2snp_id
-			cls.marker_pos2snp_id = cls.get_marker_pos2snp_id(db)
-			cls.is_new_marker_added = False
+		if self.is_new_marker_added:
+			del self.marker_pos2snp_id
+			self.marker_pos2snp_id = self.get_marker_pos2snp_id(db)
+			self.is_new_marker_added = False
 	
-	@classmethod
-	def get_marker_pos2snp_id(cls, db):
+	def get_marker_pos2snp_id(self, db):
 		"""
 		2008-05-24
 		"""
@@ -149,8 +148,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		sys.stderr.write("Done.\n")
 		return marker_pos2snp_id
 	
-	@classmethod
-	def copyAndReformatResultFile(cls, db, inputFname=None, db_entry=None, user=None, output_fname=None):
+	def copyAndReformatResultFile(self, db, inputFname=None, db_entry=None, user=None, output_fname=None):
 		"""
 		2011-2-22
 			Locus are now identified as Snps.id / CNV.id in association result files. (chr, pos) before.
@@ -218,8 +216,8 @@ class Results2DB_250k(AbstractVariationMapper):
 				sys.stderr.write("Error: file %s already exists. Skip.\n"%output_fname)
 				return False
 			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-		elif cls.marker_pos2snp_id is None:
-			cls.marker_pos2snp_id = cls.get_marker_pos2snp_id(db)
+		elif self.marker_pos2snp_id is None:
+			self.marker_pos2snp_id = self.get_marker_pos2snp_id(db)
 		
 		header_outputted = 0
 		no_of_lines = 0
@@ -227,7 +225,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		session = db.session
 		for row in reader:
 			#check if 1st line is header or not
-			if no_of_lines ==0 and cls.pa_has_characters.search(row[1]):	#check the 2nd one, which is strict digits. while the 1st column, chromosome could be 'X' or something
+			if no_of_lines ==0 and self.pa_has_characters.search(row[1]):	#check the 2nd one, which is strict digits. while the 1st column, chromosome could be 'X' or something
 				continue
 			snp_id = int(row[0])
 			if row[1] and row[1]!='0':	#2011-2-22 something on 2nd column. wrong format.
@@ -297,8 +295,8 @@ class Results2DB_250k(AbstractVariationMapper):
 			else:
 				
 				key = (chr, start_pos, stop_pos)
-				if key in cls.marker_pos2snp_id:
-					snps_id = cls.marker_pos2snp_id[key]
+				if key in self.marker_pos2snp_id:
+					snps_id = self.marker_pos2snp_id[key]
 					if isinstance(snps_id, SNPs):	#it's a new marker object
 						r = Results(score=score)
 						r.snps = snps_id
@@ -309,8 +307,8 @@ class Results2DB_250k(AbstractVariationMapper):
 					marker = SNPs(name=marker_name, chromosome=chr, position=start_pos, end_position=stop_pos, created_by=user)
 					#save it in database to get id
 					session.add(marker)
-					cls.marker_pos2snp_id[key] = marker	#for the next time to encounter same marker
-					cls.is_new_marker_added = True	#set this flag as new marker was inputted into the dict
+					self.marker_pos2snp_id[key] = marker	#for the next time to encounter same marker
+					self.is_new_marker_added = True	#set this flag as new marker was inputted into the dict
 					r = Results(score=score)
 					r.snps = marker
 					del marker
@@ -326,8 +324,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		sys.stderr.write("Done.\n")
 		return True
 	
-	@classmethod
-	def come_up_new_results_filename(cls, output_dir=None, db_entry_id=None, results_method_type_id=None,
+	def come_up_new_results_filename(self, output_dir=None, db_entry_id=None, results_method_type_id=None,
 							call_method_id=None, phenotype_method_id=None,\
 							analysis_method_id=None, cnv_method_id=None, extraBitLs=None, suffix='result'):
 		"""
@@ -364,8 +361,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		output_fname = os.path.join(output_dir, '%s.tsv'%('_'.join(filename_part_ls)))
 		return output_fname
 	
-	@classmethod
-	def copyResultsFile(cls, db, inputFname, db_entry, user, output_fname=None):
+	def copyResultsFile(self, db, inputFname, db_entry, user, output_fname=None):
 		"""
 		2008-09-30
 			return True
@@ -382,8 +378,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		return True
 		
 	
-	@classmethod
-	def add2DB(cls, db=None, short_name=None, phenotype_method_id=None, call_method_id=None, data_description=None, \
+	def add2DB(self, db=None, short_name=None, phenotype_method_id=None, call_method_id=None, data_description=None, \
 				method_description=None, comment=None, inputFname=None, user=None, results_method_type_id=None, \
 				analysis_method_id=None, results_method_type_short_name=None, data_dir=None, commit=0,\
 				cnv_method_id=None):
@@ -459,9 +454,9 @@ class Results2DB_250k(AbstractVariationMapper):
 			self.srcFilenameLs.append(inputFname)
 			self.dstFilenameLs.append(localAbsPath)
 			if db_entry.analysis_method_id==13:
-				return_value = cls.copyResultsFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
+				return_value = self.copyResultsFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
 			else:
-				return_value = cls.copyAndReformatResultFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
+				return_value = self.copyAndReformatResultFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
 			if return_value:
 				session.add(db_entry)
 				if db_entry.file_size is None:
@@ -484,8 +479,9 @@ class Results2DB_250k(AbstractVariationMapper):
 							db.cnv_id2chr_pos = cnv_method_id
 						db_id2chr_pos = db.cnv_id2chr_pos
 					pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
-					json_data = getOneResultJsonData(db_entry, db_250k=db, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, pdata=pdata)	#2011-2-24 pass pdata to getOneResultJsonData()
-					rm_json = Stock_250kDB.ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
+					json_data = db.getOneResultJsonData(result_id=db_entry.id, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, \
+													pdata=pdata, data_dir=data_dir)	#2011-2-24 pass pdata to getOneResultJsonData()
+					rm_json = Stock_250kDB.ResultsMethodJson(min_maf=min_MAF, no_of_top_snps=no_of_top_snps)
 					rm_json.result = db_entry
 					rm_json.json_data = json_data
 					session.add(rm_json)
@@ -493,7 +489,8 @@ class Results2DB_250k(AbstractVariationMapper):
 					sys.stderr.write('Except in saving results_method_json (aborted): %s\n'%repr(sys.exc_info()))
 					import traceback
 					traceback.print_exc()
-					session.delete(rm_json)
+					session.rollback()
+					self.cleanUpAndExitOnFailure(exitCode=3)
 			else:	#bad thing happend when getting data out of the file. don't save this results_method.
 				session.delete(db_entry)
 				sys.stderr.write("Error: copy file from %s to %s failed.\n"%(inputFname, localAbsPath ))
@@ -503,7 +500,7 @@ class Results2DB_250k(AbstractVariationMapper):
 			session.commit()
 		else:	#default is also rollback(). to demonstrate good programming
 			session.rollback()
-		cls.reset_marker_pos2snp_id()
+		self.reset_marker_pos2snp_id()
 	
 	def run(self):
 		"""
