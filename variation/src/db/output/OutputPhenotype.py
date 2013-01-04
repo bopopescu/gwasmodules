@@ -25,24 +25,19 @@ else:   #32bit
 import time, csv, getopt
 import traceback
 from pymodule import process_function_arguments, write_data_matrix, PassingData, SNPData
+from variation.src import AbstractVariationMapper
 
-class OutputPhenotype(object):
+class OutputPhenotype(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-					('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-					('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-					('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-					('output_fname', 1, ): ['', 'o', 1, 'store the pvalue', ],\
-					('phenotype_avg_table',1, ):['stock_250k.phenotype_avg', 'q', 1,  ],\
-					('phenotype_method_table',1, ):['stock_250k.phenotype_method', 'm', 1, ],\
-					('ecotype_table', 1, ): ['stock.ecotype', 'e', 1, 'ecotype table to get name related to each ecotype', ],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update( {
+					('phenotype_avg_table',1, ):['stock_250k.phenotype_avg', '', 1,  ],\
+					('phenotype_method_table',1, ):['stock_250k.phenotype_method', '', 1, ],\
+					('ecotype_table', 1, ): ['stock.ecotype', '', 1, 'ecotype table to get name related to each ecotype', ],\
 					('getPublicPhenotype', 0, int):[0, '', 0, 'toggle to get public phenotype only, phenotype_method.access==public and phenotype_avg.ready_for_publication=1'],\
-					('get_raw_data', 0, int):[0, 'g', 0, 'whether to output raw phenotype data from db or transform according to column transformation_description in phenotype_method table'],\
-					('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-					('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
-					}
+					('get_raw_data', 0, int):[0, '', 0, 'whether to output raw phenotype data from db or transform according to column transformation_description in phenotype_method table'],\
+					})
 	def __init__(self,  **keywords):
 		"""
 		2008-11-10
@@ -54,8 +49,9 @@ class OutputPhenotype(object):
 		"""
 		#argument dictionary
 		#self.ad = process_function_arguments(keywords, argument_default_dict, error_doc=__doc__, class_to_have_attr=self)
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
+		#from pymodule import ProcessOptions
+		#self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 		
 	@classmethod
 	def get_phenotype_method_id_info(cls, curs=None, phenotype_avg_table=None, phenotype_method_table=None, getPublicPhenotype=False):
@@ -135,6 +131,9 @@ class OutputPhenotype(object):
 	@classmethod
 	def get_ecotype_id2info(cls, curs=None, phenotype_avg_table=None, ecotype_table=None, getPublicPhenotype=False):
 		"""
+		2013.1.3 #in the mysql stock_250k, nativename is of str type.
+			#in psql, nativename is of 'unicode' type. In output, (write_data_matrix), python uses the default encoder ascii
+			# to convert nativename to str type. Error occurs. So here encodes manually through 'utf-8'
 		2012.9.28
 			add argument getPublicPhenotype, 
 		2009-2-2
@@ -166,7 +165,10 @@ class OutputPhenotype(object):
 			curs.execute("select nativename from %s where id=%s"%(ecotype_table, ecotype_id))
 			nativename = curs.fetchall()[0][0]
 			"""
-			ecotype_name_ls.append(nativename)
+			ecotype_name_ls.append(nativename.encode('utf-8'))
+			#in the mysql stock_250k, nativename is of str type.
+			#in psql, nativename is of 'unicode' type. In output, (write_data_matrix), python uses the default encoder ascii
+			# to convert nativename to str type. Error occurs. So here encodes manually through 'utf-8'
 			ecotype_id_ls.append(ecotype_id)
 			ecotype_id2index[ecotype_id] = len(ecotype_id2index)
 		sys.stderr.write("Done\n")
@@ -303,16 +305,15 @@ class OutputPhenotype(object):
 			import pdb
 			pdb.set_trace()
 		
-		import MySQLdb
-		conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
-		curs = conn.cursor()
+		#import MySQLdb
+		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
+		#curs = conn.cursor()
 		
-		
-		pheno_data = self.getPhenotypeData(curs, self.phenotype_avg_table, self.phenotype_method_table, \
+		pheno_data = self.getPhenotypeData(self.db_250k.metadata.bind, self.phenotype_avg_table, self.phenotype_method_table, \
 										self.ecotype_table, get_raw_data=self.get_raw_data,\
 										getPublicPhenotype=self.getPublicPhenotype)
 		header = ['ecotype id', 'nativename'] + pheno_data.col_label_ls
-		write_data_matrix(pheno_data.data_matrix, self.output_fname, header, pheno_data.row_id_ls, pheno_data.row_label_ls, \
+		write_data_matrix(pheno_data.data_matrix, self.outputFname, header, pheno_data.row_id_ls, pheno_data.row_label_ls, \
 						transform_to_numpy=False)
 
 if __name__ == '__main__':
@@ -341,7 +342,7 @@ if __name__ == '__main__':
 	dbname = None
 	user = None
 	passwd = None
-	output_fname = None
+	outputFname = None
 	ecotype_table = None
 	phenotype_avg_table = None
 	phenotype_method_table = None
@@ -362,7 +363,7 @@ if __name__ == '__main__':
 		elif opt in ("-p", "--passwd"):
 			passwd = arg
 		elif opt in ("-o",):
-			output_fname = arg
+			outputFname = arg
 		elif opt in ("-e",):
 			ecotype_table = arg
 		elif opt in ("-q",):
@@ -375,7 +376,7 @@ if __name__ == '__main__':
 		elif opt in ("-r", "--report"):
 			report = 1
 	
-	instance = OutputPhenotype(hostname=hostname, dbname=dbname, user=user, passwd=passwd, output_fname=output_fname,
+	instance = OutputPhenotype(hostname=hostname, dbname=dbname, user=user, passwd=passwd, outputFname=outputFname,
 					ecotype_table=ecotype_table, phenotype_avg_table=phenotype_avg_table, \
 					phenotype_method_table = phenotype_method_table, debug=debug, report=report)
 	instance.run()
