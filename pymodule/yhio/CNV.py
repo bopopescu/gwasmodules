@@ -90,7 +90,10 @@ class CNVSegmentBinarySearchTreeKey(object):
 		self.start = self.span_ls[0]
 		if len(self.span_ls)>1:
 			self.stop = self.span_ls[1]
-			self.span = abs(self.stop-self.start)
+			if self.start is not None and self.stop is not None:	#2012.12.31 bugfix
+				self.span = abs(self.stop-self.start)
+			else:
+				self.span = 0
 		else:
 			self.stop = self.start
 			self.span = 0
