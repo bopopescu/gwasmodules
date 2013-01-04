@@ -8,7 +8,7 @@
 2007-03-29
 	add mappings for '-', 'N', and ambiguous letters ('M', 'R', 'W', 'S', 'Y', 'K')
 """
-import sys, os, math
+import sys, os, math, numpy
 bit_number = math.log(sys.maxint)/math.log(2)
 if bit_number>40:       #64bit
 	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
@@ -21,6 +21,7 @@ from pymodule.yhio.SNP import ab2number, number2ab, NA_set, nt2number, \
 	number2nt, number2color, nt_number_matching_matrix, get_nt_number2diff_matrix_index,\
 	RawSnpsData_ls2SNPData, transposeSNPData, SNPData2RawSnpsData_ls
 from pymodule import PassingData
+import simplejson
 
 def get_chr_id2size(curs, chromosome_table='at.chromosome'):
 	"""
@@ -529,7 +530,6 @@ def calculate7NumberSummaryForOneList(ls, returnObj=None):
 	return returnObj
 
 def getResultForComparison(rm_x, rm_y, db_250k=None, no_of_top_snps = 500):
-	from GeneListRankTest import GeneListRankTest
 	sys.stderr.write("Getting json_data from result %s ... "%rm_x.id)
 	genome_wide_result_x = db_250k.getResultMethodContent(rm_x.id)
 	max_value_x = genome_wide_result_x.max_value
@@ -569,8 +569,9 @@ def getResultForComparison(rm_x, rm_y, db_250k=None, no_of_top_snps = 500):
 	
 		
 
-def getOneResultJsonData(rm, db_250k=None, min_MAF=0.0, no_of_top_snps=10000, pdata=None):
+def getOneResultJsonData(rm, db_250k=None, min_MAF=0.0, no_of_top_snps=10000, pdata=None, data_dir=None):
 	"""
+	2012.12.29 added argument data_dir, and moved the content to Stock_250kDB.py
 	2012.6.6 bugfix. add change param_data to pdata in calling  db_250k.getResultMethodContent()
 	2011-2-24
 		add argument pdata, to pass db_id2chr_pos to getGenomeWideResultFromFile() in pymodule/SNP.py
@@ -581,45 +582,5 @@ def getOneResultJsonData(rm, db_250k=None, min_MAF=0.0, no_of_top_snps=10000, pd
 		refactored out of fetchOne()
 		called upon only if its return is not in db.
 	"""
-	sys.stderr.write("Getting json_data from result %s ... "%rm.id)
-	if pdata is None:	#2011-2-24 create a PassingData() only when
-		pdata = PassingData(min_MAF=min_MAF)
-	from GeneListRankTest import GeneListRankTest
-	genome_wide_result = db_250k.getResultMethodContent(rm.id, min_MAF=min_MAF, pdata=pdata,\
-													results_directory=getattr(pdata, 'results_directory', None))
-	no_of_tests = len(genome_wide_result.data_obj_ls)
-	max_value = genome_wide_result.max_value
-	chr2length = {}
-	max_length = 0
-	for chr, min_max_pos in genome_wide_result.chr2min_max_pos.iteritems():
-		chr2length[chr] = min_max_pos[1]-min_max_pos[0]
-		max_length = max(max_length, chr2length[chr])
-	
-	return_ls = []
-	description = {"position": ("number", "Position"),"value": ("number", "-log Pvalue")}
-	chr2data = {}
-	for i in range(no_of_top_snps):
-		data_obj = genome_wide_result.get_data_obj_at_given_rank(i+1)
-		if data_obj.chromosome not in chr2data:
-			chr2data[data_obj.chromosome] = []
-		chr2data[data_obj.chromosome].append(dict(position=data_obj.position, value=data_obj.value))
-	
-	import gviz_api
-	json_result = {}
-	for chr in chr2data:
-		list = chr2data[chr]
-		list.sort()
-		data_table = gviz_api.DataTable(description)
-		data_table.LoadData(chr2data[chr])
-		json_result[chr] = data_table.ToJSon(columns_order=("position", "value"))
-											#,order_by="position")
-	result = {
-			'chr2data': json_result,
-			'chr2length': chr2length,
-			'max_value': max_value,
-			'max_length': max_length,
-			'no_of_tests': no_of_tests,
-			}
-	sys.stderr.write("Done.\n")
-	import simplejson
-	return simplejson.dumps(result)
+	return db_250k.getOneResultJsonData(result_id=rm.id, min_MAF=min_MAF, \
+									no_of_top_snps=no_of_top_snps, data_dir=data_dir, pdata=pdata)
