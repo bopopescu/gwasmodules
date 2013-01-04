@@ -2,16 +2,21 @@
 """
 Examples:
 	#setup database in postgresql
-	Stock_250kDB.py -v postgres -u crocea -z localhost -d graphdb -k public
+	%s -v postgres -u crocea -z localhost -d graphdb -k public
+	
+	#2013.1.3 setup db in postgresql with a custom schema name
+	%s  -v postgresql -u yh -z localhost -d vervetdb -k stock_250k
 	
 	#setup database in mysql
-	Stock_250kDB.py -u yh -z papaya.usc.edu
+	%s -u yh -z papaya.usc.edu
 	
 Description:
 	2008-07-09
 	This is a wrapper for the stock_250k database, build on top of elixir. supposed to supercede the table definitions in mysql.sql.
 """
 import sys, os, math
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
+
 from sqlalchemy.types import LargeBinary
 
 #bit_number = math.log(sys.maxint)/math.log(2)
@@ -39,7 +44,6 @@ from datetime import datetime
 from pymodule import SNPData, PassingData, figureOutDelimiter
 from pymodule.db import ElixirDB, TableClass, supplantFilePathWithNewDataDir, AbstractTableWithFilename
 import hashlib, csv
-
 
 __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 #__metadata__ = ThreadLocalMetaData()	#2008-10 not good for pylon
@@ -629,7 +633,7 @@ class ResultsMethodJson(Entity):
 	"""
 	result = ManyToOne('ResultsMethod', colname='results_id', ondelete='CASCADE', onupdate='CASCADE')
 	no_of_top_snps = Field(Integer)
-	min_MAF = Field(Float)
+	min_maf = Field(Float)
 	json_data = Field(LargeBinary(134217728), deferred=True)
 	created_by = Field(String(200))
 	updated_by = Field(String(200))
@@ -637,7 +641,7 @@ class ResultsMethodJson(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='results_method_json', metadata=__metadata__, session=__session__)
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('results_id', 'no_of_top_snps', 'min_MAF'))
+	using_table_options(UniqueConstraint('results_id', 'no_of_top_snps', 'min_maf'))
 
 class AssociationLandscape(Entity, AbstractTableWithFilename):
 	"""
@@ -1117,7 +1121,7 @@ class CandidateGeneRankSumTestResult(Entity):
 	pvalue = Field(Float)
 	min_distance = Field(Integer)
 	get_closest = Field(Integer)
-	min_MAF = Field(Float)
+	min_maf = Field(Float)
 	max_pvalue_per_gene = Field(Integer)
 	candidate_sample_size = Field(Integer)
 	non_candidate_sample_size = Field(Integer)
@@ -1292,7 +1296,7 @@ class ArrayInfo(Entity, AbstractTableWithFilename):
 	median_intensity = Field(Float)
 	samples = Field(String(20))
 	dna_amount = Field(String(20))
-	S260_280 = Field(Float)
+	s260_280 = Field(Float)
 	total_vol = Field(String(20))
 	hyb_vol = Field(String(20))
 	seed_source = Field(String(100))
@@ -1373,7 +1377,7 @@ class CallInfo(Entity, AbstractTableWithFilename):
 	filename = Field(String(1000))
 	description = Field(String(2000))
 	array = ManyToOne("%s.ArrayInfo"%__name__, colname='array_id', ondelete='CASCADE', onupdate='CASCADE')
-	NA_rate = Field(Float)
+	na_rate = Field(Float)
 	readme = ManyToOne("%s.README"%__name__, colname='readme_id', ondelete='CASCADE', onupdate='CASCADE')
 	call_method = ManyToOne('%s.CallMethod'%__name__, colname='method_id', ondelete='CASCADE', onupdate='CASCADE')
 	call_qc_ls = OneToMany("%s.CallQC"%__name__)
@@ -3677,6 +3681,7 @@ class Stock_250kDB(ElixirDB):
 	
 	def getSNPChrPos2IDLs(self, priorTAIRVersion=False, locus_type_id=None):
 		"""
+		2012.12.29 prefix the table name with the schema if schema is used (psql) 
 		2012.3.9
 			add argument locus_type_id
 		2012.3.7
@@ -3700,7 +3705,8 @@ class Stock_250kDB(ElixirDB):
 		if locus_type_id is not None:
 			where_sentence += ' and locus_type_id=%s'%(locus_type_id)
 		rows = self.metadata.bind.execute("select id, %s as chromosome, %s as position, %s from %s %s "%\
-								(chromosome_table_fieldname, position_table_fieldname, endPositionFieldName, Snps.table.name, \
+								(chromosome_table_fieldname, position_table_fieldname, endPositionFieldName, \
+								self.getProperTableName(Snps), \
 								where_sentence, ))
 		for row in rows:
 			if row.end_position is None:	#2012.3.7
@@ -3901,6 +3907,60 @@ class Stock_250kDB(ElixirDB):
 			value = (row.chromosome, row.start, row.stop)
 			self._cnv_id2chr_pos[key] = value
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
+	
+	
+	def getOneResultJsonData(self, result_id=None, min_MAF=0.0, no_of_top_snps=10000, data_dir=None, pdata=None):
+		"""
+		2012.6.6 bugfix. add change param_data to pdata in calling  db_250k.getResultMethodContent()
+		2011-2-24
+			add argument pdata, to pass db_id2chr_pos to getGenomeWideResultFromFile() in pymodule/SNP.py
+		2010-5-3
+			moved here from DisplayResults.py
+			script to create a json structure for GWAS plot out of an association result given in rm (db object)
+		2009-4-24
+			refactored out of fetchOne()
+			called upon only if its return is not in db.
+		"""
+		sys.stderr.write("Getting json_data from result %s ... "%result_id)
+		if pdata is None:	#2011-2-24 create a PassingData() only when
+			pdata = PassingData(min_MAF=min_MAF)
+		genome_wide_result = self.getResultMethodContent(result_id, min_MAF=min_MAF, pdata=pdata,\
+														data_dir=data_dir)
+		no_of_tests = len(genome_wide_result.data_obj_ls)
+		max_value = genome_wide_result.max_value
+		chr2length = {}
+		max_length = 0
+		for chr, min_max_pos in genome_wide_result.chr2min_max_pos.iteritems():
+			chr2length[chr] = min_max_pos[1]-min_max_pos[0]
+			max_length = max(max_length, chr2length[chr])
+		
+		return_ls = []
+		description = {"position": ("number", "Position"),"value": ("number", "-log Pvalue")}
+		chr2data = {}
+		for i in range(no_of_top_snps):
+			data_obj = genome_wide_result.get_data_obj_at_given_rank(i+1)
+			if data_obj.chromosome not in chr2data:
+				chr2data[data_obj.chromosome] = []
+			chr2data[data_obj.chromosome].append(dict(position=data_obj.position, value=data_obj.value))
+		
+		import gviz_api, simplejson
+		json_result = {}
+		for chr in chr2data:
+			list = chr2data[chr]
+			list.sort()
+			data_table = gviz_api.DataTable(description)
+			data_table.LoadData(chr2data[chr])
+			json_result[chr] = data_table.ToJSon(columns_order=("position", "value"))
+												#,order_by="position")
+		result = {
+				'chr2data': json_result,
+				'chr2length': chr2length,
+				'max_value': max_value,
+				'max_length': max_length,
+				'no_of_tests': no_of_tests,
+				}
+		sys.stderr.write("Done.\n")
+		return simplejson.dumps(result)
 	
 	def getResultMethodContent(self, result_id=None, data_dir=None, min_MAF=0.1, construct_chr_pos2index=False, \
 						pdata=None, min_value_cutoff=None, results_directory=None, association_landscape=None,\
@@ -4397,7 +4457,7 @@ if __name__ == '__main__':
 	query = query.filter(TableClass.cnv.has(CNV.no_of_probes_covered>=min_no_of_probes))
 	cnv_method_id = 22
 	query = query.filter_by(cnv_method_id=cnv_method_id)
-	chr = 1
+	chr = "1"
 	query = query.filter(TableClass.cnv.has(chromosome=chr))
 	start =25000
 	stop = 2500000
@@ -4411,7 +4471,7 @@ if __name__ == '__main__':
 			break
 	
 	import sqlalchemy
-	s = sqlalchemy.sql.select([AssociationOverlappingStat.table.c.call_method_id.distinct()])
+	s = sqlalchemy.sql.select([ResultsMethod.table.c.call_method_id.distinct()])
 	connection = instance.metadata.bind
 	#result = connection.execute(s).fetchmany(3)
 	result = connection.execute(s)
