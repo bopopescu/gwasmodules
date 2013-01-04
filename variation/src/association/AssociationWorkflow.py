@@ -18,8 +18,14 @@ Examples:
 	%s -A 57,75 -n -c -w 314-351 -a 1,32 -K /Network/Data/250k/db/dataset/call_method_75_K.tsv
 		-o dags/Association/associationCall57_75Phenotype314_351Analysis1_32.xml
 		-u yh -d stock_250k -z banyan  -j condorpool -l condorpool
-		#--getPublicPhenotype
-
+		--getPublicPhenotype
+	
+	#2012.12.28 run it on hoffman2 condor
+	%s -A 57,75 -n -c -w 1-35,39-48,57-82,158-159,161-179,182-186,272-283,314-351,362-380,418-589 -a 7
+		-o dags/Association/Call57_75_251PublicPhenotypeAnalysis7.xml -u yh
+		-d stock_250k -z localhost -j hcondor -l hcondor --data_dir ~/NetworkData/250k/db/
+		--drivername postgresql --dbname vervetdb --schema stock_250k --db_passwd secret --needSSHDBTunnel --getPublicPhenotype
+ 
 Description:
 	2012.6.5
 		output a workflow that runs Association.py on specified input and imports the result into db.
@@ -27,7 +33,7 @@ Description:
 		
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
 #bit_number = math.log(sys.maxint)/math.log(2)
 #if bit_number>40:	   #64bit
@@ -38,7 +44,7 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from Pegasus.DAX3 import *
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, db
 from Association import Association
 from variation.src.pegasus.AbstractVariationWorkflow import AbstractVariationWorkflow
 from variation.src import Stock_250kDB
@@ -168,9 +174,10 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 			add argument getPublicPhenotype
 		2012.6.5
 		"""
-		extraArgumentList = ['-e %s'%(ecotype_table), '-m %s'%(phenotype_method_table), '-q %s'%(phenotype_avg_table)]
+		extraArgumentList = ['--ecotype_table %s'%(ecotype_table), \
+							'--phenotype_method_table %s'%(phenotype_method_table), '--phenotype_avg_table %s'%(phenotype_avg_table)]
 		if getRawPhenotypeData:
-			extraArgumentList.append('-g')
+			extraArgumentList.append('--get_raw_data')
 		if getPublicPhenotype:
 			extraArgumentList.append("--getPublicPhenotype")
 		if extraArguments:
@@ -303,7 +310,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		for call_method_id in self.call_method_id_ls:
 			callMethod = Stock_250kDB.CallMethod.get(call_method_id)
 			if callMethod and callMethod.filename:
-				datasetFile = self.registerOneInputFile(inputFname=supplantFilePathWithNewDataDir(filePath=callMethod.filename, \
+				datasetFile = self.registerOneInputFile(inputFname=db.supplantFilePathWithNewDataDir(filePath=callMethod.filename, \
 																		oldDataDir=self.db_250k.data_dir, \
 																		newDataDir=self.data_dir), \
 													folderName=self.pegasusFolderName)
