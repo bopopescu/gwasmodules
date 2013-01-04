@@ -15,7 +15,9 @@ except ImportError:
 		sys.stderr.write("Neither psycopg nor psycopg2 is installed.\n")
 import sys, getopt, csv, re
 #from codense.common import db_connect, dict_map
-from common import nt2number, number2nt
+from pymodule.yhio.SNP import ab2number, number2ab, NA_set, nt2number, \
+	number2nt, number2color, nt_number_matching_matrix, get_nt_number2diff_matrix_index,\
+	RawSnpsData_ls2SNPData, transposeSNPData, SNPData2RawSnpsData_ls
 from sets import Set
 #import networkx as nx
 #from pymodule import importNumericArray, ProcessOptions, SNPData, write_data_matrix, read_data, TwoSNPData
