@@ -27,9 +27,10 @@ class AbstractVariationMapper(AbstractDBInteractingJob):
 	option_default_dict = AbstractDBInteractingJob.option_default_dict.copy()
 	option_default_dict.update({
 							('data_dir', 0, ):[None, '', 1, 'The results directory. Default is None. use the one given by db.'],\
-							('drivername', 1,):['mysql', '', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', '', 1, 'stock_250k database name', ],\
+							('drivername', 1,):['postgresql', '', 1, 'which type of database? mysql or postgres', ],\
+							('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
+							('dbname', 1, ): ['vervetdb', '', 1, 'stock_250k database name', ],\
+							('schema', 0, ): ['stock_250k', '', 1, 'database schema name', ],\
 							('min_MAF', 0, float): [0.1, '', 1, 'minimum Minor Allele Frequency.'],\
 							})
 	def __init__(self, inputFnameLs=None, **keywords):
