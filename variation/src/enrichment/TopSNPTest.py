@@ -34,16 +34,16 @@ else:   #32bit
 
 import time, csv, getopt
 import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter
-import Stock_250kDB
-from Stock_250kDB import Snps, SnpsContext, ResultsMethod, GeneList, CandidateGeneRankSumTestResult, CandidateGeneTopSNPTest, ResultsByGene
-from Results2DB_250k import Results2DB_250k
-from pymodule import getGenomeWideResultFromFile
-from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
+import  random, numpy
 from sets import Set
 from heapq import heappush, heappop, heapreplace
-from common import get_total_gene_ls
-import  random, numpy
+from pymodule import PassingData, figureOutDelimiter
+from pymodule import getGenomeWideResultFromFile
+from variation.src import Stock_250kDB
+from variation.src.common import get_total_gene_ls
+from variation.src.db.Results2DB_250k import Results2DB_250k
+from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
+
 
 class TopSNPTest(GeneListRankTest):
 	__doc__ = __doc__
@@ -403,7 +403,7 @@ class TopSNPTest(GeneListRankTest):
 							(getattr(pd, 'results_id',-1), getattr(pd, 'list_type_id', -1), getattr(pd, 'no_of_top_snps', -1),\
 							repr(getattr(pd, 'no_of_top_snps_ls', -1)), getattr(pd, 'type_id', -1), getattr(pd, 'min_score', -1)))
 		
-		ResultsClass = ResultsMethod
+		ResultsClass = Stock_250kDB.ResultsMethod
 		TestResultClass = Stock_250kDB.CandidateGeneTopSNPTestRM
 		rm = ResultsClass.get(pd.results_id)
 		min_distance = pd.min_distance
@@ -572,19 +572,19 @@ class TopSNPTest(GeneListRankTest):
 							repr(getattr(pd, 'no_of_top_snps_ls', -1)), getattr(pd, 'type_id', -1), getattr(pd, 'min_score', -1)))
 		need_candidate_association = 0	#2008-11-12, default is 0. pass to prepareDataForPermutationRankTest()
 		if pd.results_type==1:
-			ResultsClass = ResultsMethod
+			ResultsClass = Stock_250kDB.ResultsMethod
 			TestResultClass = Stock_250kDB.CandidateGeneTopSNPTestRM
 			min_distance = pd.min_distance
 			min_MAF = pd.min_MAF
 			get_closest = pd.get_closest
 		elif pd.results_type==2:
-			ResultsClass = ResultsByGene
-			TestResultClass = CandidateGeneTopSNPTest
+			ResultsClass = Stock_250kDB.ResultsByGene
+			TestResultClass = Stock_250kDB.CandidateGeneTopSNPTest
 			min_distance = rm.min_distance
 			min_MAF = rm.min_MAF
 			get_closest = rm.get_closest
 		elif pd.results_type==3:
-			ResultsClass = ResultsMethod
+			ResultsClass = Stock_250kDB.ResultsMethod
 			TestResultClass = Stock_250kDB.CandidateGeneTopSNPTestRG
 			min_distance = pd.min_distance
 			min_MAF = pd.min_MAF
@@ -646,7 +646,7 @@ class TopSNPTest(GeneListRankTest):
 				candidate_sample_size = x
 				non_candidate_sample_size = len(passingdata.non_candidate_gene_ls)
 				no_of_top_snps = candidate_sample_size + non_candidate_sample_size
-			elif pd.results_type==1:	#for ResultsMethod + CandidateGeneTopSNPTestRM
+			elif pd.results_type==1:	#for Stock_250kDB.ResultsMethod + CandidateGeneTopSNPTestRM
 				permData = self.prepareDataForPermutationRankTest(rm, pd.snps_context_wrapper, param_data)
 				if permData is None:
 					if self.debug:
@@ -724,7 +724,7 @@ class TopSNPTest(GeneListRankTest):
 				else:
 					sys.stderr.write("Test_type %s not supported.\n"%(pd.test_type))
 					return None
-			elif pd.results_type==3:	#for ResultsMethod + CandidateGeneTopSNPTestRG
+			elif pd.results_type==3:	#for Stock_250kDB.ResultsMethod + CandidateGeneTopSNPTestRG
 				permData = self.prepareDataForPermutationRankTest(rm, pd.snps_context_wrapper, param_data)
 				if permData is None:
 					if self.debug:
@@ -868,7 +868,7 @@ class TopSNPTest(GeneListRankTest):
 		if getattr(self, 'output_fname', None):
 			writer = csv.writer(open(self.output_fname, 'w'), delimiter='\t')
 			header_row = []
-			for column in CandidateGeneTopSNPTest.c.keys():
+			for column in Stock_250kDB.CandidateGeneTopSNPTest.c.keys():
 				header_row.append(column)
 			writer.writerow(header_row)
 		else:

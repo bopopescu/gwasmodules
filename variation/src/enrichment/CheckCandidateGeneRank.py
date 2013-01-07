@@ -36,16 +36,16 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import matplotlib as mpl; mpl.use("Agg")
 import time, csv, cPickle, numpy, random
 import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr
-import Stock_250kDB
-from Stock_250kDB import ResultsByGene, ResultsMethod
 from sets import Set
-from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
-from DrawSNPRegion import DrawSNPRegion
 #from sqlalchemy.orm import join
 import pylab
 import StringIO
-from common import get_total_gene_ls
+from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr
+from variation.src import Stock_250kDB
+from variation.src.common import get_total_gene_ls
+from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
+from variation.src.plot.DrawSNPRegion import DrawSNPRegion
+
 
 class CheckCandidateGeneRank(GeneListRankTest):
 	__doc__ = __doc__
@@ -101,15 +101,15 @@ class CheckCandidateGeneRank(GeneListRankTest):
 		sys.stderr.write("Getting results_id_ls ...")
 		phenotype_id2results_id_ls = {}
 		if results_type==1:
-			rows = ResultsClass.query.filter(ResultsMethod.phenotype_method_id.in_(phenotype_id_ls))
+			rows = ResultsClass.query.filter(Stock_250kDB.ResultsMethod.phenotype_method_id.in_(phenotype_id_ls))
 			if call_method_id is not None or call_method_id !=0:
 				rows = rows.filter_by(call_method_id=call_method_id)
 		elif results_type==2:
 			rows = ResultsClass.query.filter_by(min_distance=min_distance).filter_by(get_closest=get_closest).\
-				filter(ResultsByGene.results_method.has(ResultsMethod.phenotype_method_id.in_(phenotype_id_ls)))
+				filter(Stock_250kDB.ResultsByGene.results_method.has(Stock_250kDB.ResultsMethod.phenotype_method_id.in_(phenotype_id_ls)))
 			if min_MAF is not None:
-				rows = rows.filter(ResultsByGene.min_MAF>=min_MAF-0.0001).filter(ResultsByGene.min_MAF<=min_MAF+0.0001)
-				#.order_by(ResultsMethod.analysis_method_id)
+				rows = rows.filter(Stock_250kDB.ResultsByGene.min_MAF>=min_MAF-0.0001).filter(Stock_250kDB.ResultsByGene.min_MAF<=min_MAF+0.0001)
+				#.order_by(Stock_250kDB.ResultsMethod.analysis_method_id)
 		counter = 0
 		for row in rows:
 			if results_type==1:
