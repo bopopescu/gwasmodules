@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """
 Examples:
-	GeneListRankTest.py -e 389 -l 1 -u yh -c
+	GeneListRankTest.py --results_id_ls 389 -l 1 -u yh --commit
 	
 	#debug, quick testing
-	GeneListRankTest.py -e 389,190 -l 1 -u yh -b
+	GeneListRankTest.py --results_id_ls 389,190 -l 1 -u yh -b
 	
 	#apart from doing rank test, pickle the snps_context_wrapper into a file.
-	GeneListRankTest.py -e 389 -l 1 -u yh -c -s /tmp/snps_context
+	GeneListRankTest.py --results_id_ls 389 -l 1 -u yh --commit -s /tmp/snps_context
 	
 	#gw-looping rank-sum test
-	GeneListRankTest.py -e 389 -l1 -u yh -j1 -y2 -s ./mnt2/panfs/250k/snps_context_g0_m20000  -p secret -b
+	GeneListRankTest.py --results_id_ls 389 -l1 -u yh -j1 -y2 -s ./mnt2/panfs/250k/snps_context_g0_m20000  -p secret -b
 	
 	#run max-rank gw-looping test (test_type_id=8) to get the probability to observe the max rank of list 206 
-	./script/variation/src/GeneListRankTest.py -e 3471,3723 -l 206 -u yh -y8 -s .../snps_context_g0_m20000 -m 20000 -c -u yh
+	./script/variation/src/GeneListRankTest.py --results_id_ls 3471,3723 -l 206 -u yh -y8 -s .../snps_context_g0_m20000 -m 20000 --commit -u yh
 	
 Description:
 	2009-9-17
@@ -51,9 +51,9 @@ from sets import Set
 from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr, importNumericArray
 from pymodule import getGenomeWideResultFromFile
 from pymodule.db import TableClass
+from variation.src import AbstractVariationMapper
 from variation.src.db.Stock_250kDB import Stock_250kDB, Snps, SnpsContext, ResultsMethod, GeneList, CandidateGeneRankSumTestResult, \
 	ResultsByGene, CandidateGeneRankSumTestResultMethod, CandidateGeneRankSumTestResultMethodType
-from variation.src.db.Results2DB_250k import Results2DB_250k
 
 
 num = importNumericArray()
@@ -113,22 +113,18 @@ class SnpsContextWrapper(object):
 		return return_matrix
 
 
-class GeneListRankTest(object):
+class GeneListRankTest(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-							("results_id_ls", 1, ): [None, 'e', 1, 'comma/dash-separated results_by_gene id list, like 1,3-7'],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('inputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
+							("results_id_ls", 1, ): [None, '', 1, 'comma/dash-separated results_by_gene id list, like 1,3-7'],\
 							("min_distance", 1, int): [50000, 'm', 1, 'minimum distance allowed from the SNP to gene'],\
 							("get_closest", 0, int): [0, 'g', 0, 'only get genes closest to the SNP within that distance'],\
-							('min_MAF', 0, float): [0, 'n', 1, 'minimum Minor Allele Frequency. deprecated.'],\
 							('min_sample_size', 0, int): [1, 'i', 1, 'minimum size for both candidate and non-candidate sets to do wilcox.test'],\
 							("list_type_id", 1, int): [None, 'l', 1, 'Gene list type. must be in table gene_list_type beforehand.'],\
-							('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
-							("output_fname", 0, ): [None, 'o', 1, 'To store rank test results into this file as a backup version of db'],\
+							("outputFname", 0, ): [None, 'o', 1, 'To store rank test results into this file as a backup version of db'],\
 							("snps_context_picklef", 0, ): [None, 's', 1, 'given the option, if the file does not exist yet, to store a pickled snps_context_wrapper into it, min_distance and flag get_closest will be attached to the filename. If the file exists, load snps_context_wrapper out of it.'],\
 							("results_type", 1, int): [1, 'w', 1, 'which type of results. 1; ResultsMethod, 2: ResultsByGene (forget it), 3: ResultsMethod but counting #distinct genes'],\
 							("test_type_id", 1, int): [1, 'y', 1, 'which type of rank sum test. 1: r.wilcox.test() 2: loop-permutation. 3: loop-permutation with chromosome order kept. 4,5,6 are their counterparts which allow_two_sample_overlapping. now corresponds to id in table CandidateGeneRankSumTestResultMethodType.'],\
@@ -137,9 +133,7 @@ class GeneListRankTest(object):
 							('null_distribution_type_id', 0, int):[1, 'C', 1, 'Type of null distribution. 1=original, 2=permutation, 3=random gene list. check DB table null_distribution_type'],\
 							("allow_two_sample_overlapping", 1, int): [0, '', 0, 'whether to allow one SNP to be assigned to both candidate and non-candidate gene group'],\
 							('min_no_of_genes', 1, int):[10, 'G', 1, 'minimum no of genes one candidate gene list should harbor. effective only in MPI version'],\
-							('commit', 0, int):[0, 'c', 0, 'commit the db operation. this commit happens after every db operation, not wait till the end.'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							})
 	#("allow_two_sample_overlapping", 1, int): [0, 'x', 0, 'whether to allow one SNP to be assigned to both candidate and non-candidate gene group'],\
 	debug = 0
 	def __init__(self,  **keywords):
@@ -150,8 +144,7 @@ class GeneListRankTest(object):
 			split results_id_ls if it exists, to accomodate MpiGeneListRankTest which removed this option
 		2008-07-10
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, **keywords)
 		
 		if getattr(self, 'results_id_ls', None):
 			self.result_id_ls = getListOutOfStr(self.results_id_ls, data_type=int)
@@ -852,10 +845,10 @@ class GeneListRankTest(object):
 			sys.stderr.write("%s/%s tests in total. Done.\n"%(no_of_hits, i))
 		return rank_sum_stat, pvalue
 	
-	def output_gene_id2hit(self, gene_id2hit, output_fname):
+	def output_gene_id2hit(self, gene_id2hit, outputFname):
 		sys.stderr.write("Outputting gene_id2hit ... ")
 		
-		writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+		writer = csv.writer(open(outputFname, 'w'), delimiter='\t')
 		writer.writerow(['gene-id', 'chromosome', 'position', 'snps-id', 'disp_pos', 'score', 'rank'])
 		gene_id_ls = gene_id2hit.keys()
 		gene_id_ls.sort()
@@ -1093,15 +1086,13 @@ class GeneListRankTest(object):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		db = Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
-		db.setup(create_tables=False)
-		self.db_250k = db	#2012.3.23
+		db = self.db_250k
+		#self.db_250k = db	#2012.3.23
 		session = db.session
 		snps_context_wrapper = self.dealWithSnpsContextWrapper(self.snps_context_picklef, self.min_distance, self.get_closest)
 		
-		if getattr(self, 'output_fname', None):
-			writer = csv.writer(open(self.output_fname, 'w'), delimiter='\t')
+		if getattr(self, 'outputFname', None):
+			writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
 			header_row = []
 			for column in CandidateGeneRankSumTestResult.c.keys():
 				header_row.append(column)
@@ -1109,7 +1100,7 @@ class GeneListRankTest(object):
 		else:
 			writer = None
 		pd = PassingData(list_type_id=self.list_type_id, snps_context_wrapper=snps_context_wrapper,\
-					results_directory=self.results_directory, \
+					results_directory=self.data_dir, \
 					min_MAF=self.min_MAF, get_closest=self.get_closest, min_distance=self.min_distance, \
 					min_sample_size=self.min_sample_size, test_type_id=self.test_type_id, \
 					results_type=self.results_type, no_of_permutations=self.no_of_permutations,\
