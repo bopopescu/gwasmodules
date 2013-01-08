@@ -1,14 +1,22 @@
 #!/usr/bin/env python
 """
 Examples:
-	%s -z banyan --xColumnHeader start --whichColumnHeader score
+	# 2012 input is hdf5 association table
+	secret=...
+	%s --xColumnHeader start --whichColumnHeader score
 		-i /Network/Data/250k/db/association_landscape/type_1/56_result5859_type1.h5
 		-o /Network/Data/250k/db/association_landscape/type_1/56_result5859_type1.h5.png
-		--drivername mysql --hostname banyan --dbname stock_250k --db_user yh --db_passwd secret
-		--genome_drivername=mysql --genome_hostname=banyan --genome_dbname=genome --genome_schema=genome --genome_db_user=yh
-		--genome_db_passwd=secret --tax_id=3702 --minNoOfTotal 1 --figureDPI 200 --h5TableName association
+		--drivername postgresql --hostname localhost --dbname vervetdb --schema stock_250k --db_user yh --db_passwd $secret
+		--genome_drivername=postgresql --genome_hostname=localhost --genome_dbname=vervetdb --genome_schema=genome --genome_db_user=yh
+		--genome_db_passwd=$secret --tax_id=3702 --minNoOfTotal 1 --figureDPI 200 --h5TableName association
 	
-	%s  
+	#2013.1.7 input is plain tsv file (assuming it has columns, chromosome, start, score.)
+	%s   --xColumnHeader start --whichColumnHeader score
+		-i /Network/Data/250k/db/results/type_1/7314_call75_pheno2_ana32.tsv
+		-o /Network/Data/250k/db/results/type_1/7314_call75_pheno2_ana32.tsv.png
+		--drivername postgresql --hostname localhost --dbname vervetdb --schema stock_250k --db_user yh --db_passwd $secret
+		--genome_drivername=postgresql --genome_hostname=localhost --genome_dbname=vervetdb --genome_schema=genome
+		--genome_db_user=yh --genome_db_passwd=$secret --tax_id=3702 --minNoOfTotal 1 --figureDPI 200  --inputFileFormat 1
 	
 
 Description:
