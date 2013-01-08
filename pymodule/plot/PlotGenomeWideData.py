@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Examples:
-	%s -z banyan -U yh321 --db_passwd yh321 -u yh --xColumnHeader start --whichColumnHeader score
+	%s -z banyan --xColumnHeader start --whichColumnHeader score
 		-i /Network/Data/250k/db/association_landscape/type_1/56_result5859_type1.h5
 		-o /Network/Data/250k/db/association_landscape/type_1/56_result5859_type1.h5.png
 		--drivername mysql --hostname banyan --dbname stock_250k --db_user yh --db_passwd secret
