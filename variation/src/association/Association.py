@@ -32,21 +32,25 @@ Examples:
 	# 2010-2-1 EMMAX
 	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv -P /Network/Data/250k/tmp-yh//phenotype.tsv -o /tmp/call_method_17_y8.tsv  -y8 -w 1
 	
-	#2010-8-7 Run KW on binary (0-1) CNV deletion data. -n is added to turn off snpAlleleOrdinalConversion.
+	#2010-8-7 Run KW on binary (0-1) CNV deletion data. add "--noSNPAlleleOrdinalConversion" to turn off binary conversion. already in binary.
 	%s -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -P ~/panfs/250k/phenotype/phenotype.tsv
-		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y1_pheno.tsv -y1 -w 1-7 -n
+		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y1_pheno.tsv -y1 -w 1-7 --noSNPAlleleOrdinalConversion
 	
-	# 2011-4-27 run EMMAX on cnv-turned-into-SNP dataset with precomputed kinship matrix (same format as snp data in inputFname).
-	# "-n" is essential because in this CNV-SNP dataset, 0 is normal, not NA; 1 is deletion.
+	# 2011-4-27 run EMMAX on cnv-turned-into-SNP dataset
+	# with precomputed kinship matrix (same format as snp data in inputFname). or specify --genotype_fname_to_generate_kinship
+	# "--noSNPAlleleOrdinalConversion" is required because in this CNV-SNP dataset, 0 is normal (not NA); 1 is deletion.
+	# 	or apply "--inputMissingGenotypeNotationType 2" to change the input missing-genotype notation (then no need for binary conversion)
 	%s -i /Network/Data/250k/db/dataset/call_method_57.tsv -K ~/script/variation/data/JBLabSeasonFlowering/data/K.tsv
-		-P /Network/Data/250k/tmp-yh//phenotype/phenotype20100419.tsv -o /tmp/call_method_57_y8.tsv  -y8 -w 1 -n
+		-P /Network/Data/250k/tmp-yh//phenotype/phenotype20100419.tsv -o /tmp/call_method_57_y8.tsv  -y8 -w 1
+		--noSNPAlleleOrdinalConversion
 	
 Description:
 	class to do association test on SNP data. option 'test_type' decides which test to run.
 	
 	Input genotype file format is Strain X SNP format (Yu's format, Output by DB_250k2data.py Or Output250KSNPs.py + ConvertBjarniSNPFormat2Yu.py).
 		Each allele is either in atcgATCG... or 0(NA)1234(ACGT) digital format. It converts everything into integer matrix.
-		If the input is in integer but has different meaning, like 0 is not NA, toggle noSNPAlleleOrdinalConversion.
+		If the input is not encoded in 0,1 (could be more alleles) format and test (all but KW) needs binary input,
+			toggle noSNPAlleleOrdinalConversion.
 	Input phenotype file format is Strain X phenotype format (Output by OutputPhenotype.py). 
 	
 	It requires a minimum number of ecotypes for either alleles of a single SNP to be eligible for kruskal wallis or linear model test.
@@ -75,6 +79,8 @@ if __name__ == '__main__':
 from sets import Set
 from pymodule import pca_module
 #from DrawEcotypeOnMap import DrawEcotypeOnMap
+from mixmogam import linear_models 
+from mixmogam import kinship
 
 
 class Association(Kruskal_Wallis):
@@ -84,17 +90,21 @@ class Association(Kruskal_Wallis):
 	option_default_dict = {}
 	common_option_dict = Kruskal_Wallis.common_option_dict.copy()
 	common_option_dict.update({
-							('phenotype_method_id_ls', 0, ): ['1', 'w', 1, 'which phenotypes to work on. \
-								a comma-dash-separated list phenotype_method ids in the phenotype file. \
-								Check db Table phenotype_method. \
-								if not available, take all phenotypes in the phenotype_fname.',],
+							('phenotype_method_id_ls', 0, ): ['1', 'w', 1, 'which phenotypes to work on. \n\
+	a comma-dash-separated list phenotype_method ids in the phenotype file. \n\
+	Check db Table phenotype_method. \n\
+	if not available, take all phenotypes in the phenotype_fname.',],
 							('eigen_vector_fname', 0, ): [None, 'f', 1, 'eigen vector file with PCs outputted by smartpca.perl from EIGENSOFT', ],\
 							('kinship_fname', 0, ): [None, 'K', 1, 'file which contains the kinship matrix', ],\
-							('genotype_fname_to_generate_kinship', 0, ): [None, 'G', 1, 'genotype file which is used to generate kinship, \
-									if not given, kinship will be generated from inputFname', ],\
+							('genotype_fname_to_generate_kinship', 0, ): [None, 'G', 1, 'genotype file which is used to generate kinship, \n\
+		if not given, kinship will be generated from inputFname', ],\
 							('which_PC_index_ls', 0, ): [None, 'W', 1, 'list of indices indicating which PC(s) from eigen_vector_fname should be used. format: 0,1-3', ],\
-							('noSNPAlleleOrdinalConversion', 0, ): [0, 'n', 0, 'by default (exept test-type 4), \
-								it converts everything other than 0(=NA) into binary. toggle this for no such conversion.', ],\
+							('inputMissingGenotypeNotationType', 1, int): [1, '', 1, 'type of missing-genotype notation in the input. 1: [0,-2]; 2: ["NA", ""]\n\
+	this is only used in SNPData.convert2Binary() to distinguish missing genotype. if --noSNPAlleleOrdinalConversion is toggled, this argument has no effect.', ],\
+							('noSNPAlleleOrdinalConversion', 0, ): [0, 'n', 0, 'If this is not toggled, \n\
+	this program converts everything other than missing (controlled by --inputMissingGenotypeNotationType) into index-based (0,1,2,etc. binary for SNPs).\n\
+	This rule has one exception for test-type 4, in which this program does binary conversion regardless.\n\
+	Toggle this only when the input dataset is already in binary format or the test (i.e. KW) does not require binary input.', ],\
 							})
 	#common_option_dict will be inherited by AssociationWorkflow.py
 	option_default_dict.update(common_option_dict)
@@ -132,7 +142,15 @@ class Association(Kruskal_Wallis):
 		self.output_results = {1:self.output_kw_results,
 							2:self.output_lm_results,
 							3:self.output_lm_results,
-							7:self.output_emma_results}
+							7:self.output_emma_results}	#output_lm_results is the default
+		
+		#2013.1.7
+		if self.inputMissingGenotypeNotationType==1:
+			self.inputMissingGenotypeNotationSet = set([0, -2])
+		elif self.inputMissingGenotypeNotationType==2:
+			self.inputMissingGenotypeNotationSet = set(["", "NA"])
+		else:	#default
+			self.inputMissingGenotypeNotationSet = set([0, -2])
 	
 	@classmethod
 	def getEigenValueFromFile(cls, eigen_value_fname):
@@ -660,8 +678,9 @@ class Association(Kruskal_Wallis):
 		return results
 	
 	@classmethod
-	def removeRowsWithNAPhenotypeFromKinshipAndSNPData(cls, phenotype_ls, snpData, kinshipData=None):
+	def removeRowsWithNAPhenotypeFromKinshipAndSNPData(cls, phenotype_ls=None, snpData=None, kinshipData=None):
 		"""
+		2013.1.6 Calculate kinship (IBS) using bjarni's method, faster
 		2011-4-27
 			a preprocessing step for EMMAX(), Emma_whole_matrixForNoNAGenotypeMatrix(), Emma_whole_matrix()
 			1. generate a list of phenotypes in which each value is non-NA.
@@ -679,7 +698,12 @@ class Association(Kruskal_Wallis):
 		newSNPData = SNPData.keepRowsByRowIndex(snpData, non_NA_phenotype_row_index_ls)
 		new_data_matrix = newSNPData.data_matrix
 		if not kinshipData:	#if it's None, generate it.
-			kinshipData = SNPData(row_id_ls=newSNPData.row_id_ls, col_id_ls=newSNPData.row_id_ls, data_matrix=newSNPData.get_kinship_matrix())
+			#2013.1.6 Calculate kinship (IBS) using bjarni's method, faster
+			K = kinship.calc_ibs_kinship(new_data_matrix.transpose())
+			#K = newSNPData.get_kinship_matrix()
+			kinshipData = SNPData(row_id_ls=newSNPData.row_id_ls, col_id_ls=newSNPData.row_id_ls, \
+								data_matrix=K)
+			
 		kinshipData = cls.adjustKinshipBySNPData(kinshipData, newSNPData)[0]
 		return PassingData(kinshipData=kinshipData, snpData=newSNPData, non_NA_phenotype_row_index_ls=non_NA_phenotype_row_index_ls,\
 						non_NA_phenotype_ls=non_NA_phenotype_ls)
@@ -701,8 +725,10 @@ class Association(Kruskal_Wallis):
 		return kinshipData,Z
 	
 	@classmethod
-	def getExpandedKinship(cls, kinship_fname=None, genotype_fname_to_generate_kinship=None, independentSNPData=None):
+	def getExpandedKinship(cls, kinship_fname=None, genotype_fname_to_generate_kinship=None, independentSNPData=None,\
+						inputMissingGenotypeNotationSet=set([0,-2])):
 		"""
+		2013.1.7 add arugment inputMissingGenotypeNotationSet
 		2011-4-25
 			moved from class JBDataGWA of variation/src/misc.py
 		2010-8-22
@@ -716,11 +742,14 @@ class Association(Kruskal_Wallis):
 		else:
 			if genotype_fname_to_generate_kinship is not None:
 				snpData = SNPData(input_fname=genotype_fname_to_generate_kinship, turn_into_array=1, ignore_2nd_column=1)
-				newSnpData, allele_index2allele_ls = snpData.convert2Binary()
+				newSnpData, allele_index2allele_ls = snpData.convert2Binary(in_major_minor_order=True, \
+								NA_notation=numpy.nan, alleleStartingIndex=0,\
+								row_id_as_major_allele=None, old_NA_notation_set=inputMissingGenotypeNotationSet)
 				snpData = newSnpData
 			else:
 				snpData = independentSNPData
-			kinship_matrix = snpData.get_kinship_matrix()
+			kinship_matrix = kinship.calc_ibs_kinship(snpData.data_matrix.transpose())
+			#kinship_matrix = snpData.get_kinship_matrix()
 			kinshipData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=snpData.row_id_ls, data_matrix=kinship_matrix)
 			del snpData
 			if kinship_fname is not None:
@@ -758,7 +787,7 @@ class Association(Kruskal_Wallis):
 		return Z
 	
 	
-	emma_R_sourced = False	# 2010-4-23
+	_is_emma_R_code_sourced = False	# 2010-4-23
 	@classmethod
 	def emma(cls, non_NA_genotype_ls=None, non_NA_phenotype_ls=None, kinship_matrix=None, eig_L = None, Z=None,):
 		"""
@@ -778,9 +807,9 @@ class Association(Kruskal_Wallis):
 		2008-11-13
 			call emma.REMLE()
 		"""
-		if not cls.emma_R_sourced:	#2010-4-23 not sourced yet.
+		if not cls._is_emma_R_code_sourced:	#2010-4-23 not sourced yet.
 			rpy.r.source(os.path.expanduser('~/script/variation/src/gwa/emma/R/emma.R'))
-			cls.emma_R_sourced = True
+			cls._is_emma_R_code_sourced = True
 		len_functor = getattr(non_NA_genotype_ls, '__len__', None)
 		if len_functor:
 			n = len_functor()
@@ -887,9 +916,9 @@ class Association(Kruskal_Wallis):
 		
 		non_NA_phenotype_ar = numpy.array(returnData.non_NA_phenotype_ls)
 		
-		if not cls.emma_R_sourced:	#2010-4-23 not sourced yet.
+		if not cls._is_emma_R_code_sourced:	#2010-4-23 not sourced yet.
 			rpy.r.source(os.path.expanduser('~/script/variation/src/gwa/emma/R/emma.R'))
-			cls.emma_R_sourced = True
+			cls._is_emma_R_code_sourced = True
 		#rpy.set_default_mode(rpy.NO_CONVERSION)
 		non_NA_phenotype_ar.resize([len(non_NA_phenotype_ar),1])	#transform it into 2-D for emma
 		results = rpy.r.emma_REML_t(non_NA_phenotype_ar.transpose(), new_data_matrix.transpose(), kinship_matrix)	#in emma, row is marker. col is strain.
@@ -943,9 +972,9 @@ class Association(Kruskal_Wallis):
 				3. transform the phenotype
 		"""
 		sys.stderr.write("Running pre-EMMAX procedures ...")
-		if not cls.emma_R_sourced:	#2010-4-23 not sourced yet.
+		if not cls._is_emma_R_code_sourced:	#2010-4-23 not sourced yet.
 			rpy.r.source(os.path.expanduser('~/script/variation/src/gwa/emma/R/emma.R'))
-			cls.emma_R_sourced = True
+			cls._is_emma_R_code_sourced = True
 		# run EMMA here to get vg & ve, scalars for the two variance matrices (random effect, residual) 
 		one_emma_rs = cls.emma(non_NA_genotype_ls=non_NA_genotype_ls, \
 			non_NA_phenotype_ls=non_NA_phenotype_ls, kinship_matrix=kinship_matrix, eig_L=None, Z=Z)
@@ -991,27 +1020,49 @@ class Association(Kruskal_Wallis):
 				estimate variance first by calling EMMA with only intercept. then call regular glm() with the new variance matrix.
 		"""
 		sys.stderr.write("Association by EMMAX (fast-version EMMA) ...\n")
+		kinshipData = keywords.get('kinshipData', None)
+		#if kinshipData is None:
 		
-		returnData = self.removeRowsWithNAPhenotypeFromKinshipAndSNPData(phenotype_ls, snpData, keywords.get('kinshipData'))
+		returnData = self.removeRowsWithNAPhenotypeFromKinshipAndSNPData(phenotype_ls=phenotype_ls, snpData=snpData, \
+															kinshipData=kinshipData)
 		new_data_matrix = returnData.snpData.data_matrix
 		kinship_matrix = returnData.kinshipData.data_matrix
-		
+		"""
 		preEMMAX_data = self.preEMMAX(returnData.non_NA_phenotype_ls, kinship_matrix, debug=self.debug)
 		variance_matrix = preEMMAX_data.variance_matrix
 		non_NA_phenotype_ar = preEMMAX_data.non_NA_phenotype_ar
 		L_inverse = preEMMAX_data.L_inverse
-		
+		"""
 		results = []
 		counter = 0
 		real_counter = 0
+		#2013.1.6 use bjarni's method to run emmax
+		#bjarni's emmax accepts a list of snp objects. each SNP object is a numpy array with 0 or 1 for two alleles.
+		#the 2nd argument is just a list of phenotype values.
+		mm_results = linear_models.emmax(new_data_matrix.transpose(), returnData.non_NA_phenotype_ls, \
+												kinship_matrix, with_betas=True)
+		
 		
 		no_of_rows, no_of_cols = new_data_matrix.shape	#2010-4-23
 		for j in range(no_of_cols):
 			genotype_ls = new_data_matrix[:,j]
-			pdata = self.linear_model(genotype_ls, non_NA_phenotype_ar, min_data_point, snp_index=j, \
-									kinship_matrix=None, eig_L=None, run_type=4, counting_and_NA_checking=True,\
-									variance_matrix=None, lower_triangular_cholesky_inverse=L_inverse)
+			#pdata = self.linear_model(genotype_ls, non_NA_phenotype_ar, min_data_point, snp_index=j, \
+			#						kinship_matrix=None, eig_L=None, run_type=4, counting_and_NA_checking=True,\
+			#						variance_matrix=None, lower_triangular_cholesky_inverse=L_inverse)
 			# counting_and_NA_checking=True to get MAF and MAC. doesn't matter if it's False.
+			pdata = PassingData()
+			pdata.pvalue = mm_results['ps'][j]
+			pdata.snp_index = j
+			count_of_allele_1 = no_of_rows-sum(genotype_ls)
+			pdata.count_ls = [no_of_rows-count_of_allele_1, count_of_allele_1]	#a list of count for each allele of the SNP
+			MAC = min(pdata.count_ls)
+			if MAC<0:
+				sys.stderr.write("Error: MAC for this SNP (id=%s) is %s (below 0).\n"%(repr(returnData.snpData.col_id_ls[j]), MAC))
+				sys.exit(3)
+			pdata.var_perc = mm_results['var_perc'][j]	#variance explained
+			pdata.coeff_list = []	#mm_results['betas'][j]	#list of beta values (could be empty, but not None)
+			pdata.coeff_p_value_list = []	#only accessed when coeff_list contains stuff. pvalue for those betas.
+			
 			if pdata is not None:
 				results.append(pdata)
 				real_counter += 1
@@ -1025,7 +1076,7 @@ class Association(Kruskal_Wallis):
 		return results
 	
 	@classmethod
-	def output_emma_results(cls, results, SNP_header, output_fname, log_pvalue=0):
+	def output_emma_results(cls, results, SNP_header, output_fname, log_pvalue=0, **keywords):
 		"""
 		2011-2-17
 			call returnSNPIdLs() to format the SNP id output
@@ -1063,8 +1114,16 @@ class Association(Kruskal_Wallis):
 		sys.stderr.write("Done.\n")
 	
 	@classmethod
-	def output_lm_results(cls, results, SNP_header, output_fname, log_pvalue=0):
+	def output_lm_results(cls, results, SNP_header, output_fname, log_pvalue=0, min_MAC=None, **keywords):
 		"""
+		pdata should have these attributes:
+			pvalue
+			snp_index
+			count_ls	#a list of count for each allele of the SNP
+			var_perc	#variance explained
+			coeff_list	#list of beta values (could be empty, but not None)
+			coeff_p_value_list	#only accessed when coeff_list contains stuff. pvalue for those betas.
+		2013.1.7 added argument min_MAC
 		2011-2-17
 			call returnSNPIdLs() to format the SNP id output
 		2010-3-22
@@ -1081,8 +1140,10 @@ class Association(Kruskal_Wallis):
 			each kw result is wrapped in PassingData
 		2008-02-14
 		"""
-		sys.stderr.write("Outputting pvalue results ...")
+		sys.stderr.write("Outputting pvalue results to %s ..."%(output_fname))
 		writer = csv.writer(open(output_fname,'w'), delimiter='\t')
+		counter = 0
+		real_counter = 0
 		for i in range(len(results)):
 			pdata = results[i]
 			pvalue = pdata.pvalue
@@ -1094,6 +1155,9 @@ class Association(Kruskal_Wallis):
 				else:
 					pvalue = 'NA'
 			MAC = min(pdata.count_ls)
+			counter += 1
+			if min_MAC is not None and MAC<min_MAC:	#2013.1.7
+				continue
 			MAF = float(MAC)/sum(pdata.count_ls)
 			coeff_and_pvalue_ls = []
 			for j in range(len(pdata.coeff_list)):
@@ -1104,12 +1168,13 @@ class Association(Kruskal_Wallis):
 					coeff_and_pvalue += ':%s'%coeff_pvalue
 				coeff_and_pvalue_ls.append(coeff_and_pvalue)
 			writer.writerow(SNPIdLs + [pvalue, MAF, MAC, pdata.var_perc] + coeff_and_pvalue_ls)	#2011-2-17
+			real_counter += 1
 		del writer
-		sys.stderr.write("Done.\n")
+		sys.stderr.write(" %s (out of %s) outputted.\n"%(real_counter, counter))
 	
 	@classmethod
 	def output_multi_variate_lm_results(cls, results, writer, log_pvalue=0, run_genome_scan=True, \
-									extraVariateNameLs = ['S_square', 'var_perc', ]):
+									extraVariateNameLs = ['S_square', 'var_perc', ], **keywords):
 		"""
 		2010-4-23
 			fix a bug that arises when beta_interval_delta_ls, coeff_p_value_list, coeff_list are of different length
@@ -1216,8 +1281,9 @@ class Association(Kruskal_Wallis):
 	@classmethod
 	def readInData(cls, phenotype_fname, input_fname, eigen_vector_fname=None, phenotype_method_id_ls=[], test_type=1, report=0,\
 				snpAlleleOrdinalConversion=True, removeUnPhenotypedSNPData=True, ignore_2nd_column=False, kinship_fname=None,\
-				genotype_fname_to_generate_kinship=None, needKinship=False):
+				genotype_fname_to_generate_kinship=None, needKinship=False, inputMissingGenotypeNotationSet=set([0,-2])):
 		"""
+		2013.1.7 add arugment inputMissingGenotypeNotationSet
 		2011-4-27
 			add argument kinship_fname and genotype_fname_to_generate_kinship
 		2010-4-21
@@ -1251,7 +1317,10 @@ class Association(Kruskal_Wallis):
 			phenData = None
 		
 		if snpAlleleOrdinalConversion or test_type==4:	# test_type 4 involves PCA_svd, which requires bi-allelic SNPs.
-			newSnpData, allele2index_ls = snpData.convertSNPAllele2Index(report)	#0 (NA) or -2 (untouched) is all converted to -2 as 0 is used to denote allele
+			newSnpData, allele2index_ls = snpData.convert2Binary(report=report, in_major_minor_order=True, \
+								NA_notation=numpy.nan, alleleStartingIndex=0,\
+								row_id_as_major_allele=None, old_NA_notation_set=inputMissingGenotypeNotationSet)
+			#0 (NA) or -2 (untouched) is all converted to -2 as 0 is used to denote allele
 			newSnpData.header = snpData.header
 			snpData = newSnpData	
 		if eigen_vector_fname:
@@ -1337,7 +1406,7 @@ class Association(Kruskal_Wallis):
 								ignore_2nd_column=True, \
 								kinship_fname=self.kinship_fname, \
 								genotype_fname_to_generate_kinship=self.genotype_fname_to_generate_kinship,\
-								needKinship=needKinship)
+								needKinship=needKinship, inputMissingGenotypeNotationSet=self.inputMissingGenotypeNotationSet)
 		
 		if self.test_type==5 or self.test_type==6:
 			which_phenotype_index_ls, environment_matrix, initData.phenData.data_matrix = \
@@ -1373,7 +1442,8 @@ class Association(Kruskal_Wallis):
 			output_results_func = self.output_results.get(self.test_type)
 			if output_results_func is None:
 				output_results_func = self.output_lm_results
-			output_results_func(results, initData.snpData.col_id_ls, output_fname, self.minus_log_pvalue)
+			output_results_func(results, initData.snpData.col_id_ls, output_fname, log_pvalue=self.minus_log_pvalue,\
+							min_MAC=self.min_data_point)
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
