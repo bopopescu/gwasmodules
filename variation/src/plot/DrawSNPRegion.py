@@ -99,6 +99,7 @@ from pymodule.plot.yh_matplotlib_artists import ExonIntronCollection
 from pymodule import outputMatrixInLatexTable, outputFigureInLatex
 from pymodule import RBTree, RBDict, RBTreeIter, RBList, RBNode
 from variation.src import Stock_250kDB
+from variation.src import AbstractVariationMapper
 from variation.src.enrichment.GeneListRankTest import GeneListRankTest	#GeneListRankTest.getGeneList()
 from variation.src.common import getEcotypeInfo
 from variation.src.association.Kruskal_Wallis import Kruskal_Wallis
@@ -285,20 +286,17 @@ class GeneSNPPhenotypeAssoData(object):
 		
 class DrawSNPRegion(PlotGroupOfSNPs):
 	__doc__ = __doc__
-	option_default_dict = {
-						('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-						('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-						('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-						('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('inputFname', 0, ))
+	option_default_dict.pop(('outputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
 						('LD_fname', 0, ): [None, 'L', 1, 'the file containing LD info, output of MpiLD.py', ],\
 						("min_distance", 1, int): [20000, 'm', 1, 'minimum distance allowed from the SNP to gene'],\
 						("get_closest", 0, int): [0, 'g', 0, 'only get genes closest to the SNP within that distance'],\
 						('min_MAF', 0, float): [0.1, 'n', 1, 'minimum Minor Allele Frequency.'],\
 						("list_type_id_list", 1, ): [None, 'l', 1, 'comma/dash separated list of Gene list type. must be in table gene_list_type.'],\
 
-						('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
 						('rbg_results_directory', 0, ):[os.path.expanduser('~/panfs/db/results_by_gene/'), '', 1, 'The rbg results directory. Default is None. use the one given by db.'],\
 						("input_fname", 0, ): [None, 'i', 1, 'Filename which contains at least 3 columns: chromosome, position, phenotype_id. if not given, get from db'],\
 						('snp_matrix_fname', 0, ): ['', 'I', 1, 'genotype matrix. Strain X SNP format.', ],\
@@ -329,12 +327,9 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 						('drawGrid', 0, int):[0, 'G', 0, 'toggle to draw a grid for the SNP-matrix/haplotype'],\
 						('phenotypeDrawType', 1, int):[1, '', 1, 'phenotype drawing type. 1: same color but the length varies by magnitude. 2: same length but color varies'],\
 						('snpInfoPickleFname', 1, ): ['', 'F', 1, 'The file to contain pickled SNPInfo.'],\
-						('commit', 0, int):[0, 'c', 0, 'commit the db operation. this commit happens after every db operation, not wait till the end.'],\
-						('debug', 0, int):[0, 'b', 1, 'debug mode. 1=level 1 (pdb mode). 2=level 2 (same as 1 except no pdb mode)'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
 						('logFilename', 0, ): [None, 'A', 1, 'file to contain logs. use it only if this program is at the end of pegasus workflow \
 					and has no output file'],\
-							}
+						})
 	
 	def __init__(self,  **keywords):
 		"""
@@ -1893,7 +1888,7 @@ class DrawSNPRegion(PlotGroupOfSNPs):
 		
 		param_data = grand_dataStructure
 		param_data.call_method_id = self.call_method_id
-		param_data.results_directory = self.results_directory
+		param_data.results_directory = self.data_dir
 		param_data.output_dir = self.output_dir
 		param_data.which_LD_statistic = which_LD_statistic
 		param_data.min_distance = self.min_distance
