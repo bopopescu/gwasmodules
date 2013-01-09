@@ -51,6 +51,7 @@ class CalculateMedianMeanOfInputColumn{
 	int noOfLinesInHeader;
 	int whichColumn;
 	int maxNumberOfSamplings;
+	string inputStatName;	//name of the statistics in the input file
 	arma::mat statList;	//armadillo matrix storing all the sampled stats
 	__gnu_cxx::hash_map <int, int> stat2Occurrence;
 	int modeStat;
@@ -59,7 +60,8 @@ class CalculateMedianMeanOfInputColumn{
 
 public:
 	CalculateMedianMeanOfInputColumn(string _inputFname, string _outputFname, int _alignmentID,
-			float _fractionToSample, int _noOfLinesInHeader, int _whichColumn, int _maxNumberOfSamplings);
+			float _fractionToSample, int _noOfLinesInHeader, int _whichColumn, int _maxNumberOfSamplings,
+			string _inputStatName);
 	~CalculateMedianMeanOfInputColumn();
 	void run();
 };

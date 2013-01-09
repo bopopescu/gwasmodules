@@ -9,9 +9,11 @@
 #include "CalculateMedianMeanOfInputColumn.h"
 
 CalculateMedianMeanOfInputColumn::CalculateMedianMeanOfInputColumn(string _inputFname, string _outputFname, int _alignmentID,
-		float _fractionToSample, int _noOfLinesInHeader, int _whichColumn, int _maxNumberOfSamplings) \
+		float _fractionToSample, int _noOfLinesInHeader, int _whichColumn, int _maxNumberOfSamplings,
+		string _inputStatName) \
 		:inputFname(_inputFname), outputFname(_outputFname), alignmentID(_alignmentID), fractionToSample(_fractionToSample),\
-		 noOfLinesInHeader(_noOfLinesInHeader), whichColumn(_whichColumn), maxNumberOfSamplings(_maxNumberOfSamplings)
+		 noOfLinesInHeader(_noOfLinesInHeader), whichColumn(_whichColumn), maxNumberOfSamplings(_maxNumberOfSamplings),\
+		 inputStatName(_inputStatName)
 {
 	int inputFnameLength = inputFname.length();
 	if (inputFname.substr(inputFnameLength-2, 2)=="gz"){
@@ -24,7 +26,8 @@ CalculateMedianMeanOfInputColumn::CalculateMedianMeanOfInputColumn(string _input
 	input.push(inputFile);
 
 	outputFile.open(outputFname.c_str(), std::ios::out);
-	outputFile<<"alignmentID\ttotal_base_count\tsampled_base_count\tmeanDepth\tmedianDepth\tmodeDepth"<<endl;
+	outputFile<<"alignmentID\ttotal_base_count\tsampled_base_count\tmean" + inputStatName + "\tmedian"
+			+ inputStatName + "\tmode"+ inputStatName<<endl;
 
 }
 
@@ -144,6 +147,7 @@ int main(int argc, char* argv[]) {
 	int noOfLinesInHeader;
 	string inputFname;
 	string outputFname;
+	string inputStatName;
 	po::options_description desc("Allowed options");
 	desc.add_options()("help,h", "produce help message")
 			("alignmentID,a", po::value<int>(&alignmentID)->default_value(0),
@@ -154,6 +158,7 @@ int main(int argc, char* argv[]) {
 			("whichColumn,w", po::value<int >(&whichColumn)->default_value(1), "which column of inputFname is the target stat.")
 			("outputFname,o", po::value<string>(&outputFname), "output filename")
 			("inputFname,i", po::value<string>(&inputFname), "input filename, space/tab/coma-delimited, gzipped or not.")
+			("inputStatName,S", po::value<string>(&inputStatName)->default_value("Depth"), "name of the input statistics")
 			("maxNumberOfSamplings,m", po::value<int>(&maxNumberOfSamplings)->default_value(10000000),
 				"max number of samples to take into memory for median/mode/mean calculation to avoid memory blowup.");
 
@@ -171,6 +176,7 @@ int main(int argc, char* argv[]) {
 
 
 	CalculateMedianMeanOfInputColumn instance(inputFname, outputFname,
-			alignmentID, fractionToSample, noOfLinesInHeader, whichColumn, maxNumberOfSamplings);
+			alignmentID, fractionToSample, noOfLinesInHeader, whichColumn, maxNumberOfSamplings,
+			inputStatName);
 	instance.run();
 }
