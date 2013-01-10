@@ -4,11 +4,12 @@ Examples:
 	# 2012 input is hdf5 association table
 	secret=...
 	%s --xColumnHeader start --whichColumnHeader score
-		-i /Network/Data/250k/db/association_landscape/type_1/56_result5859_type1.h5
-		-o /Network/Data/250k/db/association_landscape/type_1/56_result5859_type1.h5.png
+		-i /Network/Data/250k/db/results/type_1/56_result5859_type1.h5
+		-o /Network/Data/250k/db/results/type_1/56_result5859_type1.h5.png
 		--drivername postgresql --hostname localhost --dbname vervetdb --schema stock_250k --db_user yh --db_passwd $secret
 		--genome_drivername=postgresql --genome_hostname=localhost --genome_dbname=vervetdb --genome_schema=genome --genome_db_user=yh
 		--genome_db_passwd=$secret --tax_id=3702 --minNoOfTotal 1 --figureDPI 200 --h5TableName association
+		--logY 2
 	
 	#2013.1.7 input is plain tsv file (assuming it has columns, chromosome, start, score.)
 	%s   --xColumnHeader start --whichColumnHeader score
@@ -17,6 +18,7 @@ Examples:
 		--drivername postgresql --hostname localhost --dbname vervetdb --schema stock_250k --db_user yh --db_passwd $secret
 		--genome_drivername=postgresql --genome_hostname=localhost --genome_dbname=vervetdb --genome_schema=genome
 		--genome_db_user=yh --genome_db_passwd=$secret --tax_id=3702 --minNoOfTotal 1 --figureDPI 200  --inputFileFormat 1
+		--logY 2
 	
 
 Description:
@@ -49,6 +51,8 @@ class PlotGenomeWideData(AbstractPlot):
 	#						
 	option_default_dict = AbstractPlot.option_default_dict.copy()
 	option_default_dict.update(AbstractPlot.db_option_dict.copy())
+	option_default_dict.update(AbstractPlot.genome_db_option_dict.copy())
+	
 	# change
 	option_default_dict[('xColumnPlotLabel', 0, )][0] = 'genome position'
 	# change default of file-format
@@ -63,12 +67,6 @@ class PlotGenomeWideData(AbstractPlot):
 	option_default_dict[('defaultFontLabelSize', 1, int)][0] = 16
 	
 	option_default_dict.update({
-							('genome_drivername', 1,):['postgresql', '', 1, 'which type of database is the genome database? mysql or postgresql', ],\
-							('genome_hostname', 1, ): ['uclaOffice', '', 1, 'hostname of the genome db server', ],\
-							('genome_dbname', 1, ): ['vervetdb', '', 1, 'genome database name', ],\
-							('genome_schema', 0, ): ['genome', '', 1, 'genome database schema name', ],\
-							('genome_db_user', 1, ): ['yh', '', 1, 'genome database username', ],\
-							('genome_db_passwd', 1, ): [None, '', 1, 'genome database password', ],\
 							('tax_id', 0, int): [3702, '', 1, 'taxonomy ID of the organism from which to retrieve the chromosome info', ],\
 							('xtickInterval', 0, int): [1000000, '', 1, 'add a tick on the x-axis every this interval within each chromosome', ],\
 							})
@@ -165,8 +163,8 @@ class PlotGenomeWideData(AbstractPlot):
 		#without commenting out db_vervet connection code. schema "genome" wont' be default path.
 		#db_genome = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
 		#				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema="genome")
-		db_genome = GenomeDB.GenomeDatabase(drivername=self.genome_drivername, username=self.genome_db_user,
-						password=self.genome_db_passwd, hostname=self.genome_hostname, database=self.genome_dbname, \
+		db_genome = GenomeDB.GenomeDatabase(drivername=self.genome_drivername, db_user=self.genome_db_user,
+						db_passwd=self.genome_db_passwd, hostname=self.genome_hostname, dbname=self.genome_dbname, \
 						schema=self.genome_schema)
 		db_genome.setup(create_tables=False)
 		#chrOrder=1 is to order chromosomes alphabetically
