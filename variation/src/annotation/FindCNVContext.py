@@ -191,9 +191,7 @@ class FindCNVContext(AbstractVariationMapper):
 		#2011-3-10 temporary: exit early , only for the genomeRBDictPickleFname
 		#sys.exit(3)
 		
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, db_user=self.db_user,
-						db_passwd=self.db_passwd, hostname=self.hostname, dbname=self.dbname, schema=self.schema)
-		db_250k.setup(create_tables=False)
+		db_250k = self.db_250k
 		
 		param_obj = PassingData(no_of_total_annotations=0, session=db_250k.session, \
 					cnv_method_id=self.cnv_method_id, no_of_total_contexts=0, no_of_into_db=0, report=self.report,\
