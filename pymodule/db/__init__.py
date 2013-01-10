@@ -103,7 +103,7 @@ class AbstractTableWithFilename(object):
 		2012.3.21
 			xxx.tsv => xxx.2012_3_21.tsv
 		"""
-		_filename = self.getFilePath(oldDataDir=oldDataDir, newDataDir=newDataDir)
+		_filename = self.getFileAbsPath(oldDataDir=oldDataDir, newDataDir=newDataDir)
 		
 		from datetime import datetime
 		lastModDatetime = datetime.fromtimestamp(os.stat(_filename).st_mtime)
@@ -112,8 +112,9 @@ class AbstractTableWithFilename(object):
 									lastModDatetime.day, suffix)
 		return newFilename
 	
-	def getFilePath(self, oldDataDir=None, newDataDir=None):
+	def getFileAbsPath(self, oldDataDir=None, newDataDir=None):
 		"""
+		2013.1.10 renamed from getFilePath() (which is now another function that returns either self.filename or self.path)
 		2012.11.13
 			in case that the whole /Network/Data/250k/db is stored in a different place (=data_dir)
 				how to modify self.filename (stored in the database tables) to reflect its new path.
@@ -125,6 +126,32 @@ class AbstractTableWithFilename(object):
 		else:
 			filePath = None
 		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
+	
+	def getFilePath(self):
+		"""
+		2013.1.10
+			returns either self.filename or self.path (old-version tables use self.filename, new version use self.path).
+		"""
+		if self.filename:
+			filePath = self.filename
+		elif self.path:
+			filePath = self.path
+		else:
+			filePath = None
+		return filePath
+	
+	def setFilePath(self, newPath=None):
+		"""
+		2013.1.10
+			either filename or path column, depending on which one is a real table column
+		"""
+		if isinstance(self.__class__.filename, sqlalchemy.orm.attributes.InstrumentedAttribute):
+			#type(None) is not good. since null-value column is None as well.
+			self.filename = newPath
+		elif isinstance(self.__class__.path, sqlalchemy.orm.attributes.InstrumentedAttribute):
+			self.path = newPath
+		else:
+			self.path = newPath
 	
 	def constructRelativePath(self, data_dir=None, subFolder=None, sourceFilename=None, **keywords):
 		"""
@@ -163,10 +190,10 @@ class Database(object):
 	__doc__ = __doc__
 	option_default_dict = {('v', 'drivername', 1, '', 1, ):'mysql',\
 							('z', 'hostname', 1, '', 1, ):'papaya.usc.edu',\
-							('d', 'database',1, '', 1, ):None,\
+							('d', 'dbname',1, '', 1, ):None,\
 							('k', 'schema',0, '', 1, ):None,\
-							('u', 'username',1, '', 1, ):None,\
-							('p', 'password',1, '', 1, ):None,\
+							('u', 'db_user',1, '', 1, ):None,\
+							('p', 'db_passwd',1, '', 1, ):None,\
 							('o', 'port', 1, '', 0, ):None,\
 							('c', 'commit', 0, '', 0, int):0,\
 							('b', 'debug', 0, '', 0, int):0,\
@@ -188,9 +215,9 @@ class Database(object):
 		
 	#@property
 	def _url(self):
-		return URL(drivername=self.drivername, username=self.username,
-				   password=self.password, host=self.hostname,
-				   port=self.port, database=self.database)
+		return URL(drivername=self.drivername, db_passwd=self.db_user,
+				   password=self.db_passwd, host=self.hostname,
+				   port=self.port, database=self.dbname)
 	_url = property(_url)
 	
 	def _setup_tables(self, metadata, tables):
@@ -309,12 +336,13 @@ class ElixirDB(object):
 	
 	option_default_dict = {('drivername', 1,):['postgres', 'v', 1, 'which type of database? mysql or postgres', ],\
 							('hostname', 1, ):['localhost', 'z', 1, 'hostname of the db server', ],\
-							('database', 1, ):[None, 'd', 1, '',],\
+							('dbname', 1, ):[None, 'd', 1, 'database name',],\
 							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('username', 1, ):[None, 'u', 1, 'database username',],\
-							('password', 1, ):[None, 'p', 1, 'database password', ],\
+							('db_user', 1, ):[None, 'u', 1, 'database username',],\
+							('db_passwd', 1, ):[None, 'p', 1, 'database password', ],\
 							('port', 0, ):[None, '', 1, 'database port number'],\
 							('pool_recycle', 0, int):[3600, '', 1, 'the length of time to keep connections open before recycling them.'],\
+							('echo_pool', 0, bool):[False, 'e', 0, 'if True, the connection pool will log all checkouts/checkins to the logging stream, which defaults to sys.stdout.'],\
 							('sql_echo', 0, ):[False, '', 1, 'wanna echo the underlying sql of every sql query'],\
 							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
 							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
@@ -410,9 +438,9 @@ class ElixirDB(object):
 				#which in turn calls metadata.create_all()
 	
 	def _url(self):
-		return URL(drivername=self.drivername, username=self.username,
-				password=self.password, host=self.hostname,
-				port=self.port, database=self.database)
+		return URL(drivername=self.drivername, username=self.db_user,
+				password=self.db_passwd, host=self.hostname,
+				port=self.port, database=self.dbname)
 	_url = property(_url)
 	
 	@property
@@ -557,12 +585,12 @@ class ElixirDB(object):
 									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
 									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
 			#same as this
-			#exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
-			#						inputDir=os.path.split(self.inputFname)[0], \
-			#						outputDir=self.dataDir, \
-			#						relativeOutputDir=None, shellCommand='cp -rL', \
-			#						srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
-			#						constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
+			exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
+									inputDir=os.path.split(self.inputFname)[0], \
+									outputDir=self.dataDir, \
+									relativeOutputDir=None, shellCommand='cp -rL', \
+									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
+									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
 									
 			if exitCode!=0:
 				sys.stderr.write("Error: moveFileIntoDBAffiliatedStorage() exits with %s code.\n"%(exitCode))
@@ -592,8 +620,8 @@ class ElixirDB(object):
 			newfilename = '%s_%s'%(db_entry.id, filename)
 			newPath = newfilename
 		
-		if db_entry.path!=newPath:
-			db_entry.path = newPath
+		if db_entry.getFilePath()!=newPath:
+			db_entry.setFilePath(newPath)
 			try:
 				self.session.add(db_entry)
 				self.session.flush()
