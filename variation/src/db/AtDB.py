@@ -114,7 +114,7 @@ class AtDB(ElixirDB):
 	__doc__ = __doc__
 	option_default_dict = ElixirDB.option_default_dict.copy()
 	option_default_dict[('drivername', 1,)][0] = 'mysql'
-	option_default_dict[('database', 1,)][0] = 'at'
+	option_default_dict[('dbname', 1,)][0] = 'at'
 	def __init__(self, **keywords):
 		"""
 		2009-4-10
