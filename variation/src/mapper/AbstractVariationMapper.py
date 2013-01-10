@@ -42,8 +42,8 @@ class AbstractVariationMapper(AbstractDBInteractingJob):
 		"""
 		2012.11.18
 		"""
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
-									hostname=self.hostname, database=self.dbname, schema=self.schema, port=self.port)
+		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, db_user=self.db_user, db_passwd=self.db_passwd, \
+									hostname=self.hostname, dbname=self.dbname, schema=self.schema, port=self.port)
 		db_250k.setup(create_tables=False)
 		self.db_250k = db_250k
 	
