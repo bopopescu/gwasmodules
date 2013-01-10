@@ -3,7 +3,7 @@
 
 Examples:
 	# Find contexts for cnv method 20 in table CNV
-	FindCNVContext.py -z banyan -u yh -g genome -m 20
+	FindCNVContext.py -z banyan --db_user yh --genome_schema genome -m 20
 	
 Description:
 	program to find the context (nearby genes) of a CNV. It fills results into db table cnv_context.
@@ -28,27 +28,26 @@ else:   #32bit
 import time, csv, getopt
 import warnings, traceback
 from pymodule import ProcessOptions, PassingData, GenomeDB
-import Stock_250kDB
 from pymodule.db import formReadmeObj
-from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-from pymodule.RBTree import RBDict
+from pymodule import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+from pymodule import RBDict
+from variation.src import AbstractVariationMapper
+from variation.src import Stock_250kDB
 
-class FindCNVContext(object):
+class FindCNVContext(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'stock_250k database name', ],\
-							('genome_dbname', 1, ): ['genome', 'g', 1, 'genome database name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('outputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update(AbstractVariationMapper.genome_db_option_dict.copy())
+	
+	option_default_dict.update({
 							('cnv_method_id', 1, int): [None, 'm', 1, 'construct contexts for CNVs from this cnv_method_id'],\
-							('genomeRBDictPickleFname', 1, ): ['', 'e', 1, 'The file to contain pickled genomeRBDict.'],\
+							('genomeRBDictPickleFname', 1, ): ['', '', 1, 'The file to contain pickled genomeRBDict.'],\
 							('output_fname', 0, ): [None, 'o', 1, 'if given, QC results will be outputed into it.'],\
 							('max_distance', 0, int): [20000, 'x', 1, "maximum distance allowed between a CNV and a gene"],\
 							('tax_id', 0, int): [3702, '', 1, 'Taxonomy ID to get gene position and coordinates.'],\
-							('commit', 0, int):[0, 'c', 0, 'commit db transaction'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							})
 	
 	def __init__(self,  **keywords):
 		"""
@@ -174,10 +173,17 @@ class FindCNVContext(object):
 			import pdb
 			pdb.set_trace()
 		
-		genome_db = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
-						password=self.db_passwd, hostname=self.hostname, database=self.genome_dbname, )
+		genome_db = GenomeDB.GenomeDatabase(drivername=self.genome_drivername, db_user=self.genome_db_user,
+						db_passwd=self.genome_db_passwd, hostname=self.genome_hostname, dbname=self.genome_dbname, \
+						schema=self.genome_schema)
 		genome_db.setup(create_tables=False)
 		
+		"""
+		genome_db = GenomeDB.GenomeDatabase(drivername=self.drivername, db_user=self.db_user,
+						db_passwd=self.db_passwd, hostname=self.hostname,\
+						database=self.genome_dbname, schema=self.genome_schema)
+		genome_db.setup(create_tables=False)
+		"""
 		genomeRBDict = genome_db.dealWithGenomeRBDict(self.genomeRBDictPickleFname, tax_id=self.tax_id, \
 													max_distance=self.max_distance, debug=self.debug)
 		#genome_db.createGenomeRBDict(tax_id=self.tax_id, max_distance=self.max_distance, \
@@ -185,8 +191,8 @@ class FindCNVContext(object):
 		#2011-3-10 temporary: exit early , only for the genomeRBDictPickleFname
 		#sys.exit(3)
 		
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
-									hostname=self.hostname, database=self.dbname)
+		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, db_user=self.db_user,
+						db_passwd=self.db_passwd, hostname=self.hostname, dbname=self.dbname, schema=self.schema)
 		db_250k.setup(create_tables=False)
 		
 		param_obj = PassingData(no_of_total_annotations=0, session=db_250k.session, \
