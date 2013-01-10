@@ -303,7 +303,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 		for result_id in result_id_ls:
 			result = Stock_250kDB.ResultsMethod.get(result_id)
 			
-			associationResultFile = self.registerOneInputFile(inputFname=result.getFilePath(oldDataDir=self.db_250k.data_dir, newDataDir=self.data_dir), \
+			associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, newDataDir=self.data_dir), \
 												folderName=self.pegasusFolderName)
 			logFile = File(os.path.join(topOutputDirJob.output, 'Result%s_LandscapeType%s.log'%\
 									(result_id, resultLandscapeType.id)))

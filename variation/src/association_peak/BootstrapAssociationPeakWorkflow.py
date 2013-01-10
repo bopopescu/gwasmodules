@@ -165,10 +165,12 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		
 		resultID2defineLandscapeJobLs = {}
 		for result in association_result_ls:
-			associationResultFile = self.registerOneInputFile(inputFname=result.getFilePath(oldDataDir=self.db_250k.data_dir, newDataDir=self.data_dir), \
+			associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, \
+											newDataDir=self.data_dir), \
 										folderName=self.pegasusFolderName)
 			
-			#associationResultFile = self.registerOneInputFile(inputFname=result.getFilePath(oldDataDir=self.db_250k.data_dir, newDataDir=self.data_dir), \
+			#associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, \
+			#				newDataDir=self.data_dir), \
 			#				folderName=self.pegasusFolderName)
 			#add DefineAssociationLandscape job
 			outputFnamePrefix = 'result_%s_neighbor_%s_max_neighbor_%s_min_MAF_%s_tax_id_%s'%\

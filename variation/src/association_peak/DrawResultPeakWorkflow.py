@@ -320,7 +320,7 @@ class DrawResultPeakWorkflow(AbstractVariationWorkflow):
 		for call_method_id in call_method_id_set:
 			call_method = Stock_250kDB.CallMethod.get(call_method_id)
 			snpMatrixFile = self.registerOneInputFile(workflow, \
-											inputFname=call_method.getFilePath(oldDataDir=db_250k.data_dir, newDataDir=data_dir),\
+											inputFname=call_method.getFileAbsPath(oldDataDir=db_250k.data_dir, newDataDir=data_dir),\
 											folderName=pegasusFolderName)
 			outputF = File(os.path.join(topOutputDir, 'SNPInfo_LocusType%s.pickle'%(call_method.locus_type_id)))
 			pickleSNPInfoJob = self.addPickleSNPInfoJob(workflow, workflow.PickleSNPInfo, \
