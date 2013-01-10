@@ -176,7 +176,7 @@ class TaxonomyDB(ElixirDB):
 	__doc__ = __doc__
 	option_default_dict = ElixirDB.option_default_dict.copy()
 	option_default_dict[('drivername', 1,)][0] = 'postgresql'
-	option_default_dict[('database', 1,)][0] = 'taxonomy'
+	option_default_dict[('dbname', 1,)][0] = 'taxonomy'
 	option_default_dict.update({
 			('inputFolder', 0, ):[None, 'i', 1, 'where taxdump.tar.gz was un-tarred. it should contain citations.dmp, division.dmp, \n\
 	gencode.dmp, names.dmp, delnodes.dmp, merged.dmp, nodes.dmp. \n\

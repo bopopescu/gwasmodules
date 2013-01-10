@@ -993,7 +993,7 @@ class GenomeDatabase(ElixirDB):
 	__doc__ = __doc__
 	option_default_dict = ElixirDB.option_default_dict.copy()
 	option_default_dict[('drivername', 1,)][0] = 'mysql'
-	option_default_dict[('database', 1,)][0] = 'genome'
+	option_default_dict[('dbname', 1,)][0] = 'genome'
 	option_default_dict.update({
 							
 							('geneAnnotationPickleFname', 0, ): ['', 'o', 1, 'The optional output file to contain a pickled object with three attributes: \n\
