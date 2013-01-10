@@ -53,9 +53,7 @@ class FindCNVContext(AbstractVariationMapper):
 		"""
 		2008-08-19
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 	
 	
 	def findCNVcontext(self, db_250k, genomeRBDict, cnv_method_id=None, compareIns=None, max_distance=50000, debug=0,
