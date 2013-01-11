@@ -37,14 +37,12 @@ from variation.src import Stock_250kDB
 class FindCNVContext(AbstractVariationMapper):
 	__doc__ = __doc__
 	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
-	option_default_dict.pop(('outputFname', 0, ))
 	option_default_dict.pop(('outputFnamePrefix', 0, ))
 	option_default_dict.update(AbstractVariationMapper.genome_db_option_dict.copy())
 	
 	option_default_dict.update({
 							('cnv_method_id', 1, int): [None, 'm', 1, 'construct contexts for CNVs from this cnv_method_id'],\
 							('genomeRBDictPickleFname', 1, ): ['', '', 1, 'The file to contain pickled genomeRBDict.'],\
-							('output_fname', 0, ): [None, 'o', 1, 'if given, QC results will be outputed into it.'],\
 							('max_distance', 0, int): [20000, 'x', 1, "maximum distance allowed between a CNV and a gene"],\
 							('tax_id', 0, int): [3702, '', 1, 'Taxonomy ID to get gene position and coordinates.'],\
 							})
