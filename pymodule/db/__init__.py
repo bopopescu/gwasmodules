@@ -353,6 +353,11 @@ class ElixirDB(object):
 		"""
 		2008-07-09
 		"""
+		#2013.1.10 backwards compatibility
+		keywords = self._setInputArgumentsEquivalentValue(keywords=keywords, argument1Name='username', argument2Name='db_user')
+		keywords = self._setInputArgumentsEquivalentValue(keywords=keywords, argument1Name='password', argument2Name='db_passwd')
+		keywords = self._setInputArgumentsEquivalentValue(keywords=keywords, argument1Name='database', argument2Name='dbname')
+		
 		from pymodule import ProcessOptions
 		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 		if self.echo_pool:	#2010-9-19 passing echo_pool to create_engine() causes error. all pool log disappeared.
@@ -379,7 +384,14 @@ class ElixirDB(object):
 		if hasattr(self, 'debug') and self.debug:
 			import pdb
 			pdb.set_trace()
-		
+	
+	def _setInputArgumentsEquivalentValue(self, keywords=None, argument1Name=None, argument2Name=None):
+		"""
+		2013.1.10 to deal with transition that 'username' is now changed to 'db_user' and etc.
+		"""
+		if argument1Name in keywords and argument2Name not in keywords:
+			keywords[argument2Name] = keywords[argument1Name]
+		return keywords
 		
 	def setup_engine(self, metadata=None, session=None, entities=[]):
 		"""
