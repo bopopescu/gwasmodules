@@ -58,23 +58,16 @@ from variation.src.association.Association import Association
 from variation.src.popgen.PhenotypeOfAncestralDerivedAllele import PhenotypeOfAncestralDerivedAllele
 from variation.src.common import get_chr_id2size, get_chr_id2cumu_size, getEcotypeInfo
 from variation.src.db.output.OutputPhenotype import OutputPhenotype
+from variation.src import AbstractVariationMapper
 
 class PlotGroupOfSNPs(GeneListRankTest):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-							('input_fname', 1, ): ['', 'i', 1, 'input genotype matrix. Strain X SNP format.', ],\
-							('output_fname_prefix', 1, ): ['', 'o', 1, 'store the pvalue', ],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.update({
 							('phenotype_fname', 1, ): [None, 'n', 1, 'phenotype file', ],\
 							('ancestral_allele_fname', 0, ): [None, 's', 1, 'File containing the ancestral alleles to polarize SNPs', ],\
-							('minus_log_pvalue', 0, ): [0, 'e', 0, 'toggle -log(pvalue)', ],\
+							('minus_log_pvalue', 0, ): [0, '', 0, 'toggle -log(pvalue)', ],\
 							('phenotype_method_id_ls', 1, ): [None, 'y', 1, 'a comma-dash-separated list of phenotype_method ids in the phenotype file. i.e. 1,4-7',],\
-							('min_MAF', 1, float): [0.1, 'm', 1, 'minimum Minor Allele Frequency.'],\
-							('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
 							('call_method_id', 0, int):[17, 'l', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
 							('analysis_method_id', 0, int):[7, 'a', 1, 'Restrict results based on this analysis_method. Default is no such restriction.'],\
 							('no_of_top_hits', 1, int): [200, 'f', 1, 'how many number of top hits based on score or -log(pvalue).'],\
@@ -88,9 +81,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 							('sortSNPByPCA_value', 0, int):[0, 'S', 0, 'toggle to sort the SNPs by PC1 from PCA when drawing the SNP matrix '],\
 							('snp_label_font_size', 1, int): [1, 'F', 1, 'the size of the font used to label SNPs when drawing SNP matrix'],\
 							('drawGrid', 0, int):[0, '', 0, 'toggle to draw a grid for the SNP-matrix/haplotype'],\
-							('commit', 0, int):[0, 'c', 0, 'commit the db operation. this commit happens after every db operation, not wait till the end.'],\
-							('debug', 0, int):[0, 'b', 0, 'debug mode. 1=level 1 (pdb mode). 2=level 2 (same as 1 except no pdb mode)'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							})
 	country_order_type2name = {1: 'Country ordered by latitude',
 							2: 'Country ordered by longitude'}
 	def __init__(self,  **keywords):
@@ -99,8 +90,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 			add option country_order_type, draw_map
 		2008-10-07
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 		if self.phenotype_method_id_ls:
 			self.phenotype_method_id_ls = getListOutOfStr(self.phenotype_method_id_ls, data_type=int)
 	
@@ -1056,15 +1046,13 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
-		db.setup(create_tables=False)
+		db = self.db_250k
 		session = db.session
 		rm = Stock_250kDB.ResultsMethod.query.filter_by(phenotype_method_id=self.phenotype_method_id_ls[0], \
 													call_method_id=self.call_method_id, analysis_method_id=self.analysis_method_id).first()
 		
 		if rm:
-			genome_wide_result = self.getResultMethodContent(rm, self.results_directory, min_MAF=0, construct_chr_pos2index=True)
+			genome_wide_result = self.getResultMethodContent(rm, self.data_dir, min_MAF=0, construct_chr_pos2index=True)
 		elif self.snp_region_tup:	#2010-4-21 if this region is provided, no need to get genome_wide_result
 			genome_wide_result = None
 		else:
@@ -1072,7 +1060,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 							(self.phenotype_method_id_ls[0], self.call_method_id, self.analysis_method_id))
 			sys.exit(3)
 		
-		initData = Association.readInData(self.phenotype_fname, self.input_fname, eigen_vector_fname=None,\
+		initData = Association.readInData(self.phenotype_fname, self.inputFname, eigen_vector_fname=None,\
 										phenotype_method_id_ls=self.phenotype_method_id_ls, test_type=1, report=0,\
 										snpAlleleOrdinalConversion=False, removeUnPhenotypedSNPData=False,\
 										ignore_2nd_column=True)
@@ -1173,7 +1161,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		#axe_chromosome.set_xlim([0,1])
 		#axe_chromosome.set_ylim([0,1])
 		no_of_axes_drawn += 1
-		#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
+		#pylab.savefig('%s_%s.png'%(self.outputFnamePrefix, no_of_axes_drawn), dpi=400)
 		
 
 		if self.draw_strain_pca or self.draw_map:	# either needs this phenotype color map
@@ -1206,7 +1194,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		axe_snp_matrix.set_xlim([0,1])
 		#axe_snp_matrix.set_ylim([0,1])
 		no_of_axes_drawn += 1
-		#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
+		#pylab.savefig('%s_%s.png'%(self.outputFnamePrefix, no_of_axes_drawn), dpi=400)
 		
 		if self.draw_strain_pca:
 			axe_strain_map = pylab.axes([axe_x_offset1, axe_y_offset3, axe_width1, axe_height3], frameon=False)
@@ -1241,7 +1229,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 			axe_strain_pca.set_ylim(axe_strain_pca_ylim)
 			axe_strain_map_pca_cover.set_ylim(axe_strain_map_pca_cover_ylim)
 			no_of_axes_drawn += 1
-			#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
+			#pylab.savefig('%s_%s.png'%(self.outputFnamePrefix, no_of_axes_drawn), dpi=400)
 		
 		if self.draw_map:
 			#mark ecotypes on the map colored according to phenotype
@@ -1254,7 +1242,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 						ecotype_info, phenotype_cmap, phenotype_norm)
 			#axe_map.set_ylim([0,1])
 			no_of_axes_drawn += 1
-			#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
+			#pylab.savefig('%s_%s.png'%(self.outputFnamePrefix, no_of_axes_drawn), dpi=400)
 		
 		no_of_phenotypes = len(self.phenotype_method_id_ls)
 		gap_between_each_phenotype_axe = 0.005
@@ -1286,7 +1274,7 @@ class PlotGroupOfSNPs(GeneListRankTest):
 			no_of_axes_drawn += 1
 			axe_phenotype.set_ylim([0,1])
 		axe_snp_matrix.set_ylim([0,1])	#without this, ylim of all 3 axes are set to [0,0.9] because axe_map automatically adjust to 0-0.9
-		#pylab.savefig('%s_%s.png'%(self.output_fname_prefix, no_of_axes_drawn), dpi=400)
+		#pylab.savefig('%s_%s.png'%(self.outputFnamePrefix, no_of_axes_drawn), dpi=400)
 		
 		
 		if self.draw_snp_pca:
@@ -1306,9 +1294,9 @@ class PlotGroupOfSNPs(GeneListRankTest):
 		else:
 			analysis_method = Stock_250kDB.AnalysisMethod.get(self.analysis_method_id)
 			#axe_snp_matrix.title.set_text('SNPs from chr %s.'%(self.snp_region_tup))
-		png_output_fname = '%s.png'%self.output_fname_prefix
+		png_output_fname = '%s.png'%self.outputFnamePrefix
 		pylab.savefig(png_output_fname, dpi=600)
-		#pylab.savefig('%s.svg'%self.output_fname_prefix)
+		#pylab.savefig('%s.svg'%self.outputFnamePrefix)
 		
 if __name__ == '__main__':
 	from matplotlib import rcParams
