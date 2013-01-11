@@ -450,8 +450,7 @@ class StockDB(ElixirDB):
 			simplified, relegate stuff to ElixirDB
 		2008-07-09
 		"""
-		from pymodule import ProcessOptions
-		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		ElixirDB.__init__(self, **keywords)
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 
 if __name__ == '__main__':

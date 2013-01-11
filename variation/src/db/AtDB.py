@@ -121,8 +121,7 @@ class AtDB(ElixirDB):
 			simplified further by moving db-common lines to ElixirDB
 		2008-07-31
 		"""
-		from pymodule.ProcessOptions import ProcessOptions
-		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		ElixirDB.__init__(self, **keywords)
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 		"""
 		from pymodule import ProcessOptions
