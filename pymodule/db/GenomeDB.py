@@ -1014,11 +1014,7 @@ class GenomeDatabase(ElixirDB):
 			simplified further by moving db-common lines to ElixirDB
 		2008-07-09
 		"""
-		from pymodule.ProcessOptions import ProcessOptions
-		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
-		if self.debug:
-			import pdb
-			pdb.set_trace()
+		ElixirDB.__init__(self, **keywords)
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 		#2011-3-25
 		self.tax_id2genomeData = {}

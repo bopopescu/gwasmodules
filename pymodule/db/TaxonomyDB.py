@@ -189,8 +189,7 @@ class TaxonomyDB(ElixirDB):
 			simplified further by moving db-common lines to ElixirDB
 		2008-07-09
 		"""
-		from ProcessOptions import ProcessOptions
-		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		ElixirDB.__init__(self, **keywords)
 		self.setup_engine(metadata=__metadata__, session=__session__, entities=entities)
 		self.ncbiTaxDumpFileDelimiter = '\t|\t'
 		
