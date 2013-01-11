@@ -17,16 +17,19 @@ from variation.src import Stock_250kDB
 class AbstractVariationWorkflow(AbstractWorkflow):
 	__doc__ = __doc__
 	option_default_dict = AbstractWorkflow.option_default_dict.copy()
+	option_default_dict.update(AbstractWorkflow.db_option_dict.copy())
 	
 	option_default_dict.update({
 						('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgres', ],\
 						('hostname', 1, ): ['localhost', 'z', 1, 'hostname of the db server', ],\
 						('dbname', 1, ): ['vervetdb', 'd', 1, 'stock_250k database name', ],\
-						('genome_dbname', 1, ): ['genome', '', 1, 'genome database name', ],\
+						
 						('schema', 0, ): ['stock_250k', '', 1, 'database schema name', ],\
 						('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 						('db_passwd', 1, ): [None, '', 1, 'database password', ],\
-						('port', 0, ):[None, '', 1, 'database port number'],\
+						('genome_dbname', 1, ): ['genome', '', 1, 'genome database name', ],\
+						('genome_schema', 1, ): ['genome', '', 1, 'genome database schema name', ],\
+						
 						('commit', 0, int):[0, 'c', 0, 'commit db transaction (individual_alignment and/or individual_alignment.path'],\
 						
 						('data_dir', 0, ):[None, 't', 1, 'The top folder of db-affiliated storage. If not given, use db.data_dir.'],\
@@ -57,10 +60,29 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 		2012.6.5
 			overwrite the parent class
 		"""
-		self.db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema,\
+		self.db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, db_user=self.db_user,
+				db_passwd=self.db_passwd, hostname=self.hostname, dbname=self.dbname, schema=self.schema,\
 				port=self.port)
 		self.db_250k.setup(create_tables=False)
+	
+	def addStock_250kDBJob(self, executable=None, outputFile=None, run_type=None, \
+					parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
+					extraArguments=None, job_max_memory=2000, sshDBTunnel=None, **keywords):
+		"""
+		2012.11.13 expand all short-arguments to become long ones
+		2012.6.5
+		"""
+		extraArgumentList = []
+		if run_type:
+			extraArgumentList.append('--run_type %s'%(run_type))
+		
+		job = self.addGenericDBJob(executable=executable, inputFile=None, outputFile=outputFile, \
+						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, transferOutput=transferOutput, \
+						extraArgumentList=extraArgumentList, extraArguments=extraArguments,\
+						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
+						objectWithDBArguments=self,\
+						**keywords)
+		return job
 	
 	
 	def registerExecutables(self, workflow=None):
@@ -80,6 +102,12 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 		
 		#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		executableClusterSizeMultiplierList = []
+		
+		Stock_250kDB = Executable(namespace=namespace, name="Stock_250kDB", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		Stock_250kDB.addPFN(PFN("file://" + os.path.join(self.variationSrcPath, "db/Stock_250kDB.py"), site_handler))
+		executableClusterSizeMultiplierList.append((Stock_250kDB, 0))
+		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
 		
