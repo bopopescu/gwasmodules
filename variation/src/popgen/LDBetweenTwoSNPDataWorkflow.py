@@ -37,18 +37,18 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], )
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, figureOutDelimiter
+import subprocess, cStringIO, csv
 from Pegasus.DAX3 import *
-import Stock_250kDB, csv
-from AbstractVariationWorkflow import AbstractVariationWorkflow
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, figureOutDelimiter
+from variation.src import Stock_250kDB
+from variation.src import AbstractVariationWorkflow
 
 class LDBetweenTwoSNPDataWorkflow(AbstractVariationWorkflow):
 	__doc__ = __doc__
 	option_default_dict = AbstractVariationWorkflow.option_default_dict.copy()
 	common_option_dict = {
 						("input1Fname", 1, ): [None, 'i', 1, '1st input dataset'],\
-						('input2Fname', 1, ): [None, 'j', 1, '2nd input dataset'],\
+						('input2Fname', 1, ): [None, '', 1, '2nd input dataset'],\
 						('chunkSize', 0, int): [5000, '', 1, 'Loci from each will be partitioned into chunks of 5000'],\
 						('min_MAF', 1, float): [0.1, '', 1, 'minimum minor allele frequency to filter the input dataset'],\
 						('min_cor', 1, float): [0.1, '', 1, 'minimum correlation for output'],\
@@ -266,9 +266,7 @@ class LDBetweenTwoSNPDataWorkflow(AbstractVariationWorkflow):
 			import pdb
 			pdb.set_trace()
 		
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user, password=self.db_passwd, \
-									hostname=self.hostname, database=self.dbname)
-		db_250k.setup(create_tables=False)
+		db_250k = self.db_250k
 		
 		# Create a abstract dag
 		workflowName = os.path.splitext(os.path.basename(self.outputFname))[0]
