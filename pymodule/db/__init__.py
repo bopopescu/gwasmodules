@@ -694,6 +694,17 @@ class ElixirDB(object):
 				exitCode = 0
 		return exitCode
 	
+	def reScalePathByNewDataDir(self, filePath=None, newDataDir=None):
+		"""
+		2013.1.11 moved from Stock_250kDB
+			if newDataDir is None, take self.data_dir
+		2012.11.13
+		"""
+		oldDataDir=self.data_dir
+		if newDataDir is None:
+			newDataDir=self.data_dir
+		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
+	
 	"""
 	def session(self):
 		#2008-07-09
