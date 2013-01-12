@@ -236,6 +236,7 @@ def get_accession_id2name(curs, accession_table='at.accession'):
 
 def map_perlegen_ecotype_name2accession_id(curs, accession_table='at.accession', perlegen_table='chip.snp_combined_may_9_06_no_van'):
 	"""
+	2013.1.11  lower case accession names in both tables 
 	2009-4-10
 		curs could be cursor of MySQLdb connection or ElixirDB.metadata.bind
 	2008-02-07
@@ -244,7 +245,8 @@ def map_perlegen_ecotype_name2accession_id(curs, accession_table='at.accession',
 	"""
 	sys.stderr.write("Getting perlegen_ecotype_name2accession_id ...")
 	perlegen_ecotype_name2accession_id = {}
-	rows = curs.execute("select distinct a.id, s.ecotype from (select distinct ecotype from %s) as s , %s a where s.ecotype=a.name"%(perlegen_table, accession_table))
+	rows = curs.execute("select distinct a.id, s.ecotype from (select distinct ecotype from %s) as s , %s a where lower(s.ecotype)=lower(a.name)"%
+					(perlegen_table, accession_table))
 	is_elixirdb = 1
 	if hasattr(curs, 'fetchall'):	#2008-10-07 curs could be elixirdb.metadata.bind
 		rows = curs.fetchall()
