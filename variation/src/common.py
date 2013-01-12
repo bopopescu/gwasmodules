@@ -258,7 +258,7 @@ def map_perlegen_ecotype_name2accession_id(curs, accession_table='at.accession',
 			accession_id, ecotype_name = row
 		perlegen_ecotype_name2accession_id[ecotype_name] = accession_id
 	perlegen_ecotype_name2accession_id['sha'] = 89	#this exception
-	sys.stderr.write("Done.\n")
+	sys.stderr.write("%s pairs.\n"%(len(perlegen_ecotype_name2accession_id)))
 	return perlegen_ecotype_name2accession_id
 
 def map_accession_id2ecotype_id(curs, accession2ecotype_table='at.ecotype2accession'):
@@ -469,6 +469,7 @@ def get_ecotypeid2tg_ecotypeid(curs, table='stock.ecotypeid2tg_ecotypeid', debug
 
 def get_ecotype_id_set_250k_in_pipeline(ArrayInfo):
 	"""
+	2013.1.11 deprecated, moved to Stock_250kDB
 	2009-7-22
 		function copied from helloworld/controllers/Accession.py with ArrayInfo as argument.
 	"""
@@ -480,6 +481,7 @@ def get_ecotype_id_set_250k_in_pipeline(ArrayInfo):
 
 def fillInPhenotypeMethodID2ecotype_id_set(PhenotypeAvgTableCalss=None):
 	"""
+	2013.1.11 deprecated, moved to Stock_250kDB
 	2009-11-17
 		return PhenotypeMethodID2ecotype_id_set
 	"""
@@ -497,6 +499,7 @@ def fillInPhenotypeMethodID2ecotype_id_set(PhenotypeAvgTableCalss=None):
 
 def fillInCallMethodID2ecotype_id_set(CallInfoTableClass=None):
 	"""
+	2013.1.11 deprecated, moved to Stock_250kDB
 	2009-11-17
 		return CallMethodID2ecotype_id_set
 	"""
