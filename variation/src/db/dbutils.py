@@ -1,5 +1,9 @@
-import env
-import sys
+
+import sys, os, math
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
+from variation.src import env
 
 user_name = env.env['db_user']
 user_passwd = env.env['db_passwd']

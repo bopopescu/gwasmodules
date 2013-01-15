@@ -3,14 +3,19 @@ This library offers functions to parse different types of SNPs data from multipl
 
 Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
+
+import sys, os, math
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
 import time, sys, random
 import os
-import dbutils
 import cPickle
 import pdb
-from snpsdata import *
-from env import *
 import scipy as sp
+from snpsdata import *
+from variation.src.env import *
+from variation.src.db import dbutils
 
 # this should be fixed
 

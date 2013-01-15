@@ -5,9 +5,11 @@ This python library aims to do two things.
 
 Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
+import sys, os, math
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import sys, warnings
-import env
 from itertools import *
 from bisect import bisect
 import h5py
@@ -18,6 +20,7 @@ try:
 except Exception, err_str:
 	print 'scipy is missing:', err_str
 
+from variation.src import env
 
 IUPAC_alphabet = ['A', 'C', 'G', 'T', '-', 'Y', 'R', 'W', 'S', 'K', 'M', 'D', 'H', 'V', 'B', 'X', 'N']
 
