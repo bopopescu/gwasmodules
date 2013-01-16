@@ -12,9 +12,12 @@ Description:
 """
 import sys, os, csv, traceback
 
-from sets import Set
+import numpy
+from SNP import cmpStringSNPID
 from SNP import get_nt_number2diff_matrix_index, nt2number, number2nt, NA_set, SNPData
 from pymodule.utils import importNumericArray
+from pymodule.ProcessOptions import ProcessOptions
+
 num = importNumericArray()
 
 class QualityControl(object):
@@ -435,7 +438,6 @@ class QualityControl(object):
 		2008-01-24 add flag need_diff_code_pair_dict to output diff_code_pair2diff_details_ls
 		2008-01-01 derived from cmp_two_matricies() of CmpAccession2Ecotype.py
 		"""
-		import numpy
 		if (hasattr(cls, 'report') and getattr(cls,'report')) or (hasattr(cls, 'debug') and getattr(cls,'debug')):
 			sys.stderr.write("Comparing two matricies ...")
 		diff_matrix = numpy.zeros([len(nt_number2diff_matrix_index), len(nt_number2diff_matrix_index)], numpy.integer)
@@ -933,7 +935,6 @@ class TwoSNPData(QualityControl):
 							('debug', 0, ): 0,\
 							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
 	def __init__(self, **keywords):
-		from __init__ import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.argument_default_dict, error_doc=self.__doc__, class_to_have_attr=self, \
 														howto_deal_with_required_none=2)
 		if self.QC_method_id!=3 and self.QC_method_id!=7:	#149SNP uses snpid
@@ -1312,7 +1313,7 @@ class TwoSNPData(QualityControl):
 		#construct new row_id_ls
 		new_row_id_ls = []
 		new_row_id2old_row_index = {}	#2008-09-17 the old_row_index stores a list of 2 tuples, each tuple = (which SNPData, which row index)
-		SNPData2_row_id_checked_set = Set()
+		SNPData2_row_id_checked_set = set()
 		for row_id in snpData_ls[0].row_id_ls:
 			if row_id in self.row_id12row_id2:	#present in both data, needs in all different row_id_merge_type
 				SNPData2_row_id = self.row_id12row_id2[row_id]
@@ -1332,7 +1333,7 @@ class TwoSNPData(QualityControl):
 		#construct new col_id_ls
 		new_col_id_ls = []
 		new_col_id2old_col_index = {}	#2008-09-17 the old_col_index stores a list of 2 tuples, each tuple = (which SNPData, which col index)
-		SNPData2_col_id_checked_set = Set()
+		SNPData2_col_id_checked_set = set()
 		for col_id in snpData_ls[0].col_id_ls:
 			if col_id in self.col_id12col_id2:	#present in both data
 				SNPData2_col_id = self.col_id12col_id2[col_id]
@@ -1350,7 +1351,6 @@ class TwoSNPData(QualityControl):
 					new_col_id_ls.append(col_id)
 		
 		if sortColumnInChrPosOrder:	# 2010-4-4
-			from SNP import cmpStringSNPID
 			new_col_id_ls.sort(cmp=cmpStringSNPID)
 		
 		newSnpData = SNPData(row_id_ls=new_row_id_ls, col_id_ls=new_col_id_ls)
@@ -1398,13 +1398,13 @@ class TwoSNPData(QualityControl):
 			chromosome, position = map(int, col_id2_split_ls)
 			for i in 
 		"""
-		col_indices_wanted_set = Set()		
+		col_indices_wanted_set = set()		
 		for col_id1, col_id2 in self.col_id12col_id2.iteritems():
 			col_index1 = self.SNPData1.col_id2col_index[col_id1]
 			for i in range(max(0, col_index1-no_of_loci_to_sample_around_on_each_side), min(col_index1+no_of_loci_to_sample_around_on_each_side+1, no_of_cols)):
 				col_indices_wanted_set.add(i)
 		
-		cols_to_be_tossed_out = Set(range(no_of_cols)) - col_indices_wanted_set
+		cols_to_be_tossed_out = set(range(no_of_cols)) - col_indices_wanted_set
 		sys.stderr.write("%s loci sampled around %s reference loci. Done.\n"%(len(col_indices_wanted_set), len(self.col_id12col_id2)))
 		return cols_to_be_tossed_out
 	
@@ -1542,7 +1542,6 @@ class MergeTwoSNPData(object):
 			allow priority=3 or 4
 		2008-06-02
 		"""
-		from __init__ import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
 	
 	def run(self):
@@ -1569,7 +1568,6 @@ class MergeTwoSNPData(object):
 
 if __name__ == '__main__':
 	#do simple intersectSNPData1_and_SNPData2_row_wise()
-	from __init__ import ProcessOptions
 	main_class = MergeTwoSNPData
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	
