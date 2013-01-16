@@ -3,17 +3,17 @@
 
 Examples:
 	#test run without commiting database (no records in database in the end)
-	./src/Results2DB_250k.py -i /home/nordborglab/pvalue.log -a 1 -E 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh
+	%s -i /home/nordborglab/pvalue.log -a 1 -E 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh
 	
 	#commit transaction
-	./src/Results2DB_250k.py -i /home/nordborglab/pvalue.log -a 1 -E 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh -c
+	%s -i /home/nordborglab/pvalue.log -a 1 -E 1 -f kw_test_96_LD -m kw -n best_96_by_tina -u yh -c
 	
 	#omit short_name
-	Results2DB_250k.py -a 17 -E 186 -i /Network/KW_newDataset_186_Bact_titer.pvals -l 1 -u yh -c
+	%s -a 17 -E 186 -i /Network/KW_newDataset_186_Bact_titer.pvals -l 1 -u yh -c
 	
 	# 2011-2-24 submit cnv association results (locus identified by CNV.ID) into db.
 	# set the call_method_id (-a) to -1 so that no call method will be fetched from db.
-	Results2DB_250k.py -i cnvMethod20_cnvID/cnvMethod20_cnvID_y1_pheno_pheno_183_Trichome\ avg\ C.tsv 
+	%s -i cnvMethod20_cnvID/cnvMethod20_cnvID_y1_pheno_pheno_183_Trichome\ avg\ C.tsv 
 		-g 20 -a -1 -E 183 -l 1 -u yh -z banyan -s 3 -c
 	
 Description:
@@ -33,12 +33,13 @@ if bit_number>40:       #64bit
 else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
 import csv, stat, getopt, re
 import traceback, gc, subprocess
-from pymodule import figureOutDelimiter, PassingData
-
 import sqlalchemy as sql
+from pymodule import figureOutDelimiter, PassingData, utils
+from pymodule import AssociationTableFile, addAttributeDictToYHTableInHDF5Group
 from variation.src.common import getOneResultJsonData
 from variation.src import Stock_250kDB
 from variation.src import AbstractVariationMapper
@@ -90,9 +91,6 @@ class Results2DB_250k(AbstractVariationMapper):
 		"""
 		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 		
-		from pymodule import ProcessOptions
-		ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
-	
 	
 	def check_if_phenotype_method_id_in_db(self, curs, phenotype_method_table, phenotype_method_id):
 		"""
@@ -322,7 +320,8 @@ class Results2DB_250k(AbstractVariationMapper):
 		if output_fname:
 			del writer
 		sys.stderr.write("Done.\n")
-		return True
+		return 0
+	
 	
 	def come_up_new_results_filename(self, output_dir=None, db_entry_id=None, results_method_type_id=None,
 							call_method_id=None, phenotype_method_id=None,\
@@ -373,9 +372,9 @@ class Results2DB_250k(AbstractVariationMapper):
 		pipe_f = os.popen('cp %s %s'%(inputFname, output_fname))
 		pipe_f_out = pipe_f.read()
 		if pipe_f_out:
-			sys.stderr.write("\tcp output: %s\n"%pipe_f_out)
+			sys.stderr.write("\t cp output: %s\n"%pipe_f_out)
 		sys.stderr.write("Done.\n")
-		return True
+		return 0
 		
 	
 	def add2DB(self, db=None, short_name=None, phenotype_method_id=None, call_method_id=None, data_description=None, \
@@ -438,7 +437,7 @@ class Results2DB_250k(AbstractVariationMapper):
 		if db_entry:
 			sys.stderr.write("There is already an entry in results_method (id=%s) with same (call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id)=(%s, %s, %s, %s).\n"\
 							%(db_entry.id, call_method_id, phenotype_method_id, analysis_method_id, results_method_type_id))
-			sys.exit(0)
+			sys.exit(2)
 		
 		db_entry = db.getResultsMethod(data_dir=data_dir, call_method_id=call_method_id, phenotype_method_id=phenotype_method_id, \
 									analysis_method_id=analysis_method_id, \
@@ -451,13 +450,24 @@ class Results2DB_250k(AbstractVariationMapper):
 			db_entry.filename = os.path.join(db.data_dir, db_entry.constructRelativePath(data_dir=data_dir))
 			localAbsPath = os.path.join(data_dir, db_entry.constructRelativePath(data_dir=data_dir))
 			
-			self.srcFilenameLs.append(inputFname)
-			self.dstFilenameLs.append(localAbsPath)
 			if db_entry.analysis_method_id==13:
-				return_value = self.copyResultsFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
+				self.srcFilenameLs.append(inputFname)
+				self.dstFilenameLs.append(localAbsPath)
+				exit_code = self.copyResultsFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
 			else:
-				return_value = self.copyAndReformatResultFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
-			if return_value:
+				#2013.1.10 add some db_entry attributes to the hdf5 file
+				db.addAttributesToResultFile(db_entry=db_entry, inputFname=inputFname)
+				inputFileBasename = os.path.basename(inputFname)
+				#moveFileIntoDBAffiliatedStorage() will also set db_entry.path
+				exit_code = db.moveFileIntoDBAffiliatedStorage(db_entry=db_entry, filename=inputFileBasename, \
+									inputDir=os.path.split(inputFname)[0], \
+									outputDir=data_dir,\
+									relativeOutputDir=None, shellCommand='cp -rL', \
+									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
+									constructRelativePathFunction=db_entry.constructRelativePath, data_dir=data_dir)
+				
+				#exit_code = self.copyAndReformatResultFile(db, inputFname, db_entry, user=user, output_fname=localAbsPath)
+			if exit_code==0:
 				session.add(db_entry)
 				if db_entry.file_size is None:
 					db.updateDBEntryPathFileSize(db_entry=db_entry, data_dir=data_dir)
