@@ -4,10 +4,9 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import time, csv
 from CircularQueue import *
-from sets import *
-from variation.src.snpsdata import RawSnpsData
-from variation.src import dataParsers
 from pymodule import PassingData
+from variation.src.yhio import dataParsers
+from variation.src.yhio.snpsdata import RawSnpsData
 
 #Infinite Number (for acc array)
 INF = 2**16-1 # set for unsigned 16-bit integers used in acc array
@@ -103,7 +102,7 @@ class SNPData(object):
 			nucs += [(passingdata.major, passingdata.minor)]
 		passingdata = PassingData()
 		passingdata.snps  = array(snps)
-		passingdata.sdps = Set(snps)
+		passingdata.sdps = set(snps)
 		passingdata.nucs = array(nucs)
 		passingdata.numSamps = no_of_cols
 		sys.stderr.write("Done.\n")
@@ -155,7 +154,7 @@ class SNPData(object):
 		"""
 		2009-10-7
 			turn snps, nucs into array before returning
-			add sdps=Set(snps) in the returning list
+			add sdps=set(snps) in the returning list
 		2008-05-19
 			snps_name could be tuple or list
 		05/07/08
@@ -196,7 +195,7 @@ class SNPData(object):
 		
 		del data_matrix
 		snps = array(snps)
-		sdps = Set(snps)
+		sdps = set(snps)
 		nucs = array(nucs)
 		sys.stderr.write("Done.\n")
 		return snps, sdps, nucs, chosen_snps_name_ls
@@ -230,7 +229,7 @@ class SNPData(object):
 			nucs += [(major,minor)]
 			
 		self.snps = array(snps)
-		self.sdps = Set(snps)
+		self.sdps = set(snps)
 		self.nucs = array(nucs)
 		print "Done"
 
