@@ -71,6 +71,7 @@ class FilterStrainSNPMatrix(object):
 		self.debug = int(debug)
 		self.report = int(report)
 	
+	@classmethod
 	def remove_rows_with_too_many_NAs(cls, data_matrix, row_cutoff, cols_with_too_many_NAs_set=None, NA_set=set([0, -2]), debug=0, is_cutoff_max=0):
 		"""
 		2008-05-19
@@ -117,8 +118,7 @@ class FilterStrainSNPMatrix(object):
 		sys.stderr.write("%s strains removed, done.\n"%len(rows_with_too_many_NAs_set))
 		return passingdata
 	
-	remove_rows_with_too_many_NAs = classmethod(remove_rows_with_too_many_NAs)
-	
+	@classmethod
 	def remove_cols_with_too_many_NAs(cls, data_matrix, col_cutoff, rows_with_too_many_NAs_set=None, NA_set=set([0, -2]), debug=0, is_cutoff_max=0):
 		"""
 		2008-05-19
@@ -164,7 +164,6 @@ class FilterStrainSNPMatrix(object):
 		sys.stderr.write("%s cols removed, done.\n"%(len(cols_with_too_many_NAs_set)))
 		return passingdata
 	
-	remove_cols_with_too_many_NAs = classmethod(remove_cols_with_too_many_NAs)
 	
 	def remove_identity_strains(self, data_matrix, rows_to_be_checked, cols_to_be_checked):
 		"""
@@ -260,47 +259,6 @@ class FilterStrainSNPMatrix(object):
 		del writer
 		sys.stderr.write("Done.\n")
 	
-	def read_data(cls, input_fname, input_alphabet=0, turn_into_integer=1, double_header=0, delimiter='\t'):
-		"""
-		2008-05-18
-			DEPRECATED. moved to pymodule.SNP
-		2008-05-12
-			add delimiter
-		2008-05-07
-			add option double_header
-		2007-03-06
-			different from the one from SelectStrains.py is map(int, data_row)
-		2007-05-14
-			add input_alphabet
-		2007-10-09
-			add turn_into_integer
-		"""
-		sys.stderr.write("Reading data ...")
-		reader = csv.reader(open(input_fname), delimiter=delimiter)
-		header = reader.next()
-		if double_header:
-			header = [header, reader.next()]
-		data_matrix = []
-		strain_acc_list = []
-		category_list = []
-		for row in reader:
-			strain_acc_list.append(row[0])
-			category_list.append(row[1])
-			data_row = row[2:]
-			no_of_snps = len(data_row)
-			if input_alphabet:
-				data_row = dict_map(nt2number, data_row)
-				if no_of_snps!=len(data_row):
-					print row
-			else:
-				if turn_into_integer:
-					data_row = map(int, data_row)
-			data_matrix.append(data_row)
-		del reader
-		sys.stderr.write("Done.\n")
-		return header, strain_acc_list, category_list, data_matrix
-	
-	read_data = classmethod(read_data)
 	
 	def run(self):
 		"""
