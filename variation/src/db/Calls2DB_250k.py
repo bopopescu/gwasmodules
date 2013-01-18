@@ -9,8 +9,14 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import sys, getopt, csv
-import Stock_250kDB
+import getopt, csv, subprocess
+import traceback, gc
 from pymodule import runLocalCommand
+from pymodule import process_function_arguments
+from pymodule import number2nt
+from pymodule import ProcessOptions
+from variation.src import Stock_250kDB
+from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 
 class Calls2DB_250k_old:
 	"""
@@ -197,24 +203,19 @@ class Calls2DB_250k_old:
 			self.submit_comment(curs, ecotypeid, duplicate_id, self.comment, self.calls_comment_table)
 			self.submit_calls_ls(curs, calls_ls, ecotypeid, duplicate_id, self.calls_table)
 
-import getopt, csv, subprocess
-import traceback, gc
-from pymodule import process_function_arguments
-from pymodule.SNP import number2nt
-
-
-class Calls2DB_250k(object):
+class Calls2DB_250k(AbstractVariationMapper):
 	"""
 
 	Examples:
-		Calls2DB_250k.py -i /tmp/simplecalls -m 1 -c
+		Calls2DB_250k.py -i /tmp/simplecalls -m 1 --commit
 		
-		Calls2DB_250k.py -i /Network/Data/250k/finalData_051808/250K_method_5_after_imputation_noRedundant_051908.csv -m 6 -u yh -y 2 -c -l 262_unique
+		Calls2DB_250k.py -i /Network/Data/250k/finalData_051808/250K_method_5_after_imputation_noRedundant_051908.csv
+			-m 6 -u yh -y 2 --commit -l 262_unique
 		
 		#2011-5-2 add a CNV dataset (column id is Snps.id, 0=normal, 1=deletion) into db
 		# The program will use pymodule.SNP.number2nt to translate 0 & 1 into nucleotides (NA and A).
 		Calls2DB_250k.py -i script/variation/data/CNV/NonOverlapCNVAsSNP_cnvMethod20_snpID.tsv -m 80 -u yh -y3
-			-c -l cnvMethod20InCall32 -z banyan
+			-l cnvMethod20InCall32 --hostname uclaOffice --commit
 		
 	Description:
 		Turn calling algorithm's results into db and associated filesystem directory.
@@ -233,21 +234,21 @@ class Calls2DB_250k(object):
 				SNP_DB_ID 'array_id'
 				213444	C
 	"""
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-							('user', 1, ): [None, 'u', 1, 'database username', ],\
-							('passwd', 1, ): [None, 'p', 1, 'database password', ],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('inputFname', 0, ))
+	option_default_dict.pop(('outputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
 							('input_dir', 1, ): [None, 'i', 1, "directory containing output files of any calling algorithm. it could aslso be a file, assuming it's in bjarni's format with arrayId."],\
 							('method_id', 1, int): [None, 'm', 1, 'the id of the calling method. If not in db, new call method is to be created with id=method_id, short_name=(user supplied).'],\
 							('call_method_short_name', 0, ): ['', 'l', 1, 'call method shortname, given to create a new call method if method_id is not in db.'],\
 							('output_dir', 1, ):['/Network/Data/250k/db/calls/', 'o', 1, 'file system storage for the call files. call_info_table would point each entry to this.'],\
 							('call_method_table', 1, ): ['call_method', 'a', 1, 'table storing the calling methods'],\
 							('call_info_table', 1, ): ['call_info', 't', 1, 'table to store final call file entries'],\
-							('input_type', 1, int): [1, 'y', 1, 'The input type. 1: directory. 2: SNP X strain format (bjarni, 1st row is array id. 2nd row is ecotype id, not used though.). 3: Strain X SNP format (Yu)'],\
-							('commit', 0, int): [0, 'c', 0, 'commit db transaction'],\
-							('debug', 0, int): [0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int): [0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							('input_type', 1, int): [1, 'y', 1, 'The input type. 1: directory. \n\
+		2: SNP X strain format (bjarni, 1st row is array id. 2nd row is ecotype id, not used though.). \n\
+		3: Strain X SNP format (Yu)'],\
+						})
 	"""
 	2008-04-40
 		option_default_dict is a dictionary for option handling, including argument_default_dict info
@@ -258,11 +259,7 @@ class Calls2DB_250k(object):
 		"""
 		2008-04-08
 		"""
-		from pymodule import process_function_arguments, turn_option_default_dict2argument_default_dict
-		from pymodule import ProcessOptions
-		#argument_default_dict = turn_option_default_dict2argument_default_dict(self.option_default_dict)
-		#argument dictionary
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 		self.cur_max_call_id = None
 		
 		call2db_func_dict = {1: self.submit_call_dir2db,\
@@ -357,9 +354,7 @@ class Calls2DB_250k(object):
 			array_id = filename.split('_')[0]
 			sys.stderr.write("%d/%d:\t%s\n"%(i+1,len(file_ls),filename))
 			
-			call_info = Stock_250kDB.CallInfo(array_id=array_id, method_id=method_id, created_by=user)
-			db.session.add(call_info)
-			db.session.flush()
+			call_info = db.getCallInfo(array_id=array_id, call_method_id=method_id, created_by=user)
 			output_fname = os.path.join(output_dir, '%s_call.tsv'%call_info.id)
 			call_info.filename = output_fname
 			db.session.add(call_info)
@@ -544,9 +539,7 @@ class Calls2DB_250k(object):
 			pdb.set_trace()
 		
 		#database connection and etc
-		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-									password=self.passwd, hostname=self.hostname, database=self.dbname)
-		db.setup(create_tables=False)
+		db = self.db_250k
 		session = db.session
 		session.begin()
 		
@@ -566,14 +559,13 @@ class Calls2DB_250k(object):
 			self.method_id = cm.id
 			
 		if self.commit:
-			self.submit_call2db(curs, self.input_dir, self.call_info_table, self.output_dir, self.method_id, self.user, \
+			self.submit_call2db(curs, self.input_dir, self.call_info_table, self.output_dir, self.method_id, self.db_user, \
 							chr_pos2db_id=chr_pos2db_id, db=db)
 			#curs.execute("commit")
 			session.flush()
 			session.commit()
 	
 if __name__ == '__main__':
-	from pymodule import ProcessOptions
 	main_class = Calls2DB_250k
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	instance = main_class(**po.long_option2value)
