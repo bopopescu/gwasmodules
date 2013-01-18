@@ -199,6 +199,7 @@ class NPUTE(object):
 								input_NA_char=0, lower_case_for_imputation=False, npute_window_size=30,\
 								no_of_accessions_per_sampling=300, no_of_samplings=10):
 		"""
+		#2013.1.16 bugfix. no_of_accessions_per_sampling could be bigger than all samples available
 		2009-10-6
 			called by samplingImpute()
 		"""	
@@ -210,7 +211,10 @@ class NPUTE(object):
 		sampling_count = 0
 		while sampling_count<no_of_samplings or all_rows_sampled is False:	# 2009-10-7 make sure every row is sampled.
 			imputed_data_index = len(imputed_data_ls)
-			sampled_row_index_ls = random.sample(row_index_ls, no_of_accessions_per_sampling)
+			if no_of_accessions_per_sampling<len(row_index_ls):	#2013.1.16 bugfix
+				sampled_row_index_ls = random.sample(row_index_ls, no_of_accessions_per_sampling)
+			else:
+				sampled_row_index_ls = row_index_ls
 			for row_index in sampled_row_index_ls:
 				if row_index not in row_index2imputed_data_index_ls:
 					row_index2imputed_data_index_ls[row_index] = []
