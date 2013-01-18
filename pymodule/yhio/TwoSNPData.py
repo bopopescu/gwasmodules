@@ -944,6 +944,7 @@ class TwoSNPData(QualityControl):
 	
 	def get_row_matching_dstruc(self, row_id_ls1, row_id_ls2, row_matching_by_which_value=None):
 		"""
+		2013.1.16 bugfix, check whether row_id is tuple or list before taking row_id[row_matching_by_which_value]
 		2010-3-30
 			report how many matched
 		2008-05-11
@@ -966,7 +967,7 @@ class TwoSNPData(QualityControl):
 		for i in range(len(row_id_ls2)):
 			row_id = row_id_ls2[i]
 			row_id2row_index2[row_id] = i
-			if isinstance(row_matching_by_which_value, int):
+			if (isinstance(row_id, tuple) or isinstance(row_id, list)) and isinstance(row_matching_by_which_value, int):	#2013.1.16 bugfix
 				key = row_id[row_matching_by_which_value]
 			else:
 				key = row_id
@@ -974,7 +975,7 @@ class TwoSNPData(QualityControl):
 		
 		row_id12row_id2 = {}
 		for row_id in row_id2row_index1:
-			if isinstance(row_matching_by_which_value, int):
+			if (isinstance(row_id, tuple) or isinstance(row_id, list)) and isinstance(row_matching_by_which_value, int):
 				key = row_id[row_matching_by_which_value]
 			else:
 				key = row_id
