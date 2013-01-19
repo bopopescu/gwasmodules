@@ -38,7 +38,7 @@ Examples:
 Description:
 	QC for 250k call data from call_info_table against 2010, perlegen, 149SNP data.
 	It will select the call_info entries that haven't been QCed for a particular QC method.
-	The output is in the call_QC_table with NA_rate, mismatch_rate and etc.
+	The output is in the call_QC_table with na_rate, mismatch_rate and etc.
 	
 	QC_method_id:
 		All but 0 correspond to field/column id in table QC_method.
@@ -57,11 +57,11 @@ else:   #32bit
 
 import time, csv, getopt
 import warnings, traceback
-from pymodule import ProcessOptions, PassingData, SNPData, TwoSNPData, read_data
-from variation.src.common import number2nt, nt2number
-import Stock_250kDB
-from pymodule.db import formReadmeObj
 import sqlalchemy, numpy
+from pymodule import ProcessOptions, PassingData, SNPData, TwoSNPData, read_data
+from pymodule.db import formReadmeObj
+from variation.src.common import number2nt, nt2number
+from variation.src import Stock_250kDB
 
 class QC_250k(TwoSNPData):
 	__doc__ = __doc__
@@ -160,13 +160,13 @@ class QC_250k(TwoSNPData):
 			if call_info.call_qc_ls and max_call_info_mismatch_rate<=1:	#2008-07-01	#2009-01-22 add = to "max_call_info_mismatch_rate<=1"
 				call_QC_with_max_no_of_non_NA_pairs = call_info.call_qc_ls[0]
 				for call_QC in call_info.call_qc_ls:
-					if call_QC.no_of_non_NA_pairs>=min_no_of_non_NA_pairs and call_QC.mismatch_rate>max_call_info_mismatch_rate:	#if enough pairs and mismatch_rate too high, ignore
+					if call_QC.no_of_non_na_pairs>=min_no_of_non_NA_pairs and call_QC.mismatch_rate>max_call_info_mismatch_rate:	#if enough pairs and mismatch_rate too high, ignore
 						ignore_this=1
 						break
 					if min_call_info_mismatch_rate and call_QC.mismatch_rate<min_call_info_mismatch_rate:
 						ignore_this=1
 						break
-					if call_QC.no_of_non_NA_pairs>call_QC_with_max_no_of_non_NA_pairs.no_of_non_NA_pairs:
+					if call_QC.no_of_non_na_pairs>call_QC_with_max_no_of_non_NA_pairs.no_of_non_na_pairs:
 						call_QC_with_max_no_of_non_NA_pairs = call_QC
 				call_info.call_QC_with_max_no_of_non_NA_pairs = call_QC_with_max_no_of_non_NA_pairs
 			else:
@@ -357,18 +357,18 @@ class QC_250k(TwoSNPData):
 			NA_mismatch_ls = row_id2NA_mismatch_rate[row_id]
 			ecotype_id, call_info_id = row_id	#bug here, order changed.
 			tg_ecotype_id = row_id12row_id2[row_id]
-			NA_rate, mismatch_rate, no_of_NAs, no_of_totals, no_of_mismatches, no_of_non_NA_pairs, relative_NA_rate, relative_no_of_NAs, relative_no_of_totals = NA_mismatch_ls
+			na_rate, mismatch_rate, no_of_nas, no_of_totals, no_of_mismatches, no_of_non_na_pairs, relative_NA_rate, relative_no_of_NAs, relative_no_of_totals = NA_mismatch_ls
 			#call_QC stores the relative NA rate. call_info already stores the independent NA rate
-			NA_rate, no_of_NAs, no_of_totals = relative_NA_rate, relative_no_of_NAs, relative_no_of_totals
+			na_rate, no_of_nas, no_of_totals = relative_NA_rate, relative_no_of_NAs, relative_no_of_totals
 			callqc = Stock_250kDB.CallQC(call_info_id=call_info_id, min_probability=min_probability, ecotype_id=ecotype_id, tg_ecotype_id=tg_ecotype_id,\
-						qc_method_id=QC_method_id, call_method_id=call_method_id, NA_rate=NA_rate, mismatch_rate=mismatch_rate,\
-						no_of_NAs=no_of_NAs, no_of_totals=no_of_totals, no_of_mismatches=no_of_mismatches, no_of_non_NA_pairs=no_of_non_NA_pairs,\
+						qc_method_id=QC_method_id, call_method_id=call_method_id, na_rate=na_rate, mismatch_rate=mismatch_rate,\
+						no_of_nas=no_of_nas, no_of_totals=no_of_totals, no_of_mismatches=no_of_mismatches, no_of_non_na_pairs=no_of_non_na_pairs,\
 						created_by=user)
 			callqc.readme = readme
 			session.add(callqc)
 			"""
 			data_insert_ls = [row_id[0]] + NA_mismatch_ls + [QC_method_id, user]	#row_id is (call_info_id, ecotypeid)
-			curs.execute("insert into " + call_QC_table + " (call_info_id, NA_rate, mismatch_rate, no_of_NAs, no_of_totals, no_of_mismatches, no_of_non_NA_pairs, QC_method_id, created_by)\
+			curs.execute("insert into " + call_QC_table + " (call_info_id, na_rate, mismatch_rate, no_of_nas, no_of_totals, no_of_mismatches, no_of_non_NA_pairs, QC_method_id, created_by)\
 				values(%s, %s, %s, %s, %s, %s, %s, %s, %s)", data_insert_ls)
 			"""
 		sys.stderr.write("Done.\n")
@@ -385,11 +385,11 @@ class QC_250k(TwoSNPData):
 			update it in the db.
 		"""
 		sys.stderr.write("Calculating indepent NA rate ... \n")
-		#curs.execute("select c.id, c.filename from %s c where c.NA_rate is null order by id"%\
+		#curs.execute("select c.id, c.filename from %s c where c.na_rate is null order by id"%\
 		#			(call_info_table))
 		#rows = curs.fetchall()
-		#call_info_ls = db.session.query(CallInfo).filter_by(NA_rate=None).all()
-		call_info_ls = Stock_250kDB.CallInfo.query.filter_by(NA_rate=None).all()
+		#call_info_ls = db.session.query(CallInfo).filter_by(na_rate=None).all()
+		call_info_ls = Stock_250kDB.CallInfo.query.filter_by(na_rate=None).all()
 		no_of_rows = len(call_info_ls)
 		sys.stderr.write("\tTotally, %d call_info entries to be processed.\n"%no_of_rows)
 		for i in range(no_of_rows):
@@ -398,7 +398,7 @@ class QC_250k(TwoSNPData):
 			reader = csv.reader(open(call_info.filename), delimiter='\t')
 			reader.next()	#throw away the first line
 			no_of_totals = 0
-			no_of_NAs = 0
+			no_of_nas = 0
 			for row in reader:
 				SNP_id, call = row[:2]
 				no_of_totals += 1
@@ -407,15 +407,15 @@ class QC_250k(TwoSNPData):
 					if probability < min_probability:
 						call = 'NA'
 				if call=='NA':
-					no_of_NAs += 1
+					no_of_nas += 1
 			if no_of_totals!=0:
-				call_info.NA_rate = float(no_of_NAs)/no_of_totals
-				sys.stderr.write("%s\n"%call_info.NA_rate)
+				call_info.na_rate = float(no_of_nas)/no_of_totals
+				sys.stderr.write("%s\n"%call_info.na_rate)
 				call_info.readme = readme
 				db.session.add(call_info)
 			del reader
-			#curs.execute("update " + call_info_table + " set NA_rate=%s where id=%s",\
-			#		(NA_rate, call_info_id))
+			#curs.execute("update " + call_info_table + " set na_rate=%s where id=%s",\
+			#		(na_rate, call_info_id))
 		sys.stderr.write("Done.\n")
 	
 	#output_row_id2NA_mismatch_rate = classmethod(TwoSNPData.output_row_id2NA_mismatch_rate)
