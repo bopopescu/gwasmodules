@@ -40,33 +40,29 @@ if bit_number>40:       #64bit
 else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/')))
-from pymodule import process_function_arguments, write_data_matrix, figureOutDelimiter, read_data, SNPData
-from common import SNPData2RawSnpsData_ls
+import numpy
+from pymodule import process_function_arguments, write_data_matrix, figureOutDelimiter, read_data, SNPData,\
+	SNPData2RawSnpsData_ls
+from variation.src import Stock_250kDB
+from variation.src import AbstractVariationMapper
 import snpsdata
-import Stock_250kDB
 
-class ConvertYuSNPFormat2Bjarni(object):
+class ConvertYuSNPFormat2Bjarni(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-						('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-						('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-						('user', 1, ): [None, 'u', 1, 'database username', ],\
-						('passwd', 1, ): [None, 'p', 1, 'database password', ],\
-						('input_fname', 1, ): [None, 'i', 1, ],\
-						('output_fname', 1, ): [None, 'o', 1, 'Output Filename'],\
-						('ecotype_table', 1, ): ['stock.ecotype', 'e', 1, 'ecotype Table to get ecotypeid2nativename'],\
-						('array_id_2nd_column', 0, int): [0, 'a', 0, 'whether 2nd column in input_fname is array id or not'],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
+						('ecotype_table', 1, ): ['stock.ecotype', '', 1, 'ecotype Table to get ecotypeid2nativename'],\
+						('array_id_2nd_column', 0, int): [0, 'a', 0, 'whether 2nd column in inputFname is array id or not'],\
 						('snp_id_type', 1, int): [1, 'y', 1, 'type 1: db_id (need db translation); type 2: chr_pos'],\
-						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						})
 	def __init__(self, **keywords):
 		"""
 		2008-05-18
 			add argument array_id_2nd_column
 		2008-5-12
 		"""
-		from pymodule import ProcessOptions
-		self.ad=ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 	
 	def run(self):
 		"""
@@ -77,14 +73,13 @@ class ConvertYuSNPFormat2Bjarni(object):
 			pdb.set_trace()
 		
 		#database connection and etc
-		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-									password=self.passwd, hostname=self.hostname, database=self.dbname)
-		db.setup(create_tables=False)
+		db = self.db_250k
+		
 		session = db.session
 		session.begin()
 		
-		delimiter = figureOutDelimiter(self.input_fname, report=self.report)
-		header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname, delimiter=delimiter)
+		delimiter = figureOutDelimiter(self.inputFname, report=self.report)
+		header, strain_acc_list, category_list, data_matrix = read_data(self.inputFname, delimiter=delimiter)
 		
 		if self.snp_id_type==1:
 			#2011-2-27 translate the db_id into chr_pos because the new StrainXSNP dataset uses db_id to identify SNPs.
@@ -98,7 +93,6 @@ class ConvertYuSNPFormat2Bjarni(object):
 					data_matrix_col_index_to_be_kept.append(i-2)
 					new_header.append(chr_pos)
 			# to remove no-db_id columns from data matrix
-			import numpy
 			data_matrix = numpy.array(data_matrix)
 			data_matrix = data_matrix[:, data_matrix_col_index_to_be_kept]
 			header = new_header
@@ -112,7 +106,7 @@ class ConvertYuSNPFormat2Bjarni(object):
 		
 		rawSnpsData_ls = SNPData2RawSnpsData_ls(snpData, need_transposeSNPData=1, report=self.report)
 		chromosomes = [rawSnpsData.chromosome for rawSnpsData in rawSnpsData_ls]
-		snpsdata.writeRawSnpsDatasToFile(self.output_fname, rawSnpsData_ls, chromosomes=chromosomes, deliminator=',', withArrayIds=self.array_id_2nd_column)
+		snpsdata.writeRawSnpsDatasToFile(self.outputFname, rawSnpsData_ls, chromosomes=chromosomes, deliminator=',', withArrayIds=self.array_id_2nd_column)
 		
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
