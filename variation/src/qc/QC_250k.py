@@ -305,7 +305,7 @@ class QC_250k(TwoSNPData):
 					column_index = db_id2index.get(db_id)
 					if column_index is None:	#2010-10-13 ignore this as it's no longer included in the snp set.
 						continue
-					chr, pos = db_id2chr_pos.get(db_id)
+					#chr, pos = db_id2chr_pos.get(db_id)
 				elif len(SNP_id_ls)>=2:
 					column_index = None
 					chr, pos = SNP_id_ls[:2]
