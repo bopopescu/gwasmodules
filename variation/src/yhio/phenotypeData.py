@@ -1,8 +1,10 @@
-import pdb
-from env import *
+
+import sys, os, math
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+
 import math
 import itertools as it
-import sys
 try:
 	import scipy as sp
 	import matplotlib
@@ -11,6 +13,8 @@ try:
 except Exception, err_str:
 	print 'scipy/matplotlib is missing:', err_str
 import warnings
+
+from variation.src.env import *
 
 #For annoying linux computers, which don't have a display..
 
