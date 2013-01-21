@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule.VCFFile import VCFFile
+from pymodule import VCFFile
 from AbstractVCFMapper import AbstractVCFMapper
 
 class SplitVCFFile(AbstractVCFMapper):
@@ -67,7 +67,6 @@ class SplitVCFFile(AbstractVCFMapper):
 		"""
 		sys.stderr.write("Splitting VCF %s into files each with %s sites and %s overlapping ... \n"%(inputFname, noOfSitesPerUnit,\
 																		noOfOverlappingSites))
-		from pymodule.VCFFile import VCFFile
 		
 		vcfFile = VCFFile(inputFname=inputFname)
 		

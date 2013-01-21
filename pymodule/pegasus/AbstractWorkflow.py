@@ -77,7 +77,12 @@ class AbstractWorkflow(ADAG):
 		self.name = workflowName
 		
 		for pathName in self.pathToInsertHomePathList:
-			setattr(self, pathName, self.insertHomePath(getattr(self, pathName, None), self.home_path))
+			absPath = self.insertHomePath(getattr(self, pathName, None), self.home_path)
+			if absPath:
+				setattr(self, pathName, absPath)
+			else:
+				sys.stderr.write("Warning: %s has empty absolute path. Skip.\n"%(pathName))
+			
 		#self.pymodulePath = self.insertHomePath(self.pymodulePath, self.home_path)
 		#self.vervetSrcPath =  self.insertHomePath(self.vervetSrcPath, self.home_path)
 		
@@ -220,11 +225,15 @@ class AbstractWorkflow(ADAG):
 	
 	def insertHomePath(self, inputPath, home_path):
 		"""
+		2013.1.4 inputPath could be None
 		2012.5.23 copied from AbstractNGSWorkflow
 		2012.1.9
 		"""
-		if inputPath.find('%s')!=-1:
-			inputPath = inputPath%home_path
+		if inputPath:
+			if inputPath.find('%s')!=-1:
+				inputPath = inputPath%home_path
+		else:
+			inputPath = None
 		return inputPath
 	
 	def registerJars(self, workflow=None):
@@ -459,6 +468,11 @@ class AbstractWorkflow(ADAG):
 						site_handler))
 		executableClusterSizeMultiplierList.append((CalculatePairwiseDistanceOutOfSNPXStrainMatrix, 0.5))
 		
+		CalculateMedianMeanOfInputColumn = Executable(namespace=namespace, name="CalculateMedianMeanOfInputColumn", version=version, os=operatingSystem,\
+								arch=architecture, installed=True)
+		CalculateMedianMeanOfInputColumn.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/CalculateMedianMeanOfInputColumn"), site_handler))
+		executableClusterSizeMultiplierList.append((CalculateMedianMeanOfInputColumn, 1))
+		
 		SampleRows = Executable(namespace=namespace, name="SampleRows", version=version, \
 											os=operatingSystem, arch=architecture, installed=True)
 		SampleRows.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "statistics/SampleRows.py"), site_handler))
@@ -565,6 +579,7 @@ class AbstractWorkflow(ADAG):
 	
 	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName=""):
 		"""
+		2013.1.10 make sure the file is not registed with the workflow already
 		2012.3.22
 			add abspath attribute to file.
 		2012.3.1
@@ -579,7 +594,8 @@ class AbstractWorkflow(ADAG):
 		file.abspath = os.path.abspath(inputFname)
 		file.absPath = file.abspath
 		file.addPFN(PFN("file://" + file.abspath, input_site_handler))
-		workflow.addFile(file)
+		if not workflow.hasFile(file):	#2013.1.10
+			workflow.addFile(file)
 		return file
 	
 		
@@ -872,6 +888,40 @@ class AbstractWorkflow(ADAG):
 		for output in outputLs:
 			job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
 	
+	def addCalculateDepthMeanMedianModeJob(self, workflow=None, executable=None, \
+							inputFile=None, outputFile=None, alignmentID=None, fractionToSample=0.001, \
+							noOfLinesInHeader=0, whichColumn=2, maxNumberOfSamplings=1E7, inputStatName=None,\
+							parentJobLs=None, job_max_memory = 500, extraArguments=None, \
+							transferOutput=False, **keywords):
+		"""
+		2013.1.8 moved from vervet.src.alignment.InspectAlignmentPipeline and use addGenericJob()
+		2012.6.15 turn maxNumberOfSamplings into integer when passing it to the job
+		2012.5.7
+			a job to take input of samtoolsDepth
+		"""
+		extraArgumentList = []
+		if alignmentID is not None:
+			extraArgumentList.append("--alignmentID %s"%(alignmentID))
+		if noOfLinesInHeader is not None:
+			extraArgumentList.append("--noOfLinesInHeader %s"%(noOfLinesInHeader))
+		if fractionToSample is not None:
+			extraArgumentList.append("--fractionToSample %s"%(fractionToSample))
+		if whichColumn is not None:
+			extraArgumentList.append("--whichColumn %s"%(whichColumn))
+		if maxNumberOfSamplings is not None:
+			extraArgumentList.append('--maxNumberOfSamplings %d'%(maxNumberOfSamplings))
+		if inputStatName is not None:
+			extraArgumentList.append("--inputStatName %s"%(inputStatName))
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		job= self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, outputFile=outputFile, \
+				parentJobLs=parentJobLs, extraDependentInputLs=None, \
+				extraOutputLs=None,\
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=None, \
+				sshDBTunnel=None, job_max_memory=job_max_memory, **keywords)
+		return job
+	
 	def addDBArgumentsToOneJob(self, job=None, objectWithDBArguments=None):
 		"""
 		2012.8.17
@@ -1091,7 +1141,7 @@ class AbstractWorkflow(ADAG):
 		2012.10.16 added argument sshDBTunnel, objectWithDBArguments
 		2012.8.31 add argument missingDataNotation
 		#no spaces or parenthesis or any other shell-vulnerable letters in the x or y axis labels (whichColumnPlotLabel, xColumnPlotLabel)
-		2012.8.2
+		2012.8.2 (check AbstractMatrixFileWalker.py or AbstractPlot.py for updated arguments)
 			('outputFname', 0, ): [None, 'o', 1, 'output file for the figure.'],\
 			('minNoOfTotal', 1, int): [100, 'M', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
 			('title', 0, ): [None, 't', 1, 'title for the figure.'],\
@@ -1102,7 +1152,7 @@ class AbstractWorkflow(ADAG):
 			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
 			('whichColumnHeader', 0, ): ["", 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
 			('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
-			('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: -log(Y), 2: log(Y). replacing self.logWhichColumn.'],\
+			('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: log(), 2: -log(). replacing self.logWhichColumn.'],\
 			('valueForNonPositiveYValue', 1, float): [50, '', 1, 'if the whichColumn value is not postive and logWhichColumn is on,\
 					what yValue should be.'],\
 			('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\

@@ -28,6 +28,14 @@ class AbstractMapper(object):
 					('port', 0, ):[None, '', 1, 'database port number'],\
 					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
 					}
+	genome_db_option_dict = {
+					('genome_drivername', 1,):['postgresql', '', 1, 'which type of database is the genome database? mysql or postgresql', ],\
+					('genome_hostname', 1, ): ['uclaOffice', '', 1, 'hostname of the genome db server', ],\
+					('genome_dbname', 1, ): ['vervetdb', '', 1, 'genome database name', ],\
+					('genome_schema', 0, ): ['genome', '', 1, 'genome database schema name', ],\
+					('genome_db_user', 1, ): ['yh', '', 1, 'genome database username', ],\
+					('genome_db_passwd', 1, ): [None, '', 1, 'genome database password', ],\
+							}
 	option_default_dict = {
 						('inputFname', 0, ): ['', 'i', 1, 'input file.', ],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\

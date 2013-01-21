@@ -123,7 +123,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	def registerCommonExecutables(self, workflow=None):
 		"""
 		"""
-		AbstractNGSWorkflow.registerCommonExecutables(self, workflow)
+		AbstractNGSWorkflow.registerCommonExecutables(self, workflow=workflow)
 	
 	def registerAllInputFiles(self, workflow=None, inputDir=None, input_site_handler=None, \
 					checkEmptyVCFByReading=False, pegasusFolderName='',\

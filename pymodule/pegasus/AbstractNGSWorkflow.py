@@ -424,7 +424,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		2012.1.9
 			abstract function
 		"""
-		pass
+		AbstractWorkflow.registerCustomExecutables(self, workflow=workflow)
 	
 	
 	def addRefFastaFaiIndexJob(self, workflow=None, samtools=None, refFastaF=None, ):
