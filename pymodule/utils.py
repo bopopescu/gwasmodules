@@ -299,7 +299,7 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', 
 	inputIsFileObject = False
 	import gzip
 	if (isinstance(input_fname, str) or isinstance(input_fname, unicode)) and os.path.isfile(input_fname):
-		inf = open(input_fname)
+		inf = openGzipFile(input_fname)
 	elif isinstance(input_fname, file) or isinstance(input_fname, gzip.GzipFile) :	#could be a file/gzip-file object
 		inf = input_fname
 		inputIsFileObject = True
@@ -309,7 +309,7 @@ def figureOutDelimiter(input_fname, report=0, delimiter_choice_ls = ['\t', ',', 
 	else:
 		import sys
 		sys.stderr.write("Error: %s is neither a file name nor a file object. But try 'open' anyway.\n"%input_fname)
-		inf = open(input_fname)
+		inf = openGzipFile(input_fname)
 	if getattr(inf, 'readline', None) is not None and use_sniff:	#2008-01-08 don't use cs.sniff unless the user specifies it. 
 		#	sniff gives you unexpected delimiter when it's a single-column.
 		line = inf.readline()
@@ -934,7 +934,7 @@ def getNoOfLinesInOneFileByOpen(inputFname=None):
 
 	"""
 	counter = 0
-	inf = open(inputFname)
+	inf = openGzipFile(inputFname)
 	for line in inf:
 		counter += 1
 	return counter
