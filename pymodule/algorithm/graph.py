@@ -21,48 +21,72 @@ class GraphWrapper(Graph):
 		"""
 		Graph.__init__(self, data=None, **keywords)
 		
-	def trimOutOfSetLeafNodes(self, nodeIdSet=None):
+	def recursiveTrimOutOfSetLeafNodes(self, nodeIdSet=None, recursiveDepth=0, total_no_of_nodes_removed=0):
 		"""
 		2013.1.2
 			recursively remove all nodes with no out-degree.
 			for directed graph. nodes with out_degree=0 are leaf nodes.
 		"""
+		if recursiveDepth==0:
+			sys.stderr.write("Trimming leaf nodes that are not in given set (%s elements) ... \n"%\
+						(len(nodeIdSet)))
+		else:
+			sys.stderr.write("%sdepth=%s"%('\x08'*80, recursiveDepth))
 		no_of_nodes_removed = 0
 		for n in self.nodes():
 			if n not in nodeIdSet and self.out_degree(n)==0:
 				self.remove_node(n)
 				no_of_nodes_removed += 1
+		total_no_of_nodes_removed += no_of_nodes_removed
 		if no_of_nodes_removed>0:
-			self.trimOutOfSetLeafNodes(nodeIdSet=nodeIdSet)
-		
-	def removeUniDegreeNodes(self):
+			self.recursiveTrimOutOfSetLeafNodes(nodeIdSet=nodeIdSet, recursiveDepth=recursiveDepth+1,\
+											total_no_of_nodes_removed=total_no_of_nodes_removed)
+		else:
+			sys.stderr.write("\n %s nodes removed."%total_no_of_nodes_removed)
+		if recursiveDepth==0:
+			sys.stderr.write("\n")
+	
+	def recursiveRemoveUniDegreeNodes(self):
 		"""
 		2013.1.2
 			recursively remove all nodes whose degree (in + out) <= 1
 		"""
-		self.removeNodesByDegree(maxDegree=1)
+		self.recursiveRemoveNodesByDegree(maxDegree=1, recursiveDepth=0)
 	
-	def removeNodesByDegree(self, maxDegree=0):
+	def recursiveRemoveNodesByDegree(self, maxDegree=0, recursiveDepth=0, total_no_of_nodes_removed=0, report=False):
 		"""
 		2013.1.2
 			recursively remove all nodes whose degree (in + out) is below or equal to maxDegree 
 		"""
+		if report:
+			if recursiveDepth==0:
+				sys.stderr.write("Recursively remove nodes whose degree is <=%s ...\n"%maxDegree)
+			else:
+				sys.stderr.write("%sdepth=%s"%('\x08'*80, recursiveDepth))
 		no_of_nodes_removed = 0
 		for n in self.nodes():
 			if self.degree(n)<=maxDegree:
 				self.remove_node(n)
 				no_of_nodes_removed += 1
+		total_no_of_nodes_removed += no_of_nodes_removed
 		if no_of_nodes_removed>0:
-			self.removeNodesByDegree(maxDegree=maxDegree)
+			self.recursiveRemoveNodesByDegree(maxDegree=maxDegree, recursiveDepth=recursiveDepth+1,\
+											total_no_of_nodes_removed=total_no_of_nodes_removed)
+		elif report:	#final round
+				sys.stderr.write("\n %s nodes removed."%total_no_of_nodes_removed)
+		if recursiveDepth==0 and report:
+			sys.stderr.write("\n")
 	
 	def findAllLeafNodes(self):
 		"""
 		2013.1.3
 		"""
+		sys.stderr.write("Finding all leaf nodes ...")
 		nodeList = []
 		for n in self.nodes():
 			if self.out_degree(n)==0:
 				nodeList.append(n)
+		sys.stderr.write(" %s leaves \n"%(len(nodeList)))
 		return nodeList
 	
 	def calculateNodeHierarchyLevel(self):
@@ -70,7 +94,9 @@ class GraphWrapper(Graph):
 		2013.1.3
 			the hierarchy level for each node is the shortest path to all leaf nodes.
 		"""
+		
 		leafNodes = set(self.findAllLeafNodes())
+		sys.stderr.write("Calculating node hierarchy level ...")
 		node2HierarchyLevel = {}
 		#leaf nodes' hierarchy level=0
 		
@@ -90,6 +116,7 @@ class GraphWrapper(Graph):
 						#no path between source and target
 						pass
 				node2HierarchyLevel[source] = level
+		sys.stderr.write("%s nodes with hierarchy level.\n"%(len(node2HierarchyLevel)))
 		return node2HierarchyLevel
 	
 class DiGraphWrapper(GraphWrapper, DiGraph):
