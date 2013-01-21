@@ -9,7 +9,8 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import copy, csv, math
 import re
 from pymodule.ProcessOptions import  ProcessOptions
-from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData, getColName2IndexFromHeader
+from pymodule.utils import dict_map, importNumericArray, figureOutDelimiter, PassingData, getColName2IndexFromHeader,\
+	openGzipFile
 from pymodule.db import TableClass
 from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToYHTableInHDF5Group
 
@@ -46,9 +47,7 @@ def reverseComplement(inputSeqStr=""):
 	return my_dna.reverse_complement().tostring()
 
 #2008-05-12	a common NA set
-#from sets import Set
-Set = set	# 2010-4-15
-NA_set = Set([0, 'NA', 'N', -2, '|'])
+NA_set = set([0, 'NA', 'N', -2, '|'])
 
 # 2009-6-5 add lower-case letter to the dictionary
 nt2number = {'|': -2,	#2008-01-07 not even tried. 'N'/'NA' is tried but produces inconclusive result.
@@ -245,10 +244,8 @@ def RawSnpsData_ls2SNPData(rawSnpsData_ls, report=0, use_nt2number=0):
 		
 		combine all chromsomes together
 	"""
-	import sys
 	if report:
 		sys.stderr.write("Converting RawSnpsData_ls to SNPData ...")
-	from QC_250k import SNPData
 	nt_dict_map = lambda x: nt2number[x]
 	row_id_ls = []; col_id_ls=[]; data_matrix=[]
 	for i in range(len(rawSnpsData_ls)):
@@ -285,7 +282,6 @@ def transposeSNPData(snpData, report=0):
 	05/12/08 fix a bug (return snpData)
 	2008-05-11
 	"""
-	import sys
 	if report:
 		sys.stderr.write("Transposing SNPData ...")
 	from pymodule import importNumericArray, SNPData
@@ -330,7 +326,6 @@ def SNPData2RawSnpsData_ls(snpData, use_number2nt=1, need_transposeSNPData=0, re
 		
 		split into different chromsomes
 	"""
-	import sys
 	if report:
 		sys.stderr.write("Converting SNPData to RawSnpsData_ls ...")
 	from snpsdata import RawSnpsData
@@ -415,13 +410,11 @@ def write_data_matrix(data_matrix, output_fname, header, strain_acc_list, catego
 	2008-04-02
 		extracted from variation.src.FilterStrainSNPMatrix to be standalone.
 	"""
-	from sets import Set
-	import sys, csv
 	sys.stderr.write("Writing data_matrix to %s ..."%(output_fname))
 	if rows_to_be_tossed_out==None:
-		rows_to_be_tossed_out = Set()
+		rows_to_be_tossed_out = set()
 	if cols_to_be_tossed_out==None:
-		cols_to_be_tossed_out = Set()
+		cols_to_be_tossed_out = set()
 	
 	writer = csv.writer(open(output_fname, 'w'), delimiter=delimiter)
 	
@@ -529,7 +522,6 @@ def read_data(inputFname, input_alphabet=0, turn_into_integer=1, double_header=0
 	2007-10-09
 		add turn_into_integer
 	"""
-	import csv
 	sys.stderr.write("Reading data from %s ..."%inputFname)
 	if ignore_het:
 		nt2number_mapper = nt2number_without_het
@@ -542,7 +534,7 @@ def read_data(inputFname, input_alphabet=0, turn_into_integer=1, double_header=0
 			return x
 	if delimiter is None:
 		delimiter = figureOutDelimiter(inputFname)
-	reader = csv.reader(open(inputFname), delimiter=delimiter)
+	reader = csv.reader(openGzipFile(inputFname), delimiter=delimiter)
 	
 	header = reader.next()
 	# 2010-3-31 pick the columns according to col_id_key_set
@@ -1079,14 +1071,14 @@ class SNPData(object):
 		"""
 		sys.stderr.write("Removing rows whose mismatch_rate >%s ..."%(max_mismatch_rate))
 		if max_mismatch_rate>=0 and max_mismatch_rate<1:
-			row_id_wanted_set = Set()	#extra computing time a bit, but to save memory
+			row_id_wanted_set = set()	#extra computing time a bit, but to save memory
 			for row_id in snpData.row_id_ls:
 				if row_id in row_id2NA_mismatch_rate and row_id2NA_mismatch_rate[row_id][1]<=max_mismatch_rate and row_id2NA_mismatch_rate[row_id][1]>=0:
 					row_id_wanted_set.add(row_id)
 		elif max_mismatch_rate>=1:	#every row is wanted
-			row_id_wanted_set = Set(snpData.row_id_ls)
+			row_id_wanted_set = set(snpData.row_id_ls)
 		else:
-			row_id_wanted_set = Set()
+			row_id_wanted_set = set()
 		no_of_rows = len(row_id_wanted_set)
 		row_index_ls = []
 		for i in range(len(snpData.row_id_ls)):
@@ -1110,14 +1102,12 @@ class SNPData(object):
 		"""
 		sys.stderr.write("Removing rows whose NA_rate >%s ..."%(max_NA_rate))
 		if max_NA_rate<1 and max_NA_rate>=0:
-			from FilterStrainSNPMatrix import FilterStrainSNPMatrix
-			remove_rows_data = FilterStrainSNPMatrix.remove_rows_with_too_many_NAs(snpData.data_matrix, max_NA_rate, is_cutoff_max=1)
-		
+			remove_rows_data = cls._remove_rows_with_too_many_NAs(snpData.data_matrix, max_NA_rate, is_cutoff_max=1)
 			rows_with_too_many_NAs_set = remove_rows_data.rows_with_too_many_NAs_set
 		elif max_NA_rate>=1:	#no row has too many NA sets
-			rows_with_too_many_NAs_set = Set()
+			rows_with_too_many_NAs_set = set()
 		else:
-			rows_with_too_many_NAs_set = Set(range(len(snpData.row_id_ls)))
+			rows_with_too_many_NAs_set = set(range(len(snpData.row_id_ls)))
 		row_index_ls = []
 		for i in range(len(snpData.row_id_ls)):
 			row_id = snpData.row_id_ls[i]
@@ -1308,14 +1298,14 @@ class SNPData(object):
 		"""
 		sys.stderr.write("Removing cols whose mismatch_rate >%s ..."%(max_mismatch_rate))
 		if max_mismatch_rate>=0 and max_mismatch_rate<1:
-			col_id_wanted_set = Set()	#extra computing time a bit, but to save memory
+			col_id_wanted_set = set()	#extra computing time a bit, but to save memory
 			for col_id in snpData.col_id_ls:
 				if col_id in col_id2NA_mismatch_rate and col_id2NA_mismatch_rate[col_id][1]<=max_mismatch_rate and col_id2NA_mismatch_rate[col_id][1]>=0:
 					col_id_wanted_set.add(col_id)
 		elif max_mismatch_rate>=1:
-			col_id_wanted_set = Set(snpData.col_id_ls)
+			col_id_wanted_set = set(snpData.col_id_ls)
 		else:
-			col_id_wanted_set = Set()
+			col_id_wanted_set = set()
 		
 		no_of_cols = len(col_id_wanted_set)
 		no_of_rows = len(snpData.row_id_ls)
@@ -1335,6 +1325,103 @@ class SNPData(object):
 	
 	
 	@classmethod
+	def _remove_rows_with_too_many_NAs(cls, data_matrix, row_cutoff, cols_with_too_many_NAs_set=None, NA_set=set([0, -2]), \
+									debug=0, is_cutoff_max=0):
+		"""
+		2013.1.16 moved from variation/src/qc/FilterStrainSNPMatrix
+		2008-05-19
+			if is_cutoff_max=1, anything > row_cutoff is deemed as having too many NAs
+			if is_cutoff_max=0 (cutoff is minimum), anything >= row_cutoff is deemed as having too many NAs
+		2008-05-12
+			made more robust
+			add cols_with_too_many_NAs_set
+			add NA_set
+		2008-05-08
+			become classmethod
+		"""
+		sys.stderr.write("Removing rows with NA rate >= %s ..."%(row_cutoff))
+		no_of_rows, no_of_cols = data_matrix.shape
+		rows_with_too_many_NAs_set = set()
+		total_cols_set = set(range(no_of_cols))
+		if cols_with_too_many_NAs_set:
+			cols_to_be_checked = total_cols_set - cols_with_too_many_NAs_set
+		else:
+			cols_to_be_checked = total_cols_set
+		row_index2no_of_NAs = {}
+		for i in range(no_of_rows):
+			no_of_NAs = 0.0
+			for j in cols_to_be_checked:
+				if data_matrix[i][j] in NA_set:
+					no_of_NAs += 1
+			if no_of_cols!=0:
+				NA_ratio = no_of_NAs/no_of_cols
+			else:
+				NA_ratio = 0.0
+			row_index2no_of_NAs[i] = NA_ratio
+			if is_cutoff_max:
+				if NA_ratio > row_cutoff:
+					rows_with_too_many_NAs_set.add(i)
+			else:
+				if NA_ratio >= row_cutoff:
+					rows_with_too_many_NAs_set.add(i)
+		if debug:
+			print
+			print 'rows_with_too_many_NAs_set'
+			print rows_with_too_many_NAs_set
+		passingdata = PassingData(rows_with_too_many_NAs_set=rows_with_too_many_NAs_set)
+		passingdata.row_index2no_of_NAs = row_index2no_of_NAs
+		sys.stderr.write("%s strains removed, done.\n"%len(rows_with_too_many_NAs_set))
+		return passingdata
+	
+	@classmethod
+	def _remove_cols_with_too_many_NAs(cls, data_matrix, col_cutoff, rows_with_too_many_NAs_set=None, NA_set=set([0, -2]), \
+									debug=0, is_cutoff_max=0):
+		"""
+		2013.1.16 moved from variation/src/qc/FilterStrainSNPMatrix
+		2008-05-19
+			if is_cutoff_max=1, anything > row_cutoff is deemed as having too many NAs
+			if is_cutoff_max=0 (cutoff is minimum), anything >= row_cutoff is deemed as having too many NAs
+		2008-05-12
+			classmethod
+			more robust, standardize
+			add NA_set
+		"""
+		sys.stderr.write("Removing columns with NA rate>=%s ..."%col_cutoff)
+		no_of_rows, no_of_cols = data_matrix.shape
+		cols_with_too_many_NAs_set = set()
+		total_rows_set = set(range(no_of_rows))
+		if rows_with_too_many_NAs_set:
+			rows_to_be_checked = total_rows_set - rows_with_too_many_NAs_set
+		else:
+			rows_to_be_checked = total_rows_set
+		
+		col_index2no_of_NAs = {}
+		
+		for j in range(no_of_cols):
+			no_of_NAs = 0.0
+			for i in rows_to_be_checked:
+				if data_matrix[i][j] in NA_set:
+					no_of_NAs += 1
+			if no_of_rows!=0:
+				NA_ratio = no_of_NAs/no_of_rows
+			else:
+				NA_ratio = 0.0
+			col_index2no_of_NAs[j] = NA_ratio
+			if is_cutoff_max:
+				if NA_ratio > col_cutoff:
+					cols_with_too_many_NAs_set.add(j)
+			else:
+				if NA_ratio >= col_cutoff:
+					cols_with_too_many_NAs_set.add(j)
+		if debug:
+			print
+			print 'cols_with_too_many_NAs_set'
+			print cols_with_too_many_NAs_set
+		passingdata = PassingData(cols_with_too_many_NAs_set=cols_with_too_many_NAs_set, col_index2no_of_NAs=col_index2no_of_NAs)
+		sys.stderr.write("%s cols removed, done.\n"%(len(cols_with_too_many_NAs_set)))
+		return passingdata
+	
+	@classmethod
 	def removeColsByNARate(cls, snpData, max_NA_rate=1):
 		"""
 		2010-2-2
@@ -1347,13 +1434,12 @@ class SNPData(object):
 		"""
 		sys.stderr.write("Removing cols whose NA_rate >%s ..."%(max_NA_rate))
 		if max_NA_rate<1 and max_NA_rate>=0:
-			from FilterStrainSNPMatrix import FilterStrainSNPMatrix
-			remove_cols_data = FilterStrainSNPMatrix.remove_cols_with_too_many_NAs(snpData.data_matrix, max_NA_rate, is_cutoff_max=1)			
+			remove_cols_data = cls._remove_cols_with_too_many_NAs(snpData.data_matrix, max_NA_rate, is_cutoff_max=1)
 			cols_with_too_many_NAs_set = remove_cols_data.cols_with_too_many_NAs_set
 		elif max_NA_rate>=1:
-			cols_with_too_many_NAs_set = Set()
+			cols_with_too_many_NAs_set = set()
 		else:
-			cols_with_too_many_NAs_set = Set(range(len(snpData.col_id_ls)))
+			cols_with_too_many_NAs_set = set(range(len(snpData.col_id_ls)))
 		
 		no_of_cols = len(snpData.col_id_ls)-len(cols_with_too_many_NAs_set)
 		no_of_rows = len(snpData.row_id_ls)
@@ -1372,7 +1458,7 @@ class SNPData(object):
 		return newSnpData
 	
 	@classmethod
-	def removeColsByMAF(cls, snpData, min_MAF=1, NA_set =Set([0, 'NA', 'N', -2, '|'])):
+	def removeColsByMAF(cls, snpData, min_MAF=1, NA_set =set([0, 'NA', 'N', -2, '|'])):
 		"""
 		2012.2.29
 			added the NA_set argument
@@ -1428,7 +1514,7 @@ class SNPData(object):
 		return newSnpData
 	
 	@classmethod
-	def removeMonomorphicCols(cls, snpData, NA_set =Set([0, 'NA', 'N', -2, '|'])):
+	def removeMonomorphicCols(cls, snpData, NA_set =set([0, 'NA', 'N', -2, '|'])):
 		"""
 		2012.2.29
 			added the NA_set argument
@@ -1438,10 +1524,10 @@ class SNPData(object):
 		"""
 		sys.stderr.write("Removing monomorphic cols ...")
 		no_of_rows, no_of_cols = snpData.data_matrix.shape
-		#NA_set = Set([0,-1,-2])
+		#NA_set = set([0,-1,-2])
 		col_index_wanted_ls = []
 		for j in range(no_of_cols):
-			non_negative_number_set = Set()
+			non_negative_number_set = set()
 			for i in range(no_of_rows):
 				number = snpData.data_matrix[i][j]
 				if number not in NA_set:
@@ -1557,7 +1643,7 @@ class SNPData(object):
 		no_of_rows, no_of_cols = snpData.data_matrix.shape
 		col_index_wanted_ls = []
 		for j in range(no_of_cols):
-			allele_set = Set(snpData.data_matrix[:,j])
+			allele_set = set(snpData.data_matrix[:,j])
 			if 0 in allele_set:	#remove NA if it's there
 				allele_set.remove(0)
 			if -2 in allele_set:	#remove -2 as well
@@ -1662,7 +1748,7 @@ class SNPData(object):
 		return LD.calLD(self.data_matrix[:, snp1_index], self.data_matrix[:, snp2_index])
 		
 	
-	def calRowPairwiseDist(self, NA_set =Set([0, 'NA', 'N', -2, '|']), ref_row_id=None, assumeBiAllelic=False,
+	def calRowPairwiseDist(self, NA_set =set([0, 'NA', 'N', -2, '|']), ref_row_id=None, assumeBiAllelic=False,
 						outputFname=None, hetHalfMatchDistance=0.5):
 		"""
 		2011-10-20
@@ -1738,7 +1824,7 @@ class SNPData(object):
 		del writer
 		sys.stderr.write("Done.\n")
 	
-	def calFractionOfLociCarryingNonRefAllelePerRow(self, ref_allele=0, NA_set =Set([0, 'NA', 'N', -2, '|'])):
+	def calFractionOfLociCarryingNonRefAllelePerRow(self, ref_allele=0, NA_set =set([0, 'NA', 'N', -2, '|'])):
 		"""
 		2010-10-23
 			for example, after the SNP alleles are converted into bi-allelic, 0 is ancestral, 1 is derived,
@@ -1767,7 +1853,7 @@ class SNPData(object):
 		sys.stderr.write("Done.\n")
 		return row_id2fractionData
 	
-	def convertSNPAllele2Index(self, report=0):
+	def convertSNPAllele2Index(self, report=0, **keywords):
 		"""
 		2008-12-03
 			set in_major_minor_order to True
@@ -1780,7 +1866,7 @@ class SNPData(object):
 			Convert SNP matrix into index (0,1,2...) is assigned as first-encounter, first-assign. if only two alleles, it's binary.
 			heterozygote is regarded as a different allele.
 		"""
-		return self.convert2Binary(report=report, in_major_minor_order=True)
+		return self.convert2Binary(report=report, in_major_minor_order=True, **keywords)
 	
 	def getRowIndexGivenRowID(self, row_id=None, row_key_index=0, ):
 		"""
@@ -2011,7 +2097,7 @@ class SNPData(object):
 				allele2 = allele_index2allele[1]
 				if allele2count_ls[j][allele1]<allele2count_ls[j][allele2]:	#minor allele got assigned the smaller number, reverse it
 					#reverse the index. won't affect num.nan but will if NA_notation is 0 (or some other numeric value).
-					if NA_notation!=num.nan and not NA_notation_report:
+					if NA_notation is not num.nan and not NA_notation_report:	#2013.1.7 replace "!=" with "is not " 
 						sys.stderr.write("\t Warning: switch the notation of major & minor alleles but NA_notation is %s, not num.nan.\n"%NA_notation)
 						NA_notation_report = True
 					newSnpData.data_matrix[:,j] = num.abs(newSnpData.data_matrix[:,j]-1-alleleStartingIndex)+alleleStartingIndex
@@ -2135,7 +2221,7 @@ class GenomeWideResult(object):
 	chr2no_of_snps = None
 	
 	def __init__(self, construct_data_obj_id2index=True, construct_chr_pos2index=False, construct_locus_db_id2index=False,\
-				name=None, base_value = 0):
+				name=None, base_value = 0, do_log10_transformation=None):
 		"""
 		2009-4-24
 		2008-10-30
@@ -2147,6 +2233,8 @@ class GenomeWideResult(object):
 		self.construct_locus_db_id2index = construct_locus_db_id2index	#2012.11.20 
 		self.name = name
 		self.base_value = base_value
+		self.do_log10_transformation = do_log10_transformation
+		
 		self.chr2min_max_pos = {}
 		# 2010-3-9 initialize these two here
 		self.data_obj_ls = []	#list and dictionary are crazy references.
@@ -2555,21 +2643,20 @@ class GenomeWideResult(object):
 		del d1, f1
 		sys.stderr.write(" %s data points\n"%(len(self.data_obj_ls)))
 	
-	def _extractOutputRowFromDataObject(self, data_obj=None):
+	def _massageDataObject(self, data_obj=None):
 		"""
-		2012.12.18
-			add genotype_var_perc
+		2013.1.9 extend the dimension of beta_list beta_pvalue_list to 5-element
 		"""
-		row = (data_obj.db_id, data_obj.chromosome, data_obj.start, data_obj.stop, data_obj.value, \
-									data_obj.mac, data_obj.maf, data_obj.genotype_var_perc)
-		return row
+		data_obj.trimListTypeAttributeToGivenLength(attributeName='beta_list', noOfElementsRequired=5)
+		data_obj.trimListTypeAttributeToGivenLength(attributeName='beta_pvalue_list', noOfElementsRequired=5)
+		return data_obj
 	
 	def outputInHDF5MatrixFile(self, writer=None, filename=None, tableName='association', tableObject=None, closeFile = True, attributeDict=None,\
 							outputFileType=1):
 		"""
 		2012.12.21 added argument tableObject, which has precedence over writer, filename, tableName
 		2012.12.16 added argument outputFileType
-			1: PyTablesMatrixFile
+			1: YHPyTables.YHFile
 			2: HDF5MatrixFile
 		2012.11.22 added attributeDict
 		2012.11.19
@@ -2594,21 +2681,23 @@ class GenomeWideResult(object):
 			else:
 				sys.stderr.write("Error: no writer(%s) or filename(%s) to dump.\n"%(writer, filename))
 				sys.exit(3)
-		
-		addAttributeDictToYHTableInHDF5Group(tableObject=tableObject, attributeDict=attributeDict)
+		if attributeDict:
+			addAttributeDictToYHTableInHDF5Group(tableObject=tableObject, attributeDict=attributeDict)
 		if self.results_method_id:
 			tableObject.addAttribute(name='result_id', value=self.results_method_id)
+		if getattr(self, 'do_log10_transformation', None) is not None:	#2013.1.11
+			tableObject.addAttribute(name='do_log10_transformation', value=self.do_log10_transformation)
 		if self.name:
 			tableObject.addAttribute(name='name', value=self.name)
 		cellList = []
 		for data_obj in self.data_obj_ls:
-			dataTuple = self._extractOutputRowFromDataObject(data_obj=data_obj)
-			cellList.append(dataTuple)
+			data_obj = self._massageDataObject(data_obj=data_obj)
+			cellList.append(data_obj)
 		
 		if tableObject is None:
 			sys.stderr.write("Error: tableObject (name=%s) is None. could not write.\n"%(tableName))
 			sys.exit(3)
-		tableObject.writeCellList(cellList)
+		tableObject.writeCellList(cellList, cellType=2)
 		if closeFile and writer is not None:
 			writer.close()
 		sys.stderr.write("%s objects.\n"%(len(cellList)))
@@ -2678,30 +2767,56 @@ class DataObject(object):
 		2010-4-15
 			add target_seq_id, target_start, target_stop
 		"""
+		#both db_id and locus_id is same
 		self.db_id = None
+		self.locus_id = None
+		
 		self.chromosome = None
-		self.position = None
-		self.stop_position = None
+		
+		self.position = None	#both are same
+		self.start = None
+		
+		self.stop_position = None	#both are same
+		self.stop = None
 		
 		self.target_seq_id = None
 		self.target_start = None
 		self.target_stop = None
 		self.name = None
+		
 		self.value = None
+		self.score = None
 		self.genome_wide_result_id = None
 		self.genome_wide_result_name = None
 		self.maf = None
 		self.mac = None
 		self.genotype_var_perc = None
 		self.extra_col_ls = []
+		self.beta_list = []	#2013.1.9
+		self.beta_pvalue_list = []	#2013.1.9
+		
 		self.comment = None
 		for key, value in keywords.iteritems():
 			setattr(self, key, value)
 		
 		#2012.11.18 convenient purpose
-		self.start = self.position
-		self.stop = self.stop_position
+		self._makeTwoAttributesSameValue('db_id', 'locus_id')
+		self._makeTwoAttributesSameValue('position', 'start')
+		self._makeTwoAttributesSameValue('stop_position', 'stop')
+		self._makeTwoAttributesSameValue('value', 'score')
+		
 		self.index = None
+	
+	def _makeTwoAttributesSameValue(self, attribute1Name=None, attribute2Name=None):
+		"""
+		2013.1.9
+		"""
+		attribute1Value = getattr(self, attribute1Name, None)
+		attribute2Value = getattr(self, attribute2Name, None)
+		if attribute1Value is not None and attribute2Value is None:
+			setattr(self, attribute2Name, attribute1Value)
+		elif attribute1Value is None and attribute2Value is not None:
+			setattr(self, attribute1Name, attribute2Value)
 	
 	def __cmp__(self, other):
 		"""
@@ -2731,6 +2846,18 @@ class DataObject(object):
 		if self.comment:
 			output_str += "\tcomment: %s\n"%(self.comment)
 		return output_str
+	
+	def trimListTypeAttributeToGivenLength(self, attributeName=None, noOfElementsRequired=None, defaultValue=-1):
+		"""
+		2013.1.9
+		"""
+		attributeValue = getattr(self, attributeName, None)
+		if isinstance(attributeValue, list):
+			noOfElements = len(attributeValue)
+			if noOfElements<noOfElementsRequired:
+				setattr(self, attributeName, attributeValue + [defaultValue]*(noOfElementsRequired-noOfElements))
+			elif noOfElements>noOfElementsRequired:
+				setattr(self, attributeName, attributeValue[:noOfElementsRequired])
 	
 	@property
 	def stopPosition(self):
@@ -2848,6 +2975,7 @@ def getGenomeWideResultFromFile(inputFname=None, min_value_cutoff=None, do_log10
 						construct_data_obj_id2index=construct_data_obj_id2index)
 	gwr.data_obj_ls = []	#list and dictionary are crazy references.
 	gwr.data_obj_id2index = {}
+	gwr.do_log10_transformation = do_log10_transformation	#2013.1.11
 	genome_wide_result_id = id(gwr)
 	delimiter = figureOutDelimiter(inputFname)
 	reader = csv.reader(open(inputFname), delimiter=delimiter)
@@ -2959,18 +3087,28 @@ def getGenomeWideResultFromFile(inputFname=None, min_value_cutoff=None, do_log10
 				
 			if column_6 is not None: 
 				#If file has a header, then use that, otherwise guess it's genotype_var_perc
-				if header:
+				if header and len(header)>5:
 					setattr(data_obj, header[5],column_6)
 				else:
 					data_obj.genotype_var_perc = column_6
 			if rest_of_row:
+				for beta_pvalue in rest_of_row:
+					beta_pvalue = beta_pvalue.split(':')
+					if len(beta_pvalue)>0:
+						beta = beta_pvalue[0]
+						data_obj.beta_list.append(float(beta))
+					if len(beta_pvalue)>1:
+						pvalue = beta_pvalue[1]
+						data_obj.beta_pvalue_list.append(float(pvalue))
+				
 				data_obj.extra_col_ls = rest_of_row
 				data_obj.comment = ','.join(rest_of_row)
-				if header:
+				"""
+				if header:	#setting the betas
 					for i in range(len(rest_of_row)):
 						col_name = header[i+6]
 						setattr(data_obj, col_name, rest_of_row[i])
-			
+				"""
 			data_obj.genome_wide_result_id = genome_wide_result_id
 			data_obj.genome_wide_result_name = gwr.name	# 2010-3-15
 			gwr.add_one_data_obj(data_obj, chr_pos2index)
@@ -3042,6 +3180,7 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableNam
 							chr_pos2index=None, max_value_cutoff=None, \
 							OR_min_max=False, report=True, inputFileType=1, **keywords):
 	"""
+	2013.1.15 maf or mac =-1 means NA.
 	2012.12.16 added argument inputFileType
 			1: AssociationTableFile
 			2: HDF5MatrixFile
@@ -3081,7 +3220,7 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableNam
 	min_MAC_request = getattr(pdata, 'min_MAC', None)	#2009-1-29
 	
 	if report:
-		sys.stderr.write("Getting genome wide result from %s ... "%inputFname)
+		sys.stderr.write("Getting genome wide result from file=%s, table=%s ... "%(inputFname, tableName))
 	
 	gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=construct_chr_pos2index, \
 						construct_data_obj_id2index=construct_data_obj_id2index, \
@@ -3096,7 +3235,7 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableNam
 		if reader is None:
 			if inputFileType==1:
 				from pymodule.yhio.Association import AssociationTableFile
-				reader = AssociationTableFile(inputFname, openMode='r')
+				reader = AssociationTableFile(inputFname, openMode='r', autoRead=False)
 			else:
 				reader = HDF5MatrixFile(inputFname, openMode='r')
 		associationTableObject = reader.getTableObject(tableName=tableName)
@@ -3104,7 +3243,7 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableNam
 	for attributeName, value in associationTableObject.getAttributes().iteritems():
 		setattr(gwr, attributeName, value)
 	gwr.setResultID(associationTableObject.getAttribute('result_id'))
-	
+	gwr.do_log10_transformation = do_log10_transformation	#2013.1.11
 	no_of_lines = 0
 	for row in associationTableObject:
 		#2011-3-10 initialize all variables
@@ -3126,18 +3265,22 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableNam
 					stop_pos = chr_pos[2]
 		
 		score = row['score']
-		MAC = row['MAC']
-		MAF = row['MAF']
+		mac = row['mac']
+		maf = row['maf']
 		genotype_var_perc = row['genotype_var_perc']
+		if chromosome=='' or chromosome is None:	#2013.1.13 invalid loci
+			continue
 		if chromosome_request!=None and chromosome!=chromosome_request:
+			continue
+		if start_pos<=0 or start_pos is None:	#2013.1.13 invalid loci
 			continue
 		if start_request!=None and start_pos<start_request:
 			continue
 		if stop_request!=None and start_pos>stop_request:
 			continue
-		if min_MAF_request!=None and MAF!=None and MAF<min_MAF_request:	#MAF too small
+		if min_MAF_request!=None and maf!=None and maf!=-1 and maf<min_MAF_request:	#maf too small	-1 is NA.
 			continue
-		if min_MAC_request!=None and MAC!=None and MAC<min_MAC_request:	#2009-1-29 MAC too small
+		if min_MAC_request!=None and mac!=None and mac!=-1 and mac<min_MAC_request:	#2009-1-29 mac too small. -1 is NA
 			continue
 		if do_log10_transformation:
 			if score<=0:
@@ -3177,7 +3320,7 @@ def getGenomeWideResultFromHDF5MatrixFile(inputFname=None, reader=None, tableNam
 					stop_pos = new_chr_start_stop[2]
 		if include_the_data_point:
 			data_obj = DataObject(db_id=db_id, chromosome=chromosome, position=start_pos, stop_position=stop_pos, value =score,
-								maf=MAF, mac=MAC, genotype_var_perc=genotype_var_perc)
+								maf=maf, mac=mac, genotype_var_perc=genotype_var_perc)
 			data_obj.genome_wide_result_id = genome_wide_result_id
 			data_obj.genome_wide_result_name = gwr.name
 			gwr.add_one_data_obj(data_obj, chr_pos2index)
