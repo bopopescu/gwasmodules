@@ -174,6 +174,7 @@ class YHTable(tables.Table, YHTableInHDF5Group):
 	
 	def writeOneCell(self, oneCell=None, cellType=1):
 		"""
+		#2013.1.9 make sure enough columns in oneCell
 		2012.12.16
 			each cell is either a tuple/list or object with column-name attributes
 			cellType
@@ -194,13 +195,24 @@ class YHTable(tables.Table, YHTableInHDF5Group):
 						cellColIndex = i-1					#oneCell does not include id
 					else:	#no "id" column, so same index
 						cellColIndex = i
-					row[colname] = oneCell[cellColIndex]
+					if cellColIndex<len(oneCell):	#2013.1.9 make sure enough columns in oneCell
+						value = oneCell[cellColIndex]
+					else:
+						continue
 				elif cellType==2:	#object with attributes
-					row[colname] = getattr(oneCell, colname, None)
+					value = getattr(oneCell, colname, None)
 				elif cellType==3:	#dictionary
-					row[colname] = oneCell.get(colname, None)
+					value = oneCell.get(colname, None)
+				if value is not None:
+					row[colname] = value
 		row.append()
-
+	
+	def appendOneRow(self, oneCell=None, cellType=1):
+		"""
+		2013.1.9
+		"""
+		self.writeOneCell(oneCell=oneCell, cellType=cellType)
+	
 	def writeCellList(self, cellList=None, cellType=1):
 		"""
 		"""
@@ -394,7 +406,9 @@ class YHFile(tables.File, HDF5MatrixFile):
 	"""
 	def __init__(self, inputFname=None, openMode='r', \
 				tableName=None, groupNamePrefix='group', tableNamePrefix='table',\
-				rowDefinition=None, filters=None, debug=0, report=0, **keywords):
+				rowDefinition=None, filters=None, expectedrows=500000, \
+				autoRead=True, autoWrite=True, \
+				debug=0, report=0, **keywords):
 		self.inputFname = inputFname
 		self.header = None
 		self.openMode = openMode
@@ -402,6 +416,9 @@ class YHFile(tables.File, HDF5MatrixFile):
 		self.groupNamePrefix = groupNamePrefix
 		self.tableNamePrefix = tableNamePrefix
 		self.rowDefinition = rowDefinition
+		self.expectedrows = expectedrows
+		self.autoRead = autoRead	#whether to automatically read in data if openMode is in reading mode
+		self.autoWrite = autoWrite	#whether to automatically create table objects if openMode is in writing mode
 		
 		self.debug = debug
 		self.report = report
@@ -421,10 +438,13 @@ class YHFile(tables.File, HDF5MatrixFile):
 		tables.File.__init__(self, self.inputFname, mode=self.openMode, title='', rootUEP='/', filters=filters,\
 							**keywords)
 		
-		if self.openMode=='r':
-			self._readInData()
-		elif self.openMode=='w' and self.rowDefinition is not None:
-			self.createNewTable(tableName=self.tableName, rowDefinition=self.rowDefinition)
+		if self.openMode=='r' or self.openMode=='a':
+			self._setupCombinedColumnIDMapper()
+			if self.autoRead:
+				self._readInData(tableName=self.tableName)
+		
+		if self.autoWrite and self.openMode=='w' and self.rowDefinition is not None:
+			self.createNewTable(tableName=self.tableName, rowDefinition=self.rowDefinition, expectedrows=self.expectedrows)
 		
 		self._c_classId = self.__class__.__name__
 	
@@ -605,11 +625,11 @@ class YHFile(tables.File, HDF5MatrixFile):
 			tableName = "%s%s"%(tableNamePrefix, i)
 		return tableName
 	
-	def _readInData(self):
+	def _readInData(self, tableName=None, tableObject=None):
 		"""
 		2012.12.16
 		"""
-		self._setupCombinedColumnIDMapper()
+		pass
 	
 	def _setupCombinedColumnIDMapper(self,):
 		"""
@@ -750,6 +770,13 @@ class YHFile(tables.File, HDF5MatrixFile):
 			row[colname] = oneCell[i]
 		row.append()
 		"""
+	
+	def appendOneRow(self, oneCell=None, tableIndex=None, tableName=None, cellType=1):
+		"""
+		2013.1.9
+		"""
+		self.writeOneCell(oneCell=oneCell, tableIndex=tableIndex, tableName=tableName, cellType=cellType)
+	
 	def writeCellList(self, cellList=None, tableIndex=None, tableName=None, cellType=1):
 		"""
 		"""

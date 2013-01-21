@@ -15,6 +15,8 @@ import numpy
 from pymodule.utils import PassingData, PassingDataList
 from pymodule.ProcessOptions import  ProcessOptions
 from pymodule.yhio.YHPyTables import YHTable, YHFile, castPyTablesRowIntoPassingData
+from pymodule.algorithm.RBTree import RBDict
+from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 from AssociationPeak import AssociationPeakTable
 
 class AssociationLocusTable(tables.IsDescription):
@@ -51,39 +53,48 @@ class AssociationLocusTableFile(YHFile):
 	"""
 	def __init__(self, inputFname=None, openMode='r', \
 				tableName='association_locus', groupNamePrefix='group', tableNamePrefix='table',\
-				filters=None, locus2PeakTableName='association_locus2peak', locusPadding=0, constructLocusRBDict=True,\
+				filters=None, autoRead=True, autoWrite=True, \
+				locus2PeakTableName='association_locus2peak', locusPadding=0, constructLocusRBDict=True,\
 				**keywords):
 		
-		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
-				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
-				rowDefinition=None, filters=filters, debug=0, report=0)
-		
+		self.constructLocusRBDict = constructLocusRBDict
 		self.locus2PeakTableName = locus2PeakTableName
 		self.locusPadding = locusPadding
 		self.associationLocusRBDict = None
-		if openMode=='r':
+		
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=None, filters=filters, debug=0, report=0,\
+				autoRead=False, autoWrite=False)
+		
+		#to overwrite self.autoRead that is set by YHFile.__init__
+		self.autoRead = autoRead
+		self.autoWrite = autoWrite
+		
+		if self.autoRead and (self.openMode=='r' or self.openMode=='a'):
 			self.associationLocusTable = self.getTableObject(tableName=self.tableName)
 			self.associationLocus2PeakTable = self.getTableObject(tableName=self.locus2PeakTableName)
-			if constructLocusRBDict:
-				self.associationLocusRBDict = self._constructAssociationLocusRBDict(tableObject=self.associationLocusTable, locusPadding=self.locusPadding)
+			if self.constructLocusRBDict:
+				self.associationLocusRBDict = self._readInData(tableName=self.tableName, tableObject=self.associationLocusTable)
 		elif openMode == 'w':
 			self.associationLocusTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationLocusTable,\
 													expectedrows=50000)
 			self.associationLocus2PeakTable = self.createNewTable(tableName=self.locus2PeakTableName, \
 													rowDefinition=AssociationLocus2PeakTable, expectedrows=500000)
-
 	
-	def _constructAssociationLocusRBDict(self, tableObject=None, locusPadding=0):
+	def _readInData(self, tableName=None, tableObject=None):
 		"""
 		2012.11.25
 			similar to constructAssociationPeakRBDictFromHDF5File
 		"""
-		from pymodule.algorithm.RBTree import RBDict
-		from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+		YHFile._readInData(self, tableName=tableName, tableObject=tableObject)
+		if not self.constructLocusRBDict:
+			return
 		
+		locusPadding = self.locusPadding
 		sys.stderr.write("Constructing association-locus RBDict (locusPadding=%s) ..."%(locusPadding))
 		if tableObject is None:
-			tableObject = self.associationLocusTable
+			tableObject = self.getTableObject(tableName=tableName)
 		associationLocusRBDict = RBDict()
 		associationLocusRBDict.locusPadding = locusPadding
 		associationLocusRBDict.HDF5AttributeNameLs = []

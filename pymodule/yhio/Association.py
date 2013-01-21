@@ -10,62 +10,186 @@ import numpy
 import networkx as nx
 from pymodule.utils import PassingData
 from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile, addAttributeDictToYHTableInHDF5Group
-from pymodule.yhio.YHPyTables import YHTable, YHFile
+from pymodule.yhio.YHPyTables import YHTable, YHFile, castPyTablesRowIntoPassingData
 from pymodule.yhio.SNP import getGenomeWideResultFromHDF5MatrixFile
 
 import tables
-from tables import UInt64Col, Float64Col, StringCol
+from tables import UInt64Col, Float64Col, StringCol, Int64Col
 
 class AssociationTable(tables.IsDescription):
 	"""
 	2012.12.18 pytable class to store the genome-wide association result
 	"""
 	id = UInt64Col(pos=0)
-	locus_id = UInt64Col(pos=1)
-	chromosome = StringCol(64, pos=2)	#64 byte-long
-	start = UInt64Col(pos=3)
-	stop = UInt64Col(pos=4)
-	score = Float64Col(pos=5)
-	MAC = UInt64Col(pos=6)
-	MAF = Float64Col(pos=7)
-	genotype_var_perc = Float64Col(pos=8)
+	locus_id = UInt64Col(pos=1, dflt=0)
+	chromosome = StringCol(64, pos=2, dflt='')	#64 byte-long
+	start = UInt64Col(pos=3, dflt=0)
+	stop = UInt64Col(pos=4, dflt=0)
+	score = Float64Col(pos=5, dflt=-1)
+	mac = Int64Col(pos=6, dflt=-1)
+	maf = Float64Col(pos=7, dflt=-1)
+	genotype_var_perc = Float64Col(pos=8, dflt=-1)
+	beta_list = Float64Col(shape=(5,), pos=9, dflt=-1)	#2013.1.9
+	beta_pvalue_list = Float64Col(shape=(5,), pos=9, dflt=-1)
 
 class AssociationTableFile(YHFile):
-	#no beta0, beta1, beta2
+	"""
+	example usage:
+		for read (but not read in the whole data):
+			associationTableFile = AssociationTableFile(absPath, openMode='r', autoRead=False)
+			self.no_of_loci = associationTableFile.nrows
+			associationTableFile.close()
+		
+		for write:
+			associationTableFile = AssociationTableFile(output_fname, openMode='w')
+			attributeDict = None
+			writer = gwr.outputInHDF5MatrixFile(tableObject=associationTableFile.associationTable, attributeDict=attributeDict)
+			associationTableFile.close()
+	"""
 	def __init__(self, inputFname=None, openMode='r', \
 				tableName='association', groupNamePrefix='group', tableNamePrefix='table',\
-				filters=None,\
-				min_MAF=0.1, **keywords):
-		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
-				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
-				rowDefinition=None, filters=filters, debug=0, report=0)
-		
+				filters=None, expectedrows=300000, autoRead=True, autoWrite=True, \
+				min_MAF=None, do_log10_transformation=False, **keywords):
 		self.min_MAF = min_MAF
 		self.genome_wide_result = None
 		self.associationTable = None
-		if openMode=='r':
+		self.do_log10_transformation = do_log10_transformation
+		
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=AssociationTable, filters=filters, expectedrows=expectedrows,\
+				autoRead=autoRead, autoWrite=autoWrite,\
+				debug=0, report=0, )
+		
+
+		"""
+		if openMode=='r' and self.readInData:
 			self.associationTable = self.getTableObject(tableName=self.tableName)
 			self._readInGWR(min_MAF=self.min_MAF, tableObject=self.associationTable)
 		elif openMode=='w':
 			self.associationTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationTable, \
 											expectedrows=300000)
+		"""
+		self.associationTable = self.getTableObject(tableName=self.tableName)
 	
-	def _readInGWR(self, inputFname=None, tableName=None, min_MAF=None, tableObject=None):
+	def _readInData(self, tableName=None, tableObject=None, do_log10_transformation=None):
 		"""
 		"""
-		if inputFname is None:
-			inputFname = self.inputFname
+		YHFile._readInData(self, tableName=tableName, tableObject=tableObject)
+		
 		if tableName is None:
 			tableName = self.tableName
-		if min_MAF is None:
-			min_MAF = self.min_MAF
-		pdata = PassingData(min_MAF=min_MAF)
+		if do_log10_transformation is None:
+			do_log10_transformation = getattr(self, 'do_log10_transformation', False)
+		pdata = PassingData(min_MAF=self.min_MAF)
 		self.genome_wide_result = getGenomeWideResultFromHDF5MatrixFile(reader=self, tableName=tableName, tableObject=tableObject,\
-							min_value_cutoff=None, do_log10_transformation=False, pdata=pdata,\
+							min_value_cutoff=None, do_log10_transformation=do_log10_transformation, pdata=pdata,\
 							construct_chr_pos2index=False, construct_data_obj_id2index=False, \
 							construct_locus_db_id2index=True,\
 							report=True)
 		return self.genome_wide_result
+
+
+class LocusMapTable(tables.IsDescription):
+	"""
+	2013.1.9 a pytable to store the locus_id and (chromosome, start, stop)
+		used by Association.py to find chr, start, stop for input loci
+	"""
+	id = UInt64Col(pos=0)
+	locus_id = UInt64Col(pos=1, dflt=0)
+	chromosome = StringCol(64, pos=2, dflt="")	#64 byte-long
+	start = UInt64Col(pos=3, dflt=0)
+	stop = UInt64Col(pos=4, dflt=0)
+
+class LocusMapTableFile(YHFile):
+
+	"""
+	usage examples:
+	
+		locusMapTableFile = LocusMapTableFile(self.outputFname, openMode='w')
+		locusMapTableFile.addAttributeDict(attributeDict)
+		locusMapTableFile.appendOneRow(pdata, cellType=2)
+		
+		#for read-only
+		locusMapTableFile = LocusMapTableFile(inputFname, openMode='r')
+		locus_id2chr_pos = locusMapTableFile.locus_id2chr_pos
+	"""
+	def __init__(self, inputFname=None, openMode='r', \
+				tableName='locus_map', groupNamePrefix='group', tableNamePrefix='table',\
+				filters=None, expectedrows=500000, autoRead=True, autoWrite=True, \
+				**keywords):
+		
+		self.locus_id2chr_pos = None
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=LocusMapTable, filters=filters, expectedrows=expectedrows,\
+				autoRead=autoRead, autoWrite=autoWrite,\
+				debug=0, report=0, **keywords)
+		
+		
+		#if (openMode=='r' or openMode == 'a')  and self.readInData:
+		#	self.locusMapTable = self.getTableObject(tableName=self.tableName)
+		#	self._readInMap(tableObject=self.locusMapTable)
+		#elif openMode == 'w':
+		#	self.locusMapTable = self.createNewTable(tableName=self.tableName, rowDefinition=LocusMapTable,\
+		#										expectedrows=500000)
+		self.locusMapTable = self.getTableObject(tableName=self.tableName)
+		
+	def _readInData(self, tableName=None, tableObject=None):
+		"""
+		2012.1.9
+		"""
+		YHFile._readInData(self, tableName=tableName, tableObject=tableObject)
+		
+		if tableObject is None:
+			tableObject = self.getTableObject(tableName=tableName)
+		
+		sys.stderr.write("Reading the locus map from HDF5 file %s ..."%(self.inputFname))
+		"""
+		for attributeName, value in self.getAttributes().iteritems():
+			HDF5AttributeNameLs.append(attributeName)
+			setattr(, attributeName, value)
+		"""
+		counter = 0
+		real_counter = 0
+		self.locus_id2chr_pos = {}
+		for row in tableObject:
+			if not row['chromosome']:	#empty chromosome, which happens when inputFname contains no valid peaks, but the default null peak (only one).
+				continue
+			counter += 1
+			chr_pos = (row['chromosome'], row['start'], row['stop'])
+			locus_id = row['locus_id']
+			if locus_id not in self.locus_id2chr_pos:
+				self.locus_id2chr_pos[locus_id] = chr_pos
+				real_counter += 1
+			else:
+				chr_pos = self.locus_id2chr_pos[locus_id]
+				sys.stderr.write("Warning: locus_id %s is already in locus_id2chr_pos with chr,start,stop(%s, %s, %s).\n"%\
+								(locus_id, chr_pos[0], chr_pos[1], chr_pos[2]))
+		sys.stderr.write("%s loci (%s total) with unique locus_id.\n"%(real_counter, counter))
+		return self.locus_id2chr_pos
+	
+	def getRowGivenLocusID(self, locus_id=None):
+		"""
+		2013.1.9
+		"""
+		query = self.where("""(locus_id ==%s) """%(locus_id))
+		rowToReturn = None
+		for row in query:
+			rowToReturn = castPyTablesRowIntoPassingData(row)
+		return rowToReturn
+		#return (row['chromosome'], row['start'], row['stop'])
+
+	def getRowGivenChrPos(self, chromosome=None, start=None, stop=None):
+		"""
+		2013.1.9
+			(chromosome, start) might not be unique (some SNPs and CNVs have some overlap).
+		"""
+		query = self.where("""(chromosome==%s) & (start==%s) & (stop==%s) """%(chromosome, start, stop))
+		rowToReturn = None
+		for row in query:
+			rowToReturn = castPyTablesRowIntoPassingData(row)
+		return rowToReturn
 
 def getAssociationLandscapeDataFromHDF5File(inputFname=None, associationTableName='association', \
 										landscapeTableName='landscape', min_MAF=0.1):

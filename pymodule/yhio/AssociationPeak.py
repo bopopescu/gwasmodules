@@ -42,31 +42,30 @@ class AssociationPeakTableFile(YHFile):
 	"""
 	def __init__(self, inputFname=None, openMode='r', \
 				tableName='association_peak', groupNamePrefix='group', tableNamePrefix='table',\
-				filters=None, peakPadding=0, \
+				filters=None, peakPadding=0, expectedrows=50000, autoRead=True, autoWrite=True, \
 				**keywords):
-		
-		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
-				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
-				rowDefinition=None, filters=filters, debug=0, report=0)
 		
 		self.peakPadding = peakPadding
 		self.associationPeakRBDict = None
-		if openMode=='r':
-			self.associationPeakTable = self.getTableObject()
-			self._constructAssociationPeakRBDict(tableObject=self.associationPeakTable)
-		elif openMode == 'w':
-			self.associationPeakTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationPeakTable,\
-												expectedrows=50000)
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=AssociationPeakTable, filters=filters, expectedrows=expectedrows,\
+				autoRead=autoRead, autoWrite=autoWrite,\
+				debug=0, report=0)
+		
+		self.associationPeakTable = self.getTableObject(tableName=self.tableName)
 
-	def _constructAssociationPeakRBDict(self, tableObject=None):
+	def _readInData(self, tableName=None, tableObject=None):
 		"""
 		2012.11.12
 			similar to Stock_250kDB.constructRBDictFromResultPeak(), but from HDF5MatrixFile-like file
 		"""
+		YHFile._readInData(self, tableName=tableName, tableObject=tableObject)
+		
 		from pymodule.algorithm.RBTree import RBDict
 		from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
 		if tableObject is None:
-			tableObject = self.associationPeakTable
+			tableObject = self.getTableObject(tableName=tableName)
 		sys.stderr.write("Constructing association-peak RBDict from HDF5 file %s, (peakPadding=%s) ..."%(self.inputFname, self.peakPadding))
 		associationPeakRBDict = RBDict()
 		associationPeakRBDict.result_id = None	#2012.6.22

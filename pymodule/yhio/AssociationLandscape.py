@@ -42,40 +42,45 @@ class AssociationLandscapeTableFile(AssociationTableFile):
 	"""
 	def __init__(self, inputFname=None, openMode='r', \
 				tableName='association_landscape', groupNamePrefix='group', tableNamePrefix='table',\
-				filters=None,\
+				filters=None, autoRead=True, autoWrite=True, \
 				min_MAF=0.1, associationTableName='association', **keywords):
 		
-		rowDefinition = AssociationLandscapeTable
-		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
-				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
-				rowDefinition=rowDefinition, filters=filters, debug=0, report=0)
-
 		self.associationTableName = associationTableName
 		self.min_MAF = min_MAF
 		
 		self.bridge_ls = None
 		self.locusLandscapeNeighborGraph = None
-		if openMode=='r':
+		
+		YHFile.__init__(self, inputFname=inputFname, openMode=openMode, \
+				tableName=tableName, groupNamePrefix=groupNamePrefix, tableNamePrefix=tableNamePrefix,\
+				rowDefinition=None, filters=filters, \
+				debug=0, report=0, autoRead=False, autoWrite=False)
+		
+		#to overwrite self.autoRead that is set by YHFile.__init__
+		self.autoRead = autoRead
+		self.autoWrite = autoWrite
+		
+		if self.autoRead and (self.openMode=='r' or self.openMode=='a'):
 			self.associationLandscapeTable = self.getTableObject(tableName=self.tableName)
 			self.associationTable = self.getTableObject(tableName=self.associationTableName)
-			self.genome_wide_result = self._readInGWR(min_MAF=self.min_MAF, tableObject=self.associationTable)
-			self._constructLandscapeGraph(genome_wide_result=self.genome_wide_result)
-		elif openMode =='w':
+			self._readInData(tableName=self.tableName, tableObject=self.associationLandscapeTable)
+		if self.autoWrite and self.openMode=='w':
 			self.associationLandscapeTable = self.createNewTable(tableName=self.tableName, rowDefinition=AssociationLandscapeTable,\
 														expectedrows=50000)
 			self.associationTable = self.createNewTable(tableName=self.associationTableName, rowDefinition=AssociationTable,\
 													expectedrows=300000)
 	
-	def _constructLandscapeGraph(self, genome_wide_result=None, tableObject=None):
+	def _readInData(self, tableName=None, tableObject=None):
 		"""
 		2012.12.17
 		"""
-		if genome_wide_result is None:
-			genome_wide_result = self.genome_wide_result
+		self.genome_wide_result = AssociationTableFile._readInData(self, tableName=self.associationTableName)
+		
+		genome_wide_result = self.genome_wide_result
 		if tableObject is None:
 			tableObject = self.associationLandscapeTable
 		
-		sys.stderr.write("Reading landscape from table %s ..."%(self.tableName))
+		sys.stderr.write("Reading landscape from table %s ..."%(tableName))
 		
 		current_obj = None
 		self.bridge_ls = []
