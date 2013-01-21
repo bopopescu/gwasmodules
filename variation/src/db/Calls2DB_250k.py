@@ -14,7 +14,7 @@ import traceback, gc
 from pymodule import runLocalCommand
 from pymodule import process_function_arguments
 from pymodule import number2nt
-from pymodule import ProcessOptions
+from pymodule import ProcessOptions, openGzipFile
 from variation.src import Stock_250kDB
 from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 
@@ -161,7 +161,7 @@ class Calls2DB_250k_old:
 		2007-12-11
 		"""
 		sys.stderr.write("Getting calls ...")
-		reader = csv.reader(open(input_fname), delimiter='\t')
+		reader = csv.reader(openGzipFile(input_fname), delimiter='\t')
 		calls_ls = []
 		reader.next()	#toss out the 1st header row
 		for row in reader:
@@ -367,8 +367,8 @@ class Calls2DB_250k(AbstractVariationMapper):
 				sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
 				continue
 			input_fname = os.path.join(input_dir, filename)
-			reader = csv.reader(open(input_fname), delimiter='\t')
-			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			reader = csv.reader(openGzipFile(input_fname), delimiter='\t')
+			writer = csv.writer(openGzipFile(output_fname, 'w'), delimiter='\t')
 			header_row = reader.next()
 			writer.writerow(header_row)
 			for row in reader:
@@ -410,7 +410,7 @@ class Calls2DB_250k(AbstractVariationMapper):
 		if not os.path.isdir(output_dir):
 			os.makedirs(output_dir)
 		
-		reader = csv.reader(open(input_fname))
+		reader = csv.reader(openGzipFile(input_fname))
 		array_id_ls = reader.next()
 		column_index2writer = {}
 		for i in range(2, len(array_id_ls)):
@@ -422,7 +422,7 @@ class Calls2DB_250k(AbstractVariationMapper):
 				if os.path.isfile(output_fname):
 					sys.stderr.write("%s already exists. Ignore.\n"%output_fname)
 					continue
-				writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+				writer = csv.writer(openGzipFile(output_fname, 'w'), delimiter='\t')
 				writer.writerow(['SNP_ID', array_id])
 				column_index2writer[i] = writer
 				curs.execute("insert into %s(id, filename, array_id, method_id, created_by) values (%s, '%s', %s, %s, '%s')"%\
@@ -474,7 +474,10 @@ class Calls2DB_250k(AbstractVariationMapper):
 		if not os.path.isdir(output_dir):
 			os.makedirs(output_dir)
 		
-		reader = csv.reader(open(input_fname), delimiter='\t')
+		#2013.1.18 set priorTAIRVersion =True, locus_type_id=1, because the input is in TAIR8
+		db.chr_pos2snp_id = (True, 1)
+		
+		reader = csv.reader(openGzipFile(input_fname), delimiter='\t')
 		header = reader.next()
 		counter = 0
 		for row in reader:
@@ -495,7 +498,7 @@ class Calls2DB_250k(AbstractVariationMapper):
 			if os.path.isfile(output_fname):
 				sys.stderr.write("Error: %s already exists. Check why the file exists while db has no record.\n"%output_fname)
 				sys.exit(2)
-			writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+			writer = csv.writer(openGzipFile(output_fname, 'w'), delimiter='\t')
 			writer.writerow(['SNP_ID', array_id])
 			for i in range(2, len(row)):
 				snp_id = header[i]
