@@ -229,7 +229,7 @@ class DefineAssociationLandscape(AbstractVariationMapper):
 		attributeDict = {'result_id':self.result_id, 'min_MAF':self.min_MAF,\
 				'call_method_id': rm.call_method_id, 'cnv_method_id': rm.cnv_method_id, \
 				'phenotype_method_id':rm.phenotype_method_id, 'analysis_method_id':rm.analysis_method_id,\
-				'no_of_accessions': rm.no_of_accessions}
+				'no_of_accessions': rm.no_of_accessions, 'do_log10_transformation':getattr(gwr,'do_log10_transformation', None)}
 		landscapeFile = AssociationLandscapeTableFile(self.outputFname, openMode='w')
 		
 		writer = gwr.outputInHDF5MatrixFile(tableObject=landscapeFile.associationTable, attributeDict=attributeDict)
