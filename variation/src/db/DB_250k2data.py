@@ -33,30 +33,29 @@ else:   #32bit
 
 import time, csv, getopt
 import warnings, traceback
-from pymodule import write_data_matrix
-from variation.src.QualityControl import QualityControl
-from variation.src.common import number2nt, nt2number
-import Stock_250kDB
-from QC_250k import QC_250k
 import sqlalchemy
+from pymodule import write_data_matrix
+from pymodule import ProcessOptions, number2nt, nt2number
+from variation.src import Stock_250kDB
+from variation.src.qc.QualityControl import QualityControl
+from variation.src.qc.QC_250k import QC_250k
+from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 
-class DB_250k2Data(object):
+class DB_250k2Data(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, '', ],\
-							('user', 1, ): [None, 'u', 1, 'database username', ],\
-							('passwd', 1, ): [None, 'p', 1, 'database password', ],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('inputFname', 0, ))
+	#option_default_dict.pop(('outputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
 							('call_method_id', 1, int): [None, 'l', 1, 'id in table call_method', ],\
 							('input_dir', 0, ): [None, 'i', 1, 'If given is directory, call_info.filename is assumed to be in this directory.'],\
-							('output_fname', 1, ): [None, 'o', 1, '', ],\
 							('min_probability', 0, float): [-1, 'y', 1, 'minimum probability for a call to be non-NA if there IS a 3rd column for probability.', ],\
-							('max_call_info_mismatch_rate', 0, float): [1, 'x', 1, 'maximum mismatch rate of an array call_info entry. used to exclude bad arrays.'],\
+							('max_array_mismatch_rate', 0, float): [1, 'x', 1, 'maximum mismatch rate of an array call_info entry. used to exclude bad arrays.'],\
 							('max_snp_mismatch_rate', 0, float): [1, 'w', 1, 'maximum snp error rate, used to exclude bad SNPs', ],\
 							('max_snp_NA_rate', 1, float): [1, 'm', 1, 'maximum snp NA rate, used to exclude SNPs with too many NAs', ],\
 							('take_unique_ecotype', 0, int):[0, 't', 0, 'toggle this to keep only one call_info with lowest mismatch_rate for one ecotype'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							})
 	"""
 	2008-09-19
 		add option take_unique_ecotype
@@ -65,8 +64,7 @@ class DB_250k2Data(object):
 		"""
 		2008-05-06
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMapper.__init__(self, inputFnameLs=None, **keywords)
 		
 		
 	def get_snps_with_best_QC_ls(cls, db, call_method_id):
@@ -210,13 +208,12 @@ class DB_250k2Data(object):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.user,
-				password=self.passwd, hostname=self.hostname, database=self.dbname)
-		db.setup(create_tables=False)
+		
+		db = self.db_250k
 		session = db.session
 		QC_method_id = 0 	#just for QC_250k.get_call_info_id2fname()
 		call_data = QC_250k.get_call_info_id2fname(db, QC_method_id, self.call_method_id, filter_calls_QCed=0, \
-												max_call_info_mismatch_rate=self.max_call_info_mismatch_rate, input_dir=self.input_dir,\
+												max_call_info_mismatch_rate=self.max_array_mismatch_rate, input_dir=self.input_dir,\
 												take_unique_ecotype=self.take_unique_ecotype)
 		#snps_with_best_QC_ls = self.get_snps_with_best_QC_ls(db, self.call_method_id)
 		if self.max_snp_mismatch_rate<1 or self.max_snp_NA_rate<1:	#2008-05-18 only do this when it's necessary
@@ -229,10 +226,9 @@ class DB_250k2Data(object):
 			pdata = QC_250k.read_call_matrix(call_data.call_info_id2fname, self.min_probability, snps_name_set, \
 											db_id2chr_pos=db_id2chr_pos, db_id2index=db_id2index)	#2008-05-20 read_call_matrix returns PassingData object
 			strain_acc_list, category_list = pdata.ecotype_id_ls, pdata.array_id_ls
-			write_data_matrix(pdata.data_matrix, self.output_fname, pdata.header, strain_acc_list, category_list)
+			write_data_matrix(pdata.data_matrix, self.outputFname, pdata.header, strain_acc_list, category_list)
 
 if __name__ == '__main__':
-	from pymodule import ProcessOptions
 	main_class = DB_250k2Data
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	
