@@ -163,7 +163,7 @@ class PlotGenomeWideData(AbstractPlot):
 		#without commenting out db_vervet connection code. schema "genome" wont' be default path.
 		#db_genome = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
 		#				password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema="genome")
-		db_genome = GenomeDB.GenomeDatabase(drivername=self.genome_drivername, db_user=self.genome_db_user,
+		db_genome = GenomeDB.GenomeDatabase(drivername=self.genome_drivername, username=self.genome_db_user,
 						db_passwd=self.genome_db_passwd, hostname=self.genome_hostname, dbname=self.genome_dbname, \
 						schema=self.genome_schema)
 		db_genome.setup(create_tables=False)
