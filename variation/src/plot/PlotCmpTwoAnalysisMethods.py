@@ -2,25 +2,25 @@
 """
 Examples:
 	#plots of comparison between analysis method 1 and 7 on phenotype 1-7 with gene list 28
-	PlotCmpTwoAnalysisMethods.py -e 1-7 -l 28 -u yh -p passw** -o /Network/Data/250k/tmp-yh/PlotCmpTwoAnalysisMethods/ -m 500 -s ./mnt2/panfs/250k/snps_context_g0_m500 -a 1,7
+	PlotCmpTwoAnalysisMethods.py --phenotype_id_ls 1-7 -l 28 -u yh -p passw** -o /Network/Data/250k/tmp-yh/PlotCmpTwoAnalysisMethods/ -m 500 -s ./mnt2/panfs/250k/snps_context_g0_m500 -a 1,7
 	
 	#save the enrichment ratio by pvalue-based thresholds (-A, -B) into db
-	~/script/variation/src/PlotCmpTwoAnalysisMethods.py -e 1-7,39-48,57-59,80-82 -l 145 -o /Network/Data/250k/tmp-yh/MatchedPvalueData -m 20000 
-	-s /Network/Data/250k/tmp-yh/snps_context/snps_context_g0_m20000 -a 1,7 -q 1 -A 3.5 -B 5.5 -j 32 -c
+	~/script/variation/src/PlotCmpTwoAnalysisMethods.py --phenotype_id_ls 1-7,39-48,57-59,80-82 -l 145 -o /Network/Data/250k/tmp-yh/MatchedPvalueData -m 20000 
+	-s /Network/Data/250k/tmp-yh/snps_context/snps_context_g0_m20000 -a 1,7 -q 1 -A 3.5 -B 5.5 -j 32 --commit
 	
 	#output the association from both results SNP by SNP
-	~/script/variation/src/PlotCmpTwoAnalysisMethods.py -e 1-7,39-48,57-59,80-82 -l 145
+	~/script/variation/src/PlotCmpTwoAnalysisMethods.py --phenotype_id_ls 1-7,39-48,57-59,80-82 -l 145
 	-o /Network/Data/250k/tmp-yh/MatchedPvalueData -m 20000 -s /Network/Data/250k/tmp-yh/snps_context/snps_context_g0_m20000
 	-a 1,7 -q 2 -A 2.5 -B 3 -j 32
 
 	#save the enrichment ratio by rank-based thresholds (-A, -B) into db
-	~/script/variation/src/PlotCmpTwoAnalysisMethods.py -e 1-7,39-48,57-59,80-82 -l 145
+	~/script/variation/src/PlotCmpTwoAnalysisMethods.py --phenotype_id_ls 1-7,39-48,57-59,80-82 -l 145
 	-o /Network/Data/250k/tmp-yh/MatchedPvalueData -m 20000 -s /Network/Data/250k/tmp-yh/snps_context/snps_context_g0_m20000
-	-a 1,7 -q 3 -A 700 -B 700 -j 32 -c
+	-a 1,7 -q 3 -A 700 -B 700 -j 32 --commit
 	
 	#null distribution type 2, to get enrichment ratio & permutation pvalues for published flowering phenotypes 
-	PlotCmpTwoAnalysisMethods.py -e 1-7,39-48,57-59,80-82 -l 145 -o /Network/Data/250k/tmp-yh/MatchedPvalueData -m 20000
-	-s /Network/Data/250k/tmp-yh/snps_context/snps_context_g0_m20000 -a 1,7 -q 1 -A 3 -B 5 -j 32 -c -y2
+	PlotCmpTwoAnalysisMethods.py --phenotype_id_ls 1-7,39-48,57-59,80-82 -l 145 -o /Network/Data/250k/tmp-yh/MatchedPvalueData -m 20000
+	-s /Network/Data/250k/tmp-yh/snps_context/snps_context_g0_m20000 -a 1,7 -q 1 -A 3 -B 5 -j 32 --commit -y2
 	
 Description:
 	Program that makes 2 figures in one plot.
@@ -38,38 +38,36 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib as mpl; mpl.use("Agg")
 import time, csv, cPickle, numpy, random
-import warnings, traceback
-from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr
-import Stock_250kDB
-from Stock_250kDB import ResultsByGene, ResultsMethod
-from sets import Set
-from GeneListRankTest import GeneListRankTest, SnpsContextWrapper
-from DrawSNPRegion import DrawSNPRegion
-#from sqlalchemy.orm import join
 import pylab
-import StringIO
-from common import get_total_gene_ls
-from CheckCandidateGeneRank import CheckCandidateGeneRank
-from TopSNPTest import TopSNPTest
+import warnings, traceback
+from sets import Set
 from matplotlib.patches import Polygon, CirclePolygon, Ellipse, Wedge
 
+#from sqlalchemy.orm import join
+import StringIO
+
+from pymodule import PassingData, figureOutDelimiter, getColName2IndexFromHeader, getListOutOfStr
+from variation.src import Stock_250kDB
+from variation.src.common import get_total_gene_ls
+from variation.src.enrichment.CheckCandidateGeneRank import CheckCandidateGeneRank
+from variation.src.enrichment.TopSNPTest import TopSNPTest
+from variation.src.enrichment.GeneListRankTest import GeneListRankTest, SnpsContextWrapper
+from variation.src import AbstractVariationMapper
+from DrawSNPRegion import DrawSNPRegion
 
 class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['papaya.usc.edu', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
-							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
-							("phenotype_id_ls", 1, ): [None, 'e', 1, 'comma/dash-separated phenotype_method id list, like 1,3-7'],\
+	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict.pop(('inputFname', 0, ))
+	option_default_dict.pop(('outputFname', 0, ))
+	option_default_dict.pop(('outputFnamePrefix', 0, ))
+	option_default_dict.update({
+							("phenotype_id_ls", 1, ): [None, '', 1, 'comma/dash-separated phenotype_method id list, like 1,3-7'],\
 							("min_distance", 0, int): [20000, 'm', 1, 'minimum distance allowed from the SNP to gene'],\
 							("get_closest", 0, int): [0, 'g', 0, 'only get genes closest to the SNP within that distance'],\
-							('min_MAF', 0, float): [0, 'n', 1, 'minimum Minor Allele Frequency. If above 1, it is minor allele count. only applied to Emma-based methods'],\
 							('min_sample_size', 0, int): [5, 'i', 1, 'minimum size for candidate gene sets to draw histogram'],\
 							("list_type_id", 1, int): [None, 'l', 1, 'Gene list type. must be in table gene_list_type beforehand.'],\
 							("snps_context_picklef", 0, ): [None, 's', 1, 'given the option, if the file does not exist yet, to store a pickled snps_context_wrapper into it, min_distance and flag get_closest will be attached to the filename. If the file exists, load snps_context_wrapper out of it.'],\
-							('results_directory', 0, ):[None, 't', 1, 'The results directory. Default is None. use the one given by db.'],\
 							("results_type", 1, int): [1, 'w', 1, 'which type of results. 1; ResultsMethod, 2: ResultsByGene'],\
 							("output_dir", 0, ): [None, 'o', 1, 'directory to store output'],\
 							('call_method_id', 0, int):[17, 'j', 1, 'Restrict results based on this call_method. Default is no such restriction.'],\
@@ -81,16 +79,13 @@ class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 							('pvalue_int_gap', 0, int):[1., 'f', 1, 'the size of bin to partition the pvalues. It is used only when both r1_pvalue_cutoff and r2_pvalue_cutoff are zero.'],\
 							('r1_pvalue_cutoff', 0, float):[3., 'A', 1, '-log pvalue cutoff for the analysis method with bigger id (emma if -a 1,7)'],\
 							('r2_pvalue_cutoff', 0, float):[5., 'B', 1, '-log pvalue cutoff for the analysis method with smaller id (kw if -a 1,7)'],\
-							('commit', 0, int):[0, 'c', 0, 'commit the db operation.'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							})
 	
 	def __init__(self,  **keywords):
 		"""
 		2008-11-19
 		"""
-		from pymodule import ProcessOptions
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, class_to_have_attr=self)
+		AbstractVariationMappe.__init__(self, **keywords)
 		
 		self.phenotype_id_ls = getListOutOfStr(self.phenotype_id_ls, data_type=int)
 		self.analysis_method_id_ls = getListOutOfStr(self.analysis_method_id_ls, data_type=int)
@@ -539,9 +534,7 @@ class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		db = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-				   password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
-		db.setup(create_tables=False)
+		db = self.db_250k
 		session = db.session
 		session.begin()
 		
@@ -567,7 +560,7 @@ class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 														self.min_distance, self.get_closest, self.min_MAF, self.call_method_id,\
 														analysis_method_id_set=analysis_method_id_set)
 		
-		param_data = PassingData(results_directory=self.results_directory, candidate_gene_list=candidate_gene_list, \
+		param_data = PassingData(data_dir=self.data_dir, candidate_gene_list=candidate_gene_list, \
 			allow_two_sample_overlapping=self.allow_two_sample_overlapping, need_the_value=1, \
 			construct_chr_pos2index=True)
 			#need_the_value means to get the pvalue/score
@@ -616,7 +609,7 @@ class PlotCmpTwoAnalysisMethods(CheckCandidateGeneRank, TopSNPTest):
 						min_MAC = None
 				#param_data.min_MAF = min_MAF	#min_MAF is passed to param_data in getResultMethodContent()
 				param_data.min_MAC = min_MAC
-				genome_wide_result = self.getResultMethodContent(rm, self.results_directory, min_MAF, pdata=param_data)
+				genome_wide_result = db.getResultMethodContent(rm, data_dir=self.data_dir, min_MAF=min_MAF, pdata=param_data)
 				if not genome_wide_result:
 					continue
 				rm_ls.append(rm)
