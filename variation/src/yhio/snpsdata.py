@@ -12,8 +12,10 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import sys, warnings
 from itertools import *
 from bisect import bisect
-import h5py
-import os
+import h5py, csv, copy
+
+import tempfile
+import warnings
 try:
 	import scipy as sp
 	sp.seterr(divide='raise')
@@ -21,6 +23,12 @@ except Exception, err_str:
 	print 'scipy is missing:', err_str
 
 from variation.src import env
+import phenotypeData as pd
+from variation.src.db import dbutils
+import util  #Used to convert val list to stringlist.
+import yu_snp_key as yk
+import dataParsers as dp
+#import ImputeSNPs as imp	#2013.1.19 does not exist anymore
 
 IUPAC_alphabet = ['A', 'C', 'G', 'T', '-', 'Y', 'R', 'W', 'S', 'K', 'M', 'D', 'H', 'V', 'B', 'X', 'N']
 
@@ -722,7 +730,6 @@ class _SnpsData_(object):
 
 
 	def _convert_to_tg_ecotypes_(self):
-		import phenotypeData as pd
 		e_dict = pd._getEcotype2TgEcotypeDict_()
 		new_ecotypes = []
 		conversion_count = 0
@@ -774,7 +781,6 @@ class _SnpsData_(object):
 		"""
 
 		if use_accession_names:
-			import phenotypeData as pd
 			ad = pd._getAccessionToEcotypeIdDict_(accessions_to_keep)
 			ecotypes = []
 			for acc in accessions_to_keep:
@@ -909,7 +915,6 @@ class _SnpsData_(object):
 		"""
 		Constructs and returns a new object based on the prev. using SNPs only in the given region.
 		"""
-		import copy
 		snpsd = copy.deepcopy(self) #Clone
 		i = 0
 		while i < len(self.snps) and self.positions[i] < start_pos:
@@ -1082,7 +1087,6 @@ class _SnpsData_(object):
 		"""
 		Prints info on the accessions/ecotype IDs to a file.
 		"""
-		import phenotypeData as pd
 		eid = pd._getEcotypeIdInfoDict_()
 		f = open(filename, 'w')
 		f.write((", ".join(["Ecotype_id", "Native_name", "Stock_parent", "latitude", "longitude", "country"])) + "\n")
@@ -1198,8 +1202,6 @@ class RawSnpsData(_SnpsData_):
 		"""
 		Impute any NA SNPs.
 		"""
-		import ImputeSNPs as imp
-		import tempfile, os, copy
 		if window_size:
 			start_pos = max(0, self.positions[0] - window_size)
 			end_pos = self.positions[-1] + window_size
@@ -1251,8 +1253,6 @@ class RawSnpsData(_SnpsData_):
 		"""
 		Impute any NAs in the data.
 		"""
-		import ImputeSNPs as imp
-		import tempfile, os
 		tmpFile1 = tempfile.mkstemp()
 		os.close(tmpFile1[0])
 		tmpFile2 = tempfile.mkstemp()
@@ -1449,7 +1449,6 @@ class RawSnpsData(_SnpsData_):
 			ref_i = self.accessions.index(reference_ecotype)
 		else:
 			ref_i = 0
-			import warnings
 			warnings.warn("Given reference ecotype %s wasn't found, using %s as 0-reference." % \
 					(reference_ecotype, self.accessions[ref_i]))
 		snps = []
@@ -2642,7 +2641,6 @@ class snps_data_set:
 		"""
 		Deletes accessions which are not common, and sorts the accessions, removes monomorphic SNPs, etc.
 		"""
-#		import bisect
 		print "Coordinating SNP and Phenotype data."
 		ets = phend.phen_dict[pid]['ecotypes']
 
@@ -2906,10 +2904,9 @@ class snps_data_set:
 		Returns two SNP sets, one with the SNPs within the given region, 
 		and the other with the remaining SNPs.
 		"""
-		import bisect
 		chr_pos_l = self.get_chr_pos_list()
-		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
-		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
+		start_i = bisect(chr_pos_l, (chrom, start_pos))
+		stop_i = bisect(chr_pos_l, (chrom, end_pos))
 		if self.cached_snps == None:
 			self.cached_snps = self.get_snps()
 		snps = self.cached_snps
@@ -2985,7 +2982,6 @@ class SNPsDataSet:
 		"""
 		Other possible keyword args are parent_id, accession_set_id ,imputed ,unique_ecotype 
 		"""
-		import dbutils
 		conn = dbutils.connect_to_papaya()
 		cursor = conn.cursor()
 
@@ -3050,9 +3046,6 @@ class SNPsDataSet:
 
 
 	def _generate_db_call_files_(self, call_method=None, array_ids=None, file_dir='/Network/Data/250k/db/calls/', cursor=None, conn=None):
-		import os
-		import warnings
-
 		if not array_ids:
 			if not self.array_ids:
 				raise Exception('Array IDs are missing.')
@@ -3071,7 +3064,6 @@ class SNPsDataSet:
 
 		#Connect to DB, if needed
 		if not cursor:
-			import dbutils
 			conn = dbutils.connect_to_papaya()
 			cursor = conn.cursor()
 
@@ -3235,7 +3227,6 @@ class SNPsDataSet:
 		
 		Only works with raw sequence data.. (IUPAC nucleotides)
 		"""
-		import yu_snp_key as yk
 		print "transposing chr_pos_snp_list"
 		chr_pos_snp_list = map(list, zip(*self.getChrPosSNPList()))
 		chrs = chr_pos_snp_list[0]
@@ -3270,7 +3261,6 @@ class SNPsDataSet:
 		"""
 		Deletes accessions which are not common, and sorts the accessions, removes monomorphic SNPs, etc.
 		"""
-#		import bisect
 		print "Coordinating SNP and Phenotype data."
 		ets = phend.phen_dict[pid]['ecotypes']
 		#Checking which accessions to keep and which to remove.
@@ -3458,12 +3448,11 @@ class SNPsDataSet:
 		Returns two SNP sets, one with the SNPs within the given region, 
 		and the other with the remaining SNPs.
 		"""
-		import bisect
 		global_snps = []
 		local_snps = []
 		chr_pos_l = self.get_chr_pos_list(cache_list=True)
-		start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
-		stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
+		start_i = bisect(chr_pos_l, (chrom, start_pos))
+		stop_i = bisect(chr_pos_l, (chrom, end_pos))
 		snps = self.get_snps(cache=True)
 		local_snps = snps[start_i:stop_i]
 		global_snps = snps[:start_i] + snps[stop_i:]
@@ -3503,13 +3492,12 @@ class SNPsDataSet:
 		Returns the SNP sets, wherethe SNPs are in multiple regions, 
 		and the other is the remaining set. 
 		"""
-		import bisect
 		chr_pos_l = self.get_chr_pos_list()
 		snps = self.get_snps()
 		region_snps = []
 		for chrom, start_pos, end_pos in chrom_pos_list:
-			start_i = bisect.bisect(chr_pos_l, (chrom, start_pos))
-			stop_i = bisect.bisect(chr_pos_l, (chrom, end_pos))
+			start_i = bisect(chr_pos_l, (chrom, start_pos))
+			stop_i = bisect(chr_pos_l, (chrom, end_pos))
 			region_snps.extend(snps[start_i:stop_i])
 		return region_snps
 
@@ -3632,7 +3620,6 @@ class SNPsDataSet:
 		Converts the underlying raw data format to a binary one, i.e. A,C,G,T,NA,etc. are converted to 0,1,-1
 		"""
 		if self.data_format == target_data_format:
-			import warnings
 			warnings.warn("Data appears to be already in %s format!" % target_data_format)
 		else:
 			if self.data_format == 'nucleotides' and target_data_format == 'binary':
@@ -3717,7 +3704,6 @@ class SNPsDataSet:
 		
 		'color_by' is by default set to be the phenotype values.
 		"""
-		import phenotypeData as pd
 		import matplotlib
 		matplotlib.use("Agg")
 		import matplotlib.pyplot as plt
@@ -4247,7 +4233,6 @@ class SNPsDataSet:
 		"""
 		assert len(accessions_to_keep) != 0, "Can't remove all ecotypes."
 		if use_accession_names:
-			import phenotypeData as pd
 			ad = pd._getAccessionToEcotypeIdDict_(accessions_to_keep)
 			ecotypes = []
 			for acc in accessions_to_keep:
@@ -4278,7 +4263,6 @@ class SNPsDataSet:
 
 
 	def filter_for_countries(self, country_codes, complement=False):
-		import phenotypeData as pd
 		ei_dict = pd._getEcotypeIdInfoDict_()
 		acc_indices_to_keep = []
 		if complement:
@@ -4377,7 +4361,6 @@ def writeRawSnpsDatasToFile(filename, snpsds, chromosomes=[1, 2, 3, 4, 5], delim
 		fix a slight bug. arrayIds is outputted always using ', ' as delimiter
 	Writes data to a file. 
 	"""
-	import sys, csv
 	sys.stderr.write("Writing data to file: %s ..." % filename)
 	numSnps = 0
 	for i in range(0, len(chromosomes)):
@@ -4410,7 +4393,6 @@ def writeRawSnpsDatasToFile(filename, snpsds, chromosomes=[1, 2, 3, 4, 5], delim
 	f = open(filename, 'w')
 	outStr += deliminator.join(fieldStrings) + "\n"
 	f.write(outStr)
-	import util  #Used to convert val list to stringlist.
 	for i in range(0, len(chromosomes)):
 		for j in range(0, len(snpsds[i].positions)):
 			outStr = str(chromosomes[i]) + deliminator + str(snpsds[i].positions[j]) + deliminator
@@ -4659,7 +4641,6 @@ def write_accessions_info_file(filename, file_250k_data="/Users/bjarnivilhjalmss
 
 
 def get_FRI_data_slice():
-	import phenotypeData as pd
 	import dataParsers as dp
 	phend = pd.readPhenotypeFile('/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_all_051710.tsv')
 	phend.removePhenotypeIDs([43])
@@ -4677,7 +4658,6 @@ def get_FRI_data_slice():
 
 
 def get_AW_common_dataset():
-	import phenotypeData as pd
 	filename = "/Users/bjarnivilhjalmsson/Projects/Data/phenotypes/phen_wilzcek_wo_OF_NS06_060210.tsv"
 	phed = pd.readPhenotypeFile(filename)
 	sd_t54 = dataParsers.parse_snp_data('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t54.csv')#,filter=0.001)	
@@ -4706,7 +4686,6 @@ def get_call_method_kinship_file(call_method_id):
 
 
 def get_bergelssons_region_datasets():
-	import phenotypeData as pd
 	first_192 = pd._getFirst192Ecotypes_()
 	print first_192
 	print len(first_192)
@@ -4716,7 +4695,6 @@ def get_bergelssons_region_datasets():
 #	sd_t54.writeToFile('/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t'+str(cm_id)+'.csv')
 
 def test_ibd_kinship():
-	import dataParsers as dp
 	import linear_models as lm
 	sd = dp.load_250K_snps()
 	ibd_k = sd.get_ibd_kinship_matrix()
@@ -4726,7 +4704,6 @@ def test_ibd_kinship():
 
 
 def _merge_imputed_and_250K_data_():
-	import  dataParsers as dp
 	import tair_converter as tc
 	sd_72 = dp.load_snps_call_method(72, 'binary')
 	sd_76 = dp.load_snps_call_method(76, 'binary')
@@ -4742,7 +4719,6 @@ def _test_prior_():
 		for l in f:
 			line = l.split()
 			cpp_list.append((int(line[1]), int(line[2]), float(line[4])))
-	import dataParsers as dp
 	sd = dp.load_snps_call_method()
 	return sd.get_snp_priors(cpp_list)
 
@@ -4785,7 +4761,6 @@ def plot_tree(K, tree_file, ets, verbose=True, label_values=None):
 
 
 def _plot_sweep_trees_():
-        import dataParsers as dp
 	with open('/home/GMI/bjarni.vilhjalmsson/Projects/data/sweepPosNorth.csv') as f:
 		print f.next()
 		for l in f:
@@ -4800,7 +4775,6 @@ def _plot_sweep_trees_():
 
 
 def _plot_interesting_snps_():
-	import dataParsers as dp
 	sd = dp.load_snps_call_method(78)
 	with open(env.env['phen_dir'] + 'swe_pair_mac15_coverage_filter2.csv', 'r') as f:
 		print f.next()
