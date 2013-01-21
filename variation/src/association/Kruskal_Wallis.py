@@ -218,8 +218,9 @@ class Kruskal_Wallis:
 			SNP_pos_ls += [0]*(2-len(SNP_pos_ls))
 		return [SNP_pos_ls[0], SNP_pos_ls[1]]
 	
-	def output_kw_results(self, kw_results, SNP_header, output_fname, log_pvalue=0):
+	def output_kw_results(self, kw_results, SNP_header, output_fname, log_pvalue=0, **keywords):
 		"""
+		2013.1.9 not used anymore by this program. convertResultsIntoGWR() is used instead.
 		2011-2-17
 			call returnSNPIdLs() to format the SNP id output
 		2009-6-17

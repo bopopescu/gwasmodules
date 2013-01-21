@@ -9,21 +9,25 @@ Examples:
 	
 	#ditto but analysis method 7 and min score 3 (make sure -c is added, otherwise nothing will be stored in db)
 	%s -q 57 -A 20 -a 7 -f 3 -o call57cnv20analysis7MinScore3.xml -u yh -z banyan -c -B condorpool -D condorpool
+		--genotype_fname_to_generate_kinship ...
 	#ditto but analysis method 32
 	%s -q 57 -A 20 -a 32 -f 3 -o call57cnv20analysis32MinScore3.xml -u yh  -z banyan -c -B condorpool -D condorpool
+		--genotype_fname_to_generate_kinship ...
 	
 	#2012.9.28 add --getPublicPhenotype if u want to run association only on published phenotype and its values
-	# -n: --noSNPAlleleOrdinalConversion 
-	# -c: commit, (make sure -c is added, otherwise nothing will be stored in db)
-	%s -A 57,75 -n -c -w 314-351 -a 1,32 -K /Network/Data/250k/db/dataset/call_method_75_K.tsv
+	# --commit, (make sure it is added, otherwise nothing will be stored in db)
+	%s -A 57,75  --commit -w 314-351 -a 1,32 -K /Network/Data/250k/db/dataset/call_method_75_K.tsv
 		-o dags/Association/associationCall57_75Phenotype314_351Analysis1_32.xml
+		--genotype_fname_to_generate_kinship ...
 		-u yh -d stock_250k -z banyan  -j condorpool -l condorpool
 		--getPublicPhenotype
 	
-	#2012.12.28 run it on hoffman2 condor
-	%s -A 57,75 -n -c -w 1-35,39-48,57-82,158-159,161-179,182-186,272-283,314-351,362-380,418-589 -a 7
-		-o dags/Association/Call57_75_251PublicPhenotypeAnalysis7.xml -u yh
-		-d stock_250k -z localhost -j hcondor -l hcondor --data_dir ~/NetworkData/250k/db/
+	#2012.12.28 run it on hoffman2 condor,
+	# --genotype_fname_to_generate_kinship is a must for call 57 (deletion) because kinship based on call 57 is not accurate.
+	%s -A 57,75 --commit -w 1-35,39-48,57-82,158-159,161-179,182-186,272-283,314-351,362-380,418-589 -a 7
+		-o dags/Association/Call57_75_251PublicPhenotypeAnalysis7.xml
+		--genotype_fname_to_generate_kinship ~/NetworkData/250k/db/dataset/call_method_75.tsv
+		-u yh -d stock_250k -z localhost -j hcondor -l hcondor --data_dir ~/NetworkData/250k/db/
 		--drivername postgresql --dbname vervetdb --schema stock_250k --db_passwd secret --needSSHDBTunnel --getPublicPhenotype
  
 Description:
@@ -55,6 +59,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 	option_default_dict.update(Association.common_option_dict.copy())
 	option_default_dict.pop(('input_fname', 1, ))
 	option_default_dict.pop(('phenotype_fname', 1, ))
+	option_default_dict.pop(('noSNPAlleleOrdinalConversion', 0, ))
 	
 	option_default_dict.update({
 			('getPublicPhenotype', 0, int):[0, '', 0, 'toggle to get public phenotype only, phenotype_method.access==public and phenotype_avg.ready_for_publication=1'],\
@@ -99,6 +104,8 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		"""
 		2012.6.5
 		"""
+		AbstractVariationWorkflow.registerCustomExecutables(self, workflow=workflow)
+		
 		namespace = self.namespace
 		version = self.version
 		operatingSystem = self.operatingSystem
@@ -126,12 +133,16 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
 	def addAssociationJob(self, executable=None, datasetFile=None, phenotypeFile=None, phenotype_method_id=None, \
-						outputFile=None, kinshipFile=None, eigenVectorFile=None, genotypeFileToGenerateKinship=None, test_type=1,\
+						outputFile=None, kinshipFile=None, eigenVectorFile=None, genotypeFileToGenerateKinship=None, \
+						locusMapFile=None,\
+						test_type=1,\
 						min_data_point=3, noSNPAlleleOrdinalConversion=False, which_PC_index_ls=None,\
+						inputMissingGenotypeNotationType=1,\
 						parentJobLs=None, job_max_memory=100, job_max_walltime = 600, \
 						extraArguments=None, extraDependentInputLs=None, \
 						transferOutput=False, **keywords):
 		"""
+		2013.1.9 added argument locusMapFile
 		2012.6.5
 			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
@@ -140,22 +151,27 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 			extraDependentInputLs = []
 		extraDependentInputLs.append(phenotypeFile)
 		
-		extraArgumentList = ['-P', phenotypeFile, '-y %s'%(test_type), '-w %s'%(phenotype_method_id),\
-							'-m %s'%(min_data_point), ]
+		extraArgumentList = ['--phenotype_fname', phenotypeFile, '--test_type %s'%(test_type), '--phenotype_method_id_ls %s'%(phenotype_method_id),\
+							'--min_data_point %s'%(min_data_point), ]
 		
 		if kinshipFile:
-			extraArgumentList.extend(['-K', kinshipFile])
+			extraArgumentList.extend(['--kinship_fname', kinshipFile])
 			extraDependentInputLs.append(kinshipFile)
 		if eigenVectorFile:
 			extraDependentInputLs.append(eigenVectorFile)
-			extraArgumentList.extend(["-f", eigenVectorFile])
+			extraArgumentList.extend(["--eigen_vector_fname", eigenVectorFile])
 		if genotypeFileToGenerateKinship:
-			extraArgumentList.extend(["-G", genotypeFileToGenerateKinship])
+			extraArgumentList.extend(["--genotype_fname_to_generate_kinship", genotypeFileToGenerateKinship])
 			extraDependentInputLs.append(genotypeFileToGenerateKinship)
 		if noSNPAlleleOrdinalConversion:
-			extraArgumentList.append("-n")
+			extraArgumentList.append("--noSNPAlleleOrdinalConversion")
 		if which_PC_index_ls:
-			extraArgumentList.append("-W %s"%(which_PC_index_ls))
+			extraArgumentList.append("--which_PC_index_ls %s"%(which_PC_index_ls))
+		if inputMissingGenotypeNotationType is not None:
+			extraArgumentList.append("--inputMissingGenotypeNotationType %s"%(inputMissingGenotypeNotationType))
+		if locusMapFile:
+			extraArgumentList.extend(["--locusMapFname", locusMapFile])
+			extraDependentInputLs.append(locusMapFile)
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		
@@ -219,31 +235,34 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		return job
 	
 	
-	def addJobs(self, db_250k=None, callMethodID2FileObject=None, kinshipFile=None, eigenVectorFile=None, phenotype_method_id_ls=[],\
+	def addJobs(self, db_250k=None, callMethodID2Data=None, kinshipFile=None, eigenVectorFile=None, phenotype_method_id_ls=[],\
 			analysis_method_id_ls=[], genotypeFileToGenerateKinship=None, data_dir=None, getPublicPhenotype=False, commit=False, \
 			transferOutput=True, needSSHDBTunnel=False, outputDirPrefix=""):
 		"""
+		2013.1.7 use callMethod.locus_type_id to decide whether noSNPAlleleOrdinalConversion should be toggled or not
 		2012.9.28
 			add argument getPublicPhenotype
 		2012.6.5
 		"""
-		sys.stderr.write("Adding association jobs for %s polymorphism data ... "%(len(callMethodID2FileObject)))
-		no_of_jobs= 0
-		
+		sys.stderr.write("Adding association jobs for %s polymorphism data ... "%(len(callMethodID2Data)))
+		returnData = PassingData()
+		returnData.jobDataLs = []
 		
 		topOutputDir = "%sAssociation"%(outputDirPrefix)
 		topOutputDirJob = yh_pegasus.addMkDirJob(workflow=self, mkdir=self.mkdirWrap, outputDir=topOutputDir)
-		no_of_jobs += 1
 		
 		phenotypeFile = File(os.path.join(topOutputDir, 'phenotype.tsv'))
 		outputPhenotypeJob = self.addOutputPhenotypeJob(executable=self.OutputPhenotype, outputFile=phenotypeFile, \
 									getRawPhenotypeData=False, getPublicPhenotype=getPublicPhenotype,\
 									parentJobLs=[topOutputDirJob], transferOutput=True, job_max_memory=2000,\
 									sshDBTunnel=needSSHDBTunnel)
-		no_of_jobs += 1
 		
-		returnData = PassingData()
-		returnData.jobDataLs = []
+		locusMapFile = File(os.path.join(topOutputDir, 'locusMap.h5'))
+		locusMapJob = self.addStock_250kDBJob(executable=self.Stock_250kDB, outputFile=locusMapFile, run_type=2, \
+					parentJobLs=[topOutputDirJob], extraDependentInputLs=None, transferOutput=False, \
+					extraArguments=None, job_max_memory=2000, sshDBTunnel=needSSHDBTunnel)
+		
+		
 		for analysis_method_id in analysis_method_id_ls:
 			analysisMethod = Stock_250kDB.AnalysisMethod.get(analysis_method_id)
 			if not analysisMethod:
@@ -254,7 +273,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 				if not phenotypeMethod:
 					sys.stderr.write("Warning: phenotype_method_id %s not in db. Skip.\n"%(phenotype_method_id))
 					continue
-				for callMethodID, fileObject in callMethodID2FileObject.iteritems():
+				for callMethodID, callMethodData in callMethodID2Data.iteritems():
 					test_type = analysisMethod.association_test_type
 					if not test_type:
 						sys.stderr.write("Warning: analysisMethod %s has non-None test_type %s. Skip.\n"%(test_type))
@@ -266,15 +285,25 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 					if rm:
 						sys.stderr.write("Warning: skip association for c=%s, p=%s, a=%s.\n"%(callMethodID, phenotype_method_id, analysis_method_id))
 						continue
-					outputFile = File(os.path.join(topOutputDir, '%s_%s_%s.tsv'%(callMethodID, phenotype_method_id, \
+					outputFile = File(os.path.join(topOutputDir, '%s_%s_%s.h5'%(callMethodID, phenotype_method_id, \
 																				analysis_method_id)))
-					associationJob = self.addAssociationJob(executable=self.Association, datasetFile=fileObject, \
+					if callMethodData.db_entry.locus_type_id==2:	#cnv dataset is already in 0,1 binary format.
+						#no conversion needed
+						noSNPAlleleOrdinalConversion = 1
+						inputMissingGenotypeNotationType = 2
+					else:
+						noSNPAlleleOrdinalConversion = 0
+						inputMissingGenotypeNotationType = 1
+					associationJob = self.addAssociationJob(executable=self.Association, datasetFile=callMethodData.datasetFile, \
 						phenotypeFile=outputPhenotypeJob.output, phenotype_method_id=phenotype_method_id, \
 						outputFile=outputFile, kinshipFile=kinshipFile, eigenVectorFile=eigenVectorFile, \
-						genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, test_type=test_type,\
-						min_data_point=self.min_data_point, noSNPAlleleOrdinalConversion=self.noSNPAlleleOrdinalConversion, \
+						genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, \
+						locusMapFile=locusMapJob.output,\
+						test_type=test_type,\
+						min_data_point=self.min_data_point, noSNPAlleleOrdinalConversion=noSNPAlleleOrdinalConversion, \
 						which_PC_index_ls=self.which_PC_index_ls,\
-						parentJobLs=[outputPhenotypeJob], job_max_memory=3500, job_max_walltime =200, \
+						inputMissingGenotypeNotationType=inputMissingGenotypeNotationType,\
+						parentJobLs=[outputPhenotypeJob, locusMapJob], job_max_memory=3500, job_max_walltime =200, \
 						extraDependentInputLs=None, transferOutput=False)
 					logFile = File(os.path.join(topOutputDir, '%s_%s_%s_2DB.log'%(callMethodID, phenotype_method_id, \
 																				analysis_method_id)))
@@ -287,9 +316,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 									job_max_memory=500, sshDBTunnel=needSSHDBTunnel)
 					returnData.jobDataLs.append(PassingData(jobLs=[result2DBJob], file=logFile, \
 											fileList=[logFile]))
-					no_of_jobs += 2
-		sys.stderr.write("%s jobs. Done.\n"%(no_of_jobs))
-
+		sys.stderr.write("%s jobs.\n"%(self.no_of_jobs))
 		return returnData
 	
 	def run(self):
@@ -306,7 +333,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		self.registerExecutables()
 		self.registerCustomExecutables()
 		
-		callMethodID2FileObject = {}
+		callMethodID2Data = {}
 		for call_method_id in self.call_method_id_ls:
 			callMethod = Stock_250kDB.CallMethod.get(call_method_id)
 			if callMethod and callMethod.filename:
@@ -314,9 +341,9 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 																		oldDataDir=self.db_250k.data_dir, \
 																		newDataDir=self.data_dir), \
 													folderName=self.pegasusFolderName)
-				callMethodID2FileObject[callMethod.id] = datasetFile
+				callMethodID2Data[callMethod.id] = PassingData(datasetFile=datasetFile, db_entry=callMethod)
 			else:
-				sys.stderr.write("WARNING: call method %s has no db entry or its .filename is empty.\n"%(call_method_id))
+				sys.stderr.write("WARNING: call method %s is not in db or the filename column is empty.\n"%(call_method_id))
 		if self.kinship_fname:
 			kinshipFile = self.registerOneInputFile(inputFname=self.kinship_fname, folderName=self.pegasusFolderName)
 		else:
@@ -331,7 +358,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		else:
 			genotypeFileToGenerateKinship = None
 		
-		self.addJobs(db_250k=self.db_250k, callMethodID2FileObject=callMethodID2FileObject, kinshipFile=kinshipFile, \
+		self.addJobs(db_250k=self.db_250k, callMethodID2Data=callMethodID2Data, kinshipFile=kinshipFile, \
 					eigenVectorFile=eigenVectorFile, phenotype_method_id_ls=self.phenotype_method_id_ls,\
 					analysis_method_id_ls=self.analysis_method_id_ls, \
 					genotypeFileToGenerateKinship=genotypeFileToGenerateKinship, \

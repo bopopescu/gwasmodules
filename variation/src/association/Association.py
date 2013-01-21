@@ -3,45 +3,56 @@
 
 Examples:
 	#try kruskal wallis
-	%s -i /tmp/250K_method_5_after_imputation_noRedundant_051908.tsv -P /Network/Data/250k/finalData_051808/phenotypes.tsv -E -r -o /tmp/250K_method_5_after_imputation_noRedundant_051908.LD.pvalue
+	%s -i /tmp/250K_method_5_after_imputation_noRedundant_051908.tsv -P /Network/Data/250k/finalData_051808/phenotypes.tsv -E -r
+		-o /tmp/250K_method_5_after_imputation_noRedundant_051908.LD.pvalue
 	
 	#try linear model
-	%s -i /Network/Data/250k/tmp-yh/call_method_17_test.tsv -P ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_lm.tsv -y2
+	%s -i /Network/Data/250k/tmp-yh/call_method_17_test.tsv -P ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_lm.h5 -y2
 	
 	#try emma (linear mixture model) on 1st 7 phenotypes
-	%s -i ./mnt2/panfs/250k/call_method_17.tsv -P ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_y3.tsv  -y3 -w 1-7
+	%s -i ./mnt2/panfs/250k/call_method_17.tsv -P ./banyan_fs/tmp/phenotype.tsv -o /tmp/call_method_17_y3.h5  -y3 -w 1-7
 
 	#linear model with principal components 0 to 9, phenotype from 1 to 7
-	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -y4 -o /Network/Data/250k/tmp-yh/eigenstrat//call_method_17_lm_with_pc0_9 -W 0-9 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -r -w 1-7
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -y4
+		-o /Network/Data/250k/tmp-yh/eigenstrat//call_method_17_lm_with_pc0_9 -W 0-9
+		-f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -r -w 1-7
 	
 	#linear model with PCs 0 to 1, phenotype from 1 to 5. the PCs are calculated on the fly according to the snp input file.
-	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_chr4_100000_700000.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_chr4_100000_700000_y4_pc0_1 -W 0-1 -y 4 -w 1-5 -r
+	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_chr4_100000_700000.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv
+	-o /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_chr4_100000_700000_y4_pc0_1 -W 0-1 -y 4 -w 1-5 -r
 	
 	#y = SNP + environment + noise, for phenotype 1 & 2
-	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y5.tsv -y5 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv
+		-o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y5.h5 -y5 -w 1,2 -r
 	
 	#y = SNP + environment + PC1 + PC2 + noise, for phenotype 1 & 2
-	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y5.tsv -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y5 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv
+		-o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y5.h5 -W 0-1
+		-f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y5 -w 1,2 -r
 	
 	#y = SNP + environment + SNP X environ + noise, for phenotype 1 & 2
-	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y6.tsv -y6 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv
+		-o /Network/Data/250k/tmp-yh/association_results/lm/call_method_17_y6.h5 -y6 -w 1,2 -r
 	
 	#y = SNP + environment + SNP X environ + PC1 + PC2 + noise, for phenotype 1 & 2
-	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv -o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y6.tsv -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y6 -w 1,2 -r
+	%s -i /Network/Data/250k/tmp-yh/call_method_17.tsv -P /Network/Data/250k/tmp-yh/phenotype.tsv
+		-o /Network/Data/250k/tmp-yh/association_results/lm_with_PC12/call_method_17_y6.h5 -W 0-1 -f /Network/Data/250k/tmp-yh/eigenstrat/call_method_17_eigenstrat.pca.evec -y6 -w 1,2 -r
 	
 	# 2010-2-1 EMMAX
-	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv -P /Network/Data/250k/tmp-yh//phenotype.tsv -o /tmp/call_method_17_y8.tsv  -y8 -w 1
+	%s -i /Network/Data/250k/tmp-yh/250k_data/call_method_17_test.tsv -P /Network/Data/250k/tmp-yh//phenotype.tsv
+		-o /tmp/call_method_17_y8.h5  -y8 -w 1
 	
 	#2010-8-7 Run KW on binary (0-1) CNV deletion data. add "--noSNPAlleleOrdinalConversion" to turn off binary conversion. already in binary.
 	%s -i ~/panfs/250k/CNV/NonOverlapCNVAsSNP_cnvMethod20.tsv -P ~/panfs/250k/phenotype/phenotype.tsv
-		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y1_pheno.tsv -y1 -w 1-7 --noSNPAlleleOrdinalConversion
+		-o ~/panfs/250k/association_results/cnvMethod20/cnvMethod20_y1_pheno.h5 -y1 -w 1-7 --noSNPAlleleOrdinalConversion
 	
 	# 2011-4-27 run EMMAX on cnv-turned-into-SNP dataset
 	# with precomputed kinship matrix (same format as snp data in inputFname). or specify --genotype_fname_to_generate_kinship
 	# "--noSNPAlleleOrdinalConversion" is required because in this CNV-SNP dataset, 0 is normal (not NA); 1 is deletion.
 	# 	or apply "--inputMissingGenotypeNotationType 2" to change the input missing-genotype notation (then no need for binary conversion)
 	%s -i /Network/Data/250k/db/dataset/call_method_57.tsv -K ~/script/variation/data/JBLabSeasonFlowering/data/K.tsv
-		-P /Network/Data/250k/tmp-yh//phenotype/phenotype20100419.tsv -o /tmp/call_method_57_y8.tsv  -y8 -w 1
+		-P /Network/Data/250k/tmp-yh//phenotype/phenotype20100419.tsv -o /tmp/call_method_57_y8.h5  -y8 -w 1
+		--locusMapFname ~/locusMap.h5
 		--noSNPAlleleOrdinalConversion
 	
 Description:
@@ -68,19 +79,18 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv, numpy, traceback
-from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOutOfStr
 from numpy import linalg
-
+from pymodule import pca_module
+from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOutOfStr, GenomeWideResult, DataObject
+from pymodule import LocusMapTableFile, AssociationTableFile
+from mixmogam import linear_models 
+from mixmogam import kinship
 from Kruskal_Wallis import Kruskal_Wallis
 from variation.src.db.output.OutputPhenotype import OutputPhenotype
 
 if __name__ == '__main__':
 	import rpy
-from sets import Set
-from pymodule import pca_module
-#from DrawEcotypeOnMap import DrawEcotypeOnMap
-from mixmogam import linear_models 
-from mixmogam import kinship
+
 
 
 class Association(Kruskal_Wallis):
@@ -100,7 +110,8 @@ class Association(Kruskal_Wallis):
 		if not given, kinship will be generated from inputFname', ],\
 							('which_PC_index_ls', 0, ): [None, 'W', 1, 'list of indices indicating which PC(s) from eigen_vector_fname should be used. format: 0,1-3', ],\
 							('inputMissingGenotypeNotationType', 1, int): [1, '', 1, 'type of missing-genotype notation in the input. 1: [0,-2]; 2: ["NA", ""]\n\
-	this is only used in SNPData.convert2Binary() to distinguish missing genotype. if --noSNPAlleleOrdinalConversion is toggled, this argument has no effect.', ],\
+	this is only used in SNPData.convert2Binary() to distinguish missing genotype. if --noSNPAlleleOrdinalConversion is toggled, this argument has no effect.\n\
+	inputMissingGenotypeNotationType=1 always for genotype_fname_to_generate_kinship \n', ],\
 							('noSNPAlleleOrdinalConversion', 0, ): [0, 'n', 0, 'If this is not toggled, \n\
 	this program converts everything other than missing (controlled by --inputMissingGenotypeNotationType) into index-based (0,1,2,etc. binary for SNPs).\n\
 	This rule has one exception for test-type 4, in which this program does binary conversion regardless.\n\
@@ -109,6 +120,7 @@ class Association(Kruskal_Wallis):
 	#common_option_dict will be inherited by AssociationWorkflow.py
 	option_default_dict.update(common_option_dict)
 	option_default_dict.update({
+						('locusMapFname', 0, ): [None, '', 1, 'file that contains the chr,start,stop for each locus-id', ],\
 						('output_fname', 1, ): ['', 'o', 1, 'file to store the pvalue. If multiple phenotypes are give, \
 							phenotype id will be attached.', ],\
 						('test_type', 1, int): [1, 'y', 1, 'Which type of test to do. \n\
@@ -139,10 +151,8 @@ class Association(Kruskal_Wallis):
 								7:self.Emma_whole_matrixForNoNAGenotypeMatrix,
 								8:self.EMMAX}
 		
-		self.output_results = {1:self.output_kw_results,
-							2:self.output_lm_results,
-							3:self.output_lm_results,
-							7:self.output_emma_results}	#output_lm_results is the default
+		self.turnAssociationResultsIntoGWRFunctionDict = {1:self.convertResultsIntoGWR,
+							7:self.convert_R_EMMA_ResultsIntoGWR}	#convertResultsIntoGWR is the default
 		
 		#2013.1.7
 		if self.inputMissingGenotypeNotationType==1:
@@ -1005,6 +1015,7 @@ class Association(Kruskal_Wallis):
 		
 	def EMMAX(self, snpData, phenotype_ls, min_data_point=3, **keywords):
 		"""
+		2013.1.5 use bjarni's emmax implementation
 		2011-4-27
 			argument data_matrix renamed to snpData.
 			preprocessing steps are merged into self.removeRowsWithNAPhenotypeFromKinshipAndSNPData().
@@ -1060,8 +1071,8 @@ class Association(Kruskal_Wallis):
 				sys.stderr.write("Error: MAC for this SNP (id=%s) is %s (below 0).\n"%(repr(returnData.snpData.col_id_ls[j]), MAC))
 				sys.exit(3)
 			pdata.var_perc = mm_results['var_perc'][j]	#variance explained
-			pdata.coeff_list = []	#mm_results['betas'][j]	#list of beta values (could be empty, but not None)
-			pdata.coeff_p_value_list = []	#only accessed when coeff_list contains stuff. pvalue for those betas.
+			pdata.coeff_list = mm_results['betas'][j]	#mm_results['betas'][j]	#list of beta values (could be empty, but not None)
+			pdata.coeff_p_value_list = None	#only accessed when coeff_list contains stuff. pvalue for those betas.
 			
 			if pdata is not None:
 				results.append(pdata)
@@ -1075,9 +1086,70 @@ class Association(Kruskal_Wallis):
 		sys.stderr.write("Done.\n")
 		return results
 	
+	def convert_R_EMMA_ResultsIntoGWR(self, results=None, snpData=None, log_pvalue=0, min_MAC=None, locus_id2chr_pos=None, \
+						gwr_name=None, **keywords):
+		"""
+		2013.1.9
+		"""
+		sys.stderr.write("Turning pvalue results of R-EMMA into  GenomeWideResultMethod ...")
+		counter = 0
+		real_counter = 0
+		gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=False, \
+						construct_data_obj_id2index=False, \
+						construct_locus_db_id2index=False)
+		genome_wide_result_id = id(gwr)
+		#gwr.setResultID(associationTableObject.getAttribute('result_id'))
+		no_of_snps = len(results['ps'])
+		
+		for i in range(no_of_snps):
+			counter += 1
+			
+			snp_index = i
+			locus_id = snpData.col_id_ls[snp_index]
+			
+			pvalue = results['ps'][i][0]
+			if log_pvalue:
+				if pvalue>0:
+					pvalue = -math.log10(pvalue)
+				else:
+					pvalue = None
+			var_perc = results['genotype_var_perc'][i][0]
+			
+			coeff_list = [results['beta0_est'][i][0], results['beta1_est'][i][0]]
+			
+			#fake
+			maf = 0.5
+			mac = 20
+			chr = None
+			start = None
+			stop = None
+			if locus_id2chr_pos:
+				locus_id = int(locus_id)
+				chr_pos = locus_id2chr_pos.get(locus_id)
+				if chr_pos is not None:
+					chr, start, stop = chr_pos
+					if chr=='':
+						chr = None
+					if start ==0:
+						start = None
+					if stop == 0:
+						stop = None
+			data_obj = DataObject(locus_id=locus_id, chromosome=chr, start=start, \
+								stop=stop, value=pvalue,\
+								maf=maf, mac=mac, genotype_var_perc=var_perc, \
+								beta_list=coeff_list,\
+								beta_pvalue_list=None)
+			data_obj.genome_wide_result_id = genome_wide_result_id
+			data_obj.genome_wide_result_name = gwr.name	# 2010-3-15
+			gwr.add_one_data_obj(data_obj)
+			real_counter += 1
+		sys.stderr.write(" %s (out of %s) included.\n"%(real_counter, counter))
+		return gwr
+	
 	@classmethod
 	def output_emma_results(cls, results, SNP_header, output_fname, log_pvalue=0, **keywords):
 		"""
+		2013.1.9 not used anymore by this program. convert_R_EMMA_ResultsIntoGWR() is used instead.
 		2011-2-17
 			call returnSNPIdLs() to format the SNP id output
 		2008-11-12
@@ -1113,10 +1185,76 @@ class Association(Kruskal_Wallis):
 		del writer
 		sys.stderr.write("Done.\n")
 	
-	@classmethod
-	def output_lm_results(cls, results, SNP_header, output_fname, log_pvalue=0, min_MAC=None, **keywords):
+	def convertResultsIntoGWR(self, results=None, snpData=None, log_pvalue=0, min_MAC=None, locus_id2chr_pos=None, \
+						gwr_name=None, **keywords):
 		"""
+		2013.1.9
 		pdata should have these attributes:
+			pvalue
+			snp_index
+			count_ls	#a list of count for each allele of the SNP
+			var_perc	#variance explained
+			coeff_list	#list of beta values (could be empty, but not None)
+			coeff_p_value_list	#only accessed when coeff_list contains stuff. pvalue for those betas.
+		"""
+		sys.stderr.write("Turning pvalue results into  GenomeWideResultMethod ...")
+		counter = 0
+		real_counter = 0
+		gwr = GenomeWideResult(name=gwr_name, construct_chr_pos2index=False, \
+						construct_data_obj_id2index=False, \
+						construct_locus_db_id2index=False)
+		genome_wide_result_id = id(gwr)
+		#gwr.setResultID(associationTableObject.getAttribute('result_id'))
+	
+		for i in xrange(len(results)):
+			counter += 1
+			pdata = results[i]
+			pvalue = pdata.pvalue
+			snp_index = pdata.snp_index
+			locus_id = snpData.col_id_ls[snp_index]
+			if log_pvalue:
+				if pvalue>0:
+					pvalue = -math.log10(pvalue)
+				else:
+					pvalue = None
+			mac = min(pdata.count_ls)
+			if min_MAC is not None and mac<min_MAC:	#2013.1.7
+				continue
+			maf = float(mac)/sum(pdata.count_ls)
+			chr = None
+			start = None
+			stop = None
+			if locus_id2chr_pos:
+				locus_id = int(locus_id)
+				chr_pos = locus_id2chr_pos.get(locus_id)
+				if chr_pos is not None:
+					chr, start, stop = chr_pos
+					if chr=='':
+						chr = None
+					if start ==0:
+						start = None
+					if stop == 0:
+						stop = None
+			
+			data_obj = DataObject(locus_id=locus_id, chromosome=chr, start=start, \
+								stop=stop, value=pvalue,\
+								maf=maf, mac=mac, genotype_var_perc=getattr(pdata, 'var_perc', None), \
+								beta_list=getattr(pdata, 'coeff_list', None),\
+								beta_pvalue_list=getattr(pdata, 'coeff_p_value_list', None))
+			data_obj.genome_wide_result_id = genome_wide_result_id
+			data_obj.genome_wide_result_name = gwr.name	# 2010-3-15
+			gwr.add_one_data_obj(data_obj)
+			real_counter += 1
+		sys.stderr.write(" %s (out of %s) included.\n"%(real_counter, counter))
+		return gwr
+	
+	@classmethod
+	def output_lm_results(cls, results, SNP_header, output_fname, log_pvalue=0, min_MAC=None, locus_id2chr_pos=None, \
+						**keywords):
+		"""
+		2013.1.9 not used anymore by this program. convertResultsIntoGWR() is used instead.
+			
+			pdata should have these attributes:
 			pvalue
 			snp_index
 			count_ls	#a list of count for each allele of the SNP
@@ -1145,6 +1283,7 @@ class Association(Kruskal_Wallis):
 		counter = 0
 		real_counter = 0
 		for i in range(len(results)):
+			
 			pdata = results[i]
 			pvalue = pdata.pvalue
 			snp_index = pdata.snp_index
@@ -1171,6 +1310,7 @@ class Association(Kruskal_Wallis):
 			real_counter += 1
 		del writer
 		sys.stderr.write(" %s (out of %s) outputted.\n"%(real_counter, counter))
+		
 	
 	@classmethod
 	def output_multi_variate_lm_results(cls, results, writer, log_pvalue=0, run_genome_scan=True, \
@@ -1247,7 +1387,7 @@ class Association(Kruskal_Wallis):
 		sys.stderr.write("Removing un-phenotyped ecotypes from the SNP data ...")
 		phenData = SNPData(header=header_phen, strain_acc_list=strain_acc_list_phen, data_matrix=data_matrix_phen)
 		if phenotype_method_id_ls:
-			which_phenotype_ls = phenData.getColIndexLsGivenQuerySet(Set(phenotype_method_id_ls), \
+			which_phenotype_ls = phenData.getColIndexLsGivenQuerySet(set(phenotype_method_id_ls), \
 												colIDHashFunction=OutputPhenotype.extractPhenotypeIDFromMethodIDName)
 		else:	#if not available, take all phenotypes
 			which_phenotype_ls = range(len(phenData.col_id_ls))
@@ -1281,8 +1421,10 @@ class Association(Kruskal_Wallis):
 	@classmethod
 	def readInData(cls, phenotype_fname, input_fname, eigen_vector_fname=None, phenotype_method_id_ls=[], test_type=1, report=0,\
 				snpAlleleOrdinalConversion=True, removeUnPhenotypedSNPData=True, ignore_2nd_column=False, kinship_fname=None,\
-				genotype_fname_to_generate_kinship=None, needKinship=False, inputMissingGenotypeNotationSet=set([0,-2])):
+				genotype_fname_to_generate_kinship=None, needKinship=False, inputMissingGenotypeNotationSet=set([0,-2]),\
+				locusMapFname=None):
 		"""
+		2013.1.9 added argument locusMapFname
 		2013.1.7 add arugment inputMissingGenotypeNotationSet
 		2011-4-27
 			add argument kinship_fname and genotype_fname_to_generate_kinship
@@ -1301,6 +1443,13 @@ class Association(Kruskal_Wallis):
 		2009-3-20
 			refactored out of run(), easy for MpiAssociation.py to call
 		"""
+		if locusMapFname:
+			locusMapTableFile = LocusMapTableFile(locusMapFname, openMode='r')
+			locus_id2chr_pos = locusMapTableFile.locus_id2chr_pos
+			locusMapTableFile.close()
+		else:
+			locus_id2chr_pos = None
+		
 		header, strain_acc_list, category_list, data_matrix = read_data(input_fname)
 		snpData = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\
 						data_matrix=data_matrix, turn_into_array=1, ignore_2nd_column=ignore_2nd_column)
@@ -1335,7 +1484,7 @@ class Association(Kruskal_Wallis):
 		
 		if phenData:	# 2010-2-28 make sure it exists
 			if phenotype_method_id_ls:
-				which_phenotype_ls = phenData.getColIndexLsGivenQuerySet(Set(phenotype_method_id_ls), \
+				which_phenotype_ls = phenData.getColIndexLsGivenQuerySet(set(phenotype_method_id_ls), \
 																	colIDHashFunction=OutputPhenotype.extractPhenotypeIDFromMethodIDName)
 			else:	#if not available, take all phenotypes
 				which_phenotype_ls = range(len(phenData.col_id_ls))
@@ -1352,8 +1501,10 @@ class Association(Kruskal_Wallis):
 				phenData = phenData.removeRowsNotInTargetSNPData(snpData)
 		else:
 			kinshipData = None
+		
 		pdata = PassingData(snpData=snpData, phenData=phenData, PC_matrix=PC_matrix, which_phenotype_ls=which_phenotype_ls, \
-						phenotype_method_id_ls=phenotype_method_id_ls, kinshipData=kinshipData)
+						phenotype_method_id_ls=phenotype_method_id_ls, kinshipData=kinshipData,\
+						locus_id2chr_pos=locus_id2chr_pos)
 		sys.stderr.write("%s phenotypes, %s accessions, %s SNPs.\n"%(len(which_phenotype_ls), len(snpData.row_id_ls), \
 															len(snpData.col_id_ls)))
 		return pdata
@@ -1406,7 +1557,8 @@ class Association(Kruskal_Wallis):
 								ignore_2nd_column=True, \
 								kinship_fname=self.kinship_fname, \
 								genotype_fname_to_generate_kinship=self.genotype_fname_to_generate_kinship,\
-								needKinship=needKinship, inputMissingGenotypeNotationSet=self.inputMissingGenotypeNotationSet)
+								needKinship=needKinship, inputMissingGenotypeNotationSet=self.inputMissingGenotypeNotationSet,\
+								locusMapFname=self.locusMapFname)
 		
 		if self.test_type==5 or self.test_type==6:
 			which_phenotype_index_ls, environment_matrix, initData.phenData.data_matrix = \
@@ -1434,16 +1586,21 @@ class Association(Kruskal_Wallis):
 			if len(which_phenotype_index_ls)==1:	#2012.6.5 only one phenotype, don't bother change output_fname
 				output_fname = self.output_fname
 			else:
-				output_fname='%s_pheno_%s.tsv'%(os.path.splitext(self.output_fname)[0], phenotype_name)	#make up a new name corresponding to this phenotype
+				output_fname='%s_pheno_%s.h5'%(os.path.splitext(self.output_fname)[0], phenotype_name)	#make up a new name corresponding to this phenotype
 			results = self.run_whole_matrix[self.test_type](initData.snpData, initData.phenData.data_matrix[:, which_phenotype], \
 											self.min_data_point, PC_matrix=initData.PC_matrix, \
 											which_PC_index_ls=self.which_PC_index_ls, environment_matrix=environment_matrix,\
 											gene_environ_interaction=gene_environ_interaction, kinshipData=initData.kinshipData)
-			output_results_func = self.output_results.get(self.test_type)
-			if output_results_func is None:
-				output_results_func = self.output_lm_results
-			output_results_func(results, initData.snpData.col_id_ls, output_fname, log_pvalue=self.minus_log_pvalue,\
-							min_MAC=self.min_data_point)
+			
+			convertFunc = self.turnAssociationResultsIntoGWRFunctionDict.get(self.test_type, self.convertResultsIntoGWR)
+			gwr = convertFunc(results=results, snpData=initData.snpData, log_pvalue=self.minus_log_pvalue,\
+							min_MAC=self.min_data_point,\
+							locus_id2chr_pos=initData.locus_id2chr_pos, gwr_name='test%s_on_%s'%(self.test_type, phenotype_name))
+			
+			associationTableFile = AssociationTableFile(output_fname, openMode='w')
+			attributeDict = {'min_MAC':self.min_data_point, 'test_type': self.test_type}
+			writer = gwr.outputInHDF5MatrixFile(tableObject=associationTableFile.associationTable, attributeDict=attributeDict)
+			associationTableFile.close()
 
 if __name__ == '__main__':
 	from pymodule import ProcessOptions
