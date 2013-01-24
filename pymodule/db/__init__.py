@@ -83,7 +83,7 @@ class TableClass(object):
 		
 		return ", ".join(return_ls)
 
-class AbstractTableWithFilename(object):
+class AbstractTableWithFilename(TableClass):
 	"""
 	2012.11.13 ancestor of ResultsMethod and AssociationLandscape, and other tables that store paths to files on harddisk.
 	"""
