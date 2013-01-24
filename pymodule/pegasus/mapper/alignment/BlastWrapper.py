@@ -23,11 +23,11 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from AbstractMapper import AbstractMapper
 from Bio.Blast import NCBIXML, NCBIStandalone
 from Bio.Blast.Applications import NcbiblastnCommandline
 import cStringIO
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
+from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 
 class BlastWrapper(AbstractMapper):
 	__doc__ = __doc__

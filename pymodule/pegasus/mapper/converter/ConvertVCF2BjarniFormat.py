@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import cStringIO, re, csv
 from pymodule import ProcessOptions, figureOutDelimiter
 from pymodule.utils import sortCMPBySecondTupleValue
-from pymodule.VCFFile import VCFFile
+from pymodule.yhio.VCFFile import VCFFile
 
 class ConvertVCF2BjarniFormat(object):
 	__doc__ = __doc__

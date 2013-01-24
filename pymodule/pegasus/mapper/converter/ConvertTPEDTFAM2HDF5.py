@@ -6,7 +6,7 @@ Examples:
 	%s -i /Network/Data/250k/db/dataset/call_method_32.tsv -o /tmp/call_32.hdf5
 
 Description:
-	2012.3.1
+	2012.9.6 unfinished. still the copied skeleton from ConvertSNPData2HDF5.py
 
 """
 
@@ -17,12 +17,13 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
+import h5py
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule import SNPData
-from AbstractMapper import AbstractMapper
-import h5py
+from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 
-class ConvertSNPData2HDF5(AbstractMapper):
+
+class ConvertTPEDTFAM2HDF5(AbstractMapper):
 	__doc__ = __doc__
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict.update({
@@ -57,7 +58,7 @@ class ConvertSNPData2HDF5(AbstractMapper):
 		
 
 if __name__ == '__main__':
-	main_class = ConvertSNPData2HDF5
+	main_class = ConvertTPEDTFAM2HDF5
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	instance = main_class(**po.long_option2value)
 	instance.run()
