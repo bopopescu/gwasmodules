@@ -21,8 +21,8 @@ if test $# -lt 2 ; then
 	echo ""
 	echo "Examples:"
 	echo "  #plan & submit and auto-cleanup"
-	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool"
-	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 1"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1"
 	echo "  #plan & submit and no cleanup"
 	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 0"
 	echo "  #only planning, no running (toggleCleanup does not matter)"
@@ -116,6 +116,7 @@ UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 UCLA_CLUSTER_PYTHON_DIR="/u/local/python/2.6/"
 UCLA_CLUSTER_R_DIR="/u/local/apps/R/R-2.12.2-gnu/"
 UCLA_CLUSTER_HDF5_DIR="/u/local/intel/11.1/libs/hdf5/1.8.8-shared/"	#2013.1.10 not necessary
+
 freeSpace="50000G"
 
 USC_CLUSTER_HOSTNAME="hpc-login2.usc.edu"
