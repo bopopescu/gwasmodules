@@ -418,28 +418,28 @@ class AbstractWorkflow(ADAG):
 		
 		ConvertBjarniSNPFormat2Yu = Executable(namespace=namespace, name="ConvertBjarniSNPFormat2Yu", \
 											version=version, os=operatingSystem, arch=architecture, installed=True)
-		ConvertBjarniSNPFormat2Yu.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "ConvertBjarniSNPFormat2Yu.py"), site_handler))
+		ConvertBjarniSNPFormat2Yu.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "yhio/ConvertBjarniSNPFormat2Yu.py"), site_handler))
 		executableClusterSizeMultiplierList.append((ConvertBjarniSNPFormat2Yu, 1))
 		
 		ConvertVCF2BjarniFormat = Executable(namespace=namespace, name="ConvertVCF2BjarniFormat", \
 											version=version, os=operatingSystem, arch=architecture, installed=True)
-		ConvertVCF2BjarniFormat.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/ConvertVCF2BjarniFormat.py"), site_handler))
+		ConvertVCF2BjarniFormat.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/converter/ConvertVCF2BjarniFormat.py"), site_handler))
 		executableClusterSizeMultiplierList.append((ConvertVCF2BjarniFormat, 1))
 		
 		
 		ConvertYuSNPFormat2Bjarni = Executable(namespace=namespace, name="ConvertYuSNPFormat2Bjarni", \
 											version=version, os=operatingSystem, arch=architecture, installed=True)
-		ConvertYuSNPFormat2Bjarni.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "ConvertYuSNPFormat2Bjarni.py"), site_handler))
+		ConvertYuSNPFormat2Bjarni.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "yhio/ConvertYuSNPFormat2Bjarni.py"), site_handler))
 		executableClusterSizeMultiplierList.append((ConvertYuSNPFormat2Bjarni, 1))
 		
 		ConvertYuSNPFormat2EigenStrat = Executable(namespace=namespace, name="ConvertYuSNPFormat2EigenStrat", \
 											version=version, os=operatingSystem, arch=architecture, installed=True)
-		ConvertYuSNPFormat2EigenStrat.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "ConvertYuSNPFormat2EigenStrat.py"), site_handler))
+		ConvertYuSNPFormat2EigenStrat.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "yhio/ConvertYuSNPFormat2EigenStrat.py"), site_handler))
 		executableClusterSizeMultiplierList.append((ConvertYuSNPFormat2EigenStrat, 1))
 		
 		ConvertYuSNPFormat2TPED_TFAM = Executable(namespace=namespace, name="ConvertYuSNPFormat2TPED_TFAM", \
 											version=version, os=operatingSystem, arch=architecture, installed=True)
-		ConvertYuSNPFormat2TPED_TFAM.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "ConvertYuSNPFormat2TPED_TFAM.py"), site_handler))
+		ConvertYuSNPFormat2TPED_TFAM.addPFN(PFN("file://" +  os.path.join(self.variationSrcPath, "yhio/ConvertYuSNPFormat2TPED_TFAM.py"), site_handler))
 		executableClusterSizeMultiplierList.append((ConvertYuSNPFormat2TPED_TFAM, 1))
 		
 		

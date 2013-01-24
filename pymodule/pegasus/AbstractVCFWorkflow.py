@@ -90,7 +90,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		executableClusterSizeMultiplierList.append((PlotVCFtoolsStat, 0))
 		
 		SplitVCFFile = Executable(namespace=namespace, name="SplitVCFFile", version=version, os=operatingSystem, arch=architecture, installed=True)
-		SplitVCFFile.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/SplitVCFFile.py"), site_handler))
+		SplitVCFFile.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/splitter/SplitVCFFile.py"), site_handler))
 		executableClusterSizeMultiplierList.append((SplitVCFFile, 1))
 		
 		#2012.8.30 moved from vervet/src/AddVCFFolder2DBWorkflow.py

@@ -191,12 +191,12 @@ class BlastWorkflow(AbstractWorkflow):
 		
 		BlastWrapper = Executable(namespace=namespace, name="BlastWrapper", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
-		BlastWrapper.addPFN(PFN("file://" + os.path.join(self.pymodulePath, 'pegasus/mapper/BlastWrapper.py'), site_handler))
+		BlastWrapper.addPFN(PFN("file://" + os.path.join(self.pymodulePath, 'pegasus/mapper/alignment/BlastWrapper.py'), site_handler))
 		executableClusterSizeMultiplierList.append((BlastWrapper, 0.1))
 		
 		SplitFastaFile = Executable(namespace=namespace, name="SplitFastaFile", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
-		SplitFastaFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, 'pegasus/mapper/SplitFastaFile.py'), site_handler))
+		SplitFastaFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, 'pegasus/mapper/splitter/SplitFastaFile.py'), site_handler))
 		executableClusterSizeMultiplierList.append((SplitFastaFile, 0.1))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
