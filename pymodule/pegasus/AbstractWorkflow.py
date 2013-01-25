@@ -367,7 +367,7 @@ class AbstractWorkflow(ADAG):
 		#2012.8.15 ancestor of SelectRowsFromMatrix, 
 		AbstractMatrixFileWalker  = Executable(namespace=namespace, name="AbstractMatrixFileWalker", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		AbstractMatrixFileWalker.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "AbstractMatrixFileWalker.py"), site_handler))
+		AbstractMatrixFileWalker.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "yhio/AbstractMatrixFileWalker.py"), site_handler))
 		executableClusterSizeMultiplierList.append((AbstractMatrixFileWalker, 1))
 		
 		#2012.8.13
