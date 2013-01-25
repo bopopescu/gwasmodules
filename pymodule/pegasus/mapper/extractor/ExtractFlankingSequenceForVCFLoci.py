@@ -31,9 +31,9 @@ from pymodule import SNP
 
 #used in getattr(individual_site_id_set, '__len__', returnZeroFunc)()
 from pymodule.utils import returnZeroFunc
-from pymodule.VCFFile import VCFFile
+from pymodule.yhio.VCFFile import VCFFile
 from pymodule.Genome.FastaFile import FastaFile
-from AbstractVCFMapper import AbstractVCFMapper
+from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 
 
 class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):

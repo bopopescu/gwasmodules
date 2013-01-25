@@ -101,7 +101,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		executableClusterSizeMultiplierList.append((AddVCFFile2DB, 1))
 		
 		FilterVCFSNPCluster = Executable(namespace=namespace, name="FilterVCFSNPCluster", version=version, os=operatingSystem, arch=architecture, installed=True)
-		FilterVCFSNPCluster.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/FilterVCFSNPCluster.py"), site_handler))
+		FilterVCFSNPCluster.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/filter/FilterVCFSNPCluster.py"), site_handler))
 		executableClusterSizeMultiplierList.append((FilterVCFSNPCluster, 1))
 		
 		ExtractSamplesFromVCF = Executable(namespace=namespace, name="ExtractSamplesFromVCF", \
@@ -113,10 +113,14 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		JuxtaposeAlleleFrequencyFromMultiVCFInput = Executable(namespace=namespace, name="JuxtaposeAlleleFrequencyFromMultiVCFInput", \
 											version=version, os=operatingSystem, arch=architecture, installed=True)
 		JuxtaposeAlleleFrequencyFromMultiVCFInput.addPFN(PFN("file://" + os.path.join(self.pymodulePath, \
-											"pegasus/mapper/JuxtaposeAlleleFrequencyFromMultiVCFInput.py"), \
+											"pegasus/mapper/extractor/JuxtaposeAlleleFrequencyFromMultiVCFInput.py"), \
 											site_handler))
 		executableClusterSizeMultiplierList.append((JuxtaposeAlleleFrequencyFromMultiVCFInput, 1))
 		
+		ExtractInfoFromVCF = Executable(namespace=namespace, name="ExtractInfoFromVCF", version=version, os=operatingSystem,\
+									arch=architecture, installed=True)
+		ExtractInfoFromVCF.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/extractor/ExtractInfoFromVCF.py"), site_handler))
+		executableClusterSizeMultiplierList.append((ExtractInfoFromVCF, 1))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		

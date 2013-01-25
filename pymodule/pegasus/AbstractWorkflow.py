@@ -336,7 +336,7 @@ class AbstractWorkflow(ADAG):
 		
 		SelectLineBlockFromFile = Executable(namespace=namespace, name="SelectLineBlockFromFile", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		SelectLineBlockFromFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/SelectLineBlockFromFile.py"), \
+		SelectLineBlockFromFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/filter/SelectLineBlockFromFile.py"), \
 										site_handler))
 		executableClusterSizeMultiplierList.append((SelectLineBlockFromFile, 1))
 		
@@ -361,7 +361,7 @@ class AbstractWorkflow(ADAG):
 		#2012.8.13 SelectRowsFromMatrix is a derivative of AbstractMatrixFileWalker, so use addAbstractMatrixFileWalkerJob()
 		SelectRowsFromMatrix = Executable(namespace=namespace, name="SelectRowsFromMatrix", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		SelectRowsFromMatrix.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/SelectRowsFromMatrix.py"), site_handler))
+		SelectRowsFromMatrix.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/filter/SelectRowsFromMatrix.py"), site_handler))
 		executableClusterSizeMultiplierList.append((SelectRowsFromMatrix, 1))
 		
 		#2012.8.15 ancestor of SelectRowsFromMatrix, 
@@ -373,7 +373,7 @@ class AbstractWorkflow(ADAG):
 		#2012.8.13
 		OutputVCFSiteGap = Executable(namespace=namespace, name="OutputVCFSiteGap", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		OutputVCFSiteGap.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/OutputVCFSiteGap.py"), site_handler))
+		OutputVCFSiteGap.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/computer/OutputVCFSiteGap.py"), site_handler))
 		executableClusterSizeMultiplierList.append((OutputVCFSiteGap, 1))
 		
 		java = Executable(namespace=namespace, name="java", version=version, os=operatingSystem, arch=architecture, installed=True)
