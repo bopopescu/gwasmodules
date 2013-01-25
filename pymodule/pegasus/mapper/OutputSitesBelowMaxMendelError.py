@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, MatrixFile
-from AbstractMapper import AbstractMapper
+from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 
 class OutputSitesBelowMaxMendelError(AbstractMapper):
 	__doc__ = __doc__
