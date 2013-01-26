@@ -39,7 +39,7 @@ def addMkDirJob(workflow=None, mkdir=None, outputDir=None, namespace=None, versi
 		workflow.no_of_jobs += 1
 	return job
 
-def registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, input_site_handler='local',\
+def registerRefFastaFile(workflow=None, refFastaFname=None, registerAffiliateFiles=True, input_site_handler='local',\
 						checkAffiliateFileExistence=True, addPicardDictFile=True,\
 						affiliateFilenameSuffixLs=['dict', 'fai', 'amb', 'ann', 'bwt', 'pac', 'sa', 'rbwt', 'rpac', 'rsa', \
 						'stidx', 'sthash'], folderName=""):
