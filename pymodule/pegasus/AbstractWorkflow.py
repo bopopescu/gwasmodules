@@ -99,6 +99,8 @@ class AbstractWorkflow(ADAG):
 		
 		#2012.9.25 global counter
 		self.no_of_jobs = 0
+		
+		self.connectDB()
 	
 	def writeXML(self, out):
 		"""
@@ -190,6 +192,11 @@ class AbstractWorkflow(ADAG):
 		# Close tag
 		out.write('</adag>\n')
 
+	def connectDB(self):
+		"""
+		2013.1.25 placeholder, to establish db connection
+		"""
+		self.db = None
 	
 	def processListArguments(self, listArgumentName_data_type_ls=None, emptyContent=[]):
 		"""

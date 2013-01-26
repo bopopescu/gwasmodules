@@ -1305,6 +1305,18 @@ Contig966       3160    50
 			self.depends(parent=parentJob, child=job)
 		return job
 	
+	def getReferenceSequence(self, workflow=None, **keywords):
+		"""
+		2013.1.25 placeholder, usually from database. such as:
+			refSequence = VervetDB.IndividualSequence.get(self.ref_ind_seq_id)
+			refFastaFname = os.path.join(self.dataDir, refSequence.path)
+			refFastaFList = yh_pegasus.registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, \
+								input_site_handler=self.input_site_handler,\
+								checkAffiliateFileExistence=True)
+			return refFastaFList
+			
+		"""
+		pass
 	
 	def getContigIDFromFname(self, filename):
 		"""

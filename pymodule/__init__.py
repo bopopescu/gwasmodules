@@ -51,6 +51,8 @@ from pegasus import yh_pegasus
 from pegasus.AbstractWorkflow import AbstractWorkflow
 from pegasus.AbstractNGSWorkflow import AbstractNGSWorkflow
 from pegasus.AbstractVCFWorkflow import AbstractVCFWorkflow
+from pegasus.AbstractAlignmentWorkflow import AbstractAlignmentWorkflow
+from pegasus.AbstractAlignmentAndVCFWorkflow import AbstractAlignmentAndVCFWorkflow
 from pegasus.mapper.AbstractMapper import AbstractMapper
 from pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 from pegasus.mapper.AbstractDBInteractingJob import AbstractDBInteractingJob
