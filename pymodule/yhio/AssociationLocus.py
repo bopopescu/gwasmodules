@@ -84,6 +84,7 @@ class AssociationLocusTableFile(YHFile):
 	
 	def _readInData(self, tableName=None, tableObject=None):
 		"""
+		2013.1.26 added phenotype_id_set in the node
 		2012.11.25
 			similar to constructAssociationPeakRBDictFromHDF5File
 		"""
@@ -110,10 +111,14 @@ class AssociationLocusTableFile(YHFile):
 			if not row.chromosome:	#empty chromosome, which happens when inputFname contains no valid locus, but the default null locus (only one).
 				continue
 			counter += 1
+			phenotype_id_ls = row.phenotype_id_ls_in_str.split(',')
+			phenotype_id_set = set(map(int, phenotype_id_ls))
+			
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
 							span_ls=[max(1, row.start - locusPadding), row.stop + locusPadding], \
 							min_reciprocal_overlap=1, no_of_peaks=row.no_of_peaks, \
-							no_of_results=row.no_of_results, connectivity=row.connectivity)
+							no_of_results=row.no_of_results, connectivity=row.connectivity,\
+							phenotype_id_set=phenotype_id_set, locus_id=row.id)
 							#2010-8-17 overlapping keys are regarded as separate instances as long as they are not identical.
 			if segmentKey not in associationLocusRBDict:
 				associationLocusRBDict[segmentKey] = []
@@ -164,3 +169,28 @@ class AssociationLocusTableFile(YHFile):
 				associationLocus2PeakTableRow.append()
 				#self.associationLocus2PeakTable.writeOneCell(oneCell, cellType=3)	#doesn't work. nested type shows up as one column in colnames.
 		sys.stderr.write("\n")
+	
+	def fetchOneLocusGivenID(self, locus_id=None):
+		"""
+		2013.1.27 query the file by the AssociationLocus.id
+		"""
+		rows = self.readWhere('(id=%s)'%(locus_id))
+		if len(rows)>1:
+			sys.stderr.write("Warning: %s (>1) rows found with id=%s. Return 1st one.\n"%(len(rows), locus_id))
+		elif len(rows)==0:
+			#sys.stderr.write("Warning: nothing found with id=%s.\n"%(locus_id))
+			return None
+		return rows[0]
+	
+	def fetchOneLocusGivenChrStartStop(self, chromosome=None, start=None, stop=None):
+		"""
+		2013.1.27
+		"""
+		rows = self.readWhere('(chromosome=%s) & (start=%s) & (stop=%s)'%(chromosome, start, stop))
+		if len(rows)>1:
+			sys.stderr.write("Warning: %s (>1) rows found with chr=%s, start=%s, stop=%s. Return 1st one.\n"%\
+							(len(rows), chromosome, start, stop))
+		elif len(rows)==0:
+			#sys.stderr.write("Warning: nothing found with id=%s.\n"%(locus_id))
+			return None
+		return rows[0]

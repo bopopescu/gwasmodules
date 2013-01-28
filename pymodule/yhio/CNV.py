@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """
+2013.1.27 coordinates are all 1-based and inclusive (??), start=1,stop=100 means [1,100]?? 
 2009-10-31
 	module for CNV (copy-number-variation)-related functions & classes
 """
@@ -15,6 +16,7 @@ from pymodule.utils import getColName2IndexFromHeader, dict_map, importNumericAr
 
 def get_overlap_ratio(span1_ls, span2_ls):
 	"""
+	2013.1.27 add total_span, overlapFraction, and return PassingData (data structure)
 	2012.5.17 bugfix. overlap_length can't be negative (hard-set to zero).
 	2010-8-18
 		figure out the overlap coordinates
@@ -24,7 +26,7 @@ def get_overlap_ratio(span1_ls, span2_ls):
 	2010-7-30
 		doc: if two spans have no overlap, it returns 0,0
 	2010-2-11
-		swap overlap1 and overlap2 so that they match the span1_ls and span2_ls
+		swap overlapFraction1 and overlapFraction2 so that they match the span1_ls and span2_ls
 	2009-12-13
 		calculate the two overlap ratios for two segments
 	"""
@@ -32,37 +34,53 @@ def get_overlap_ratio(span1_ls, span2_ls):
 	qc_start, qc_stop = span2_ls
 	#2010-8-18 figure out the overlap coordinates
 	overlap_start_pos = max(qc_start, segment_start_pos)
+	total_start_pos = min(qc_start, segment_start_pos)
+	
 	overlap_stop_pos = min(qc_stop, segment_stop_pos)
+	total_stop_pos = max(qc_stop, segment_stop_pos)
+	
+	total_span = abs(total_stop_pos-total_start_pos) + 1	#2013.1.27 add +1 ?
+	
 	if overlap_start_pos>overlap_stop_pos:
 		overlap_start_pos = None
 		overlap_stop_pos = None
-	overlap_length = max(0, segment_stop_pos - qc_start+1) - max(0, segment_stop_pos - qc_stop) - max(0, segment_start_pos - qc_start)	# accomodates 6 scenarios
+	overlap_length = max(0, segment_stop_pos - qc_start+1) - max(0, segment_stop_pos - qc_stop) - \
+		max(0, segment_start_pos - qc_start)
+		# accomodates 6 scenarios
 	overlap_length = float(overlap_length)
 	if segment_stop_pos == segment_start_pos:	#2010-8-2 bugfix
 		if overlap_length>0:
-			overlap1 = 1.0
+			overlapFraction1 = 1.0
 		else:
 			overlap_length = 0	#2012.5.17 bugfix. can't be negative
-			overlap1 = 0.0
+			overlapFraction1 = 0.0
 	else:
-		overlap1 = overlap_length/(segment_stop_pos-segment_start_pos)
+		overlapFraction1 = overlap_length/(segment_stop_pos-segment_start_pos+1)	#2013.1.27 add +1?
 	if qc_stop == qc_start:
 		if overlap_length>0:
-			overlap2 = 1.0
+			overlapFraction2 = 1.0
 		else:
 			overlap_length = 0#2012.5.17 bugfix. can't be negative
-			overlap2 = 0.0
+			overlapFraction2 = 0.0
 	else:
-		overlap2 = overlap_length/(qc_stop-qc_start)
-	return overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos
+		overlapFraction2 = overlap_length/(qc_stop-qc_start+1)	#2013.1.27 add +1 ?
+	overlapFraction = float(overlap_length)/total_span	#2013.1.27
+	return PassingData(overlapFraction1=overlapFraction1, overlapFraction2=overlapFraction2, \
+					overlap_length=overlap_length, \
+					overlapFraction=overlapFraction,\
+					overlap_start_pos=overlap_start_pos, overlap_stop_pos=overlap_stop_pos, \
+					total_start_pos=total_start_pos, total_stop_pos=total_stop_pos,\
+					total_span = total_span)
 
 def is_reciprocal_overlap(span1_ls, span2_ls, min_reciprocal_overlap=0.6):
 	"""
 	2009-12-12
 		return True if both overlap ratios are above the min_reciprocal_overlap
 	"""
-	overlap1, overlap2 = get_overlap_ratio(span1_ls, span2_ls)[:2]
-	if overlap1>=min_reciprocal_overlap and overlap2>=min_reciprocal_overlap:
+	overlapData = get_overlap_ratio(span1_ls, span2_ls)
+	overlapFraction1 = overlapData.overlapFraction1
+	overlapFraction2 = overlapData.overlapFraction2
+	if overlapFraction1>=min_reciprocal_overlap and overlapFraction2>=min_reciprocal_overlap:
 		return True
 	else:
 		return False
@@ -118,11 +136,13 @@ class CNVSegmentBinarySearchTreeKey(object):
 				if len(other.span_ls)==1:
 					return self.span_ls[0]<other.span_ls[0]
 				elif len(other.span_ls)>1:
-					overlap1, overlap2 = get_overlap_ratio(self.span_ls, other.span_ls)[:2]
-					min_overlap = min(overlap1, overlap2)
+					overlapData = get_overlap_ratio(self.span_ls, other.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					min_overlap = min(overlapFraction1, overlapFraction2)
 					if min_overlap>=self.min_reciprocal_overlap:	#should be equal,
 						return False
-					#if overlap1>0 and overlap1<=1 and  overlap2>0 and overlap2<=1:	# there's overlap between two segments 
+					#if overlapFraction1>0 and overlapFraction1<=1 and  overlapFraction2>0 and overlapFraction2<=1:	# there's overlap between two segments 
 					#	return False
 					else:
 						return self.span_ls[0]<other.span_ls[0]	# whether the stop of this segment is ahead of the start of other
@@ -197,10 +217,12 @@ class CNVSegmentBinarySearchTreeKey(object):
 		2009-12-12
 		"""
 		if self.chromosome==other.chromosome and len(self.span_ls)>1 and len(other.span_ls)>1:
-			overlap1, overlap2 = get_overlap_ratio(self.span_ls, other.span_ls)[:2]
-			if overlap1>=min_reciprocal_overlap and overlap2>=min_reciprocal_overlap:
+			overlapData = get_overlap_ratio(self.span_ls, other.span_ls)
+			overlapFraction1 = overlapData.overlapFraction1
+			overlapFraction2 = overlapData.overlapFraction2
+			if overlapFraction1>=min_reciprocal_overlap and overlapFraction2>=min_reciprocal_overlap:
 				return True
-			#elif overlap1>0 and overlap1<=1 and  overlap2>0 and overlap2<=1:	# there's overlap between two segments 
+			#elif overlapFraction1>0 and overlapFraction1<=1 and  overlapFraction2>0 and overlapFraction2<=1:	# there's overlap between two segments 
 			#	return False
 			else:
 				return not self.__lt__(other)
@@ -212,11 +234,13 @@ class CNVSegmentBinarySearchTreeKey(object):
 		2009-12-12
 		"""
 		if self.chromosome==other.chromosome and len(self.span_ls)>1 and len(other.span_ls)>1:
-			overlap1, overlap2 = get_overlap_ratio(self.span_ls, other.span_ls)[:2]
-			min_overlap = min(overlap1, overlap2)
+			overlapData = get_overlap_ratio(self.span_ls, other.span_ls)
+			overlapFraction1 = overlapData.overlapFraction1
+			overlapFraction2 = overlapData.overlapFraction2
+			min_overlap = min(overlapFraction1, overlapFraction2)
 			if min_overlap>=self.min_reciprocal_overlap:	#should be equal,
 				return False
-			#if overlap1>0 and overlap1<=1 and  overlap2>0 and overlap2<=1:	# there's overlap between two segments 
+			#if overlapFraction1>0 and overlapFraction1<=1 and  overlapFraction2>0 and overlapFraction2<=1:	# there's overlap between two segments 
 			#	return False
 			else:
 				return not self.__le__(other)
@@ -249,7 +273,7 @@ class SegmentTreeNodeKey(CNVSegmentBinarySearchTreeKey):
 			 
 			If the tree is comprised of CNVSegmentBinarySearchTreeKey instances, self=segmentKey, other=nodes in the tree.
 			If the tree is comprised of SegmentTreeNodeKey instances, self=nodes in the tree, other=segmentKey.
-				That's why here used the condition that "other"'s overlap ratio (overlap2) ==1..
+				That's why here used the condition that "other"'s overlap ratio (overlapFraction2) ==1..
 			
 		
 	"""
@@ -321,12 +345,14 @@ class CNVCompareBySmallOverlapRatio(object):
 				if len(key2.span_ls)==1:
 					return key1.span_ls[0]<key2.span_ls[0]
 				elif len(key2.span_ls)>1:
-					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-					recip_overlap = min(overlap1, overlap2)
+					overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					recip_overlap = min(overlapFraction1, overlapFraction2)
 					if recip_overlap>=min_reciprocal_overlap:	#should be equal,
 						return False
 					
-					#if overlap1>0 and overlap1<=1 and  overlap2>0 and overlap2<=1:	# there's overlap between two segments 
+					#if overlapFraction1>0 and overlapFraction1<=1 and  overlapFraction2>0 and overlapFraction2<=1:	# there's overlap between two segments 
 					#	return False
 					else:
 						return key1.span_ls[0]<key2.span_ls[0]	# whether the start of key1 is ahead of the start of key2
@@ -381,8 +407,11 @@ class CNVCompareByOverlapLen(object):
 					return key1.span_ls[0]<=key2.span_ls[0] and key1.span_ls[1]>=key2.span_ls[0]	# if self includes the point position, yes it's equal
 				elif len(key2.span_ls)>1:
 					# need to calculate min_reciprocal_overlap
-					overlap1, overlap2, overlap_len = get_overlap_ratio(key1.span_ls, key2.span_ls)[:3]
-					if overlap_len>=min_overlap_len:	#should be equal,
+					overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					overlap_length = overlapData.overlap_length
+					if overlap_length>=min_overlap_len:	#should be equal,
 						return True
 					else:
 						return False
@@ -410,7 +439,10 @@ class CNVCompareByOverlapLen(object):
 				if len(key2.span_ls)==1:
 					return key1.span_ls[0]<key2.span_ls[0]
 				elif len(key2.span_ls)>1:
-					overlap1, overlap2, overlap_len = get_overlap_ratio(key1.span_ls, key2.span_ls)[:3]
+					overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					overlap_length = overlapData.overlap_length
 					if overlap_len>=min_overlap_len:	#should be equal,
 						return False
 					else:
@@ -431,8 +463,8 @@ class CNVCompareByOverlapLen(object):
 class CNVCompareByBigOverlapRatio(object):
 	"""
 	2011-3-16
-		similar to CNVCompareBySmallOverlapRatio, but use max(overlap1, overlap2) to compare aginst min_overlap_len, \
-			rather than min(overlap1, overlap2)
+		similar to CNVCompareBySmallOverlapRatio, but use max(overlapFraction1, overlapFraction2) to compare aginst min_overlap_len, \
+			rather than min(overlapFraction1, overlapFraction2)
 	2010-8-16
 		a class to compare two CNVSegmentBinarySearchTreeKey according to any arbitrary min_reciprocal_overlap
 	"""
@@ -464,9 +496,11 @@ class CNVCompareByBigOverlapRatio(object):
 				if len(key2.span_ls)==1:	# self is a segment. other is a point position.
 					return key1.span_ls[0]<=key2.span_ls[0] and key1.span_ls[1]>=key2.span_ls[0]	# if self includes the point position, yes it's equal
 				elif len(key2.span_ls)>1:
-					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-					recip_overlap = max(overlap1, overlap2)
+					overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					overlap_length = overlapData.overlap_length
+					recip_overlap = max(overlapFraction1, overlapFraction2)
 					if recip_overlap>=min_reciprocal_overlap:	#should be equal,
 						return True
 					else:
@@ -492,8 +526,10 @@ class CNVCompareByBigOverlapRatio(object):
 				if len(key2.span_ls)==1:
 					return key1.span_ls[0]<key2.span_ls[0]
 				elif len(key2.span_ls)>1:
-					overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-					recip_overlap = max(overlap1, overlap2)
+					overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					recip_overlap = max(overlapFraction1, overlapFraction2)
 					if recip_overlap>=min_reciprocal_overlap:	#should be equal,
 						return False
 					else:
@@ -522,8 +558,10 @@ def leftWithinRightAlsoEqual(key1, key2):
 		return equalResult
 	else:
 		if len(key1.span_ls)==2 and len(key2.span_ls)==2:
-			overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-			if overlap1==1.:	# 2010-1-28 added the overlap2==1.
+			overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+			overlapFraction1 = overlapData.overlapFraction1
+			overlapFraction2 = overlapData.overlapFraction2
+			if overlapFraction1==1.:	# 2010-1-28 added the overlapFraction2==1.
 				return True
 			else:
 				return equalResult
@@ -541,8 +579,12 @@ def rightWithinLeftAlsoEqual(key1, key2):
 		return equalResult
 	else:
 		if len(key1.span_ls)==2 and len(key2.span_ls)==2:
-			overlap1, overlap2 = get_overlap_ratio(key1.span_ls, key2.span_ls)[:2]
-			if overlap2==1.:	# 2010-1-28 added the overlap2==1.
+			overlapData = get_overlap_ratio(key1.span_ls, key2.span_ls)
+			overlapFraction1 = overlapData.overlapFraction1
+			overlapFraction2 = overlapData.overlapFraction2
+			overlap_length = overlapData.overlap_length
+					
+			if overlapFraction2==1.:	# 2010-1-28 added the overlapFraction2==1.
 				return True
 			else:
 				return equalResult
@@ -1139,6 +1181,46 @@ def readQuanLongPECoverageIntoGWR(input_fname, additionalTitle=None, windowSize=
 		coverage_gwr.add_one_data_obj(data_obj)
 	sys.stderr.write("Done.\n")
 	return coverage_gwr
+
+
+def findCorrespondenceBetweenTwoCNVRBDict(rbDict1=None, rbDict2=None):
+	"""
+	2013.1.27
+	"""
+	dc1Length = len(rbDict1)
+	dc2Length = len(rbDict2)
+	sys.stderr.write("Finding correspondence between two CNV RB dictionaries, %s and %s nodes respectively ... "%\
+					(dc1Length, dc2Length))
+	nodePairList = []	#each cell is a tuple of (node1, node2, overlap)
+	compareIns = CNVCompare(min_reciprocal_overlap=0.0000001)	#to detect any overlap
+	setOfMatchedNodesInRBDict2 = set()
+	for input1Node in rbDict1:
+		targetNodeLs = []
+		rbDict2.findNodes(input1Node.key, node_ls=targetNodeLs, compareIns=compareIns)
+		if targetNodeLs:
+			for input2Node in targetNodeLs:
+				overlapData = get_overlap_ratio(input1Node.key.span_ls, input2Node.key.span_ls)
+				overlapFraction = overlapData.overlapFraction
+				nodePairList.append((input1Node, input2Node, overlapFraction))
+				setOfMatchedNodesInRBDict2.add(input2Node)
+		else:
+			nodePairList.append((input1Node, None, None))
+	for input2Node in rbDict2:
+		if input2Node not in setOfMatchedNodesInRBDict2:
+			targetNodeLs = []
+			rbDict1.findNodes(input2Node.key, node_ls=targetNodeLs, compareIns=compareIns)
+			if targetNodeLs:	#this should not happen
+				sys.stderr.write("Warning: after first scan node from rbDict2, %s, still has hits from rbDict1.\n"%\
+								(input2Node))
+				for input1Node in targetNodeLs:
+					overlapData = get_overlap_ratio(input1Node.key.span_ls, input2Node.key.span_ls)
+					overlapFraction = overlapData.overlapFraction
+					nodePairList.append((input1Node, input2Node, overlapFraction))
+			else:
+				nodePairList.append((None, input2Node, None))
+	sys.stderr.write(" found %s corresponding pairs.\n"%(len(nodePairList)))
+	return nodePairList
+
 
 # test program if this file is run
 if __name__ == "__main__":
