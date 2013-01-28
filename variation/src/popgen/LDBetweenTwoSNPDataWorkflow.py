@@ -91,7 +91,7 @@ class LDBetweenTwoSNPDataWorkflow(AbstractVariationWorkflow):
 	
 		ConvertSNPData2HDF5 = Executable(namespace=namespace, name="ConvertSNPData2HDF5", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
-		ConvertSNPData2HDF5.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/ConvertSNPData2HDF5.py"), \
+		ConvertSNPData2HDF5.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/converter/ConvertSNPData2HDF5.py"), \
 									site_handler))
 		#ConvertSNPData2HDF5.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		workflow.addExecutable(ConvertSNPData2HDF5)
