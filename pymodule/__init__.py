@@ -38,7 +38,8 @@ from yhio.AssociationLocus import AssociationLocusTable, AssociationLocus2PeakTa
 
 #from yhio.BamFile import BamFile
 from yhio.VCFFile import VCFFile, VCFRecord
-from yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
+from yhio import CNV
+from yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio, findCorrespondenceBetweenTwoCNVRBDict
 from yhio.AbstractMatrixFileWalker import AbstractMatrixFileWalker
 from yhio.latex import outputMatrixInLatexTable, outputFigureInLatex
 
