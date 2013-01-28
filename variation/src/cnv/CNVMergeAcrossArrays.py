@@ -436,29 +436,33 @@ class CNVMergeAcrossArrays(object):
 				if aheadSegment[0]!=segment[0]:		#on different chromosomes, ignore
 					#leftMostOverlapSegmentIndex = aheadSegmentIndex + 1
 					continue
-				overlap1, overlap2, overlap_length = get_overlap_ratio([aheadSegment[1], aheadSegment[2]], \
-															[segment[1], segment[2]])[:3]
-				#if overlap1==0 or overlap2==0:	#2010-8-12 this is wrong. this could cut out earlier segments
+				overlapData = get_overlap_ratio([aheadSegment[1], aheadSegment[2]], \
+															[segment[1], segment[2]])
+				overlapFraction1 = overlapData.overlapFraction1
+				overlapFraction2 = overlapData.overlapFraction2
+				overlap_length = overlapData.overlap_length
+				
+				#if overlapFraction1==0 or overlapFraction2==0:	#2010-8-12 this is wrong. this could cut out earlier segments
 				#	that could still be overlapping with future segments.
 				#	leftMostOverlapSegmentIndex = aheadSegmentIndex + 1
 				
-				if overlap1>=min_overlap_ratio or overlap2>=min_overlap_ratio:
+				if overlapFraction1>=min_overlap_ratio or overlapFraction2>=min_overlap_ratio:
 					# 2010-8-12 doesn't require both to be >=min_overlap_ratio because
-					# scenario 1. overlap1>=min_overlap_ratio but overlap2 not
+					# scenario 1. overlapFraction1>=min_overlap_ratio but overlapFraction2 not
 					# 	the future segments might be shorter than current segment while with similar overlap length,
-					# 	thus its overlap2 could be
+					# 	thus its overlapFraction2 could be
 					# 	>=min_overlap_ratio even though the current one's is <min_overlap_ratio
 					# scenario 2. opposite of scenario 1.
 					# 	the current segment is embedded in the previous segment,
-					#	future segments might extend over this aheadSegment and overlap1 reaches above min_overlap_ratio
+					#	future segments might extend over this aheadSegment and overlapFraction1 reaches above min_overlap_ratio
 					newLeftOverlapSegmentIndexLs.append(aheadSegmentIndex)
 				
-				if overlap1<0 or overlap2<0:
+				if overlapFraction1<0 or overlapFraction2<0:
 					sys.stderr.write("aheadSegment %s.\n"%repr(aheadSegment))
 					sys.stderr.write("segment %s.\n"%repr(segment))
-					sys.stderr.write("Error: overlap1 %s or overlap2 %s is zero.\n"%(overlap1, overlap2)) 
-				elif overlap1>=min_overlap_ratio and overlap2>=min_overlap_ratio:
-					G.add_edge(aheadSegmentIndex, current_segment_index, weight=min(overlap1, overlap2))
+					sys.stderr.write("Error: overlapFraction1 %s or overlapFraction2 %s is zero.\n"%(overlapFraction1, overlapFraction2)) 
+				elif overlapFraction1>=min_overlap_ratio and overlapFraction2>=min_overlap_ratio:
+					G.add_edge(aheadSegmentIndex, current_segment_index, weight=min(overlapFraction1, overlapFraction2))
 					real_counter += 1
 			
 			# always include the current_segment_index for the next segment to compare

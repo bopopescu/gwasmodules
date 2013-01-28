@@ -64,7 +64,7 @@ class TopCNVTest(GeneListRankTest):
 						("no_of_permutations", 1, int): [20000, 'N', 1, 'no of permutations to carry out'],\
 						("no_of_min_breaks", 1, int): [10, 'B', 1, 'minimum no of times that rank_sum_stat_perm>=rank_sum_stat to break away. if 0, no breaking'],\
 						('null_distribution_type_id', 0, int):[1, 'C', 1, 'Type of null distribution. 1=original, 2=permutation, 3=random gene list. check DB table null_distribution_type'],\
-						("min_big_overlap", 1, float): [0.3, 'a', 1, 'minimum of max(overlap1, overlap2) to declare a CNV is close to a gene'],\
+						("min_big_overlap", 1, float): [0.3, 'a', 1, 'minimum of max(overlapFraction1, overlapFraction2) to declare a CNV is close to a gene'],\
 						('min_no_of_genes', 1, int):[10, 'G', 1, 'minimum no of genes one candidate gene list should harbor. effective only in MPI version'],\
 						('tax_id', 1, int): [3702, 'x', 1, 'to get the number of total genes from database, which species.'],\
 						('no_of_top_loci', 1, int): [200, 'f', 1, 'how many number of top snps based on score or -log(pvalue).'],\
@@ -103,8 +103,13 @@ class TopCNVTest(GeneListRankTest):
 			if len(node_ls)==0:
 				no_of_loci_skipped += 1
 			for node in node_ls:
-				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-										[node.key.start, node.key.stop])[:5]
+				overlapData = get_overlap_ratio(segmentKey.span_ls, [node.key.start, node.key.stop])
+				overlapFraction1 = overlapData.overlapFraction1
+				overlapFraction2 = overlapData.overlapFraction2
+				overlap_length = overlapData.overlap_length
+				overlap_start_pos = overlapData.overlap_start_pos
+				overlap_stop_pos = overlapData.overlap_stop_pos
+				
 				cumu_start = overlap_start_pos - node.key.start + 1 + node.value	#overlap_start_pos is in normal genome coordinates.
 				cumu_stop = overlap_stop_pos - node.key.start + 1 + node.value
 				top_loci_in_cumu_pos.append([cumu_start, cumu_stop])
@@ -133,8 +138,13 @@ class TopCNVTest(GeneListRankTest):
 				sys.stderr.write("(%s, %s) not found in cumuSpan2ChrSpanRBDict.\n"%(cumu_start, cumu_stop))
 			for node in node_ls:
 				chr, node_chr_start, node_chr_stop = node.value[:3]
-				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-										[node.key.start, node.key.stop])[:5]
+				overlapData = get_overlap_ratio(segmentKey.span_ls, [node.key.start, node.key.stop])
+				overlapFraction1 = overlapData.overlapFraction1
+				overlapFraction2 = overlapData.overlapFraction2
+				overlap_length = overlapData.overlap_length
+				overlap_start_pos = overlapData.overlap_start_pos
+				overlap_stop_pos = overlapData.overlap_stop_pos
+				
 				
 				start = overlap_start_pos - node.key.span_ls[0] + node_chr_start	#overlap_start_pos is in cumu coordinates.
 				stop = overlap_stop_pos - node.key.span_ls[0] + node_chr_start

@@ -7950,7 +7950,7 @@ class CmpDifferentData(object):
 
 class DB250k(object):
 	@classmethod
-	def bringBackOldAssociationResults(cls, db_250k, call_method_id=None):
+	def bringBackOldAssociationResults(cls, db_250k, call_method_id=None, newDataDir=None):
 		"""
 		2012.3.21
 			bring the *.old.tsv to *.tsv. Backup existing *.tsv to *.datetime.tsv
@@ -7969,21 +7969,22 @@ class DB250k(object):
 		for row in query:
 			counter += 1
 			sys.stderr.write("%d/%d:\t%s "%(counter, no_of_files, row.filename))
-			if not os.path.isfile(row.filename):	#2011-5-4 bugfix: file might not exist at all.
-				sys.stderr.write(" file doesn't exist.\n")
+			path = db_250k.reScalePathByNewDataDir(filePath=row.filename, newDataDir=newDataDir)
+			if not os.path.isfile(path):	#2011-5-4 bugfix: file might not exist at all.
+				sys.stderr.write(" file %s doesn't exist.\n"%(path))
 				continue
 			
 			no_of_lines = 0
 			no_of_lines_changed = 0
 			sys.stderr.write("...")
 			# backup the old file first
-			oldFormatFname = '%s.old.tsv'%(os.path.splitext(row.filename)[0])
-			if os.path.isfile(oldFormatFname) and os.path.isfile(row.filename):
-				os.rename(row.filename, row.getDateStampedFilename())
+			oldFormatFname = '%s.old.tsv'%(os.path.splitext(path)[0])
+			if os.path.isfile(oldFormatFname) and os.path.isfile(path):
+				os.rename(path, row.getDateStampedFilename())
 				real_counter += 1
 			
 			if os.path.isfile(oldFormatFname):
-				os.rename(oldFormatFname, row.filename)
+				os.rename(oldFormatFname, path)
 			sys.stderr.write("  .\n")
 		sys.stderr.write("%s files out of %s total were brought back.\n"%(real_counter, counter))
 		return real_counter
@@ -8002,6 +8003,62 @@ class DB250k(object):
 					DB250k.convertOldFormatResultMethodFileIntoNewFormat(db_250k, call_method_id=call_method_id, priorTAIRVersion=True)
 		sys.exit(0)
 		
+	"""
+	
+	@classmethod
+	def removeOrphanResultsMethodFiles(cls, db_250k=None, associationFileFolder=None, newDataDir=None):
+		"""
+		2013.1.7
+			deletes .tsv files in results/type_1/ that have no db entry associated with them.
+				(their ex-db-entries were deleted from the db at one point) 
+		"""
+		from variation.src import Stock_250kDB
+		import csv, sys, os
+		from pymodule import utils
+		sys.stderr.write("Removing orphaned association results inside folder %s ..."%(associationFileFolder))
+		TableClass = Stock_250kDB.ResultsMethod
+		query = TableClass.query
+		counter = 0
+		real_counter = 0
+		file_ls = os.listdir(associationFileFolder)
+		no_of_files = len(file_ls)
+		for fname in file_ls:
+			counter += 1
+			sys.stderr.write("%d/%d:\t%s "%(counter, no_of_files, fname))
+			#suffix = os.path.splitext(fname)[1]
+			#if suffix!='.tsv':
+			#	continue
+			try:
+				result_id = int(fname.split('_')[0])
+			except:
+				sys.stderr.write("  Except, ignored.\n")
+				continue
+			db_entry = TableClass.get(result_id)
+			if db_entry is None:	#orphaned
+				path = os.path.join(associationFileFolder, fname)
+				utils.runLocalCommand("rm -rf %s"%(path))
+				real_counter += 1
+				sys.stderr.write("  deleted.\n")
+			else:
+				sys.stderr.write("  .\n")
+		sys.stderr.write("%s files out of %s total were deleted.\n"%(real_counter, counter))
+		return real_counter
+	"""
+		#2013.1.7
+		#run on office desktop for type 1
+		DB250k.removeOrphanResultsMethodFiles(db_250k=db_250k, \
+								associationFileFolder=os.path.expanduser('/Network/Data/250k/db/results/type_1/'), newDataDir=None)
+		sys.exit(0)
+		
+		#run on hoffman2
+		DB250k.removeOrphanResultsMethodFiles(db_250k=db_250k, \
+								associationFileFolder=os.path.expanduser('~/NetworkData/250k/db/results/type_1/'), newDataDir=None)
+		sys.exit(0)
+		
+		#run on office desktop for type 3
+		DB250k.removeOrphanResultsMethodFiles(db_250k=db_250k, \
+								associationFileFolder=os.path.expanduser('/Network/Data/250k/db/results/type_3/'), newDataDir=None)
+		sys.exit(0)
 	"""
 	
 	@classmethod
@@ -9100,9 +9157,142 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 	"""
 	
 	@classmethod
+	def convert2ndGenResultMethodFileIntoHDF5File(cls, db_250k=None, call_method_id=None, data_dir=None,\
+												commit=True):
+		"""
+		2013.1.10 convert all .tsv into .h5
+		"""
+		from variation.src import Stock_250kDB
+		import os, sys, csv
+		from pymodule import AssociationTableFile, getGenomeWideResultFromFile, PassingData
+		#db_250k.session.begin()
+		
+		sys.stderr.write("Converting 2nd-gen locus-id-based results_method files from method %s into new format ... \n"%(call_method_id))
+		
+		#type 2 is segment-based recombination rate. only one result.
+		# analysis method 13 is BooleanSNPPair. ignore
+		TableClass = Stock_250kDB.ResultsMethod
+		query = TableClass.query.filter(TableClass.results_method_type_id!=2).filter(TableClass.analysis_method_id!=13)
+		if call_method_id>=1 or call_method_id is None:	#None is for cnvs
+			query = query.filter_by(call_method_id=call_method_id)
+		counter = 0
+		no_of_files = query.count()
+		pdata = PassingData(data_dir=db_250k.data_dir)
+		for db_entry in query:
+			counter += 1
+			sys.stderr.write("%d/%d:\t%s "%(counter, no_of_files, db_entry.filename))
+			suffix = os.path.splitext(db_entry.filename)[1]
+			inputFname = db_250k.reScalePathByNewDataDir(filePath=db_entry.filename, newDataDir=data_dir)
+			if suffix=='.tsv' and os.path.isfile(inputFname):
+				newFilenameForOldFormat = db_entry.getDateStampedFilename()
+				
+				
+				if not os.path.isfile(inputFname):	#2011-5-4 bugfix: file might not exist at all.
+					sys.stderr.write(" file doesn't exist.\n")
+					continue
+				
+				if db_entry.call_method_id:
+					db_id2chr_pos = db_250k.snp_id2chr_pos
+				elif db_entry.cnv_method_id:
+					if db_250k._cnv_method_id!=db_entry.cnv_method_id:
+						db_250k.cnv_id2chr_pos = db_entry.cnv_method_id
+						db_250k._cnv_method_id = db_entry.cnv_method_id
+					db_id2chr_pos = db_250k.cnv_id2chr_pos
+				pdata.db_id2chr_pos = db_id2chr_pos
+				
+				genome_wide_result = getGenomeWideResultFromFile(inputFname, do_log10_transformation=False, \
+														pdata=pdata, min_value_cutoff=None)
+				genome_wide_result.setResultMethod(rm=db_entry)
+					
+				newPath = db_entry.constructRelativePath(data_dir=data_dir)
+				localAbsPath = os.path.join(data_dir, newPath)
+				
+				#write it to hdf5
+				associationTableFile = AssociationTableFile(localAbsPath, openMode='w')
+				attributeDict = {}
+				genome_wide_result.outputInHDF5MatrixFile(tableObject=associationTableFile.associationTable, attributeDict=attributeDict)
+				associationTableFile.close()
+				
+				db_250k.addAttributesToResultFile(db_entry=db_entry, inputFname=localAbsPath)
+				
+				if db_entry.getFilePath()!=newPath:
+					db_entry.setFilePath(newPath)
+					try:
+						db_250k.session.add(db_entry)
+						db_250k.session.flush()
+					except:
+						sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+						import traceback
+						traceback.print_exc()
+						exitCode = 4
+						return exitCode
+				#rename the old format file
+				os.rename(inputFname, \
+						db_250k.reScalePathByNewDataDir(filePath=newFilenameForOldFormat, newDataDir=data_dir))
+				sys.stderr.write(" converted.\n")
+			elif not os.path.isfile(inputFname):
+				sys.stderr.write(" no conversion. file %s not existing.\n"%(inputFname))
+			else:
+				sys.stderr.write(" no conversion. (maybe converted already).\n")
+		if commit:
+			db_250k.session.flush()
+			try:
+				db_250k.session.commit()
+			except:
+				pass
+		else:
+			db_250k.session.rollback()
+	"""
+				
+		# 2013.1.10
+		DB250k.convert2ndGenResultMethodFileIntoHDF5File(db_250k, call_method_id=1, data_dir=db_250k.data_dir,\
+												commit=True)
+		sys.exit(0)
+		
+		# 2013.1.10
+		for call_method_id in range(20,81):
+			try:
+				DB250k.convert2ndGenResultMethodFileIntoHDF5File(db_250k, call_method_id=call_method_id, data_dir=db_250k.data_dir,\
+												commit=True)
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+		sys.exit(0)
+		
+		# 2013.1.10 for associations whose call_method is null (and whose cnv_method_id is not )
+		DB250k.convert2ndGenResultMethodFileIntoHDF5File(db_250k, call_method_id=None, data_dir=db_250k.data_dir,\
+												commit=True)
+		sys.exit(0)
+		# 2013.1.10
+		for call_method_id in range(1,20)+[72,73,80]:
+			try:
+				DB250k.convert2ndGenResultMethodFileIntoHDF5File(db_250k, call_method_id=call_method_id, data_dir=db_250k.data_dir,\
+												commit=True)
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+		sys.exit(0)
+		
+		
+		# 2013.1.10
+		for call_method_id in [5, 36, 17]:
+			try:
+				DB250k.convert2ndGenResultMethodFileIntoHDF5File(db_250k, call_method_id=call_method_id, data_dir=db_250k.data_dir,\
+												commit=True)
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+		sys.exit(0)
+		
+	"""
+	@classmethod
 	def convertRMIntoJson(cls, db_250k, call_method_id_ls_str="", analysis_method_id_ls_str="", \
 						phenotype_method_id_ls_str="", no_of_top_snps = 10000, commit=False):
 		"""
+		2013.1.14 updated with new stock_250k db definition
 		2010-5-3
 			
 		"""
@@ -9111,19 +9301,20 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 		else:
 			# begin the session but without commit
 			db_250k.session.begin()
-		from pymodule import getListOutOfStr
-		import Stock_250kDB
-		from Stock_250kDB import ResultsMethodJson, ResultsMethod
-		query = ResultsMethod.query
+		from pymodule import getListOutOfStr, PassingData
+		from variation.src import Stock_250kDB
+		RMTable = Stock_250kDB.ResultsMethod
+		RMJSTable = Stock_250kDB.ResultsMethodJson
+		query = RMTable.query
 		call_method_id_ls = getListOutOfStr(call_method_id_ls_str, data_type=int)
 		if call_method_id_ls:
-			query = query.filter(ResultsMethod.call_method_id.in_(call_method_id_ls))
+			query = query.filter(RMTable.call_method_id.in_(call_method_id_ls))
 		analysis_method_id_ls = getListOutOfStr(analysis_method_id_ls_str, data_type=int)
 		if analysis_method_id_ls:
-			query = query.filter(ResultsMethod.analysis_method_id.in_(analysis_method_id_ls))
+			query = query.filter(RMTable.analysis_method_id.in_(analysis_method_id_ls))
 		phenotype_method_id_ls = getListOutOfStr(phenotype_method_id_ls_str, data_type=int)
 		if phenotype_method_id_ls:
-			query = query.filter(ResultsMethod.phenotype_method_id.in_(phenotype_method_id_ls))
+			query = query.filter(RMTable.phenotype_method_id.in_(phenotype_method_id_ls))
 		
 		no_of_total = query.count()
 		count = 0
@@ -9135,17 +9326,25 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 				min_MAF = rm.analysis_method.min_maf
 			else:
 				min_MAF = 0
-			rm_json = ResultsMethodJson.query.filter_by(results_id=rm.id).\
-				filter(ResultsMethodJson.min_MAF<=min_MAF+0.0001).\
-				filter(ResultsMethodJson.min_MAF>=min_MAF-0.0001).\
+			rm_json = RMJSTable.query.filter_by(results_id=rm.id).\
+				filter(RMJSTable.min_maf<=min_MAF+0.0001).\
+				filter(RMJSTable.min_maf>=min_MAF-0.0001).\
 				filter_by(no_of_top_snps=no_of_top_snps).first()
 			if rm_json:
 				sys.stderr.write("json for result %s (%s, %s, %s) already exists in db.\n"%\
 								(rm.id, rm.call_method_id, rm.analysis_method_id, rm.phenotype_method_id))
 				continue
-			from common import getOneResultJsonData
-			json_data = getOneResultJsonData(rm, min_MAF, no_of_top_snps)
-			rm_json = ResultsMethodJson(min_MAF=min_MAF, no_of_top_snps=no_of_top_snps)
+			if rm.call_method_id:	#call method, snp dataset
+				db_id2chr_pos = db_250k.snp_id2chr_pos
+			elif rm.cnv_method_id:
+				if db_250k._cnv_method_id!=cnv_method_id:
+					db_250k.cnv_id2chr_pos = cnv_method_id
+				db_id2chr_pos = db_250k.cnv_id2chr_pos
+			#pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
+			pdata = PassingData(min_MAF=min_MAF, db_id2chr_pos=db_id2chr_pos)
+			json_data = db_250k.getOneResultJsonData(result_id=rm.id, min_MAF=min_MAF, no_of_top_snps=no_of_top_snps, \
+												data_dir=None, pdata=pdata)
+			rm_json = RMJSTable(min_maf=min_MAF, no_of_top_snps=no_of_top_snps)
 			rm_json.result = rm
 			rm_json.json_data = json_data
 			db_250k.session.add(rm_json)
@@ -9159,10 +9358,17 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 			#db_250k.session.commit()
 	
 	"""
-	DB250k.convertRMIntoJson(db_250k, call_method_id_ls_str='54', analysis_method_id_ls_str='1,4,7,47,49', \
-		phenotype_method_id_ls_str='409-603', commit=True)
-	
-	DB250k.convertRMIntoJson(db_250k, call_method_id_ls_str='29,32,43-56', commit=True)
+		#2013.1.15
+		DB250k.convertRMIntoJson(db_250k, call_method_id_ls_str='57,75', analysis_method_id_ls_str='1,7,32', \
+			phenotype_method_id_ls_str='', commit=True)
+		sys.exit(0)
+		
+		DB250k.convertRMIntoJson(db_250k, call_method_id_ls_str='54', analysis_method_id_ls_str='1,4,7,47,49', \
+			phenotype_method_id_ls_str='409-603', commit=True)
+		sys.exit(0)
+		
+		
+		DB250k.convertRMIntoJson(db_250k, call_method_id_ls_str='29,32,43-56', commit=True)
 	
 	"""
 	
@@ -9230,7 +9436,54 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 		DB250k.updateResultsMethodNoOfAccessions(db_250k, call_method_id_ls_str='4-80', analysis_method_id_ls_str='', \
 									phenotype_method_id_ls_str='', commit=True, updateType=1)
 		sys.exit(0)
+		
+				#2012.12.18
+		DB250k.updateResultsMethodNoOfAccessions(db_250k, call_method_id_ls_str='4-80', analysis_method_id_ls_str='', \
+									phenotype_method_id_ls_str='', commit=True, updateType=2)
+		sys.exit(0)
 	"""
+	@classmethod
+	def addCallInfoEntriesForOneCallMethod(cls, db_250k=None, call_method_id=None, filename=None, commit=False, updateType=1):
+		"""
+		2013.1.17 call method 57, 75 don't have corresponding call_info entries
+		"""
+		sys.stderr.write("Adding call info entries for call method  %s, %s .. \n"%(call_method_id, filename))
+		if commit:
+			pass
+		else:
+			# begin the session but without commit
+			db_250k.session.begin()
+		from variation.src import Stock_250kDB
+		import csv
+		reader = csv.reader(open(filename), delimiter='\t')
+		header = reader.next()
+		array_id_ls = []
+		count = 0
+		for row in reader:
+			ecotype_id, array_id = row[:2]
+			array_id = int(array_id)
+			call_info = db_250k.getCallInfo(array_id=array_id, call_method_id=call_method_id)
+			count += 1
+		if commit:
+			db_250k.session.flush()
+			db_250k.session.commit()
+		else:
+			pass
+		sys.stderr.write("%s entries updated \n"%(counter))
+	
+	"""
+		#2013.1.17
+		DB250k.addCallInfoEntriesForOneCallMethod(db_250k=db_250k, call_method_id=57, \
+										filename='/Network/Data/250k/db/dataset/call_method_57.tsv', commit=True)
+		sys.exit(0)
+		
+		#2013.1.17
+		DB250k.addCallInfoEntriesForOneCallMethod(db_250k=db_250k, call_method_id=75, \
+										filename='/Network/Data/250k/db/dataset/call_method_75.tsv', commit=True)
+		sys.exit(0)
+		
+	"""
+	
 	@classmethod
 	def updateProbeChrPosToTAIR9(cls, db_250k, input_fname, min_no_of_matches=25):
 		"""
@@ -10554,9 +10807,14 @@ class CNV(object):
 			result2_peakRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
 			total_perc_overlapped_by_result2 = 0.
 			for node in node_ls:
-				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-										[node.key.start, node.key.stop])[:5]
-				total_perc_overlapped_by_result2 += overlap1
+				overlapData = get_overlap_ratio(segmentKey.span_ls, [node.key.start, node.key.stop])
+				overlapFraction1 = overlapData.overlapFraction1
+				overlapFraction2 = overlapData.overlapFraction2
+				overlap_length = overlapData.overlap_length
+				overlap_start_pos = overlapData.overlap_start_pos
+				overlap_stop_pos = overlapData.overlap_stop_pos
+				
+				total_perc_overlapped_by_result2 += overlapFraction1
 			score_ls.append(row.peak_score)
 			if total_perc_overlapped_by_result2==0:
 				no_of_peaks_not_in_result2 += 1
@@ -11528,9 +11786,16 @@ class CNV(object):
 		overlap_ratio_ls = []
 		for node in node_ls:
 			key = node.key
-			overlap1, overlap2 = get_overlap_ratio(cnvSegmentKey.span_ls, key.span_ls)[:2]
-			normalPerc += overlap1
-			overlap_ratio_ls.append((overlap1, overlap2))
+			
+			overlapData = get_overlap_ratio(cnvSegmentKey.span_ls, key.span_ls)
+			overlapFraction1 = overlapData.overlapFraction1
+			overlapFraction2 = overlapData.overlapFraction2
+			overlap_length = overlapData.overlap_length
+			overlap_start_pos = overlapData.overlap_start_pos
+			overlap_stop_pos = overlapData.overlap_stop_pos
+			
+			normalPerc += overlapFraction1
+			overlap_ratio_ls.append((overlapFraction1, overlapFraction2))
 		
 		if normalPerc<=maxNormalPercInDeletion:
 			return PassingData(isDeletionTrue=True, normalPerc=normalPerc, overlap_ratio_ls=overlap_ratio_ls)
@@ -11576,9 +11841,15 @@ class CNV(object):
 		overlap_ratio_ls = []
 		for node in node_ls:
 			key = node.key
-			overlap1, overlap2 = get_overlap_ratio(cnvSegmentKey.span_ls, key.span_ls)[:2]
-			deletedFraction += overlap1
-			overlap_ratio_ls.append((overlap1, overlap2))
+			overlapData = get_overlap_ratio(cnvSegmentKey.span_ls, key.span_ls)
+			overlapFraction1 = overlapData.overlapFraction1
+			overlapFraction2 = overlapData.overlapFraction2
+			overlap_length = overlapData.overlap_length
+			overlap_start_pos = overlapData.overlap_start_pos
+			overlap_stop_pos = overlapData.overlap_stop_pos
+			
+			deletedFraction += overlapFraction1
+			overlap_ratio_ls.append((overlapFraction1, overlapFraction2))
 		
 		if deletedFraction>=minDeletedFraction:
 			return PassingData(isDeletionTrue=True, deletedFraction=deletedFraction, overlap_ratio_ls=overlap_ratio_ls)
@@ -14112,21 +14383,27 @@ class CNV(object):
 					if aheadSegment[0]!=segment[0]:		#on different chromosomes, ignore
 						segmentOverlapIndex = i+1
 						continue
-					overlap1, overlap2, overlap_length = get_overlap_ratio([aheadSegment[1], aheadSegment[2]], \
-																[segment[1], segment[2]])[:3]
-					if overlap1==0 or overlap2==0:
+					overlapData = get_overlap_ratio([aheadSegment[1], aheadSegment[2]], \
+																[segment[1], segment[2]])
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					overlap_length = overlapData.overlap_length
+					overlap_start_pos = overlapData.overlap_start_pos
+					overlap_stop_pos = overlapData.overlap_stop_pos
+				
+					if overlapFraction1==0 or overlapFraction2==0:
 						segmentOverlapIndex = i+1
-					elif overlap1<0 or overlap2<0:
+					elif overlapFraction1<0 or overlapFraction2<0:
 						sys.stderr.write("aheadSegment %s.\n"%repr(aheadSegment))
 						sys.stderr.write("segment %s.\n"%repr(segment))
-						sys.stderr.write("Error: overlap1 %s or overlap2 %s is zero.\n"%(overlap1, overlap2)) 
+						sys.stderr.write("Error: overlapFraction1 %s or overlapFraction2 %s is zero.\n"%(overlapFraction1, overlapFraction2)) 
 					else:
 						if self.logRatio:
-							overlap1 = math.log10(overlap1)
-							overlap2 = math.log10(overlap2)
-						self.x_ls.append(overlap1)
+							overlapFraction1 = math.log10(overlapFraction1)
+							overlapFraction2 = math.log10(overlapFraction2)
+						self.x_ls.append(overlapFraction1)
 						if self.dataType==1:
-							self.y_ls.append(overlap2)
+							self.y_ls.append(overlapFraction2)
 						elif self.dataType==2:
 							self.y_ls.append(math.log10(overlap_length))
 						self.real_counter += 1
@@ -21175,10 +21452,10 @@ class DBGenome(object):
 	"""
 class Main(object):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
-							('hostname', 1, ): ['banyan', 'z', 1, 'hostname of the db server', ],\
-							('dbname', 1, ): ['stock_250k', 'd', 1, 'database name', ],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
+	option_default_dict = {('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgres', ],\
+							('hostname', 1, ): ['uclaOffice', 'z', 1, 'hostname of the db server', ],\
+							('dbname', 1, ): ['vervetdb', 'd', 1, 'database name', ],\
+							('schema', 0, ): ['stock_250k', 'k', 1, 'database schema name', ],\
 							('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 							('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 							('input_fname', 0, ): ['', 'i', 1, 'common input file.', ],\
@@ -21204,19 +21481,20 @@ class Main(object):
 		
 		
 		from variation.src import Stock_250kDB
-		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, username=self.db_user,
-						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema=self.schema)
+		db_250k = Stock_250kDB.Stock_250kDB(drivername=self.drivername, db_user=self.db_user,
+						db_passwd=self.db_passwd, hostname=self.hostname, dbname=self.dbname, schema=self.schema)
 		db_250k.setup(create_tables=False)
 		self.db_250k = db_250k
+		
+		#2013.1.17
+		DB250k.addCallInfoEntriesForOneCallMethod(db_250k=db_250k, call_method_id=75, \
+										filename='/Network/Data/250k/db/dataset/call_method_75.tsv', commit=True)
+		sys.exit(0)
+		
 		
 		#import MySQLdb
 		#conn = MySQLdb.connect(db=self.dbname, host=self.hostname, user = self.db_user, passwd = self.db_passwd)
 		#curs = conn.cursor()
-		
-		#2012.12.18
-		DB250k.updateResultsMethodNoOfAccessions(db_250k, call_method_id_ls_str='4-80', analysis_method_id_ls_str='', \
-									phenotype_method_id_ls_str='', commit=True, updateType=2)
-		sys.exit(0)
 
 #2007-03-05 common codes to initiate database connection
 import sys, os, math

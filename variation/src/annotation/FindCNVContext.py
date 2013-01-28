@@ -78,8 +78,13 @@ class FindCNVContext(AbstractVariationMapper):
 				geneSegKey = node.key
 				for oneGeneData in node.value:
 					# geneSegKey.span_ls expands 20kb upstream or downstream of the gene.
-					overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-															[oneGeneData.gene_start, oneGeneData.gene_stop])[:5]
+					overlapData = get_overlap_ratio(segmentKey.span_ls, \
+															[oneGeneData.gene_start, oneGeneData.gene_stop])
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					overlap_length = overlapData.overlap_length
+					overlap_start_pos = overlapData.overlap_start_pos
+					overlap_stop_pos = overlapData.overlap_stop_pos 
 					if overlap_length>0:	#use fraction of length as coordinates.
 						gene_length = oneGeneData.gene_stop - oneGeneData.gene_start + 1
 						try:
@@ -113,7 +118,7 @@ class FindCNVContext(AbstractVariationMapper):
 														gene_strand=oneGeneData.strand, term5_disp_pos=term5_disp_pos, \
 														term3_disp_pos=term3_disp_pos,\
 														overlap_length=overlap_length, \
-														overlap_fraction_in_cnv=overlap1, overlap_fraction_in_gene=overlap2)
+														overlap_fraction_in_cnv=overlapFraction1, overlap_fraction_in_gene=overlapFraction2)
 						session.add(cnv_context)
 						param_obj.no_of_into_db += 1
 					param_obj.no_of_total_contexts += 1
@@ -123,8 +128,12 @@ class FindCNVContext(AbstractVariationMapper):
 						geneCommentaryRBDict.findNodes(segmentKey, node_ls=gene_box_node_ls, compareIns=compareIns)
 						for gene_box_node in gene_box_node_ls:
 							gene_box_key = gene_box_node.key
-							overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-													gene_box_key.span_ls)[:5]
+							overlapData = get_overlap_ratio(segmentKey.span_ls, gene_box_key.span_ls)
+							overlapFraction1 = overlapData.overlapFraction1
+							overlapFraction2 = overlapData.overlapFraction2
+							overlap_length = overlapData.overlap_length
+							overlap_start_pos = overlapData.overlap_start_pos
+							overlap_stop_pos = overlapData.overlap_stop_pos
 							cnv_annotation = Stock_250kDB.CNVAnnotation.query.filter_by(cnv_id=row.id).filter_by(cnv_context_id=cnv_context.id).\
 								filter_by(gene_commentary_id= geneCommentaryRBDict.gene_commentary_id).\
 								filter_by(gene_segment_id= gene_box_key.gene_segment_id).first()
@@ -137,7 +146,7 @@ class FindCNVContext(AbstractVariationMapper):
 												utr_number = gene_box_key.utr_number, cds_number = gene_box_key.cds_number, \
 												intron_number = gene_box_key.intron_number, exon_number = gene_box_key.exon_number,\
 												overlap_length=overlap_length, \
-												overlap_fraction_in_cnv=overlap1, overlap_fraction_in_gene=overlap2)
+												overlap_fraction_in_cnv=overlapFraction1, overlap_fraction_in_gene=overlapFraction2)
 								cnv_annotation.cnv_context = cnv_context
 								session.add(cnv_annotation)
 								param_obj.no_of_into_db += 1

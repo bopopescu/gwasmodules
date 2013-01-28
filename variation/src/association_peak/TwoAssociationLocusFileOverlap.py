@@ -55,7 +55,7 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 		"""
 		CountAssociationLocus.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 		#self.connectDB() called within its __init__()
-		self.associationLocusRBDictList = []
+		self.associationLocusFileList = []
 	
 	def setup(self, **keywords):
 		"""
@@ -83,11 +83,11 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 			afterFileFunction = self.afterFileFunction
 		try:
 			associationLocusTableFile = AssociationLocusTableFile(inputFname, openMode='r')
-			rbDict = associationLocusTableFile.associationLocusRBDict
+			#rbDict = associationLocusTableFile.associationLocusRBDict
 			#rbDict = yhio.Association.constructAssociationLocusRBDictFromHDF5File(inputFname=inputFname, \
 			#							locusPadding=self.locusPadding, tableName='association_locus')
-			self.associationLocusRBDictList.append(rbDict)
-			associationLocusTableFile.close()
+			self.associationLocusFileList.append(associationLocusTableFile)
+			#associationLocusTableFile.close()
 			
 			counter += 1
 			real_counter += 1
@@ -108,10 +108,11 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 		2012.11.25 derive overlap & distance-to-closest-locus statistics between two input and output the statistics as well.
 		"""
 		compareIns = CNVCompare(min_reciprocal_overlap=0.0000001)	#to detect any overlap
-		#for i in xrange(len(self.associationLocusRBDictList)):
-		#	for j in xrange(i+1, len(self.associationLocusRBDictList)):
-		associationLocusRBDict1 = self.associationLocusRBDictList[0]
-		associationLocusRBDict2 = self.associationLocusRBDictList[1]
+		#for i in xrange(len(self.associationLocusFileList)):
+		#	for j in xrange(i+1, len(self.associationLocusFileList)):
+		associationLocusRBDict1 = self.associationLocusFileList[0].associationLocusRBDict
+		associationLocusRBDict2 = self.associationLocusFileList[1].associationLocusRBDict
+		
 		#output attributes from its HDF5 file
 		for attributeName in associationLocusRBDict1.HDF5AttributeNameLs:
 			attributeValue = getattr(associationLocusRBDict1, attributeName)
@@ -121,16 +122,19 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 			self.writer.addAttribute(name='association2_%s'%(attributeName), value=attributeValue)
 		
 		cellList = []
-		for locus1Node in associationLocusRBDict1:
+		for input1Node in associationLocusRBDict1:
 			targetNodeLs = []
-			associationLocusRBDict2.findNodes(locus1Node.key, node_ls=targetNodeLs, compareIns=compareIns)
+			associationLocusRBDict2.findNodes(input1Node.key, node_ls=targetNodeLs, compareIns=compareIns)
 			fractionCoveredByAssociation2 = 0.0
 			if targetNodeLs:
-				for locus2Node in targetNodeLs:
-					overlap1 = get_overlap_ratio(locus1Node.key.span_ls, locus2Node.key.span_ls)[0]
-					fractionCoveredByAssociation2 += overlap1
+				for input2Node in targetNodeLs:
+					overlapData = get_overlap_ratio(input1Node.key.span_ls, input2Node.key.span_ls)
+					overlapFraction1 = overlapData.overlapFraction1
+					overlapFraction2 = overlapData.overlapFraction2
+					
+					fractionCoveredByAssociation2 += overlapFraction1
 			else:
-				closestNodeData = associationLocusRBDict2.findClosestNode(key=locus1Node.key)
+				closestNodeData = associationLocusRBDict2.findClosestNode(key=input1Node.key)
 				distanceToSmallerNode = None
 				distanceToBiggerNode = None
 				if closestNodeData is not None:
@@ -138,17 +142,17 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 					biggerNode = closestNodeData.biggerNode
 					if smallerNode == biggerNode:
 						sys.stderr.write("Warning: should not happen. Found no overlapping nodes for %s but now found one, %s.\n"%\
-										(repr(locus1Node), repr(smallerNode)))
+										(repr(input1Node), repr(smallerNode)))
 						sys.exit(4)
 					else:
-						if smallerNode and smallerNode.key.chromosome==locus1Node.key.chromosome:	#make sure it's same chromosome
-							distanceToSmallerNode = locus1Node.key.start - smallerNode.key.stop
-						if biggerNode and biggerNode.key.chromosome==locus1Node.key.chromosome:
-							distanceToBiggerNode = biggerNode.key.start - locus1Node.key.stop
+						if smallerNode and smallerNode.key.chromosome==input1Node.key.chromosome:	#make sure it's same chromosome
+							distanceToSmallerNode = input1Node.key.start - smallerNode.key.stop
+						if biggerNode and biggerNode.key.chromosome==input1Node.key.chromosome:
+							distanceToBiggerNode = biggerNode.key.start - input1Node.key.stop
 				else:
 					sys.stderr.write("Error: impossible to happen. Found no close nodes for %s (%s:%s-%s).\n"%\
-									(repr(locus1Node.key), locus1Node.key.chromosome, locus1Node.key.start, \
-									locus1Node.key.stop))
+									(repr(input1Node.key), input1Node.key.chromosome, input1Node.key.start, \
+									input1Node.key.stop))
 					#continue	#2012.12.3 temporary bugfix to skip loci with empty chromosomes.
 					# bug from upstream AssociationPeak2AssociationLocus.py
 					sys.exit(6)
@@ -164,13 +168,18 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 				#if fractionCoveredByAssociation2<-10:
 				#	import pdb
 				#	pdb.set_trace()
-			oneCell = (locus1Node.key.chromosome, locus1Node.key.start, locus1Node.key.stop, float(fractionCoveredByAssociation2))
+			oneCell = (input1Node.key.chromosome, input1Node.key.start, input1Node.key.stop, float(fractionCoveredByAssociation2))
 			cellList.append(oneCell)
 		self.writer.writeCellList(cellList)
+	
+	def closeFiles(self, **keywords):
+		"""
+		2013.1.27
+		"""
+		CountAssociationLocus.closeFiles(self, **keywords)	#it'll close self.writer, self.invariantPData.writer
+		for associationLocusTableFile in self.associationLocusFileList:
+			associationLocusTableFile.close()
 		
-		if getattr(self, 'writer', None):
-			del self.writer
-
 if __name__ == '__main__':
 	main_class = TwoAssociationLocusFileOverlap
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

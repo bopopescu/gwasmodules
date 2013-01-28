@@ -80,9 +80,15 @@ class TwoGWASPeakOverlap(AbstractVariationMapper):
 			association2_peakRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
 			total_perc_overlapped_by_result2 = 0.
 			for node in node_ls:
-				overlap1, overlap2, overlap_length, overlap_start_pos, overlap_stop_pos = get_overlap_ratio(segmentKey.span_ls, \
-										[node.key.start, node.key.stop])[:5]
-				total_perc_overlapped_by_result2 += overlap1
+				
+				overlapData = get_overlap_ratio(segmentKey.span_ls, [node.key.start, node.key.stop])
+				overlapFraction1 = overlapData.overlapFraction1
+				overlapFraction2 = overlapData.overlapFraction2
+				overlap_length = overlapData.overlap_length
+				overlap_start_pos = overlapData.overlap_start_pos
+				overlap_stop_pos = overlapData.overlap_stop_pos
+						
+				total_perc_overlapped_by_result2 += overlapFraction1
 			if total_perc_overlapped_by_result2==0:
 				no_of_peaks_not_in_result2 += 1
 				overlap_ls.append(-0.5)
