@@ -37,6 +37,7 @@ from AssociationPeak2DB import AssociationPeak2DB
 class AssociationLocus2DB(AssociationPeak2DB):
 	__doc__ = __doc__
 	option_default_dict = AssociationPeak2DB.option_default_dict.copy()
+	option_default_dict.pop(('result_id', 1, int))
 	option_default_dict.update({
 			('min_connectivity', 0, float): [None, '', 1, "minimum connectivity of any peak graph connected component, not used."],\
 			('min_overlap_ratio', 0, float): [0.5, '', 1, 'minimum overlap ratio between two peaks for them to merge. overlap length/total'],\

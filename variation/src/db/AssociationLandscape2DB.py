@@ -112,7 +112,7 @@ class AssociationLandscape2DB(AbstractVariationMapper):
 			sys.stderr.write("Error: file, %s,  is not a file.\n"%(self.inputFname))
 			sys.exit(3)
 		
-		landscapeFile = AssociationLandscapeTableFile(inputFname, openMode='r')
+		landscapeFile = AssociationLandscapeTableFile(self.inputFname, openMode='r', autoRead=False)
 		result_id = landscapeFile.getAttribute('result_id')
 		landscapeFile.close()
 		
