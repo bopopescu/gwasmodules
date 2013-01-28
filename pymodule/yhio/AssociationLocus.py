@@ -20,14 +20,17 @@ from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_ove
 from AssociationPeak import AssociationPeakTable
 
 class AssociationLocusTable(tables.IsDescription):
+	"""
+	2013.1.28 bugfix, was pos=3 for no_of_peaks (same as stop), now change it to pos=4, and increment others accordingly
+	"""
 	id = UInt64Col(pos=0)
 	chromosome = StringCol(64, pos=1)	#64 byte-long
 	start = UInt64Col(pos=2)
 	stop = UInt64Col(pos=3)
-	no_of_peaks = UInt64Col(pos=3)
-	connectivity = Float64Col(pos=4)
-	no_of_results = UInt64Col(pos=5)
-	phenotype_id_ls_in_str = StringCol(1000, pos=6)
+	no_of_peaks = UInt64Col(pos=4)
+	connectivity = Float64Col(pos=5)
+	no_of_results = UInt64Col(pos=6)
+	phenotype_id_ls_in_str = StringCol(1000, pos=7)
 
 class AssociationLocus2PeakTable(tables.IsDescription):
 	id = UInt64Col(pos=0)
@@ -149,9 +152,9 @@ class AssociationLocusTableFile(YHFile):
 		#2012.11.28 sort it
 		associationLocusList.sort()
 		for associationLocus in associationLocusList:
-			dataTuple = (associationLocus.chromosome, associationLocus.start, associationLocus.stop, associationLocus.no_of_peaks,\
-						associationLocus.connectivity, associationLocus.no_of_results, associationLocus.phenotype_id_ls_in_str)
-			self.associationLocusTable.writeOneCell(dataTuple)
+			#dataTuple = (associationLocus.chromosome, associationLocus.start, associationLocus.stop, associationLocus.no_of_peaks,\
+			#			associationLocus.connectivity, associationLocus.no_of_results, associationLocus.phenotype_id_ls_in_str)
+			self.associationLocusTable.writeOneCell(associationLocus, cellType=2)
 			associationLocus2PeakTableRow = self.associationLocus2PeakTable.row
 			for association_peak in associationLocus.association_peak_ls:
 				self.associationLocus2PeakTable.no_of_rows += 1
