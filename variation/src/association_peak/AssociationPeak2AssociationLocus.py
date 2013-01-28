@@ -244,6 +244,7 @@ class AssociationPeak2AssociationLocus(AssociationLandscape2Peak):
 		associationLocusTableFile = AssociationLocusTableFile(self.outputFname, openMode='w')
 		associationLocusTableFile.associationLocusTable.addAttributeDict(attributeDict)
 		associationLocusTableFile.appendAssociationLoci(associationLocusList=associationLocusList)
+		associationLocusTableFile.close()
 
 
 if __name__ == '__main__':
