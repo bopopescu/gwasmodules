@@ -334,6 +334,8 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		self.handleYLim()
 		self.reduce()
 		
+		self.closeFiles()
+		
 
 if __name__ == '__main__':
 	main_class = AbstractPlot
