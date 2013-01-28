@@ -46,6 +46,7 @@ class TwoAssociationLocusFileOverlap(CountAssociationLocus):
 	# change default of file-format
 	option_default_dict[('inputFileFormat', 0, int)][0] = 2
 	option_default_dict[('outputFileFormat', 0, int)][0] = 2
+	option_default_dict.pop(("inputFname", 0,))
 	#option_default_dict.update(AbstractMapper.db_option_dict.copy())
 	option_default_dict.update({
 					('locusPadding', 0, int): [0, '', 1, 'the padding around each locus (used only to extend the loci)' ],\
