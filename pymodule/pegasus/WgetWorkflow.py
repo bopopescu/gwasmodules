@@ -261,8 +261,6 @@ class WgetWorkflow(AbstractWorkflow):
 		self.registerExecutables()
 		self.registerCustomExecutables()
 		
-		
-		
 		filenameList = self.getFilenamesToBeDownloaded(url=self.inputURL, username=self.username, password=self.password)
 		#one file needs to registered so that replica catalog is not empty
 		#but this file doesn't need to be actually used by any job.
