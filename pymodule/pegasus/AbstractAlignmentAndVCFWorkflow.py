@@ -31,7 +31,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		"""
 		AbstractAlignmentWorkflow.__init__(self, **keywords)
 	
-	def mapReduceWholeAlignment(self, workflow=None, alignmentData=None, passingData=None, \
+	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
 						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFFile=None, \
 						outputDirPrefix=None, transferOutput=False, **keywords):
 		"""
@@ -96,7 +96,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 					topOutputDirJob=passingData.gzipReduceAfterEachChromosomeFolderJob, report=False)
 			passingData.gzipReduceAfterEachChromosomeFolderJob = gzipReduceAfterEachChromosomeData.topOutputDirJob
 	
-	def prePreprocess(self, inputVCFData=None, chr2IntervalDataLs=None, **keywords):
+	def setup(self, inputVCFData=None, chr2IntervalDataLs=None, **keywords):
 		"""
 		2013.1.25
 		"""
