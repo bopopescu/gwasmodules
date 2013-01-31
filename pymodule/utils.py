@@ -496,8 +496,9 @@ def getStrOutOfList(ls, separator=','):
 		ls_str = ls
 	return separator.join(ls_str)
 
-def getSuccinctStrOutOfList(ls, step=1, separator=','):
+def getSuccinctStrOutOfList(ls=None, step=1, separator=','):
 	"""
+	2013.1.28 bugfix, ls could be empty list. return ''
 	2012.12.21 use , and - to represent a list of numbers in fewest possible characters
 		step controls the order of numbers.
 		separator separates between different spans or singletons.
@@ -527,13 +528,14 @@ def getSuccinctStrOutOfList(ls, step=1, separator=','):
 					span_tuple_ls.append('%s-%s'%(spanStartValue, spanStopValue))
 				spanStartValue = newValue
 				spanStopValue = newValue
-	#handle the last span
-	if spanStopValue is None:
-		spanStopValue = ls_copy[-1]
-	if spanStartValue==spanStopValue:	#singleton
-		span_tuple_ls.append(str(spanStartValue))
-	else:
-		span_tuple_ls.append('%s-%s'%(spanStartValue, spanStopValue))
+	if ls_copy:
+		#handle the last span
+		if spanStopValue is None and ls_copy:
+			spanStopValue = ls_copy[-1]
+		if spanStartValue==spanStopValue:	#singleton
+			span_tuple_ls.append(str(spanStartValue))
+		else:
+			span_tuple_ls.append('%s-%s'%(spanStartValue, spanStopValue))
 	return separator.join(span_tuple_ls)
 
 def runLocalCommand(commandline, report_stderr=True, report_stdout=False):
