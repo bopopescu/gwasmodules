@@ -115,7 +115,8 @@ class CNVSegmentBinarySearchTreeKey(object):
 		else:
 			self.stop = self.start
 			self.span = 0
-		
+		if self.stop<self.start:
+			sys.stderr.write("Warning: not supposed to happen. stop %s is smaller than start %s.\n"%(self.stop, self.start))
 		for key, value in keywords.iteritems():	#2010-8-2
 			setattr(self, key, value)
 	
@@ -1189,7 +1190,7 @@ def findCorrespondenceBetweenTwoCNVRBDict(rbDict1=None, rbDict2=None):
 	"""
 	dc1Length = len(rbDict1)
 	dc2Length = len(rbDict2)
-	sys.stderr.write("Finding correspondence between two CNV RB dictionaries, %s and %s nodes respectively ... "%\
+	sys.stderr.write("Finding correspondence between two CNV RB dictionaries, %s and %s nodes in input1, input2 respectively ... "%\
 					(dc1Length, dc2Length))
 	nodePairList = []	#each cell is a tuple of (node1, node2, overlap)
 	compareIns = CNVCompare(min_reciprocal_overlap=0.0000001)	#to detect any overlap
@@ -1205,20 +1206,26 @@ def findCorrespondenceBetweenTwoCNVRBDict(rbDict1=None, rbDict2=None):
 				setOfMatchedNodesInRBDict2.add(input2Node)
 		else:
 			nodePairList.append((input1Node, None, None))
+	sys.stderr.write(" %s input2 nodes matched. "%(len(setOfMatchedNodesInRBDict2)))
+	
+	no_of_unmatched_input2_nodes_matched_to_input1 = 0
 	for input2Node in rbDict2:
 		if input2Node not in setOfMatchedNodesInRBDict2:
 			targetNodeLs = []
 			rbDict1.findNodes(input2Node.key, node_ls=targetNodeLs, compareIns=compareIns)
 			if targetNodeLs:	#this should not happen
-				sys.stderr.write("Warning: after first scan node from rbDict2, %s, still has hits from rbDict1.\n"%\
-								(input2Node))
+				sys.stderr.write("Warning: after first scan node from rbDict2, key=%s, value=%s, still has hits from rbDict1.\n"%\
+								(str(input2Node.key), str(input2Node.value[0])))
+				no_of_unmatched_input2_nodes_matched_to_input1 += 1
+				
 				for input1Node in targetNodeLs:
 					overlapData = get_overlap_ratio(input1Node.key.span_ls, input2Node.key.span_ls)
 					overlapFraction = overlapData.overlapFraction
 					nodePairList.append((input1Node, input2Node, overlapFraction))
 			else:
 				nodePairList.append((None, input2Node, None))
-	sys.stderr.write(" found %s corresponding pairs.\n"%(len(nodePairList)))
+	sys.stderr.write(" %s un-matched input2 nodes have matches from input1. found %s corresponding pairs.\n"%\
+					(no_of_unmatched_input2_nodes_matched_to_input1, len(nodePairList)))
 	return nodePairList
 
 
