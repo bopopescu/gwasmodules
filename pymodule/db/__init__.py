@@ -588,6 +588,7 @@ class ElixirDB(object):
 			
 			data_dir: the top-level folder where all the db-affiliated file storage is. for constructRelativePathFunction 
 			 	
+		2013.1.31 bugfix: if relativeOutputDir is included in both outputDir and newPath, use newfilename to avoid double usage. 
 		2012.12.15 moved from VervetDB. i.e.:
 			inputFileBasename = os.path.basename(self.inputFname)
 			relativePath = genotypeFile.constructRelativePath(sourceFilename=inputFileBasename)
@@ -646,7 +647,13 @@ class ElixirDB(object):
 		
 		srcFilename = os.path.join(inputDir, filename)
 		if dstFilename is None:	#2012.8.30
-			dstFilename = os.path.join(outputDir, newPath)
+			relativePathIndex = outputDir.find(relativeOutputDir)
+			noOfCharsInRelativeOutputDir = len(relativeOutputDir)
+			if outputDir[relativePathIndex:relativePathIndex+noOfCharsInRelativeOutputDir]==relativeOutputDir and newPath.find(relativeOutputDir)>=0:
+				#2013.1.31 bugfix: if relativeOutputDir is included in both outputDir and newPath, use newfilename to avoid double usage. 
+				dstFilename = os.path.join(outputDir, newfilename)
+			else:
+				dstFilename = os.path.join(outputDir, newPath)
 		if os.path.isfile(dstFilename):
 			sys.stderr.write("Error: destination %s already exits.\n"%(dstFilename))
 			exitCode = 2
