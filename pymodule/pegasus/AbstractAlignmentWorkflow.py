@@ -7,7 +7,6 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
 from Pegasus.DAX3 import *
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, utils
 from AbstractNGSWorkflow import AbstractNGSWorkflow
@@ -147,7 +146,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		returnData.reduceAfterEachAlignmentDataLs = reduceAfterEachAlignmentDataLs
 		return returnData
 	
-	def mapReduceWholeAlignment(self, workflow=None, alignmentData=None, passingData=None, \
+	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
 						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFFile=None, \
 						outputDirPrefix=None, transferOutput=False, **keywords):
 		"""
@@ -155,7 +154,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		"""
 		pass
 	
-	def prePreprocess(self, chr2IntervalDataLs=None, **keywords):
+	def setup(self, chr2IntervalDataLs=None, **keywords):
 		"""
 		2013.1.25
 			chr2VCFFile is None.
@@ -176,7 +175,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		"""
 		2012.7.26
 		"""
-		prePreprocessData = self.prePreprocess(chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
+		prePreprocessData = self.setup(chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
 		chrIDSet = prePreprocessData.chrIDSet
 		chr2VCFFile = prePreprocessData.chr2VCFFile
 		
@@ -263,7 +262,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			passingData.reduceBeforeEachAlignmentDataLs.append(reduceBeforeEachAlignmentData)
 			
 			
-			self.mapReduceWholeAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
+			self.mapReduceOneAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
 							chrIDSet=chrIDSet, chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFFile=chr2VCFFile, \
 							outputDirPrefix=outputDirPrefix, transferOutput=transferOutput)
 			
