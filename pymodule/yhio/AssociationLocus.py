@@ -85,12 +85,16 @@ class AssociationLocusTableFile(YHFile):
 			self.associationLocus2PeakTable = self.createNewTable(tableName=self.locus2PeakTableName, \
 													rowDefinition=AssociationLocus2PeakTable, expectedrows=500000)
 	
-	def _readInData(self, tableName=None, tableObject=None):
+	def _readInData(self, tableName=None, tableObject=None, bugfixType=None):
 		"""
+		2013.1.28 added argument bugfixType (default is None)
+			1: swap stop & no_of_peaks, an earlier bug exchanged the positions of the two.
 		2013.1.26 added phenotype_id_set in the node
 		2012.11.25
 			similar to constructAssociationPeakRBDictFromHDF5File
 		"""
+		if tableName is None:
+			tableName = self.tableName
 		YHFile._readInData(self, tableName=tableName, tableObject=tableObject)
 		if not self.constructLocusRBDict:
 			return
@@ -116,7 +120,15 @@ class AssociationLocusTableFile(YHFile):
 			counter += 1
 			phenotype_id_ls = row.phenotype_id_ls_in_str.split(',')
 			phenotype_id_set = set(map(int, phenotype_id_ls))
-			
+			if bugfixType==1:
+				#2013.1.28 old association-loci file have two columns swapped. run this to correct it.
+				# a function in variation/src/misc.py is written:
+				#	DB250k.correctAssociationLocusFileFormat(db_250k=db_250k, data_dir=None)
+				rowPointer['stop'] = row.no_of_peaks
+				rowPointer['no_of_peaks'] = row.stop
+				rowPointer.update()
+				row.no_of_peaks = rowPointer['no_of_peaks']
+				row.stop = rowPointer['stop']
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=row.chromosome, \
 							span_ls=[max(1, row.start - locusPadding), row.stop + locusPadding], \
 							min_reciprocal_overlap=1, no_of_peaks=row.no_of_peaks, \
