@@ -264,14 +264,30 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		#pass it to the invariantPData
 		self.invariantPData.writer = writer
 	
+	def closeFiles(self, **keywords):
+		"""
+		2013.1.27
+		"""
+		if getattr(self.invariantPData, 'writer', None):
+			try:
+				self.invariantPData.writer.close()
+			except:
+				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+				import traceback
+				traceback.print_exc()
+			
+			del self.invariantPData.writer	#this would close file too if it's not closed
+		
+		if getattr(self, 'writer', None):
+			del self.writer
+		
 	def reduce(self, **keywords):
 		"""
 		2012.10.15
 			run after all files have been walked through
 		"""
-		if getattr(self.invariantPData, 'writer', None):
-			self.invariantPData.writer.close()
-			del self.invariantPData.writer
+		pass
+		
 	
 	def run(self):
 		
@@ -286,6 +302,9 @@ class AbstractMatrixFileWalker(AbstractMapper):
 				self.fileWalker(inputFname, afterFileFunction=self.afterFileFunction, run_type=1, processRowFunction=self.processRow)
 		
 		self.reduce()
+		
+		self.closeFiles()
+		
 			
 if __name__ == '__main__':
 	main_class = AbstractMatrixFileWalker
