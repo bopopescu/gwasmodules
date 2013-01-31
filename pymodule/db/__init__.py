@@ -906,6 +906,7 @@ if __name__ == '__main__':
 		import pdb
 		pdb.set_trace()
 	session = instance.session
+	"""
 	print dir(session.query(Results))
 	
 	for row in session.query(ResultsMethod).list():
@@ -926,3 +927,4 @@ if __name__ == '__main__':
 		print row.results_method_obj.short_name
 		print row.phenotype_method_id
 		print row.phenotype_method_obj.short_name
+	"""
