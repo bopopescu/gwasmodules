@@ -6,7 +6,25 @@ Examples:
 	%s
 
 Description:
-	2012.3.1
+	2012.3.1 a matrix file API like csv.reader, it can deal with any delimiter: coma, tab, space or multi-space.
+	Example:
+	
+		reader = MatrixFile(inputFname='/tmp/input.txt', openMode='r')
+		reader = MatrixFile('/tmp/input.txt', openMode='r')
+		reader.constructColName2IndexFromHeader()
+		for row in reader:
+			row[reader.getColName2IndexFromHeader('KID')]
+		
+		inf = utils.openGzipFile(inputFname, openMode='r')
+		reader = MatrixFile(inputFile=inf)
+		
+		#2013.2.1 writing
+		writer = MatrixFile('/tmp/output.txt', openMode='w')
+		writer.writeHeader(...)
+		writer.writerow(row)
+		writer.close()
+	
+	
 
 """
 
@@ -25,7 +43,8 @@ class MatrixFile(object):
 	option_default_dict = {
 						('inputFname', 0, ): [None, 'i', 1, 'filename.'],\
 						('inputFile', 0, ): [None, '', 1, 'opened file handler'],\
-						('openMode', 1, ): ['r', '', 1, 'r'],\
+						('openMode', 1, ): ['r', '', 1, 'mode to open the inputFname if inputFile is not presented.'],\
+						('delimiter', 1, ): ['\t', '', 1, ''],\
 						('header', 0, ): [None, '', 1, 'the header to be in output file, openMode=w'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
@@ -35,18 +54,20 @@ class MatrixFile(object):
 														class_to_have_attr=self)
 		if not self.inputFname:
 			self.inputFname = inputFname
-		self.isCSVReader = True
-		if self.inputFname:
+		if self.inputFname and self.inputFile is None:
 			self.inputFile = utils.openGzipFile(self.inputFname, openMode=self.openMode)
 		
-		delimiter = figureOutDelimiter(self.inputFile)
-		if delimiter=='\t' or delimiter==',':
-			csvFile = csv.reader(self.inputFile, delimiter=delimiter)
+		if self.openMode=='r':
+			delimiter = figureOutDelimiter(self.inputFile)
+			if delimiter=='\t' or delimiter==',':
+				self.csvFile = csv.reader(self.inputFile, delimiter=delimiter)
+				self.isCSVReader = True
+			else:
+				self.csvFile = self.inputFile
+				self.isCSVReader = False
+			self.delimiter = delimiter
 		else:
-			csvFile = self.inputFile
-			self.isCSVReader = False
-		self.delimiter = delimiter
-		self.csvFile = csvFile
+			self.csvFile = csv.writer(self.inputFile, delimiter=self.delimiter)
 		self.col_name2index = None
 	
 	def writeHeader(self):
