@@ -843,16 +843,22 @@ def getDateStampedFilename(filename):
 
 def openGzipFile(inputFname, openMode='r'):
 	"""
+	2013.2.1 support openMode='w'
 	2012.8.21
 		add argument openMode
 	2012.5.23
 		if suffix is .gz, use gzip to open it
 	"""
-	import os
 	fname_prefix, fname_suffix = os.path.splitext(inputFname)
 	if fname_suffix=='.gz':
 		import gzip
-		inf = gzip.open(inputFname, mode='rb')
+		if openMode=='r':
+			mode='rb'
+		elif openMode=='w':
+			mode='wb'
+		else:
+			mode='rb'
+		inf = gzip.open(inputFname, mode=mode)
 	else:
 		inf = open(inputFname, openMode)
 	return inf
