@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.yhio.VCFFile import VCFFile
-from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 
 class SplitVCFFile(AbstractVCFMapper):
 	__doc__ = __doc__
