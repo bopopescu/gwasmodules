@@ -68,7 +68,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		
 		self.chr_pattern = Genome.chr_pattern
 		self.contig_id_pattern = Genome.contig_id_pattern
-	
+		
 	def registerJars(self, workflow=None, ):
 		"""
 		2011-11-22
@@ -1316,7 +1316,7 @@ Contig966       3160    50
 			return refFastaFList
 			
 		"""
-		pass
+		sys.stderr.write("Getting reference sequences (placeholder) ... nothing \n")
 	
 	def getContigIDFromFname(self, filename):
 		"""

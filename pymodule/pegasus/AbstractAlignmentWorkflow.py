@@ -7,13 +7,14 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
+import copy
 from Pegasus.DAX3 import *
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, utils
 from AbstractNGSWorkflow import AbstractNGSWorkflow
 
 class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	__doc__ = __doc__
-	option_default_dict = AbstractNGSWorkflow.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractNGSWorkflow.option_default_dict)
 	#option_default_dict.pop(('inputDir', 0, ))
 	option_default_dict.update({
 						('intervalOverlapSize', 1, int): [300000, 'U', 1, 'overlap #bps/#loci between adjacent intervals from one contig/chromosome,\
@@ -22,7 +23,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						})
 	commonAlignmentWorkflowOptionDict = {
 						('ind_seq_id_ls', 0, ): ['', 'i', 1, 'a comma/dash-separated list of IndividualSequence.id. alignments come from these', ],\
-						('ind_aln_id_ls', 0, ): ['', 'I', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
+						('ind_aln_id_ls', 0, ): ['', '', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
 						("sequence_filtered", 0, int): [None, 'Q', 1, 'To filter alignments. None: whatever; 0: unfiltered sequences, 1: filtered sequences: 2: ...'],\
 						("alignment_method_id", 0, int): [None, 'G', 1, 'To filter alignments. None: whatever; integer: AlignmentMethod.id'],\
 						("site_id_ls", 0, ): ["", 'S', 1, 'comma/dash-separated list of site IDs. individuals must come from these sites.'],\
@@ -45,6 +46,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						('maxNoOfRegionsPerJob', 1, int): [5000, 'K', 1, 'Given selectedRegionFname, this dictates the maximum number of regions each job would handle,\
 		The actual number could be lower because the regions are first grouped into chromosomes. If one chromosome has <maxNoOfRegionsPerJob, then that job handles less.', ],\
 						}
+	option_default_dict.update(partitionWorkflowOptionDict)
 	
 	def __init__(self,  **keywords):
 		"""
@@ -54,7 +56,6 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int), \
 								("site_id_ls", int), ('country_id_ls', int), ('tax_id_ls', int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
-	
 	
 	
 	def preReduce(self, workflow=None, passingData=None, transferOutput=True, **keywords):
@@ -97,13 +98,28 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		return returnData
 
-	def mapEachAlignment(self, workflow=None, passingData=None, transferOutput=True, **keywords):
+	def mapEachAlignment(self, workflow=None, alignmentData=None,  passingData=None, transferOutput=True, **keywords):
 		"""
 		2012.9.22
 			similar to reduceBeforeEachAlignmentData() but for mapping programs that run on one alignment each.
+			
+			passingData.AlignmentJobAndOutputLs = []
+			passingData.bamFnamePrefix = bamFnamePrefix
+			passingData.individual_alignment = alignment
 		"""
 		returnData = PassingData(no_of_jobs = 0)
 		returnData.jobDataLs = []
+		
+		topOutputDirJob = passingData.topOutputDirJob
+		refFastaFile = passingData.refFastaFList[0]
+		
+		alignment = alignmentData.alignment
+		parentJobLs = alignmentData.jobLs
+		bamF = alignmentData.bamF
+		baiF = alignmentData.baiF
+		
+		bamFnamePrefix = alignment.getReadGroup()
+		
 		return returnData
 	
 	def reduceAfterEachChromosome(self, workflow=None, chromosome=None, passingData=None, transferOutput=True, \
@@ -249,9 +265,11 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			passingData.AlignmentJobAndOutputLs = []
 			passingData.bamFnamePrefix = bamFnamePrefix
 			passingData.individual_alignment = alignment
+			passingData.alignmentData = alignmentData
 			
-			mapEachAlignmentData = self.mapEachAlignment(workflow=workflow, passingData=passingData, transferOutput=False, \
-												preReduceReturnData=preReduceReturnData, **keywords)
+			mapEachAlignmentData = self.mapEachAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
+								transferOutput=False, \
+								preReduceReturnData=preReduceReturnData, **keywords)
 			passingData.mapEachAlignmentDataLs.append(mapEachAlignmentData)
 			passingData.mapEachAlignmentData = mapEachAlignmentData
 			
@@ -340,7 +358,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		"""
 		"""
-		AbstractVervetWorkflow.registerCustomExecutables(self, workflow=workflow)
+		AbstractNGSWorkflow.registerCustomExecutables(self, workflow=workflow)
 		
 		if workflow is None:
 			workflow = self
@@ -354,6 +372,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		executableClusterSizeMultiplierList = []
+		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
 	
@@ -373,11 +392,11 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		if not self.localDataDir:
 			self.localDataDir = self.db.data_dir
 		
-		chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, contigMinRankBySize=self.contigMinRankBySize)
-		#chr2size = set(['Contig149'])	#temporary when testing Contig149
-		#chr2size = set(['1MbBAC'])	#temporary when testing the 1Mb-BAC (formerly vervet_path2)
-		chrLs = chr2size.keys()
-		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=chr2size, \
+		#self.chr2size = {}
+		#self.chr2size = set(['Contig149'])	#temporary when testing Contig149
+		#self.chr2size = set(['1MbBAC'])	#temporary when testing the 1Mb-BAC (formerly vervet_path2)
+		chrLs = self.chr2size.keys()
+		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
 													intervalSize=self.intervalSize, \
 													intervalOverlapSize=self.intervalOverlapSize)
 		

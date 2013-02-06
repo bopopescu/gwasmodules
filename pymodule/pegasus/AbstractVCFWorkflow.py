@@ -8,14 +8,16 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, utils
+import copy
 from Pegasus.DAX3 import *
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, utils
+from pymodule.yhio.MatrixFile import MatrixFile
+from pymodule.yhio.VCFFile import VCFFile
 from AbstractNGSWorkflow import AbstractNGSWorkflow
 
 class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	__doc__ = __doc__
-	option_default_dict = AbstractNGSWorkflow.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractNGSWorkflow.option_default_dict)
 	option_default_dict.update({
 						('inputDir', 0, ): ['', 'I', 1, 'input folder that contains vcf or vcf.gz files', ],\
 						('minDepth', 0, float): [0, 'm', 1, 'minimum depth for a call to regarded as non-missing', ],\
@@ -185,7 +187,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 							no_of_individuals = genotype_file.no_of_individuals
 					if no_of_loci is None:
 						#do file parsing
-						from pymodule.VCFFile import VCFFile
 						vcfFile = VCFFile(inputFname=inputFname, report=False)
 						counter = 0
 						no_of_loci = vcfFile.getNoOfLoci()
@@ -346,7 +347,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				sshDBTunnel=sshDBTunnel, **keywords)
 		return job
 	
-	def getChr2IntervalDataLsBySelectVCFFile(self, vcfFolder=None, noOfSitesPerUnit=5000, noOfOverlappingSites=1000, \
+	def getChr2IntervalDataLsBySelectVCFFile(self, vcfFname=None, noOfSitesPerUnit=5000, noOfOverlappingSites=1000, \
 											folderName=None, parentJobLs= None):
 		"""
 		2012.8.9 update it so that the interval encompassing all lines in one block/unit is known.
@@ -354,26 +355,24 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			TODO: offer partitioning by equal-chromosome span, rather than number of sites.
 				Some sites could be in far from each other in one block, which could incur long-running mpileup. goal is to skip these deserts.
 		2012.8.8 bugfix add -1 to the starting number below cuz otherwise it's included in the next block's start
-				blockStopLineNumber = min(startLineNumber+(i+1)*noOfLinesPerUnit-1, stopLineNumber)	
+				blockStopLineNumber = min(startLineNumber+(i+1)*noOfSitesPerUnit-1, stopLineNumber)	
 		2012.8.14
 			1.
-			2. folderName is the relative path of the folder in the pegasus workflow, that holds intervalFname.
+			2. folderName is the relative path of the folder in the pegasus workflow, that holds vcfFname.
 				it'll be created upon file stage-in. no mkdir job for it.
 				
-			get the number of lines in intervalFname.
+			get the number of lines in vcfFname.
 			get chr2StartStopDataLsTuple
-			for each chr, split its lines into units  that don't exceed noOfLinesPerUnit
+			for each chr, split its lines into units  that don't exceed noOfSitesPerUnit
 				add the split job
 				 
 		"""
-		sys.stderr.write("Splitting %s into blocks of %s lines ... "%(intervalFname, noOfLinesPerUnit))
+		sys.stderr.write("Splitting %s into blocks of %s lines ... "%(vcfFname, noOfSitesPerUnit))
 		#from pymodule import utils
-		#noOfLines = utils.getNoOfLinesInOneFileByWC(intervalFname)
+		#noOfLines = utils.getNoOfLinesInOneFileByWC(vcfFname)
 		chr2StartStopDataLs = {}
-		import csv
-		from pymodule import figureOutDelimiter
-		inf = open(intervalFname)
-		reader = csv.reader(inf, delimiter=figureOutDelimiter(intervalFname))
+		reader = MatrixFile(vcfFname)
+		#csv.reader(inf, delimiter=figureOutDelimiter(vcfFname))
 		lineNumber = 0
 		previousChromosome = None
 		previousLine = None
@@ -401,7 +400,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				lastStartStopData = chr2StartStopDataLs[chromosome][-1]
 				if lastStartStopData.stopLineNumber is None:	#last block hasn't been closed yet.
 					noOfLinesInCurrentBlock = lineNumber - lastStartStopData.startLineNumber +1
-					if noOfLinesInCurrentBlock>=noOfLinesPerUnit:	#time to close it
+					if noOfLinesInCurrentBlock>=noOfSitesPerUnit:	#time to close it
 						lastStartStopData.stopLineNumber = lineNumber
 						lastStartStopData.stopLineStart = start
 						lastStartStopData.stopLineStop = stop
@@ -411,7 +410,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					chr2StartStopDataLs[chromosome].append(StartStopData)
 			previousLine = PassingData(chromosome = chromosome, start=start, stop=stop, lineNumber=lineNumber)
 		#final closure
-		if previousLine is not None:	#intervalFname is not empty
+		if previousLine is not None:	#vcfFname is not empty
 			lastStartStopData = chr2StartStopDataLs[previousLine.chromosome][-1]
 			if lastStartStopData.stopLineNumber is None:	#last block hasn't been closed yet.
 				#close it regardless of whether it has enough lines in it or not.
@@ -420,7 +419,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				lastStartStopData.stopLineStop = previousLine.stop
 		sys.stderr.write("%s chromosomes out of %s lines.\n"%(len(chr2StartStopDataLs), lineNumber))
 		
-		intervalFile = self.registerOneInputFile(inputFname=intervalFname, folderName=folderName)
+		intervalFile = self.registerOneInputFile(inputFname=vcfFname, folderName=folderName)
 		chr2IntervalDataLs = {}
 		counter = 0
 		for chr, startStopDataLs in chr2StartStopDataLs.iteritems():

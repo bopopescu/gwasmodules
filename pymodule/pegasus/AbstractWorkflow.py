@@ -100,6 +100,13 @@ class AbstractWorkflow(ADAG):
 		#2012.9.25 global counter
 		self.no_of_jobs = 0
 		
+		if hasattr(self, 'contigMaxRankBySize') and hasattr(self, 'contigMinRankBySize'):
+			#2013.2.6 non-public schema dbs should be connected before the main vervetdb or other db (schema=public) is connected.
+			self.chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, \
+													contigMinRankBySize=self.contigMinRankBySize)
+		else:
+			self.chr2size = {}
+	
 		self.connectDB()
 	
 	def writeXML(self, out):
@@ -191,7 +198,13 @@ class AbstractWorkflow(ADAG):
 		
 		# Close tag
 		out.write('</adag>\n')
-
+	
+	def getTopNumberOfContigs(self, **keywords):
+		"""
+		2013.2.6 placeholder
+		"""
+		pass
+	
 	def connectDB(self):
 		"""
 		2013.1.25 placeholder, to establish db connection
@@ -491,6 +504,18 @@ class AbstractWorkflow(ADAG):
 		EstimateOutliersIn2DData.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "statistics/EstimateOutliersIn2DData.py"), site_handler))
 		executableClusterSizeMultiplierList.append((EstimateOutliersIn2DData, 0))
 		
+		#2013.2.3 use samtools to extract consensus from bam files
+		ExtractConsensusSequenceFromAlignment = Executable(namespace=namespace, name="ExtractConsensusSequenceFromAlignment", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		ExtractConsensusSequenceFromAlignment.addPFN(PFN("file://" + \
+			os.path.join(self.pymodulePath, "pegasus/mapper/alignment/ExtractConsensusSequenceFromAlignment.sh"), site_handler))
+		executableClusterSizeMultiplierList.append((ExtractConsensusSequenceFromAlignment, 1))
+		
+		#2013.2.4
+		splitfa = Executable(namespace=namespace, name="splitfa", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		splitfa.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/splitter/splitfa.sh"), site_handler))
+		executableClusterSizeMultiplierList.append((splitfa, 1))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
@@ -995,9 +1020,10 @@ class AbstractWorkflow(ADAG):
 		return returnData
 	
 	def addAbstractMapperLikeJob(self, workflow=None, executable=None, \
-					inputVCF=None, inputF=None, outputF=None, \
+					inputVCF=None, inputF=None, outputF=None, extraOutputLs=None,\
 					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
-					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
+					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, \
+					sshDBTunnel=None, **keywords):
 		"""
 		2012.10.8 call addGenericJob() instead
 		2012.7.19
@@ -1009,10 +1035,11 @@ class AbstractWorkflow(ADAG):
 			inputF = inputVCF
 		job= self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputF, outputFile=outputF, \
 				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
-				extraOutputLs=None,\
+				extraOutputLs=extraOutputLs,\
 				transferOutput=transferOutput, \
+				extraArguments=extraArguments,\
 				extraArgumentList=extraArgumentList, key2ObjectForJob=None, \
-				sshDBTunnel=None, job_max_memory=job_max_memory, **keywords)
+				sshDBTunnel=sshDBTunnel, job_max_memory=job_max_memory, **keywords)
 		return job
 	
 	def addSelectLineBlockFromFileJob(self, executable=None, inputFile=None, outputFile=None,\
