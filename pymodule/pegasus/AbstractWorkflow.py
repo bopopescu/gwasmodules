@@ -680,6 +680,7 @@ class AbstractWorkflow(ADAG):
 							namespace=None, version=None, extraDependentInputLs=None):
 		"""
 		i.e. :	self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
+		2013.2.6 make sure parentJob is of instance Job
 		2012.10.8
 			inputF is optional, if not given, parentJobLs must be given, and parentJobLs[0].output is inputF. 
 		2012.9.12 parentJobLs and extraDependentInputLs could be None
@@ -690,7 +691,8 @@ class AbstractWorkflow(ADAG):
 			workflow = self
 		if inputF is None and parentJobLs is not None:	#2012.10.8
 			parentJob = parentJobLs[0]
-			inputF = parentJob.output
+			if hasattr(parentJob, 'output'):
+				inputF = parentJob.output
 		if inputF:
 			isAdded = self.addJobUse(statMergeJob, file=inputF, transfer=True, register=True, link=Link.INPUT)
 			if isAdded:
@@ -703,7 +705,8 @@ class AbstractWorkflow(ADAG):
 		
 		if parentJobLs:
 			for parentJob in parentJobLs:
-				self.addJobDependency(parentJob=parentJob, childJob=statMergeJob)
+				if parentJob:
+					self.addJobDependency(parentJob=parentJob, childJob=statMergeJob)
 	
 	
 	def addGenericDBJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
@@ -792,16 +795,24 @@ class AbstractWorkflow(ADAG):
 	
 	def addJobDependency(self, workflow=None, parentJob=None, childJob=None):
 		"""
+		2013.2.6 make sure parentJob is of instance Job, sometimes, it could be a fake job, like PassingData(output=...)
 		2012.10.18 check whether that the dependency exists already
 		"""
 		if workflow is None:
 			workflow = self
-		dep = Dependency(parent=parentJob, child=childJob)
-		if not workflow.hasDependency(dep):
-			workflow.addDependency(dep)
-			return True
-		else:
-			return False
+		addedOrNot = True
+		if isinstance(parentJob, Job):
+			dep = Dependency(parent=parentJob, child=childJob)
+			if not workflow.hasDependency(dep):
+				workflow.addDependency(dep)
+				addedOrNot = True
+			else:
+				addedOrNot = False
+		else:	#2013.2.6
+			#sys.stderr.write("Warning: parent job %s is not a Job-instance.\n"%(repr(parentJob)))
+			addedOrNot = False
+		return addedOrNot
+		
 		
 	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
@@ -862,16 +873,15 @@ class AbstractWorkflow(ADAG):
 		workflow.addJob(job)
 		job.parentJobLs = []	#2012.10.18
 		if parentJob:	#2012.10.15
-			self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
-			job.parentJobLs.append(parentJob)
-			#workflow.depends(parent=parentJob, child=job)
+			isAdded = self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
+			if isAdded:
+				job.parentJobLs.append(parentJob)
 		if parentJobLs:
 			for parentJob in parentJobLs:
 				if parentJob:
 					isAdded = self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
 					if isAdded:
 						job.parentJobLs.append(parentJob)
-					#workflow.depends(parent=parentJob, child=job)
 		if extraDependentInputLs:
 			for input in extraDependentInputLs:
 				if input:
