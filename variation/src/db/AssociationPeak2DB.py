@@ -22,16 +22,14 @@ __doc__ = __doc__%(sys.argv[0], )
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import csv, stat, getopt, re
-import traceback, gc, subprocess
-from pymodule import figureOutDelimiter, PassingData
+import copy
 from pymodule import AssociationPeakTableFile
 from variation.src import Stock_250kDB
 from AssociationLandscape2DB import AssociationLandscape2DB
 
 class AssociationPeak2DB(AssociationLandscape2DB):
 	__doc__ = __doc__
-	option_default_dict = AssociationLandscape2DB.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AssociationLandscape2DB.option_default_dict)
 	option_default_dict.update({
 						('min_score', 0, float): [3, '', 1, 'minimum score to cut an association landscape into peaks, -log(pvalue).'],\
 						})
