@@ -511,11 +511,17 @@ class AbstractWorkflow(ADAG):
 			os.path.join(self.pymodulePath, "pegasus/mapper/alignment/ExtractConsensusSequenceFromAlignment.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((ExtractConsensusSequenceFromAlignment, 1))
 		
-		#2013.2.4
+		#2013.2.4, wrapper around psmc's splitfa, a program that splits fasta files
 		splitfa = Executable(namespace=namespace, name="splitfa", version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
 		splitfa.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/splitter/splitfa.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((splitfa, 1))
+		
+		#2013.2.7 convert, an image swissknife program, part of imagemagick 
+		convertImage = Executable(namespace=namespace, name="convertImage", version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		convertImage.addPFN(PFN("file:///usr/bin/convert", site_handler))
+		executableClusterSizeMultiplierList.append((convertImage, 1))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
@@ -709,6 +715,55 @@ class AbstractWorkflow(ADAG):
 					self.addJobDependency(parentJob=parentJob, childJob=statMergeJob)
 	
 	
+	def addConvertImageJob(self, inputFile=None, inputArgumentOption=None, \
+					outputFile=None, outputArgumentOption=None, density=None, \
+					resizeDimension=None, \
+					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,\
+					key2ObjectForJob=None, **keywords):
+		"""
+		2013.2.7 use imagemagick's convert to convert images. examples:
+			plotOutputFile = File('%s.eps'%(plotOutputFnamePrefix))
+			plotPNGOutputFile = File('%s.png'%(plotOutputFnamePrefix))
+			#change dpi to 300
+			self.addConvertImageJob(inputFile=plotOutputFile, \
+					outputFile=plotPNGOutputFile, density=300, \
+					resizeDimension=None, \
+					parentJobLs=[psmc_plotJob], extraDependentInputLs=None, extraOutputLs=None, transferOutput=True, \
+					extraArguments=None, frontArgumentList=None, job_max_memory=500)
+			
+			#resize by demanding the width = 1800, height will scale accordingly
+			self.addConvertImageJob(inputFile=plotOutputFile, \
+					outputFile=plotPNGOutputFile, density=None, \
+					resizeDimension=1800, \
+					parentJobLs=[psmc_plotJob], extraDependentInputLs=None, extraOutputLs=None, transferOutput=True, \
+					extraArguments=None, frontArgumentList=None, job_max_memory=500)
+			#resize by demanding the dimension=1800X900
+			self.addConvertImageJob(inputFile=plotOutputFile, \
+					outputFile=plotPNGOutputFile, density=None, \
+					resizeDimension='1800X900', \
+					parentJobLs=[psmc_plotJob], extraDependentInputLs=None, extraOutputLs=None, transferOutput=True, \
+					extraArguments=None, frontArgumentList=None, job_max_memory=500)
+		"""
+		if frontArgumentList is None:
+			frontArgumentList = []
+		if extraOutputLs is None:
+			extraOutputLs = []
+		if density is not None:
+			frontArgumentList.append("-density %s"%(density))
+		if resizeDimension is not None:
+			frontArgumentList.append("-resize %s"%(resizeDimension))
+		#do not pass the inputFileList to addGenericJob() because db arguments need to be added before them. 
+		job = self.addGenericJob(workflow=self, executable=self.convertImage, inputFile=inputFile, \
+						inputArgumentOption=inputArgumentOption, outputFile=outputFile, \
+						outputArgumentOption=outputArgumentOption, inputFileList=None, parentJobLs=parentJobLs, \
+						extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+						transferOutput=transferOutput, \
+						frontArgumentList=frontArgumentList, extraArguments=extraArguments, extraArgumentList=extraArgumentList,\
+						job_max_memory=job_max_memory, key2ObjectForJob=key2ObjectForJob,\
+						**keywords)
+		return job
+	
 	def addGenericDBJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
 					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
@@ -817,9 +872,10 @@ class AbstractWorkflow(ADAG):
 	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
 					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
-					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
 					key2ObjectForJob=None, no_of_cpus=None, max_walltime=None, **keywords):
 		"""
+		2013.2.7 add argument frontArgumentList, a list of arguments to be put in front of anything else
 		2012.10.18
 			add job.parentJobLs to store its parent job(s).
 		2012.10.15
@@ -845,6 +901,8 @@ class AbstractWorkflow(ADAG):
 		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
 		job.outputLs = []	#2012.6.27 to hold more output files
 		job.inputLs = []
+		if frontArgumentList:	#2013.2.7
+			job.addArguments(*frontArgumentList)
 		if inputFile:
 			if inputArgumentOption:
 				job.addArguments(inputArgumentOption)
