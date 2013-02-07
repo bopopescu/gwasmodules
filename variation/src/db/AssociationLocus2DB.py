@@ -27,16 +27,13 @@ else:   #32bit
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import csv, stat, getopt, re
-import traceback, gc, subprocess
-from pymodule import figureOutDelimiter, PassingData
+import copy
 from pymodule import AssociationLocusTableFile, utils
-from variation.src import Stock_250kDB
 from AssociationPeak2DB import AssociationPeak2DB
  
 class AssociationLocus2DB(AssociationPeak2DB):
 	__doc__ = __doc__
-	option_default_dict = AssociationPeak2DB.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AssociationPeak2DB.option_default_dict)
 	option_default_dict.pop(('result_id', 1, int))
 	option_default_dict.update({
 			('min_connectivity', 0, float): [None, '', 1, "minimum connectivity of any peak graph connected component, not used."],\
