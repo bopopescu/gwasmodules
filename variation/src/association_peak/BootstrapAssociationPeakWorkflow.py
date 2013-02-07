@@ -19,11 +19,20 @@ Examples:
 		-o dags/BootstrapAssociationPeak/Bootstrap_call57_75_ana_1_32_min_score_3_4_5_min_overlap_0.05_0.2_0.5_0.8.xml
 		-u yh  --db_passwd secret -z banyan -j condorpool -l condorpool
 
+	#2013.1.11, on hoffman2
+	%s  --call_method_id_ls 57,75 --analysis_method_id_ls 1,32 --min_score_ls 2,3,4,5 --min_overlap_ratio_ls 0.50,0.80
+		-o dags/BootstrapAssociationPeak/Bootstrap_call57_75_ana_1_32_min_score_2_3_4_5_min_overlap_0.5_0.8.xml
+		--phenotype_method_id_ls 1-35,39-48,57-82,158-159,161-179,182-186,272-283,314-351,362-380,418-589
+		-z localhost -j hcondor -l hcondor
+		--data_dir /u/home/eeskin/polyacti/NetworkData/250k/db/
+		--db_user yh --db_passwd secret -C 50 --commit --needSSHDBTunnel
+	
 Description:
-	2012.11.21 a workflow that checks association landscape/peak/loci under different threshold settings.
+	2013.2.6 a workflow that checks association landscape/peak/loci under different threshold settings.
+		it'll check with db to see if some landscape/peak/loci have been registered in db. if yes, it'll skip those jobs.
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
 
 #bit_number = math.log(sys.maxint)/math.log(2)
@@ -34,16 +43,15 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
+import copy
 from Pegasus.DAX3 import *
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, utils
 
-from variation.src import AbstractVariationWorkflow
-from variation.src import Stock_250kDB
-from variation.src import DefineAssociationLandscapePipeline
+from variation.src.association_peak.DefineAssociationLandscapePipeline import DefineAssociationLandscapePipeline
 
 class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 	__doc__ = __doc__
-	option_default_dict = DefineAssociationLandscapePipeline.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(DefineAssociationLandscapePipeline.option_default_dict)
 	for key in [('result_id_ls', 0, )]:
 		option_default_dict.pop(key)
 	#remove some irrelevant options
@@ -121,7 +129,8 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		
 		return returnData
 	
-	def addAllJobs(self, workflow=None, association_result_ls=None, data_dir=None, min_MAF=None, \
+	def addAllJobs(self, workflow=None, db_250k=None, association_result_ls=None, \
+				data_dir=None, min_MAF=None, \
 				neighbor_distance=None, max_neighbor_distance=None, \
 				min_score_ls=None, min_overlap_ratio_ls=None, ground_score=None,\
 				peakPadding=None, tax_id=None, \
@@ -132,7 +141,10 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		"""
 		if workflow is None:
 			workflow = self
-		sys.stderr.write("Adding jobs for %s association results ..."%(len(association_result_ls)))
+		phenotype_method_id_of_associations_set = set([row.phenotype_method_id for row in association_result_ls])
+		
+		sys.stderr.write("Adding jobs for %s association results (%s phenotypes) ..."%(len(association_result_ls),\
+																			len(phenotype_method_id_of_associations_set)))
 		
 		returnData = PassingData()
 		returnData.jobDataLs = []
@@ -163,39 +175,53 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		#	each row is index by association threshold.
 		#	each column is index by overlap threshold.
 		
-		resultID2defineLandscapeJobLs = {}
+		resultID2defineLandscapeJobData = {}
+		association_landscape_type = db_250k.getAssociationLandscapeType(min_MAF=min_MAF, \
+											neighbor_distance=neighbor_distance, \
+											max_neighbor_distance=max_neighbor_distance)
 		for result in association_result_ls:
 			associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, \
 											newDataDir=self.data_dir), \
 										folderName=self.pegasusFolderName)
 			
-			#associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, \
-			#				newDataDir=self.data_dir), \
-			#				folderName=self.pegasusFolderName)
-			#add DefineAssociationLandscape job
-			outputFnamePrefix = 'result_%s_neighbor_%s_max_neighbor_%s_min_MAF_%s_tax_id_%s'%\
-					(result.id, neighbor_distance, max_neighbor_distance, min_MAF, tax_id)
-			landscapeOutputFile = File(os.path.join(mapDirJob.output, '%s_landscape.h5'%(outputFnamePrefix)))
-			defineLandscapeJob = self.addDefineLandscapeJob(workflow, executable=workflow.DefineAssociationLandscape, \
-							result_id=result.id, neighbor_distance=neighbor_distance, \
-							max_neighbor_distance=max_neighbor_distance,\
-							min_MAF=min_MAF, tax_id=tax_id, \
-							data_dir=data_dir, logFile=None,\
-							landscapeOutputFile=landscapeOutputFile, \
-							extraDependentInputLs=[associationResultFile], \
-							parentJobLs=[mapDirJob], sshDBTunnel=self.needSSHDBTunnel,\
-							job_max_memory=2000, transferOutput=False)
+			association_landscape = db_250k.checkAssociationLandscape(result_id=result.id, \
+														association_landscape_type_id=association_landscape_type.id)
+			if association_landscape:	#2013.2.6 already in db
+				landscapeOutputFname = association_landscape.getFileAbsPath(oldDataDir=db_250k.data_dir, \
+											newDataDir=data_dir)
+				landscapeOutputFile = self.registerOneInputFile(inputFname=landscapeOutputFname, \
+										folderName=self.pegasusFolderName)
+				defineLandscapeJob = PassingData(output=landscapeOutputFile)
+				landscape2DBJob = None
+			else:
+				#associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, \
+				#				newDataDir=self.data_dir), \
+				#				folderName=self.pegasusFolderName)
+				#add DefineAssociationLandscape job
+				outputFnamePrefix = 'result_%s_neighbor_%s_max_neighbor_%s_min_MAF_%s_tax_id_%s'%\
+						(result.id, neighbor_distance, max_neighbor_distance, min_MAF, tax_id)
+				landscapeOutputFile = File(os.path.join(mapDirJob.output, '%s_landscape.h5'%(outputFnamePrefix)))
+				defineLandscapeJob = self.addDefineLandscapeJob(workflow, executable=workflow.DefineAssociationLandscape, \
+								result_id=result.id, neighbor_distance=neighbor_distance, \
+								max_neighbor_distance=max_neighbor_distance,\
+								min_MAF=min_MAF, tax_id=tax_id, \
+								data_dir=data_dir, logFile=None,\
+								landscapeOutputFile=landscapeOutputFile, \
+								extraDependentInputLs=[associationResultFile], \
+								parentJobLs=[mapDirJob], sshDBTunnel=self.needSSHDBTunnel,\
+								job_max_memory=2000, transferOutput=False)
 						
-			logFile = File(os.path.join(mapDirJob.output, '%s_2db_log.tsv'%\
-										(outputFnamePrefix)))
-			landscape2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLandscape2DB, inputFile=defineLandscapeJob.output, \
-						result_id=result.id, \
-						data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
-						min_MAF=min_MAF, \
-						neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
-						parentJobLs=[mapDirJob, defineLandscapeJob], \
-						extraDependentInputLs=None, transferOutput=True, extraArguments=None, job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
-			resultID2defineLandscapeJobLs[result.id] = [defineLandscapeJob, landscape2DBJob]
+				logFile = File(os.path.join(mapDirJob.output, '%s_2db_log.tsv'%\
+											(outputFnamePrefix)))
+				landscape2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLandscape2DB, inputFile=defineLandscapeJob.output, \
+							result_id=result.id, \
+							data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
+							min_MAF=min_MAF, \
+							neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
+							parentJobLs=[mapDirJob, defineLandscapeJob], \
+							extraDependentInputLs=None, transferOutput=True, extraArguments=None, job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
+			resultID2defineLandscapeJobData[result.id] = PassingData(defineLandscapeJob=defineLandscapeJob, landscape2DBJob=landscape2DBJob,\
+																association_landscape=association_landscape)
 
 			call_method_id = result.call_method_id
 			analysis_method_id = result.analysis_method_id
@@ -218,32 +244,48 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 			associationMinScoreDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=associationMinScoreDir)
 			
 			resultID2associationPeakJob = {}
-			for resultID, defineLandscapeJobLs in resultID2defineLandscapeJobLs.iteritems():
-				defineLandscapeJob, landscape2DBJob = defineLandscapeJobLs[:2]
-				#add landscape -> peak job
-				outputFnamePrefix = os.path.splitext(os.path.basename(defineLandscapeJob.output.name))[0]
-				outputFnamePrefix = '%s_min_score_%s_ground_score_%s'%(outputFnamePrefix, min_score, ground_score)
-				outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s_peak.h5'%(outputFnamePrefix)))
-				
-				associationPeakJob = self.addAssociationLandscape2PeakJob(executable=self.AssociationLandscape2Peak, \
-					inputFile=defineLandscapeJob.output, outputFile=outputFile, \
-					min_score=min_score, ground_score=ground_score, \
-					parentJobLs=[associationMinScoreDirJob, defineLandscapeJob], job_max_memory=2000, job_max_walltime = 60, \
-					extraDependentInputLs=None, \
-					transferOutput=False)
+			
+			association_peak_type = self.db_250k.getAssociationPeakType(association_landscape_type_id=association_landscape_type.id, \
+															min_score=min_score)
+			for resultID, defineLandscapeJobData in resultID2defineLandscapeJobData.iteritems():
+				defineLandscapeJob = defineLandscapeJobData.defineLandscapeJob
+				landscape2DBJob = defineLandscapeJobData.landscape2DBJob
+				association_landscape = defineLandscapeJobData.association_landscape
+				genome_wide_association_peak = self.db_250k.checkGenomeWideAssociationPeak(result_id=resultID, \
+													association_landscape_id=association_landscape.id,\
+													association_peak_type_id=association_peak_type.id)
+				if genome_wide_association_peak:
+					associationPeakFname = genome_wide_association_peak.getFileAbsPath(oldDataDir=db_250k.data_dir, \
+												newDataDir=data_dir)
+					associationPeakFile = self.registerOneInputFile(inputFname=associationPeakFname, \
+											folderName=self.pegasusFolderName)
+					associationPeakJob = PassingData(output=associationPeakFile)
+					associationPeak2DBJob = None
+				else:
+					#add landscape -> peak job
+					outputFnamePrefix = os.path.splitext(os.path.basename(defineLandscapeJob.output.name))[0]
+					outputFnamePrefix = '%s_min_score_%s_ground_score_%s'%(outputFnamePrefix, min_score, ground_score)
+					outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s_peak.h5'%(outputFnamePrefix)))
+					
+					associationPeakJob = self.addAssociationLandscape2PeakJob(executable=self.AssociationLandscape2Peak, \
+						inputFile=defineLandscapeJob.output, outputFile=outputFile, \
+						min_score=min_score, ground_score=ground_score, \
+						parentJobLs=[associationMinScoreDirJob, defineLandscapeJob], job_max_memory=2000, job_max_walltime = 60, \
+						extraDependentInputLs=None, \
+						transferOutput=False)
+					
+					if landscape2DBJob or association_landscape:	#it needs the landscape already in db_250k
+						logFile = File(os.path.join(associationMinScoreDirJob.output, '%s_2db_log.tsv'%\
+												(outputFnamePrefix)))
+						associationPeak2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationPeak2DB, inputFile=associationPeakJob.output, \
+								result_id=resultID, \
+								data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
+								min_MAF=min_MAF, \
+								neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
+								parentJobLs=[associationMinScoreDirJob, associationPeakJob, landscape2DBJob], \
+								extraDependentInputLs=None, transferOutput=True, extraArguments="--min_score %s"%(min_score), \
+								job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
 				resultID2associationPeakJob[resultID] = associationPeakJob
-				
-				if landscape2DBJob:	#it needs the landscape already in db_250k
-					logFile = File(os.path.join(associationMinScoreDirJob.output, '%s_2db_log.tsv'%\
-											(outputFnamePrefix)))
-					associationPeak2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationPeak2DB, inputFile=associationPeakJob.output, \
-							result_id=resultID, \
-							data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
-							min_MAF=min_MAF, \
-							neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
-							parentJobLs=[associationMinScoreDirJob, associationPeakJob, landscape2DBJob], \
-							extraDependentInputLs=None, transferOutput=True, extraArguments="--min_score %s"%(min_score), \
-							job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
 			
 			for j in xrange(len(min_overlap_ratio_ls)):
 				min_overlap_ratio = min_overlap_ratio_ls[j]
@@ -252,35 +294,55 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 				analysis_method_id2AssociationLocusJobList = {}
 				
 				for association_group_key, result_ls in association_group_key2resultList.iteritems():
-					#add a AssociationPeak2AssociationLocus job
-					associationLocusFnamePrefix = 'call_%s_analysis_%s_min_score_%s_min_overlap_%s'%\
-											(association_group_key[0], association_group_key[1], min_score, min_overlap_ratio)
-					associationLocusFile = File(os.path.join(associationMinScoreDirJob.output, '%s_locus.h5'%(associationLocusFnamePrefix)))
-					#input to this job is added later
-					associationLocusJob = self.addAssociationPeak2LocusJob(executable=self.AssociationPeak2AssociationLocus, \
-								inputFile=None, outputFile=associationLocusFile, min_overlap_ratio=min_overlap_ratio, \
-								parentJobLs=[associationMinScoreDirJob], job_max_memory=2000, job_max_walltime = 60, \
-								extraDependentInputLs=None, \
-								transferOutput=False)
-					
 					call_method_id, analysis_method_id = association_group_key[:2]
-					associationLocusJob.call_method_id = call_method_id
-					associationLocusJob.analysis_method_id = analysis_method_id
+					associationLocusFnamePrefix = 'call_%s_analysis_%s_min_score_%s_min_overlap_%s'%\
+							(call_method_id, analysis_method_id, min_score, min_overlap_ratio)
+					
+					association_locus_type = db_250k.getAssociationLocusType(association_peak_type_id=association_peak_type.id, \
+									min_overlap_ratio=min_overlap_ratio, \
+									min_connectivity=None)
+					genome_wide_association_locus = db_250k.checkGenomeWideAssociationLocus(association_locus_type_id=association_locus_type.id,\
+								call_method_id=call_method_id, analysis_method_id=analysis_method_id,\
+								call_method_id_ls='%s'%(call_method_id),\
+								analysis_method_id_ls="%s"%(analysis_method_id),\
+								phenotype_method_id_ls=utils.getSuccinctStrOutOfList(phenotype_method_id_of_associations_set))
+					if genome_wide_association_locus:
+						associationLocusFname = genome_wide_association_locus.getFileAbsPath(oldDataDir=db_250k.data_dir, \
+													newDataDir=data_dir)
+						associationLocusFile = self.registerOneInputFile(inputFname=associationLocusFname, \
+												folderName=self.pegasusFolderName)
+						associationLocusJob = PassingData(output=associationLocusFile,call_method_id=call_method_id, \
+														analysis_method_id=analysis_method_id)
+						associationLocus2DBJob = None
+					else:
+						#add a AssociationPeak2AssociationLocus job
+						associationLocusFile = File(os.path.join(associationMinScoreDirJob.output, '%s_locus.h5'%(associationLocusFnamePrefix)))
+						#input to this job is added later
+						associationLocusJob = self.addAssociationPeak2LocusJob(executable=self.AssociationPeak2AssociationLocus, \
+									inputFile=None, outputFile=associationLocusFile, min_overlap_ratio=min_overlap_ratio, \
+									parentJobLs=[associationMinScoreDirJob], job_max_memory=2000, job_max_walltime = 60, \
+									extraDependentInputLs=None, \
+									transferOutput=False)
+						
+						associationLocusJob.call_method_id = call_method_id
+						associationLocusJob.analysis_method_id = analysis_method_id
+						
+						
+						#add to the database
+						logFile = File(os.path.join(associationMinScoreDirJob.output, '%s_2db_log.tsv'%\
+												(associationLocusFnamePrefix)))
+						associationLocus2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLocus2DB, \
+								inputFile=associationLocusJob.output, \
+								result_id=None, \
+								data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
+								min_MAF=min_MAF, \
+								neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
+								parentJobLs=[associationMinScoreDirJob, associationLocusJob], \
+								extraDependentInputLs=None, transferOutput=True, \
+								extraArguments="--min_score %s --min_overlap_ratio %s"%(min_score, min_overlap_ratio), \
+								job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
 					
 					association_group_key2reduceAssociationPeakJobMatrix[association_group_key][i].append(associationLocusJob)
-					
-					#add to the database
-					logFile = File(os.path.join(associationMinScoreDirJob.output, '%s_2db_log.tsv'%\
-											(associationLocusFnamePrefix)))
-					associationLocus2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLocus2DB, inputFile=associationLocusJob.output, \
-							result_id=None, \
-							data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
-							min_MAF=min_MAF, \
-							neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
-							parentJobLs=[associationMinScoreDirJob, associationLocusJob], \
-							extraDependentInputLs=None, transferOutput=True, \
-							extraArguments="--min_score %s --min_overlap_ratio %s"%(min_score, min_overlap_ratio), \
-							job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
 					
 					#add PlotAssociationLocusFrequencyOnGenome job
 					associationLocusFrequencyOnGenomeFnamePrefix = os.path.join(plotOutputDirJob.output, \
@@ -319,9 +381,10 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 						analysis_method_id2AssociationLocusJobList[analysis_method_id] = []
 					analysis_method_id2AssociationLocusJobList[analysis_method_id].append(associationLocusJob)
 					
-					for result in result_ls:
-						associationPeakJob = resultID2associationPeakJob.get(result.id)
-						self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
+					if isinstance(associationLocusJob, Job):	#2013.2.6 it could PassingData
+						for result in result_ls:
+							associationPeakJob = resultID2associationPeakJob.get(result.id)
+							self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
 				
 				#add HistogramAssociationLocusAdjacencyDistance jobs
 				for analysis_method_id, associationLocusJobList in analysis_method_id2AssociationLocusJobList.iteritems():
@@ -385,6 +448,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 								extraArgumentList=None, extraArguments=None, transferOutput=True, job_max_memory=1000)
 							
 		sys.stderr.write("\t %s jobs added before PlotAssociationLocusFrequencyVsAssociationThreshold jobs.\n"%(self.no_of_jobs))
+		
 		#add a PlotAssociationLocusFrequencyVsAssociationThreshold job
 		for j in xrange(len(min_overlap_ratio_ls)):
 			min_overlap_ratio = min_overlap_ratio_ls[j]
@@ -531,7 +595,8 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		self.registerCustomExecutables(workflow)
 		association_result_ls = [ row for row in result_query]
 		
-		self.addAllJobs(workflow=workflow, association_result_ls=association_result_ls, data_dir=self.data_dir, min_MAF=self.min_MAF, \
+		self.addAllJobs(workflow=workflow, db_250k=self.db_250k, association_result_ls=association_result_ls, \
+				data_dir=self.data_dir, min_MAF=self.min_MAF, \
 				neighbor_distance=self.neighbor_distance, max_neighbor_distance=self.max_neighbor_distance, \
 				min_score_ls=self.min_score_ls, min_overlap_ratio_ls=self.min_overlap_ratio_ls, ground_score=self.ground_score,\
 				peakPadding=self.peakPadding, tax_id=self.tax_id, \
