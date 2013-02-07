@@ -406,7 +406,7 @@ class FigureOutTaxID(object):
 		2012.6.6
 			update it to get table names from TaxonomyDB
 		"""
-		import TaxonomyDB
+		from db import TaxonomyDB
 		scientific_name2tax_id = {}
 		curs = self.curs
 		curs.execute("SELECT n.name_txt, n.tax_id FROM taxonomy.%s n, taxonomy.%s o where n.name_class='scientific name' \
