@@ -498,6 +498,11 @@ def getStrOutOfList(ls, separator=','):
 
 def getSuccinctStrOutOfList(ls=None, step=1, separator=','):
 	"""
+	examples:
+		utils.getSuccinctStrOutOfList(phenotype_method_id_of_associations_set)
+		utils.getSuccinctStrOutOfList(phenotype_method_id_ls)
+	
+	2013.2.6 ls could be set as well
 	2013.1.28 bugfix, ls could be empty list. return ''
 	2012.12.21 use , and - to represent a list of numbers in fewest possible characters
 		step controls the order of numbers.
@@ -505,7 +510,7 @@ def getSuccinctStrOutOfList(ls=None, step=1, separator=','):
 		like 1,2,3,4,7 => 1-4,7.
 	"""
 	import copy
-	ls_copy = copy.deepcopy(ls)
+	ls_copy = copy.deepcopy(list(ls))
 	ls_copy.sort()
 	spanStartValue = None
 	#ls_copy[0]
