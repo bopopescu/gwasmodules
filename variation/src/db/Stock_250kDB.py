@@ -8,14 +8,18 @@ Examples:
 	%s  -v postgresql -u yh -z localhost -d vervetdb -k stock_250k
 	
 	#setup database in mysql
-	%s -u yh -z papaya.usc.edu
+	%s -v mysql -u yh -z papaya.usc.edu -d stock_250k -k ""
+	
+	#2013.1.9 dump the Snps table into pytables
+	%s -o /tmp/locusMap.h5 -n 2 -u yh
 	
 Description:
 	2008-07-09
 	This is a wrapper for the stock_250k database, build on top of elixir. supposed to supercede the table definitions in mysql.sql.
 """
+
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
 
 from sqlalchemy.types import LargeBinary
 
@@ -40,17 +44,18 @@ from sqlalchemy import and_, or_, not_
 from sqlalchemy import func
 
 from datetime import datetime
-
-from pymodule import SNPData, PassingData, figureOutDelimiter
-from pymodule.db import ElixirDB, TableClass, supplantFilePathWithNewDataDir, AbstractTableWithFilename
 import hashlib, csv
+
+from pymodule import SNPData, PassingData, figureOutDelimiter, addAttributeDictToYHTableInHDF5Group
+from pymodule.db import ElixirDB, TableClass, supplantFilePathWithNewDataDir, AbstractTableWithFilename
+from pymodule import LocusMapTableFile, AssociationTableFile, getGenomeWideResultFromHDF5MatrixFile
 
 __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 #__metadata__ = ThreadLocalMetaData()	#2008-10 not good for pylon
 
 __metadata__ = MetaData()
 
-
+	
 class README(Entity, TableClass):
 	#2008-08-07
 	title = Field(String(2000))
@@ -566,11 +571,12 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 		if self.accession_set_id is not None:
 			filename_part_ls.append('set%s'%(self.accession_set_id))
 		filename_part_ls = map(str, filename_part_ls)
-		fileRelativePath = os.path.join(outputDirRelativePath, '%s.tsv'%('_'.join(filename_part_ls)))
+		fileRelativePath = os.path.join(outputDirRelativePath, '%s.h5'%('_'.join(filename_part_ls)))
 		return fileRelativePath
 	
 	def calculateNoOfAccessionsFromFile(self, data_dir=None, absPath=None):
 		"""
+		2013.1.10 use AssociationTableFile to get the number of accessions
 		2012.12.18
 			use MAC & MAF to figure out no_of_accessions
 		"""
@@ -578,6 +584,15 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 			absPath = supplantFilePathWithNewDataDir(filePath=self.filename, oldDataDir=None, newDataDir=data_dir)
 		if absPath and os.path.isfile(absPath):
 			try:
+				associationTableFile = AssociationTableFile(absPath, openMode='r', autoRead=False)
+				row = None
+				for row in associationTableFile:
+					break
+				maf = float(row['maf'])
+				mac = float(row['mac'])
+				self.no_of_accessions = int(round(mac/maf))
+				associationTableFile.close()
+				"""
 				delimiter = figureOutDelimiter(absPath)
 				reader = csv.reader(open(absPath), delimiter=delimiter)
 				header = reader.next()
@@ -587,6 +602,7 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 					MAC = float(row[4])
 					self.no_of_accessions = int(round(MAC/MAF))
 				del reader
+				"""
 			except:
 				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 				import traceback
@@ -595,12 +611,17 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 
 	def calculateNoOfLociFromFile(self, data_dir=None, absPath=None):
 		"""
+		2013.1.10 use AssociationTableFile to get the number of loci
 		2012.12.28 count the number of lines.
 		"""
 		if absPath is None:
 			absPath = supplantFilePathWithNewDataDir(filePath=self.filename, oldDataDir=None, newDataDir=data_dir)
 		if absPath and os.path.isfile(absPath):
 			try:
+				associationTableFile = AssociationTableFile(absPath, openMode='r', autoRead=False)
+				self.no_of_loci = associationTableFile.nrows
+				associationTableFile.close()
+				"""
 				delimiter = figureOutDelimiter(absPath)
 				reader = csv.reader(open(absPath), delimiter=delimiter)
 				header = reader.next()
@@ -609,6 +630,7 @@ class ResultsMethod(Entity, AbstractTableWithFilename):
 					no_of_loci += 1
 				self.no_of_loci = no_of_loci
 				del reader
+				"""
 			except:
 				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 				import traceback
@@ -655,7 +677,7 @@ class AssociationLandscape(Entity, AbstractTableWithFilename):
 	no_of_accessions = Field(Integer)	#2012.11.14
 	no_of_bridges = Field(Integer)	#2012.12.18
 	
-	short_name = Field(String(60), unique=True)
+	short_name = Field(String(120), unique=True)
 	path = Field(String(750), unique=True)
 	original_path = Field(Text)
 	md5sum = Field(Text)	# unique=True
@@ -703,14 +725,25 @@ class AssociationLandscape(Entity, AbstractTableWithFilename):
 		2012.12.15
 		"""
 		short_name = None
+		name_part_ls = []
 		if self.result and self.association_landscape_type:
-			am = self.result.analysis_method
-			pm = self.result.phenotype_method
 			cm = self.result.call_method
+			if cm:
+				name_part_ls.append('call%s'%(cm.id))
 			cnv_m = self.result.cnv_method
+			if cnv_m:
+				name_part_ls.append('cnv%s'%(cnv_m.id))
+			am = self.result.analysis_method
+			if am:
+				name_part_ls.append('a%s'%(am.id))
+			pm = self.result.phenotype_method
+			if pm:
+				name_part_ls.append('p%s'%(pm.id))
 			results_method_type = self.result.results_method_type
-			short_name = 'call%s_cnv%s_%s_%s_%s_%s'%(getattr(cm, 'id',0), getattr(cnv_m, 'id',0), am.short_name, pm.short_name, \
-										results_method_type.id, self.association_landscape_type.id)
+			if results_method_type:
+				name_part_ls.append('ry%s'%(results_method_type.id))
+			name_part_ls.append('y%s'%self.association_landscape_type.id)
+			short_name = '_'.join(name_part_ls)
 		return short_name
 	
 class AssociationLandscapeType(Entity):
@@ -718,7 +751,7 @@ class AssociationLandscapeType(Entity):
 	2012.11.12
 		type for AssociationLandscape
 	"""
-	short_name = Field(String(30), unique=True)
+	short_name = Field(String(120), unique=True)
 	description = Field(Text)
 	min_MAF = Field(Float)
 	neighbor_distance = Field(Integer)
@@ -737,7 +770,7 @@ class AssociationLandscapeType(Entity):
 		"""
 		short_name = None
 		if self.min_MAF is not None and self.neighbor_distance is not None and self.max_neighbor_distance is not None:
-			short_name = 'min_MAF_%s_neighbor_%s_max_neigh_%s'%(self.min_MAF, self.neighbor_distance, self.max_neighbor_distance)
+			short_name = 'min_MAF_%s_neigh_%s_max_neigh_%s'%(self.min_MAF, self.neighbor_distance, self.max_neighbor_distance)
 		return short_name
 
 class GenomeWideAssociationPeak(Entity, AbstractTableWithFilename):
@@ -1371,6 +1404,7 @@ class ArrayQuartileOutlier(Entity):
 
 class CallInfo(Entity, AbstractTableWithFilename):
 	"""
+	2013.1.17 add unique constraint
 	2009-2-2
 		add pc_value_ls
 	"""
@@ -1390,6 +1424,7 @@ class CallInfo(Entity, AbstractTableWithFilename):
 	using_table_options(mysql_engine='InnoDB')
 	
 	folderName = 'calls'
+	using_table_options(UniqueConstraint('array_id', 'method_id'))
 
 class CallQC(Entity):
 	call_info = ManyToOne("%s.CallInfo"%__name__, colname='call_info_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -1398,12 +1433,12 @@ class CallQC(Entity):
 	duplicate = Field(Integer)
 	tg_ecotype_id = Field(Integer)
 	tg_duplicate = Field(Integer)
-	NA_rate = Field(Float)
-	no_of_NAs = Field(Integer)
+	na_rate = Field(Float)
+	no_of_nas = Field(Integer)
 	no_of_totals = Field(Integer)
 	mismatch_rate = Field(Float)
 	no_of_mismatches = Field(Integer)
-	no_of_non_NA_pairs = Field(Integer)
+	no_of_non_na_pairs = Field(Integer)
 	call_method = ManyToOne('CallMethod', colname='call_method_id', ondelete='CASCADE', onupdate='CASCADE')
 	readme = ManyToOne("%s.README"%__name__, colname='readme_id', ondelete='CASCADE', onupdate='CASCADE')
 	qc_method = ManyToOne("%s.QCMethod"%__name__, colname='qc_method_id', ondelete='CASCADE', onupdate='CASCADE')
@@ -2559,19 +2594,15 @@ class Chromosome(Entity):
 
 class Stock_250kDB(ElixirDB):
 	__doc__ = __doc__
-	option_default_dict = {('drivername', 1,):['mysql', 'v', 1, 'which type of database? mysql or postgres', ],\
+	option_default_dict = ElixirDB.option_default_dict.copy()
+	option_default_dict.update({
+							('drivername', 1,):['postgresql', 'v', 1, 'which type of database? mysql or postgresql', ],\
 							('hostname', 1, ):['localhost', 'z', 1, 'hostname of the db server', ],\
-							('database', 1, ):['stock_250k', 'd', 1, '',],\
-							('schema', 0, ): [None, 'k', 1, 'database schema name', ],\
-							('username', 1, ):[None, 'u', 1, 'database username',],\
-							('password', 1, ):[None, 'p', 1, 'database password', ],\
-							('port', 0, ):[None, 'o', 1, 'database port number'],\
-							('pool_recycle', 0, int):[3600, 'l', 1, 'the length of time to keep connections open before recycling them.'],\
-							('sql_echo', 0, bool):[False, 's', 0, 'display SQL Statements'],\
-							('echo_pool', 0, bool):[False, 'e', 0, 'if True, the connection pool will log all checkouts/checkins to the logging stream, which defaults to sys.stdout.'],\
-							('commit',0, int): [0, 'c', 0, 'commit db transaction'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+							('dbname', 1, ):['vervetdb', 'd', 1, '',],\
+							('schema', 0, ): ['stock_250k', 'k', 1, 'database schema name', ],\
+							('run_type', 1, int):[1, '', 1, 'different run types. 1: setup db; 2: output a map between db locus-id and (chr,start,stop)', ],\
+							('outputFname', 0, ): [None, 'o', 1, 'output file (for some run_types)'],\
+							})
 	def __init__(self, **keywords):
 		"""
 		2008-10-06
@@ -2602,12 +2633,20 @@ class Stock_250kDB(ElixirDB):
 		#2008-08-26 setup_all() would setup other databases as well if they also appear in the program. Seperate this to be envoked after initialization
 		# to ensure the metadata of other databases is setup properly.
 	
-	def reScalePathByNewDataDir(self, filePath=None, newDataDir=None):
+	def addAttributesToResultFile(self, db_entry=None, inputFname=None, oldDataDir=None, newDataDir=None):
 		"""
-		2012.11.13
+		2013.1.10
+			add some attributes to the hdf5 file
 		"""
-		oldDataDir=self.data_dir
-		return supplantFilePathWithNewDataDir(filePath=filePath, oldDataDir=oldDataDir, newDataDir=newDataDir)
+		if inputFname is None:
+			inputFname = db_entry.getFileAbsPath(oldDataDir=oldDataDir, newDataDir=newDataDir)
+		attributeDict = {'result_id':db_entry.id, \
+				'call_method_id': db_entry.call_method_id, 'cnv_method_id': db_entry.cnv_method_id, \
+				'phenotype_method_id':db_entry.phenotype_method_id, 'analysis_method_id':db_entry.analysis_method_id,\
+				'no_of_accessions': db_entry.no_of_accessions}
+		associationTableFile = AssociationTableFile(inputFname, openMode='a', autoRead=False)
+		addAttributeDictToYHTableInHDF5Group(tableObject=associationTableFile.getTableObject(), attributeDict=attributeDict)
+		associationTableFile.close()
 	
 	def checkResultsMethod(self, call_method_id=None, phenotype_method_id=None, analysis_method_id=None, \
 			cnv_method_id=None, accession_set_id=None, results_method_type_id=None):
@@ -2895,6 +2934,25 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("%s out of %s entries were linked to a differing Snps.id.\n"%(real_counter, len(dc)))
 		return dc
 	
+	def checkCallInfo(self, call_method_id=None, array_id=None):
+		"""
+		2013.1.17
+		"""
+		query = CallInfo.query.filter_by(method_id=call_method_id).filter_by(array_id=array_id)
+		db_entry = query.first()
+		return db_entry
+	def getCallInfo(self, array_id=None, call_method_id=None, filename=None, created_by=None):
+		"""
+		2013.1.17
+		"""
+		db_entry = self.checkCallInfo(call_method_id=call_method_id, array_id=array_id)
+		if not db_entry:
+			db_entry = CallInfo(array_id=array_id, method_id=call_method_id, filename=filename,\
+							created_by=created_by)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
+	
 	@classmethod
 	def getCNVQCInGWA(cls, accession_id=None, cnv_type_id=None, min_size=None, min_no_of_probes=None,\
 					chr=None, start=None, stop=None, cnv_method_id=None):
@@ -2960,6 +3018,8 @@ class Stock_250kDB(ElixirDB):
 			gwr.min_value = -1
 		sys.stderr.write(" %s segments. Done.\n"%(len(gwr.data_obj_ls)))
 		return gwr
+	
+	
 	
 	def getCNVInGWA(self, cnv_method_id=None,cnv_type_id=None, chr=None, start=None, \
 						stop=None, min_size=None, min_no_of_probes=None):
@@ -3770,38 +3830,53 @@ class Stock_250kDB(ElixirDB):
 		return self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=priorTAIRVersion, locus_type_id=locus_type_id)
 	
 	
-	def get_db_id_given_chr_pos2db_id(self, snp_id):
+	def get_db_id_given_chr_pos2db_id(self, snp_id=None):
 		"""
+		2013.1.18 
 		2011-2-27
 			snp_id could be chr_pos or just Snps.id
 			
 			called by Calls2DB_250k.py and others.
 		"""
-		snp_id = snp_id.split('_')[:2]
-		chr_pos = tuple(map(int, snp_id))
-		if len(chr_pos)==1 or (len(chr_pos)>=2 and chr_pos[1]==0):
-			db_id = chr_pos[0]
-		else:
+		snp_id_in_ls = snp_id.split('_')
+		
+		if len(snp_id_in_ls)>1:
+			chr = snp_id_in_ls[0]
+			positions = snp_id_in_ls[1:]
+			positions = map(int, positions)
+			if len(positions)==1:
+				start = positions[0]
+				stop = start
+			elif len(positions)>=2:
+				start = positions[0]
+				stop = positions[1]
+			else:
+				sys.stderr.write("Error: could not parse chr, start, stop properly from snp_id %s ... "%(snp_id))
+				sys.exit(3)
+			chr_pos = (chr, start, stop)
 			db_id = self.chr_pos2snp_id.get(chr_pos)
+		else:	#database ID
+			db_id = int(snp_id_in_ls[0])
 		return db_id
 	
 	def get_chr_pos_given_db_id2chr_pos(self, snp_id=None):
 		"""
+		2013.1.18 return chr_start_stop
 		2011-2-27
 			snp_id could be chr_pos or just Snps.id
 			
 			called by QC_250k.py and Calls2DB_250k.py
 		"""
-		snp_id = snp_id.split('_')[:2]
-		chr_pos = tuple(map(int, snp_id))
-		if len(chr_pos)==1 or (len(chr_pos)>=2 and chr_pos[1]==0):
-			db_id = chr_pos[0]
+		snp_id_in_ls = snp_id.split('_')
+		if len(snp_id_in_ls)==1 or (len(snp_id_in_ls)>=2 and snp_id_in_ls[1]==0):
+			db_id = int(snp_id_in_ls[0])
 			chr_pos = self.snp_id2chr_pos.get(db_id)
-		if chr_pos:
-			snp_id = '%s_%s'%(chr_pos[0], chr_pos[1])
-			return snp_id
-		else:
-			return None
+			if chr_pos:
+				snp_id = '%s_%s_%s'%(chr_pos[0], chr_pos[1], chr_pos[2])
+			else:
+				snp_id = None
+		#chr_pos = tuple([snp_id_in_ls[0]] + map(int, snp_id_in_ls[1:]))
+		return snp_id
 	
 	@property
 	def snp_id2chr_pos(self,):
@@ -3824,7 +3899,7 @@ class Stock_250kDB(ElixirDB):
 				chr_pos = db.snp_id2chr_pos.get(1)
 		2011-2-28
 		"""
-		argData = self.handleSNPChrPos2IDArguments(argument_ls)
+		argData = self._handleSNPChrPos2IDArguments(argument_ls)
 		self._snp_id2chr_pos = self.getSNPChrPos2ID(keyType=2, priorTAIRVersion=argData.priorTAIRVersion,\
 										locus_type_id=argData.locus_type_id)
 	
@@ -3850,11 +3925,11 @@ class Stock_250kDB(ElixirDB):
 				snp_id = db.chr_pos2snp_id.get((1,657))
 		2011-2-28
 		"""
-		argData = self.handleSNPChrPos2IDArguments(argument_ls)
+		argData = self._handleSNPChrPos2IDArguments(argument_ls)
 		self._chr_pos2snp_id = self.getSNPChrPos2ID(keyType=1, priorTAIRVersion=argData.priorTAIRVersion,\
 												locus_type_id=argData.locus_type_id)
 	
-	def handleSNPChrPos2IDArguments(self, argument_ls=[False, None]):
+	def _handleSNPChrPos2IDArguments(self, argument_ls=[False, None]):
 		"""
 		2012.3.9
 			called by chr_pos2snp_id or snp_id2chr_pos:
@@ -3901,13 +3976,27 @@ class Stock_250kDB(ElixirDB):
 		self._cnv_id2chr_pos = {}
 		self._cnv_method_id = cnv_method_id
 		rows = self.metadata.bind.execute("select id, chromosome, start, stop from %s where cnv_method_id=%s"\
-										%(CNV.table.name, cnv_method_id))
+										%(self.getProperTableName(CNV), cnv_method_id))
 		for row in rows:
 			key = row.id
 			value = (row.chromosome, row.start, row.stop)
 			self._cnv_id2chr_pos[key] = value
 		sys.stderr.write("%s entries. Done.\n"%(len(self._cnv_id2chr_pos)))
 	
+	def writeSnps2LocusMapTableFile(self, outputFname=None):
+		"""
+		2012.1.9
+		"""
+		sys.stderr.write("Writing Snps table entries to locus map table file %s ..."%(outputFname))
+		locusMapTableFile = LocusMapTableFile(outputFname, openMode='w')
+		counter = 0
+		for row in Snps.query:
+			pdata = PassingData(locus_id=row.id, chromosome=row.chromosome, start=row.position, stop=row.end_position)
+			locusMapTableFile.appendOneRow(pdata, cellType=2)
+			counter += 1
+		locusMapTableFile.close()
+		
+		sys.stderr.write("%s entries.\n"%(counter))
 	
 	def getOneResultJsonData(self, result_id=None, min_MAF=0.0, no_of_top_snps=10000, data_dir=None, pdata=None):
 		"""
@@ -3959,8 +4048,24 @@ class Stock_250kDB(ElixirDB):
 				'max_length': max_length,
 				'no_of_tests': no_of_tests,
 				}
+		json_data = simplejson.dumps(result)
+		
+		#2013.1.15 save it in db
+		rm_json = ResultsMethodJson(min_maf=min_MAF, no_of_top_snps=no_of_top_snps)
+		rm_json.results_id = result_id
+		rm_json.json_data = json_data
+		self.session.add(rm_json)
+		self.session.flush()
+		try:
+			self.session.commit()
+			self.session.begin()
+		except:
+			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+			import traceback
+			traceback.print_exc()
+			self.session.begin()
 		sys.stderr.write("Done.\n")
-		return simplejson.dumps(result)
+		return json_data
 	
 	def getResultMethodContent(self, result_id=None, data_dir=None, min_MAF=0.1, construct_chr_pos2index=False, \
 						pdata=None, min_value_cutoff=None, results_directory=None, association_landscape=None,\
@@ -4005,6 +4110,9 @@ class Stock_250kDB(ElixirDB):
 		if not data_dir and results_directory:
 			data_dir = results_directory
 		
+		if data_dir is None:	#2013.1.10
+			data_dir = self.data_dir
+		
 		#2011-3-21 assign min_MAF to pdata only when pdata.min_MAF is None or doesn't exist.
 		min_MAF_request = getattr(pdata, 'min_MAF', None)
 		if min_MAF_request is None:
@@ -4020,7 +4128,7 @@ class Stock_250kDB(ElixirDB):
 		elif result_id:
 			db_entry = ResultsMethod.get(result_id)
 		
-		from pymodule import getGenomeWideResultFromFile
+		from pymodule import getGenomeWideResultFromFile, getGenomeWideResultFromHDF5MatrixFile
 		# 2011-3-21 no more caching
 		#if genome_wide_result is not None and genome_wide_result.results_id==db_entry.id:
 		#	return genome_wide_result
@@ -4051,9 +4159,11 @@ class Stock_250kDB(ElixirDB):
 					self._cnv_method_id = db_entry.cnv_method_id
 				db_id2chr_pos = self.cnv_id2chr_pos
 			pdata.db_id2chr_pos = db_id2chr_pos
-			
-			genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
-													pdata=pdata, min_value_cutoff=min_value_cutoff)
+			genome_wide_result = getGenomeWideResultFromHDF5MatrixFile(inputFname=result_fname, \
+										tableName='association', tableObject=None,\
+										min_value_cutoff=min_value_cutoff, do_log10_transformation=do_log10_transformation, pdata=pdata)
+			#genome_wide_result = getGenomeWideResultFromFile(result_fname, do_log10_transformation=do_log10_transformation, \
+			#										pdata=pdata, min_value_cutoff=min_value_cutoff)
 			genome_wide_result.setResultMethod(rm=db_entry)
 		else:
 			sys.stderr.write("Skip. %s doesn't exist.\n"%result_fname)
@@ -4342,6 +4452,51 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write(" %s entries left.\n"%(len(new_result_id_ls)))
 		return new_result_id_ls
 	
+	def get_ecotype_id_set_250k_in_pipeline(self):
+		"""
+		2013.1.11 moved from variation/src/common.py
+		2009-7-22
+			function copied from helloworld/controllers/Accession.py with ArrayInfo as argument.
+		"""
+		ecotype_id_set_250k_in_pipeline = set()
+		for row in ArrayInfo.query:
+			if row.maternal_ecotype_id==row.paternal_ecotype_id:	#no crosses.
+				ecotype_id_set_250k_in_pipeline.add(row.maternal_ecotype_id)
+		return ecotype_id_set_250k_in_pipeline
+	
+	def fillInPhenotypeMethodID2ecotype_id_set(self):
+		"""
+		2013.1.11 moved from variation/src/common.py
+		2009-11-17
+			return PhenotypeMethodID2ecotype_id_set
+		"""
+		sys.stderr.write("Filling up PhenotypeMethodID2ecotype_id_set ...")
+		PhenotypeMethodID2ecotype_id_set = {}
+		for row in PhenotypeAvg.query:
+			phenotype_method_id = row.method_id
+			if phenotype_method_id not in PhenotypeMethodID2ecotype_id_set:
+				PhenotypeMethodID2ecotype_id_set[phenotype_method_id] = set()
+			PhenotypeMethodID2ecotype_id_set[phenotype_method_id].add(row.ecotype_id)
+		sys.stderr.write("%s phenotypes.\n"%(len(PhenotypeMethodID2ecotype_id_set)))
+		return PhenotypeMethodID2ecotype_id_set
+	
+	
+	def fillInCallMethodID2ecotype_id_set(self):
+		"""
+		2013.1.11 moved from variation/src/common.py
+		2009-11-17
+			return CallMethodID2ecotype_id_set
+		"""
+		sys.stderr.write("Filling up CallMethodID2ecotype_id_set...")
+		CallMethodID2ecotype_id_set = {}
+		for row in CallInfo.query:
+			call_method_id = row.method_id
+			if call_method_id not in CallMethodID2ecotype_id_set:
+				CallMethodID2ecotype_id_set[call_method_id] = set()
+			CallMethodID2ecotype_id_set[call_method_id].add(row.array.maternal_ecotype_id)
+		sys.stderr.write(" %s call methods. \n"%(len(CallMethodID2ecotype_id_set)))
+		return CallMethodID2ecotype_id_set
+	
 	def getAssociationLocusType(self, association_peak_type_id=None, min_overlap_ratio=None, min_connectivity=None):
 		"""
 		2012.12.21
@@ -4441,45 +4596,49 @@ if __name__ == '__main__':
 	main_class = Stock_250kDB
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	instance = main_class(**po.long_option2value)
-	instance.setup()
-	import pdb
-	pdb.set_trace()
-	
-	#2010-8-6 complex query
-	TableClass = CNVArrayCall
-	array_id = 612
-	query = TableClass.query.filter_by(array_id=array_id)
-	min_size = 100
-	query = query.filter(TableClass.cnv.has((CNV.stop-CNV.start+1)>=min_size))
-	cnv_type_id = 1
-	query = query.filter(TableClass.cnv.has(cnv_type_id=cnv_type_id))
-	min_no_of_probes = 5
-	query = query.filter(TableClass.cnv.has(CNV.no_of_probes_covered>=min_no_of_probes))
-	cnv_method_id = 22
-	query = query.filter_by(cnv_method_id=cnv_method_id)
-	chr = "1"
-	query = query.filter(TableClass.cnv.has(chromosome=chr))
-	start =25000
-	stop = 2500000
-	query = query.filter(or_(and_(TableClass.cnv.has(CNV.start>=start), TableClass.cnv.has(CNV.start<=stop)), \
-								and_(TableClass.cnv.has(CNV.stop>=start), TableClass.cnv.has(CNV.stop<=stop))))
-	counter = 0
-	for row in query:
-		print row.id, row.array_id, row.cnv_id
-		counter += 1
-		if counter>=10:
-			break
-	
-	import sqlalchemy
-	s = sqlalchemy.sql.select([ResultsMethod.table.c.call_method_id.distinct()])
-	connection = instance.metadata.bind
-	#result = connection.execute(s).fetchmany(3)
-	result = connection.execute(s)
-	for r in result:
-		print r
-		print dir(r)
-		print r.call_method_id
+	if instance.run_type==1:
+		instance.setup()
+		import pdb
+		pdb.set_trace()
 		
-	rows = GeneListType.query.all()
-	for row in rows[:10]:
-		print row.gene_list[0].list_type_id
+		#2010-8-6 complex query
+		TableClass = CNVArrayCall
+		array_id = 612
+		query = TableClass.query.filter_by(array_id=array_id)
+		min_size = 100
+		query = query.filter(TableClass.cnv.has((CNV.stop-CNV.start+1)>=min_size))
+		cnv_type_id = 1
+		query = query.filter(TableClass.cnv.has(cnv_type_id=cnv_type_id))
+		min_no_of_probes = 5
+		query = query.filter(TableClass.cnv.has(CNV.no_of_probes_covered>=min_no_of_probes))
+		cnv_method_id = 22
+		query = query.filter_by(cnv_method_id=cnv_method_id)
+		chr = "1"
+		query = query.filter(TableClass.cnv.has(chromosome=chr))
+		start =25000
+		stop = 2500000
+		query = query.filter(or_(and_(TableClass.cnv.has(CNV.start>=start), TableClass.cnv.has(CNV.start<=stop)), \
+									and_(TableClass.cnv.has(CNV.stop>=start), TableClass.cnv.has(CNV.stop<=stop))))
+		counter = 0
+		for row in query:
+			print row.id, row.array_id, row.cnv_id
+			counter += 1
+			if counter>=10:
+				break
+		
+		import sqlalchemy
+		s = sqlalchemy.sql.select([ResultsMethod.table.c.call_method_id.distinct()])
+		connection = instance.metadata.bind
+		#result = connection.execute(s).fetchmany(3)
+		result = connection.execute(s)
+		for r in result:
+			print r
+			print dir(r)
+			print r.call_method_id
+			
+		rows = GeneListType.query.all()
+		for row in rows[:10]:
+			print row.gene_list[0].list_type_id
+	elif instance.run_type==2:
+		instance.setup(create_tables=False)
+		instance.writeSnps2LocusMapTableFile(outputFname=instance.outputFname)
