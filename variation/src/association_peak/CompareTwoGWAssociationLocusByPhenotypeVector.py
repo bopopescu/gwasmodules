@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
-import pylab
-import csv, random, numpy
+import copy
+import csv
 import tables
 from tables import UInt64Col, Float64Col, StringCol, UInt32Col, Float32Col
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter,\
@@ -71,7 +71,7 @@ class TwoGenomeWideAssociationLocusMapTable(tables.IsDescription):
 
 class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverlap):
 	__doc__ = __doc__
-	option_default_dict = TwoAssociationLocusFileOverlap.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(TwoAssociationLocusFileOverlap.option_default_dict)
 	# change default of file-format
 	option_default_dict[('inputFileFormat', 0, int)][0] = 2
 	option_default_dict[('outputFileFormat', 0, int)][0] = 2
