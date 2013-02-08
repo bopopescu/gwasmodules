@@ -26,16 +26,14 @@ else:   #32bit
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import csv, stat, getopt, re
-import traceback, gc, subprocess
-from pymodule import figureOutDelimiter, PassingData
+import copy
 from pymodule import AssociationLandscapeTableFile
 from variation.src import Stock_250kDB
 from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 
 class AssociationLandscape2DB(AbstractVariationMapper):
 	__doc__ = __doc__
-	option_default_dict = AbstractVariationMapper.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractVariationMapper.option_default_dict)
 	option_default_dict.update({
 						('result_id', 1, int): [None, '', 1, "ResultsMethod.id of the association result from which the landscape is derived."],\
 						('neighbor_distance', 0, int): [5000, '', 1, "within this distance, a locus that increases the association score \
