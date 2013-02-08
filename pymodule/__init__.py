@@ -42,6 +42,7 @@ from yhio import CNV
 from yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio, findCorrespondenceBetweenTwoCNVRBDict
 from yhio.AbstractMatrixFileWalker import AbstractMatrixFileWalker
 from yhio.latex import outputMatrixInLatexTable, outputFigureInLatex
+from yhio.FastaFile import FastaFile
 
 from Genome import GeneModel
 
