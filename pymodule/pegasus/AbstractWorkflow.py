@@ -1299,6 +1299,8 @@ class AbstractWorkflow(ADAG):
 			('xColumnPlotLabel', 0, ): ['', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
 			('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
 			
+			inputFileFormat   1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; . "1"(default)
+			
 		"""
 		extraOutputLs = []
 		key2ObjectForJob = {}
@@ -1484,11 +1486,13 @@ class AbstractWorkflow(ADAG):
 				xColumnHeader=None, xColumnPlotLabel=None, \
 				minNoOfTotal=100,\
 				figureDPI=300, formatString='.', samplingRate=0.001, need_svg=False, \
+				inputFileFormat=None, outputFileFormat=None,\
 				zColumnHeader=None, \
 				parentJobLs=None, \
 				extraDependentInputLs=None, \
 				extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
 		"""
+		2013.2.8 added argument inputFileFormat
 		2013.2.7 executable could be None, default is self.Draw2DHistogramOfMatrix
 		2012.11.28 change logX, logY, logZ
 		2012.10.7
@@ -1511,6 +1515,7 @@ class AbstractWorkflow(ADAG):
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=figureDPI, formatString=formatString, ylim_type=None, \
 							samplingRate=samplingRate, need_svg=need_svg, \
+							inputFileFormat=inputFileFormat, outputFileFormat=outputFileFormat,\
 							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \
 							**keywords)
