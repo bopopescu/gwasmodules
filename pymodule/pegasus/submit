@@ -25,8 +25,8 @@ if test $# -lt 2 ; then
 	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 1"
 	echo "  #plan & submit and no cleanup"
 	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 0"
-	echo "  #only planning, no running (toggleCleanup does not matter)"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1 local TrioInconsistency15DistantVRC_20110929T1726 \"\""
+	echo "  #only planning, no running (toggleCleanup does not matter) by assigning empty spaces to submitOption"
+	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1 local TrioInconsistency15DistantVRC_20110929T1726 \"  \""
 	echo "  #run the workflow without cleanup. good for testing in which you often need to modify rescue log to backtrack finished jobs"
 	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 0 local TrioInconsistency15DistantVRC_20110929T1726 \"--submit --nocleanup\" "
 	exit 1
@@ -64,7 +64,8 @@ if test "$toggleCleanUp" = "1"; then
 elif test -n "$toggleCleanUp"; then
 	submitOptionDefault="--submit --nocleanup"
 fi
-echo "submitOptionDefault is now = $submitOptionDefault "
+
+echo "Default submitOption is changed (or not) to $submitOptionDefault."
 
 if test -z "$submitOption"
 then
@@ -73,7 +74,7 @@ fi
 
 echo "Submitting to $TargetSite"
 echo STORAGE_SITE $STORAGE_SITE
-echo "submitOption=$submitOption"
+echo "Final submitOption is $submitOption"
 
 # 2012.5.3 these two condor profiles are for condor sites to have computing nodes keep stdout on local storage and transfer them to central manager upon exit/evict
 # it's useful in the case that there are too many jobs (.sub, .err, .out files) and the filesystem is not good at dealing with numerous small files (like panasas filesystem)
