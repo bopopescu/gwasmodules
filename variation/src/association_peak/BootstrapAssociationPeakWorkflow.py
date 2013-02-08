@@ -129,58 +129,16 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		
 		return returnData
 	
-	def addAllJobs(self, workflow=None, db_250k=None, association_result_ls=None, \
-				data_dir=None, min_MAF=None, \
-				neighbor_distance=None, max_neighbor_distance=None, \
-				min_score_ls=None, min_overlap_ratio_ls=None, ground_score=None,\
-				peakPadding=None, tax_id=None, \
-				outputDirPrefix="", transferOutput=True, job_max_memory=2000, **keywords):
+	def addDefineAssociationLandscapeJobs(self, db_250k=None, association_result_ls=None, mapDirJob=None, \
+										association_landscape_type=None,min_score_ls=None,\
+										data_dir=None, tax_id=None, passingData=None):
 		"""
-		2012.11.21
-			
+		2013.2.7
 		"""
-		if workflow is None:
-			workflow = self
-		phenotype_method_id_of_associations_set = set([row.phenotype_method_id for row in association_result_ls])
+		sys.stderr.write("\t Adding define-association-landscape jobs, #jobs=%s..."%(self.no_of_jobs))
 		
-		sys.stderr.write("Adding jobs for %s association results (%s phenotypes) ..."%(len(association_result_ls),\
-																			len(phenotype_method_id_of_associations_set)))
-		
-		returnData = PassingData()
-		returnData.jobDataLs = []
-		
-		passingData = PassingData(fnamePrefix=None, \
-					outputDirPrefix=outputDirPrefix, \
-					jobData=None,\
-					preReduceReturnData=None,\
-					)
-		
-		preReduceReturnData = self.preReduce(workflow=workflow, outputDirPrefix=outputDirPrefix, \
-									passingData=passingData, transferOutput=False,\
-									**keywords)
-		
-		mapDirJob = preReduceReturnData.mapDirJob
-		plotOutputDirJob = preReduceReturnData.plotOutputDirJob
-		countAssociationLocusOutputDirJob = preReduceReturnData.countAssociationLocusOutputDirJob
-		reduceOutputDirJob = preReduceReturnData.reduceOutputDirJob
-		
-		passingData.preReduceReturnData = preReduceReturnData
-		
-		association_group_key2orderIndex = {}
-		association_group_key2resultList = {}
-		association_group_key2reduceAssociationPeakJobMatrix = {}
-		association_group_key2countAssociationLocusJobList = {}
-		
-		#the job matrix is a matrix of AssociationPeak2AssociationLocus jobs.
-		#	each row is index by association threshold.
-		#	each column is index by overlap threshold.
-		
-		resultID2defineLandscapeJobData = {}
-		association_landscape_type = db_250k.getAssociationLandscapeType(min_MAF=min_MAF, \
-											neighbor_distance=neighbor_distance, \
-											max_neighbor_distance=max_neighbor_distance)
 		for result in association_result_ls:
-			associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=self.db_250k.data_dir, \
+			associationResultFile = self.registerOneInputFile(inputFname=result.getFileAbsPath(oldDataDir=db_250k.data_dir, \
 											newDataDir=self.data_dir), \
 										folderName=self.pegasusFolderName)
 			
@@ -199,12 +157,13 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 				#				folderName=self.pegasusFolderName)
 				#add DefineAssociationLandscape job
 				outputFnamePrefix = 'result_%s_neighbor_%s_max_neighbor_%s_min_MAF_%s_tax_id_%s'%\
-						(result.id, neighbor_distance, max_neighbor_distance, min_MAF, tax_id)
+						(result.id, association_landscape_type.neighbor_distance, \
+						association_landscape_type.max_neighbor_distance, association_landscape_type.min_MAF, tax_id)
 				landscapeOutputFile = File(os.path.join(mapDirJob.output, '%s_landscape.h5'%(outputFnamePrefix)))
-				defineLandscapeJob = self.addDefineLandscapeJob(workflow, executable=workflow.DefineAssociationLandscape, \
-								result_id=result.id, neighbor_distance=neighbor_distance, \
-								max_neighbor_distance=max_neighbor_distance,\
-								min_MAF=min_MAF, tax_id=tax_id, \
+				defineLandscapeJob = self.addDefineLandscapeJob(executable=self.DefineAssociationLandscape, \
+								result_id=result.id, neighbor_distance=association_landscape_type.neighbor_distance, \
+								max_neighbor_distance=association_landscape_type.max_neighbor_distance,\
+								min_MAF=association_landscape_type.min_MAF, tax_id=tax_id, \
 								data_dir=data_dir, logFile=None,\
 								landscapeOutputFile=landscapeOutputFile, \
 								extraDependentInputLs=[associationResultFile], \
@@ -216,38 +175,150 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 				landscape2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationLandscape2DB, inputFile=defineLandscapeJob.output, \
 							result_id=result.id, \
 							data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
-							min_MAF=min_MAF, \
-							neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
+							min_MAF=association_landscape_type.min_MAF, \
+							neighbor_distance=association_landscape_type.neighbor_distance, \
+							max_neighbor_distance=association_landscape_type.max_neighbor_distance, \
 							parentJobLs=[mapDirJob, defineLandscapeJob], \
 							extraDependentInputLs=None, transferOutput=True, extraArguments=None, job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
-			resultID2defineLandscapeJobData[result.id] = PassingData(defineLandscapeJob=defineLandscapeJob, landscape2DBJob=landscape2DBJob,\
+			passingData.resultID2defineLandscapeJobData[result.id] = PassingData(defineLandscapeJob=defineLandscapeJob, landscape2DBJob=landscape2DBJob,\
 																association_landscape=association_landscape)
 
 			call_method_id = result.call_method_id
 			analysis_method_id = result.analysis_method_id
 			association_group_key = (call_method_id, analysis_method_id)
-			if association_group_key not in association_group_key2resultList:
-				association_group_key2resultList[association_group_key] = []
-				association_group_key2reduceAssociationPeakJobMatrix[association_group_key] = []
+			if association_group_key not in passingData.association_group_key2resultList:
+				passingData.association_group_key2resultList[association_group_key] = []
+				passingData.association_group_key2reduceAssociationPeakJobMatrix[association_group_key] = []
 				for min_score in min_score_ls:
-					association_group_key2reduceAssociationPeakJobMatrix[association_group_key].append([])
-				association_group_key2countAssociationLocusJobList[association_group_key] = []
-			association_group_key2resultList[association_group_key].append(result)
+					passingData.association_group_key2reduceAssociationPeakJobMatrix[association_group_key].append([])
+				passingData.association_group_key2countAssociationLocusJobList[association_group_key] = []
+			passingData.association_group_key2resultList[association_group_key].append(result)
 			
-			
+		sys.stderr.write(" \t %s total jobs.\n"%(self.no_of_jobs))
+		return passingData
+	
+	def addCheckTwoAssociationLocusFileOverlapJobs(self, analysis_method_id2AssociationLocusJobList=None,\
+												min_score=None, min_overlap_ratio=None, associationMinScoreDirJob=None,\
+												plotOutputDirJob=None, ):
+		"""
+		2013.2.7
 		
+		"""
+		sys.stderr.write("\t\t Adding jobs handling two-association-locus-files #jobs=%s ..."%(self.no_of_jobs))
+		#add TwoAssociationLocusFileOverlap & HistogramAssociationLocusAdjacencyDistance jobs
+		for analysis_method_id, associationLocusJobList in analysis_method_id2AssociationLocusJobList.iteritems():
+			#add HistogramAssociationLocusAdjacencyDistance job for each pair of association locus jobs
+			for k in xrange(len(associationLocusJobList)-1):
+				associationLocusJob1 = associationLocusJobList[k]
+				for l in xrange(k+1, len(associationLocusJobList)):
+					associationLocusJob2 = associationLocusJobList[l]
+					
+					outputFnamePrefix = 'distance_from_call_%s_to_call_%s_ana_%s_loci_min_score_%s_min_overlap_%s'%\
+								(associationLocusJob1.call_method_id, associationLocusJob2.call_method_id, \
+								analysis_method_id, min_score, min_overlap_ratio)
+					outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s.h5'%(outputFnamePrefix)))
+					
+					twoAssociationLocusOverlapJob = self.addTwoAssociationLocusFileOverlapJob(executable=self.TwoAssociationLocusFileOverlap, \
+												inputFileList=[associationLocusJob1.output, associationLocusJob2.output], \
+												inputFile=None, outputFile=outputFile, \
+												parentJobLs=[associationLocusJob1, associationLocusJob2], \
+												job_max_memory=1000, job_max_walltime = 60, \
+												transferOutput=False)
+					#add HistogramAssociationLocusAdjacencyDistance job. the order of input matters
+					outputFile = File(os.path.join(plotOutputDirJob.output, 'histogram_of_%s.png'%(outputFnamePrefix)))
+					histogramAssociationLocusAdjacencyDistanceJob = self.addDrawHistogramJob(executable=self.DrawHistogram, \
+						inputFileList=None, inputFile=twoAssociationLocusOverlapJob.output, outputFile=outputFile, \
+						outputFnamePrefix=None, whichColumn=None, whichColumnHeader="fractionCoveredByAssociation2", \
+						whichColumnPlotLabel="fractionCall%sCoveredByCall%s"%(associationLocusJob1.call_method_id, associationLocusJob2.call_method_id), \
+						logY=1, valueForNonPositiveYValue=-10, \
+						missingDataNotation='NA',\
+						minNoOfTotal=1, maxNoOfTotal=None,\
+						figureDPI=200, formatString='.', ylim_type=2, samplingRate=1, need_svg=False, \
+						logCount=True, inputFileFormat=2, \
+						parentJobLs=[plotOutputDirJob, twoAssociationLocusOverlapJob], \
+						extraDependentInputLs=None, \
+						extraArgumentList=None, extraArguments=None, transferOutput=True, job_max_memory=1000)
+					
+					#now reverse the order
+					outputFnamePrefix = 'distance_from_call_%s_to_call_%s_ana_%s_loci_min_score_%s_min_overlap_%s'%\
+									(associationLocusJob2.call_method_id, associationLocusJob1.call_method_id, \
+									analysis_method_id, min_score, min_overlap_ratio)
+					outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s.h5'%(outputFnamePrefix)))
+					
+					twoAssociationLocusOverlapJob = self.addTwoAssociationLocusFileOverlapJob(executable=self.TwoAssociationLocusFileOverlap, \
+												inputFileList=[associationLocusJob2.output, associationLocusJob1.output], \
+												inputFile=None, outputFile=outputFile, \
+												parentJobLs=[associationLocusJob1, associationLocusJob2], \
+												job_max_memory=1000, job_max_walltime = 60, \
+												transferOutput=False)
+					#add HistogramAssociationLocusAdjacencyDistance job. the order of input matters
+					outputFile = File(os.path.join(plotOutputDirJob.output, 'histogram_of_%s.png'%(outputFnamePrefix)))
+					histogramAssociationLocusAdjacencyDistanceJob = self.addDrawHistogramJob(executable=self.DrawHistogram, \
+						inputFileList=None, inputFile=twoAssociationLocusOverlapJob.output, outputFile=outputFile, \
+						outputFnamePrefix=None, whichColumn=None, whichColumnHeader="fractionCoveredByAssociation2", \
+						whichColumnPlotLabel="fractionCall%sCoveredByCall%s"%(associationLocusJob2.call_method_id, associationLocusJob1.call_method_id), \
+						logY=1, valueForNonPositiveYValue=-10, \
+						missingDataNotation='NA',\
+						minNoOfTotal=1, maxNoOfTotal=None,\
+						figureDPI=200, formatString='.', ylim_type=2, samplingRate=1, need_svg=False, \
+						logCount=True, inputFileFormat=2, \
+						parentJobLs=[plotOutputDirJob, twoAssociationLocusOverlapJob], \
+						extraDependentInputLs=None, \
+						extraArgumentList=None, extraArguments=None, transferOutput=True, job_max_memory=1000)
+					
+					#2013.2.7 
+					outputFnamePrefix = 'compare_association_call_%s_to_call_%s_ana_%s_loci_min_score_%s_min_overlap_%s'%\
+									(associationLocusJob1.call_method_id, associationLocusJob2.call_method_id, \
+									analysis_method_id, min_score, min_overlap_ratio)
+					outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s.h5'%(outputFnamePrefix)))
+					
+					compareGWAssociationLocusByPhenotypeVectorJob = self.addTwoAssociationLocusFileOverlapJob(\
+												executable=self.CompareTwoGWAssociationLocusByPhenotypeVector, \
+												inputFileList=[associationLocusJob1.output, associationLocusJob2.output], \
+												inputFile=None, outputFile=outputFile, \
+												parentJobLs=[associationLocusJob1, associationLocusJob2], \
+												job_max_memory=1000, job_max_walltime = 60, \
+												transferOutput=True)
+					
+					outputFile = File(os.path.join(plotOutputDirJob.output, '%s_2Dhist.png'%(outputFnamePrefix)))
+					self.addDraw2DHistogramOfMatrixJob(inputFileList=None, inputFile=compareGWAssociationLocusByPhenotypeVectorJob.output, \
+							outputFile=outputFile, \
+							outputFnamePrefix=None, whichColumn=None, whichColumnHeader="fraction_of_input2_only_phenotypes", \
+							whichColumnPlotLabel="fraction_of_call%s_ana%s_only_phenotypes"%(associationLocusJob2.call_method_id, \
+																						associationLocusJob2.analysis_method_id), \
+							logX=False, logY=False, logZ=False, valueForNonPositiveYValue=-1, \
+							missingDataNotation='NA',\
+							xColumnHeader="fraction_of_input1_only_phenotypes", \
+							xColumnPlotLabel="fraction_of_call%s_ana%s_only_phenotypes"%(associationLocusJob1.call_method_id, \
+																						associationLocusJob1.analysis_method_id), \
+							minNoOfTotal=0,\
+							figureDPI=100, formatString='.', samplingRate=1, need_svg=False, \
+							inputFileFormat=2, outputFileFormat=None,\
+							zColumnHeader=None, \
+							parentJobLs=[plotOutputDirJob, compareGWAssociationLocusByPhenotypeVectorJob], \
+							extraDependentInputLs=None, \
+							extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000)
+		sys.stderr.write("%s total jobs.\n"%(self.no_of_jobs))
 		
+	def addAssociationPeakAndLocusJobs(self, db_250k=None, min_score_ls=None, association_landscape_type=None,\
+									data_dir=None, ground_score=None, min_overlap_ratio_ls=None, 
+									phenotype_method_id_of_associations_set=None, plotOutputDirJob=None, passingData=None,\
+									**keywords):
+		"""
+		#2013.2.7 add the association-peak, association-locus jobs
+		"""
+		sys.stderr.write("\t Adding association-peak & association-locus jobs, #jobs=%s ... \n"%(self.no_of_jobs))
 		for i in xrange(len(min_score_ls)):
 			min_score = min_score_ls[i]
 			#create a folder here.
 			associationMinScoreDir = "association_min_score_%s"%(min_score)
-			associationMinScoreDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=associationMinScoreDir)
+			associationMinScoreDirJob = yh_pegasus.addMkDirJob(self, mkdir=self.mkdirWrap, outputDir=associationMinScoreDir)
 			
 			resultID2associationPeakJob = {}
 			
 			association_peak_type = self.db_250k.getAssociationPeakType(association_landscape_type_id=association_landscape_type.id, \
 															min_score=min_score)
-			for resultID, defineLandscapeJobData in resultID2defineLandscapeJobData.iteritems():
+			for resultID, defineLandscapeJobData in passingData.resultID2defineLandscapeJobData.iteritems():
 				defineLandscapeJob = defineLandscapeJobData.defineLandscapeJob
 				landscape2DBJob = defineLandscapeJobData.landscape2DBJob
 				association_landscape = defineLandscapeJobData.association_landscape
@@ -280,8 +351,9 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 						associationPeak2DBJob = self.addAssociationLandscape2DBJob(executable=self.AssociationPeak2DB, inputFile=associationPeakJob.output, \
 								result_id=resultID, \
 								data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
-								min_MAF=min_MAF, \
-								neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
+								min_MAF=association_landscape_type.min_MAF, \
+								neighbor_distance=association_landscape_type.neighbor_distance, \
+								max_neighbor_distance=association_landscape_type.max_neighbor_distance, \
 								parentJobLs=[associationMinScoreDirJob, associationPeakJob, landscape2DBJob], \
 								extraDependentInputLs=None, transferOutput=True, extraArguments="--min_score %s"%(min_score), \
 								job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
@@ -293,7 +365,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 				#comparing association locus from two different call methods, but same analysis method
 				analysis_method_id2AssociationLocusJobList = {}
 				
-				for association_group_key, result_ls in association_group_key2resultList.iteritems():
+				for association_group_key, result_ls in passingData.association_group_key2resultList.iteritems():
 					call_method_id, analysis_method_id = association_group_key[:2]
 					associationLocusFnamePrefix = 'call_%s_analysis_%s_min_score_%s_min_overlap_%s'%\
 							(call_method_id, analysis_method_id, min_score, min_overlap_ratio)
@@ -335,14 +407,15 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 								inputFile=associationLocusJob.output, \
 								result_id=None, \
 								data_dir=self.data_dir, logFile=logFile, commit=self.commit, \
-								min_MAF=min_MAF, \
-								neighbor_distance=neighbor_distance, max_neighbor_distance=max_neighbor_distance, \
+								min_MAF=association_landscape_type.min_MAF, \
+								neighbor_distance=association_landscape_type.neighbor_distance, \
+								max_neighbor_distance=association_landscape_type.max_neighbor_distance, \
 								parentJobLs=[associationMinScoreDirJob, associationLocusJob], \
 								extraDependentInputLs=None, transferOutput=True, \
 								extraArguments="--min_score %s --min_overlap_ratio %s"%(min_score, min_overlap_ratio), \
 								job_max_memory=1000, sshDBTunnel=self.needSSHDBTunnel)
 					
-					association_group_key2reduceAssociationPeakJobMatrix[association_group_key][i].append(associationLocusJob)
+					passingData.association_group_key2reduceAssociationPeakJobMatrix[association_group_key][i].append(associationLocusJob)
 					
 					#add PlotAssociationLocusFrequencyOnGenome job
 					associationLocusFrequencyOnGenomeFnamePrefix = os.path.join(plotOutputDirJob.output, \
@@ -385,70 +458,75 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 						for result in result_ls:
 							associationPeakJob = resultID2associationPeakJob.get(result.id)
 							self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
-				
-				#add HistogramAssociationLocusAdjacencyDistance jobs
-				for analysis_method_id, associationLocusJobList in analysis_method_id2AssociationLocusJobList.iteritems():
-					#add HistogramAssociationLocusAdjacencyDistance job for each pair of association locus jobs
-					for k in xrange(len(associationLocusJobList)-1):
-						associationLocusJob1 = associationLocusJobList[k]
-						for l in xrange(k+1, len(associationLocusJobList)):
-							associationLocusJob2 = associationLocusJobList[l]
-							
-							outputFnamePrefix = 'distance_from_call_%s_to_call_%s_ana_%s_loci_min_score_%s_min_overlap_%s'%\
-										(associationLocusJob1.call_method_id, associationLocusJob2.call_method_id, \
-										analysis_method_id, min_score, min_overlap_ratio)
-							outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s.h5'%(outputFnamePrefix)))
-							
-							twoAssociationLocusOverlapJob = self.addTwoAssociationLocusFileOverlapJob(executable=self.TwoAssociationLocusFileOverlap, \
-														inputFileList=[associationLocusJob1.output, associationLocusJob2.output], \
-														inputFile=None, outputFile=outputFile, \
-														parentJobLs=[associationLocusJob1, associationLocusJob2], \
-														job_max_memory=1000, job_max_walltime = 60, \
-														transferOutput=False)
-							#add HistogramAssociationLocusAdjacencyDistance job. the order of input matters
-							outputFile = File(os.path.join(plotOutputDirJob.output, 'histogram_of_%s.png'%(outputFnamePrefix)))
-							histogramAssociationLocusAdjacencyDistanceJob = self.addDrawHistogramJob(executable=self.DrawHistogram, \
-								inputFileList=None, inputFile=twoAssociationLocusOverlapJob.output, outputFile=outputFile, \
-								outputFnamePrefix=None, whichColumn=None, whichColumnHeader="fractionCoveredByAssociation2", \
-								whichColumnPlotLabel="fractionCall%sCoveredByCall%s"%(associationLocusJob1.call_method_id, associationLocusJob2.call_method_id), \
-								logY=1, valueForNonPositiveYValue=-10, \
-								missingDataNotation='NA',\
-								minNoOfTotal=1, maxNoOfTotal=None,\
-								figureDPI=200, formatString='.', ylim_type=2, samplingRate=1, need_svg=False, \
-								logCount=True, inputFileFormat=2, \
-								parentJobLs=[plotOutputDirJob, twoAssociationLocusOverlapJob], \
-								extraDependentInputLs=None, \
-								extraArgumentList=None, extraArguments=None, transferOutput=True, job_max_memory=1000)
-							
-							#now reverse the order
-							outputFnamePrefix = 'distance_from_call_%s_to_call_%s_ana_%s_loci_min_score_%s_min_overlap_%s'%\
-											(associationLocusJob2.call_method_id, associationLocusJob1.call_method_id, \
-											analysis_method_id, min_score, min_overlap_ratio)
-							outputFile = File(os.path.join(associationMinScoreDirJob.output, '%s.h5'%(outputFnamePrefix)))
-							
-							twoAssociationLocusOverlapJob = self.addTwoAssociationLocusFileOverlapJob(executable=self.TwoAssociationLocusFileOverlap, \
-														inputFileList=[associationLocusJob2.output, associationLocusJob1.output], \
-														inputFile=None, outputFile=outputFile, \
-														parentJobLs=[associationLocusJob1, associationLocusJob2], \
-														job_max_memory=1000, job_max_walltime = 60, \
-														transferOutput=False)
-							#add HistogramAssociationLocusAdjacencyDistance job. the order of input matters
-							outputFile = File(os.path.join(plotOutputDirJob.output, 'histogram_of_%s.png'%(outputFnamePrefix)))
-							histogramAssociationLocusAdjacencyDistanceJob = self.addDrawHistogramJob(executable=self.DrawHistogram, \
-								inputFileList=None, inputFile=twoAssociationLocusOverlapJob.output, outputFile=outputFile, \
-								outputFnamePrefix=None, whichColumn=None, whichColumnHeader="fractionCoveredByAssociation2", \
-								whichColumnPlotLabel="fractionCall%sCoveredByCall%s"%(associationLocusJob2.call_method_id, associationLocusJob1.call_method_id), \
-								logY=1, valueForNonPositiveYValue=-10, \
-								missingDataNotation='NA',\
-								minNoOfTotal=1, maxNoOfTotal=None,\
-								figureDPI=200, formatString='.', ylim_type=2, samplingRate=1, need_svg=False, \
-								logCount=True, inputFileFormat=2, \
-								parentJobLs=[plotOutputDirJob, twoAssociationLocusOverlapJob], \
-								extraDependentInputLs=None, \
-								extraArgumentList=None, extraArguments=None, transferOutput=True, job_max_memory=1000)
-							
-		sys.stderr.write("\t %s jobs added before PlotAssociationLocusFrequencyVsAssociationThreshold jobs.\n"%(self.no_of_jobs))
+					self.addCheckTwoAssociationLocusFileOverlapJobs(analysis_method_id2AssociationLocusJobList=analysis_method_id2AssociationLocusJobList, \
+													min_score=min_score, min_overlap_ratio=min_overlap_ratio, \
+													associationMinScoreDirJob=associationMinScoreDirJob, plotOutputDirJob=plotOutputDirJob)
+		sys.stderr.write("\t %s total jobs.\n"%(self.no_of_jobs))
 		
+		
+	
+	def addAllJobs(self, workflow=None, db_250k=None, association_result_ls=None, \
+				data_dir=None, min_MAF=None, \
+				neighbor_distance=None, max_neighbor_distance=None, \
+				min_score_ls=None, min_overlap_ratio_ls=None, ground_score=None,\
+				peakPadding=None, tax_id=None, \
+				outputDirPrefix="", transferOutput=True, job_max_memory=2000, **keywords):
+		"""
+		2012.11.21
+			
+		"""
+		if workflow is None:
+			workflow = self
+		phenotype_method_id_of_associations_set = set([row.phenotype_method_id for row in association_result_ls])
+		
+		sys.stderr.write("Adding jobs for %s association results (%s phenotypes) #jobs=%s... \n"%(len(association_result_ls),\
+																			len(phenotype_method_id_of_associations_set), self.no_of_jobs))
+		
+		returnData = PassingData()
+		returnData.jobDataLs = []
+		
+		passingData = PassingData(fnamePrefix=None, \
+					outputDirPrefix=outputDirPrefix, \
+					jobData=None,\
+					preReduceReturnData=None,\
+					association_group_key2orderIndex = {},\
+					association_group_key2resultList = {},\
+					association_group_key2reduceAssociationPeakJobMatrix = {},\
+					association_group_key2countAssociationLocusJobList = {},\
+					resultID2defineLandscapeJobData = {},
+					)
+		
+		preReduceReturnData = self.preReduce(workflow=workflow, outputDirPrefix=outputDirPrefix, \
+									passingData=passingData, transferOutput=False,\
+									**keywords)
+		
+		mapDirJob = preReduceReturnData.mapDirJob
+		plotOutputDirJob = preReduceReturnData.plotOutputDirJob
+		countAssociationLocusOutputDirJob = preReduceReturnData.countAssociationLocusOutputDirJob
+		reduceOutputDirJob = preReduceReturnData.reduceOutputDirJob
+		
+		passingData.preReduceReturnData = preReduceReturnData
+		
+		
+		
+		#the job matrix is a matrix of AssociationPeak2AssociationLocus jobs.
+		#	each row is index by association threshold.
+		#	each column is index by overlap threshold.
+		
+		association_landscape_type = db_250k.getAssociationLandscapeType(min_MAF=min_MAF, \
+											neighbor_distance=neighbor_distance, \
+											max_neighbor_distance=max_neighbor_distance)
+		#2013.2.7
+		self.addDefineAssociationLandscapeJobs(db_250k=db_250k, association_result_ls=association_result_ls, \
+											mapDirJob=mapDirJob, association_landscape_type=association_landscape_type, \
+											min_score_ls=min_score_ls, data_dir=data_dir, tax_id=tax_id, passingData=passingData)
+		
+		self.addAssociationPeakAndLocusJobs(db_250k=db_250k, min_score_ls=min_score_ls, association_landscape_type=association_landscape_type,\
+										data_dir=data_dir, ground_score=ground_score, min_overlap_ratio_ls=min_overlap_ratio_ls, \
+										phenotype_method_id_of_associations_set=phenotype_method_id_of_associations_set, \
+										plotOutputDirJob=plotOutputDirJob, passingData=passingData)
+		
+		sys.stderr.write("Adding PlotAssociationLocusFrequencyVsAssociationThreshold jobs, #jobs=%s ..."%(self.no_of_jobs))
 		#add a PlotAssociationLocusFrequencyVsAssociationThreshold job
 		for j in xrange(len(min_overlap_ratio_ls)):
 			min_overlap_ratio = min_overlap_ratio_ls[j]
@@ -471,7 +549,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 					sshDBTunnel=None, \
 					objectWithDBArguments=None)
 			
-			for association_group_key, countAssociationLocusJobList in association_group_key2countAssociationLocusJobList.iteritems():
+			for association_group_key, countAssociationLocusJobList in passingData.association_group_key2countAssociationLocusJobList.iteritems():
 				#add a CountAssociationLocus job across different association thresholds (min_score)
 				countAssociationLocusFnamePrefix = os.path.join(countAssociationLocusOutputDirJob.output, 'call_%s_analysis_%s_min_overlap_%s'%\
 										(association_group_key[0], association_group_key[1], min_overlap_ratio))
@@ -485,15 +563,16 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 				countAssociationLocusJobList.append(countAssociationLocusJob)
 				for i in xrange(len(min_score_ls)):
 					min_score = min_score_ls[i]
-					associationLocusJob = association_group_key2reduceAssociationPeakJobMatrix[association_group_key][i][j]
+					associationLocusJob = passingData.association_group_key2reduceAssociationPeakJobMatrix[association_group_key][i][j]
 					self.addInputToStatMergeJob(statMergeJob=countAssociationLocusJob, parentJobLs=[associationLocusJob])
 				
 				self.addInputToStatMergeJob(statMergeJob=plotAssociationLocusFrequencyVsAssociationThresholdJob, \
 										parentJobLs=[countAssociationLocusJob])
-		sys.stderr.write("\t %s jobs added before BoxPlotAssociationLocusAttributeVsOverlapThreshold jobs.\n"%(self.no_of_jobs))
+		sys.stderr.write("\t %s total jobs so far.\n"%(self.no_of_jobs))
 		
+		sys.stderr.write("Adding BoxPlotAssociationLocusAttributeVsOverlapThreshold jobs,#jobs=%s ..."%(self.no_of_jobs))
 		#add the BoxPlotAssociationLocusAttributeVsOverlapThreshold jobs
-		for association_group_key, jobMatrix in association_group_key2reduceAssociationPeakJobMatrix.iteritems():
+		for association_group_key, jobMatrix in passingData.association_group_key2reduceAssociationPeakJobMatrix.iteritems():
 			for i in xrange(len(min_score_ls)):
 				min_score = min_score_ls[i]
 				#add a BoxPlotAssociationLocusAttributeVsOverlapThreshold job
@@ -523,7 +602,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 										parentJobLs=[associationLocusJob])
 		
 		
-		sys.stderr.write("\t %s jobs.\n"%(self.no_of_jobs))
+		sys.stderr.write("\t %s total jobs.\n"%(self.no_of_jobs))
 		return returnData
 	
 	def registerCustomExecutables(self, workflow=None):
@@ -572,8 +651,13 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 						os.path.join(self.variationSrcPath, "association_peak/TwoAssociationLocusFileOverlap.py"), site_handler))
 		executableClusterSizeMultiplierList.append((TwoAssociationLocusFileOverlap, 0.3))
 		
-		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+		
+		#2013.2.7	new simpler way of adding an executable
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.variationSrcPath, \
+													"association_peak/CompareTwoGWAssociationLocusByPhenotypeVector.py"), \
+													name="CompareTwoGWAssociationLocusByPhenotypeVector", clusterSizeMultipler=0)
+		
 	
 	def run(self):
 		"""
