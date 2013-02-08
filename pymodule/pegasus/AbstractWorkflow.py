@@ -199,6 +199,22 @@ class AbstractWorkflow(ADAG):
 		# Close tag
 		out.write('</adag>\n')
 	
+	def constructOneExecutableObject(self, path=None, name=None):
+		"""
+		2013.2.7
+		"""
+		namespace = self.namespace
+		version = self.version
+		operatingSystem = self.operatingSystem
+		architecture = self.architecture
+		site_handler = self.site_handler
+		
+		executable = Executable(namespace=namespace, name=name, version=version, \
+						os=operatingSystem, arch=architecture, installed=True)
+		executable.addPFN(PFN("file://" + os.path.expanduser(path), site_handler))
+		return executable
+		#executableClusterSizeMultiplierList.append((executable, 0))
+	
 	def getTopNumberOfContigs(self, **keywords):
 		"""
 		2013.2.6 placeholder
@@ -534,22 +550,44 @@ class AbstractWorkflow(ADAG):
 		"""
 		if defaultClustersSize is None:
 			defaultClustersSize = self.clusters_size
-		for executableAndclusterSizeMultipler in executableClusterSizeMultiplierList:
-			executable = executableAndclusterSizeMultipler[0]
-			if len(executableAndclusterSizeMultipler)==1:
+		for executableClusterSizeMultiplierTuple in executableClusterSizeMultiplierList:
+			executable = executableClusterSizeMultiplierTuple[0]
+			if len(executableClusterSizeMultiplierTuple)==1:
 				clusterSizeMultipler = 1
-			elif len(executableAndclusterSizeMultipler)>1:
-				clusterSizeMultipler = executableAndclusterSizeMultipler[1]
-			clusterSize = int(defaultClustersSize*clusterSizeMultipler)
-			if clusterSize>1:
-				clusteringProf = Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusterSize)
-				if not executable.hasProfile(clusteringProf):	#2012.8.26 check this first
-					executable.addProfile(clusteringProf)	#removeProfile()
-			if not self.hasExecutable(executable):
-				self.addExecutable(executable)	#removeExecutable() is its counterpart
-				setattr(self, executable.name, executable)
+			else:
+				clusterSizeMultipler = executableClusterSizeMultiplierTuple[1]
+			self.addOneExecutableAndAssignProperClusterSize(executable=executable, \
+										clusterSizeMultipler=clusterSizeMultipler, defaultClustersSize=defaultClustersSize)
 		
 		
+	def addOneExecutableAndAssignProperClusterSize(self, executable=None, clusterSizeMultipler=1, defaultClustersSize=None):
+		"""
+		2013.2.7, split out of addExecutableAndAssignProperClusterSize()
+			clusterSizeMultipler could be any real value >=0. 0 means no clustering, 1=default clustering size.
+			
+			i.e.
+			self.addOneExecutableAndAssignProperClusterSize(executable=CompareTwoGWAssociationLocusByPhenotypeVector, clusterSizeMultipler=0)
+		"""
+		if defaultClustersSize is None:
+			defaultClustersSize = self.clusters_size
+		clusterSize = int(defaultClustersSize*clusterSizeMultipler)
+		if clusterSize>1:
+			clusteringProf = Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusterSize)
+			if not executable.hasProfile(clusteringProf):	#2012.8.26 check this first
+				executable.addProfile(clusteringProf)	#removeProfile()
+		if not self.hasExecutable(executable):
+			self.addExecutable(executable)	#removeExecutable() is its counterpart
+			setattr(self, executable.name, executable)
+	
+	def addOneExecutableFromPathAndAssignProperClusterSize(self, path=None, name=None, clusterSizeMultipler=1):
+		"""
+		2013.2.7
+			combination of constructOneExecutableObject() & addOneExecutableAndAssignProperClusterSize()
+		"""
+		if clusterSizeMultipler is None:
+			clusterSizeMultipler = 1
+		executable = self.constructOneExecutableObject(path=path, name=name)
+		self.addOneExecutableAndAssignProperClusterSize(executable=executable, clusterSizeMultipler=clusterSizeMultipler)
 	
 	
 	def getFilesWithProperSuffixFromFolder(self, inputFolder=None, suffix='.h5'):
@@ -1451,6 +1489,7 @@ class AbstractWorkflow(ADAG):
 				extraDependentInputLs=None, \
 				extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, **keywords):
 		"""
+		2013.2.7 executable could be None, default is self.Draw2DHistogramOfMatrix
 		2012.11.28 change logX, logY, logZ
 		2012.10.7
 			
@@ -1461,6 +1500,8 @@ class AbstractWorkflow(ADAG):
 			extraArgumentList.append("--zColumnHeader %s"%(zColumnHeader))
 		if logZ:
 			extraArgumentList.append("--logZ %s"%(logZ))
+		if executable is None:
+			executable = self.Draw2DHistogramOfMatrix
 		return self.addAbstractPlotJob(workflow=workflow, executable=executable, inputFileList=inputFileList, \
 							inputFile=inputFile, outputFile=outputFile, outputFnamePrefix=outputFnamePrefix, whichColumn=whichColumn, \
 							whichColumnHeader=whichColumnHeader, whichColumnPlotLabel=whichColumnPlotLabel, \
