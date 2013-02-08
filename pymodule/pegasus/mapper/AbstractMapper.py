@@ -27,6 +27,7 @@ class AbstractMapper(object):
 					('db_passwd', 1, ): [None, '', 1, 'database password', ],\
 					('port', 0, ):[None, '', 1, 'database port number'],\
 					('commit', 0, int):[0, '', 0, 'commit db transaction'],\
+					('data_dir', 0, ):[None, '', 1, 'path to the db-affliated file storage.'],\
 					}
 	genome_db_option_dict = {
 					('genome_drivername', 1,):['postgresql', '', 1, 'which type of database is the genome database? mysql or postgresql', ],\
