@@ -29,16 +29,16 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], )
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, figureOutDelimiter
-from Pegasus.DAX3 import *
-import Stock_250kDB
-from AbstractVariationWorkflow import AbstractVariationWorkflow
+import copy
 import h5py
+from Pegasus.DAX3 import *
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, figureOutDelimiter
+from variation.src import Stock_250kDB
+from variation.src.pegasus.AbstractVariationWorkflow import AbstractVariationWorkflow
 
 class FindGenomeWideLDPatternBetweenSNPsAndPeakWorkflow(AbstractVariationWorkflow):
 	__doc__ = __doc__
-	option_default_dict = AbstractVariationWorkflow.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractVariationWorkflow.option_default_dict)
 	common_option_dict = {
 						('genome_drivername', 1,):['postgresql', '', 1, 'which type of database is the genome database? mysql or postgresql', ],\
 						('genome_hostname', 1, ): ['uclaOffice', '', 1, 'hostname of the genome db server', ],\
