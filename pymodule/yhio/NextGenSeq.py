@@ -6,8 +6,10 @@
 import os, sys
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
-import os, sys, csv, re
+import re
+from Bio import SeqIO
 from pymodule import utils
+
 
 def getPEInputFiles(input_dir, isPE=True):
 	"""
@@ -91,6 +93,21 @@ def isVCFFileEmpty(inputFname, checkContent=False):
 		return fileIsEmpty
 	else:
 		return False
+
+def countNoOfChromosomesBasesInFastQFile(inputFname=None):
+	"""
+	2013.2.9 count the #chromosomes, #bases of inputFname
+	"""
+	sys.stderr.write("Counting #chromosomes, #bases of %s ..."%(inputFname))
+	no_of_chromosomes = 0
+	no_of_bases = 0
+	inf = utils.openGzipFile(inputFname)
+	for seq_record in SeqIO.parse(inf, 'fastq'):
+		no_of_chromosomes += 1
+		no_of_bases += len(seq_record)
+	inf.close()
+	sys.stderr.write("%s chromosomes, %s bases\n"%(no_of_chromosomes, no_of_bases))
+	return utils.PassingData(no_of_chromosomes=no_of_chromosomes, no_of_bases=no_of_bases)
 
 if __name__ == '__main__':
 	pass
