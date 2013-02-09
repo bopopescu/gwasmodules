@@ -85,7 +85,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 			
 			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chr, passingData=passingData, \
 								mapEachIntervalDataLs=passingData.mapEachIntervalDataLs,\
-								transferOutput=False, dataDir=dataDir, \
+								transferOutput=False, data_dir=data_dir, \
 								**keywords)
 			passingData.reduceAfterEachChromosomeData = reduceAfterEachChromosomeData
 			passingData.reduceAfterEachChromosomeDataLs.append(reduceAfterEachChromosomeData)
@@ -139,11 +139,11 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 			import pdb
 			pdb.set_trace()
 		
-		if not self.dataDir:
-			self.dataDir = self.db.data_dir
+		if not self.data_dir:
+			self.data_dir = self.db.data_dir
 		
-		if not self.localDataDir:
-			self.localDataDir = self.db.data_dir
+		if not self.local_data_dir:
+			self.local_data_dir = self.db.data_dir
 		
 		chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, contigMinRankBySize=self.contigMinRankBySize)
 		#chr2size = set(['Contig149'])	#temporary when testing Contig149
@@ -154,7 +154,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 													intervalOverlapSize=self.intervalOverlapSize)
 		
 		alignmentLs = self.db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
-										alignment_method_id=self.alignment_method_id, dataDir=self.localDataDir,\
+										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
 										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
 										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
 		alignmentLs = self.db.filterAlignments(alignmentLs, sequence_filtered=self.sequence_filtered, \
@@ -169,7 +169,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		self.registerJars()
 		self.registerExecutables()
 		self.registerCustomExecutables()
-		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow, alignmentLs, dataDir=self.dataDir)
+		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow, alignmentLs, data_dir=self.data_dir)
 		
 		inputData = self.registerAllInputFiles(workflow, self.inputDir, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
@@ -187,7 +187,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 				mv=workflow.mv, \
 				refFastaFList=refFastaFList,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
-				dataDir=self.dataDir, no_of_gatk_threads = 1, transferOutput=True,\
+				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
 				outputDirPrefix=self.pegasusFolderName)
 		
 		outf = open(self.outputFname, 'w')

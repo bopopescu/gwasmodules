@@ -40,7 +40,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		
 	
 	def addAddVCFFile2DBJob(self, executable=None, inputFile=None, genotypeMethodShortName=None,\
-						logFile=None, format=None, dataDir=None, checkEmptyVCFByReading=None, commit=False, \
+						logFile=None, format=None, data_dir=None, checkEmptyVCFByReading=None, commit=False, \
 						parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
 						extraArguments=None, job_max_memory=2000, **keywords):
 		"""
@@ -52,8 +52,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		extraArgumentList = ['--format', format]
 		if logFile:
 			extraArgumentList.extend(["--logFilename", logFile])
-		if dataDir:
-			extraArgumentList.extend(['--dataDir', dataDir])
+		if data_dir:
+			extraArgumentList.extend(['--data_dir', data_dir])
 		if checkEmptyVCFByReading:
 			extraArgumentList.extend(['--checkEmptyVCFByReading'])
 		if genotypeMethodShortName:
@@ -569,7 +569,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				mv=None, \
 				refFastaFList=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
-				dataDir=None, no_of_gatk_threads = 1, \
+				data_dir=None, no_of_gatk_threads = 1, \
 				intervalSize=3000, intervalOverlapSize=0, \
 				outputDirPrefix="", transferOutput=True, job_max_memory=2000, **keywords):
 		"""
@@ -721,7 +721,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				
 				reduceEachVCFData = self.reduceEachVCF(workflow=workflow, chromosome=chr, passingData=passingData, \
 								mapEachIntervalDataLs=passingData.mapEachIntervalDataLs,\
-								transferOutput=False, dataDir=dataDir, \
+								transferOutput=False, data_dir=data_dir, \
 								**keywords)
 				passingData.reduceEachVCFData = reduceEachVCFData
 				passingData.reduceEachVCFDataLs.append(reduceEachVCFData)
@@ -734,7 +734,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			reduceEachChromosomeData = self.reduceEachChromosome(workflow=workflow, chromosome=chr, passingData=passingData, \
 								mapEachVCFDataLs=passingData.mapEachVCFDataLs,\
 								reduceEachVCFDataLs=passingData.reduceEachVCFDataLs,\
-								transferOutput=False, dataDir=dataDir, \
+								transferOutput=False, data_dir=data_dir, \
 								**keywords)
 			passingData.reduceEachChromosomeData = reduceEachChromosomeData
 			passingData.reduceEachChromosomeDataLs.append(reduceEachChromosomeData)
@@ -804,7 +804,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				mv=workflow.mv, \
 				refFastaFList=self.refFastaFList,\
 				needFastaIndexJob=getattr(self, 'needFastaIndexJob',False), needFastaDictJob=getattr(self, 'needFastaDictJob', False), \
-				dataDir=self.dataDir, no_of_gatk_threads = 1,\
+				data_dir=self.data_dir, no_of_gatk_threads = 1,\
 				intervalSize=self.intervalSize, intervalOverlapSize=self.intervalOverlapSize, \
 				outputDirPrefix=self.pegasusFolderName, transferOutput=True,)
 		

@@ -11,7 +11,7 @@ Examples:
 		-z dl324b-1.cmb.usc.edu -c
 		--tmpDir /work/ -H
 	
-	# 2011-8-30 output a workflow to run alignments on hoffman2's condor pool (-D changes localDataDir. -t changes dataDir.)
+	# 2011-8-30 output a workflow to run alignments on hoffman2's condor pool (-D changes local_data_dir. -t changes data_dir.)
 	# 2012.3.20 use /work/ or /u/scratch/p/polyacti/tmp as TMP_DIR for MarkDuplicates.jar (/tmp is too small for 30X genome)
 	# 2012.5.4 cluster 10 alignment jobs (before merging) as a unit (--cluster_size_for_aln_jobs 10), skip done alignment (-K)
 	# 2012.9.21 add "-H" because AddAlignmentFile2DB need db conneciton
@@ -320,7 +320,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						job_max_memory=job_max_memory, max_walltime=job_max_walltime)
 		return stampyGenomeHashJob
 	
-	def registerISQFileObjLsToWorkflow(self, fileObjectLs=None, workflow=None, dataDir=None):
+	def registerISQFileObjLsToWorkflow(self, fileObjectLs=None, workflow=None, data_dir=None):
 		'''
 		2012-2.24
 			similar to registerFileToWorkflow but for a different input

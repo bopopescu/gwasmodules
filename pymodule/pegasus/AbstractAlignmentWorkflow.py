@@ -186,7 +186,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				mv=None, \
 				refFastaFList=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
-				dataDir=None, no_of_gatk_threads = 1, \
+				data_dir=None, no_of_gatk_threads = 1, \
 				outputDirPrefix="", transferOutput=True, **keywords):
 		"""
 		2012.7.26
@@ -289,7 +289,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 												mapEachChromosomeDataLs=passingData.mapEachChromosomeDataLs,\
 												reduceAfterEachChromosomeDataLs=passingData.reduceAfterEachChromosomeDataLs,\
 												passingData=passingData, \
-												transferOutput=False, dataDir=dataDir, **keywords)
+												transferOutput=False, data_dir=data_dir, **keywords)
 			passingData.reduceAfterEachAlignmentData = reduceAfterEachAlignmentData
 			passingData.reduceAfterEachAlignmentDataLs.append(reduceAfterEachAlignmentData)
 			
@@ -327,7 +327,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		sys.stderr.write("%s jobs.\n"%(self.no_of_jobs))
 		return returnData
 	
-	def registerAlignmentAndItsIndexFile(self, workflow=None, alignmentLs=None, dataDir=None, checkFileExistence=True):
+	def registerAlignmentAndItsIndexFile(self, workflow=None, alignmentLs=None, data_dir=None, checkFileExistence=True):
 		"""
 		2012.9.18 copied from AlignmentToCallPipeline.py
 		2012.6.12
@@ -338,7 +338,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		sys.stderr.write("Registering %s alignments ..."%(len(alignmentLs)))
 		returnData = []
 		for alignment in alignmentLs:
-			inputFname = os.path.join(dataDir, alignment.path)
+			inputFname = os.path.join(data_dir, alignment.path)
 			input = File(alignment.path)	#relative path, induces symlinking or stage-in
 			baiFilepath = '%s.bai'%(inputFname)
 			if checkFileExistence and (not os.path.isfile(inputFname) or not os.path.isfile(baiFilepath)):
@@ -386,11 +386,11 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			pdb.set_trace()
 		
 		
-		if not self.dataDir:
-			self.dataDir = self.db.data_dir
+		if not self.data_dir:
+			self.data_dir = self.db.data_dir
 		
-		if not self.localDataDir:
-			self.localDataDir = self.db.data_dir
+		if not self.local_data_dir:
+			self.local_data_dir = self.db.data_dir
 		
 		#self.chr2size = {}
 		#self.chr2size = set(['Contig149'])	#temporary when testing Contig149
@@ -401,7 +401,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 													intervalOverlapSize=self.intervalOverlapSize)
 		
 		alignmentLs = self.db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
-										alignment_method_id=self.alignment_method_id, dataDir=self.localDataDir,\
+										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
 										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
 										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
 		alignmentLs = self.db.filterAlignments(alignmentLs, sequence_filtered=self.sequence_filtered, \
@@ -416,7 +416,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		self.registerJars()
 		self.registerExecutables()
 		self.registerCustomExecutables()
-		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow, alignmentLs=alignmentLs, dataDir=self.dataDir)
+		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow, alignmentLs=alignmentLs, data_dir=self.data_dir)
 		
 		self.addAllJobs(workflow=workflow, alignmentDataLs=alignmentDataLs, \
 				chr2IntervalDataLs=chr2IntervalDataLs, samtools=workflow.samtools, \
@@ -427,7 +427,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				mv=workflow.mv, \
 				refFastaFList=refFastaFList,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
-				dataDir=self.dataDir, no_of_gatk_threads = 1, transferOutput=True,\
+				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
 				outputDirPrefix=self.pegasusFolderName)
 		
 		outf = open(self.outputFname, 'w')

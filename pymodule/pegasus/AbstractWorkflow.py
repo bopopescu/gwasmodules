@@ -24,6 +24,13 @@ class AbstractWorkflow(ADAG):
 					('db_user', 1, ): [None, 'u', 1, 'database username', ],\
 					('db_passwd', 1, ): [None, 'p', 1, 'database password', ],\
 					('port', 0, ):[None, '', 1, 'database port number'],\
+					('commit', 0, ):[None, '', 0, 'commit database transaction if there is db transaction'],\
+					("data_dir", 0, ): ["", 't', 1, 'the base directory where all db-affiliated files are stored. \
+									If not given, use the default stored in db.'],\
+					("local_data_dir", 0, ): ["", 'D', 1, 'this one should contain same files as data_dir but accessible locally.\
+							If not given, use the default stored in db (db.data_dir). This argument is used to find all input files available.\n\
+							It should be different from data_dir only when you generate a workflow on one computer and execute it on another which has different data_dir.'],\
+						
 					}
 	option_default_dict = {
 						("vervetSrcPath", 1, ): ["%s/script/vervet/src", '', 1, 'vervet source code folder'],\

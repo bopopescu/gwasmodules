@@ -464,14 +464,14 @@ class ElixirDB(object):
 		"""
 		if not self._data_dir:
 			if self.READMEClass:
-				dataDirEntry = self.READMEClass.query.filter_by(title='data_dir').first()
-				if not dataDirEntry or not dataDirEntry.description:
-					# todo: need to test dataDirEntry.description is writable to the user
+				data_dirEntry = self.READMEClass.query.filter_by(title='data_dir').first()
+				if not data_dirEntry or not data_dirEntry.description:
+					# todo: need to test data_dirEntry.description is writable to the user
 					sys.stderr.write("data_dir not available in db or not accessible on the harddisk. Raise exception.\n")
 					raise
 					self._data_dir = None
 				else:
-					self._data_dir = dataDirEntry.description
+					self._data_dir = data_dirEntry.description
 		return self._data_dir
 	
 	def getProperTableName(self, tableClass=None):
@@ -593,17 +593,17 @@ class ElixirDB(object):
 			inputFileBasename = os.path.basename(self.inputFname)
 			relativePath = genotypeFile.constructRelativePath(sourceFilename=inputFileBasename)
 			exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
-									inputDir=os.path.split(self.inputFname)[0], dstFilename=os.path.join(self.dataDir, relativePath), \
+									inputDir=os.path.split(self.inputFname)[0], dstFilename=os.path.join(self.data_dir, relativePath), \
 									relativeOutputDir=None, shellCommand='cp -rL', \
 									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
-									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
+									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.data_dir)
 			#same as this
 			exitCode = self.db_vervet.moveFileIntoDBAffiliatedStorage(db_entry=genotypeFile, filename=inputFileBasename, \
 									inputDir=os.path.split(self.inputFname)[0], \
-									outputDir=self.dataDir, \
+									outputDir=self.data_dir, \
 									relativeOutputDir=None, shellCommand='cp -rL', \
 									srcFilenameLs=self.srcFilenameLs, dstFilenameLs=self.dstFilenameLs,\
-									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.dataDir)
+									constructRelativePathFunction=genotypeFile.constructRelativePath, data_dir=self.data_dir)
 									
 			if exitCode!=0:
 				sys.stderr.write("Error: moveFileIntoDBAffiliatedStorage() exits with %s code.\n"%(exitCode))

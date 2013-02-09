@@ -27,10 +27,6 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
 						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank number (rank 1=biggest) controls how small a contig to be included in calling'],\
 						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank number (rank 1=biggest contig) controls how big a contig to be included in calling'],\
-						("dataDir", 0, ): ["", 't', 1, 'the base directory where all db-affiliated files are stored. \
-									If not given, use the default stored in db.'],\
-						("localDataDir", 0, ): ["", 'D', 1, 'localDataDir should contain same files as dataDir but accessible locally.\
-									If not given, use the default stored in db. This argument is used to find all input files available.'],\
 						
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments from contaminated individuals, \n\
@@ -1309,7 +1305,7 @@ Contig966       3160    50
 		"""
 		2013.1.25 placeholder, usually from database. such as:
 			refSequence = VervetDB.IndividualSequence.get(self.ref_ind_seq_id)
-			refFastaFname = os.path.join(self.dataDir, refSequence.path)
+			refFastaFname = os.path.join(self.data_dir, refSequence.path)
 			refFastaFList = yh_pegasus.registerRefFastaFile(workflow, refFastaFname, registerAffiliateFiles=True, \
 								input_site_handler=self.input_site_handler,\
 								checkAffiliateFileExistence=True)
@@ -1593,7 +1589,7 @@ Contig966       3160    50
 						mask_genotype_method_id=None,\
 						individual_sequence_file_raw_id=None,\
 						format=None,\
-						logFile=False, dataDir=None, \
+						logFile=False, data_dir=None, \
 						parentJobLs=None, \
 						extraDependentInputLs=None, \
 						extraArguments=None, transferOutput=True, \
@@ -1629,8 +1625,8 @@ Contig966       3160    50
 			extraArgumentList.append("--individual_sequence_file_raw_id %s"%(individual_sequence_file_raw_id))
 		if format:
 			extraArgumentList.append("--format %s"%(format))
-		if dataDir:
-			extraArgumentList.append("--dataDir %s"%(dataDir))
+		if data_dir:
+			extraArgumentList.append("--data_dir %s"%(data_dir))
 		if commit:
 			extraArgumentList.append("--commit")
 		if extraArguments:
