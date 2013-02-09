@@ -2775,7 +2775,7 @@ class Stock_250kDB(ElixirDB):
 		sys.stderr.write("Dealing with SNPInfo ...")
 		from pymodule.SNP import SNPInfo
 		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from pymodule.RBTree import RBDict
+		from pymodule import RBDict
 		import cPickle
 		if snpInfoPickleFname:
 			if os.path.isfile(snpInfoPickleFname):	#if this file is already there, suggest to un-pickle it.
@@ -2823,7 +2823,7 @@ class Stock_250kDB(ElixirDB):
 		
 		from pymodule.SNP import SNPInfo
 		from pymodule.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from pymodule.RBTree import RBDict
+		from pymodule import RBDict
 		locusRBDict = RBDict()
 		
 		where_ls = ['chromosome is not null', 'position is not null']
@@ -3040,7 +3040,7 @@ class Stock_250kDB(ElixirDB):
 			query = query.filter_by(cnv_method_id=cnv_method_id)
 		
 		# 2010-4-28
-		query = cls.limitQueryByChrPosition(query, TableClass, chr, start, stop)
+		query = self.limitQueryByChrPosition(query, TableClass, chr, start, stop)
 			
 		from pymodule import GenomeWideResult, DataObject
 		
@@ -3102,6 +3102,7 @@ class Stock_250kDB(ElixirDB):
 		try:
 			rows = CNVArrayCall.table.metadata.bind.execute("select * from view_array where array_id=%s"%array_id)
 		except:
+			import traceback
 			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()[0]))
 			traceback.print_exc()
 			sys.stderr.write("Error in running select * from view_array where array_id=%s via CNVArrayCall.table.metadata.bind.execute\n"%\
@@ -3479,6 +3480,7 @@ class Stock_250kDB(ElixirDB):
 		try:
 			rows = CNVCall.table.metadata.bind.execute("select * from view_array where array_id=%s"%array_id)
 		except:
+			import traceback
 			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()[0]))
 			traceback.print_exc()
 			sys.stderr.write("Error in running select * from view_array where array_id=%s via CNVCall.table.metadata.bind.execute\n"%\
@@ -3552,7 +3554,7 @@ class Stock_250kDB(ElixirDB):
 		rows = self.metadata.bind.execute(sql_string)
 		count = 0
 		ecotype_id2span_data = {}
-		from pymodule.RBTree import RBDict	# 2010-1-26 RBDict is more efficient than binary_tree.
+		from pymodule import RBDict	# 2010-1-26 RBDict is more efficient than binary_tree.
 		from pymodule.CNV import CNVSegmentBinarySearchTreeKey, leftWithinRightAlsoEqualCmp
 		for row in rows:
 			if row.ecotype_id not in ecotype_id2span_data:
