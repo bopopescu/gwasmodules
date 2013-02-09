@@ -30,9 +30,7 @@ class AbstractVariationWorkflow(AbstractWorkflow):
 						('genome_dbname', 1, ): ['genome', '', 1, 'genome database name', ],\
 						('genome_schema', 1, ): ['genome', '', 1, 'genome database schema name', ],\
 						
-						('commit', 0, int):[0, 'c', 0, 'commit db transaction (individual_alignment and/or individual_alignment.path'],\
 						
-						('data_dir', 0, ):[None, 't', 1, 'The top folder of db-affiliated storage. If not given, use db.data_dir.'],\
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
 						("variationSrcPath", 1, ): ["%s/script/variation/src", 'S', 1, 'variation source code folder'],\
 						})
