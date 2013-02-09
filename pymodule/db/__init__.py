@@ -647,12 +647,13 @@ class ElixirDB(object):
 		
 		srcFilename = os.path.join(inputDir, filename)
 		if dstFilename is None:	#2012.8.30
-			relativePathIndex = outputDir.find(relativeOutputDir)
-			noOfCharsInRelativeOutputDir = len(relativeOutputDir)
-			if outputDir[relativePathIndex:relativePathIndex+noOfCharsInRelativeOutputDir]==relativeOutputDir and newPath.find(relativeOutputDir)>=0:
-				#2013.1.31 bugfix: if relativeOutputDir is included in both outputDir and newPath, use newfilename to avoid double usage. 
-				dstFilename = os.path.join(outputDir, newfilename)
-			else:
+			if relativeOutputDir:
+				relativePathIndex = outputDir.find(relativeOutputDir)
+				noOfCharsInRelativeOutputDir = len(relativeOutputDir)
+				if outputDir[relativePathIndex:relativePathIndex+noOfCharsInRelativeOutputDir]==relativeOutputDir and newPath.find(relativeOutputDir)>=0:
+					#2013.1.31 bugfix: if relativeOutputDir is included in both outputDir and newPath, use newfilename to avoid double usage. 
+					dstFilename = os.path.join(outputDir, newfilename)
+			if dstFilename is None:	#still nothing , use newPath instead
 				dstFilename = os.path.join(outputDir, newPath)
 		if os.path.isfile(dstFilename):
 			sys.stderr.write("Error: destination %s already exits.\n"%(dstFilename))
