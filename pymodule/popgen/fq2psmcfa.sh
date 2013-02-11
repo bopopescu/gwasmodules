@@ -27,7 +27,7 @@ psmcFolderPath=$1
 consensusSequenceFname=$2
 consensusSequencePSMCFname=$3
 minBaseQ=$4
-if [ -z $minBaseQ]
+if [ -z $minBaseQ ]
 then
 	minBaseQ=$minBaseQDefault
 fi
@@ -44,5 +44,6 @@ fi
 # 
 
 fq2psmcfaPath=$psmcFolderPath/utils/fq2psmcfa
+echo "minBaseQ is $minBaseQ."
 
 $fq2psmcfaPath -q $minBaseQ $consensusSequenceFname > $consensusSequencePSMCFname
