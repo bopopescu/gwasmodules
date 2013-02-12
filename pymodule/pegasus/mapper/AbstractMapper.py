@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
-from pymodule.yhio import SNP
 import re
 
 class AbstractMapper(object):
@@ -50,7 +49,6 @@ class AbstractMapper(object):
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
-		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
 		if getattr(self, 'outputFname', None) and hasattr(self,'outputFnamePrefix'):
