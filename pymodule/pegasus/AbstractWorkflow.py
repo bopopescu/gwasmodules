@@ -326,35 +326,6 @@ class AbstractWorkflow(ADAG):
 		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		#noClusteringExecutableSet = set()	#2012.8.2 you don't want to cluster for some jobs.
 		
-		mergeSameHeaderTablesIntoOne = Executable(namespace=namespace, name="mergeSameHeaderTablesIntoOne", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		mergeSameHeaderTablesIntoOne.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/MergeSameHeaderTablesIntoOne.py"), site_handler))
-		executableClusterSizeMultiplierList.append((mergeSameHeaderTablesIntoOne,0))
-		
-		#2012.10.16 same as above but capital case
-		MergeSameHeaderTablesIntoOne = Executable(namespace=namespace, name="MergeSameHeaderTablesIntoOne", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		MergeSameHeaderTablesIntoOne.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/MergeSameHeaderTablesIntoOne.py"), site_handler))
-		executableClusterSizeMultiplierList.append((MergeSameHeaderTablesIntoOne,0))
-		
-		ReduceMatrixByChosenColumn = Executable(namespace=namespace, name="ReduceMatrixByChosenColumn", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		ReduceMatrixByChosenColumn.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixByChosenColumn.py"), site_handler))
-		executableClusterSizeMultiplierList.append((ReduceMatrixByChosenColumn,0))
-		
-		ReduceMatrixBySumSameKeyColsAndThenDivide = Executable(namespace=namespace, name="ReduceMatrixBySumSameKeyColsAndThenDivide", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		ReduceMatrixBySumSameKeyColsAndThenDivide.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixBySumSameKeyColsAndThenDivide.py"), \
-											site_handler))
-		executableClusterSizeMultiplierList.append((ReduceMatrixBySumSameKeyColsAndThenDivide,0))
-		
-		
-		ReduceMatrixByAverageColumnsWithSameKey = Executable(namespace=namespace, name="ReduceMatrixByAverageColumnsWithSameKey", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		ReduceMatrixByAverageColumnsWithSameKey.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "reducer/ReduceMatrixByAverageColumnsWithSameKey.py"), \
-												site_handler))
-		executableClusterSizeMultiplierList.append((ReduceMatrixByAverageColumnsWithSameKey,0))
-		
 		
 		#mkdirWrap is better than mkdir that it doesn't report error when the directory is already there.
 		mkdirWrap = Executable(namespace=namespace, name="mkdirWrap", version=version, os=operatingSystem, \
@@ -540,14 +511,36 @@ class AbstractWorkflow(ADAG):
 		splitfa.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/splitter/splitfa.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((splitfa, 1))
 		
-		#2013.2.7 convert, an image swissknife program, part of imagemagick 
-		convertImage = Executable(namespace=namespace, name="convertImage", version=version, \
-						os=operatingSystem, arch=architecture, installed=True)
-		convertImage.addPFN(PFN("file:///usr/bin/convert", site_handler))
-		executableClusterSizeMultiplierList.append((convertImage, 1))
-		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 	
+		#2013.2.7 convert, an image swissknife program, part of imagemagick 
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path="file:///usr/bin/convert", \
+												name='convertImage', clusterSizeMultipler=1)
+		#2013.2.10
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path="file://" + os.path.join(self.pymodulePath, "pegasus/mapper/runShellCommand.sh"), \
+												name='runShellCommand', clusterSizeMultipler=1)
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/converter/ConvertMSOutput2FASTQ.py'), \
+										name='ConvertMSOutput2FASTQ', clusterSizeMultipler=1)
+		
+		#2013.2.11 moved from vervet/src/reduce to pymodule/pegasus/reducer
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/MergeGenotypeMatrix.py'), \
+										name='MergeGenotypeMatrix', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/MergeSameHeaderTablesIntoOne.py'), \
+										name='mergeSameHeaderTablesIntoOne', clusterSizeMultipler=0)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/MergeSameHeaderTablesIntoOne.py'), \
+										name='MergeSameHeaderTablesIntoOne', clusterSizeMultipler=0)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/ReduceMatrixByAverageColumnsWithSameKey.py'), \
+										name='ReduceMatrixByAverageColumnsWithSameKey', clusterSizeMultipler=0)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/ReduceMatrixByChosenColumn.py'), \
+										name='ReduceMatrixByChosenColumn', clusterSizeMultipler=0)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/ReduceMatrixByMergeColumnsWithSameKey.py'), \
+										name='ReduceMatrixByMergeColumnsWithSameKey', clusterSizeMultipler=0)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/ReduceMatrixBySumSameKeyColsAndThenDivide.py'), \
+										name='ReduceMatrixBySumSameKeyColsAndThenDivide', clusterSizeMultipler=0)
+		
+		
+		
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
 		"""
 		2012.8.31
@@ -575,16 +568,28 @@ class AbstractWorkflow(ADAG):
 			i.e.
 			self.addOneExecutableAndAssignProperClusterSize(executable=CompareTwoGWAssociationLocusByPhenotypeVector, clusterSizeMultipler=0)
 		"""
-		if defaultClustersSize is None:
-			defaultClustersSize = self.clusters_size
-		clusterSize = int(defaultClustersSize*clusterSizeMultipler)
-		if clusterSize>1:
-			clusteringProf = Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusterSize)
-			if not executable.hasProfile(clusteringProf):	#2012.8.26 check this first
-				executable.addProfile(clusteringProf)	#removeProfile()
+		executable = self.setOrChangeExecutableClusterSize(executable=executable, \
+											clusterSizeMultipler=clusterSizeMultipler, defaultClustersSize=defaultClustersSize)
 		if not self.hasExecutable(executable):
 			self.addExecutable(executable)	#removeExecutable() is its counterpart
 			setattr(self, executable.name, executable)
+	
+	def setOrChangeExecutableClusterSize(self, executable=None, clusterSizeMultipler=1, defaultClustersSize=None):
+		"""
+		2013.2.10
+			split out of addOneExecutableAndAssignProperClusterSize()
+			it'll remove the clustering profile if the new clusterSize is <1 
+		"""
+		if defaultClustersSize is None:
+			defaultClustersSize = self.clusters_size
+		clusterSize = int(defaultClustersSize*clusterSizeMultipler)
+		clusteringProf = Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusterSize)
+		if executable.hasProfile(clusteringProf):	#2012.8.26 check this first
+			executable.removeProfile(clusteringProf)
+		if clusterSize>1:
+			executable.addProfile(clusteringProf)
+		return executable
+		
 	
 	def addOneExecutableFromPathAndAssignProperClusterSize(self, path=None, name=None, clusterSizeMultipler=1):
 		"""
@@ -1526,6 +1531,27 @@ class AbstractWorkflow(ADAG):
 							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \
 							**keywords)
+	
+	def addMkDirJob(self, workflow=None, executable=None, outputDir=None, namespace=None, version=None,\
+			parentJobLs=None, extraDependentInputLs=None):
+		"""
+		2013.2.11, wrapper around yh_pegasus.addMkDirJob
+			i.e. 
+			simulateOutputDirJob = self.addMkDirJob(outputDir=simulateOutputDir)
+		"""
+		from pymodule.pegasus import yh_pegasus
+		if workflow is None:
+			workflow=self
+		if namespace is None:
+			namespace = workflow.namespace
+		if version is None:
+			version = workflow.version
+		if executable is None:
+			executable = workflow.mkdirWrap
+		
+		return yh_pegasus.addMkDirJob(workflow=workflow, mkdir=executable, outputDir=outputDir, namespace=namespace, \
+							version=version,\
+							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs)
 	
 	def addPlinkJob(self, workflow=None, executable=None, inputFileList=None, tpedFile=None, tfamFile=None,\
 				pedFile=None, famFile=None, mapFile=None, bedFile=None, bimFile=None,\
