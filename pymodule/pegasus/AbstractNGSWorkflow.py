@@ -242,11 +242,6 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		GenotypeCallByCoverage.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "mapper/GenotypeCallByCoverage.py"), site_handler))
 		executableClusterSizeMultiplierList.append((GenotypeCallByCoverage, 1))
 		
-		MergeGenotypeMatrix = Executable(namespace=namespace, name="MergeGenotypeMatrix", version=version, \
-										os=operatingSystem, arch=architecture, installed=True)
-		MergeGenotypeMatrix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "reducer/MergeGenotypeMatrix.py"), site_handler))
-		executableClusterSizeMultiplierList.append((MergeGenotypeMatrix, 1))
-		
 		bgzip_tabix = Executable(namespace=namespace, name="bgzip_tabix", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		bgzip_tabix.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/bgzip_tabix.sh"), site_handler))
