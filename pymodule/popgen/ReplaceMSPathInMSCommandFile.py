@@ -3,7 +3,10 @@
 Examples:
 	%s 
 	
-	%s 
+	#2013.2.11 add --replaceTheHengLiOutputFlagAsWell to get rid of "-l" argument so that msHOT or ms could run as well
+	%s -i 1534_788_2009098_GA_vs_524.ms_command.sh -o 1534_788_2009098_GA_vs_524.msHOT-lite.output.traditional_output.sh
+		--msPath ~/script/lh3_foreign/msHOT-lite/msHOT-lite
+		#--replaceTheHengLiOutputFlagAsWell
 
 Description:
 	2013.2.10 This program replaces the ms command path in the inputFname (output of history2ms.pl) with correct msPath
@@ -28,6 +31,8 @@ class ReplaceMSPathInMSCommandFile(AbstractMapper):
 	option_default_dict.update({
 							('oldMSPath', 0, ): ['msHOT-lite', '', 1, 'path of the ms program in inputFname '],\
 							('msPath', 0, ): [None, '', 1, 'path to the ms or msHOT, msHOT-lite program, '],\
+							('replaceTheHengLiOutputFlagAsWell', 0, int): [0, '', 0, "Heng Li's msHOT-lite has a '-l' flag to output in a succinct format.\n\
+				Toggle this to get rid of '-l'. "],\
 							})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
@@ -48,7 +53,9 @@ class ReplaceMSPathInMSCommandFile(AbstractMapper):
 		inf = utils.openGzipFile(self.inputFname, 'r')
 		outf = open(self.outputFname, 'w')
 		for line in inf:
-			newLine = re.sub(r'%s'%(self.oldMSPath), r'%s'%(self.msPath), line) 
+			newLine = re.sub(r'%s'%(self.oldMSPath), r'%s'%(self.msPath), line)
+			if self.replaceTheHengLiOutputFlagAsWell:
+				newLine = newLine.replace(" -l", "")	#it's global and exhaustive, any " -l " will be replaced.
 			outf.write(newLine)
 		inf.close()
 		outf.close()
