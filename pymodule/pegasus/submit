@@ -3,83 +3,11 @@
 set -e
 
 TOPDIR=`pwd`
-STORAGE_SITE_DEFAULT="local"
+
+storageSiteNameDefault="local"
 submitOptionDefault="--submit"
-if test $# -lt 2 ; then
-	echo "Please specify local or condorpool as argument. Examples:"
-	echo "  $0 dagFile siteName [finalOutputDir] [toggleCleanUp] [STORAGE_SITE] [submitFolderName] [submitOption]"
-	echo ""
-	echo "Note:"
-	echo "	#. siteName is the running site. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
-	echo ""
-	echo "	#. finalOutputDir is the directory which would contain the files requested to be transferred out by the end of the workflow. If it doesn't exist, pegasus would create one. Default is dagFile (without first folder if there is one) + year+date+time"
-	echo "	#. toggleCleanUp (value=1 means cleanup, 0 is or any other non-empty string means nocleanup.) is used to change the default submit option ($submitOptionDefault) to --submit or --submit --nocleanup."
-	echo "	#. STORAGE_SITE is the site to which final output is staged to. default is $STORAGE_SITE_DEFAULT."
-	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
-	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
-	echo "	#. submitOption are extra options passed to pegasus-plan. Default is $submitOptionDefault. '--submit' means pegasus will plan & submit the workflow. '--submit --nocleanup' means pegasus won't add cleanup jobs = all intermediate files will be kept. If you set it to empty string, '', only planning will be done but no submission. It will overwrite the toggleCleanup value, which modifies the default option."
-	echo ""
-	echo "Examples:"
-	echo "  #plan & submit and auto-cleanup"
-	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool"
-	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 1"
-	echo "  #plan & submit and no cleanup"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 0"
-	echo "  #only planning, no running (toggleCleanup does not matter) by assigning empty spaces to submitOption"
-	echo "	$0 TrioInconsistency15DistantVRC.xml condorpool TrioInconsistency15DistantVRC_20110929T1726 1 local TrioInconsistency15DistantVRC_20110929T1726 \"  \""
-	echo "  #run the workflow without cleanup. good for testing in which you often need to modify rescue log to backtrack finished jobs"
-	echo "	$0 TrioInconsistency15DistantVRC.xml hcondor TrioInconsistency15DistantVRC_20110929T1726 0 local TrioInconsistency15DistantVRC_20110929T1726 \"--submit --nocleanup\" "
-	exit 1
-fi
+scratchTypeDefault="1"
 
-dagFile=$1
-TargetSite=$2
-finalOutputDir=$3
-toggleCleanUp=$4
-STORAGE_SITE=$5
-submitFolderName=$6
-submitOption=$7
-
-
-if [ -z $finalOutputDir ]; then
-	t=`python -c "import time; print time.asctime().split()[3].replace(':', '')"`
-	month=`python -c "import time; print time.asctime().split()[1]"`
-	day=`python -c "import time; print time.asctime().split()[2]"`
-	year=`python -c "import time; print time.asctime().split()[-1]"`
-	finalOutputDir=`python -c "import sys, os; pathLs= os.path.splitext(sys.argv[1])[0].split('/'); n=len(pathLs); print '/'.join(pathLs[-(n-1):])" $dagFile`.$year.$month.$day\T$t;
-	echo Final output will be in $finalOutputDir
-fi
-
-if test -z "$submitFolderName"
-then
-	submitFolderName=$finalOutputDir
-fi
-
-if [ -z $STORAGE_SITE ]; then
-	STORAGE_SITE=$STORAGE_SITE_DEFAULT
-fi
-
-if test "$toggleCleanUp" = "1"; then
-	submitOptionDefault="--submit"
-elif test -n "$toggleCleanUp"; then
-	submitOptionDefault="--submit --nocleanup"
-fi
-
-echo "Default submitOption is changed (or not) to $submitOptionDefault."
-
-if test -z "$submitOption"
-then
-	submitOption=$submitOptionDefault
-fi
-
-echo "Submitting to $TargetSite"
-echo STORAGE_SITE $STORAGE_SITE
-echo "Final submitOption is $submitOption"
-
-# 2012.5.3 these two condor profiles are for condor sites to have computing nodes keep stdout on local storage and transfer them to central manager upon exit/evict
-# it's useful in the case that there are too many jobs (.sub, .err, .out files) and the filesystem is not good at dealing with numerous small files (like panasas filesystem)
-#		<profile namespace="condor" key="should_transfer_files">YES</profile> <profile>
-#		<profile namespace="condor" key="when_to_transfer_output">ON_EXIT_OR_EVICT</profile>
 
 # figure out where Pegasus is installed
 export PEGASUS_HOME=`which pegasus-plan | sed 's/\/bin\/*pegasus-plan//'`
@@ -109,12 +37,14 @@ UCLA_CLUSTER_HOME="/u/home/eeskin/polyacti"
 UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
-#UCLA_CLUSTER_SCRATCH="/u/scratch/p/polyacti/pegasus"
-UCLA_CLUSTER_SCRATCH="$UCLA_CLUSTER_HOME/NetworkData/scratch/"
-#UCLA_CLUSTER_SCRATCH="/u/home/eeskin2/polyacti/NetworkData/scratch"
+
+UCLA_CLUSTER_SCRATCH_Type1="/u/scratch/p/polyacti/pegasus"
+UCLA_CLUSTER_SCRATCH_Type2="$UCLA_CLUSTER_HOME/NetworkData/scratch/"
+
 #UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
 #if you choose hcondor as storage site, final output is staged out to local scratch!! make sure it's in shared storage.
 UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
+
 UCLA_CLUSTER_PYTHON_DIR="/u/local/python/2.6/"
 UCLA_CLUSTER_R_DIR="/u/local/apps/R/R-2.12.2-gnu/"
 UCLA_CLUSTER_HDF5_DIR="/u/local/intel/11.1/libs/hdf5/1.8.8-shared/"	#2013.1.10 not necessary
@@ -128,6 +58,103 @@ USC_CLUSTER_WORK_DIR=$USC_CLUSTER_HOME"/pg_work"
 USC_CLUSTER_PEGASUS_HOME=$USC_CLUSTER_HOME"/bin/pegasus"
 USC_CLUSTER_GLOBUS_LOCATION="/usr/usc/globus/default/"
 #USC_CLUSTER_GLOBUS_LOCATION="/usr/local/globus/default"
+
+
+if test $# -lt 2 ; then
+	echo "Please specify local or condorpool as argument. Examples:"
+	echo "  $0 dagFile computingSiteName [keepIntermediateFiles] [scratchType] [submitOption] [storageSiteName] [finalOutputDir] [submitFolderName]"
+	echo ""
+	echo "Note:"
+	echo "	#. computingSiteName is the site on which the computing jobs run. could be local, condorpool, hcondor, hoffman2, uschpc. The dagFile should match this."
+	echo ""
+	echo "	#. keepIntermediateFiles (setting it to 1 means no cleanup, otherwise or default is cleanup.). It changes the default submit option ($submitOptionDefault) to --submit --nocleanup."
+	echo "	#. scratchType is the type of scratch file system to use."
+	echo "		Only valid for hcondor site. "
+	echo "			1: scratch FS is  $UCLA_CLUSTER_SCRATCH_Type1."
+	echo "			2: scratch FS is  $UCLA_CLUSTER_SCRATCH_Type2."
+	echo
+	echo "	#. submitOption are options passed to pegasus-plan. Default is $submitOptionDefault. "
+	echo "		'--submit' means pegasus will plan & submit the workflow."
+	echo "		'--submit --nocleanup' means pegasus will not add cleanup jobs = all intermediate files will be kept."
+	echo "		If you set it to empty string, '', only planning will be done but no submission."
+	echo "		This option overwrites the keepIntermediateFiles option, which modifies the default submitOption."
+	echo "	#. storageSiteName is the site to which final output is staged to. default is $storageSiteNameDefault."
+	echo "	#. finalOutputDir is the directory which would contain the files requested to be transferred out by the end of the workflow. If it doesn't exist, pegasus would create one. Default is dagFile (without first folder if there is one) + year+date+time"
+	echo "	#. submitFolderName is the submit folder which contains all job description files, job stdout/stderr output, logs, etc.It is optional. If not given, value of finalOutputDir is taken as submitFolderName."
+	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
+	echo ""
+	echo "Examples:"
+	echo "	#plan & submit and do not keep intermediate files"
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool"
+	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool 0"
+	echo
+	echo "	#plan & submit, keep intermediate files, run on scratch type 2 ($UCLA_CLUSTER_SCRATCH_Type2) on hcondor"
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml hcondor 1 2"
+	echo
+	echo "	#only planning, no running (keepIntermediateFiles & scratchType does not matter) by assigning empty spaces to submitOption"
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool 0 1 \"  \" "
+	echo
+	echo "	#run the workflow while keeping intermediate files. good for testing in which you often need to modify .dag.rescue log to backtrack finished jobs"
+	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml hcondor 1 1 \"--submit\" local TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 "
+	exit 1
+fi
+
+dagFile=$1
+computingSiteName=$2
+keepIntermediateFiles=$3
+scratchType=$4
+submitOption=$5
+storageSiteName=$6
+finalOutputDir=$7
+submitFolderName=$8
+
+#2013.2.12 no cleanup only when keepIntermediateFiles = 1
+if test "$keepIntermediateFiles" = "1"; then
+	submitOptionDefault="--submit --nocleanup"
+fi
+
+#2013.2.12 
+if test "$scratchType" = "2"; then
+	UCLA_CLUSTER_SCRATCH=$UCLA_CLUSTER_SCRATCH_Type2
+else
+	UCLA_CLUSTER_SCRATCH=$UCLA_CLUSTER_SCRATCH_Type1
+fi
+
+echo "Default submitOption is changed to $submitOptionDefault."
+
+if test -z "$submitOption"
+then
+	submitOption=$submitOptionDefault
+fi
+
+
+if [ -z $storageSiteName ]; then
+	storageSiteName=$storageSiteNameDefault
+fi
+
+
+if [ -z $finalOutputDir ]; then
+	t=`python -c "import time; print time.asctime().split()[3].replace(':', '')"`
+	month=`python -c "import time; print time.asctime().split()[1]"`
+	day=`python -c "import time; print time.asctime().split()[2]"`
+	year=`python -c "import time; print time.asctime().split()[-1]"`
+	finalOutputDir=`python -c "import sys, os; pathLs= os.path.splitext(sys.argv[1])[0].split('/'); n=len(pathLs); print '/'.join(pathLs[-(n-1):])" $dagFile`.$year.$month.$day\T$t;
+	echo Final output will be in $finalOutputDir
+fi
+
+if test -z "$submitFolderName"
+then
+	submitFolderName=$finalOutputDir
+fi
+
+
+
+echo "Submitting to $computingSiteName for computing."
+echo "UCLA_CLUSTER_SCRATCH is $UCLA_CLUSTER_SCRATCH."
+echo "storageSiteName is $storageSiteName."
+echo "Final workflow submit option is $submitOption."
+
+
 
 # 2012.7.31 the two lines below are added to any condor cluster that do not use shared file system or filesystem that is not good at handling numerous small files in one folder
 #		<profile namespace="condor" key="should_transfer_files">YES</profile>
@@ -297,11 +324,11 @@ echo $CLASSPATH
 
 pegasus-plan \
 	--conf pegasusrc \
-	--sites $TargetSite \
+	--sites $computingSiteName \
 	--dir work \
 	--relative-dir $submitFolderName \
 	--dax $dagFile \
-	--output $STORAGE_SITE \
+	--output $storageSiteName \
 	--cluster horizontal $submitOption
 # add the option below for debugging
 #	-vvvvv \
