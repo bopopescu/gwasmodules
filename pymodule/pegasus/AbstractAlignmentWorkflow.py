@@ -201,6 +201,9 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		topOutputDir = "%sMap"%(outputDirPrefix)
 		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
 		
+		plotOutputDir = "%sPlot"%(outputDirPrefix)
+		plotOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=plotOutputDir)
+		
 		if needFastaDictJob:	# the .dict file is required for GATK
 			fastaDictJob = self.addRefFastaDictJob(workflow, createSequenceDictionaryJava=createSequenceDictionaryJava, \
 												refFastaF=refFastaF)
@@ -228,6 +231,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		#	mapEachIntervalDataLs is reset right after each chromosome is chosen.
 		#	all reduce dataLs never gets reset.
 		passingData = PassingData(AlignmentJobAndOutputLs=[], bamFnamePrefix=None, topOutputDirJob=topOutputDirJob,\
+					plotOutputDirJob=plotOutputDirJob,\
 					outputDirPrefix=outputDirPrefix, refFastaFList=refFastaFList, \
 					
 					mapEachAlignmentData = None,\
