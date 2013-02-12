@@ -590,7 +590,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		else:
 			refFastaF = None
 		
-		topOutputDir = "%sTop"%(outputDirPrefix)
+		topOutputDir = "%sMap"%(outputDirPrefix)
 		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
 		
 		if needFastaDictJob and refFastaF:	# the .dict file is required for GATK
