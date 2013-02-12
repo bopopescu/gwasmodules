@@ -20,8 +20,9 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from pymodule import ProcessOptions, figureOutDelimiter, utils, PassingData
 import csv
-
+from pymodule.yhio.MatrixFile import MatrixFile
 from ReduceMatrixByMergeColumnsWithSameKey import ReduceMatrixByMergeColumnsWithSameKey
+
 class ReduceMatrixByChosenColumn(ReduceMatrixByMergeColumnsWithSameKey):
 	__doc__ = __doc__
 	option_default_dict = ReduceMatrixByMergeColumnsWithSameKey.option_default_dict.copy()
@@ -77,31 +78,29 @@ class ReduceMatrixByChosenColumn(ReduceMatrixByMergeColumnsWithSameKey):
 		delimiter = None
 		for inputFname in self.inputFnameLs:
 			if not os.path.isfile(inputFname):
-				continue
+				if self.exitNonZeroIfAnyInputFileInexistent:
+					sys.exit(3)
+				else:
+					continue
 			reader = None
 			try:
 				inputFile = utils.openGzipFile(inputFname)
 				delimiter = figureOutDelimiter(inputFile)
-				isCSVReader = True
-				if delimiter=='\t' or delimiter==',':
-					reader = csv.reader(inputFile, delimiter=delimiter)
-				else:
-					reader = inputFile
-					isCSVReader = False
+				reader = MatrixFile(inputFile=inputFile, delimiter=delimiter)
 			except:
 				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 				import traceback
 				traceback.print_exc()
 			
 			try:
-				if isCSVReader:
-					header = reader.next()
-				else:
-					header = inputFile.readline().strip().split()	#whatever splits them
+				#if isCSVReader:
+				header = reader.next()
+				#else:
+				#	header = inputFile.readline().strip().split()	#whatever splits them
 				self.handleNewHeader(header, newHeader, self.keyColumnLs, self.valueColumnLs, keyColumnSet=self.keyColumnSet)
 				if self.noHeader:	#2012.8.10
 					inputFile.seek(0)
-					reader = csv.reader(inputFile, delimiter=delimiter)
+					reader = MatrixFile(inputFile=inputFile, delimiter=delimiter)
 			except:	#in case something wrong (i.e. file is empty)
 				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 				import traceback
@@ -109,8 +108,8 @@ class ReduceMatrixByChosenColumn(ReduceMatrixByMergeColumnsWithSameKey):
 			
 			if reader is not None:
 				for row in reader:
-					if not isCSVReader:
-						row = row.strip().split()
+					#if not isCSVReader:
+					#	row = row.strip().split()
 					try:
 						self.handleValueColumns(row, key2dataLs=key2dataLs, keyColumnLs=self.keyColumnLs, valueColumnLs=self.valueColumnLs)
 					except:	#in case something wrong (i.e. file is empty)

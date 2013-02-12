@@ -4,7 +4,7 @@ Examples:
 	#testing merge three identical genotype files
 	%s -o /tmp/ccc.tsv /tmp/call_1.tsv /tmp/call_1.tsv /tmp/call_1.tsv
 	
-	%s 
+	%s --exitNonZeroIfAnyInputFileInexistent  -o /tmp/ccc.tsv /tmp/call_1.tsv /tmp/call_1.tsv /tmp/call_1.tsv
 	
 Description:
 	2011-7-12
@@ -24,22 +24,21 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
+import copy
 from pymodule import ProcessOptions
+from AbstractReducer import AbstractReducer
 
-class MergeGenotypeMatrix(object):
+class MergeGenotypeMatrix(AbstractReducer):
 	__doc__ = __doc__
-	option_default_dict = {('outputFname', 1, ): [None, 'o', 1, 'output the SNP data.'],\
-						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('noHeader', 0, int): [0, 'n', 0, 'all input has no header'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	option_default_dict = copy.deepcopy(AbstractReducer.option_default_dict)
+	option_default_dict.update({
+					})
 
-	def __init__(self, inputFnameLs, **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2011-7-12
 		"""
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
-		self.inputFnameLs = inputFnameLs
+		AbstractReducer.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
 	def run(self):
 		
@@ -50,8 +49,13 @@ class MergeGenotypeMatrix(object):
 		header = None
 		outf = open(self.outputFname, 'w')
 		for inputFname in self.inputFnameLs:
+			sys.stderr.write("File %s ... "%(inputFname))
 			if not os.path.isfile(inputFname):
-				continue
+				if self.exitNonZeroIfAnyInputFileInexistent:
+					sys.stderr.write(" doesn't exist. Exit 3.\n")
+					sys.exit(3)
+				else:
+					continue
 			suffix = os.path.splitext(inputFname)[1]
 			if suffix=='.gz':
 				import gzip
@@ -79,11 +83,10 @@ class MergeGenotypeMatrix(object):
 						print sys.exc_info()
 			for line in inf:
 				outf.write(line)
-		
+			sys.stderr.write(".\n")
 
 if __name__ == '__main__':
 	main_class = MergeGenotypeMatrix
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
-	import copy
 	instance = main_class(po.arguments, **po.long_option2value)
 	instance.run()

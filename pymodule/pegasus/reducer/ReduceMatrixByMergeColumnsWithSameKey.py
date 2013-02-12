@@ -20,25 +20,24 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
+import copy
 from pymodule import ProcessOptions, figureOutDelimiter, utils, PassingData
-import csv
+from pymodule.yhio.MatrixFile import MatrixFile
+from AbstractReducer import AbstractReducer
 
-class ReduceMatrixByMergeColumnsWithSameKey(object):
+class ReduceMatrixByMergeColumnsWithSameKey(AbstractReducer):
 	__doc__ = __doc__
-	option_default_dict = {('outputFname', 1, ): [None, 'o', 1, 'output the SNP data.'],\
+	option_default_dict = copy.deepcopy(AbstractReducer.option_default_dict)
+	option_default_dict.update({
 						("keyColumnLs", 1, ): [0, 'k', 1, 'index(es) of the key in each input file. must be same. comma/dash-separated. i.e. 0-2,4 '],\
 						("keyHeaderLs", 0, ): [0, '', 1, 'header(s) of the key. comma-separated'],\
-						('noHeader', 0, int): [0, 'n', 0, 'all input has no header'],\
-						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						})
 
-	def __init__(self, inputFnameLs, **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2011-7-12
 		"""
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
-		self.inputFnameLs = inputFnameLs
+		AbstractReducer.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 		if self.keyColumnLs:
 			self.keyColumnLs = utils.getListOutOfStr(self.keyColumnLs, data_type=int)
 		else:
@@ -72,15 +71,15 @@ class ReduceMatrixByMergeColumnsWithSameKey(object):
 		key = tuple(keyLs)
 		return key
 	
-	def outputFinalData(self, outputFname, key2dataLs, delimiter=None, header=None):
+	def outputFinalData(self, outputFname, key2dataLs=None, delimiter=None, header=None):
 		"""
+		2013.2.12 replace csv.writer with MatrixFile
 		2012.7.30
 			open the outputFname regardless whether there is data or not.
 		2012.1.9
 		"""
-		outf = open(outputFname, 'w')
+		writer = MatrixFile(inputFname=outputFname, delimiter=delimiter)
 		if key2dataLs and delimiter and header:
-			writer = csv.writer(outf, delimiter=delimiter)
 			if header:
 				writer.writerow(header)
 			keyLs = key2dataLs.keys()
@@ -88,8 +87,7 @@ class ReduceMatrixByMergeColumnsWithSameKey(object):
 			for key in keyLs:
 				dataLs = key2dataLs.get(key)
 				writer.writerow(list(key) + dataLs)
-			del writer
-		outf.close()
+		writer.close()
 	
 	def handleNewHeader(self, oldHeader=None, newHeader=None, keyColumnLs=None, valueColumnLs=None, keyColumnSet=None):
 		"""
@@ -128,14 +126,15 @@ class ReduceMatrixByMergeColumnsWithSameKey(object):
 		noOfDataColumnsFromPriorFiles = 0
 		for inputFname in self.inputFnameLs:
 			if not os.path.isfile(inputFname):
-				continue
+				if self.exitNonZeroIfAnyInputFileInexistent:
+					sys.exit(3)
+				else:
+					continue
 			reader = None
 			try:
 				inputFile = utils.openGzipFile(inputFname)
 				delimiter = figureOutDelimiter(inputFile)
-				if not delimiter:
-					delimiter='\t'
-				reader = csv.reader(inputFile, delimiter=delimiter)
+				reader = MatrixFile(inputFile=inputFile, delimiter=delimiter)
 			except:
 				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 				import traceback
@@ -147,7 +146,7 @@ class ReduceMatrixByMergeColumnsWithSameKey(object):
 				self.handleNewHeader(header, newHeader, self.keyColumnLs, valueColumnLs, keyColumnSet=self.keyColumnSet)
 				if self.noHeader:	#2012.8.10
 					inputFile.seek(0)
-					reader = csv.reader(inputFile, delimiter=delimiter)
+					reader = MatrixFile(inputFile=inputFile, delimiter=delimiter)
 			except:	#in case something wrong (i.e. file is empty)
 				sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 				import traceback
@@ -185,7 +184,7 @@ class ReduceMatrixByMergeColumnsWithSameKey(object):
 			pdb.set_trace()
 		
 		returnData = self.traverse()
-		self.outputFinalData(self.outputFname, returnData.key2dataLs, returnData.delimiter, header=returnData.header)
+		self.outputFinalData(self.outputFname, key2dataLs=returnData.key2dataLs, delimiter=returnData.delimiter, header=returnData.header)
 
 if __name__ == '__main__':
 	main_class = ReduceMatrixByMergeColumnsWithSameKey
