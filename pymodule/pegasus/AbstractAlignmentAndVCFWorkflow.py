@@ -7,7 +7,7 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import subprocess, cStringIO
+import copy
 from Pegasus.DAX3 import *
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, utils
 from AbstractAlignmentWorkflow import AbstractAlignmentWorkflow
@@ -15,7 +15,7 @@ from AbstractVCFWorkflow import AbstractVCFWorkflow
 
 class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWorkflow):
 	__doc__ = __doc__
-	option_default_dict = AbstractAlignmentWorkflow.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractAlignmentWorkflow.option_default_dict)
 	option_default_dict.update({
 						('inputDir', 0, ): ['', 'L', 1, 'input folder that contains vcf or vcf.gz files', ],\
 						('minDepth', 0, float): [0, 'm', 1, 'minimum depth for a call to regarded as non-missing', ],\
@@ -85,7 +85,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 			
 			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chr, passingData=passingData, \
 								mapEachIntervalDataLs=passingData.mapEachIntervalDataLs,\
-								transferOutput=False, data_dir=data_dir, \
+								transferOutput=False, data_dir=self.data_dir, \
 								**keywords)
 			passingData.reduceAfterEachChromosomeData = reduceAfterEachChromosomeData
 			passingData.reduceAfterEachChromosomeDataLs.append(reduceAfterEachChromosomeData)
@@ -113,7 +113,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		
 		"""
 		"""
-		AbstractVervetWorkflow.registerCustomExecutables(self, workflow=workflow)
+		AbstractAlignmentWorkflow.registerCustomExecutables(self, workflow=workflow)
+		AbstractVCFWorkflow.registerCustomExecutables(self, workflow=workflow)
 		
 		if workflow is None:
 			workflow = self
