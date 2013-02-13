@@ -8,10 +8,7 @@ Examples:
 		--db_passwd SECRET --hostname banyan  --gene_annotation_pickleFname /Network/Data/250k/tmp-yh/at_gene_model_pickelf
 		--locusExtensionDistance 15000
 	
-	%s  --samplingRate 0.1 -O hweplot --whichColumnHeader "P" --xColumnHeader POS --logWhichColumn
-		--chrColumnHeader CHR --whichColumnPlotLabel "hweLogPvalue" --xColumnPlotLabel position 
-		-z dl324b-1.cmb.usc.edu -u yh /tmp/5988_VCF_Contig966.hwe
-	
+	%s 
 
 Description:
 	2012.11.14
@@ -26,10 +23,10 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
-import csv
+import copy
+import pylab
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
-from pymodule import yh_matplotlib, GenomeDB, utils
-import numpy, random, pylab
+from pymodule import yh_matplotlib, GenomeDB, utils, SNPData, read_data
 from pymodule.plot.AbstractPlot import AbstractPlot
 from variation.src.mapper.AbstractVariationMapper import AbstractVariationMapper
 from variation.src import Stock_250kDB
@@ -39,7 +36,7 @@ from variation.src.association.Kruskal_Wallis import Kruskal_Wallis
 
 class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion):
 	__doc__ = __doc__
-	option_default_dict = AbstractPlot.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractPlot.option_default_dict)
 	option_default_dict[('whichColumnPlotLabel', 0, )][0] = '#SNPs in 100kb window'
 	option_default_dict[('whichColumn', 0, int)][0] = 3
 	option_default_dict[('xColumnPlotLabel', 0, )][0] = 'position'
@@ -139,6 +136,7 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 			snpData=None, phenData=None, ecotype_info=None,\
 			snpData_before_impute=None, snp_matrix_data_type=1, \
 			drawMap=False, drawStrainPCA=False, markSNPInGenes=True, drawGrid=False, phenotypeDrawType=1,\
+			phenotype_method_id=None,\
 			**keywords):
 		"""
 		2012.11.14
@@ -415,7 +413,7 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 			
 			#2008-12-05 fake a snp_info for findSNPsInRegion
 			DrawSNPRegion.construct_chr_pos2index_forSNPData(snpData, snp_info=snp_info)
-			ecotype_info = getEcotypeInfo(db)
+			ecotype_info = getEcotypeInfo(db_250k)
 		else:
 			snpData = None
 			phenData = None
