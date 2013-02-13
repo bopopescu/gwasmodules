@@ -108,22 +108,19 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		returnData = PassingData()
 		returnData.jobDataLs = []
 		
-		mapDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir="%sMap"%(outputDirPrefix))
+		mapDirJob = self.addMkDirJob(outputDir="%sMap"%(outputDirPrefix))
 		passingData.mapDirJob = mapDirJob
 		returnData.mapDirJob = mapDirJob
 		
-		countAssociationLocusOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, \
-											outputDir="%sCountAssociationLocus"%(outputDirPrefix))
+		countAssociationLocusOutputDirJob = self.addMkDirJob(outputDir="%sCountAssociationLocus"%(outputDirPrefix))
 		passingData.countAssociationLocusOutputDirJob = countAssociationLocusOutputDirJob
 		returnData.countAssociationLocusOutputDirJob = countAssociationLocusOutputDirJob
 		
-		plotOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, \
-											outputDir='%sPlot'%(outputDirPrefix))
+		plotOutputDirJob = self.addMkDirJob(outputDir='%sPlot'%(outputDirPrefix))
 		passingData.plotOutputDirJob = plotOutputDirJob
 		returnData.plotOutputDirJob = plotOutputDirJob
 		
-		reduceOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, \
-												outputDir="%sReduce"%(outputDirPrefix))
+		reduceOutputDirJob = self.addMkDirJob(outputDir="%sReduce"%(outputDirPrefix))
 		passingData.reduceOutputDirJob = reduceOutputDirJob
 		returnData.reduceOutputDirJob = reduceOutputDirJob
 		
@@ -312,7 +309,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 			min_score = min_score_ls[i]
 			#create a folder here.
 			associationMinScoreDir = "association_min_score_%s"%(min_score)
-			associationMinScoreDirJob = yh_pegasus.addMkDirJob(self, mkdir=self.mkdirWrap, outputDir=associationMinScoreDir)
+			associationMinScoreDirJob = self.addMkDirJob(outputDir=associationMinScoreDir)
 			
 			resultID2associationPeakJob = {}
 			
