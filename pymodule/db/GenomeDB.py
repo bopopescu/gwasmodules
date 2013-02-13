@@ -25,7 +25,7 @@ from elixir import OneToMany, ManyToOne, ManyToMany, OneToOne
 from elixir import setup_all, session, metadata, entities
 from elixir.options import using_table_options_handler	#using_table_options() can only work inside Entity-inherited class.
 from datetime import datetime
-from sqlalchemy.schema import ThreadLocalMetaData, MetaData
+from sqlalchemy.schema import MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy import and_, or_, not_
@@ -35,6 +35,7 @@ from pymodule.algorithm.RBTree import RBDict
 from pymodule.db import ElixirDB
 from pymodule.Genome import GeneModel	#2010-9-21 although "from Genome import GeneModel" works,
 			#it causes problem in cPickle.load() because Genome is not directly visible outside.
+from __init__ import get_sequence_segment
 
 __session__ = scoped_session(sessionmaker(autoflush=False, autocommit=True))
 #__metadata__ = ThreadLocalMetaData() #2008-11-04 not good for pylon
@@ -199,7 +200,6 @@ class GeneCommentary(Entity):
 				because annot_assembly_id was not used. check GenomeDatabase.getSequenceSegment()
 		2009-01-03
 		"""
-		from db import get_sequence_segment
 		seq = ''
 		curs = __metadata__.bind	#or self.table.bind or self.table.metadata.bind
 		for box in box_ls:
@@ -969,8 +969,6 @@ class OneGenomeData(PassingData):
 		"""
 		tax_id, chr_gap = argument_list[:2]
 		sys.stderr.write("Creating cumuSpan2ChrRBDict for tax_id=%s, chr_gap=%s  \n"%(tax_id, chr_gap))
-		from CNV import CNVCompare, CNVSegmentBinarySearchTreeKey, get_overlap_ratio
-		from RBTree import RBDict
 		self._cumuSpan2ChrRBDict = RBDict()
 		if self._chr_id2size is None:
 			self.chr_id2size = [tax_id,]
@@ -1293,7 +1291,6 @@ class GenomeDatabase(ElixirDB):
 			sys.stderr.write("Warning: no entry available from tax_id %s, chromosome %s.\n"%(tax_id, chromosome))
 			return ""
 		annot_assembly_id = annot_assembly_id_ls[0]
-		from db import get_sequence_segment
 		curs = __metadata__.bind	#or self.table.bind or self.table.metadata.bind
 		seq = get_sequence_segment(curs, gi=None, start=start, stop=stop, annot_assembly_id=annot_assembly_id,\
 								annot_assembly_table='%s.%s'%(schema, AnnotAssembly.table.name), \
@@ -1465,7 +1462,7 @@ class GenomeDatabase(ElixirDB):
 		"""
 		gene_segment_ls = []
 		if commentary_type:
-			gene_commentary_type = db.getGeneCommentaryType(commentary_type=commentary_type)
+			gene_commentary_type = self.getGeneCommentaryType(commentary_type=commentary_type)
 		else:
 			gene_commentary_type = gene_commentary.gene_commentary_type
 		for box in box_ls:
