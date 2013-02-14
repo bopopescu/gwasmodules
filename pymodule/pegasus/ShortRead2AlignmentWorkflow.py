@@ -84,14 +84,16 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, yh_pegasus
+
+import copy
 from Pegasus.DAX3 import *
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, yh_pegasus
 from pymodule.pegasus.AbstractNGSWorkflow import AbstractNGSWorkflow
 
 
 class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	__doc__ = __doc__
-	option_default_dict = AbstractNGSWorkflow.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractNGSWorkflow.option_default_dict)
 	alignment_option_dict = {
 						('noCheckEmptyReadFile', 0, int):[0, 'R', 0, "toggle to not check whether each read file is empty (if empty, exclude it). \
 							If IndividualSequenceFile.read_count is null, it'll try to count them on the fly and take a lot of time.\
