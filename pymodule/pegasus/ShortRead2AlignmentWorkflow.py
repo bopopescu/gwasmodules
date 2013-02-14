@@ -426,7 +426,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		if parentJobLs:
 			for parentJob in parentJobLs:
 				if parentJob:
-					workflow.depends(parent=mkdirJob, child=alignmentJob)
+					workflow.depends(parent=parentJob, child=alignmentJob)
 		return alignmentJob
 	
 	def addBWAAlnJob(self, workflow=None, executable=None, bwaCommand='aln', fileObject=None, outputFile=None,\
@@ -734,7 +734,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, addOrReplaceReadGroupsJar=addOrReplaceReadGroupsJar,\
 						no_of_aln_threads=no_of_aln_threads, transferOutput=transferOutput)
 		else:
-			sys.stderr.write("Alignment method %s is not supported.\n"%(alignment_method_name))
+			sys.stderr.write("Alignment method %s is not supported.\n"%(alignment_method.short_name))
 			sys.exit(3)
 		fname_prefix = alignmentJob.fname_prefix
 		
