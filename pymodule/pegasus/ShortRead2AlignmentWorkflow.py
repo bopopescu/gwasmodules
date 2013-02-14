@@ -947,8 +947,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 								transferOutput=transferOutput)
 		return MarkDupJob, bamIndexJob
 		
-	@classmethod
-	def addSAMtoolsCalmdJob(cls, workflow, samtoolsCalmd=None, inputBamF=None, \
+	def addSAMtoolsCalmdJob(self, workflow, samtoolsCalmd=None, inputBamF=None, \
 					refFastaFList=None, outputBamF=None, \
 					parentJob=None, \
 					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
