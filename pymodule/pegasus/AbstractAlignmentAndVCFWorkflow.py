@@ -31,6 +31,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		"""
 		AbstractAlignmentWorkflow.__init__(self, **keywords)
 	
+	registerAllInputFiles = AbstractVCFWorkflow.registerAllInputFiles
+	
 	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
 						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFFile=None, \
 						outputDirPrefix=None, transferOutput=False, **keywords):

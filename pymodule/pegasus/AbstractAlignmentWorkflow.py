@@ -52,7 +52,13 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		"""
 		2012.1.17
 		"""
-		AbstractNGSWorkflow.__init__(self, **keywords)
+		AbstractNGSWorkflow.__init__(self, **keywords)	#extra__init__() will be executed inside __init__()
+		
+	def extra__init__(self):
+		"""
+		2013.2.14
+		"""
+		AbstractNGSWorkflow.extra__init__(self)
 		listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int), \
 								("site_id_ls", int), ('country_id_ls', int), ('tax_id_ls', int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])

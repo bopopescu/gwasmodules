@@ -32,6 +32,12 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		2012.1.17
 		"""
 		AbstractNGSWorkflow.__init__(self, **keywords)
+	
+	def extra__init__(self):
+		"""
+		2013.2.14
+		"""
+		AbstractNGSWorkflow.extra__init__(self)
 		if getattr(self, "inputDir", None):
 			self.inputDir = os.path.abspath(self.inputDir)
 		

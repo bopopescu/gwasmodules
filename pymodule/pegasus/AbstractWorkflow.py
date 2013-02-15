@@ -115,6 +115,13 @@ class AbstractWorkflow(ADAG):
 			self.chr2size = {}
 	
 		self.connectDB()
+		self.extra__init__()
+	
+	def extra__init__(self):
+		"""
+		2013.2.14
+		"""
+		pass
 	
 	def writeXML(self, out):
 		"""
@@ -638,7 +645,7 @@ class AbstractWorkflow(ADAG):
 		sys.stderr.write("%s files out of %s total.\n"%(len(inputFnameLs), counter))
 		#return inputFnameLs
 	
-	def registerAllInputFiles(self, workflow=None, inputFnameLs=[], input_site_handler=None, pegasusFolderName=''):
+	def registerAllInputFiles(self, workflow=None, inputFnameLs=[], input_site_handler=None, pegasusFolderName='', **keywords):
 		"""
 		2012.3.9
 			copied from variation.src.LDBetweenTwoSNPDataWorkflow.py
