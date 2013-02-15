@@ -53,7 +53,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2011-7-11
 		"""
-		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath'])
+		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'gatk2_path'])
 		#inserted before AbstractWorkflow.__init__()
 		AbstractWorkflow.__init__(self, **keywords)
 		#from pymodule import ProcessOptions

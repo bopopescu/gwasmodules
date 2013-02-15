@@ -148,11 +148,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		if not self.local_data_dir:
 			self.local_data_dir = self.db.data_dir
 		
-		chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, contigMinRankBySize=self.contigMinRankBySize)
-		#chr2size = set(['Contig149'])	#temporary when testing Contig149
-		#chr2size = set(['1MbBAC'])	#temporary when testing the 1Mb-BAC (formerly vervet_path2)
-		chrLs = chr2size.keys()
-		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=chr2size, \
+		chrLs = self.chr2size.keys()
+		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
 													intervalSize=self.intervalSize, \
 													intervalOverlapSize=self.intervalOverlapSize)
 		
