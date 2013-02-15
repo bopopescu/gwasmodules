@@ -563,8 +563,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		return returnData
 	
 	def addAllJobs(self, workflow=None, inputVCFData=None, chr2IntervalDataLs=None, \
-				genomeAnalysisTKJar=None, samtools=None, \
-				createSequenceDictionaryJava=None, createSequenceDictionaryJar=None, \
+				GenomeAnalysisTKJar=None, samtools=None, \
+				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
 				BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None,\
 				mv=None, \
 				refFastaFList=None, \
@@ -594,7 +594,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
 		
 		if needFastaDictJob and refFastaF:	# the .dict file is required for GATK
-			fastaDictJob = self.addRefFastaDictJob(workflow, createSequenceDictionaryJava=createSequenceDictionaryJava, \
+			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
 												refFastaF=refFastaF)
 			refFastaDictF = fastaDictJob.refFastaDictF
 		else:
@@ -798,8 +798,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, \
 					chr2IntervalDataLs=None, samtools=workflow.samtools, \
-				genomeAnalysisTKJar=workflow.genomeAnalysisTKJar, \
-				createSequenceDictionaryJava=workflow.createSequenceDictionaryJava, createSequenceDictionaryJar=workflow.createSequenceDictionaryJar, \
+				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
+				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexFilesJar=workflow.BuildBamIndexFilesJar,\
 				mv=workflow.mv, \
 				refFastaFList=self.refFastaFList,\

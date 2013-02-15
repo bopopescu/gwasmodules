@@ -146,18 +146,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			workflow = self
 		AbstractNGSWorkflow.registerCustomJars(self, workflow=workflow)
 		
-		site_handler = self.site_handler
-		abs_path = os.path.join(self.picard_path, 'SortSam.jar')
-		SortSamFilesJar = File(abs_path)
-		SortSamFilesJar.addPFN(PFN("file://" + abs_path, site_handler))
-		workflow.addFile(SortSamFilesJar)
-		workflow.SortSamFilesJar = SortSamFilesJar
-		
-		abs_path = os.path.join(self.picard_path, 'SamFormatConverter.jar')
-		SamFormatConverterJar = File(abs_path)
-		SamFormatConverterJar.addPFN(PFN("file://" + abs_path, site_handler))
-		workflow.addFile(SamFormatConverterJar)
-		workflow.SamFormatConverterJar = SamFormatConverterJar
+		self.registerOneJar(name="SortSamJar", path=os.path.join(self.picard_path, 'SortSam.jar'))
+		self.registerOneJar(name="SamFormatConverterJar", path=os.path.join(self.picard_path, 'SamFormatConverter.jar'))
 		
 	
 	def registerCustomExecutables(self, workflow=None):
@@ -355,8 +345,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					samtools=None, refIndexJob=None, parentJobLs=None,\
 					alignment_method=None, outputDir=None, \
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
-					java=None, SortSamFilesJava=None, SortSamFilesJar=None,\
-					addOrReplaceReadGroupsJava=None, addOrReplaceReadGroupsJar=None,\
+					java=None, SortSamFilesJava=None, SortSamJar=None,\
+					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 					no_of_aln_threads=3, stampy=None, transferOutput=False, **keywords):
 		"""
 		2014.4.4
@@ -374,7 +364,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			alignment job for stampy
 			no_of_aln_threads is only for bwa.
 		2011-9-13
-			add argument java & SortSamFilesJar
+			add argument java & SortSamJar
 		2011-9-9
 			two steps:
 				1. aln doesn't use pipe, outputs to sai files.
@@ -502,8 +492,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					refIndexJob=None, parentJobLs=None,\
 					alignment_method=None, outputDir=None, namespace='workflow', version='1.0',\
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
-					java=None, SortSamFilesJava=None, SortSamFilesJar=None,\
-					addOrReplaceReadGroupsJava=None, addOrReplaceReadGroupsJar=None,\
+					java=None, SortSamFilesJava=None, SortSamJar=None,\
+					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 					no_of_aln_threads=3, maxMissingAlignmentFraction=0.04, maxNoOfGaps=1, \
 					transferOutput=False, **keywords):
 		"""
@@ -525,7 +515,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		2012.2.23
 			split out of addAlignmentJob()
 		2011-9-13
-			add argument java & SortSamFilesJar
+			add argument java & SortSamJar
 		2011-9-9
 			two steps:
 				1. aln doesn't use pipe, outputs to sai files.
@@ -669,8 +659,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					samtools=None, refIndexJob=None, parentJobLs=None, \
 					alignment_method=None, outputDir=None, namespace='workflow', version='1.0',\
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
-					java=None, SortSamFilesJava=None, SortSamFilesJar=None,\
-					addOrReplaceReadGroupsJava=None, addOrReplaceReadGroupsJar=None,\
+					java=None, SortSamFilesJava=None, SortSamJar=None,\
+					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 					no_of_aln_threads=3, stampy=None, \
 					maxMissingAlignmentFraction=0.04, maxNoOfGaps=1, addBamIndexJob=False,\
 					transferOutput=False, **keywords):
@@ -696,7 +686,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		2012.2.23
 			split the BWA alignment part to addBWAAlignmentJob()
 		2011-9-13
-			add argument java & SortSamFilesJar
+			add argument java & SortSamJar
 		2011-9-9
 			two steps:
 				1. aln doesn't use pipe, outputs to sai files.
@@ -719,8 +709,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						outputDir=outputDir, namespace=namespace, version=version,\
 						PEAlignmentByBWA=PEAlignmentByBWA, ShortSEAlignmentByBWA=ShortSEAlignmentByBWA, \
 						LongSEAlignmentByBWA=LongSEAlignmentByBWA,\
-						java=java, SortSamFilesJava=SortSamFilesJava, SortSamFilesJar=SortSamFilesJar,\
-						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, addOrReplaceReadGroupsJar=addOrReplaceReadGroupsJar,\
+						java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
+						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
 						no_of_aln_threads=no_of_aln_threads, stampy=stampy,\
 						transferOutput=transferOutput)
 		elif alignment_method.short_name.find('bwa')==0:
@@ -732,8 +722,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						outputDir=outputDir, namespace=namespace, version=version,\
 						PEAlignmentByBWA=PEAlignmentByBWA, ShortSEAlignmentByBWA=ShortSEAlignmentByBWA, \
 						LongSEAlignmentByBWA=LongSEAlignmentByBWA,\
-						java=java, SortSamFilesJava=SortSamFilesJava, SortSamFilesJar=SortSamFilesJar,\
-						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, addOrReplaceReadGroupsJar=addOrReplaceReadGroupsJar,\
+						java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
+						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
 						no_of_aln_threads=no_of_aln_threads, transferOutput=transferOutput)
 		else:
 			sys.stderr.write("Alignment method %s is not supported.\n"%(alignment_method.short_name))
@@ -757,7 +747,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 								inputBamFile=sam_convert_job.output, \
 								outputBamFile=outputRGBAM,\
 								addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, \
-								addOrReplaceReadGroupsJar=addOrReplaceReadGroupsJar,\
+								AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
 								parentJobLs=[sam_convert_job], extraDependentInputLs=None, \
 								extraArguments=None, job_max_memory = 2500, transferOutput=transferOutput)
 			sortAlnParentJob = addRGJob
@@ -772,7 +762,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		sortBamF = File('%s.bam'%(bam_output_fname_prefix))
 		sortAlignmentJob = self.addSortAlignmentJob(workflow=workflow, inputBamFile=sortAlnParentJob.output, \
 					outputBamFile=sortBamF,\
-					SortSamFilesJava=SortSamFilesJava, SortSamFilesJar=SortSamFilesJar,\
+					SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
 					parentJobLs=[sortAlnParentJob], extraDependentInputLs=None, \
 					extraArguments=None, job_max_memory = 2500, transferOutput=transferOutput)
 		if addBamIndexJob:
@@ -788,7 +778,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def addReadGroupInsertionJob(self, workflow=None, individual_alignment=None, inputBamFile=None, \
 								outputBamFile=None,\
-								addOrReplaceReadGroupsJava=None, addOrReplaceReadGroupsJar=None,\
+								addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 								parentJobLs=None, extraDependentInputLs=None, \
 								extraArguments=None, job_max_memory = 2500, transferOutput=False, **keywords):
 		"""
@@ -809,7 +799,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			platform_id = 'ILLUMINA'
 		# the add-read-group job
 		
-		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', addOrReplaceReadGroupsJar,\
+		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', AddOrReplaceReadGroupsJar,\
 							"INPUT=", inputBamFile,\
 							'RGID=%s'%(read_group), 'RGLB=%s'%(platform_id), 'RGPL=%s'%(platform_id), \
 							'RGPU=%s'%(read_group), 'RGSM=%s'%(read_group),\
@@ -833,7 +823,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def addSortAlignmentJob(self, workflow=None, inputBamFile=None, \
 					outputBamFile=None,\
-					SortSamFilesJava=None, SortSamFilesJar=None,\
+					SortSamFilesJava=None, SortSamJar=None,\
 					parentJobLs=None, extraDependentInputLs=None, \
 					extraArguments=None, job_max_memory = 2500, transferOutput=False, **keywords):
 		"""
@@ -843,7 +833,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		job_max_memory = memRequirementData.memRequirement
 		javaMemRequirement = memRequirementData.memRequirementInStr
 		
-		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', SortSamFilesJar,\
+		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', SortSamJar,\
 							"SORT_ORDER=coordinate", "I=", inputBamFile, \
 							"O=", outputBamFile, "VALIDATION_STRINGENCY=LENIENT"]
 					#not including 'SORT_ORDER=coordinate'
@@ -864,7 +854,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		return job
 	
 	def addAlignmentMergeBySAMtoolsJob(self, workflow, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
-					java=None, mergeSamFilesJava=None, mergeSamFilesJar=None, \
+					java=None, MergeSamFilesJava=None, \
 					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					mv=None, transferOutput=False, job_max_memory=2500, **keywords):
 		"""

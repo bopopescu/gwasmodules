@@ -179,9 +179,9 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		return PassingData(chrIDSet=chrIDSet, chr2VCFFile=None)
 	
 	def addAllJobs(self, workflow=None, alignmentDataLs=None, chr2IntervalDataLs=None, samtools=None, \
-				genomeAnalysisTKJar=None, \
-				mergeSamFilesJar=None, \
-				createSequenceDictionaryJava=None, createSequenceDictionaryJar=None, \
+				GenomeAnalysisTKJar=None, \
+				MergeSamFilesJar=None, \
+				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
 				BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None,\
 				mv=None, \
 				refFastaFList=None, \
@@ -205,7 +205,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		plotOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=plotOutputDir)
 		
 		if needFastaDictJob:	# the .dict file is required for GATK
-			fastaDictJob = self.addRefFastaDictJob(workflow, createSequenceDictionaryJava=createSequenceDictionaryJava, \
+			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
 												refFastaF=refFastaF)
 			refFastaDictF = fastaDictJob.refFastaDictF
 		else:
@@ -424,9 +424,9 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		self.addAllJobs(workflow=workflow, alignmentDataLs=alignmentDataLs, \
 				chr2IntervalDataLs=chr2IntervalDataLs, samtools=workflow.samtools, \
-				genomeAnalysisTKJar=workflow.genomeAnalysisTKJar, \
-				mergeSamFilesJar=workflow.mergeSamFilesJar, \
-				createSequenceDictionaryJava=workflow.createSequenceDictionaryJava, createSequenceDictionaryJar=workflow.createSequenceDictionaryJar, \
+				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
+				MergeSamFilesJar=workflow.MergeSamFilesJar, \
+				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexFilesJar=workflow.BuildBamIndexFilesJar,\
 				mv=workflow.mv, \
 				refFastaFList=refFastaFList,\

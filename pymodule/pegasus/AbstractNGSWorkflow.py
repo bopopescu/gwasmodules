@@ -25,8 +25,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
 						('maxContigID', 0, int): [None, 'x', 1, 'if contig/chromosome(non-sex) ID > this number, it will not be included. If None or 0, no restriction.', ],\
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
-						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank number (rank 1=biggest) controls how small a contig to be included in calling'],\
-						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank number (rank 1=biggest contig) controls how big a contig to be included in calling'],\
+						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
+						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
+						("chromosome_type", 0, int): [0, '', 1, 'what types of chromosomes to be included. 0: all; 1: autosomes; 2: X; 3: Y; 4: mitochrondrial'],\
 						
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments from contaminated individuals, \n\
@@ -72,55 +73,17 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		AbstractWorkflow.registerJars(self)
 		
-		site_handler = self.site_handler
 		#add the MergeSamFiles.jar file into workflow
-		abs_path = os.path.join(self.picard_path, 'MergeSamFiles.jar')
-		mergeSamFilesJar = File(abs_path)	#using abs_path avoids add this jar to every job as Link.INPUT
-		mergeSamFilesJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(mergeSamFilesJar)
-		self.mergeSamFilesJar = mergeSamFilesJar
+		self.registerOneJar(name="MergeSamFilesJar", path=os.path.join(self.picard_path, 'MergeSamFiles.jar'))
+		self.registerOneJar(name="BuildBamIndexJar", path=os.path.join(self.picard_path, 'BuildBamIndex.jar'))
 		
-		abs_path = os.path.join(self.picard_path, 'BuildBamIndex.jar')
-		BuildBamIndexFilesJar = File(abs_path)
-		BuildBamIndexFilesJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(BuildBamIndexFilesJar)
-		self.BuildBamIndexFilesJar = BuildBamIndexFilesJar
+		self.registerOneJar(name="CreateSequenceDictionaryJar", path=os.path.join(self.picard_path, 'CreateSequenceDictionary.jar'))
+		self.registerOneJar(name="AddOrReplaceReadGroupsAndCleanSQHeaderJar", path=os.path.join(self.picard_path, 'AddOrReplaceReadGroupsAndCleanSQHeader.jar'))
+		self.registerOneJar(name="AddOrReplaceReadGroupsJar", path=os.path.join(self.picard_path, 'AddOrReplaceReadGroups.jar'))
+		self.registerOneJar(name="MarkDuplicatesJar", path=os.path.join(self.picard_path, 'MarkDuplicates.jar'))
+		self.registerOneJar(name="SplitReadFileJar", path=os.path.join(self.picard_path, 'SplitReadFile.jar'))
 		
-		abs_path = os.path.join(self.gatk_path, 'GenomeAnalysisTK.jar')
-		genomeAnalysisTKJar = File(abs_path)
-		genomeAnalysisTKJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(genomeAnalysisTKJar)
-		self.genomeAnalysisTKJar = genomeAnalysisTKJar
-		
-		abs_path = os.path.join(self.picard_path, 'CreateSequenceDictionary.jar')
-		createSequenceDictionaryJar = File(abs_path)
-		createSequenceDictionaryJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(createSequenceDictionaryJar)
-		self.createSequenceDictionaryJar = createSequenceDictionaryJar
-		
-		abs_path = os.path.join(self.picard_path, 'AddOrReplaceReadGroupsAndCleanSQHeader.jar')
-		addOrReplaceReadGroupsAndCleanSQHeaderJar = File(abs_path)
-		addOrReplaceReadGroupsAndCleanSQHeaderJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(addOrReplaceReadGroupsAndCleanSQHeaderJar)
-		self.addOrReplaceReadGroupsAndCleanSQHeaderJar = addOrReplaceReadGroupsAndCleanSQHeaderJar
-		
-		abs_path = os.path.join(self.picard_path, 'AddOrReplaceReadGroups.jar')
-		addOrReplaceReadGroupsJar = File(abs_path)
-		addOrReplaceReadGroupsJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(addOrReplaceReadGroupsJar)
-		self.addOrReplaceReadGroupsJar=addOrReplaceReadGroupsJar
-		
-		abs_path = os.path.join(self.picard_path, 'MarkDuplicates.jar')
-		MarkDuplicatesJar = File(abs_path)
-		MarkDuplicatesJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(MarkDuplicatesJar)
-		self.MarkDuplicatesJar = MarkDuplicatesJar
-		
-		abs_path = os.path.join(self.picard_path, 'SplitReadFile.jar')
-		SplitReadFileJar = File(abs_path)
-		SplitReadFileJar.addPFN(PFN("file://" + abs_path, site_handler))
-		self.addFile(SplitReadFileJar)
-		self.SplitReadFileJar = SplitReadFileJar
+		self.registerOneJar(name="GenomeAnalysisTKJar", path=os.path.join(self.gatk_path, 'GenomeAnalysisTK.jar'))
 	
 	def registerCustomJars(self, workflow=None, ):
 		"""
@@ -194,10 +157,10 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		IndexMergedBamIndexJava.addPFN(PFN("file://" + self.javaPath, site_handler))
 		executableClusterSizeMultiplierList.append((IndexMergedBamIndexJava, 0))
 		
-		createSequenceDictionaryJava = Executable(namespace=namespace, name="createSequenceDictionaryJava", version=version, os=operatingSystem,\
+		CreateSequenceDictionaryJava = Executable(namespace=namespace, name="CreateSequenceDictionaryJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
-		createSequenceDictionaryJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((createSequenceDictionaryJava, 0))
+		CreateSequenceDictionaryJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((CreateSequenceDictionaryJava, 0))
 		
 		DOCWalkerJava = Executable(namespace=namespace, name="DOCWalkerJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
@@ -340,10 +303,10 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		executableClusterSizeMultiplierList.append((AddAlignmentFile2DB, 0))
 		
 		
-		mergeSamFilesJava = Executable(namespace=namespace, name="mergeSamFilesJava", version=version, os=operatingSystem,\
+		MergeSamFilesJava = Executable(namespace=namespace, name="MergeSamFilesJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
-		mergeSamFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((mergeSamFilesJava, 0))
+		MergeSamFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
+		executableClusterSizeMultiplierList.append((MergeSamFilesJava, 0))
 		
 		SortSamFilesJava = Executable(namespace=namespace, name="SortSamFilesJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
@@ -436,19 +399,20 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		self.no_of_jobs += 1
 		return fastaIndexJob
 	
-	def addRefFastaDictJob(self, workflow=None, createSequenceDictionaryJava=None, createSequenceDictionaryJar=None, refFastaF=None):
+	def addRefFastaDictJob(self, workflow=None, CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, refFastaF=None):
 		"""
-		2012.9.14 bugfix. add argument createSequenceDictionaryJar
+		2012.9.14 bugfix. add argument CreateSequenceDictionaryJar
 		2011-11-25
 			# the .dict file is required for GATK
 		"""
 		refFastaDictFname = '%s.dict'%(os.path.splitext(refFastaF.name)[0])
 		refFastaDictF = File(refFastaDictFname)
 		#not os.path.isfile(refFastaDictFname) or 
-		fastaDictJob = Job(namespace=self.namespace, name=createSequenceDictionaryJava.name, version=self.version)
-		fastaDictJob.addArguments('-jar', createSequenceDictionaryJar, \
+		fastaDictJob = Job(namespace=self.namespace, name=CreateSequenceDictionaryJava.name, version=self.version)
+		fastaDictJob.addArguments('-jar', CreateSequenceDictionaryJar, \
 				'REFERENCE=', refFastaF, 'OUTPUT=', refFastaDictF)
-		fastaDictJob.uses(refFastaF,  transfer=True, register=True, link=Link.INPUT)
+		#fastaDictJob.uses(CreateSequenceDictionaryJar, transfer=True, register=True, link=Link.INPUT)
+		fastaDictJob.uses(refFastaF, transfer=True, register=True, link=Link.INPUT)
 		fastaDictJob.uses(refFastaDictF, transfer=True, register=True, link=Link.OUTPUT)
 		yh_pegasus.setJobProperRequirement(fastaDictJob, job_max_memory=1000)
 		fastaDictJob.refFastaDictF = refFastaDictF
@@ -456,7 +420,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		self.no_of_jobs += 1
 		return fastaDictJob
 	
-	def addRefFastaJobDependency(self, workflow=None, job=None, refFastaF=None, fastaDictJob=None, refFastaDictF=None, fastaIndexJob = None, refFastaIndexF = None):
+	def addRefFastaJobDependency(self, workflow=None, job=None, refFastaF=None, fastaDictJob=None, refFastaDictF=None, \
+								fastaIndexJob = None, refFastaIndexF = None):
 		"""
 		2011-9-14
 		"""
@@ -583,7 +548,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		2012.5.8
 			executable is GenotypeCallByCoverage
 		"""
-		
+		if workflow is None:
+			workflow = self
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
 		#2012.5.8 "-n 10" means numberOfReadGroups is 10 but it's irrelevant when "-y 3" (run_type =3, read from vcf without filter)
@@ -668,7 +634,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			vcf1Name = defaultName
 		return vcf1Name
 	
-	def addSelectVariantsJob(self, workflow=None, SelectVariantsJava=None, genomeAnalysisTKJar=None, inputF=None, outputF=None, \
+	def addSelectVariantsJob(self, workflow=None, SelectVariantsJava=None, GenomeAnalysisTKJar=None, inputF=None, outputF=None, \
 					refFastaFList=[], sampleIDKeepFile=None, snpIDKeepFile=None, sampleIDExcludeFile=None, \
 					parentJobLs=None, \
 					extraDependentInputLs=None, transferOutput=True, extraArguments=None, job_max_memory=2000, interval=None,\
@@ -716,7 +682,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		javaMemRequirement = memRequirementObject.memRequirementInStr
 		
 		refFastaF = refFastaFList[0]
-		extraArgumentList = [javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T SelectVariants", "-R", refFastaF, \
+		extraArgumentList = [javaMemRequirement, '-jar', GenomeAnalysisTKJar, "-T SelectVariants", "-R", refFastaF, \
 						"--variant", inputF, "-o ", outputF]
 		if interval:
 			extraArgumentList.append("-L %s"%(interval))
@@ -841,7 +807,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		#	job.overlapSitePosF = overlapSitePosF
 		return job
 	
-	def addFilterVCFByDepthJob(self, workflow=None, FilterVCFByDepthJava=None, genomeAnalysisTKJar=None, \
+	def addFilterVCFByDepthJob(self, workflow=None, FilterVCFByDepthJava=None, GenomeAnalysisTKJar=None, \
 							refFastaFList=None, inputVCFF=None, outputVCFF=None, outputSiteStatF=None, \
 							parentJobLs=[], alnStatForFilterF=None, \
 							job_max_memory=1000, extraDependentInputLs=[], onlyKeepBiAllelicSNP=False, \
@@ -855,7 +821,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		filterByDepthJob = Job(namespace=getattr(self, 'namespace', namespace), name=FilterVCFByDepthJava.name, \
 							version=getattr(self, 'version', version))
 		refFastaF = refFastaFList[0]
-		filterByDepthJob.addArguments("-Xmx%sm"%(job_max_memory), "-jar", genomeAnalysisTKJar, "-R", refFastaF, "-T FilterVCFByDepth", \
+		filterByDepthJob.addArguments("-Xmx%sm"%(job_max_memory), "-jar", GenomeAnalysisTKJar, "-R", refFastaF, "-T FilterVCFByDepth", \
 							"--variant", inputVCFF, "-depthFname", alnStatForFilterF)
 		if outputVCFF:
 			filterByDepthJob.addArguments("-o", outputVCFF)
@@ -1643,7 +1609,7 @@ Contig966       3160    50
 		return job
 	
 	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
-					java=None, mergeSamFilesJava=None, mergeSamFilesJar=None, \
+					java=None, MergeSamFilesJava=None, MergeSamFilesJar=None, \
 					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
 					mv=None, parentJobLs=None, namespace='workflow', version='1.0', transferOutput=False,\
 					**keywords):
@@ -1670,8 +1636,8 @@ Contig966       3160    50
 		version = getattr(workflow, 'version', version)
 		
 		if len(AlignmentJobAndOutputLs)>1:
-			merge_sam_job = Job(namespace=namespace, name=mergeSamFilesJava.name, version=version)
-			merge_sam_job.addArguments(javaMemRequirement, "-jar", mergeSamFilesJar, 'SORT_ORDER=coordinate', \
+			merge_sam_job = Job(namespace=namespace, name=MergeSamFilesJava.name, version=version)
+			merge_sam_job.addArguments(javaMemRequirement, "-jar", MergeSamFilesJar, 'SORT_ORDER=coordinate', \
 						'ASSUME_SORTED=true', 'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT")
 			# 'USE_THREADING=true', threading might be causing process hanging forever (sleep).
 			merge_sam_job.uses(outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
@@ -1706,7 +1672,7 @@ Contig966       3160    50
 		return merge_sam_job, bamIndexJob
 	
 	
-	def addMergeVCFReplicateGenotypeColumnsJob(self, workflow=None, executable=None, genomeAnalysisTKJar=None, \
+	def addMergeVCFReplicateGenotypeColumnsJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, \
 						inputF=None, outputF=None, replicateIndividualTag=None, \
 						debugHaplotypeDistanceFile=None, \
 						debugMajoritySupportFile=None,\
@@ -1736,7 +1702,7 @@ Contig966       3160    50
 		job_max_memory = memRequirementObject.memRequirement
 		javaMemRequirement = memRequirementObject.memRequirementInStr
 		refFastaF = refFastaFList[0]
-		extraArgumentList = [javaMemRequirement, '-jar', genomeAnalysisTKJar, "-T", analysis_type,\
+		extraArgumentList = [javaMemRequirement, '-jar', GenomeAnalysisTKJar, "-T", analysis_type,\
 			"-R", refFastaF, "--variant:VCF", inputF, "--out", outputF,\
 			'--onlyKeepBiAllelicSNP', "--replicateIndividualTag %s"%(replicateIndividualTag)]
 		if debugHaplotypeDistanceFile:

@@ -300,9 +300,9 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 				outputDir=mapDirJob.output,\
 				PEAlignmentByBWA=workflow.PEAlignmentByBWA, ShortSEAlignmentByBWA=workflow.ShortSEAlignmentByBWA, \
 				LongSEAlignmentByBWA=workflow.LongSEAlignmentByBWA,\
-				java=workflow.java, SortSamFilesJava=workflow.SortSamFilesJava, SortSamFilesJar=workflow.SortSamFilesJar,\
+				java=workflow.java, SortSamFilesJava=workflow.SortSamFilesJava, SortSamJar=workflow.SortSamJar,\
 				addOrReplaceReadGroupsJava=workflow.addOrReplaceReadGroupsJava, \
-				addOrReplaceReadGroupsJar=workflow.addOrReplaceReadGroupsJar,\
+				AddOrReplaceReadGroupsJar=workflow.AddOrReplaceReadGroupsJar,\
 				no_of_aln_threads=self.no_of_aln_threads,\
 				stampy=workflow.stampy, \
 				maxMissingAlignmentFraction=self.maxMissingAlignmentFraction, maxNoOfGaps=self.maxNoOfGaps, \

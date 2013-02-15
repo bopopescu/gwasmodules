@@ -181,9 +181,9 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		#adding inputVCFData=... is the key difference from the parent class
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, alignmentDataLs=alignmentDataLs, \
 					chr2IntervalDataLs=chr2IntervalDataLs, samtools=workflow.samtools, \
-				genomeAnalysisTKJar=workflow.genomeAnalysisTKJar, \
-				mergeSamFilesJar=workflow.mergeSamFilesJar, \
-				createSequenceDictionaryJava=workflow.createSequenceDictionaryJava, createSequenceDictionaryJar=workflow.createSequenceDictionaryJar, \
+				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
+				MergeSamFilesJar=workflow.MergeSamFilesJar, \
+				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexFilesJar=workflow.BuildBamIndexFilesJar,\
 				mv=workflow.mv, \
 				refFastaFList=refFastaFList,\
