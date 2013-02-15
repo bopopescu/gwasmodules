@@ -338,7 +338,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					inputBamF=None,\
 					extraArguments=None, parentJobLs=None, extraDependentInputLs=None, \
-					transferOutput=True, javaMaxMemory=2500,\
+					transferOutput=True, job_max_memory=None, javaMaxMemory=2500,\
 					**keywords):
 		"""
 		2012.10.18 use addGenericJob() instead
@@ -351,7 +351,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			proper transfer/register setup
 		2011-11-20
 		"""
-		memRequirementData = self.getJVMMemRequirment(job_max_memory=javaMaxMemory, minMemory=2000)
+		if javaMaxMemory is not None and job_max_memory is None:
+			job_max_memory = javaMaxMemory
+		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
 		job_max_memory = memRequirementData.memRequirement
 		javaMemRequirement = memRequirementData.memRequirementInStr
 		baiFile = File('%s.bai'%inputBamF.name)		
@@ -1676,7 +1678,7 @@ Contig966       3160    50
 		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexJar=BuildBamIndexJar, \
 					inputBamF=outputBamFile,\
 					parentJobLs=[merge_sam_job], namespace=namespace, version=version,\
-					transferOutput=transferOutput, javaMaxMemory=3000)
+					transferOutput=transferOutput, job_max_memory=3000)
 		return merge_sam_job, bamIndexJob
 	
 	
