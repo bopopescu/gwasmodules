@@ -30,12 +30,11 @@ class SplitFastaFile(AbstractMapper):
 							('suffixLength', 1, int): [3, 'a', 1, 'length of suffix that is used to distinguish all split files. i.e. 001,002,003', ],\
 							('filenameSuffix', 0, ): ['', 'f', 1, 'the suffix attached to the final split filename. i.e. .fasta, .txt', ],\
 							})
-	def __init__(self, inputFnameLs, **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2012.5.23
 		"""
-		AbstractMapper.__init__(self, **keywords)
-		self.inputFnameLs = inputFnameLs
+		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
 	
 	def splitFastaFile(self, inputFname=None, outputFnamePrefix=None, noOfSequences=1000, suffixLength=3, filenameSuffix=""):
