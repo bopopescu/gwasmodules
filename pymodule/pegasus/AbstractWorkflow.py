@@ -664,9 +664,10 @@ class AbstractWorkflow(ADAG):
 		for inputFile in inputFileList:
 			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 	
-	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName="", useAbsolutePathAsFileName=False):
+	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName="", useAbsolutePathAsPegasusFileName=False,\
+							pegasusFileName=None):
 		"""
-		2013.2.14 added argument useAbsolutePathAsFileName
+		2013.2.14 added argument useAbsolutePathAsPegasusFileName
 			This would render the file to be referred as the absolute path on the running computer.
 			And pegasus will not seek to symlink or copy/transfer the file.
 			set it to True only when you dont want to add the file to the job as INPUT dependency (as it's accessed through abs path).
@@ -681,10 +682,11 @@ class AbstractWorkflow(ADAG):
 			workflow = self
 		if input_site_handler is None:
 			input_site_handler = self.input_site_handler
-		if useAbsolutePathAsFileName:
-			pegasusFileName = os.path.abspath(inputFname)	#this will stop symlinking/transferring , and also no need to indicate them as file dependency for jobs.
-		else:
-			pegasusFileName = os.path.join(folderName, os.path.basename(inputFname))
+		if not pegasusFileName:
+			if useAbsolutePathAsPegasusFileName:
+				pegasusFileName = os.path.abspath(inputFname)	#this will stop symlinking/transferring , and also no need to indicate them as file dependency for jobs.
+			else:
+				pegasusFileName = os.path.join(folderName, os.path.basename(inputFname))
 		pegasusFile = File(pegasusFileName)
 		pegasusFile.abspath = os.path.abspath(inputFname)
 		pegasusFile.absPath = pegasusFile.abspath
@@ -693,10 +695,10 @@ class AbstractWorkflow(ADAG):
 			workflow.addFile(pegasusFile)
 		return pegasusFile
 	
-	def registerOneJar(self, name=None, path=None, site_handler=None, workflow=None, folderName="", useAbsolutePathAsFileName=True):
+	def registerOneJar(self, name=None, path=None, site_handler=None, workflow=None, folderName="", useAbsolutePathAsPegasusFileName=False):
 		"""
 		2013.2.14
-			
+			useAbsolutePathAsPegasusFileName=True if you do not plan to add a jar file as INPUT dependency for jobs
 		"""
 		if workflow is None:
 			workflow = self
@@ -705,7 +707,7 @@ class AbstractWorkflow(ADAG):
 		if not folderName:
 			folderName = "jar"
 		pegasusFile = self.registerOneInputFile(workflow=workflow, inputFname=path, input_site_handler=site_handler, \
-											folderName=folderName, useAbsolutePathAsFileName=useAbsolutePathAsFileName)
+											folderName=folderName, useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
 		setattr(workflow, name, pegasusFile)
 	
 	def registerBlastNucleotideDatabaseFile(self, ntDatabaseFname=None, input_site_handler=None, folderName=""):

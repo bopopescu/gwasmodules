@@ -565,7 +565,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	def addAllJobs(self, workflow=None, inputVCFData=None, chr2IntervalDataLs=None, \
 				GenomeAnalysisTKJar=None, samtools=None, \
 				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
-				BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None,\
+				BuildBamIndexFilesJava=None, BuildBamIndexJar=None,\
 				mv=None, \
 				refFastaFList=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
@@ -800,7 +800,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					chr2IntervalDataLs=None, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
-				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexFilesJar=workflow.BuildBamIndexFilesJar,\
+				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
 				refFastaFList=self.refFastaFList,\
 				needFastaIndexJob=getattr(self, 'needFastaIndexJob',False), needFastaDictJob=getattr(self, 'needFastaDictJob', False), \

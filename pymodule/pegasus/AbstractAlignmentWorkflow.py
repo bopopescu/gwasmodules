@@ -182,7 +182,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				GenomeAnalysisTKJar=None, \
 				MergeSamFilesJar=None, \
 				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
-				BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None,\
+				BuildBamIndexFilesJava=None, BuildBamIndexJar=None,\
 				mv=None, \
 				refFastaFList=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
@@ -427,7 +427,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
 				MergeSamFilesJar=workflow.MergeSamFilesJar, \
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
-				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexFilesJar=workflow.BuildBamIndexFilesJar,\
+				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
 				refFastaFList=refFastaFList,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \

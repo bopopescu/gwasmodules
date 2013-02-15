@@ -768,7 +768,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		if addBamIndexJob:
 			# add the index job on the merged bam file
 			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
-						BuildBamIndexFilesJar=self.BuildBamIndexFilesJar, \
+						BuildBamIndexJar=self.BuildBamIndexJar, \
 						inputBamF=sortAlignmentJob.output, parentJobLs=[sortAlignmentJob], \
 						transferOutput=transferOutput, javaMaxMemory=2000)
 			returnJob = bamIndexJob	#bamIndexJob.parentJobLs[0] is sortAlignmentJob.
@@ -805,7 +805,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							'RGPU=%s'%(read_group), 'RGSM=%s'%(read_group),\
 							'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT"]
 					#not including 'SORT_ORDER=coordinate'
-					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexFilesJar won't fail.)
+					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		if extraDependentInputLs is None:
@@ -837,7 +837,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							"SORT_ORDER=coordinate", "I=", inputBamFile, \
 							"O=", outputBamFile, "VALIDATION_STRINGENCY=LENIENT"]
 					#not including 'SORT_ORDER=coordinate'
-					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexFilesJar won't fail.)
+					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		if extraDependentInputLs is None:
@@ -855,7 +855,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def addAlignmentMergeBySAMtoolsJob(self, workflow, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
 					java=None, MergeSamFilesJava=None, \
-					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					mv=None, transferOutput=False, job_max_memory=2500, **keywords):
 		"""
 		2012-3.22
@@ -885,14 +885,14 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		
 		# add the index job on the merged bam file
 		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, \
-						BuildBamIndexFilesJar=BuildBamIndexFilesJar, \
+						BuildBamIndexJar=BuildBamIndexJar, \
 						inputBamF=outputBamFile, parentJobLs=[merge_sam_job], \
 						transferOutput=transferOutput, javaMaxMemory=javaMaxMemory)
 		return merge_sam_job, bamIndexJob
 	
 	def addMarkDupJob(self, workflow, parentJobLs=[], inputBamF=None, inputBaiF=None, outputBamFile=None,\
 					MarkDuplicatesJava=None, MarkDuplicatesJar=None, tmpDir="/Network/Data/vervet/vervetPipeline/tmp/",\
-					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					namespace='workflow', version='1.0', transferOutput=True, no_of_cpus=1):
 		"""
 		2012.3.21
@@ -915,6 +915,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			"VALIDATION_STRINGENCY=LENIENT", "ASSUME_SORTED=true", "INPUT=", inputBamF, \
 			'OUTPUT=', MarkDupOutputF, "M=", MarkDupOutputMetricF, "MAX_RECORDS_IN_RAM=500000",\
 			"TMP_DIR=%s"%tmpDir)
+		self.addJobUse(MarkDupJob, file=MarkDuplicatesJar, transfer=True, register=True, link=Link.INPUT)
 		MarkDupJob.uses(inputBaiF, transfer=True, register=True, link=Link.INPUT)
 		MarkDupJob.uses(inputBamF, transfer=True, register=True, link=Link.INPUT)
 		MarkDupJob.output = MarkDupOutputF
@@ -931,7 +932,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		
 		# add the index job on the bam file
 		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, \
-								BuildBamIndexFilesJar=BuildBamIndexFilesJar, \
+								BuildBamIndexJar=BuildBamIndexJar, \
 								inputBamF=MarkDupOutputF,\
 								parentJobLs=[MarkDupJob], namespace=namespace, version=version,\
 								transferOutput=transferOutput)
@@ -940,7 +941,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	def addSAMtoolsCalmdJob(self, workflow, samtoolsCalmd=None, inputBamF=None, \
 					refFastaFList=None, outputBamF=None, \
 					parentJob=None, \
-					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					namespace='workflow', version='1.0', transferOutput=True,\
 					**keywords):
 		"""
@@ -962,7 +963,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			workflow.depends(parent=parentJob, child=job)
 			
 		# add the index job on the bam
-		return self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexFilesJar=BuildBamIndexFilesJar, \
+		return self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexJar=BuildBamIndexJar, \
 					inputBamF=outputBamF,\
 					parentJobLs=[job], namespace=namespace, version=version,\
 					transferOutput=transferOutput)

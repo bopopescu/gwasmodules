@@ -22,6 +22,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						("samtools_path", 1, ): ["%s/bin/samtools", '', 1, 'samtools binary'],\
 						("picard_path", 1, ): ["%s/script/picard/dist", '', 1, 'picard folder containing its jar binaries'],\
 						("gatk_path", 1, ): ["%s/script/gatk/dist", '', 1, 'GATK folder containing its jar binaries'],\
+						("gatk2_path", 1, ): ["%s/script/gatk2/", '', 1, 'GATK version 2 or afterwards, no more source code, just binary jar files.'],\
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
 						('maxContigID', 0, int): [None, 'x', 1, 'if contig/chromosome(non-sex) ID > this number, it will not be included. If None or 0, no restriction.', ],\
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
@@ -84,6 +85,10 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		self.registerOneJar(name="SplitReadFileJar", path=os.path.join(self.picard_path, 'SplitReadFile.jar'))
 		
 		self.registerOneJar(name="GenomeAnalysisTKJar", path=os.path.join(self.gatk_path, 'GenomeAnalysisTK.jar'))
+		
+		#have to be a different folder, otherwise name clash with the old gatk jar file
+		self.registerOneJar(name="GenomeAnalysisTK2Jar", path=os.path.join(self.gatk2_path, 'GenomeAnalysisTK.jar'),\
+						folderName='gatk2')
 	
 	def registerCustomJars(self, workflow=None, ):
 		"""
@@ -330,7 +335,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 									affiliateFilenameSuffixLs=self.bwaIndexFileSuffixLs,\
 									folderName=folderName)
 	
-	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+	def addBAMIndexJob(self, workflow=None, BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					inputBamF=None,\
 					extraArguments=None, parentJobLs=None, extraDependentInputLs=None, \
 					transferOutput=True, javaMaxMemory=2500,\
@@ -350,16 +355,16 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		job_max_memory = memRequirementData.memRequirement
 		javaMemRequirement = memRequirementData.memRequirementInStr
 		baiFile = File('%s.bai'%inputBamF.name)		
-		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', BuildBamIndexFilesJar,\
+		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', BuildBamIndexJar,\
 							"VALIDATION_STRINGENCY=LENIENT", \
 							"INPUT=", inputBamF, "OUTPUT=", baiFile]
 					#not including 'SORT_ORDER=coordinate'
-					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexFilesJar won't fail.)
+					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		if extraDependentInputLs is None:
 			extraDependentInputLs=[]
-		extraDependentInputLs.extend([inputBamF])
+		extraDependentInputLs.extend([inputBamF, BuildBamIndexJar])
 		
 		job= self.addGenericJob(executable=BuildBamIndexFilesJava, inputFile=None,\
 							outputFile=None, outputArgumentOption="-o", \
@@ -411,7 +416,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		fastaDictJob = Job(namespace=self.namespace, name=CreateSequenceDictionaryJava.name, version=self.version)
 		fastaDictJob.addArguments('-jar', CreateSequenceDictionaryJar, \
 				'REFERENCE=', refFastaF, 'OUTPUT=', refFastaDictF)
-		#fastaDictJob.uses(CreateSequenceDictionaryJar, transfer=True, register=True, link=Link.INPUT)
+		self.addJobUse(fastaDictJob, file=CreateSequenceDictionaryJar, transfer=True, register=True, link=Link.INPUT)
 		fastaDictJob.uses(refFastaF, transfer=True, register=True, link=Link.INPUT)
 		fastaDictJob.uses(refFastaDictF, transfer=True, register=True, link=Link.OUTPUT)
 		yh_pegasus.setJobProperRequirement(fastaDictJob, job_max_memory=1000)
@@ -689,6 +694,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
 		extraDependentInputLs.append(inputF)
+		extraDependentInputLs.append(GenomeAnalysisTKJar)	#2013.2.14
 		extraDependentInputLs = extraDependentInputLs + refFastaFList
 		if sampleIDKeepFile:
 			extraArgumentList.extend(['--sample_file', sampleIDKeepFile])
@@ -735,7 +741,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		if needBAMIndexJob:
 			# add the index job on the bam file
 			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
-						BuildBamIndexFilesJar=self.BuildBamIndexFilesJar, \
+						BuildBamIndexJar=self.BuildBamIndexJar, \
 						inputBamF=job.output, parentJobLs=[job], \
 						transferOutput=transferOutput, job_max_memory=job_max_memory)
 		else:
@@ -823,6 +829,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		refFastaF = refFastaFList[0]
 		filterByDepthJob.addArguments("-Xmx%sm"%(job_max_memory), "-jar", GenomeAnalysisTKJar, "-R", refFastaF, "-T FilterVCFByDepth", \
 							"--variant", inputVCFF, "-depthFname", alnStatForFilterF)
+		self.addJobUse(filterByDepthJob, file=GenomeAnalysisTKJar, transfer=True, register=True, link=Link.INPUT)
 		if outputVCFF:
 			filterByDepthJob.addArguments("-o", outputVCFF)
 			filterByDepthJob.uses(outputVCFF, transfer=transferOutput, register=True, link=Link.OUTPUT)
@@ -1610,7 +1617,7 @@ Contig966       3160    50
 	
 	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
 					java=None, MergeSamFilesJava=None, MergeSamFilesJar=None, \
-					BuildBamIndexFilesJava=None, BuildBamIndexFilesJar=None, \
+					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					mv=None, parentJobLs=None, namespace='workflow', version='1.0', transferOutput=False,\
 					**keywords):
 		"""
@@ -1640,7 +1647,8 @@ Contig966       3160    50
 			merge_sam_job.addArguments(javaMemRequirement, "-jar", MergeSamFilesJar, 'SORT_ORDER=coordinate', \
 						'ASSUME_SORTED=true', 'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT")
 			# 'USE_THREADING=true', threading might be causing process hanging forever (sleep).
-			merge_sam_job.uses(outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
+			self.addJobUse(merge_sam_job, file=MergeSamFilesJar, transfer=True, register=True, link=Link.INPUT)
+			self.addJobUse(merge_sam_job, file=outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 			yh_pegasus.setJobProperRequirement(merge_sam_job, job_max_memory=job_max_memory)
 			workflow.addJob(merge_sam_job)
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
@@ -1665,7 +1673,7 @@ Contig966       3160    50
 				workflow.depends(parent=parentJob, child=merge_sam_job)
 						
 		# add the index job on the merged bam file
-		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexFilesJar=BuildBamIndexFilesJar, \
+		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexJar=BuildBamIndexJar, \
 					inputBamF=outputBamFile,\
 					parentJobLs=[merge_sam_job], namespace=namespace, version=version,\
 					transferOutput=transferOutput, javaMaxMemory=3000)
@@ -1712,7 +1720,7 @@ Contig966       3160    50
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		if extraDependentInputLs is None:
-			_extraDependentInputLs=[inputF] + refFastaFList
+			_extraDependentInputLs=[inputF, GenomeAnalysisTKJar] + refFastaFList
 		else:
 			import copy
 			_extraDependentInputLs = copy.deepcopy(extraDependentInputLs)
