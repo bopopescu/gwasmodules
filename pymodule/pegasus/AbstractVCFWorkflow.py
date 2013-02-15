@@ -796,6 +796,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			sys.stderr.write("No VCF files in this folder , %s.\n"%self.inputDir)
 			sys.exit(0)
 		
+		self.refFastaFList = self.getReferenceSequence(workflow=self)	#2013.2.14
+		
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, \
 					chr2IntervalDataLs=None, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
