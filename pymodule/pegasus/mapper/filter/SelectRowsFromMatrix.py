@@ -25,11 +25,8 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import csv
-import numpy, random
 
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
-from pymodule import yh_matplotlib, GenomeDB
+from pymodule import ProcessOptions
 from pymodule.yhio.AbstractMatrixFileWalker import AbstractMatrixFileWalker
 
 
