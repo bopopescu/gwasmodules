@@ -77,6 +77,7 @@ class RawSequence(Entity):
 
 class AnnotAssembly(Entity):
 	"""
+	2013.2.12 added argument chromosome_type
 	2011-8-24
 		gi is no longer the primary key.
 		a new id is added as primary key.
@@ -96,7 +97,8 @@ class AnnotAssembly(Entity):
 	orientation = Field(String(1))
 	sequence = Field(String(10000))
 	raw_sequence_start_id = Field(Integer)
-	sequence_type = ManyToOne('%s.SequenceType'%__name__, colname='sequence_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	sequence_type = ManyToOne('%s.SequenceType'%__name__, colname='sequence_type_id', ondelete='SET NULL', onupdate='CASCADE')
+	chromosome_type = ManyToOne('%s.ChromosomeType'%__name__, colname='chromosome_type_id', ondelete='SET NULL', onupdate='CASCADE')
 	comment = Field(Text)
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
@@ -106,6 +108,18 @@ class AnnotAssembly(Entity):
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('tax_id','chromosome', 'start', 'stop', 'orientation', 'sequence_type_id'))
 
+class ChromosomeType(Entity):
+	"""
+	2013.2.12 table to stores things like autosome, X, Y, mitochondrial
+	"""
+	short_name = Field(String(223), unique=True)
+	comment = Field(Text)
+	created_by = Field(String(256))
+	updated_by = Field(String(256))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='chromosome_type')
+	using_table_options(mysql_engine='InnoDB')
 
 class EntrezgeneType(Entity):
 	"""
