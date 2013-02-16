@@ -451,6 +451,8 @@ def getColName2IndexFromHeader(header, skipEmptyColumn=False):
 
 def getListOutOfStr(list_in_str=None, data_type=int, separator1=',', separator2='-'):
 	"""
+	Examples:
+		self.chromosomeList = utils.getListOutOfStr(self.chromosomeList, data_type=str, separator2=None)
 	2012.10.25
 		if separator2 is None or nothing or 0, it wont' be used.
 	2009-10-28
