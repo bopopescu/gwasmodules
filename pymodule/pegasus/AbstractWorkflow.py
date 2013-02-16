@@ -356,7 +356,7 @@ class AbstractWorkflow(ADAG):
 		
 		SelectLineBlockFromFile = Executable(namespace=namespace, name="SelectLineBlockFromFile", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		SelectLineBlockFromFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/filter/SelectLineBlockFromFile.py"), \
+		SelectLineBlockFromFile.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/extractor/SelectLineBlockFromFile.py"), \
 										site_handler))
 		executableClusterSizeMultiplierList.append((SelectLineBlockFromFile, 1))
 		
@@ -381,7 +381,7 @@ class AbstractWorkflow(ADAG):
 		#2012.8.13 SelectRowsFromMatrix is a derivative of AbstractMatrixFileWalker, so use addAbstractMatrixFileWalkerJob()
 		SelectRowsFromMatrix = Executable(namespace=namespace, name="SelectRowsFromMatrix", \
 							version=version, os=operatingSystem, arch=architecture, installed=True)
-		SelectRowsFromMatrix.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/filter/SelectRowsFromMatrix.py"), site_handler))
+		SelectRowsFromMatrix.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/extractor/SelectRowsFromMatrix.py"), site_handler))
 		executableClusterSizeMultiplierList.append((SelectRowsFromMatrix, 1))
 		
 		#2012.8.15 ancestor of SelectRowsFromMatrix, 
