@@ -1311,8 +1311,12 @@ class GenomeDatabase(ElixirDB):
 								raw_sequence_table='%s.%s'%(schema, RawSequence.table.name))
 		return seq
 	
-	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9):
+	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
+								chromosome_type_id=0):
 		"""
+		2013.2.15 added argument chromosome_type_id
+		chromosome_type_id: what type of chromosomes to be included, same as table genome.chromosome_type.
+			0: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial
 		2011-11-7
 			copied from vervet/src/AlignmentToCallPipeline.py
 		2011-11-6
@@ -1328,7 +1332,11 @@ class GenomeDatabase(ElixirDB):
 						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
 		chr2size = {}
 		from sqlalchemy import desc
-		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).order_by(desc(AnnotAssembly.stop))
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id)
+		if chromosome_type_id:
+			query = query.filter_by(chromosome_type_id=chromosome_type_id)
+		#order by size from big to small
+		query = query.order_by(desc(AnnotAssembly.stop))
 		counter = 0
 		for row in query:
 			counter += 1
