@@ -22,8 +22,9 @@ dagman.retry=3
 
 #pegasus.dir.submit.logs=/var/pegasus_tmp/
 pegasus.condor.logs.symlink=false
-#2011.11.28 generation of *.arg files to store extra-long job arguments when its length is >=10M
-pegasus.gridstart.invoke.length=10000000
+# 2011.11.28 generation of *.arg files to store extra-long job arguments when its length is >=10M
+# 2013.2.16 during conversion from the dag .xml to *.sub (condor sub files). If a single argument's length is >2049, it'll be truncated to 2049. However if you force pegasus to generate *.arg files as supplement to *.sub files. The *.arg files won't have this problem.
+pegasus.gridstart.invoke.length=2000
 
 #2011.11.28 increase the nubmer of stagein and stageout jobs to 10 (default is 4)
 stageout.clusters=10
