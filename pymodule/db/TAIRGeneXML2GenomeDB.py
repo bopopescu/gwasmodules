@@ -23,7 +23,6 @@ Description:
 
 import sys, getopt, os
 sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
-from codense.common import db_connect
 import xml.etree.cElementTree as ElementTree
 from GenomeDB import GenomeDatabase, Gene, SequenceType, EntrezgeneType, \
 	GeneSegment, GeneCommentaryType, GeneCommentary, AnnotAssembly, Gene2go
@@ -44,6 +43,7 @@ def usernameOptionCallBack(option, opt_str, value, parser):
 
 def passwordOptionCallBack(option, opt_str, value, parser):
 	option_name = option.dest
+	import getpass
 	if not value:
 		value = getpass.getpass("%s: "%opt_str)
 	setattr(parser.values, option_name, value)
@@ -319,7 +319,7 @@ class TAIRGeneXML2GenomeDB:
 				chromosome=annot_assembly.chromosome,\
 				description = pub_comment, full_name_from_nomenclature_authority=com_name, type_of_gene=type_of_gene, \
 				modification_date=modification_date, strand=strand, start=start, stop=stop,)
-			gene.genomic_annot_assembly = annot_assembly
+			gene.annot_assembly = annot_assembly
 			gene.entrezgene_type = entrezgene_type
 			session.add(gene)
 		else:
@@ -356,7 +356,7 @@ class TAIRGeneXML2GenomeDB:
 		if not entrezgene_mapping:
 			entrezgene_mapping = EntrezgeneMapping(tax_id=annot_assembly.tax_id, chromosome=annot_assembly.chromosome,\
 											start=start, stop=stop, strand=strand,)
-			entrezgene_mapping.genomic_annot_assembly = annot_assembly
+			entrezgene_mapping.annot_assembly = annot_assembly
 			entrezgene_mapping.gene = gene
 			entrezgene_mapping.entrezgene_type = entrezgene_type
 			
