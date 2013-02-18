@@ -26,9 +26,7 @@ sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
 import xml.etree.cElementTree as ElementTree
 from GenomeDB import GenomeDatabase, Gene, SequenceType, EntrezgeneType, \
 	GeneSegment, GeneCommentaryType, GeneCommentary, AnnotAssembly, Gene2go
-from datetime import datetime
 from pymodule import PassingData
-import traceback
 import datetime
 #import argparse	#in python 2.7
 from optparse import OptionParser
