@@ -18,9 +18,7 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
-import pylab
-import csv, random, numpy
-import tables
+import copy, tables
 from tables import UInt64Col, Float64Col, StringCol
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter,\
 	yh_matplotlib, YHFile
@@ -43,7 +41,7 @@ class CountAssociationLocusTable(tables.IsDescription):
 	
 class CountAssociationLocus(AbstractMatrixFileWalker):
 	__doc__ = __doc__
-	option_default_dict = AbstractMatrixFileWalker.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractMatrixFileWalker.option_default_dict)
 	for key in [('samplingRate', 1, float), ('whichColumnHeader', 0, ), ('whichColumn', 0, int),\
 			('minNoOfTotal', 1, int), ('maxNoOfTotal', 0, int), ('logY', 0, int), \
 			('valueForNonPositiveYValue', 1, float), ('missingDataNotation', 0, )]:
