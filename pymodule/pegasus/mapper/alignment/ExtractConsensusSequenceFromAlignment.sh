@@ -9,7 +9,7 @@ minDistanceToIndelDefault=5
 
 if test $# -lt 3
 then
-	echo "Usage: $0 refFastaFname inputAlignmentFname outputFname [minDP] [maxDP] [minMapQ] [minBaseQ] [minRMSMapQ] [minDistanceToIndel]"
+	echo "Usage: $0 refFastaFname inputAlignmentFname outputFname [minDP] [maxDP] [minMapQ] [minBaseQ] [minRMSMapQ] [minDistanceToIndel] [mpileupInterval]"
 	echo
 	echo "Note:"
 	echo "	#. This is a program that generates a consensus sequence out of inputAlignmentFname for psmc (Li Durbin 2011) analysis."
@@ -21,6 +21,7 @@ then
 	echo "	#. default minBaseQ is $minBaseQDefault."
 	echo "	#. default minRMSMapQ is $minRMSMapQDefault."
 	echo "	#. default minDistanceToIndel is $minDistanceToIndelDefault."
+	echo "	#. default mpileupInterval is nothing, no restriction."
 	echo
 	echo "Example:"
 	echo "	$0 individual_sequence/524_superContigsMinSize2000.fasta individual_alignment/555_15_vs_524_by_2.bam /tmp/555_15_vs_524_by_2.fq.gz 24 48"
@@ -73,11 +74,29 @@ then
 	minRMSMapQ=$minRMSMapQDefault
 fi
 
-minDistanceToIndel=$8
+minDistanceToIndel=$9
 if [ -z $minDistanceToIndel]
 then
 	minDistanceToIndel=$minDistanceToIndel
 fi
+
+shift	#no double-digit (or more digits) argument number
+mpileupInterval=$9
+if [ -n $mpileupInterval ]; then
+	if test -r "$mpileupInterval"
+	then
+		#it's a file, BED format.
+		echo "$mpileupInterval is treated as a BED file."
+		mpileupIntervalArgument="-l $mpileupInterval"
+	else
+		echo "$mpileupInterval" is treated as a region-defining string.
+		mpileupIntervalArgument="-r $mpileupInterval"
+	fi
+else
+	mpileupIntervalArgument=""
+fi
+
+echo "mpileupIntervalArgument is $mpileupIntervalArgument."
 
 ###################
 #
@@ -199,8 +218,9 @@ fi
 
 bcftoolsArguments=""
 
+echo "bcftoolsArguments is $bcftoolsArguments."
 
-$samtoolsPath mpileup -C50 -q $minMapQ -Q $minBaseQ -uf $refFastaFname $inputAlignmentFname | $bcftoolsPath view $bcftoolsArguments -c - | $vcfutilsPath vcf2fq -d $minDP -D $maxDP -Q $minRMSMapQ -l $minDistanceToIndel | gzip > $outputFname
+$samtoolsPath mpileup -C50 -q $minMapQ -Q $minBaseQ $mpileupIntervalArgument -u -f $refFastaFname $inputAlignmentFname | $bcftoolsPath view $bcftoolsArguments -c - | $vcfutilsPath vcf2fq -d $minDP -D $maxDP -Q $minRMSMapQ -l $minDistanceToIndel | gzip > $outputFname
 
 exitCodeAll="${PIPESTATUS[0]} ${PIPESTATUS[1]} ${PIPESTATUS[2]} ${PIPESTATUS[3]}"
 exitCode1=`echo $exitCodeAll|awk -F ' ' '{print $1}'`
