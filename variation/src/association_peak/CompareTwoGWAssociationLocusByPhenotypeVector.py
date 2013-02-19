@@ -97,11 +97,6 @@ class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverl
 			writer = YHFile(self.outputFname, openMode='w', rowDefinition=TwoGenomeWideAssociationLocusMapTable)
 		self.writer = writer
 	
-	def constructLocusCorrespondanceBetweenTwoFiles(self):
-		"""
-		2013.1.27
-		"""
-	
 	def reduce(self, **keywords):
 		"""
 		2013.1.27
