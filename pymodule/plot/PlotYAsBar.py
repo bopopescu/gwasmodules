@@ -99,7 +99,7 @@ class PlotYAsBar(AbstractPlot):
 			xValue = self.processValue(xValue, processType=self.logX)
 			yValue = float(row[whichColumn])
 			yValue = self.processValue(yValue, processType=self.logY)
-			xValue2yValueLs[xValue] = yValue
+			xValue2yValue[xValue] = yValue
 			y_ls.append(yValue)
 	
 
