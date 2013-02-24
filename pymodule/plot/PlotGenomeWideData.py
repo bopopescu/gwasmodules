@@ -4,12 +4,14 @@ Examples:
 	# 2012 input is hdf5 association table
 	secret=...
 	%s --xColumnHeader start --whichColumnHeader score
-		-i /Network/Data/250k/db/results/type_1/56_result5859_type1.h5
-		-o /Network/Data/250k/db/results/type_1/56_result5859_type1.h5.png
+		-i /Network/Data/250k/db/results/type_1/56_call6_pheno38_ana1.h5
+		-o /Network/Data/250k/db/results/type_1/56_call6_pheno38_ana1.h5.png
 		--drivername postgresql --hostname localhost --dbname vervetdb --schema stock_250k --db_user yh --db_passwd $secret
 		--genome_drivername=postgresql --genome_hostname=localhost --genome_dbname=vervetdb --genome_schema=genome --genome_db_user=yh
 		--genome_db_passwd=$secret --tax_id=3702 --minNoOfTotal 1 --figureDPI 200 --h5TableName association
 		--logY 2
+		--drawCentromere
+		#--chromosomeHeader chromosome
 	
 	#2013.1.7 input is plain tsv file (assuming it has columns, chromosome, start, score.)
 	%s   --xColumnHeader start --whichColumnHeader score
@@ -38,18 +40,17 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
-import csv
-import numpy, random, pylab
-from pymodule import ProcessOptions, getListOutOfStr, PassingData
+import copy
+import pylab
+from pymodule import ProcessOptions, PassingData
 from pymodule import utils
 from pymodule.db import GenomeDB
-import yh_matplotlib
 from AbstractPlot import AbstractPlot
 
 class PlotGenomeWideData(AbstractPlot):
 	__doc__ = __doc__
 	#						
-	option_default_dict = AbstractPlot.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractPlot.option_default_dict)
 	option_default_dict.update(AbstractPlot.db_option_dict.copy())
 	option_default_dict.update(AbstractPlot.genome_db_option_dict.copy())
 	
@@ -67,9 +68,11 @@ class PlotGenomeWideData(AbstractPlot):
 	option_default_dict[('defaultFontLabelSize', 1, int)][0] = 16
 	
 	option_default_dict.update({
-							('tax_id', 0, int): [3702, '', 1, 'taxonomy ID of the organism from which to retrieve the chromosome info', ],\
-							('xtickInterval', 0, int): [1000000, '', 1, 'add a tick on the x-axis every this interval within each chromosome', ],\
-							})
+					('chromosomeHeader', 1, ): ['chromosome', '', 1, 'header of the column that designates the chromosome' ],\
+					('tax_id', 0, int): [3702, '', 1, 'taxonomy ID of the organism from which to retrieve the chromosome info', ],\
+					('xtickInterval', 0, int): [1000000, '', 1, 'add a tick on the x-axis every this interval within each chromosome', ],\
+					('drawCentromere', 0, int): [0, '', 0, 'toggle to plot centromere as semi-transparent band', ],\
+					})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
@@ -98,7 +101,7 @@ class PlotGenomeWideData(AbstractPlot):
 		x_ls = getattr(pdata, 'x_ls', None)
 		y_ls = getattr(pdata, 'y_ls', None)
 		
-		chromosomeIndex = col_name2index.get("chromosome")
+		chromosomeIndex = col_name2index.get(self.chromosomeHeader)
 		xColumnIndex = col_name2index.get(self.xColumnHeader)
 		yColumnIndex = col_name2index.get(self.whichColumnHeader, self.whichColumn)
 		
@@ -133,8 +136,21 @@ class PlotGenomeWideData(AbstractPlot):
 		chr_ls.sort()
 		max_y = None
 		min_y = None
-		for chr in chr_ls:
-			x_ls, y_ls = pdata.chr2xy_ls[chr][:2]
+		for chromosome in chr_ls:
+			# draw chromosome boundaries
+			ax.axvline(self.chr_id2cumu_start[chromosome], linestyle='--', color='k', linewidth=0.8)
+			#2013.2.17 draw the centromere as transparent band
+			if self.drawCentromere:
+				cumuStart = self.chr_id2cumu_start.get(chromosome)
+				centromere = self.chr_id2centromere.get(chromosome)
+				if centromere:	#centromere is an instance of GenomeAnnotation of GenomeDB.py 
+					centromereCumuStart = cumuStart + centromere.start
+					centromereCumuStop = cumuStart + centromere.stop
+					
+					pylab.axvspan(centromereCumuStart, centromereCumuStop, facecolor='0.5', alpha=0.3)	#gray color
+			
+			
+			x_ls, y_ls = pdata.chr2xy_ls[chromosome][:2]
 			
 			self.setGlobalMinVariable(extremeVariableName='xMin', givenExtremeValue=min(x_ls))
 			self.setGlobalMaxVariable(extremeVariableName='xMax', givenExtremeValue=max(x_ls))
@@ -143,11 +159,6 @@ class PlotGenomeWideData(AbstractPlot):
 			
 			if x_ls and y_ls:
 				ax.plot(x_ls, y_ls, '.', markeredgewidth=0, alpha=0.6)	#markersize=5, 
-		
-		#separate each chromosome
-		for chr in chr_ls:
-		#	print chr
-			ax.axvline(self.chr_id2cumu_start[chr], linestyle='--', color='k', linewidth=0.8)
 		
 		"""
 		if drawBonferroni:
@@ -170,16 +181,18 @@ class PlotGenomeWideData(AbstractPlot):
 		#chrOrder=1 is to order chromosomes alphabetically
 		self.oneGenomeData = db_genome.getOneGenomeData(tax_id=self.tax_id, chr_gap=0, chrOrder=1, sequence_type_id=1)
 		self.chr_id2cumu_start = self.oneGenomeData.chr_id2cumu_start
+		#2013.2.18 get centromere locations
+		self.chr_id2centromere = self.oneGenomeData.chr_id2centromere
 		
 		#for marking the X-axis
 		self.xtick_locs = []
 		self.xtick_labels = []
 		self.chrID2labelXPosition = {}	#the x-axis coordinate for each chromosome's label below x-axis
 		
-		for chr in self.oneGenomeData.chr_id_ls:
-			cumuStart = self.chr_id2cumu_start.get(chr)
-			chr_size = self.oneGenomeData.chr_id2size.get(chr)
-			self.chrID2labelXPosition[chr] = cumuStart + chr_size/2	#chromosome label sits in the middle
+		for chromosome in self.oneGenomeData.chr_id_ls:
+			cumuStart = self.chr_id2cumu_start.get(chromosome)
+			chr_size = self.oneGenomeData.chr_id2size.get(chromosome)
+			self.chrID2labelXPosition[chromosome] = cumuStart + chr_size/2	#chromosome label sits in the middle
 
 			for j in range(cumuStart, cumuStart+ chr_size, self.xtickInterval):	#tick at each interval
 				self.xtick_locs.append(j)
@@ -201,8 +214,8 @@ class PlotGenomeWideData(AbstractPlot):
 			pylab.xticks(self.xtick_locs, self.xtick_labels)
 		#mark the chromosome
 		if self.yMin is not None:
-			for chr, labelXPosition in self.chrID2labelXPosition.iteritems():
-				pylab.text(labelXPosition, self.yMin, "Chr %s"%(chr),\
+			for chromosome, labelXPosition in self.chrID2labelXPosition.iteritems():
+				pylab.text(labelXPosition, self.yMin, "Chr %s"%(chromosome),\
 					horizontalalignment='center',
 				 	verticalalignment='center', )	#transform = ax.transAxes
 		
