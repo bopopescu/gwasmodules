@@ -489,8 +489,12 @@ def getListOutOfStr(list_in_str=None, data_type=int, separator1=',', separator2=
 
 def getStrOutOfList(ls, separator=','):
 	"""
+	#2013.2.24 bugfix
 	2012.11.25 reverse of getListOutOfStr
 	"""
+	#2013.2.24 bugfix
+	if not ls:
+		return ''
 	firstElement = ls[0]
 	if type(firstElement)!=str:
 		ls_str = map(str, ls)
@@ -775,6 +779,8 @@ def getPhredScoreOutOfSolexaScore(solexaChar):
 
 def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname, fakeSuffix='.gz'):
 	"""
+	"." is included in the fname_suffix
+	
 	2012.4.30
 		make the fakeSuffix an option.
 		if fakeSuffix is None or nothing, the 2nd os.path.splitext() won't run.
