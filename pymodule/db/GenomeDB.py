@@ -29,6 +29,7 @@ from sqlalchemy.schema import MetaData
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy import and_, or_, not_
+from sqlalchemy import desc
 from pymodule.utils import PassingData	#2012.3.26 "from utils import PassingData" won't work because no module named "utils" exists outside pymodule (!=pymodule.utils). 
 from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey
 from pymodule.algorithm.RBTree import RBDict
@@ -77,7 +78,8 @@ class RawSequence(Entity):
 
 class AnnotAssembly(Entity):
 	"""
-	2013.2.12 added argument chromosome_type
+	2013.2.17 added column genome_annotation_list
+	2013.2.12 added column chromosome_type
 	2011-8-24
 		gi is no longer the primary key.
 		a new id is added as primary key.
@@ -99,6 +101,8 @@ class AnnotAssembly(Entity):
 	raw_sequence_start_id = Field(Integer)
 	sequence_type = ManyToOne('%s.SequenceType'%__name__, colname='sequence_type_id', ondelete='SET NULL', onupdate='CASCADE')
 	chromosome_type = ManyToOne('%s.ChromosomeType'%__name__, colname='chromosome_type_id', ondelete='SET NULL', onupdate='CASCADE')
+	genome_annotation_list = OneToMany('%s.GenomeAnnotation'%__name__)
+	
 	comment = Field(Text)
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
@@ -107,6 +111,7 @@ class AnnotAssembly(Entity):
 	using_options(tablename='annot_assembly')
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('tax_id','chromosome', 'start', 'stop', 'orientation', 'sequence_type_id'))
+
 
 class ChromosomeType(Entity):
 	"""
@@ -119,6 +124,45 @@ class ChromosomeType(Entity):
 	date_created = Field(DateTime, default=datetime.now)
 	date_updated = Field(DateTime)
 	using_options(tablename='chromosome_type')
+	using_table_options(mysql_engine='InnoDB')
+
+class GenomeAnnotation(Entity):
+	"""
+	2013.2.17
+	"""
+	strand = Field(String(4))	#2010-8-12 add strand, start, stop
+	start = Field(Integer)
+	stop = Field(Integer)
+	description = Field(Text)
+	comment = Field(Text)
+	
+	annot_assembly = ManyToOne('%s.AnnotAssembly'%__name__, colname='annot_assembly_id', \
+							ondelete='CASCADE', onupdate='CASCADE')
+	genome_annotation_type = ManyToOne('%s.GenomeAnnotationType'%__name__, \
+									colname='genome_annotation_type_id', ondelete='CASCADE', onupdate='CASCADE')
+	
+	created_by = Field(String(256))
+	updated_by = Field(String(256))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='genome_annotation')
+	using_table_options(mysql_engine='InnoDB')
+	using_table_options(UniqueConstraint('strand', 'start', 'stop', 'annot_assembly_id',\
+										'genome_annotation_type_id'))
+
+
+class GenomeAnnotationType(Entity):
+	"""
+	2013.2.17 table to stores things like centromere, telemere, euchromatin, heterochromatin
+	"""
+	short_name = Field(String(223), unique=True)
+	description = Field(Text)
+	comment = Field(Text)
+	created_by = Field(String(256))
+	updated_by = Field(String(256))
+	date_created = Field(DateTime, default=datetime.now)
+	date_updated = Field(DateTime)
+	using_options(tablename='genome_annotation_type')
 	using_table_options(mysql_engine='InnoDB')
 
 class EntrezgeneType(Entity):
@@ -146,7 +190,7 @@ class EntrezgeneMapping(Entity):
 	tax_id = Field(Integer)
 	genomic_accession = Field(String(32))
 	genomic_version = Field(Integer)
-	genomic_annot_assembly = ManyToOne('AnnotAssembly', colname='genomic_gi', ondelete='CASCADE', onupdate='CASCADE')
+	annot_assembly = ManyToOne('AnnotAssembly', colname='genomic_gi', ondelete='CASCADE', onupdate='CASCADE')
 	chromosome = Field(String(256))
 	strand = Field(String(4))
 	start = Field(Integer)
@@ -572,7 +616,7 @@ class Gene(Entity):
 	genomic_accession = Field(String(32))
 	genomic_version = Field(Integer)
 	genomic_gi = Field(Integer)
-	genomic_annot_assembly = ManyToOne('%s.AnnotAssembly'%__name__, colname='annot_assembly_id', ondelete='CASCADE', onupdate='CASCADE')
+	annot_assembly = ManyToOne('%s.AnnotAssembly'%__name__, colname='annot_assembly_id', ondelete='CASCADE', onupdate='CASCADE')
 	entrezgene_type = ManyToOne('%s.EntrezgeneType'%__name__, colname='entrezgene_type_id', ondelete='CASCADE', onupdate='CASCADE')
 	comment = Field(Text)
 	gene_commentaries = OneToMany('%s.GeneCommentary'%__name__)
@@ -735,9 +779,13 @@ class OneGenomeData(PassingData):
 		self._chr_id2cumu_size = None
 		self._chr_id2cumu_start = None
 		self._chr_id2cumu_chr_start = None	#2012.8.13 the key is chromosome ID.
-		# the value is (pseudoChromosomeID, cumuStart).
-		# This data structure is used to re-organize the old chromosomes into new/pseudo chromosomes.
-		# The max length of each pseudo chromosome is <=self.maxPseudoChrSize. 
+			# the value is (pseudoChromosomeID, cumuStart).
+			# This data structure is used to re-organize the old chromosomes into new/pseudo chromosomes.
+			# The max length of each pseudo chromosome is <=self.maxPseudoChrSize. 
+		
+		#2013.2.17
+		self._chr_id2centromere = None
+		self._chr_id2annot_assembly = None
 		
 		self.tax_id = tax_id
 		self.maxPseudoChrSize = maxPseudoChrSize	#2012.8.13
@@ -779,6 +827,7 @@ class OneGenomeData(PassingData):
 		sys.stderr.write("Getting chr_id2size for tax_id %s ..."%(tax_id))
 		
 		#query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
+		"""
 		if self.chrOrder==2:
 			orderByString = 'order by stop desc'
 		else:
@@ -787,15 +836,26 @@ class OneGenomeData(PassingData):
 			extraCondition = " and sequence_type_id=%s "%self.sequence_type_id
 		else:
 			extraCondition = ""
-		rows = self.db_genome.metadata.bind.execute("select chromosome, stop from genome.%s where tax_id=%s and start=1 %s %s"%\
+		
+		query = self.db_genome.metadata.bind.execute("select id, chromosome, stop from genome.%s where tax_id=%s and start=1 %s %s"%\
 						(AnnotAssembly.table.name, tax_id, extraCondition, orderByString))
-		chr_id2size = {}
-		for row in rows:
+		"""
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
+		if self.chrOrder==2:
+			query = query.order_by(AnnotAssembly.stop)
+		if self.sequence_type_id:
+			query = query.filter_by(sequence_type_id=self.sequence_type_id)
+		
+		self._chr_id2size = {}
+		self._chr_id2annot_assembly = {}
+		
+		for row in query:
+			self._chr_id2annot_assembly[row.chromosome] = row
 			chr_id = row.chromosome
 			size = row.stop
-			chr_id2size[chr_id] = size
-		self._chr_id2size = chr_id2size
-		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2size)))
+			self._chr_id2size[chr_id] = size
+		#self._chr_id2size = chr_id2size
+		sys.stderr.write("%s chromosomes.\n"%(len(self._chr_id2size)))
 	
 	@property
 	def chr_id2cumu_size(self):
@@ -920,7 +980,7 @@ class OneGenomeData(PassingData):
 		sys.stderr.write("Getting chr_id2cumu_chr_start for tax-id=%s, chr-gap=%s, maxPseudoChrSize=%s ..."%\
 						(tax_id, chr_gap, maxPseudoChrSize))
 		if self._chr_id2size is None:
-			self.chr_id2size = [tax_id]
+			self.chr_id2size = (tax_id)
 		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
 		if chr_gap==None:
 			chr_size_ls = self.chr_id2size.values()
@@ -952,7 +1012,33 @@ class OneGenomeData(PassingData):
 		self.chr_id_ls = chr_id_ls
 		sys.stderr.write("%s chromosomes, last newChrID=%s Done.\n"%(len(self._chr_id2cumu_chr_start), newChrID))
 	
+	@property
+	def chr_id2centromere(self):
+		"""
+		2013.2.17
+		"""
+		if self._chr_id2centromere is None:
+			self.chr_id2centromere = (self.maxPseudoChrSize, self.tax_id, self.chr_gap)
+		return self._chr_id2centromere
+	
+	@chr_id2centromere.setter
+	def chr_id2centromere(self, argument_list):
+		"""
+		2013.2.17
+		"""
 		
+		maxPseudoChrSize, tax_id, chr_gap = argument_list[:3]
+		sys.stderr.write("Getting chr_id2centromere for tax-id=%s, chr-gap=%s, maxPseudoChrSize=%s ..."%\
+						(tax_id, chr_gap, maxPseudoChrSize))
+		if self._chr_id2cumu_start is None:
+			self.chr_id2cumu_start = (self.tax_id, self.chr_gap)
+		
+		self._chr_id2centromere ={}
+		for chr_id, annot_assembly in self._chr_id2annot_assembly.iteritems():
+			for genome_annotation in annot_assembly.genome_annotation_list:
+				if genome_annotation.genome_annotation_type_id==1:
+					self._chr_id2centromere[chr_id] = genome_annotation
+		sys.stderr.write("%s centromeres.\n"%(len(self._chr_id2centromere)))
 	
 	@property
 	def cumuSpan2ChrRBDict(self):
@@ -1331,7 +1417,6 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("Getting %s chromosomes with rank (by size) between %s and %s  ..."%\
 						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
 		chr2size = {}
-		from sqlalchemy import desc
 		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id)
 		if chromosome_type_id:
 			query = query.filter_by(chromosome_type_id=chromosome_type_id)
@@ -1471,7 +1556,7 @@ class GenomeDatabase(ElixirDB):
 					symbol_from_nomenclature_authority=symbol_from_nomenclature_authority, \
 					full_name_from_nomenclature_authority=full_name_from_nomenclature_authority,\
 					nomenclature_status=nomenclature_status, modification_date=modification_date)
-			gene.genomic_annot_assembly = annot_assembly
+			gene.annot_assembly = annot_assembly
 			self.session.add(gene)
 			self.session.flush()
 		return gene
