@@ -89,7 +89,7 @@ class YHTable(tables.Table, YHTableInHDF5Group):
 		"""
 		self.tableName = tableName
 		self.parentNode = parentNode
-		  
+		
 		if tableName in self.parentNode: # existing table
 			description = None
 		elif description is None: # pull the description from the attrs
@@ -290,14 +290,14 @@ class YHSingleTableFile(YHTable):
 		self.groupName = groupName
 		self.tableName = tableName
 		
- 		self.hdf5File = tables.openFile(inputFname, openMode)
- 		self.uservars = None
- 		
+		self.hdf5File = tables.openFile(inputFname, openMode)
+		self.uservars = None
+		
 		if groupName is None:
 			groupName = 'default'
 		
 		self.parentNode = self.hdf5File._getOrCreatePath('/' + groupName, True)
-		  
+		
 		YHTable.__init__(self, self.parentNode, tableName,
 						description=description, rowDefinition=rowDefinition, \
 						title=title,
