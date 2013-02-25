@@ -25,7 +25,7 @@ else:   #32bit
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import copy
-from pymodule import ProcessOptions
+from pymodule import ProcessOptions, utils
 from AbstractReducer import AbstractReducer
 
 class MergeGenotypeMatrix(AbstractReducer):
@@ -47,7 +47,7 @@ class MergeGenotypeMatrix(AbstractReducer):
 			pdb.set_trace()
 		
 		header = None
-		outf = open(self.outputFname, 'w')
+		outf = utils.openGzipFile(self.outputFname, 'w')
 		for inputFname in self.inputFnameLs:
 			sys.stderr.write("File %s ... "%(inputFname))
 			if not os.path.isfile(inputFname):
@@ -82,7 +82,9 @@ class MergeGenotypeMatrix(AbstractReducer):
 						traceback.print_exc()
 						print sys.exc_info()
 			for line in inf:
-				outf.write(line)
+				isEmpty = self.isInputLineEmpty(line.strip(), inputFile=inf, inputEmptyType=self.inputEmptyType)
+				if not isEmpty:	#only write when it's not empty
+					outf.write(line)
 			sys.stderr.write(".\n")
 
 if __name__ == '__main__':
