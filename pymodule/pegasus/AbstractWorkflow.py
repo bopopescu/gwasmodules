@@ -106,16 +106,9 @@ class AbstractWorkflow(ADAG):
 		
 		#2012.9.25 global counter
 		self.no_of_jobs = 0
-		
-		if hasattr(self, 'contigMaxRankBySize') and hasattr(self, 'contigMinRankBySize'):
-			#2013.2.6 non-public schema dbs should be connected before the main vervetdb or other db (schema=public) is connected.
-			self.chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, \
-													contigMinRankBySize=self.contigMinRankBySize)
-		else:
-			self.chr2size = {}
 	
+		self.extra__init__()	#this has to be ahead of connectDB() as this connects to GenomeDB 
 		self.connectDB()
-		self.extra__init__()
 	
 	def extra__init__(self):
 		"""
@@ -529,6 +522,9 @@ class AbstractWorkflow(ADAG):
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/converter/ConvertMSOutput2FASTQ.py'), \
 										name='ConvertMSOutput2FASTQ', clusterSizeMultipler=1)
 		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/extractor/SelectChromosomeSequences.py'), \
+										name='SelectChromosomeSequences', clusterSizeMultipler=0.5)
+		
 		#2013.2.11 moved from vervet/src/reduce to pymodule/pegasus/reducer
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/MergeGenotypeMatrix.py'), \
 										name='MergeGenotypeMatrix', clusterSizeMultipler=0.2)
@@ -545,6 +541,8 @@ class AbstractWorkflow(ADAG):
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/ReduceMatrixBySumSameKeyColsAndThenDivide.py'), \
 										name='ReduceMatrixBySumSameKeyColsAndThenDivide', clusterSizeMultipler=0)
 		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'plot/PlotGenomeWideData.py'), \
+										name='PlotGenomeWideData', clusterSizeMultipler=1)
 		
 		
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):

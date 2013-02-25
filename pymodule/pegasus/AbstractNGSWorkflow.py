@@ -28,7 +28,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
 						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
 						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
-						("chromosome_type", 0, int): [0, '', 1, 'what types of chromosomes to be included. 0: all; 1: autosomes; 2: X; 3: Y; 4: mitochrondrial'],\
+						('chromosome_type_id', 0, int):[0, '', 1, 'what type of chromosomes to be included, same as table genome.chromosome_type.\n\
+	0: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial '],\
 						
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments from contaminated individuals, \n\
@@ -66,7 +67,21 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		
 		self.chr_pattern = Genome.chr_pattern
 		self.contig_id_pattern = Genome.contig_id_pattern
+	
+	def extra__init__(self):
+		"""
+		2013.2.15
+		"""
+		AbstractWorkflow.extra__init__(self)
 		
+		if hasattr(self, 'contigMaxRankBySize') and hasattr(self, 'contigMinRankBySize'):
+			#2013.2.6 non-public schema dbs should be connected before the main vervetdb or other db (schema=public) is connected.
+			self.chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, \
+							contigMinRankBySize=self.contigMinRankBySize, tax_id=60711, sequence_type_id=9,\
+							chromosome_type_id=self.chromosome_type_id)
+		else:
+			self.chr2size = {}
+	
 	def registerJars(self, workflow=None, ):
 		"""
 		2011-11-22
@@ -1307,8 +1322,12 @@ Contig966       3160    50
 		"""
 		return Genome.getChrFromFname(filename)
 	
-	def getTopNumberOfContigs(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9):
+	def getTopNumberOfContigs(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
+							chromosome_type_id=0):
 		"""
+		2013.2.15 added argument chromosome_type_id
+		chromosome_type_id: what type of chromosomes to be included, same as table genome.chromosome_type.
+			0: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial
 		2012.8.2
 			moved from vervet/src/AlignmentToCallPipeline.py
 			call GenomeDB.getTopNumberOfContigs() instead
@@ -1323,14 +1342,13 @@ Contig966       3160    50
 		no_of_contigs_to_fetch = contigMaxRankBySize-contigMinRankBySize+1
 		sys.stderr.write("Getting %s contigs with rank (by size) between %s and %s  ..."%\
 						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
-		chr2size = {}
 		
 		from pymodule import GenomeDB
 		db_genome = GenomeDB.GenomeDatabase(drivername=self.drivername, username=self.db_user,
 						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema="genome")
 		db_genome.setup(create_tables=False)
 		chr2size = db_genome.getTopNumberOfChomosomes(contigMaxRankBySize=contigMaxRankBySize, contigMinRankBySize=contigMinRankBySize, \
-											tax_id=tax_id, sequence_type_id=sequence_type_id)
+											tax_id=tax_id, sequence_type_id=sequence_type_id, chromosome_type_id=chromosome_type_id)
 		return chr2size
 	
 	def restrictContigDictionry(self, dc=None, maxContigID=None, minContigID=None):

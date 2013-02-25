@@ -205,10 +205,13 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		refFastaF = refFastaFList[0]
 		
 		topOutputDir = "%sMap"%(outputDirPrefix)
-		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
+		topOutputDirJob = self.addMkDirJob(outputDir=topOutputDir)
 		
 		plotOutputDir = "%sPlot"%(outputDirPrefix)
-		plotOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=plotOutputDir)
+		plotOutputDirJob = self.addMkDirJob(outputDir=plotOutputDir)
+		
+		reduceOutputDir = "%sReduce"%(outputDirPrefix)
+		reduceOutputDirJob = self.addMkDirJob(outputDir=reduceOutputDir)
 		
 		if needFastaDictJob:	# the .dict file is required for GATK
 			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
@@ -236,8 +239,14 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		#	mapEachChromosomeDataLs is reset right after a new alignment is chosen.
 		#	mapEachIntervalDataLs is reset right after each chromosome is chosen.
 		#	all reduce dataLs never gets reset.
-		passingData = PassingData(AlignmentJobAndOutputLs=[], bamFnamePrefix=None, topOutputDirJob=topOutputDirJob,\
+		passingData = PassingData(AlignmentJobAndOutputLs=[], bamFnamePrefix=None, \
+					chrIDSet=chrIDSet,\
+					chr2IntervalDataLs=chr2IntervalDataLs,\
+					
+					topOutputDirJob=topOutputDirJob,\
 					plotOutputDirJob=plotOutputDirJob,\
+					reduceOutputDirJob = reduceOutputDirJob,\
+					
 					outputDirPrefix=outputDirPrefix, refFastaFList=refFastaFList, \
 					
 					mapEachAlignmentData = None,\
