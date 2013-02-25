@@ -36,10 +36,10 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 #	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
 #	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
 #else:   #32bit
+import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import matplotlib; matplotlib.use("Agg")	#to disable pop-up requirement
 import copy
 import pylab
 from pymodule import ProcessOptions, PassingData
@@ -214,10 +214,21 @@ class PlotGenomeWideData(AbstractPlot):
 			pylab.xticks(self.xtick_locs, self.xtick_labels)
 		#mark the chromosome
 		if self.yMin is not None:
-			for chromosome, labelXPosition in self.chrID2labelXPosition.iteritems():
-				pylab.text(labelXPosition, self.yMin, "Chr %s"%(chromosome),\
-					horizontalalignment='center',
-				 	verticalalignment='center', )	#transform = ax.transAxes
+			if (self.yMin==0 and self.yScaleLog>0):
+				"""
+			###2013.2.24 this is causing some error when yScaleLog =1 or 2 and yMin=0: 
+			File &quot;/u/local/python/2.6/lib64/python2.6/site-packages/matplotlib/backends/backend_agg.py&quot;, line 154, in draw_text
+				self._renderer.draw_text_image(font.get_image(), int(x), int(y) + 1, angle, gc)
+			File &quot;/u/home/eeskin/polyacti/lib/python/numpy-1.6.2-py2.6-linux-x86_64.egg/numpy/ma/core.py&quot;, line 3795, in __int__
+				raise MaskError, &apos;Cannot convert masked element to a Python int.&apos;
+			numpy.ma.core.MaskError: Cannot convert masked element to a Python int.
+				"""
+				pass
+			else:
+				for chromosome, labelXPosition in self.chrID2labelXPosition.iteritems():
+					pylab.text(labelXPosition, self.yMin, "Chr %s"%(chromosome),\
+						horizontalalignment='center',
+						verticalalignment='center', )	#transform = ax.transAxes
 		
 		return AbstractPlot.handleXLabel(self, **keywords)
 		"""
