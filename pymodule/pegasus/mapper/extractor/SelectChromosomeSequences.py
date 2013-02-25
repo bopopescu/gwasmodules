@@ -27,8 +27,8 @@ class SelectChromosomeSequences(AbstractMapper):
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict.update({
 							('chromosomeList', 1, ): [None, '', 1, 'coma-separated list of chromosome IDs', ],\
-							('inputFileFormat', 1, int): [1, '', 1, "1: fasta; 2: fastq", ],\
-							('outputFileFormat', 1, int): [1, '', 1, "1: fasta; 2: fastq", ],\
+							('inputFileFormat', 0, int): [0, '', 1, "0: guess, looking for '.fasta' or '.fastq' in filename; 1: fasta; 2: fastq", ],\
+							('outputFileFormat', 0, int): [0, '', 1, "0: self-guess; 1: fasta; 2: fastq", ],\
 							('defaultBasePhredQuality', 1, int): [87, '', 1, "if input format is not fastq and output is fastq. need this base quality.\n\
 		Assuming Sanger format for the quality score (87=x).",],\
 							})
@@ -42,9 +42,16 @@ class SelectChromosomeSequences(AbstractMapper):
 		
 		self.fileFormatDict = {1: 'fasta', 2:'fastq'}
 		
-		self.inputFileFormat = self.fileFormatDict.get(self.inputFileFormat)
-		self.outputFileFormat = self.fileFormatDict.get(self.outputFileFormat)
-		
+		if not self.inputFileFormat:	#0 or None or ''
+			#use 1: to exclude the '.' in suffix
+			self.inputFileFormat = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(self.inputFname)[1][1:]
+		else:
+			self.inputFileFormat = self.fileFormatDict.get(self.inputFileFormat)
+		if not self.outputFileFormat:	#0 or None or ''
+			self.outputFileFormat = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(self.outputFname)[1][1:]			
+		else:
+			self.outputFileFormat = self.fileFormatDict.get(self.outputFileFormat)
+	
 	
 	def selectSequences(self, inputFname=None, outputFname=None, inputFileFormat='fasta', outputFileFormat='fasta', chromosomeSet=None,\
 					defaultBasePhredQuality=87):
