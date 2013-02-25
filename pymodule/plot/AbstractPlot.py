@@ -45,9 +45,9 @@ class AbstractPlot(AbstractMatrixFileWalker):
 						
 						('logX', 0, int): [0, '', 1, 'value 0: nothing; 1: log(X), 2: -log(X)'],\
 						('xScaleLog', 0, int): [0, '', 1, 'regarding the x-axis scale. 0: nothing; 1: scale of log(10), 2: scale of log(2),\
-	if this is non-zero, then logX is better off. otherwise mess up the data'],\
+	if this is non-zero, then logX should be toggled off. otherwise mess up the data'],\
 						('yScaleLog', 0, int): [0, '', 1, 'regarding the y-axis scale. 0: nothing; 1: scale of log(10), 2: scale of log(2),\
-	if this is non-zero, then logY is better off. otherwise data will be messed up.'],\
+	if this is non-zero, then logY should be toggled off. otherwise data will be messed up.'],\
 						('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
 						('defaultFontLabelSize', 1, int): [12, '', 1, 'default font & label size on the plot'], \
 						('defaultFigureWidth', 1, float): [10, '', 1, 'default figure width (in inch) in the pedigree plot'], \
