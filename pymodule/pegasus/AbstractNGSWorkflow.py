@@ -8,9 +8,13 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, NextGenSeq, Genome
+from pymodule import Genome, utils
+from pymodule.yhio import NextGenSeq
+from pymodule.pegasus import yh_pegasus
+from pymodule.utils import PassingData
 from Pegasus.DAX3 import *
 from AbstractWorkflow import AbstractWorkflow
+
 
 class AbstractNGSWorkflow(AbstractWorkflow):
 	__doc__ = __doc__
@@ -609,7 +613,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				frontArgumentList=None, extraArguments="-selectType INDEL", \
 				extraArgumentList=None, extraOutputLs=None, \
 				extraDependentInputLs=None, no_of_cpus=None, max_walltime=None)
-		2012.2.26 a generic function to add GATK jobs
+		2013.2.26 add gatkVCFIndexOutput to the extraOutputLs if outputFile is a .vcf file
+		2013.2.26 a generic function to add GATK jobs
 		"""
 		if workflow is None:
 			workflow = self
@@ -623,7 +628,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			extraArgumentList = []
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
-		
+		if extraOutputLs is None:
+			extraOutputLs = []
 		
 		refFastaFile = refFastaFList[0]
 		extraDependentInputLs.extend(refFastaFList)
@@ -644,7 +650,13 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				frontArgumentList.extend(["-L:bed", interval])
 			else:
 				frontArgumentList.extend(["-L", interval])
-		
+		outputFnameSuffix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(outputFile.name)
+		if outputFnameSuffix=='.vcf':	#2013.2.26 GATK will generate an index file along with the VCF output
+			gatkVCFIndexOutputFname = '%s.idx'%(outputFile.name)
+			gatkVCFIndexOutput = File(gatkVCFIndexOutputFname)
+			extraOutputLs.append(gatkVCFIndexOutput)
+		else:
+			gatkVCFIndexOutput = None
 		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
 					inputArgumentOption=inputArgumentOption,  inputFileList=inputFileList,\
 					argumentForEachFileInInputFileList=argumentForEachFileInInputFileList,\
@@ -655,6 +667,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					frontArgumentList=frontArgumentList, extraArguments=extraArguments, \
 					extraArgumentList=extraArgumentList, job_max_memory=job_max_memory,  sshDBTunnel=None, \
 					key2ObjectForJob=None, no_of_cpus=no_of_cpus, max_walltime=max_walltime, **keywords)
+		
+		job.gatkVCFIndexOutput = gatkVCFIndexOutput
 		return job
 	
 	
