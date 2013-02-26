@@ -760,11 +760,14 @@ class AbstractWorkflow(ADAG):
 				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, **keywords)
 		return job
 	
-	def addInputToStatMergeJob(self, workflow=None, statMergeJob=None, inputF=None, \
+	def addInputToStatMergeJob(self, workflow=None, statMergeJob=None, inputF=None, inputArgumentOption="",\
 							parentJobLs=None, \
-							namespace=None, version=None, extraDependentInputLs=None):
+							extraDependentInputLs=None, **keywords):
 		"""
 		i.e. :	self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
+				self.addInputToStatMergeJob(statMergeJob=gatkUnionJob, parentJobLs=[gatk_job], \
+											inputArgumentOption="--variant")
+		2013.2.26 added argument inputArgumentOption, to be added in front of each input file
 		2013.2.6 make sure parentJob is of instance Job
 		2012.10.8
 			inputF is optional, if not given, parentJobLs must be given, and parentJobLs[0].output is inputF. 
@@ -781,6 +784,8 @@ class AbstractWorkflow(ADAG):
 		if inputF:
 			isAdded = self.addJobUse(statMergeJob, file=inputF, transfer=True, register=True, link=Link.INPUT)
 			if isAdded:
+				if inputArgumentOption:	#2013.2.26 add it in front of each input file
+					statMergeJob.addArguments(inputArgumentOption)
 				statMergeJob.addArguments(inputF)
 		
 		if extraDependentInputLs:
