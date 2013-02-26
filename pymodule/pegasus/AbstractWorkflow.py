@@ -1019,12 +1019,11 @@ class AbstractWorkflow(ADAG):
 					if isAdded:
 						job.parentJobLs.append(parentJob)
 		if extraDependentInputLs:
-			for input in extraDependentInputLs:
-				if input:
-					isAdded = self.addJobUse(job, file=input, transfer=True, register=True, link=Link.INPUT)
-					#job.uses(input, transfer=True, register=True, link=Link.INPUT)
+			for inputFile in extraDependentInputLs:
+				if inputFile:
+					isAdded = self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
 					if isAdded:
-						job.inputLs.append(input)
+						job.inputLs.append(inputFile)
 		if extraOutputLs:
 			for output in extraOutputLs:
 				if output:
@@ -1033,8 +1032,8 @@ class AbstractWorkflow(ADAG):
 						self.addJobUse(job, file=output, transfer=transferOutput, register=True, link=Link.OUTPUT)
 						#job.uses(output, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		if key2ObjectForJob:
-			for key, object in key2ObjectForJob.iteritems():
-				setattr(job, key, object)	#key should be a string.
+			for key, objectForJob in key2ObjectForJob.iteritems():
+				setattr(job, key, objectForJob)	#key should be a string.
 		
 		#2012.10.6 add all input files to the last (after db arguments,) otherwise, it'll mask others (cuz these don't have options).
 		if inputFileList:
