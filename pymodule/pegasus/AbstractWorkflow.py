@@ -577,6 +577,7 @@ class AbstractWorkflow(ADAG):
 		if not self.hasExecutable(executable):
 			self.addExecutable(executable)	#removeExecutable() is its counterpart
 			setattr(self, executable.name, executable)
+		return executable
 	
 	def setOrChangeExecutableClusterSize(self, executable=None, clusterSizeMultipler=1, defaultClustersSize=None):
 		"""
@@ -604,7 +605,7 @@ class AbstractWorkflow(ADAG):
 			clusterSizeMultipler = 1
 		executable = self.constructOneExecutableObject(path=path, name=name)
 		self.addOneExecutableAndAssignProperClusterSize(executable=executable, clusterSizeMultipler=clusterSizeMultipler)
-	
+		return executable
 	
 	def getFilesWithProperSuffixFromFolder(self, inputFolder=None, suffix='.h5'):
 		"""
