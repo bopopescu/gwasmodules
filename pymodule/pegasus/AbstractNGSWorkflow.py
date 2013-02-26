@@ -543,10 +543,17 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		return job
 	
 	def addGATKCombineVariantsJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, \
-								refFastaFList=None, outputFile=None, genotypeMergeOptions='UNIQUIFY', \
+							refFastaFList=None, inputFileList=None, argumentForEachFileInInputFileList="--variant",\
+							outputFile=None, genotypeMergeOptions='UNIQUIFY', \
 					parentJobLs=None, transferOutput=True, job_max_memory=2000,max_walltime=None,\
 					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
 		"""
+		add input file to this job via
+			gatkUnionJob = self.addGATKCombineVariantsJob(...)
+			self.addInputToStatMergeJob(statMergeJob=gatkUnionJob, parentJobLs=[gatk_job], \
+									inputArgumentOption="--variant")
+		OR through the inputFileList argument
+			gatkUnionJob = self.addGATKCombineVariantsJob(.., inputFileList=[gatk_job.output, ...])
 		2012.2.26 replacing addVCFConcatJob using GATK's CombineVariants analysis-type
 		Value for genotypeMergeOptions:
 			UNIQUIFY
@@ -575,7 +582,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		
 		job = self.addGATKJob(workflow=workflow, executable=executable, GenomeAnalysisTKJar=GenomeAnalysisTKJar, \
 							GATKAnalysisType="CombineVariants",\
-					inputFile=None, inputArgumentOption=None, refFastaFList=refFastaFList, inputFileList=None,\
+					inputFile=None, inputArgumentOption=None, refFastaFList=refFastaFList, inputFileList=inputFileList,\
+					argumentForEachFileInInputFileList=argumentForEachFileInInputFileList,\
 					outputFile=outputFile, \
 					parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
 					frontArgumentList=None, extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
@@ -585,11 +593,22 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	
 	def addGATKJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, GATKAnalysisType=None,\
 					inputFile=None, inputArgumentOption=None, refFastaFList=None, inputFileList=None,\
+					argumentForEachFileInInputFileList=None,\
 					interval=None, outputFile=None, \
 					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
 					extraDependentInputLs=None, no_of_cpus=None, max_walltime=None, **keywords):
 		"""
+		i.e.
+			indelUnionOutputF = File(os.path.join(gatkIndelDirJob.folder, '%s.indel.vcf'%chromosome))
+			selectIndelJob = self.addGATKJob(executable=self.SelectVariantsJava, GATKAnalysisType="SelectVariants",\
+				inputFile=gatkUnionJob.output, inputArgumentOption="--variant", refFastaFList=refFastaFList, inputFileList=None,\
+				argumentForEachFileInInputFileList=None,\
+				interval=None, outputFile=indelUnionOutputF, \
+				parentJobLs=[gatkIndelDirJob, gatkUnionJob], transferOutput=False, job_max_memory=job_max_memory,\
+				frontArgumentList=None, extraArguments="-selectType INDEL", \
+				extraArgumentList=None, extraOutputLs=None, \
+				extraDependentInputLs=None, no_of_cpus=None, max_walltime=None)
 		2012.2.26 a generic function to add GATK jobs
 		"""
 		if workflow is None:
@@ -627,8 +646,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				frontArgumentList.extend(["-L", interval])
 		
 		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
-					inputArgumentOption=inputArgumentOption,\
-					outputFile=outputFile, outputArgumentOption="--out", inputFileList=inputFileList, \
+					inputArgumentOption=inputArgumentOption,  inputFileList=inputFileList,\
+					argumentForEachFileInInputFileList=argumentForEachFileInInputFileList,\
+					outputFile=outputFile, outputArgumentOption="--out", \
 					parentJob=None, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					extraOutputLs=extraOutputLs, \
 					transferOutput=transferOutput, \
