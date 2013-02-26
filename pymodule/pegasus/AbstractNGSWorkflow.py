@@ -24,6 +24,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						("gatk_path", 1, ): ["%s/script/gatk/dist", '', 1, 'GATK folder containing its jar binaries'],\
 						("gatk2_path", 1, ): ["%s/script/gatk2/", '', 1, 'GATK version 2 or afterwards, no more source code, just binary jar files.'],\
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
+						('vcftoolsPath', 1, ): ["%s/bin/vcftools/vcftools", '', 1, 'path to the vcftools binary', ],\
+						('vcfSubsetPath', 1, ): ["%s/bin/vcftools/vcf-subset", '', 1, 'path to the vcf-subset program', ],\
 						('maxContigID', 0, int): [None, 'x', 1, 'if contig/chromosome(non-sex) ID > this number, it will not be included. If None or 0, no restriction.', ],\
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
 						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
@@ -54,7 +56,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2011-7-11
 		"""
-		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'gatk2_path'])
+		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'gatk2_path',\
+											'vcftoolsPath', 'vcfSubsetPath'])
 		#inserted before AbstractWorkflow.__init__()
 		AbstractWorkflow.__init__(self, **keywords)
 		#from pymodule import ProcessOptions
@@ -103,7 +106,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		
 		#have to be a different folder, otherwise name clash with the old gatk jar file
 		self.registerOneJar(name="GenomeAnalysisTK2Jar", path=os.path.join(self.gatk2_path, 'GenomeAnalysisTK.jar'),\
-						folderName='gatk2')
+						folderName='gatk2Jar')
 	
 	def registerCustomJars(self, workflow=None, ):
 		"""
@@ -246,11 +249,11 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		vcf_concat.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((vcf_concat, 1))
 		
-		vcfSubsetPath = os.path.join(self.home_path, "bin/vcftools/vcf-subset")
-		self.vcfSubsetPath = vcfSubsetPath	#vcfSubsetPath is first argument to vcfSubsetPath
+		#vcfSubsetPath is first argument to vcfSubset
 		vcfSubset = Executable(namespace=namespace, name="vcfSubset", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcfSubset.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcfSubset.sh"), site_handler))
+		vcfSubset.vcfSubsetPath = self.vcfSubsetPath
 		executableClusterSizeMultiplierList.append((vcfSubset, 1))
 		
 		concatGATK = Executable(namespace=namespace, name="concatGATK", version=version, \
@@ -263,12 +266,11 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		concatSamtools.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((concatSamtools, 1))
 		
-		vcftoolsPath = os.path.join(self.home_path, "bin/vcftools/vcftools")
-		self.vcftoolsPath = vcftoolsPath	#vcftoolsPath is first argument to vcftoolsWrapper
+		#vcftoolsPath is first argument to vcftoolsWrapper
 		vcftoolsWrapper = Executable(namespace=namespace, name="vcftoolsWrapper", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
 		vcftoolsWrapper.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcftoolsWrapper.sh"), site_handler))
-		vcftoolsWrapper.vcftoolsPath = vcftoolsPath
+		vcftoolsWrapper.vcftoolsPath = self.vcftoolsPath
 		executableClusterSizeMultiplierList.append((vcftoolsWrapper, 1))
 		#vcftoolsWrapper.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		#self.addExecutable(vcftoolsWrapper)
@@ -471,9 +473,10 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		return vcf_convert_job
 	
 	def addBGZIP_tabix_Job(self, workflow=None, bgzip_tabix=None, parentJob=None, inputF=None, outputF=None, \
-							namespace=None, version=None, transferOutput=False, parentJobLs=None, tabixArguments=None,\
+							transferOutput=False, parentJobLs=None, tabixArguments=None,\
 							extraDependentInputLs=None, **keywords):
 		"""
+			access the tbi file via job.tbi_F
 		2012.8.17 if transferOutput is None, do not register output files as OUTPUT with transfer flag
 			use addGenericJob()
 		2011.12.20
@@ -481,6 +484,10 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		2011-11-4
 		
 		"""
+		if workflow is None:
+			workflow = self
+		if bgzip_tabix is None:
+			bgzip_tabix = self.bgzip_tabix
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
 		extraArgumentList = []
@@ -534,6 +541,102 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=vcf_job_max_memory,  sshDBTunnel=None, \
 					key2ObjectForJob=key2ObjectForJob, **keywords)
 		return job
+	
+	def addGATKCombineVariantsJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, \
+								refFastaFList=None, outputFile=None, genotypeMergeOptions='UNIQUIFY', \
+					parentJobLs=None, transferOutput=True, job_max_memory=2000,max_walltime=None,\
+					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
+		"""
+		2012.2.26 replacing addVCFConcatJob using GATK's CombineVariants analysis-type
+		Value for genotypeMergeOptions:
+			UNIQUIFY
+				Make all sample genotypes unique by file. Each sample shared across RODs gets named sample.ROD.
+			PRIORITIZE
+				Take genotypes in priority order (see the priority argument).
+			UNSORTED
+				Take the genotypes in any order.
+			REQUIRE_UNIQUE
+				Require that all samples/genotypes be unique between all inputs.
+		"""
+		if workflow is None:
+			workflow = self
+		if executable is None:
+			executable = self.CombineVariantsJava
+		if GenomeAnalysisTKJar is None:
+			GenomeAnalysisTKJar = self.GenomeAnalysisTK2Jar
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		
+		if genotypeMergeOptions:
+			extraArgumentList.append("-genotypeMergeOptions %s"%(genotypeMergeOptions))
+		
+		
+		job = self.addGATKJob(workflow=workflow, executable=executable, GenomeAnalysisTKJar=GenomeAnalysisTKJar, \
+							GATKAnalysisType="CombineVariants",\
+					inputFile=None, inputArgumentOption=None, refFastaFList=refFastaFList, inputFileList=None,\
+					outputFile=outputFile, \
+					parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+					frontArgumentList=None, extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
+					extraOutputLs=None, \
+					extraDependentInputLs=extraDependentInputLs, no_of_cpus=None, max_walltime=max_walltime, **keywords)
+		return job
+	
+	def addGATKJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, GATKAnalysisType=None,\
+					inputFile=None, inputArgumentOption=None, refFastaFList=None, inputFileList=None,\
+					interval=None, outputFile=None, \
+					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
+					extraDependentInputLs=None, no_of_cpus=None, max_walltime=None, **keywords):
+		"""
+		2012.2.26 a generic function to add GATK jobs
+		"""
+		if workflow is None:
+			workflow = self
+		if executable is None:
+			executable = self.java
+		if GenomeAnalysisTKJar is None:
+			GenomeAnalysisTKJar = self.GenomeAnalysisTK2Jar
+		if frontArgumentList is None:
+			frontArgumentList = []
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		
+		
+		refFastaFile = refFastaFList[0]
+		extraDependentInputLs.extend(refFastaFList)
+		
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementObject.memRequirement
+		javaMemRequirement = memRequirementObject.memRequirementInStr
+		
+		frontArgumentList.extend([javaMemRequirement, '-jar', GenomeAnalysisTKJar, "--reference_sequence",  refFastaFile, \
+						"-T", GATKAnalysisType,\
+						self.defaultGATKArguments])
+		extraDependentInputLs.append(GenomeAnalysisTKJar)
+		if no_of_cpus:
+			frontArgumentList.append("--num_threads %s"%no_of_cpus)
+		if interval is not None:
+			if isinstance(interval, File):	#2012.7.30
+				extraDependentInputLs.append(interval)
+				frontArgumentList.extend(["-L:bed", interval])
+			else:
+				frontArgumentList.extend(["-L", interval])
+		
+		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
+					inputArgumentOption=inputArgumentOption,\
+					outputFile=outputFile, outputArgumentOption="--out", inputFileList=inputFileList, \
+					parentJob=None, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=extraOutputLs, \
+					transferOutput=transferOutput, \
+					frontArgumentList=frontArgumentList, extraArguments=extraArguments, \
+					extraArgumentList=extraArgumentList, job_max_memory=job_max_memory,  sshDBTunnel=None, \
+					key2ObjectForJob=None, no_of_cpus=no_of_cpus, max_walltime=max_walltime, **keywords)
+		return job
+	
 	
 	def addVCFSubsetJob(self, workflow=None, executable=None, vcfSubsetPath=None, sampleIDFile=None,\
 					inputVCF=None, outputF=None, \
