@@ -954,11 +954,12 @@ class AbstractWorkflow(ADAG):
 		
 		
 	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
-					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
+					outputFile=None, outputArgumentOption="-o", inputFileList=None, argumentForEachFileInInputFileList=None, \
 					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
 					key2ObjectForJob=None, no_of_cpus=None, max_walltime=None, **keywords):
 		"""
+		2013.2.26 added argument argumentForEachFileInInputFileList, to be added in front of each file in inputFileList
 		2013.2.7 add argument frontArgumentList, a list of arguments to be put in front of anything else
 		2012.10.18
 			add job.parentJobLs to store its parent job(s).
@@ -1045,6 +1046,8 @@ class AbstractWorkflow(ADAG):
 		if inputFileList:
 			for inputFile in inputFileList:
 				if inputFile:
+					if argumentForEachFileInInputFileList:
+						job.addArguments(argumentForEachFileInInputFileList)
 					job.addArguments(inputFile)
 					isAdded = self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
 					#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
