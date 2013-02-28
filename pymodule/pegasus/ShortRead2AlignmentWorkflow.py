@@ -421,7 +421,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					workflow.depends(parent=parentJob, child=alignmentJob)
 		return alignmentJob
 	
-	def addBWAAlnJob(self, workflow=None, executable=None, bwaCommand='aln', fileObject=None, outputFile=None,\
+	def addBWAAlignmentJob(self, workflow=None, executable=None, bwaCommand='aln', fileObject=None, outputFile=None,\
 					refFastaFList=None, no_of_aln_threads=3, \
 					maxMissingAlignmentFraction=0.04, maxNoOfGaps=1, additionalArguments=None, \
 					refIndexJob=None,\
@@ -486,7 +486,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			self.addRefIndexJobAndItsOutputAsParent(workflow, refIndexJob, childJob=alignmentJob)
 		return alignmentJob
 	
-	def addBWAAlignmentJob(self, workflow=None, fileObjectLs=None, \
+	def addBWAAlignmentWrapJob(self, workflow=None, fileObjectLs=None, \
 					refFastaFList=None, bwa=None, additionalArguments=None, \
 					samtools=None, \
 					refIndexJob=None, parentJobLs=None,\
@@ -552,7 +552,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				outputFname = os.path.join(outputDir, '%s.sai'%fname_prefix)
 				saiOutput = File(outputFname)
-				alignmentJob = self.addBWAAlnJob(workflow=workflow, executable=bwa, bwaCommand=alignment_method.command, \
+				alignmentJob = self.addBWAAlignmentJob(workflow=workflow, executable=bwa, bwaCommand=alignment_method.command, \
 									fileObject=fileObject, outputFile=saiOutput,\
 					refFastaFList=refFastaFList, no_of_aln_threads=no_of_aln_threads, \
 					maxMissingAlignmentFraction=maxMissingAlignmentFraction, maxNoOfGaps=maxNoOfGaps, \
@@ -622,7 +622,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 				outputFname = os.path.join(outputDir, '%s.sai'%tmp_fname_prefix)
 				saiOutput = File(outputFname)
 				
-				alignmentJob = self.addBWAAlnJob(workflow=workflow, executable=bwa, bwaCommand=alignment_method.command, \
+				alignmentJob = self.addBWAAlignmentJob(workflow=workflow, executable=bwa, bwaCommand=alignment_method.command, \
 									fileObject=fileObject, outputFile=saiOutput,\
 					refFastaFList=refFastaFList, no_of_aln_threads=no_of_aln_threads, \
 					maxMissingAlignmentFraction=maxMissingAlignmentFraction, maxNoOfGaps=maxNoOfGaps, \
@@ -684,7 +684,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		2012.4.5
 			choose which alignment program to use based on alignment_method.short_name
 		2012.2.23
-			split the BWA alignment part to addBWAAlignmentJob()
+			split the BWA alignment part to addBWAAlignmentWrapJob()
 		2011-9-13
 			add argument java & SortSamJar
 		2011-9-9
@@ -714,7 +714,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						no_of_aln_threads=no_of_aln_threads, stampy=stampy,\
 						transferOutput=transferOutput)
 		elif alignment_method.short_name.find('bwa')==0:
-			alignmentJob = self.addBWAAlignmentJob(workflow=workflow, fileObjectLs=fileObjectLs, \
+			alignmentJob = self.addBWAAlignmentWrapJob(workflow=workflow, fileObjectLs=fileObjectLs, \
 						refFastaFList=refFastaFList, bwa=bwa, \
 						additionalArguments=additionalArguments, samtools=samtools, \
 						refIndexJob=refIndexJob, parentJobLs=parentJobLs, \
