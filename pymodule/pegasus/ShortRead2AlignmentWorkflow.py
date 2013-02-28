@@ -351,7 +351,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def addBWAAlignmentJob(self, workflow=None, executable=None, bwaCommand='aln', fileObject=None, outputFile=None,\
 					refFastaFList=None, no_of_aln_threads=3, \
-					maxMissingAlignmentFraction=0.04, maxNoOfGaps=1, additionalArguments=None, \
+					maxMissingAlignmentFraction=None, maxNoOfGaps=None, additionalArguments=None, \
 					refIndexJob=None,\
 					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000, \
@@ -422,7 +422,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
 					java=None, SortSamFilesJava=None, SortSamJar=None,\
 					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
-					no_of_aln_threads=3, maxMissingAlignmentFraction=0.04, maxNoOfGaps=1, \
+					no_of_aln_threads=3, maxMissingAlignmentFraction=None, maxNoOfGaps=None, \
 					transferOutput=False, **keywords):
 		"""
 		2012.10.10
@@ -590,7 +590,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					java=None, SortSamFilesJava=None, SortSamJar=None,\
 					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 					no_of_aln_threads=3, stampy=None, \
-					maxMissingAlignmentFraction=0.04, maxNoOfGaps=1, addBamIndexJob=False,\
+					maxMissingAlignmentFraction=None, maxNoOfGaps=None, addBamIndexJob=False,\
 					transferOutput=False, **keywords):
 		"""
 		2012.10.18 add argument addBamIndexJob,
