@@ -1,85 +1,13 @@
 #!/usr/bin/env python
 """
 Examples:
-	# 2011-8-30 workflow on condor, always commit (-c)
-	%s -i 165-167 -o ShortRead2Alignment_isq_id_165_167_vs_9.xml -u yh -a 9 -l condorpool
-		-n1 -z dl324b-1.cmb.usc.edu -c -H
-	
-	# 2011-8-30 a workflow with 454 long-read and short-read PE. need a ref index job (-n1). 
-	%s -i 165-167 -o ShortRead2Alignment_isq_id_165_167_vs_9.xml -u yh -a 9
-		-e /u/home/eeskin/polyacti -l hoffman2 -t /u/home/eeskin/polyacti/NetworkData/vervet/db -n1
-		-z dl324b-1.cmb.usc.edu -c
-		--tmpDir /work/ -H
-	
-	# 2011-8-30 output a workflow to run alignments on hoffman2's condor pool (-D changes local_data_dir. -t changes data_dir.)
-	# 2012.3.20 use /work/ or /u/scratch/p/polyacti/tmp as TMP_DIR for MarkDuplicates.jar (/tmp is too small for 30X genome)
-	# 2012.5.4 cluster 10 alignment jobs (before merging) as a unit (--cluster_size_for_aln_jobs 10), skip done alignment (-K)
-	# 2012.9.21 add "-H" because AddAlignmentFile2DB need db conneciton
-	# 2012.9.21 add "--alignmentPerLibrary" to also get alignment for each library within one individual_sequence
-	%s  -D /u/home/eeskin/polyacti/NetworkData/vervet/db/ -t /u/home/eeskin/polyacti/NetworkData/vervet/db/ 
-		-l hcondor -j hcondor 
-		-z localhost -u yh -c
-		-i 631-700 -o workflow/ShortRead2Alignment_Isq_631-700_vs_524_hcondor.xml  -a 524 
-		--tmpDir /work/ -e /u/home/eeskin/polyacti  --cluster_size_for_aln_jobs 10 -K  -H --alignmentPerLibrary
-	
-	# 2011-8-30 a workflow to run on condorpool, no ref index job. Note the site_handler and input_site_handler are both condorpool
-	# to enable symlink of input files. need ref index job (--needRefIndexJob).
-	# If input_site_handler is "local", pegasus will report error saying it doesn't know how to replica-transfer input files.
-	%s -i 176,178-183,207-211
-		-o ShortRead2Alignment_8VWP_vs_9_condor_no_refIndex.xml
-		-u yh -a 9 -j condorpool -l condorpool --needRefIndexJob -z dl324b-1.cmb.usc.edu -p secret  -c -H
-	
-	# 2011-8-30 a workflow to run on condorpool, no ref index job. Note the site_handler and input_site_handler are both condorpool
-	# to enable symlink of input files.
-	# If input_site_handler is "local", pegasus will report error saying it doesn't know how to replica-transfer input files.
-	%s -i 176,178-183,207-211
-		-o ShortRead2Alignment_8VWP_vs_9_condor_no_refIndex.xml
-		-u yh -a 9 -j condorpool -l condorpool --needRefIndexJob -z dl324b-1.cmb.usc.edu -p secret  -c -H
-		
-	# 2011-8-30 a workflow to run on uschpc, with ref index job. Note the site_handler and input_site_handler.
-	# to enable replica-transfer.
-	%s -i 391-397,456,473,493
-		-o ShortRead2Alignment_4DeepVRC_6LowCovVRC_392_397_vs_9_uschpc.xml -u yh -a 9
-		-j local -l uschpc -n1 -e /home/cmb-03/mn/yuhuang -z 10.8.0.10 -p secret  -c -H
-
-	# 2011-8-30 a workflow to run on uschpc, Need ref index job (--needRefIndexJob), and 4 threads for each alignment job 
-	# Note the site_handler, input_site_handler and "-t ..." to enable symlink
-	%s -i 391-397,456,473,493
-		-o ShortRead2Alignment_4DeepVRC_6LowCovVRC_392_397_vs_9_uschpc.xml -u yh -a 9
-		-j uschpc -l uschpc --needRefIndexJob -p secret -c --no_of_aln_threads 4 -H
-		-e /home/cmb-03/mn/yuhuang -z 10.8.0.10 
-		-t /home/cmb-03/mn/yuhuang/NetworkData/vervet/db/ -J /home/cmb-03/mn/yuhuang/bin/jdk/bin/java
-	
-	# 2011-11-16 a workflow to run on uschpc, Need ref index job (--needRefIndexJob), and 4 threads for each alignment job 
-	# Note the site_handler, input_site_handler. this will stage in all input and output (--notStageOutFinalOutput).
-	%s -i 391-397,456,473,493
-		-o workflow/ShortRead2Alignment/ShortRead2Alignment_4DeepVRC_6LowCovVRC_392_397_vs_9_local2usc.xml -u yh -a 9
-		-j local -l uschpc --needRefIndexJob -p secret -c --no_of_aln_threads 4
-		-e /home/cmb-03/mn/yuhuang -z 10.8.0.10 
-		-J /home/cmb-03/mn/yuhuang/bin/jdk/bin/java  -H
-	
-	
-	#2011-9-13 no ref index job, staging input files from localhost to uschpc, stage output files back to localhost
-	# modify the refFastaFile's path in xml manually
-	%s -i 1-3 -o ShortRead2Alignment_1_3_vs_524_local2uschpc.xml -u yh -a 524
-		-j local -l uschpc --needRefIndexJob -p secret -c --no_of_aln_threads 4 -e /home/cmb-03/mn/yuhuang -z 10.8.0.10
-		-t /Network/Data/vervet/db/  -H
-	
-	# 2011-8-31 output the same workflow above but for condorpool
-	%s -i 391-397,456,473,493, -o workflow/ShortRead2Alignment/ShortRead2Alignment_4DeepVRC_6LowCovVRC_392_397_vs_9_condorpool.xml
-		-u yh -a 9 -j condorpool -l condorpool --needRefIndexJob -z 10.8.0.10  -p secret  -c --alignmentPerLibrary  -H
-	
-	# 2012-4-5 new alignment method, stampy (--alignment_method_name)
-	%s -i 167,176,178,182,183,207-211,391-397,456,473,493
-		-o workflow/ShortRead2Alignment/ShortRead2Alignment_10VWP_4DeepVRC_6LowCovVRC_392_397_vs_508_condorpool.xml
-		-u yh -a 508 -j condorpool -l condorpool -n1 -z 10.8.0.10  -p secret  -c --alignment_method_name stampy  -H
+	%s 
 	
 Description:
 	2012.11.14 a read-alignment workflow, extracted from vervet/src/ShortRead2AlignmentPipeline.py.
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0], \
-				sys.argv[0], sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
@@ -548,7 +476,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			sequence_type = fileObject.db_entry.individual_sequence.sequence_type
 			sequencer = fileObject.db_entry.individual_sequence.sequencer
 			
-			if alignment_method.command=='aln' and sequencer!='454':	#short single-end read
+			if alignment_method.command.find('aln')>=0 and sequencer!='454':	#short single-end read
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				outputFname = os.path.join(outputDir, '%s.sai'%fname_prefix)
 				saiOutput = File(outputFname)
@@ -574,7 +502,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 				self.addJobDependency(workflow=workflow, parentJob=alignmentJob, childJob=sai2samJob)
 				workflow.no_of_jobs += 1
 				
-			elif alignment_method.command=='bwasw' or sequencer=='454':	#long single-end read
+			elif alignment_method.command.find('bwasw')>=0 or sequencer=='454':	#long single-end read
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
 				alignmentJob = Job(namespace=namespace, name=LongSEAlignmentByBWA.name, version=version)
@@ -905,7 +833,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						version=getattr(workflow, 'version', version))
 		bamFnamePrefix = os.path.splitext(outputBamFile.name)[0]
 		MarkDupOutputF = outputBamFile
-		MarkDupOutputMetricF = '%s.metric'%(bamFnamePrefix)
+		MarkDupOutputMetricF = File('%s.metric'%(bamFnamePrefix))	#2013.2.27 bugfix
 		
 		memRequirementData = self.getJVMMemRequirment(job_max_memory=MarkDupJobMaxMemory, minMemory=2000)
 		job_max_memory = memRequirementData.memRequirement
