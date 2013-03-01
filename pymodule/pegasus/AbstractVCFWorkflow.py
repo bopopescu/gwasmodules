@@ -140,8 +140,9 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	def registerAllInputFiles(self, workflow=None, inputDir=None, input_site_handler=None, \
 					checkEmptyVCFByReading=False, pegasusFolderName='',\
 					maxContigID=None, minContigID=None, db_vervet=None, needToKnowNoOfLoci=False,
-					minNoOfLoci=None):
+					minNoOfLoci=None, includeIndelVCF=True):
 		"""
+		2013.3.1 flip includeIndelVCF to true (now indel and SNP vcf files from AlignmentToCall workflows are in separate folders.
 		2012.8.15 add argument db_vervet, needToKnowNoOfLoci, to get no_of_loci by parsing inputFname and find db-entry...
 			argument minNoOfLoci, only used when it's not None and needToKnowNoOfLoci is True
 		2012.8.10 add maxContigID and minContigID to restrict input
@@ -175,7 +176,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 					import traceback
 					traceback.print_exc()
-			if NextGenSeq.isFileNameVCF(fname, includeIndelVCF=False) and \
+			if NextGenSeq.isFileNameVCF(fname, includeIndelVCF=includeIndelVCF) and \
 					not NextGenSeq.isVCFFileEmpty(inputFname, checkContent=checkEmptyVCFByReading):
 				real_counter += 1
 				inputBaseFname = os.path.basename(inputFname)
