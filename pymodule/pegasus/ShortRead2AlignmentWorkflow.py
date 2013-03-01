@@ -37,6 +37,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	for bwa/PEAlignmentByBWA/LongSEAlignmentByBWA/addOrReplaceReadGroupsJava/SortSamFilesJava/samtools jobs'],\
 						('notStageOutFinalOutput', 0, int):[0, '', 0, 'toggle to not stage out final output (bam + bam.bai)'],\
 						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, default is /tmp/ but sometimes it is too small'],\
+						("coreAlignmentJobWallTimeMultiplier", 1, float): [1.0, '', 1, 'The default wall time is 23 hours (for bwa aln, stampy, etc.).\
+	This option controls walltime by multiplying the default with this number.'],\
 						
 							}
 	option_default_dict.update(alignment_option_dict.copy())
@@ -305,10 +307,10 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		samse_job_max_memory = 4500	#in MB
 		sampe_job_max_memory = 6000	#in MB
 		addRGJob_max_memory = 2500	#in MB
-		aln_job_max_walltime= 4800	#80 hours, in minutes
-		aln_job_max_walltime = 1320	#22 hours, because all reads are stored in chunks of 5-million-read files
+		#2013.3.1 change the walltime by multiplying it
+		aln_job_max_walltime = 1380*self.coreAlignmentJobWallTimeMultiplier
+			#1380 is 23 hours, because all reads are stored in chunks of 5-million-read files
 		
-		javaMemRequirement = "-Xms128m -Xmx%sm"%addRGJob_max_memory
 		refFastaFile = refFastaFList[0]
 		firstFileObject = fileObjectLs[0]
 		fastqF = firstFileObject.fastqF
@@ -462,8 +464,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		sampe_job_max_memory = 6000	#in MB
 		addRGJob_max_memory = 2500	#in MB
 		
-		aln_job_max_walltime= 4800	#80 hours, in minutes
-		aln_job_max_walltime = 1020	#22 hours, because all reads are stored in chunks of 5-million-read files
+		#2013.3.1 change the walltime by multiplying it
+		aln_job_max_walltime = int(1380*self.coreAlignmentJobWallTimeMultiplier)
+			#1380 is 23 hours, because all reads are stored in chunks of 5-million-read files
 		
 		memRequirementData = self.getJVMMemRequirment(job_max_memory=addRGJob_max_memory, minMemory=2000)
 		job_max_memory = memRequirementData.memRequirement
