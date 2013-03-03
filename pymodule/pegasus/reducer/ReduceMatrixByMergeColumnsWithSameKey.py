@@ -73,12 +73,13 @@ class ReduceMatrixByMergeColumnsWithSameKey(AbstractReducer):
 	
 	def outputFinalData(self, outputFname, key2dataLs=None, delimiter=None, header=None):
 		"""
+		2013.3.3 bugfix , added openMode='w' for MatrixFile()
 		2013.2.12 replace csv.writer with MatrixFile
 		2012.7.30
 			open the outputFname regardless whether there is data or not.
 		2012.1.9
 		"""
-		writer = MatrixFile(inputFname=outputFname, delimiter=delimiter)
+		writer = MatrixFile(inputFname=outputFname, delimiter=delimiter, openMode='w')
 		if key2dataLs and delimiter and header:
 			if header:
 				writer.writerow(header)
