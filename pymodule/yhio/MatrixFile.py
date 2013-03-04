@@ -19,7 +19,7 @@ Description:
 		reader = MatrixFile(inputFile=inf)
 		
 		#2013.2.1 writing
-		writer = MatrixFile('/tmp/output.txt', openMode='w')
+		writer = MatrixFile('/tmp/output.txt', openMode='w', delimiter='\t')
 		writer.writeHeader(...)
 		writer.writerow(row)
 		writer.close()
@@ -58,17 +58,24 @@ class MatrixFile(object):
 			self.inputFile = utils.openGzipFile(self.inputFname, openMode=self.openMode)
 		
 		self.csvFile = None
-		if self.openMode=='r':
+		self.isRealCSV = False
+		if self.openMode=='r':	#reading mode
 			if self.delimiter is None:
 				self.delimiter = figureOutDelimiter(self.inputFile)
+			
 			if self.delimiter=='\t' or self.delimiter==',':
 				self.csvFile = csv.reader(self.inputFile, delimiter=self.delimiter)
-				self.isCSVReader = True
+				self.isRealCSV = True
 			else:
 				self.csvFile = self.inputFile
-				self.isCSVReader = False
-		elif self.delimiter:
-			self.csvFile = csv.writer(self.inputFile, delimiter=self.delimiter)
+				self.isRealCSV = False
+		else:	#writing mode
+			if self.delimiter:
+				self.csvFile = csv.writer(self.inputFile, delimiter=self.delimiter)
+				self.isRealCSV = True
+			else:
+				self.csvFile = self.inputFile
+				self.isRealCSV = False
 		self.col_name2index = None
 	
 	def writeHeader(self):
@@ -76,7 +83,7 @@ class MatrixFile(object):
 		2012.11.16
 		"""
 		if self.header:
-			if self.isCSVReader:
+			if self.isRealCSV:
 				self.csvFile.writerow(self.header)
 			else:
 				self.csvFile.write("%s\n"%(self.delimiter.join(self.header)))
@@ -113,7 +120,7 @@ class MatrixFile(object):
 			row = self.csvFile.next()
 		except:
 			raise StopIteration
-		if not self.isCSVReader:
+		if not self.isRealCSV:
 			row = row.strip().split()
 		return row
 	
@@ -126,7 +133,7 @@ class MatrixFile(object):
 		mimic csv's writerow()
 		"""
 		if row:
-			if self.isCSVReader:
+			if self.isRealCSV:
 				self.csvFile.writerow(row)
 			else:
 				self.csvFile.write("%s\n"%(self.delimiter.join(row)))
