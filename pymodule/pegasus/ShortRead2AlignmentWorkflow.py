@@ -741,7 +741,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			extraArgumentList.append(extraArguments)
 		if extraDependentInputLs is None:
 			extraDependentInputLs=[]
-		extraDependentInputLs.extend([inputBamFile])
+		extraDependentInputLs.extend([inputBamFile, AddOrReplaceReadGroupsJar])
 		
 		job= self.addGenericJob(executable=addOrReplaceReadGroupsJava, inputFile=None,\
 							outputFile=None, outputArgumentOption="-o", \
@@ -773,7 +773,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			extraArgumentList.append(extraArguments)
 		if extraDependentInputLs is None:
 			extraDependentInputLs=[]
-		extraDependentInputLs.extend([inputBamFile])
+		extraDependentInputLs.extend([inputBamFile, SortSamJar])
 		
 		job= self.addGenericJob(executable=SortSamFilesJava, inputFile=None,\
 							outputFile=None, outputArgumentOption="-o", \
