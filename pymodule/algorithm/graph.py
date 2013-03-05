@@ -119,9 +119,10 @@ class GraphWrapper(Graph):
 		sys.stderr.write("%s nodes with hierarchy level.\n"%(len(node2HierarchyLevel)))
 		return node2HierarchyLevel
 	
-class DiGraphWrapper(GraphWrapper, DiGraph):
+class DiGraphWrapper(DiGraph, GraphWrapper):
 	def __init__(self, data=None, **keywords):
 		"""
+		2013.3.5, put GraphWrapper, behind DiGraph in inheritance
 		2013.1.3
 		"""
 		DiGraph.__init__(self, data=None, **keywords)
