@@ -328,7 +328,7 @@ def SNPData2RawSnpsData_ls(snpData, use_number2nt=1, need_transposeSNPData=0, re
 	"""
 	if report:
 		sys.stderr.write("Converting SNPData to RawSnpsData_ls ...")
-	from snpsdata import RawSnpsData
+	from variation.src.yhio.snpsdata import RawSnpsData
 	
 	if need_transposeSNPData:
 		newSnpData = transposeSNPData(snpData, report=report)
@@ -840,6 +840,7 @@ class SNPData(object):
 							('debug', 0, int): [0, '', 0, 'turn on the debug flag']}
 	def __init__(self, row_id_key_set=None, row_id_hash_func=None, col_id_key_set=None, col_id_hash_func=None, **keywords):
 		"""
+		2013.3.6 added allele_sequence2allele_number & allele_number2allele_sequence
 		2010-4-21 ignore_2nd_column is applied before processRowIDColID(). not just after read_data() is run.
 		2009-12-11
 			add 2 arguments (col_id_key_set and col_id_hash_func) to be passed to read_data()
@@ -851,6 +852,10 @@ class SNPData(object):
 		"""
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self, howto_deal_with_required_none=2)
+		#encode the allele-sequence in numbers
+		self.allele_sequence2allele_number = {}
+		self.allele_number2allele_sequence = {}
+		
 		#read it from file
 		if self.isDataMatrixEmpty(self.data_matrix) and isinstance(self.input_fname,str):
 			if os.path.isfile(self.input_fname):
@@ -1010,8 +1015,7 @@ class SNPData(object):
 		2012.8.24
 		"""
 		sys.stderr.write("Carrying out PCA on data_matrix ...")
-		import pca_module
-		from pymodule.PCA import PCA
+		from pymodule.algorithm.PCA import PCA
 		#T, P, explained_var = pca_module.PCA_svd(phenData_trans.data_matrix, standardize=True)
 		T, P, explained_var = PCA.eig(self.data_matrix, normalize=False)	#normalize=True causes missing value in the covariance matrix
 		if outputFname:
@@ -1578,6 +1582,7 @@ class SNPData(object):
 	
 	def convertSNPIDToChrPos(self, db):
 		"""
+		2013.3.6 bugfix
 		2011-03-10 (not tested)
 			assuming col_id is Snps.id, and convert them into chr_pos through db (stock_250k).
 			If col_id is already chr_pos format, no conversion.
@@ -1599,11 +1604,12 @@ class SNPData(object):
 		data_matrix = self.data_matrix[:, data_matrix_col_index_to_be_kept]
 		
 		no_of_rows = len(self.row_id_ls)
-		newSnpData = SNPData(row_id_ls=copy.deepcopy(self.row_id_ls), col_id_ls=self.col_id_ls)
+		newSnpData = SNPData(row_id_ls=copy.deepcopy(self.row_id_ls), col_id_ls=new_col_id_ls)
 		newSnpData.data_matrix = data_matrix
+		no_of_cols = len(newSnpData.col_id_ls)
 		newSnpData.no_of_cols_removed = len(self.col_id_ls)-no_of_cols
 		newSnpData.processRowIDColID()	# to initiate a new row_id2row_index since row_id_ls is changed
-		sys.stderr.write("%s columns discarded. Done.\n"%(newSnpData.no_of_cols_removed))
+		sys.stderr.write("%s columns discarded.\n"%(newSnpData.no_of_cols_removed))
 		return newSnpData
 	
 	@classmethod
@@ -1742,7 +1748,7 @@ class SNPData(object):
 		2010-9-30
 			like calLD() but doesn't require the alleles are encoded in integer according to nt2number.
 		"""
-		from algorithm import LD
+		from pymodule.algorithm import LD
 		snp1_index = self.col_id2col_index[col1_id]
 		snp2_index = self.col_id2col_index[col2_id]
 		return LD.calLD(self.data_matrix[:, snp1_index], self.data_matrix[:, snp2_index])
@@ -2508,7 +2514,7 @@ class GenomeWideResult(object):
 		
 		if drawBonferroni:
 			#draw the bonferroni line
-			bonferroni_value = -math.log10(0.01/len(genome_wide_result.data_obj_ls))
+			bonferroni_value = -math.log10(0.01/len(self.data_obj_ls))
 			ax.axhline(bonferroni_value, linestyle='--', color='k', linewidth=0.8)
 		
 		for highlightBand in highlightBandLs:
@@ -2610,7 +2616,7 @@ class GenomeWideResult(object):
 				continue
 			if do_log10_transformation:
 				if score<=0:
-					sys.stderr.write("score <=0. can't do log10. row is %s. assign %s to it.\n"%(repr(row), score_for_0_pvalue))
+					sys.stderr.write("score <=0. can't do log10. row is %s. assign %s to it.\n"%(repr(d1[i]), score_for_0_pvalue))
 					#continue
 					score = score_for_0_pvalue
 				else:
