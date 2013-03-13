@@ -1741,3 +1741,10 @@ class AbstractWorkflow(ADAG):
 			outputFile = File('%s%s'%(outputFnamePrefix, suffix))
 			extraOutputLs.append(outputFile)
 			key2ObjectForJob['%sFile'%(name)] = outputFile
+
+
+if __name__ == '__main__':
+	main_class = AbstractWorkflow
+	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
+	instance = main_class(**po.long_option2value)
+	instance.run()
