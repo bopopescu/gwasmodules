@@ -12,6 +12,7 @@ from pymodule import Genome, utils
 from pymodule.yhio import NextGenSeq
 from pymodule.pegasus import yh_pegasus
 from pymodule.utils import PassingData
+from pymodule import ProcessOptions
 from Pegasus.DAX3 import *
 from AbstractWorkflow import AbstractWorkflow
 
@@ -548,7 +549,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	
 	def addGATKCombineVariantsJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, \
 							refFastaFList=None, inputFileList=None, argumentForEachFileInInputFileList="--variant",\
-							outputFile=None, genotypeMergeOptions='UNIQUIFY', \
+							outputFile=None, genotypeMergeOptions='UNSORTED', \
 					parentJobLs=None, transferOutput=True, job_max_memory=2000,max_walltime=None,\
 					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
 		"""
@@ -1892,3 +1893,9 @@ Contig966       3160    50
 						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory)
 		
 		return job
+
+if __name__ == '__main__':
+	main_class = AbstractNGSWorkflow
+	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
+	instance = main_class(**po.long_option2value)
+	instance.run()
