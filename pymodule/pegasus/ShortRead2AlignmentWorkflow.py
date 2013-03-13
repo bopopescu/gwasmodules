@@ -898,3 +898,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					inputBamF=outputBamF,\
 					parentJobLs=[job], namespace=namespace, version=version,\
 					transferOutput=transferOutput)
+
+if __name__ == '__main__':
+	main_class = ShortRead2AlignmentWorkflow
+	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
+	instance = main_class(**po.long_option2value)
+	instance.run()
