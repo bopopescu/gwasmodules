@@ -479,7 +479,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			sequence_type = fileObject.db_entry.individual_sequence.sequence_type
 			sequencer = fileObject.db_entry.individual_sequence.sequencer
 			
-			if alignment_method.command.find('aln')>=0 and sequencer!='454':	#short single-end read
+			if alignment_method.command.find('aln')>=0 and sequencer.short_name!='454':	#short single-end read
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				outputFname = os.path.join(outputDir, '%s.sai'%fname_prefix)
 				saiOutput = File(outputFname)
@@ -505,7 +505,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 				self.addJobDependency(workflow=workflow, parentJob=alignmentJob, childJob=sai2samJob)
 				workflow.no_of_jobs += 1
 				
-			elif alignment_method.command.find('bwasw')>=0 or sequencer=='454':	#long single-end read
+			elif alignment_method.command.find('bwasw')>=0 or sequencer.short_name=='454':	#long single-end read
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
 				alignmentJob = Job(namespace=namespace, name=LongSEAlignmentByBWA.name, version=version)
@@ -722,9 +722,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		# add RG to this bam
 		sequencer = individual_alignment.individual_sequence.sequencer
 		read_group = individual_alignment.getReadGroup()	#2012.9.19
-		if sequencer=='454':
+		if sequencer.short_name=='454':
 			platform_id = 'LS454'
-		elif sequencer=='GA':
+		elif sequencer.short_name=='GA':
 			platform_id = 'ILLUMINA'
 		else:
 			platform_id = 'ILLUMINA'
