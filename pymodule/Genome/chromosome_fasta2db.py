@@ -1,1 +1,1 @@
-../../../Transfac/trunk/transfac/src/chromosome_fasta2db.py
+../../../transfac/src/chromosome_fasta2db.py
