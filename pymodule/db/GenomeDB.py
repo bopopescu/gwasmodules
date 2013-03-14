@@ -78,6 +78,7 @@ class RawSequence(Entity):
 
 class AnnotAssembly(Entity):
 	"""
+	2013.3.14 added accession & version & chromosome_type_id into the unique key
 	2013.2.17 added column genome_annotation_list
 	2013.2.12 added column chromosome_type
 	2011-8-24
@@ -110,7 +111,8 @@ class AnnotAssembly(Entity):
 	date_updated = Field(DateTime)
 	using_options(tablename='annot_assembly')
 	using_table_options(mysql_engine='InnoDB')
-	using_table_options(UniqueConstraint('tax_id','chromosome', 'start', 'stop', 'orientation', 'sequence_type_id'))
+	using_table_options(UniqueConstraint('accession', 'version','tax_id','chromosome', 'start', 'stop', \
+										'orientation', 'sequence_type_id', 'chromosome_type_id'))
 
 
 class ChromosomeType(Entity):
