@@ -29,7 +29,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						('additionalArguments', 0, ): ["-q 20", '', 1, 'a string of additional arguments passed to aln, not bwasw, add double quote if space'],\
 						("bwa_path", 1, ): ["%s/bin/bwa", '', 1, 'bwa binary'],\
 						("stampy_path", 1, ): ["%s/bin/stampy.py", '', 1, 'path to stampy.py'],\
-						("alignment_method_name", 1, ): ["bwa-short-read", '', 1, 'alignment_method.short_name from db.\
+						("alignment_method_name", 1, ): ["bwaShortRead", '', 1, 'alignment_method.short_name from db.\
 								used only when unable to guess based on individual_sequence.sequencer and individual_sequence.sequence_type'],\
 						("needRefIndexJob", 0, int): [0, '', 1, 'need to add a reference index job by bwa?'],\
 						('no_of_aln_threads', 1, int): [1, '', 1, 'number of threads during alignment'],\
@@ -479,7 +479,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			sequence_type = fileObject.db_entry.individual_sequence.sequence_type
 			sequencer = fileObject.db_entry.individual_sequence.sequencer
 			
-			if alignment_method.command.find('aln')>=0 and sequencer.short_name!='454':	#short single-end read
+			if alignment_method.command.find('aln')>=0 and sequencer.short_name!='454' and \
+						(sequence_type and sequence_type.read_length_mean is not None \
+						and sequence_type.read_length_mean<150):	#short single-end read
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				outputFname = os.path.join(outputDir, '%s.sai'%fname_prefix)
 				saiOutput = File(outputFname)
@@ -505,7 +507,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 				self.addJobDependency(workflow=workflow, parentJob=alignmentJob, childJob=sai2samJob)
 				workflow.no_of_jobs += 1
 				
-			elif alignment_method.command.find('bwasw')>=0 or sequencer.short_name=='454':	#long single-end read
+			elif alignment_method.command.find('bwasw')>=0 or sequencer.short_name=='454' or \
+						(sequence_type and sequence_type.read_length_mean is not None \
+						and sequence_type.read_length_mean>150):	#long single-end read
 				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
 				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
 				alignmentJob = Job(namespace=namespace, name=LongSEAlignmentByBWA.name, version=version)
