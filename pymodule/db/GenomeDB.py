@@ -45,10 +45,12 @@ __metadata__ = MetaData()
 
 class SequenceType(Entity):
 	"""
+	2013.3.14 added description
 	2008-07-27
 		a table storing meta information to be referenced by other tables
 	"""
-	type = Field(String(223), unique=True)
+	short_name = Field(String(223), unique=True)
+	description = Field(Text)	#2013.3.14
 	created_by = Field(String(256))
 	updated_by = Field(String(256))
 	date_created = Field(DateTime, default=datetime.now)
@@ -100,6 +102,7 @@ class AnnotAssembly(Entity):
 	orientation = Field(String(1))
 	sequence = Field(String(10000))
 	raw_sequence_start_id = Field(Integer)
+	original_path = Field(Text)
 	sequence_type = ManyToOne('%s.SequenceType'%__name__, colname='sequence_type_id', ondelete='SET NULL', onupdate='CASCADE')
 	chromosome_type = ManyToOne('%s.ChromosomeType'%__name__, colname='chromosome_type_id', ondelete='SET NULL', onupdate='CASCADE')
 	genome_annotation_list = OneToMany('%s.GenomeAnnotation'%__name__)
@@ -1399,9 +1402,21 @@ class GenomeDatabase(ElixirDB):
 								raw_sequence_table='%s.%s'%(schema, RawSequence.table.name))
 		return seq
 	
-	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
-								chromosome_type_id=0):
+	def getSequenceType(self, short_name=None, id=None, **keywords):
 		"""
+		2013.3.14
+		"""
+		db_entry = self.checkIfEntryInTable(TableClass=SequenceType, short_name=short_name, id=id)
+		if not db_entry:
+			db_entry = SequenceType(short_name=short_name)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
+	
+	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
+							version=None, chromosome_type_id=0, chromosome=None):
+		"""
+		2013.3.14 added argument version, chromosome
 		2013.2.15 added argument chromosome_type_id
 		chromosome_type_id: what type of chromosomes to be included, same as table genome.chromosome_type.
 			0: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial
@@ -1422,6 +1437,10 @@ class GenomeDatabase(ElixirDB):
 		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id)
 		if chromosome_type_id:
 			query = query.filter_by(chromosome_type_id=chromosome_type_id)
+		if version is not None:	#2013.3.14
+			query = query.filter_by(version=version)
+		if chromosome:	#2013.3.14
+			query = query.filter_by(chromosome=chromosome)
 		#order by size from big to small
 		query = query.order_by(desc(AnnotAssembly.stop))
 		counter = 0
@@ -1434,44 +1453,81 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("%s contigs. Done.\n"%(len(chr2size)))
 		return chr2size
 	
-	def run(self):
+	def getChromosomeType(self, short_name=None, id=None, comment=None, **keywords):
 		"""
+		2013.3.14
 		"""
-		if self.debug:
-			import pdb
-			pdb.set_trace()
+		TableClass=ChromosomeType
+		db_entry = self.checkIfEntryInTable(TableClass=TableClass, short_name=short_name, id=id)
+		if not db_entry:
+			db_entry = TableClass(short_name=short_name, comment=comment)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
 	
-		if self.geneAnnotationPickleFname and self.tax_id:	#only pick the file if the output file is not empty.
-			import cPickle
-			pickle_fname = os.path.expanduser(self.geneAnnotationPickleFname)	#2012.3.26 stopped using '~/at_gene_model_pickelf',
-			if os.path.isfile(pickle_fname):
-				#2011-1-20 check if the pickled file already exists or not
-				sys.stderr.write("File %s already exists, no gene model pickle output.\n"%(pickle_fname))
-				sys.exit(2)
-			else:
-				#2008-10-01	get gene model and pickle it into a file
-				gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = self.get_gene_id2model(tax_id=self.tax_id)
-				gene_annotation = PassingData()
-				gene_annotation.gene_id2model = gene_id2model
-				gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
-				gene_annotation.geneSpanRBDict = geneSpanRBDict
-				picklef = open(os.path.expanduser(pickle_fname), 'w')
-				cPickle.dump(gene_annotation, picklef, -1)
-				picklef.close()
-	
-	def getAnnotAssemblyFromTaxIDSequenceTypeChromosome(self, tax_id=None, sequence_type_id=None, chromosome=None):
+	def checkAnnotAssembly(self, id=None, accession = None, \
+						version=None, tax_id=None, chromosome =None, \
+						start=None, stop =None, orientation=None, \
+						sequence_type_id=None, chromosome_type_id=None):
 		"""
+		2013.3.14
+			all arguments part of unique key
+		"""
+		if id is not None:
+			db_entry = self.checkIfEntryInTable(TableClass=AnnotAssembly, id=id)
+			if db_entry:
+				return db_entry
+		
+		query = AnnotAssembly.query
+		if accession:
+			query = query.filter_by(accession=accession)
+		if version:
+			query = query.filter_by(version=version)
+		if tax_id:
+			query = query.filter_by(tax_id=tax_id)
+		if chromosome:
+			query = query.filter_by(chromosome=chromosome)
+		if start:
+			query = query.filter_by(start=start)
+		if stop:
+			query = query.filter_by(stop=stop)
+		if sequence_type_id:
+			query = query.filter_by(sequence_type_id=sequence_type_id)
+		if chromosome_type_id:
+			query = query.filter_by(chromosome_type_id=chromosome_type_id)
+		db_entry = query.first()
+		return db_entry
+	
+	def getAnnotAssembly(self, id=None, gi=None, acc_ver=None, accession = None, \
+						version =None, tax_id=None, chromosome =None, \
+						start =1, stop =None, orientation=None, sequence = None,\
+						raw_sequence_start_id=None, original_path=None, \
+						sequence_type_id=None, sequence_type_name= None, \
+						chromosome_type_id=None, chromosome_type_name=None, comment=None, **keywords):
+		"""
+		2013.3.14 more fully-fledged
 		2012.4.26
 			return db entry of a chromosome
 		"""
-		query = AnnotAssembly.query
-		if tax_id:
-			query = query.filter_by(tax_id=tax_id)
-		if sequence_type_id:
-			query = query.filter_by(sequence_type_id=sequence_type_id)
-		if chromosome:
-			query = query.filter_by(chromosome=chromosome)
-		return query.first()
+		sequence_type_id = None
+		chromosome_type_id = None
+		if sequence_type_name or sequence_type_id:
+			sequence_type = self.getSequenceType(short_name=sequence_type_name, id=sequence_type_id)
+			sequence_type_id=sequence_type.id
+		if chromosome_type_name or chromosome_type_id:
+			chromosome_type = self.getChromosomeType(short_name=chromosome_type_name, id=chromosome_type_id)
+			chromosome_type_id=chromosome_type.id
+		db_entry=self.checkAnnotAssembly(id=id, accession=accession, version=version, tax_id=tax_id, \
+								chromosome=chromosome, start=start, stop=stop, orientation=orientation, \
+								sequence_type_id=sequence_type_id, chromosome_type_id=chromosome_type_id)
+		if not db_entry:
+			db_entry = AnnotAssembly(gi =gi, acc_ver=acc_ver, accession=accession, \
+						version=version, tax_id = tax_id, chromosome = chromosome, start = start,\
+						stop =stop, orientation=orientation, sequence=sequence, \
+						raw_sequence_start_id = raw_sequence_start_id, original_path=original_path,\
+						sequence_type_id = sequence_type_id, chromosome_type_id=chromosome_type_id,\
+						comment = comment)
+		return db_entry
 	
 	def getGeneCommentary(self, gene_id=None, start=None, stop=None, gene_commentary_type_id=None, gene_commentary_id=None,\
 						accession=None, version=None, gi=None, label=None, text=None, comment=None,
@@ -1538,7 +1594,7 @@ class GenomeDatabase(ElixirDB):
 		if annot_assembly_id is None and annot_assembly:
 			annot_assembly_id = annot_assembly.id
 		if annot_assembly_id is None and chromosome and tax_id  and chromosome_sequence_type_id:
-			annot_assembly = self.getAnnotAssemblyFromTaxIDSequenceTypeChromosome(tax_id=tax_id, \
+			annot_assembly = self.getAnnotAssembly(tax_id=tax_id, \
 									sequence_type_id=chromosome_sequence_type_id, chromosome=chromosome)
 			annot_assembly_id = annot_assembly.id
 		
@@ -1583,6 +1639,32 @@ class GenomeDatabase(ElixirDB):
 			gene_segment_ls.append(gene_segment)
 		self.session.flush()
 		return gene_segment_ls
+	
+	def run(self):
+		"""
+		"""
+		if self.debug:
+			import pdb
+			pdb.set_trace()
+	
+		if self.geneAnnotationPickleFname and self.tax_id:	#only pick the file if the output file is not empty.
+			import cPickle
+			pickle_fname = os.path.expanduser(self.geneAnnotationPickleFname)	#2012.3.26 stopped using '~/at_gene_model_pickelf',
+			if os.path.isfile(pickle_fname):
+				#2011-1-20 check if the pickled file already exists or not
+				sys.stderr.write("File %s already exists, no gene model pickle output.\n"%(pickle_fname))
+				sys.exit(2)
+			else:
+				#2008-10-01	get gene model and pickle it into a file
+				gene_id2model, chr_id2gene_id_ls, geneSpanRBDict = self.get_gene_id2model(tax_id=self.tax_id)
+				gene_annotation = PassingData()
+				gene_annotation.gene_id2model = gene_id2model
+				gene_annotation.chr_id2gene_id_ls = chr_id2gene_id_ls
+				gene_annotation.geneSpanRBDict = geneSpanRBDict
+				picklef = open(os.path.expanduser(pickle_fname), 'w')
+				cPickle.dump(gene_annotation, picklef, -1)
+				picklef.close()
+	
 
 	
 def get_entrezgene_annotated_anchor(curs, tax_id, entrezgene_mapping_table='genome.gene',\
