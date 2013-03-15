@@ -31,7 +31,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						("stampy_path", 1, ): ["%s/bin/stampy.py", '', 1, 'path to stampy.py'],\
 						("alignment_method_name", 1, ): ["bwaShortRead", '', 1, 'alignment_method.short_name from db.\
 								used only when unable to guess based on individual_sequence.sequencer and individual_sequence.sequence_type'],\
-						("needRefIndexJob", 0, int): [0, '', 1, 'need to add a reference index job by bwa?'],\
+						("needRefIndexJob", 0, int): [0, '', 0, 'need to add a reference index job by bwa?'],\
 						('no_of_aln_threads', 1, int): [1, '', 1, 'number of threads during alignment'],\
 						('cluster_size_for_aln_jobs', 1, float): [0.01, '', 1, 'cluster size relative to self.clusters_size, \n\
 	for bwa/PEAlignmentByBWA/LongSEAlignmentByBWA/addOrReplaceReadGroupsJava/SortSamFilesJava/samtools jobs'],\
