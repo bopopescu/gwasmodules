@@ -105,7 +105,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		AddVCFFile2DB = Executable(namespace=namespace, name="AddVCFFile2DB", \
 											version=version, \
 											os=operatingSystem, arch=architecture, installed=True)
-		AddVCFFile2DB.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "db/AddVCFFile2DB.py"), site_handler))
+		AddVCFFile2DB.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "db/input/AddVCFFile2DB.py"), site_handler))
 		executableClusterSizeMultiplierList.append((AddVCFFile2DB, 1))
 		
 		FilterVCFSNPCluster = Executable(namespace=namespace, name="FilterVCFSNPCluster", version=version, os=operatingSystem, arch=architecture, installed=True)
