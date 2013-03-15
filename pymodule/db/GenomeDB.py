@@ -80,6 +80,7 @@ class RawSequence(Entity):
 
 class AnnotAssembly(Entity):
 	"""
+	2013.3.15 added argument outdated_index
 	2013.3.14 added accession & version & chromosome_type_id into the unique key
 	2013.2.17 added column genome_annotation_list
 	2013.2.12 added column chromosome_type
@@ -106,6 +107,7 @@ class AnnotAssembly(Entity):
 	sequence_type = ManyToOne('%s.SequenceType'%__name__, colname='sequence_type_id', ondelete='SET NULL', onupdate='CASCADE')
 	chromosome_type = ManyToOne('%s.ChromosomeType'%__name__, colname='chromosome_type_id', ondelete='SET NULL', onupdate='CASCADE')
 	genome_annotation_list = OneToMany('%s.GenomeAnnotation'%__name__)
+	outdated_index = Field(Integer, default=0)	#2013.3.15 any non-zero means outdated. to allow multiple outdated alignments
 	
 	comment = Field(Text)
 	created_by = Field(String(256))
@@ -115,7 +117,8 @@ class AnnotAssembly(Entity):
 	using_options(tablename='annot_assembly')
 	using_table_options(mysql_engine='InnoDB')
 	using_table_options(UniqueConstraint('accession', 'version','tax_id','chromosome', 'start', 'stop', \
-										'orientation', 'sequence_type_id', 'chromosome_type_id'))
+								'orientation', 'sequence_type_id', 'chromosome_type_id',\
+								'outdated_index'))
 
 
 class ChromosomeType(Entity):
@@ -1468,8 +1471,10 @@ class GenomeDatabase(ElixirDB):
 	def checkAnnotAssembly(self, id=None, accession = None, \
 						version=None, tax_id=None, chromosome =None, \
 						start=None, stop =None, orientation=None, \
-						sequence_type_id=None, chromosome_type_id=None):
+						sequence_type_id=None, chromosome_type_id=None,\
+						outdated_index=0):
 		"""
+		2013.3.15 added argument outdated_index
 		2013.3.14
 			all arguments part of unique key
 		"""
@@ -1495,6 +1500,8 @@ class GenomeDatabase(ElixirDB):
 			query = query.filter_by(sequence_type_id=sequence_type_id)
 		if chromosome_type_id:
 			query = query.filter_by(chromosome_type_id=chromosome_type_id)
+		if outdated_index:
+			query = query.filter_by(outdated_index=outdated_index)
 		db_entry = query.first()
 		return db_entry
 	
@@ -1503,8 +1510,11 @@ class GenomeDatabase(ElixirDB):
 						start =1, stop =None, orientation=None, sequence = None,\
 						raw_sequence_start_id=None, original_path=None, \
 						sequence_type_id=None, sequence_type_name= None, \
-						chromosome_type_id=None, chromosome_type_name=None, comment=None, **keywords):
+						chromosome_type_id=None, chromosome_type_name=None, \
+						outdated_index=0,\
+						comment=None, **keywords):
 		"""
+		2013.3.15 added argument outdated_index
 		2013.3.14 more fully-fledged
 		2012.4.26
 			return db entry of a chromosome
@@ -1519,13 +1529,15 @@ class GenomeDatabase(ElixirDB):
 				chromosome_type_id=chromosome_type.id
 		db_entry=self.checkAnnotAssembly(id=id, accession=accession, version=version, tax_id=tax_id, \
 								chromosome=chromosome, start=start, stop=stop, orientation=orientation, \
-								sequence_type_id=sequence_type_id, chromosome_type_id=chromosome_type_id)
+								sequence_type_id=sequence_type_id, chromosome_type_id=chromosome_type_id,\
+								outdated_index=outdated_index)
 		if not db_entry:
 			db_entry = AnnotAssembly(gi =gi, acc_ver=acc_ver, accession=accession, \
 						version=version, tax_id = tax_id, chromosome = chromosome, start = start,\
 						stop =stop, orientation=orientation, sequence=sequence, \
 						raw_sequence_start_id = raw_sequence_start_id, original_path=original_path,\
 						sequence_type_id = sequence_type_id, chromosome_type_id=chromosome_type_id,\
+						outdated_index=outdated_index,\
 						comment = comment)
 		return db_entry
 	
