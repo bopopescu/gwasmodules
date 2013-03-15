@@ -115,6 +115,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 	
 	def processHeader(self, header=None, pdata=None, rowDefinition=None):
 		"""
+		2013.3 only open self.outputFname for write when self.writer and self.invariantPData.writer is not available
 		2012.11.22
 		2012.8.13
 			called right after the header of an input file is derived in fileWalker()
@@ -123,22 +124,27 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			if self.outputFileFormat==1:
 				if self.invariantPData.writer and header:
 					self.invariantPData.writer.writerow(header)
-			elif self.outputFileFormat==2:
-				if not rowDefinition and header:	#generate a rowDefinition based on header
-					rowDefinition = []
-					for colID in header:
-						rowDefinition.append((colID, 's2000'))
-				writer = YHFile(self.outputFname, openMode='w', rowDefinition=rowDefinition)
-				self.invariantPData.writer = writer
-			else:	#for HDF5MatrixFile
-				if not rowDefinition and header:	#generate a rowDefinition based on header
-					rowDefinition = []
-					for colID in header:
-						rowDefinition.append((colID, HDF5MatrixFile.varLenStrType))
-				#rowDefinition = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
-				#	('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
-				writer = HDF5MatrixFile(self.outputFname, openMode='w', rowDefinition=rowDefinition)
-				self.invariantPData.writer = writer
+			elif getattr(self, 'writer', None) is None and getattr(self.invariantPData, 'writer', None) is None:
+				if self.outputFileFormat==2:
+					if not rowDefinition and header:	#generate a rowDefinition based on header
+						rowDefinition = []
+						for colID in header:
+							rowDefinition.append((colID, 's2000'))
+					writer = YHFile(self.outputFname, openMode='w', rowDefinition=rowDefinition)
+					self.invariantPData.writer = writer
+				else:	#for HDF5MatrixFile
+					if not rowDefinition and header:	#generate a rowDefinition based on header
+						rowDefinition = []
+						for colID in header:
+							rowDefinition.append((colID, HDF5MatrixFile.varLenStrType))
+					#rowDefinition = [('locus_id','i8'),('chromosome', HDF5MatrixFile.varLenStrType), ('start','i8'), ('stop', 'i8'), \
+					#	('score', 'f8'), ('MAC', 'i8'), ('MAF', 'f8')]
+					writer = HDF5MatrixFile(self.outputFname, openMode='w', rowDefinition=rowDefinition)
+					self.invariantPData.writer = writer
+			else:
+				sys.stderr.write("\t Either self.writer %s, or self.invariantPData.writer %s already exists.\n"%\
+								(getattr(self, 'writer', None), getattr(self.invariantPData, 'writer', None)))
+				sys.stderr.write("\t no writer created in processHeader().\n")
 		self.invariantPData.headerOutputted = True
 	
 	
