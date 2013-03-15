@@ -31,16 +31,33 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
 						('vcftoolsPath', 1, ): ["%s/bin/vcftools/vcftools", '', 1, 'path to the vcftools binary', ],\
 						('vcfSubsetPath', 1, ): ["%s/bin/vcftools/vcf-subset", '', 1, 'path to the vcf-subset program', ],\
+						
+						#to filter chromosomes
 						('maxContigID', 0, int): [None, 'x', 1, 'if contig/chromosome(non-sex) ID > this number, it will not be included. If None or 0, no restriction.', ],\
 						('minContigID', 0, int): [None, 'V', 1, 'if contig/chromosome(non-sex) ID < this number, it will not be included. If None or 0, no restriction.', ],\
 						("contigMaxRankBySize", 1, int): [1000, 'N', 1, 'maximum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
 						("contigMinRankBySize", 1, int): [1, 'M', 1, 'minimum rank (rank 1=biggest) of a contig/chr to be included in calling'],\
-						('chromosome_type_id', 0, int):[0, '', 1, 'what type of chromosomes to be included, same as table genome.chromosome_type.\n\
-	0: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial '],\
+						('chromosome_type_id', 0, int):[None, '', 1, 'what type of chromosomes to be included, same as table genome.chromosome_type.\n\
+	0 or None: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial '],\
+						('ref_genome_tax_id', 0, int):[60711, '', 1, 'used to fetch chromosome info from GenomeDB'],\
+						('ref_genome_sequence_type_id', 0, int):[9, '', 1, 'used to fetch chromosome info from GenomeDB'],\
+						('ref_genome_version', 0, int):[1, '', 1, 'used to fetch chromosome info from GenomeDB'],\
 						
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
-						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments from contaminated individuals, \n\
+						
+						#to filter alignment or individual_sequence
+						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments or sequences that are from contaminated individuals, \n\
 		(Individual.is_contaminated=1)'],\
+						("sequence_filtered", 0, int): [None, 'Q', 1, 'to filter alignments/individual_sequences. None: whatever; 0: unfiltered sequences, 1: filtered sequences: 2: ...'],\
+						("site_id_ls", 0, ): ["", 'S', 1, 'comma/dash-separated list of site IDs. individuals must come from these sites.'],\
+						("country_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of country IDs. individuals must come from these countries.'],\
+						("tax_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of taxonomy IDs. individuals must come from these taxonomies.'],\
+						("sequence_type_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.sequence_type_id. Empty for no filtering'],\
+						("sequencer_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.sequencer_id. Empty for no filtering'],\
+						("sequence_batch_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.sequence_batch_id. Empty for no filtering'],\
+						("version_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.version. Empty for no filtering'],\
+						("sequence_max_coverage", 0, float): [None, '', 1, 'max IndividualSequence.coverage. Empty for no filtering'],\
+						("sequence_min_coverage", 0, float): [None, '', 1, 'min IndividualSequence.coverage. Empty for no filtering'],\
 						})
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
 	
@@ -85,10 +102,17 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		if hasattr(self, 'contigMaxRankBySize') and hasattr(self, 'contigMinRankBySize'):
 			#2013.2.6 non-public schema dbs should be connected before the main vervetdb or other db (schema=public) is connected.
 			self.chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, \
-							contigMinRankBySize=self.contigMinRankBySize, tax_id=60711, sequence_type_id=9,\
+							contigMinRankBySize=self.contigMinRankBySize, tax_id=self.ref_genome_tax_id, \
+							sequence_type_id=self.ref_genome_sequence_type_id, version=self.ref_genome_version, \
 							chromosome_type_id=self.chromosome_type_id)
 		else:
 			self.chr2size = {}
+		
+		listArgumentName_data_type_ls = [("site_id_ls", int), ('country_id_ls', int), ('tax_id_ls', int),\
+								('sequence_type_id_ls', int), ('sequencer_id_ls', int), \
+								('sequence_batch_id_ls', int),('version_ls', int)]
+		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
+	
 	
 	def registerJars(self, workflow=None, ):
 		"""
@@ -326,7 +350,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				
 		AddAlignmentFile2DB = Executable(namespace=namespace, name="AddAlignmentFile2DB", version=version, os=operatingSystem,\
 										arch=architecture, installed=True)
-		AddAlignmentFile2DB.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "db/AddAlignmentFile2DB.py"), site_handler))
+		AddAlignmentFile2DB.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "db/input/AddAlignmentFile2DB.py"), site_handler))
 		executableClusterSizeMultiplierList.append((AddAlignmentFile2DB, 0))
 		
 		
@@ -1461,8 +1485,9 @@ Contig966       3160    50
 		return Genome.getChrFromFname(filename)
 	
 	def getTopNumberOfContigs(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
-							chromosome_type_id=0):
+							version=None, chromosome_type_id=0):
 		"""
+		2013.3.14 added argument version
 		2013.2.15 added argument chromosome_type_id
 		chromosome_type_id: what type of chromosomes to be included, same as table genome.chromosome_type.
 			0: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial
@@ -1486,7 +1511,8 @@ Contig966       3160    50
 						password=self.db_passwd, hostname=self.hostname, database=self.dbname, schema="genome")
 		db_genome.setup(create_tables=False)
 		chr2size = db_genome.getTopNumberOfChomosomes(contigMaxRankBySize=contigMaxRankBySize, contigMinRankBySize=contigMinRankBySize, \
-											tax_id=tax_id, sequence_type_id=sequence_type_id, chromosome_type_id=chromosome_type_id)
+							tax_id=tax_id, sequence_type_id=sequence_type_id, \
+							version=version, chromosome_type_id=chromosome_type_id)
 		return chr2size
 	
 	def restrictContigDictionry(self, dc=None, maxContigID=None, minContigID=None):
