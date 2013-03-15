@@ -33,7 +33,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 								used only when unable to guess based on individual_sequence.sequencer and individual_sequence.sequence_type'],\
 						("needRefIndexJob", 0, int): [0, '', 0, 'need to add a reference index job by bwa?'],\
 						('no_of_aln_threads', 1, int): [1, '', 1, 'number of threads during alignment'],\
-						('cluster_size_for_aln_jobs', 1, float): [0.01, '', 1, 'cluster size relative to self.clusters_size, \n\
+						('cluster_size_for_aln_jobs', 1, float): [0.01, '', 1, 'alignment job cluster size relative to self.clusters_size, \n\
 	for bwa/PEAlignmentByBWA/LongSEAlignmentByBWA/addOrReplaceReadGroupsJava/SortSamFilesJava/samtools jobs'],\
 						('notStageOutFinalOutput', 0, int):[0, '', 0, 'toggle to not stage out final output (bam + bam.bai)'],\
 						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, default is /tmp/ but sometimes it is too small'],\
@@ -105,8 +105,10 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		executableClusterSizeMultiplierList.append((stampy, self.cluster_size_for_aln_jobs))
 		
 		#workflow.BuildBamIndexFilesJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.cluster_size_for_aln_jobs))
-		executableClusterSizeMultiplierList.append((workflow.addOrReplaceReadGroupsJava, self.cluster_size_for_aln_jobs))
-		executableClusterSizeMultiplierList.append((workflow.samtools, self.cluster_size_for_aln_jobs))
+		self.setOrChangeExecutableClusterSize(executable=workflow.addOrReplaceReadGroupsJava, clusterSizeMultipler=self.cluster_size_for_aln_jobs, \
+											defaultClustersSize=None)
+		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=self.cluster_size_for_aln_jobs, \
+											defaultClustersSize=None)
 		
 		
 		bwa = Executable(namespace=namespace, name="bwa", version=version, os=operatingSystem, arch=architecture, installed=True)
