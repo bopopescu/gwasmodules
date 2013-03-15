@@ -96,15 +96,24 @@ def isVCFFileEmpty(inputFname, checkContent=False):
 
 def countNoOfChromosomesBasesInFastQFile(inputFname=None):
 	"""
+	2013.2.16 add the try...except around the parser
 	2013.2.9 count the #chromosomes, #bases of inputFname
 	"""
 	sys.stderr.write("Counting #chromosomes, #bases of %s ..."%(inputFname))
 	no_of_chromosomes = 0
 	no_of_bases = 0
 	inf = utils.openGzipFile(inputFname)
-	for seq_record in SeqIO.parse(inf, 'fastq'):
-		no_of_chromosomes += 1
-		no_of_bases += len(seq_record)
+	try:
+		for seq_record in SeqIO.parse(inf, 'fastq'):
+			no_of_chromosomes += 1
+			no_of_bases += len(seq_record)
+	except:
+		sys.stderr.write("Except after handling %s chromosomes & %s bases.\n"%(no_of_chromosomes, no_of_bases))
+		sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+		import traceback
+		traceback.print_exc()
+		raise
+		
 	inf.close()
 	sys.stderr.write("%s chromosomes, %s bases\n"%(no_of_chromosomes, no_of_bases))
 	return utils.PassingData(no_of_chromosomes=no_of_chromosomes, no_of_bases=no_of_bases)
