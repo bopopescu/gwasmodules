@@ -1509,14 +1509,14 @@ class GenomeDatabase(ElixirDB):
 		2012.4.26
 			return db entry of a chromosome
 		"""
-		sequence_type_id = None
-		chromosome_type_id = None
-		if sequence_type_name or sequence_type_id:
-			sequence_type = self.getSequenceType(short_name=sequence_type_name, id=sequence_type_id)
-			sequence_type_id=sequence_type.id
-		if chromosome_type_name or chromosome_type_id:
-			chromosome_type = self.getChromosomeType(short_name=chromosome_type_name, id=chromosome_type_id)
-			chromosome_type_id=chromosome_type.id
+		if not sequence_type_id:
+			if sequence_type_name:
+				sequence_type = self.getSequenceType(short_name=sequence_type_name)
+				sequence_type_id=sequence_type.id
+		if not chromosome_type_id:
+			if chromosome_type_name:
+				chromosome_type = self.getChromosomeType(short_name=chromosome_type_name)
+				chromosome_type_id=chromosome_type.id
 		db_entry=self.checkAnnotAssembly(id=id, accession=accession, version=version, tax_id=tax_id, \
 								chromosome=chromosome, start=start, stop=stop, orientation=orientation, \
 								sequence_type_id=sequence_type_id, chromosome_type_id=chromosome_type_id)
