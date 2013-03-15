@@ -474,6 +474,27 @@ class ElixirDB(object):
 					self._data_dir = data_dirEntry.description
 		return self._data_dir
 	
+	def checkIfEntryInTable(self, TableClass=None, short_name=None, id=None):
+		"""
+		2013.3.14
+			this could be used as generic way to query tables with short_name (unique) & id columns
+		"""
+		query = TableClass.query
+		if short_name or id:
+			if short_name:
+				query.filter_by(short_name=short_name)
+			if id is not None:
+				db_entry = TableClass.get(id)
+				return db_entry
+		else:
+			sys.stderr.write("Either short_name (%s) or id (%s) have to be non-None.\n"%(short_name, id))
+			raise
+		db_entry = query.first()
+		if db_entry:
+			return db_entry
+		else:
+			return None
+	
 	def getProperTableName(self, tableClass=None):
 		"""
 		2012.12.31 helper function to add schema in front of tablename.
