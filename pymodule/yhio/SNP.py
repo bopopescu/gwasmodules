@@ -852,7 +852,7 @@ class SNPData(object):
 		"""
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self, howto_deal_with_required_none=2)
-		#encode the allele-sequence in numbers
+		# 2013.3.7 to encode the allele-sequence in numbers. check PolymorphismTableFile.py 
 		self.allele_sequence2allele_number = {}
 		self.allele_number2allele_sequence = {}
 		
