@@ -180,7 +180,8 @@ class YHTable(tables.Table, YHTableInHDF5Group):
 			cellType
 				1: list or tuple, in the order of table columns, not including first "id" column
 				2: object with attributes whose names are same as those of the table columns
-				3: a dictionary with key=column-name, value=column-value
+				3: a dictionary with key=column-name, value=column-value, access by oneCell.get(colname, None)
+				4: raw dictionary. access by oneCell[colname]
 		"""
 		row = self.row
 		for i in xrange(len(self.colnames)):	#assuming data in oneCell is in the same order as tableObject.colnames
@@ -203,6 +204,10 @@ class YHTable(tables.Table, YHTableInHDF5Group):
 					value = getattr(oneCell, colname, None)
 				elif cellType==3:	#dictionary
 					value = oneCell.get(colname, None)
+				elif cellType==4:	#canonical dictionary
+					value = oneCell[colname]
+				else:
+					value = None
 				if value is not None:
 					row[colname] = value
 		row.append()
@@ -829,4 +834,18 @@ TypeError: 'NoneType' object is not callable
 	pdata = PassingData()	
 	for colname in rowPointer.table.colnames:
 		setattr(pdata, colname, rowPointer[colname])
+	return pdata
+
+
+def castPyTablesEntryIntoPassingData(entry=None):
+	"""
+	2013.3.11 entry is one cell in the array,that is returned from readWhere() query.
+		The array is a numpy data structure: array([(1L, '1', '', 2)], 
+			dtype=[('id', '<u8'), ('name', '|S512'), ('scientific_name', '|S512'), ('ploidy', '<u2')])
+		
+	"""
+	pdata = PassingData()
+	for i in xrange(len(entry.dtype.names)):
+		colname = entry.dtype.names[i]
+		setattr(pdata, colname, entry[i])
 	return pdata
