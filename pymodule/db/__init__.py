@@ -584,6 +584,26 @@ class ElixirDB(object):
 		self.session.add(db_entry)
 		self.session.flush()
 	
+	def copyFileWithAnotherFilePrefix(self, inputFname=None, filenameWithPrefix=None, outputDir=None,\
+									logMessage=None, srcFilenameLs=None, dstFilenameLs=None):
+		"""
+		2013.3.18 bugfix in filename. there was extra . between prefix and suffix.
+			moved from vervet/src/VervetDB.py
+		2012.9.20
+		"""
+		srcFilename = inputFname
+		prefix, suffix = os.path.splitext(os.path.basename(inputFname))
+		newPrefix = os.path.splitext(filenameWithPrefix)[0]
+		dstFilename = os.path.join(outputDir, '%s%s'%(newPrefix, suffix))
+		utils.copyFile(srcFilename=srcFilename, dstFilename=dstFilename)
+		if logMessage:
+			logMessage += "file %s has been copied to %s.\n"%(srcFilename, dstFilename)
+		if srcFilenameLs:
+			srcFilenameLs.append(srcFilename)
+		if dstFilenameLs:
+			dstFilenameLs.append(dstFilename)
+		return logMessage
+	
 	def moveFileIntoDBAffiliatedStorage(self, db_entry=None, filename=None, inputDir=None, outputDir=None, \
 									dstFilename=None,\
 								relativeOutputDir=None, shellCommand='cp -rL', srcFilenameLs=None, dstFilenameLs=None,\
