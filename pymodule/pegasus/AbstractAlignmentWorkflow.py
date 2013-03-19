@@ -197,7 +197,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		chrIDSet = prePreprocessData.chrIDSet
 		chr2VCFFile = prePreprocessData.chr2VCFFile
 		
-		sys.stderr.write("Adding alignment (+VCF)-related jobs for %s chromosomes/contigs ..."%(len(chrIDSet)))
+		sys.stderr.write("Adding jobs that work on alignment(/VCF)s for %s chromosomes/contigs ..."%(len(chrIDSet)))
 		refFastaF = refFastaFList[0]
 		
 		topOutputDir = "%sMap"%(outputDirPrefix)
