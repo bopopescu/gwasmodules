@@ -131,7 +131,10 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		executableClusterSizeMultiplierList.append((LongSEAlignmentByBWA, self.cluster_size_for_aln_jobs))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
-
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, \
+													name="SAM2BAMJava", clusterSizeMultipler=0.7)
+		
 	def addBWAReferenceIndexJob(self, workflow=None, refFastaFList=None, refSequenceBaseCount=3000000000, bwa=None,\
 					bwaIndexFileSuffixLs = None,\
 					transferOutput=True, job_max_memory=4000, max_walltime=200):
@@ -537,7 +540,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			#fastqF1, format, sequence_type = fileObjectLs[0][:3]
 			#fastqF2, format, sequence_type = fileObjectLs[1][:3]
 			fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
-			fname_prefix = fname_prefix[:-2]
+			#fname_prefix = fname_prefix[:-2]	#2013.3.18 stop discarding the last two characters of filename prefix
+			# full filename for pair-1 fastq is 13135_3628_20_gerald_81LWDABXX_5_ATCACG_1_3.fastq.gz. the last 3 is split order.
+			# the last 1 means pair-1. Doesn't affect filename uniqueness in either way. since the file id (13135) is unique.
 			alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
 			sai2samJob = Job(namespace=namespace, name=PEAlignmentByBWA.name, version=version)
 			sai2samJob.addArguments(refFastaFList[0])
@@ -669,6 +674,13 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		
 		## convert sam into bam	
 		bamOutputF = File(os.path.join(outputDir, "%s.bam"%(fname_prefix)))
+		#2013.3.18
+		sam_convert_job = self.addSAM2BAMJob(inputFile=alignmentJob.output, outputFile=bamOutputF,\
+					executable=self.SAM2BAMJava, SamFormatConverterJar=self.SamFormatConverterJar,\
+					parentJobLs=[alignmentJob], extraDependentInputLs=None, \
+					extraArguments=None, job_max_memory = 3000, transferOutput=transferOutput)
+		"""
+		#2013.3.18 samtools is buggy, constantly reporting inconsistency between sequence length and CIGAR length
 		sam_convert_job = self.addGenericJob(executable=samtools, inputFile=None,\
 							outputFile=bamOutputF, outputArgumentOption="view -bSh -o", \
 							parentJobLs=[alignmentJob], extraDependentInputLs=[alignmentJob.output], \
@@ -676,7 +688,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							transferOutput=transferOutput, \
 							extraArgumentList=[alignmentJob.output], \
 							job_max_memory=2000)
-		
+		"""
 		if individual_alignment:	#if not given then , no read-group addition job
 			#2012.9.19 add a AddReadGroup job
 			outputRGBAM = File(os.path.join(outputDir, "%s.RG.bam"%(fname_prefix)))
@@ -785,6 +797,35 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							outputFile=None, outputArgumentOption="-o", \
 							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 							extraOutputLs=[outputBamFile],\
+							transferOutput=transferOutput, \
+							extraArgumentList=extraArgumentList, \
+							job_max_memory=memRequirementData.memRequirement, **keywords)
+		return job
+	
+	def addSAM2BAMJob(self, inputFile=None, outputFile=None,\
+					executable=None, SamFormatConverterJar=None,\
+					parentJobLs=None, extraDependentInputLs=None, \
+					extraArguments=None, job_max_memory = 2500, transferOutput=False, **keywords):
+		"""
+		2013.3.18
+		"""
+		if executable is None:
+			executable = self.SAM2BAMJava
+		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementData.memRequirement
+		javaMemRequirement = memRequirementData.memRequirementInStr
+		
+		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', SamFormatConverterJar,\
+							"I=", inputFile, "O=", outputFile, "VALIDATION_STRINGENCY=LENIENT"]
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		if extraDependentInputLs is None:
+			extraDependentInputLs=[]
+		extraDependentInputLs.extend([inputFile, SamFormatConverterJar])
+		
+		job= self.addGenericJob(executable=executable, inputFile=None,\
+							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							extraOutputLs=[outputFile],\
 							transferOutput=transferOutput, \
 							extraArgumentList=extraArgumentList, \
 							job_max_memory=memRequirementData.memRequirement, **keywords)
