@@ -24,11 +24,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	commonAlignmentWorkflowOptionDict = {
 						('ind_seq_id_ls', 0, ): ['', 'i', 1, 'a comma/dash-separated list of IndividualSequence.id. alignments come from these', ],\
 						('ind_aln_id_ls', 0, ): ['', '', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
-						("sequence_filtered", 0, int): [None, 'Q', 1, 'To filter alignments. None: whatever; 0: unfiltered sequences, 1: filtered sequences: 2: ...'],\
 						("alignment_method_id", 0, int): [None, 'G', 1, 'To filter alignments. None: whatever; integer: AlignmentMethod.id'],\
-						("site_id_ls", 0, ): ["", 'S', 1, 'comma/dash-separated list of site IDs. individuals must come from these sites.'],\
-						("country_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of country IDs. individuals must come from these countries.'],\
-						("tax_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of country IDs. individuals must come from these countries.'],\
 						('defaultSampleAlignmentDepth', 1, int): [10, '', 1, "when database doesn't have median_depth info for one alignment, use this number instead.", ],\
 						('individual_sequence_file_raw_id_type', 1, int): [1, '', 1, "1: only all-library-fused libraries,\n\
 		2: only library-specific alignments,\n\
@@ -59,8 +55,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		2013.2.14
 		"""
 		AbstractNGSWorkflow.extra__init__(self)
-		listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int), \
-								("site_id_ls", int), ('country_id_ls', int), ('tax_id_ls', int)]
+		
+		listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
 	
 	
