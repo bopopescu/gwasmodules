@@ -47,7 +47,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						
 						#to filter alignment or individual_sequence
 						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments or sequences that are from contaminated individuals, \n\
-		(Individual.is_contaminated=1)'],\
+		(IndividualSequence.is_contaminated=1)'],\
 						("sequence_filtered", 0, int): [None, 'Q', 1, 'to filter alignments/individual_sequences. None: whatever; 0: unfiltered sequences, 1: filtered sequences: 2: ...'],\
 						("site_id_ls", 0, ): ["", 'S', 1, 'comma/dash-separated list of site IDs. individuals must come from these sites.'],\
 						("country_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of country IDs. individuals must come from these countries.'],\
@@ -1848,7 +1848,8 @@ Contig966       3160    50
 			merge_sam_job.uses(outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 			workflow.addJob(merge_sam_job)
 			workflow.depends(parent=alignmentJob, child=merge_sam_job)	#2012.7.4
-			sys.stderr.write(" copy (no merge, only one alignment) from %s to %s.\n"%(alignmentOutput.name, outputBamFile.name))
+			sys.stderr.write(" copy (instead of merging small alignment files) due to only one alignment file, from %s to %s.\n"%\
+							(alignmentOutput.name, outputBamFile.name))
 		#assign output
 		merge_sam_job.output = outputBamFile
 		#2012.9.21
