@@ -41,7 +41,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	0 or None: all, 1: autosomes, 2: X, 3:Y, 4: mitochondrial '],\
 						('ref_genome_tax_id', 0, int):[60711, '', 1, 'used to fetch chromosome info from GenomeDB'],\
 						('ref_genome_sequence_type_id', 0, int):[9, '', 1, 'used to fetch chromosome info from GenomeDB'],\
-						('ref_genome_version', 0, int):[1, '', 1, 'used to fetch chromosome info from GenomeDB'],\
+						('ref_genome_version', 0, int):[None, '', 1, 'used to fetch chromosome info from GenomeDB'],\
+						('ref_genome_outdated_index', 0, int):[0, '', 1, 'used to fetch chromosome info from GenomeDB. 0 means not outdated.'],\
 						
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						
@@ -104,7 +105,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			self.chr2size = self.getTopNumberOfContigs(contigMaxRankBySize=self.contigMaxRankBySize, \
 							contigMinRankBySize=self.contigMinRankBySize, tax_id=self.ref_genome_tax_id, \
 							sequence_type_id=self.ref_genome_sequence_type_id, version=self.ref_genome_version, \
-							chromosome_type_id=self.chromosome_type_id)
+							chromosome_type_id=self.chromosome_type_id, outdated_index=self.ref_genome_outdated_index)
 		else:
 			self.chr2size = {}
 		
@@ -1485,7 +1486,7 @@ Contig966       3160    50
 		return Genome.getChrFromFname(filename)
 	
 	def getTopNumberOfContigs(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
-							version=None, chromosome_type_id=0):
+							version=None, chromosome_type_id=0, outdated_index=0):
 		"""
 		2013.3.14 added argument version
 		2013.2.15 added argument chromosome_type_id
@@ -1512,7 +1513,7 @@ Contig966       3160    50
 		db_genome.setup(create_tables=False)
 		chr2size = db_genome.getTopNumberOfChomosomes(contigMaxRankBySize=contigMaxRankBySize, contigMinRankBySize=contigMinRankBySize, \
 							tax_id=tax_id, sequence_type_id=sequence_type_id, \
-							version=version, chromosome_type_id=chromosome_type_id)
+							version=version, chromosome_type_id=chromosome_type_id, outdated_index=outdated_index)
 		return chr2size
 	
 	def restrictContigDictionry(self, dc=None, maxContigID=None, minContigID=None):
