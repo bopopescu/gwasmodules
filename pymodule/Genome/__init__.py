@@ -132,7 +132,8 @@ class LargeFastaFileTraverse:
 
 import re
 chr_pattern = re.compile(r'([a-zA-Z]+\d+)[._\-:]*')	#the last - has special meaning in [] when it's not the last character. 
-contig_id_pattern = re.compile(r'Contig(\d+)[._\-:]*')
+#contig_id_pattern = re.compile(r'Contig(\d+)[._\-:]*')	#2013.3.19
+contig_id_pattern = re.compile(r'Scaffold(\d+)[._\-:]*')	#2013.3.19 new vervet ref is scaffold-based.
 
 def getContigIDFromFname(filename):
 	"""
