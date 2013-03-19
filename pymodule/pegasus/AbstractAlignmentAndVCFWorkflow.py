@@ -157,10 +157,11 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
 										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
 										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
-		alignmentLs = self.db.filterAlignments(alignmentLs, sequence_filtered=self.sequence_filtered, \
-									individual_site_id_set=set(self.site_id_ls),\
-									mask_genotype_method_id=None, parent_individual_alignment_id=None,\
-									country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls))
+		alignmentLs = self.db.filterAlignments(alignmentLs, min_coverage=self.sequence_min_coverage,\
+						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
+						individual_site_id_set=set(self.site_id_ls),\
+						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
+						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls))
 		
 		workflow = self.initiateWorkflow()
 		
