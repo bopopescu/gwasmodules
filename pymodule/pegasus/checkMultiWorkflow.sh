@@ -16,7 +16,9 @@ noOfWaitingSeconds=$noOfWaitingSecondsDefault
 workflowFolders=$*
 
 while [ "1" = "1" ]; do
-	echo -n "=========current date is  "
+	echo
+	echo "=================================================================="
+	echo -n "==============  current date is  "
 	date
 	for i in $workflowFolders; do
 		echo $i
