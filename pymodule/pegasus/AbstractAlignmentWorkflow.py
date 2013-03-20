@@ -186,7 +186,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
 				BuildBamIndexFilesJava=None, BuildBamIndexJar=None,\
 				mv=None, \
-				refFastaFList=None, \
+				registerReferenceData=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
 				data_dir=None, no_of_gatk_threads = 1, \
 				outputDirPrefix="", transferOutput=True, **keywords):
@@ -198,6 +198,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		chr2VCFFile = prePreprocessData.chr2VCFFile
 		
 		sys.stderr.write("Adding jobs that work on alignment(/VCF)s for %s chromosomes/contigs ..."%(len(chrIDSet)))
+		refFastaFList = registerReferenceData.refFastaFList
 		refFastaF = refFastaFList[0]
 		
 		topOutputDir = "%sMap"%(outputDirPrefix)
@@ -209,7 +210,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		reduceOutputDir = "%sReduce"%(outputDirPrefix)
 		reduceOutputDirJob = self.addMkDirJob(outputDir=reduceOutputDir)
 		
-		if needFastaDictJob:	# the .dict file is required for GATK
+		if needFastaDictJob or registerReferenceData.needPicardFastaDictJob:
 			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
 												refFastaF=refFastaF)
 			refFastaDictF = fastaDictJob.refFastaDictF
@@ -217,7 +218,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			fastaDictJob = None
 			refFastaDictF = None
 		
-		if needFastaIndexJob:
+		if needFastaIndexJob or registerReferenceData.needSAMtoolsFastaIndexJob:
 			fastaIndexJob = self.addRefFastaFaiIndexJob(workflow, samtools=samtools, refFastaF=refFastaF)
 			refFastaIndexF = fastaIndexJob.refFastaIndexF
 		else:
@@ -244,6 +245,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 					reduceOutputDirJob = reduceOutputDirJob,\
 					
 					outputDirPrefix=outputDirPrefix, refFastaFList=refFastaFList, \
+					registerReferenceData= registerReferenceData,\
 					
 					mapEachAlignmentData = None,\
 					mapEachChromosomeData=None, \
@@ -427,7 +429,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		workflow = self.initiateWorkflow()
 		
-		refFastaFList = self.getReferenceSequence()
+		registerReferenceData = self.getReferenceSequence()
 		
 		self.registerJars()
 		self.registerExecutables()
@@ -441,7 +443,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
-				refFastaFList=refFastaFList,\
+				registerReferenceData=registerReferenceData,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
 				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
 				outputDirPrefix=self.pegasusFolderName)
