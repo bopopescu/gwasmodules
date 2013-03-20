@@ -718,6 +718,7 @@ class AbstractWorkflow(ADAG):
 	
 	def registerBlastNucleotideDatabaseFile(self, ntDatabaseFname=None, input_site_handler=None, folderName=""):
 		"""
+		2013.3.20 yh_pegasus.registerRefFastaFile() returns a PassingData
 		2012.10.8
 			moved from BlastWorkflow.py
 		2012.5.23
@@ -728,7 +729,7 @@ class AbstractWorkflow(ADAG):
 									input_site_handler=input_site_handler,\
 									checkAffiliateFileExistence=True, addPicardDictFile=False, \
 									affiliateFilenameSuffixLs=['nin', 'nhr', 'nsq'],\
-									folderName=folderName)
+									folderName=folderName).refFastaFList
 	
 	
 	def addStatMergeJob(self, workflow=None, statMergeProgram=None, outputF=None, \
