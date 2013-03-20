@@ -216,7 +216,7 @@ class BlastWorkflow(AbstractWorkflow):
 			extraOutputLs.append(dbIndexFile)
 		
 		extraArgumentList = ["-p F"]
-		job = self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=outputFile, \
+		job = self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=None, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 						extraOutputLs=extraOutputLs,\
 						transferOutput=transferOutput, \
