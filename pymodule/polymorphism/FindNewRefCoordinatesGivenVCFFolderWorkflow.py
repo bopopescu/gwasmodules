@@ -110,9 +110,10 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 				passingData.newRefFastaFileList = [passingData.newRefFastaFileList[0]] + refIndexJob.outputList
 				sys.stderr.write(".\n")
 		else:	#bwa
-			passingData.newRefFastaFileList = self.registerBWAIndexFile(refFastaFname=self.newRefFastaFname, \
+			registerReferenceData = self.registerBWAIndexFile(refFastaFname=self.newRefFastaFname, \
 												folderName=self.pegasusFolderName, input_site_handler=self.input_site_handler)
-			if len(passingData.newRefFastaFileList)<6:
+			passingData.newRefFastaFileList = registerReferenceData.refFastaFList
+			if registerReferenceData.needBWARefIndexJob:	#2013.3.20
 				sys.stderr.write("Adding bwa reference index job ...")
 				refIndexJob = self.addBWAReferenceIndexJob(workflow=workflow, refFastaFList=passingData.newRefFastaFileList, \
 					refSequenceBaseCount=3000000000, bwa=workflow.bwa,\
