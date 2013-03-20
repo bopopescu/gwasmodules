@@ -458,7 +458,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		2012.9.24
 			place holder. AbstractVervetMapper.py will use it 
 		"""
-		
+		self.registerReferenceData = None
 		self.refFastaFList= None
 	
 	def preReduce(self, workflow=None, outputDirPrefix="", passingData=None, transferOutput=True, **keywords):
@@ -574,7 +574,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
 				BuildBamIndexFilesJava=None, BuildBamIndexJar=None,\
 				mv=None, \
-				refFastaFList=None, \
+				registerReferenceData=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
 				data_dir=None, no_of_gatk_threads = 1, \
 				intervalSize=3000, intervalOverlapSize=0, \
@@ -592,6 +592,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			chr2jobDataLs[chr].append(jobData)
 		
 		sys.stderr.write("Adding jobs for %s chromosomes/contigs of %s VCF files..."%(len(chr2jobDataLs), len(inputVCFData.jobDataLs)))
+		refFastaFList = registerReferenceData.refFastaFList
 		if refFastaFList:
 			refFastaF = refFastaFList[0]
 		else:
@@ -600,7 +601,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		topOutputDir = "%sMap"%(outputDirPrefix)
 		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
 		
-		if needFastaDictJob and refFastaF:	# the .dict file is required for GATK
+		if needFastaDictJob or registerReferenceData.needPicardFastaDictJob:
 			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
 												refFastaF=refFastaF)
 			refFastaDictF = fastaDictJob.refFastaDictF
@@ -608,7 +609,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			fastaDictJob = None
 			refFastaDictF = None
 		
-		if needFastaIndexJob and refFastaF:
+		if needFastaIndexJob or registerReferenceData.needSAMtoolsFastaIndexJob:
 			fastaIndexJob = self.addRefFastaFaiIndexJob(workflow, samtools=samtools, refFastaF=refFastaF)
 			refFastaIndexF = fastaIndexJob.refFastaIndexF
 		else:
@@ -628,6 +629,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					outputDirPrefix=outputDirPrefix, \
 					intervalFnamePrefix=None,\
 					refFastaFList=refFastaFList, \
+					registerReferenceData=registerReferenceData, \
 					intervalOverlapSize =intervalOverlapSize, intervalSize=intervalSize,\
 					jobData=None,\
 					VCFFile=None,\
@@ -803,7 +805,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			sys.stderr.write("No VCF files in this folder , %s.\n"%self.inputDir)
 			sys.exit(0)
 		
-		self.refFastaFList = self.getReferenceSequence(workflow=self)	#2013.2.14
+		self.registerReferenceData = self.getReferenceSequence(workflow=self)	#2013.2.14
 		
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, \
 					chr2IntervalDataLs=None, samtools=workflow.samtools, \
@@ -811,7 +813,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
-				refFastaFList=self.refFastaFList,\
+				registerReferenceData=self.registerReferenceData,\
 				needFastaIndexJob=getattr(self, 'needFastaIndexJob',False), needFastaDictJob=getattr(self, 'needFastaDictJob', False), \
 				data_dir=self.data_dir, no_of_gatk_threads = 1,\
 				intervalSize=self.intervalSize, intervalOverlapSize=self.intervalOverlapSize, \
