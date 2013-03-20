@@ -244,8 +244,9 @@ class BlastWorkflow(AbstractWorkflow):
 		inputData.jobDataLs.append(PassingData(output=inputFile, jobLs=[]))
 		noOfTotalSequences= self.getNoOfSequencesFromFasta(inputFastaFname=self.inputFname)
 		
-		ntDatabaseFileList = self.registerBlastNucleotideDatabaseFile(ntDatabaseFname=self.databaseFname, \
+		registerReferenceData = self.registerBlastNucleotideDatabaseFile(ntDatabaseFname=self.databaseFname, \
 																	input_site_handler=self.input_site_handler)
+		ntDatabaseFileList = registerReferenceData.refFastaFList
 		ntDatabaseFile = ntDatabaseFileList[0]
 
 		if len(ntDatabaseFileList)<4:	#some nt-database index file is missing
