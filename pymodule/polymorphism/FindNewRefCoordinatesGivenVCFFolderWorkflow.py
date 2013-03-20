@@ -100,8 +100,9 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 															folderName=self.pegasusFolderName)
 		refIndexJob = None
 		if self.alignmentMethodType==1:	#blast
-			passingData.newRefFastaFileList = self.registerBlastNucleotideDatabaseFile(self.newRefFastaFname, \
+			registerReferenceData = self.registerBlastNucleotideDatabaseFile(self.newRefFastaFname, \
 						folderName=self.pegasusFolderName, input_site_handler=self.input_site_handler)
+			passingData.newRefFastaFileList = registerReferenceData.refFastaFList
 			if len(passingData.newRefFastaFileList)<4:	#some nt-database index file is missing
 				sys.stderr.write("Adding blast-db-making job ...")
 				refIndexJob = self.addMakeBlastDBJob(executable=self.formatdb,\
