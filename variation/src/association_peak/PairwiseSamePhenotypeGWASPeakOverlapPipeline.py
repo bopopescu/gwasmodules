@@ -143,7 +143,7 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 								self.biology_category_id))
 		plotAssociationPeakOverlapJob = slef.addPlotPeakOverlapJob(workflow, executable=workflow.plotAssociationPeakOverlapJob, \
 							outputFnamePrefix=outputFnamePrefix, \
-							parentJobLs=[overlapPlotDirJob], job_max_memory=100, job_max_walltime = 60, \
+							parentJobLs=[overlapPlotDirJob], job_max_memory=100, walltime = 60, \
 							extraDependentInputLs=[], \
 							transferOutput=True)
 		"""
@@ -172,7 +172,7 @@ class PairwiseSamePhenotypeGWASPeakOverlapPipeline(PairwiseGWASPeakOverlapPipeli
 							association2_peak_type_id=self.association2_peak_type_id, peak_padding=self.peak_padding, \
 							outputF=outputF, \
 							commit=1, results_directory=None, logFile=None, \
-							parentJobLs=[overlapStatDirJob], job_max_memory=100, job_max_walltime = 60, \
+							parentJobLs=[overlapStatDirJob], job_max_memory=100, walltime = 60, \
 							extraDependentInputLs=extraDependentInputLs, \
 							transferOutput=True)
 			counter += 1

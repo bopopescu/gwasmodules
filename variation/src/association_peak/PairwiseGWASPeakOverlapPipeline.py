@@ -110,12 +110,12 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 							result1_id=None, result2_id=None, association1_peak_type_id=None, \
 							association2_peak_type_id=None, peak_padding=None, outputF=None, \
 							commit=0, results_directory=None, logFile=None, \
-							parentJobLs=[], job_max_memory=100, job_max_walltime = 60, \
+							parentJobLs=[], job_max_memory=100, walltime = 60, \
 							extraDependentInputLs=[], \
 							transferOutput=False, **keywords):
 		"""
 		2012.2.22
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
@@ -142,17 +142,17 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		for parentJob in parentJobLs:
 			workflow.depends(parent=parentJob, child=job)
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, max_walltime=job_max_walltime)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, walltime=walltime)
 		return job
 	
 	def addPlotPeakOverlapJob(self, workflow, executable=None, \
 							outputFnamePrefix=None, \
-							parentJobLs=[], job_max_memory=100, job_max_walltime = 60, \
+							parentJobLs=[], job_max_memory=100, walltime = 60, \
 							extraDependentInputLs=[], \
 							transferOutput=False, **keywords):
 		"""
 		2012.2.22
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		job = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
@@ -181,7 +181,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 			job.uses(input, transfer=True, register=True, link=Link.INPUT)
 		for parentJob in parentJobLs:
 			workflow.depends(parent=parentJob, child=job)
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, max_walltime=job_max_walltime)
+		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, walltime=walltime)
 		return job
 
 	
@@ -229,7 +229,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 								self.association_peak_type_id))
 		plotAssociationPeakOverlapJob = self.addPlotPeakOverlapJob(workflow, executable=workflow.plotAssociationPeakOverlap, \
 							outputFnamePrefix=outputFnamePrefix, \
-							parentJobLs=[overlapPlotDirJob], job_max_memory=100, job_max_walltime = 60, \
+							parentJobLs=[overlapPlotDirJob], job_max_memory=100, walltime = 60, \
 							extraDependentInputLs=[], \
 							transferOutput=True)
 		
@@ -254,7 +254,7 @@ class PairwiseGWASPeakOverlapPipeline(AbstractVariationWorkflow):
 							association2_peak_type_id=self.association_peak_type_id, peak_padding=self.peak_padding, \
 							outputF=outputF, \
 							commit=1, results_directory=None, logFile=None, \
-							parentJobLs=[overlapStatDirJob], job_max_memory=100, job_max_walltime = 60, \
+							parentJobLs=[overlapStatDirJob], job_max_memory=100, walltime = 60, \
 							extraDependentInputLs=extraDependentInputLs, \
 							transferOutput=True)
 				counter += 1

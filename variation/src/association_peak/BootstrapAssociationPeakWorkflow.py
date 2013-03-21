@@ -76,12 +76,12 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 	
 	def addTwoAssociationLocusFileOverlapJob(self, workflow=None, executable=None, \
 				inputFileList=None, inputFile=None, outputFile=None, \
-				parentJobLs=None, job_max_memory=100, job_max_walltime = 60, \
+				parentJobLs=None, job_max_memory=100, walltime = 60, \
 				extraDependentInputLs=None, \
 				transferOutput=False, **keywords):
 		"""
 		2012.11.28
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		extraArgumentList = []
@@ -95,7 +95,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 					parentJobLs=parentJobLs, \
 					extraDependentInputLs=extraDependentInputLs, extraArgumentList=None, \
 					extraArguments=None, transferOutput=transferOutput,  job_max_memory=job_max_memory, \
-					job_max_walltime=job_max_walltime,\
+					walltime=walltime,\
 					sshDBTunnel=False, \
 					objectWithDBArguments=None, **keywords)
 		return job
@@ -196,7 +196,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 	
 	def addCheckTwoAssociationLocusFileOverlapJobs(self, analysis_method_id2AssociationLocusJobList=None,\
 												min_score=None, min_overlap_ratio=None, associationMinScoreDirJob=None,\
-												plotOutputDirJob=None, ):
+												plotOutputDirJob=None, biologyCategoryID2PhenotypeIDSet=None):
 		"""
 		2013.2.7
 		
@@ -219,7 +219,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 												inputFileList=[associationLocusJob1.output, associationLocusJob2.output], \
 												inputFile=None, outputFile=outputFile, \
 												parentJobLs=[associationLocusJob1, associationLocusJob2], \
-												job_max_memory=1000, job_max_walltime = 60, \
+												job_max_memory=1000, walltime = 60, \
 												transferOutput=False)
 					#add HistogramAssociationLocusAdjacencyDistance job. the order of input matters
 					outputFile = File(os.path.join(plotOutputDirJob.output, 'histogram_of_%s.png'%(outputFnamePrefix)))
@@ -246,7 +246,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 												inputFileList=[associationLocusJob2.output, associationLocusJob1.output], \
 												inputFile=None, outputFile=outputFile, \
 												parentJobLs=[associationLocusJob1, associationLocusJob2], \
-												job_max_memory=1000, job_max_walltime = 60, \
+												job_max_memory=1000, walltime = 60, \
 												transferOutput=False)
 					#add HistogramAssociationLocusAdjacencyDistance job. the order of input matters
 					outputFile = File(os.path.join(plotOutputDirJob.output, 'histogram_of_%s.png'%(outputFnamePrefix)))
@@ -274,7 +274,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 												inputFileList=[associationLocusJob1.output, associationLocusJob2.output], \
 												inputFile=None, outputFile=outputFile, \
 												parentJobLs=[associationLocusJob1, associationLocusJob2], \
-												job_max_memory=1000, job_max_walltime = 60, \
+												job_max_memory=1000, walltime = 60, \
 												transferOutput=True)
 					
 					outputFile = File(os.path.join(plotOutputDirJob.output, '%s_2Dhist.png'%(outputFnamePrefix)))
@@ -295,11 +295,108 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 							parentJobLs=[plotOutputDirJob, compareGWAssociationLocusByPhenotypeVectorJob], \
 							extraDependentInputLs=None, \
 							extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000)
+					#2013.2.23 plot the peak frequency over genome distance for each peak-category (confirmatory, del-gwas-novel, etc.)
+					# 0: all; 1: confirmatory; 2: del-gwas-novel; 3:SNP-gwas-novel; 4:specific-in-both; 5: other
+					#. also split for each phenotype category 
+					for associationLocusCategory in xrange(6):
+						#choose  peaks that belong to specific category
+						outputFile = File(os.path.join(associationMinScoreDirJob.output, \
+											'%s_associationLocusCategory%s.h5'%(outputFnamePrefix, associationLocusCategory)))
+						filterTwoGWAssociationLocusComparisonResultJob = self.addGenericJob(executable=self.FilterTwoGWAssociationLocusComparisonResult, \
+									inputFile=compareGWAssociationLocusByPhenotypeVectorJob.output, \
+									outputFile=outputFile, inputFileList=[], \
+									parentJobLs=[compareGWAssociationLocusByPhenotypeVectorJob, associationMinScoreDirJob], \
+									extraDependentInputLs=[], extraOutputLs=[], transferOutput=False, \
+									extraArguments=None, extraArgumentList=["--associationLocusCategory %s"%(associationLocusCategory)], \
+									job_max_memory=1000,  sshDBTunnel=None, \
+									key2ObjectForJob=None, no_of_cpus=None, walltime=120)
+						#add a plot job
+						#add PlotAssociationLocusFrequencyOnGenome job
+						plotFilenamePrefix = os.path.join(plotOutputDirJob.output, \
+													'frequency_manhattan_%s_associationLocusCategory%s'%(outputFnamePrefix, associationLocusCategory))
+						outputFile = File('%s.png'%(plotFilenamePrefix))
+						if self.drivername=='mysql':
+							genome_dbname = 'genome'
+						else:
+							genome_dbname = self.dbname
+						plotAssociationLocusFrequencyOnGenomeJob = self.addAbstractPlotJob(executable=self.PlotGenomeWideData, \
+							inputFileList=None, inputFile=filterTwoGWAssociationLocusComparisonResultJob.output, outputFile=outputFile, \
+							outputFnamePrefix=None, whichColumn=None, whichColumnHeader="no_of_total_phenotypes", \
+							whichColumnPlotLabel="numberOfPhenotypes", \
+							logX=None, logY=None, valueForNonPositiveYValue=-1, \
+							xScaleLog=None, yScaleLog=None,\
+							missingDataNotation='NA',\
+							xColumnHeader="start", xColumnPlotLabel="genomePosition", \
+							minNoOfTotal=1, maxNoOfTotal=None,\
+							figureDPI=200, formatString='.', ylim_type=2, samplingRate=1, need_svg=False, \
+							inputFileFormat=None, outputFileFormat=None,\
+							parentJobLs=[plotOutputDirJob, filterTwoGWAssociationLocusComparisonResultJob], \
+							extraDependentInputLs=None, \
+							extraArgumentList=['--genome_drivername=%s'%self.drivername,\
+								'--genome_hostname=%s'%self.hostname,\
+								'--genome_dbname=%s'%(genome_dbname),\
+								'--genome_schema=genome',\
+								'--genome_db_user=%s'%(self.db_user),\
+								'--genome_db_passwd=%s'%(self.db_passwd),\
+								'--tax_id=%s'%(self.tax_id), '--drawCentromere', '--chromosomeHeader chromosome'], \
+							extraArguments=None, transferOutput=True,  job_max_memory=2000, \
+							sshDBTunnel=self.needSSHDBTunnel, \
+							objectWithDBArguments=self)
+						for biologyCategoryID, phenotypeIDSet in biologyCategoryID2PhenotypeIDSet.iteritems():
+							phenotypeIDListInStr = utils.getSuccinctStrOutOfList(phenotypeIDSet)
+							#. add a filter peak job
+							outputFile = File(os.path.join(associationMinScoreDirJob.output, \
+									'%s_associationLocusCategory%s_biologyCategory%s.h5'%(outputFnamePrefix, associationLocusCategory,\
+																						biologyCategoryID)))
+							filterTwoGWAssociationLocusComparisonResultJob = self.addGenericJob(executable=self.FilterTwoGWAssociationLocusComparisonResult, \
+									inputFile=compareGWAssociationLocusByPhenotypeVectorJob.output, \
+									outputFile=outputFile, inputFileList=[], \
+									parentJobLs=[compareGWAssociationLocusByPhenotypeVectorJob, associationMinScoreDirJob], \
+									extraDependentInputLs=[], extraOutputLs=[], transferOutput=False, \
+									extraArguments=None, extraArgumentList=["--associationLocusCategory %s --phenotypeIDList %s"%\
+																		(associationLocusCategory, phenotypeIDListInStr)], \
+									job_max_memory=1000,  sshDBTunnel=None, \
+									key2ObjectForJob=None, no_of_cpus=None, walltime=120)
+							#. add a plot job
+							#add PlotAssociationLocusFrequencyOnGenome job
+							plotFilenamePrefix = os.path.join(plotOutputDirJob.output, \
+											'frequency_manhattan_%s_associationLocusCategory%s_biologyCategory%s'%\
+											(outputFnamePrefix, associationLocusCategory, biologyCategoryID))
+							outputFile = File('%s.png'%(plotFilenamePrefix))
+							if self.drivername=='mysql':
+								genome_dbname = 'genome'
+							else:
+								genome_dbname = self.dbname
+							plotAssociationLocusFrequencyOnGenomeJob = self.addAbstractPlotJob(executable=self.PlotGenomeWideData, \
+								inputFileList=None, inputFile=filterTwoGWAssociationLocusComparisonResultJob.output, outputFile=outputFile, \
+								outputFnamePrefix=None, whichColumn=None, whichColumnHeader="no_of_total_phenotypes", \
+								whichColumnPlotLabel="numberOfPhenotypes", \
+								logX=None, logY=None, valueForNonPositiveYValue=-1, \
+								xScaleLog=None, yScaleLog=None,\
+								missingDataNotation='NA',\
+								xColumnHeader="start", xColumnPlotLabel="genomePosition", \
+								minNoOfTotal=1, maxNoOfTotal=None,\
+								figureDPI=200, formatString='.', ylim_type=2, samplingRate=1, need_svg=False, \
+								inputFileFormat=None, outputFileFormat=None,\
+								parentJobLs=[plotOutputDirJob, filterTwoGWAssociationLocusComparisonResultJob], \
+								extraDependentInputLs=None, \
+								extraArgumentList=['--genome_drivername=%s'%self.drivername,\
+									'--genome_hostname=%s'%self.hostname,\
+									'--genome_dbname=%s'%(genome_dbname),\
+									'--genome_schema=genome',\
+									'--genome_db_user=%s'%(self.db_user),\
+									'--genome_db_passwd=%s'%(self.db_passwd),\
+									'--tax_id=%s'%(self.tax_id), '--drawCentromere', '--chromosomeHeader chromosome'], \
+								extraArguments=None, transferOutput=True,  job_max_memory=2000, \
+								sshDBTunnel=self.needSSHDBTunnel, \
+								objectWithDBArguments=self)
 		sys.stderr.write("%s total jobs.\n"%(self.no_of_jobs))
 		
 	def addAssociationPeakAndLocusJobs(self, db_250k=None, min_score_ls=None, association_landscape_type=None,\
 									data_dir=None, ground_score=None, min_overlap_ratio_ls=None, 
-									phenotype_method_id_of_associations_set=None, plotOutputDirJob=None, passingData=None,\
+									phenotype_method_id_of_associations_set=None, \
+									biologyCategoryID2PhenotypeIDSet=None,\
+									plotOutputDirJob=None, passingData=None,\
 									**keywords):
 		"""
 		#2013.2.7 add the association-peak, association-locus jobs
@@ -338,7 +435,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 					associationPeakJob = self.addAssociationLandscape2PeakJob(executable=self.AssociationLandscape2Peak, \
 						inputFile=defineLandscapeJob.output, outputFile=outputFile, \
 						min_score=min_score, ground_score=ground_score, \
-						parentJobLs=[associationMinScoreDirJob, defineLandscapeJob], job_max_memory=2000, job_max_walltime = 60, \
+						parentJobLs=[associationMinScoreDirJob, defineLandscapeJob], job_max_memory=2000, walltime = 60, \
 						extraDependentInputLs=None, \
 						transferOutput=False)
 					
@@ -389,7 +486,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 						#input to this job is added later
 						associationLocusJob = self.addAssociationPeak2LocusJob(executable=self.AssociationPeak2AssociationLocus, \
 									inputFile=None, outputFile=associationLocusFile, min_overlap_ratio=min_overlap_ratio, \
-									parentJobLs=[associationMinScoreDirJob], job_max_memory=2000, job_max_walltime = 60, \
+									parentJobLs=[associationMinScoreDirJob], job_max_memory=2000, walltime = 60, \
 									extraDependentInputLs=None, \
 									transferOutput=False)
 						
@@ -441,7 +538,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 							'--genome_schema=genome',\
 							'--genome_db_user=%s'%(self.db_user),\
 							'--genome_db_passwd=%s'%(self.db_passwd),\
-							'--tax_id=%s'%(self.tax_id)], extraArguments=None, transferOutput=True,  job_max_memory=2000, \
+							'--tax_id=%s'%(self.tax_id), '--drawCentromere'], extraArguments=None, transferOutput=True,  job_max_memory=2000, \
 						sshDBTunnel=self.needSSHDBTunnel, \
 						objectWithDBArguments=self)
 					
@@ -457,7 +554,8 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 							self.addInputToStatMergeJob(statMergeJob=associationLocusJob, parentJobLs=[associationPeakJob])
 					self.addCheckTwoAssociationLocusFileOverlapJobs(analysis_method_id2AssociationLocusJobList=analysis_method_id2AssociationLocusJobList, \
 													min_score=min_score, min_overlap_ratio=min_overlap_ratio, \
-													associationMinScoreDirJob=associationMinScoreDirJob, plotOutputDirJob=plotOutputDirJob)
+													associationMinScoreDirJob=associationMinScoreDirJob, plotOutputDirJob=plotOutputDirJob,\
+													biologyCategoryID2PhenotypeIDSet=biologyCategoryID2PhenotypeIDSet)
 		sys.stderr.write("\t %s total jobs.\n"%(self.no_of_jobs))
 		
 		
@@ -474,10 +572,20 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		"""
 		if workflow is None:
 			workflow = self
-		phenotype_method_id_of_associations_set = set([row.phenotype_method_id for row in association_result_ls])
+		#2013.2.24 setup some data strutures here
+		phenotype_method_id_of_associations_set = set()
+		biologyCategoryID2PhenotypeIDSet = {}
+		for association_result in association_result_ls:
+			biologyCategoryID = association_result.phenotype_method.biology_category_id
+			if biologyCategoryID not in biologyCategoryID2PhenotypeIDSet:
+				biologyCategoryID2PhenotypeIDSet[biologyCategoryID] = set()
+			biologyCategoryID2PhenotypeIDSet[biologyCategoryID].add(association_result.phenotype_method_id)
+			phenotype_method_id_of_associations_set.add(association_result.phenotype_method_id)
 		
-		sys.stderr.write("Adding jobs for %s association results (%s phenotypes) #jobs=%s... \n"%(len(association_result_ls),\
-																			len(phenotype_method_id_of_associations_set), self.no_of_jobs))
+		sys.stderr.write("Adding jobs for %s association results (%s phenotypes, %s biology categories) #jobs=%s... \n"%\
+							(len(association_result_ls),\
+							len(phenotype_method_id_of_associations_set), \
+							len(biologyCategoryID2PhenotypeIDSet), self.no_of_jobs))
 		
 		returnData = PassingData()
 		returnData.jobDataLs = []
@@ -521,6 +629,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 		self.addAssociationPeakAndLocusJobs(db_250k=db_250k, min_score_ls=min_score_ls, association_landscape_type=association_landscape_type,\
 										data_dir=data_dir, ground_score=ground_score, min_overlap_ratio_ls=min_overlap_ratio_ls, \
 										phenotype_method_id_of_associations_set=phenotype_method_id_of_associations_set, \
+										biologyCategoryID2PhenotypeIDSet = biologyCategoryID2PhenotypeIDSet,\
 										plotOutputDirJob=plotOutputDirJob, passingData=passingData)
 		
 		sys.stderr.write("Adding PlotAssociationLocusFrequencyVsAssociationThreshold jobs, #jobs=%s ..."%(self.no_of_jobs))
@@ -554,7 +663,7 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 				#input to this job is added later
 				countAssociationLocusJob = self.addCountAssociationLocusJob(executable=self.CountAssociationLocus, \
 								inputFileList=None, inputFile=None, outputFile=countAssociationLocusFile, \
-								parentJobLs=[countAssociationLocusOutputDirJob], job_max_memory=1000, job_max_walltime = 6, \
+								parentJobLs=[countAssociationLocusOutputDirJob], job_max_memory=1000, walltime = 6, \
 								extraDependentInputLs=None, \
 								transferOutput=False)
 				countAssociationLocusJobList.append(countAssociationLocusJob)
@@ -641,20 +750,19 @@ class BootstrapAssociationPeakWorkflow(DefineAssociationLandscapePipeline):
 						os.path.join(self.variationSrcPath, "association_peak/plot/PlotAssociationLocusFrequencyVsAssociationThreshold.py"), site_handler))
 		executableClusterSizeMultiplierList.append((PlotAssociationLocusFrequencyVsAssociationThreshold, 0.2))
 		
-		TwoAssociationLocusFileOverlap = Executable(namespace=namespace, name="TwoAssociationLocusFileOverlap", \
-						version=version, \
-						os=operatingSystem, arch=architecture, installed=True)
-		TwoAssociationLocusFileOverlap.addPFN(PFN("file://" + \
-						os.path.join(self.variationSrcPath, "association_peak/TwoAssociationLocusFileOverlap.py"), site_handler))
-		executableClusterSizeMultiplierList.append((TwoAssociationLocusFileOverlap, 0.3))
-		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.variationSrcPath, \
+													"association_peak/TwoAssociationLocusFileOverlap.py"), \
+													name="TwoAssociationLocusFileOverlap", clusterSizeMultipler=0.3)
 		#2013.2.7	new simpler way of adding an executable
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.variationSrcPath, \
 													"association_peak/CompareTwoGWAssociationLocusByPhenotypeVector.py"), \
 													name="CompareTwoGWAssociationLocusByPhenotypeVector", clusterSizeMultipler=0)
-		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.variationSrcPath, \
+													"association_peak/filters/FilterTwoGWAssociationLocusComparisonResult.py"), \
+													name="FilterTwoGWAssociationLocusComparisonResult", clusterSizeMultipler=0)
+	
 	
 	def run(self):
 		"""

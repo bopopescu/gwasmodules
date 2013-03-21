@@ -135,13 +135,13 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 							result_id=None, neighbor_distance=None, max_neighbor_distance=None,\
 							min_MAF=None, tax_id=None, \
 							data_dir=None, logFile=None, landscapeOutputFile=None, \
-							parentJobLs=None, job_max_memory=100, job_max_walltime = 60, sshDBTunnel=None,\
+							parentJobLs=None, job_max_memory=100, walltime = 60, sshDBTunnel=None,\
 							extraDependentInputLs=None, \
 							transferOutput=False, **keywords):
 		"""
 		2012.11.21 renamed
 		2012.2.15
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		extraArgumentList = ["--result_id %s"%(result_id), "--neighbor_distance %s"%(neighbor_distance), \
@@ -159,18 +159,18 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
 					transferOutput=transferOutput, \
 					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
-					sshDBTunnel=sshDBTunnel, max_walltime=job_max_walltime,\
+					sshDBTunnel=sshDBTunnel, walltime=walltime,\
 					key2ObjectForJob=key2ObjectForJob, objectWithDBArguments=self, **keywords)
 		return job
 	
 	def addAssociationLandscape2PeakJob(self, workflow=None, executable=None, \
 				inputFile=None, outputFile=None,  min_score=None, ground_score=None, \
-				parentJobLs=None, job_max_memory=100, job_max_walltime = 60, \
+				parentJobLs=None, job_max_memory=100, walltime = 60, \
 				extraDependentInputLs=None, extraArguments=None, \
 				transferOutput=False, **keywords):
 		"""
 		2012.11.21
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		extraArgumentList = []
@@ -187,18 +187,18 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					transferOutput=transferOutput, \
 					extraArguments=extraArguments, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
-					max_walltime=job_max_walltime,\
+					walltime=walltime,\
 					key2ObjectForJob=key2ObjectForJob, **keywords)
 		return job
 	
 	def addAssociationPeak2LocusJob(self, workflow=None, executable=None, \
 				inputFile=None, outputFile=None, min_overlap_ratio=None, \
-				parentJobLs=None, job_max_memory=100, job_max_walltime = 60, \
+				parentJobLs=None, job_max_memory=100, walltime = 60, \
 				extraDependentInputLs=None, \
 				transferOutput=False, **keywords):
 		"""
 		2012.11.21
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		extraArgumentList = []
@@ -209,18 +209,18 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					transferOutput=transferOutput, \
 					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
-					max_walltime=job_max_walltime,\
+					walltime=walltime,\
 					key2ObjectForJob=None, **keywords)
 		return job
 	
 	def addCountAssociationLocusJob(self, workflow=None, executable=None, \
 				inputFileList=None, inputFile=None, outputFile=None, \
-				parentJobLs=None, job_max_memory=100, job_max_walltime = 60, \
+				parentJobLs=None, job_max_memory=100, walltime = 60, \
 				extraDependentInputLs=None, \
 				transferOutput=False, **keywords):
 		"""
 		2012.11.21
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		extraArgumentList = []
@@ -234,7 +234,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 					parentJobLs=parentJobLs, \
 					extraDependentInputLs=extraDependentInputLs, extraArgumentList=None, \
 					extraArguments=None, transferOutput=transferOutput,  job_max_memory=job_max_memory, \
-					job_max_walltime=job_max_walltime,\
+					walltime=walltime,\
 					sshDBTunnel=False, \
 					objectWithDBArguments=None, **keywords)
 		return job
@@ -335,7 +335,7 @@ class DefineAssociationLandscapePipeline(AbstractVariationWorkflow):
 			self.addAssociationLandscape2PeakJob(executable=self.AssociationLandscape2Peak, \
 				inputFile=defineLandscapeJob.output, outputFile=outputFile, min_score=min_score, ground_score=ground_score, \
 				data_dir=data_dir, \
-				parentJobLs=[defineLandscapeJob], job_max_memory=100, job_max_walltime = 60, \
+				parentJobLs=[defineLandscapeJob], job_max_memory=100, walltime = 60, \
 				extraDependentInputLs=None, \
 				transferOutput=False)
 			

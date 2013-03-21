@@ -69,8 +69,8 @@ class PlotAssociationLocusFrequencyOnGenome(PlotGenomeWideData, PlotAssociationL
 		2012.8.2
 			handles each row in each file
 		"""
-		if not row['chromosome']:	#2012.12.3 ignore rows with empty chromosomes (stopgap bugfix, )
-			return
+		#if not row['chromosome']:	#2012.12.3 ignore rows with empty chromosomes (stopgap bugfix, )
+		#	return
 		PlotGenomeWideData.processRow(self, row=row, pdata=pdata)
 		
 		reader = getattr(pdata, 'reader', None)

@@ -40,33 +40,38 @@ class TwoGenomeWideAssociationLocusMapTable(tables.IsDescription):
 	"""
 	id = UInt64Col(pos=0)
 	
-	input1_locus_id = UInt64Col()
-	input1_chromosome = StringCol(64, )
-	input1_start = UInt64Col()
-	input1_stop = UInt64Col()
+	#2013.2.24 overall position of the locus
+	chromosome = StringCol(64, pos=1)	#64 byte-long
+	start = UInt64Col(pos=2)
+	stop = UInt64Col(pos=3)
 	
-	input2_locus_id = UInt64Col()
-	input2_chromosome = StringCol(64,)
-	input2_start = UInt64Col()
-	input2_stop = UInt64Col()
+	input1_locus_id = UInt64Col(pos=4)
+	input1_chromosome = StringCol(64, pos=5)
+	input1_start = UInt64Col(pos=6)
+	input1_stop = UInt64Col(pos=7)
 	
-	locusOverlapFraction = Float64Col()
+	input2_locus_id = UInt64Col(pos=8)
+	input2_chromosome = StringCol(64,pos=9)
+	input2_start = UInt64Col(pos=10)
+	input2_stop = UInt64Col(pos=11)
 	
-	no_of_total_phenotypes = UInt32Col()	#all significant phenotypes
-	total_phenotype_ls_in_str = StringCol(1000)
-	fraction_of_total_phenotypes = Float32Col()	#divided by all phenotypes with association
+	locusOverlapFraction = Float64Col(pos=12)
 	
-	no_of_overlap_phenotypes = UInt32Col()
-	overlap_phenotype_ls_in_str = StringCol(1000)
-	fraction_of_overlap_phenotypes = Float32Col()	#divided by the no_of_total_phenotypes (3 cols above, with significant hits)
+	no_of_total_phenotypes = UInt32Col(pos=13)	#all significant phenotypes
+	total_phenotype_ls_in_str = StringCol(1000, pos=14)
+	fraction_of_total_phenotypes = Float32Col(pos=15)	#divided by all phenotypes with association
 	
-	no_of_input1_only_phenotypes = UInt32Col()
-	input1_only_phenotype_ls_in_str = StringCol(1000)
-	fraction_of_input1_only_phenotypes = Float32Col()
+	no_of_overlap_phenotypes = UInt32Col(pos=16)
+	overlap_phenotype_ls_in_str = StringCol(1000, pos=17)
+	fraction_of_overlap_phenotypes = Float32Col(pos=18)	#divided by the no_of_total_phenotypes (3 cols above, with significant hits)
 	
-	no_of_input2_only_phenotypes = UInt32Col()
-	input2_only_phenotype_ls_in_str = StringCol(1000)
-	fraction_of_input2_only_phenotypes = Float32Col()
+	no_of_input1_only_phenotypes = UInt32Col(pos=19)
+	input1_only_phenotype_ls_in_str = StringCol(1000, pos=20)
+	fraction_of_input1_only_phenotypes = Float32Col(pos=21)
+	
+	no_of_input2_only_phenotypes = UInt32Col(pos=22)
+	input2_only_phenotype_ls_in_str = StringCol(1000, pos=23)
+	fraction_of_input2_only_phenotypes = Float32Col(pos=24)
 
 
 class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverlap):
@@ -129,6 +134,10 @@ class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverl
 				input2_start = input2Node.key.start
 				input2_stop = input2Node.key.stop
 				
+				chromosome = input1_chromosome
+				start = min(input1_start, input2_start)
+				stop = max(input1_stop, input2_stop)
+				
 				total_phenotype_id_set = input1Node.key.phenotype_id_set | input2Node.key.phenotype_id_set
 				no_of_total_phenotypes = len(total_phenotype_id_set)
 				
@@ -149,6 +158,10 @@ class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverl
 				input2_chromosome = input2Node.key.chromosome
 				input2_start = input2Node.key.start
 				input2_stop = input2Node.key.stop
+				
+				chromosome = input2_chromosome
+				start = input2_start
+				stop = input2_stop
 				
 				total_phenotype_id_set = input2Node.key.phenotype_id_set
 				no_of_total_phenotypes = len(total_phenotype_id_set)
@@ -172,6 +185,10 @@ class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverl
 				input2_start = None
 				input2_stop = None
 				
+				chromosome = input1_chromosome
+				start = input1_start
+				stop = input1_stop
+				
 				total_phenotype_id_set = input1Node.key.phenotype_id_set
 				no_of_total_phenotypes = len(total_phenotype_id_set)
 				
@@ -186,6 +203,10 @@ class CompareTwoGWAssociationLocusByPhenotypeVector(TwoAssociationLocusFileOverl
 				sys.stderr.write("Error: Both input1Node and input2Node are None.\n")
 				sys.exit(3)
 			oneCell = PassingData(
+					chromosome = chromosome,
+					start = start,
+					stop = stop,
+					
 					input1_locus_id = input1_locus_id,
 					input1_chromosome = input1_chromosome,
 					input1_start = input1_start,
