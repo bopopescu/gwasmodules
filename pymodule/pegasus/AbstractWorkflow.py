@@ -48,6 +48,8 @@ class AbstractWorkflow(ADAG):
 								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
 								If empty, everything is in the pegasus root.', ],\
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
+						('max_walltime', 1, int):[20160, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
+	used in addGenericJob().'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('needSSHDBTunnel', 0, int):[0, 'H', 0, 'DB-interacting jobs need a ssh tunnel (running on cluster behind firewall).'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
@@ -607,6 +609,12 @@ class AbstractWorkflow(ADAG):
 		self.addOneExecutableAndAssignProperClusterSize(executable=executable, clusterSizeMultipler=clusterSizeMultipler)
 		return executable
 	
+	def getExecutableClustersSize(self, executable=None):
+		"""
+		2013.03.21, default is None
+		"""
+		return yh_pegasus.getExecutableClustersSize(executable)
+	
 	def getFilesWithProperSuffixFromFolder(self, inputFolder=None, suffix='.h5'):
 		"""
 		2012.3.21
@@ -729,7 +737,7 @@ class AbstractWorkflow(ADAG):
 									input_site_handler=input_site_handler,\
 									checkAffiliateFileExistence=True, addPicardDictFile=False, \
 									affiliateFilenameSuffixLs=['nin', 'nhr', 'nsq'],\
-									folderName=folderName).refFastaFList
+									folderName=folderName)
 	
 	
 	def addStatMergeJob(self, workflow=None, statMergeProgram=None, outputF=None, \
@@ -958,8 +966,9 @@ class AbstractWorkflow(ADAG):
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, argumentForEachFileInInputFileList=None, \
 					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-					key2ObjectForJob=None, no_of_cpus=None, max_walltime=None, **keywords):
+					key2ObjectForJob=None, no_of_cpus=None, walltime=180, **keywords):
 		"""
+		#2013.3.21 scale walltime according to clusters_size
 		2013.2.26 added argument argumentForEachFileInInputFileList, to be added in front of each file in inputFileList
 		2013.2.7 add argument frontArgumentList, a list of arguments to be put in front of anything else
 		2012.10.18
@@ -1012,8 +1021,15 @@ class AbstractWorkflow(ADAG):
 		if extraArguments:
 			job.addArguments(extraArguments)
 		
+		#2013.3.21 scale walltime according to clusters_size
+		clusters_size = self.getExecutableClustersSize(executable)
+		if clusters_size is not None and clusters_size and walltime is not None:
+			clusters_size = int(clusters_size)
+			if clusters_size>1:
+				walltime = min(walltime*clusters_size, self.max_walltime)
+			
 		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
-									no_of_cpus=no_of_cpus, max_walltime=max_walltime)
+									no_of_cpus=no_of_cpus, walltime=walltime)
 		workflow.addJob(job)
 		job.parentJobLs = []	#2012.10.18
 		if parentJob:	#2012.10.15
