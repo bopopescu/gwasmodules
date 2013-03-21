@@ -16,7 +16,7 @@ if [ "x$PEGASUS_HOME" = "x" ]; then
 	echo "Please make sure pegasus-plan is in your path"
 	exit 1
 fi 
-echo $PEGASUS_HOME
+echo "pegasus home is " $PEGASUS_HOME
 
 if [ "x$GLOBUS_LOCATION" = "x" ]; then
 	echo "Please set GLOBUS_LOCATION to the location of your Pegasus install"
@@ -27,8 +27,9 @@ echo GLOBUS_LOCATION: $GLOBUS_LOCATION
 
 # 2011-8-28 same as the submitted user's home directory
 # it's a must to export HOME in condor environment because HOME is not set by default.
-CONDOR_HOME_DIR=$HOME
+HOME_DIR=$HOME
 
+PEGASUS_PYTHON_LIB_DIR=`$PEGASUS_HOME/bin/pegasus-config --python`
 VCF_PERL5LIB=script/vcftools/perl
 
 UCLA_CLUSTER_HOSTNAME="grid4.hoffman2.idre.ucla.edu"
@@ -47,6 +48,8 @@ UCLA_CLUSTER_SCRATCH_Type2="$UCLA_CLUSTER_HOME/NetworkData/scratch/"
 #if you choose hcondor as storage site, final output is staged out to local scratch!! make sure it's in shared storage.
 UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 
+UCLA_CLUSTER_PEGASUS_PYTHON_LIB_DIR=`$UCLA_CLUSTER_PEGASUS_HOME/bin/pegasus-config --python`
+
 UCLA_CLUSTER_PYTHON_DIR="/u/local/python/2.6/"
 UCLA_CLUSTER_R_DIR="/u/local/apps/R/R-2.12.2-gnu/"
 UCLA_CLUSTER_HDF5_DIR="/u/local/intel/11.1/libs/hdf5/1.8.8-shared/"	#2013.1.10 not necessary
@@ -60,6 +63,7 @@ USC_CLUSTER_WORK_DIR=$USC_CLUSTER_HOME"/pg_work"
 USC_CLUSTER_PEGASUS_HOME=$USC_CLUSTER_HOME"/bin/pegasus"
 USC_CLUSTER_GLOBUS_LOCATION="/usr/usc/globus/default/"
 #USC_CLUSTER_GLOBUS_LOCATION="/usr/local/globus/default"
+USC_CLUSTER_PEGASUS_PYTHON_LIB_DIR=`$USC_CLUSTER_PEGASUS_HOME/bin/pegasus-config --python`
 
 
 if test $# -lt 2 ; then
@@ -186,6 +190,9 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PEGASUS_HOME" >$PEGASUS_HOME</profile>
 		<profile namespace="env" key="GLOBUS_LOCATION" >$GLOBUS_LOCATION</profile>
 		<profile namespace="env" key="HOME">$HOME</profile>
+		<profile namespace="env" key="PERL5LIB">$HOME_DIR/$VCF_PERL5LIB</profile>
+		<profile namespace="env" key="PATH" >$HOME_DIR/bin:$PATH</profile>
+		<profile namespace="env" key="PYTHONPATH">$PYTHONPATH:$PEGASUS_PYTHON_LIB_DIR</profile>
 	</site>
 	<site  handle="condorpool" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -208,10 +215,10 @@ cat >sites.xml <<EOF
 		<profile namespace="pegasus" key="style" >condor</profile>
 		<profile namespace="condor" key="universe" >vanilla</profile>
 		<profile namespace="env" key="PEGASUS_HOME" >$PEGASUS_HOME</profile>
-		<profile namespace="env" key="PERL5LIB">$CONDOR_HOME_DIR/$VCF_PERL5LIB</profile>
-		<profile namespace="env" key="HOME" >$CONDOR_HOME_DIR</profile>
-		<profile namespace="env" key="PATH" >$CONDOR_HOME_DIR/bin:$PATH</profile>
-		<profile namespace="env" key="PYTHONPATH">$PYTHONPATH:$PEGASUS_HOME/lib/pegasus/python</profile>
+		<profile namespace="env" key="PERL5LIB">$HOME_DIR/$VCF_PERL5LIB</profile>
+		<profile namespace="env" key="HOME" >$HOME_DIR</profile>
+		<profile namespace="env" key="PATH" >$HOME_DIR/bin:$PATH</profile>
+		<profile namespace="env" key="PYTHONPATH">$PYTHONPATH:$PEGASUS_PYTHON_LIB_DIR</profile>
 	</site>
 	<site  handle="hcondor" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -258,7 +265,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PYTHON_DIR">$UCLA_CLUSTER_PYTHON_DIR</profile>
 		<profile namespace="env" key="PYTHON_INC">$UCLA_CLUSTER_PYTHON_DIR/include/python2.6</profile>
 		<profile namespace="env" key="PYTHON_LIB">$UCLA_CLUSTER_PYTHON_DIR/lib</profile>
-		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:$UCLA_CLUSTER_PYTHON_DIR/lib64/python2.6/site-packages:$UCLA_CLUSTER_PYTHON_DIR/lib/python2.6/site-packages:/u/home/eeskin/polyacti/bin/pegasus/lib/pegasus/python:$UCLA_CLUSTER_PYTHON_DIR/lib64/python2.6-other</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:$UCLA_CLUSTER_PYTHON_DIR/lib64/python2.6/site-packages:$UCLA_CLUSTER_PYTHON_DIR/lib/python2.6/site-packages:$UCLA_CLUSTER_PEGASUS_PYTHON_LIB_DIR:$UCLA_CLUSTER_PYTHON_DIR/lib64/python2.6-other</profile>
 	</site>
 	<site  handle="hoffman2" arch="x86_64" os="LINUX">
 		<grid  type="gt5" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -292,7 +299,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
 		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
 		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/apps/python/2.6.5/bin/:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.2/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
-		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages:/u/local/python/2.6/lib64/python2.6-other</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages:/u/local/python/2.6/lib64/python2.6-other:$UCLA_CLUSTER_PEGASUS_PYTHON_LIB_DIR</profile>
 	</site>
 	<site  handle="uschpc" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="$USC_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -315,7 +322,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="HOME">$USC_CLUSTER_HOME</profile>
 		<profile namespace="env" key="PERL5LIB">$USC_CLUSTER_HOME/$VCF_PERL5LIB/</profile>
 		<profile namespace="env" key="PATH" >$USC_CLUSTER_HOME/bin:/usr/usc/python/default/bin/:/usr/usc/root/5.27.02/bin:/usr/usc/matlab/2009a/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/usr/usc/jdk/default/bin/</profile>
-		<profile namespace="env" key="PYTHONPATH">$USC_CLUSTER_HOME/lib/python:/usr/usc/python/default/lib/python2.6/site-packages/</profile>
+		<profile namespace="env" key="PYTHONPATH">$USC_CLUSTER_HOME/lib/python:/usr/usc/python/default/lib/python2.6/site-packages/:$USC_CLUSTER_PEGASUS_PYTHON_LIB_DIR</profile>
 	</site>
 </sitecatalog>
 EOF
@@ -330,7 +337,7 @@ pegasus-plan \
 	--dir work \
 	--relative-dir $submitFolderName \
 	--dax $dagFile \
-	--output $storageSiteName \
+	--output-site $storageSiteName \
 	--cluster horizontal $submitOption
 # add the option below for debugging
 #	-vvvvv \
