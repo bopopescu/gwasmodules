@@ -48,7 +48,13 @@ UCLA_CLUSTER_SCRATCH_Type2="$UCLA_CLUSTER_HOME/NetworkData/scratch/"
 #if you choose hcondor as storage site, final output is staged out to local scratch!! make sure it's in shared storage.
 UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 
-UCLA_CLUSTER_PEGASUS_PYTHON_LIB_DIR=`$UCLA_CLUSTER_PEGASUS_HOME/bin/pegasus-config --python`
+UCLA_CLUSTER_PEGASUS_CONFIG_PATH=$UCLA_CLUSTER_PEGASUS_HOME/bin/pegasus-config
+if test -f $UCLA_CLUSTER_PEGASUS_CONFIG_PATH; then
+	#if no test file existence, error will happen
+	UCLA_CLUSTER_PEGASUS_PYTHON_LIB_DIR=`$UCLA_CLUSTER_PEGASUS_CONFIG_PATH --python`
+else
+	UCLA_CLUSTER_PEGASUS_PYTHON_LIB_DIR=$UCLA_CLUSTER_PEGASUS_HOME/lib/pegasus/python
+fi
 
 UCLA_CLUSTER_PYTHON_DIR="/u/local/python/2.6/"
 UCLA_CLUSTER_R_DIR="/u/local/apps/R/R-2.12.2-gnu/"
@@ -63,7 +69,13 @@ USC_CLUSTER_WORK_DIR=$USC_CLUSTER_HOME"/pg_work"
 USC_CLUSTER_PEGASUS_HOME=$USC_CLUSTER_HOME"/bin/pegasus"
 USC_CLUSTER_GLOBUS_LOCATION="/usr/usc/globus/default/"
 #USC_CLUSTER_GLOBUS_LOCATION="/usr/local/globus/default"
-USC_CLUSTER_PEGASUS_PYTHON_LIB_DIR=`$USC_CLUSTER_PEGASUS_HOME/bin/pegasus-config --python`
+USC_CLUSTER_PEGASUS_CONFIG_PATH=$USC_CLUSTER_PEGASUS_HOME/bin/pegasus-config
+if test -f $USC_CLUSTER_PEGASUS_CONFIG_PATH; then
+	#if no test file existence, error will happen
+	USC_CLUSTER_PEGASUS_PYTHON_LIB_DIR=`$USC_CLUSTER_PEGASUS_CONFIG_PATH --python`
+else
+	USC_CLUSTER_PEGASUS_PYTHON_LIB_DIR=$USC_CLUSTER_PEGASUS_HOME/lib/pegasus/python
+fi
 
 
 if test $# -lt 2 ; then
