@@ -341,7 +341,7 @@ EOF
 # plan and submit the  workflow
 
 export CLASSPATH=.:$PEGASUS_HOME/lib/pegasus.jar:$CLASSPATH
-echo $CLASSPATH
+echo Java CLASSPATH is $CLASSPATH
 
 pegasus-plan \
 	--conf pegasusrc \
