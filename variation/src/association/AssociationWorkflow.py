@@ -138,13 +138,13 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 						test_type=1,\
 						min_data_point=3, noSNPAlleleOrdinalConversion=False, which_PC_index_ls=None,\
 						inputMissingGenotypeNotationType=1,\
-						parentJobLs=None, job_max_memory=100, job_max_walltime = 600, \
+						parentJobLs=None, job_max_memory=100, walltime = 600, \
 						extraArguments=None, extraDependentInputLs=None, \
 						transferOutput=False, **keywords):
 		"""
 		2013.1.9 added argument locusMapFile
 		2012.6.5
-			job_max_walltime is in minutes (max time allowed on hoffman2 is 24 hours).
+			walltime is in minutes (max time allowed on hoffman2 is 24 hours).
 			
 		"""
 		if not extraDependentInputLs:
@@ -177,7 +177,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 		
 		return self.addGenericJob(executable=executable, inputFile=datasetFile, outputFile=outputFile, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, transferOutput=transferOutput, \
-						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, job_max_walltime=job_max_walltime,
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, walltime=walltime,
 						**keywords)
 	
 	def addOutputPhenotypeJob(self, executable=None, outputFile=None, getRawPhenotypeData=False,\
@@ -303,7 +303,7 @@ class AssociationWorkflow(AbstractVariationWorkflow):
 						min_data_point=self.min_data_point, noSNPAlleleOrdinalConversion=noSNPAlleleOrdinalConversion, \
 						which_PC_index_ls=self.which_PC_index_ls,\
 						inputMissingGenotypeNotationType=inputMissingGenotypeNotationType,\
-						parentJobLs=[outputPhenotypeJob, locusMapJob], job_max_memory=3500, job_max_walltime =200, \
+						parentJobLs=[outputPhenotypeJob, locusMapJob], job_max_memory=3500, walltime =200, \
 						extraDependentInputLs=None, transferOutput=False)
 					logFile = File(os.path.join(topOutputDir, '%s_%s_%s_2DB.log'%(callMethodID, phenotype_method_id, \
 																				analysis_method_id)))
