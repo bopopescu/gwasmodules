@@ -48,7 +48,7 @@ class AbstractWorkflow(ADAG):
 								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
 								If empty, everything is in the pegasus root.', ],\
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
-						('max_walltime', 1, int):[20160, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
+						('max_walltime', 1, int):[4320, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
 	used in addGenericJob().'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('needSSHDBTunnel', 0, int):[0, 'H', 0, 'DB-interacting jobs need a ssh tunnel (running on cluster behind firewall).'],\
