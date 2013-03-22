@@ -473,6 +473,7 @@ class ProcessOptions(object):
 	@classmethod
 	def processListArguments(cls, listArgumentName_data_type_ls=None, emptyContent=[], class_to_have_attr=None):
 		"""
+		2013.3.22 skip getListOutOfStr() if listArgumentValue is already a list or tuple. some conversion done already
 		2012.10.5 copied from AbstractAlignmentAndVCFWorkflow.py
 		2012.8.15
 		i.e.:
@@ -484,7 +485,11 @@ class ProcessOptions(object):
 		for listArgumentName, data_type in listArgumentName_data_type_ls:
 			listArgumentValue = getattr(class_to_have_attr, listArgumentName, None)
 			if listArgumentValue:
-				setattr(class_to_have_attr, listArgumentName, getListOutOfStr(listArgumentValue, data_type=data_type))
+				if isinstance(listArgumentValue, list) or isinstance(listArgumentValue, tuple):
+					pass	#already a list or tuple. some conversion done already
+				else:
+					listArgumentValue = getListOutOfStr(listArgumentValue, data_type=data_type)
+				setattr(class_to_have_attr, listArgumentName, listArgumentValue)
 				listArgumentName2hasContent[listArgumentName]=True
 			else:
 				setattr(class_to_have_attr, listArgumentName, emptyContent)
