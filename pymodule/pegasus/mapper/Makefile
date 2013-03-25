@@ -15,19 +15,19 @@ all:	$(cxx_targets) $(c_targets) CalculateMedianMeanOfInputColumn
 
 
 $(cxx_targets):	%:	%.o
-	-$(cxx_compiler) $(cxx_flags) $(HDF5Lib) $< -o $@
+	-$(cxx_compiler) $< $(cxx_flags) $(HDF5Lib) -o $@
 
 CalculateMedianMeanOfInputColumn:	%:	%.o
-	-$(cxx_compiler) $(cxx_flags) -lboost_program_options -lboost_iostreams -larmadillo $< -o $@
+	-$(cxx_compiler) $< $(cxx_flags) -lboost_program_options -lboost_iostreams -larmadillo -o $@
 
 .cc.o:
-	$(cxx_compiler) $(cxx_flags) -c $< -o $@
+	$(cxx_compiler) $< $(cxx_flags) -c -o $@
 
 $(c_targets):	%:	%.o
-	$(c_compiler) $(c_flags)  $< -o $@
+	$(c_compiler) $< $(c_flags) -o $@
 
 .c.o:
-	$(c_compiler) $(c_flags) -c $< -o $@
+	$(c_compiler) $< $(c_flags) -c -o $@
 
 
 clean:
