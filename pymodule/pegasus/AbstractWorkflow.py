@@ -48,6 +48,7 @@ class AbstractWorkflow(ADAG):
 								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
 								If empty, everything is in the pegasus root.', ],\
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
+						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, etc., default is /tmp/ but sometimes it is too small'],\
 						('max_walltime', 1, int):[4320, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
 	used in addGenericJob().'],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
@@ -545,8 +546,9 @@ class AbstractWorkflow(ADAG):
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'plot/PlotGenomeWideData.py'), \
 										name='PlotGenomeWideData', clusterSizeMultipler=1)
-		
-		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/pipeCommandOutput2File.sh'), \
+										name='pipeCommandOutput2File', clusterSizeMultipler=1)
+	
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
 		"""
 		2012.8.31
@@ -1078,6 +1080,82 @@ class AbstractWorkflow(ADAG):
 		if getattr(job, 'input', None) is None and job.inputLs:
 			job.input = job.inputLs[0]
 		self.no_of_jobs += 1
+		return job
+	
+	def addGenericJavaJob(self, workflow=None, executable=None, jarFile=None, \
+					inputFile=None, inputArgumentOption=None, \
+					inputFileList=None,argumentForEachFileInInputFileList=None,\
+					outputFile=None, outputArgumentOption=None,\
+					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
+					extraDependentInputLs=None, no_of_cpus=None, walltime=120, sshDBTunnel=None, **keywords):
+		"""
+		2013.3.23 a generic function to add Java jobs
+		
+			fastaDictJob = self.addGenericJavaJob(executable=CreateSequenceDictionaryJava, jarFile=CreateSequenceDictionaryJar, \
+					inputFile=refFastaF, inputArgumentOption="REFERENCE=", \
+					inputFileList=None, argumentForEachFileInInputFileList=None,\
+					outputFile=refFastaDictF, outputArgumentOption="OUTPUT=",\
+					parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
+					extraDependentInputLs=None, no_of_cpus=None, walltime=walltime, sshDBTunnel=None, **keywords)
+		"""
+		if workflow is None:
+			workflow = self
+		if executable is None:
+			executable = self.java
+		if frontArgumentList is None:
+			frontArgumentList = []
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if extraOutputLs is None:
+			extraOutputLs = []
+		
+		
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementObject.memRequirement
+		javaMemRequirement = memRequirementObject.memRequirementInStr
+		
+		frontArgumentList = [javaMemRequirement, '-jar', jarFile] + frontArgumentList	#put java stuff in front of other fron arguments
+		extraDependentInputLs.append(jarFile)
+		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
+					inputArgumentOption=inputArgumentOption,  inputFileList=inputFileList,\
+					argumentForEachFileInInputFileList=argumentForEachFileInInputFileList,\
+					outputFile=outputFile, outputArgumentOption=outputArgumentOption, \
+					parentJob=None, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=extraOutputLs, \
+					transferOutput=transferOutput, \
+					frontArgumentList=frontArgumentList, extraArguments=extraArguments, \
+					extraArgumentList=extraArgumentList, job_max_memory=job_max_memory,  sshDBTunnel=sshDBTunnel, \
+					key2ObjectForJob=None, no_of_cpus=no_of_cpus, walltime=walltime, **keywords)
+		
+		return job
+	
+	def addGenericPipeCommandOutput2FileJob(self, workflow=None, executableFile=None, \
+					outputFile=None, \
+					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+					extraArguments=None, extraArgumentList=None, sshDBTunnel=None,\
+					job_max_memory=2000, walltime=120, **keywords):
+		"""
+		2013.03.25 use pipeCommandOutput2File to get output piped into outputF
+		"""
+		if workflow is None:
+			workflow = self
+		executable = self.pipeCommandOutput2File
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraDependentInputLs.append(executableFile)
+		job= self.addGenericJob(executable=executable, \
+					frontArgumentList=[executableFile],\
+					inputFile=None, inputArgumentOption=None,\
+					outputFile=outputFile, outputArgumentOption=None,\
+				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+				extraOutputLs=extraOutputLs, extraArguments=extraArguments, \
+				transferOutput=transferOutput, \
+				extraArgumentList=extraArgumentList, key2ObjectForJob=None, job_max_memory=job_max_memory, \
+				sshDBTunnel=sshDBTunnel, walltime=walltime, **keywords)
 		return job
 	
 	def setJobOutputFileTransferFlag(self, job=None, transferOutput=False, outputLs=None):
