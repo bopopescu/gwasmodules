@@ -865,6 +865,7 @@ class AbstractWorkflow(ADAG):
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
 					key2ObjectForJob=None, objectWithDBArguments=None, **keywords):
 		"""
+		2013.3.25 bugfix. moved most post-addGenericDBJob code into addGenericDBJob()
 		2012.10.6
 			similar to addGenericJob but these are generic jobs that need db-interacting arguments.
 			
@@ -873,26 +874,18 @@ class AbstractWorkflow(ADAG):
 				Difference from extraDependentInputLs: the latter is purely for dependency purpose, not added as input arguments.
 					So if files have been put in inputFileList, then they shouldn't be in extraDependentInputLs.
 		"""
-		#do not pass the inputFileList to addGenericJob() because db arguments need to be added before them. 
-		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
-						inputArgumentOption=inputArgumentOption, outputFile=outputFile, \
-						outputArgumentOption=outputArgumentOption, inputFileList=None, parentJobLs=parentJobLs, \
+		if objectWithDBArguments is None:
+			objectWithDBArguments = self
+		job = self.addGenericJob(workflow=workflow, executable=executable, \
+						inputFile=inputFile, inputArgumentOption=inputArgumentOption, \
+						outputFile=outputFile, outputArgumentOption=outputArgumentOption, \
+						inputFileList=inputFileList, argumentForEachFileInInputFileList=None, \
+						parentJobLs=parentJobLs, \
 						extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
 						transferOutput=transferOutput, extraArguments=extraArguments, extraArgumentList=extraArgumentList,\
 						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel, key2ObjectForJob=key2ObjectForJob,\
+						objectWithDBArguments=objectWithDBArguments, \
 						**keywords)
-		if objectWithDBArguments is None:
-			objectWithDBArguments = self
-		self.addDBArgumentsToOneJob(job=job, objectWithDBArguments=objectWithDBArguments)
-				
-		#2012.10.6 add all input files to the last (after db arguments,) otherwise, it'll mask others (cuz these don't have options).
-		if inputFileList:
-			for inputFile in inputFileList:
-				if inputFile:
-					isAdded = self.addJobUse(job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
-					if isAdded:	#2012.11.21
-						job.addArguments(inputFile)
-						job.inputLs.append(inputFile)
 		
 		#2012.10.6 set the job.input
 		if getattr(job, 'input', None) is None and job.inputLs:
@@ -968,8 +961,12 @@ class AbstractWorkflow(ADAG):
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, argumentForEachFileInInputFileList=None, \
 					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-					key2ObjectForJob=None, no_of_cpus=None, walltime=180, **keywords):
+					key2ObjectForJob=None, objectWithDBArguments=None, no_of_cpus=None, walltime=180, **keywords):
 		"""
+		order in commandline:
+			executable [frontArgumentList] [DBArguments] [inputArgumentOption] [inputFile] [outputArgumentOption] [outputFile]
+				[extraArgumentList] [extraArguments]
+		#2013.3.25 added argument objectWithDBArguments
 		#2013.3.21 scale walltime according to clusters_size
 		2013.2.26 added argument argumentForEachFileInInputFileList, to be added in front of each file in inputFileList
 		2013.2.7 add argument frontArgumentList, a list of arguments to be put in front of anything else
@@ -1000,6 +997,9 @@ class AbstractWorkflow(ADAG):
 		job.inputLs = []
 		if frontArgumentList:	#2013.2.7
 			job.addArguments(*frontArgumentList)
+		if objectWithDBArguments:	#2013.3.25 moved from addGenericDBJob()
+			self.addDBArgumentsToOneJob(job=job, objectWithDBArguments=objectWithDBArguments)
+		
 		if inputFile:
 			if inputArgumentOption:
 				job.addArguments(inputArgumentOption)
