@@ -37,5 +37,8 @@ pegasus.gridstart.arguments=-B 4000000
 #2012.4.9 monitord could blow out the memory on large worklfows. run it later with '--replay' to re-create the jobstate.log file, or re-populate the stats database from scratch.
 #pegasus.monitord.event=false
 #
-#2012.10.16 enable cleanup clustering to N jobs on each level
-pegasus.file.cleanup.clusters.num=25
+#2012.10.16 enable cleanup job clustering. this would reduce the number of jobs on each level to N.
+#pegasus.file.cleanup.clusters.num=50
+
+#2013.03.26 enable cleanup job clustering. This parameter means N cleanup jobs on each level would be clustered as one job.
+pegasus.file.cleanup.clusters.size=25
