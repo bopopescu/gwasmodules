@@ -105,18 +105,18 @@ if test $# -lt 2 ; then
 	echo "	#. finalOutputDir and submitFolderName could be same. But they should be different from previous workflows."
 	echo ""
 	echo "Examples:"
-	echo "	#plan & submit and do not keep intermediate files"
+	echo "	#plan & submit and do not keep intermediate files, cleanup clustering=30"
 	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool"
-	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool 0"
+	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool 0 30"
 	echo
-	echo "	#plan & submit, keep intermediate files, run on scratch type 2 ($UCLA_CLUSTER_SCRATCH_Type2) on hcondor"
-	echo "	$0 dags/TrioInconsistency15DistantVRC.xml hcondor 1 2"
+	echo "	#plan & submit, keep intermediate files, cleanupClustersSize=10 doesn't matter, run on scratch type 2 ($UCLA_CLUSTER_SCRATCH_Type2) on hcondor"
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml hcondor 1 10 2"
 	echo
-	echo "	#only planning, no running (keepIntermediateFiles & scratchType does not matter) by assigning empty spaces to submitOption"
-	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool 0 1 \"  \" "
+	echo "	#only planning, no running (keepIntermediateFiles & cleanupClustersSize & scratchType do not matter) by assigning empty spaces to submitOption"
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool 0 20 1 \"  \" "
 	echo
 	echo "	#run the workflow while keeping intermediate files. good for testing in which you often need to modify .dag.rescue log to backtrack finished jobs"
-	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml hcondor 1 1 \"--submit\" local TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 "
+	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml hcondor 1 20 1 \"--submit\" local TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 "
 	exit 1
 fi
 
