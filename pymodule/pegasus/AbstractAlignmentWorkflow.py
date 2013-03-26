@@ -32,8 +32,6 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						}
 	option_default_dict.update(commonAlignmentWorkflowOptionDict)
 	partitionWorkflowOptionDict= {
-						("needFastaIndexJob", 0, int): [0, 'A', 0, 'need to add a reference index job by samtools?'],\
-						("needFastaDictJob", 0, int): [0, 'B', 0, 'need to add a reference dict job by picard CreateSequenceDictionary.jar?'],\
 						("selectedRegionFname", 0, ): ["", 'R', 1, 'the file is in bed format, tab-delimited, chr start stop.\
 		used to restrict SAMtools/GATK to only make calls at this region. \
 		start and stop are 0-based. i.e. start=0, stop=100 means bases from 0-99.\
@@ -59,10 +57,144 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
 	
+	def addAlignmentAsInputToJobLs(self, workflow, alignmentDataLs, jobLs=[], jobInputOption=""):
+		"""
+		2012.1.9
+			used in addGenotypeCallJobs() to add alignment files as input to calling jobs
+		"""
+		for alignmentData in alignmentDataLs:
+			alignment = alignmentData.alignment
+			parentJobLs = alignmentData.jobLs
+			bamF = alignmentData.bamF
+			baiF = alignmentData.baiF
+			for job in jobLs:
+				if jobInputOption:
+					job.addArguments(jobInputOption)
+				job.addArguments(bamF)
+				#it's either symlink or stage-in
+				job.uses(bamF, transfer=True, register=True, link=Link.INPUT)
+				job.uses(baiF, transfer=True, register=True, link=Link.INPUT)
+				for parentJob in parentJobLs:
+					if parentJob:
+						workflow.depends(parent=parentJob, child=job)
+		
+	def addAddRG2BamJobsAsNeeded(self, workflow=None, alignmentDataLs=None, site_handler=None, input_site_handler=None, \
+							addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None, \
+							BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
+							mv=None, namespace="workflow", version="1.0", \
+							data_dir=None, tmpDir="/tmp"):
+		"""
+		2012.4.5
+			fix some bugs here
+		2011-9-15
+			add a read group only when the alignment doesn't have it according to db record
+			DBVervet.pokeBamReadGroupPresence() from misc.py helps to fill in db records if it's unclear.
+		2011-9-14
+			The read-group adding jobs will have a "move" part that overwrites the original bam&bai if site_handler and input_site_handler is same.
+			For those alignment files that don't need to. It doesn't matter. pegasus will transfer/symlink them.
+		"""
+		sys.stderr.write("Adding add-read-group2BAM jobs for %s alignments if read group is not detected ..."%(len(alignmentDataLs)))
+		if workflow is None:
+			workflow = self
+		job_max_memory = 3500	#in MB
+		javaMemRequirement = "-Xms128m -Xmx%sm"%job_max_memory
+		indexJobMaxMem=2500
+		
+		addRG2BamDir = None
+		addRG2BamDirJob = None
+		
+		no_of_rg_jobs = 0
+		returnData = []
+		for alignmentData in alignmentDataLs:
+			alignment = alignmentData.alignment
+			parentJobLs = alignmentData.jobLs
+			bamF = alignmentData.bamF
+			baiF = alignmentData.baiF
+			if alignment.read_group_added!=1:
+				if addRG2BamDir is None:
+					addRG2BamDir = "addRG2Bam"
+					addRG2BamDirJob = self.addMkDirJob(outputDir=addRG2BamDir)
+				
+				# add RG to this bam
+				sequencer = alignment.individual_sequence.sequencer
+				#read_group = '%s_%s_%s_%s_vs_%s'%(alignment.id, alignment.ind_seq_id, alignment.individual_sequence.individual.code, \
+				#						sequencer, alignment.ref_ind_seq_id)
+				read_group = alignment.getReadGroup()	##2011-11-02
+				if sequencer=='454':
+					platform_id = 'LS454'
+				elif sequencer=='GA':
+					platform_id = 'ILLUMINA'
+				else:
+					platform_id = 'ILLUMINA'
+				
+				# the add-read-group job
+				#addRGJob = Job(namespace=namespace, name=addRGExecutable.name, version=version)
+				addRGJob = Job(namespace=namespace, name=addOrReplaceReadGroupsJava.name, version=version)
+				outputRGSAM = File(os.path.join(addRG2BamDir, os.path.basename(alignment.path)))
+				
+				addRGJob.addArguments(javaMemRequirement, '-jar', AddOrReplaceReadGroupsJar, \
+									"INPUT=", bamF,\
+									'RGID=%s'%(read_group), 'RGLB=%s'%(platform_id), 'RGPL=%s'%(platform_id), \
+									'RGPU=%s'%(read_group), 'RGSM=%s'%(read_group),\
+									'OUTPUT=', outputRGSAM, 'SORT_ORDER=coordinate', "VALIDATION_STRINGENCY=LENIENT")
+									#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
+				self.addJobUse(addRGJob, file=AddOrReplaceReadGroupsJar, transfer=True, register=True, link=Link.INPUT)
+				if tmpDir:
+					addRGJob.addArguments("TMP_DIR=%s"%tmpDir)
+				addRGJob.uses(bamF, transfer=True, register=True, link=Link.INPUT)
+				addRGJob.uses(baiF, transfer=True, register=True, link=Link.INPUT)
+				addRGJob.uses(outputRGSAM, transfer=True, register=True, link=Link.OUTPUT)
+				yh_pegasus.setJobProperRequirement(addRGJob, job_max_memory=job_max_memory)
+				for parentJob in parentJobLs:
+					if parentJob:
+						workflow.depends(parent=parentJob, child=addRGJob)
+				workflow.addJob(addRGJob)
+				
+				
+				index_sam_job = self.addBAMIndexJob(workflow, BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar, \
+					inputBamF=outputRGSAM, parentJobLs=[addRGJob], transferOutput=True, javaMaxMemory=2000)
+				newAlignmentData = PassingData(alignment=alignment)
+				newAlignmentData.jobLs = [index_sam_job, addRGJob]
+				newAlignmentData.bamF = index_sam_job.bamFile
+				newAlignmentData.baiF = index_sam_job.baiFile
+				"""
+				# add the index job to the bamF (needs to be re-indexed)
+				index_sam_job = Job(namespace=namespace, name=BuildBamIndexFilesJava.name, version=version)
+				
+				if input_site_handler==site_handler:	#on the same site. overwrite the original file without RG
+					mvJob = Job(namespace=namespace, name=mv.name, version=version)
+					mvJob.addArguments(outputRGSAM, inputFname)	#watch, it's inputFname, not input. input is in relative path.
+					#samToBamJob.uses(outputRG, transfer=False, register=True, link=Link.OUTPUT)	#don't register it here
+					workflow.addJob(mvJob)
+					workflow.depends(parent=addRGJob, child=mvJob)
+					bai_output = File('%s.bai'%inputFname)	#in absolute path, don't register it to the job
+				else:
+					##on different site, input for index should be outputRGSAM and register it as well
+					mvJob = addRGJob
+					bamF = outputRGSAM	
+					addRGJob.uses(outputRGSAM, transfer=True, register=True, link=Link.OUTPUT)
+					bai_output = File('%s.bai'%outputRGSAMFname)
+					index_sam_job.uses(bai_output, transfer=True, register=False, link=Link.OUTPUT)
+				
+				index_sam_job
+				
+				yh_pegasus.setJobProperRequirement(index_sam_job, job_max_memory=indexJobMaxMem)
+				
+				workflow.addJob(index_sam_job)
+				workflow.depends(parent=mvJob, child=index_sam_job)
+				alignmentId2RGJobDataLs[alignment.id]= [index_sam_job, inputFile, bai_output]
+				"""
+				no_of_rg_jobs += 1
+			else:
+				newAlignmentData = alignmentData
+			returnData.append(newAlignmentData)
+		sys.stderr.write(" %s alignments need read-group addition. Done\n"%(no_of_rg_jobs))
+		return returnData
 	
 	def preReduce(self, workflow=None, passingData=None, transferOutput=True, **keywords):
 		"""
 		2012.9.17
+			setup additional mkdir folder jobs, before mapEachAlignment, mapEachChromosome, mapReduceOneAlignment 
 		"""
 		returnData = PassingData(no_of_jobs = 0)
 		returnData.jobDataLs = []
@@ -113,7 +245,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		
 		topOutputDirJob = passingData.topOutputDirJob
-		refFastaFile = passingData.refFastaFList[0]
+		refFastaF = passingData.refFastaFList[0]
 		
 		alignment = alignmentData.alignment
 		parentJobLs = alignmentData.jobLs
@@ -197,10 +329,11 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		chrIDSet = prePreprocessData.chrIDSet
 		chr2VCFFile = prePreprocessData.chr2VCFFile
 		
-		sys.stderr.write("Adding jobs that work on alignment(/VCF)s for %s chromosomes/contigs ..."%(len(chrIDSet)))
+		sys.stderr.write("Adding jobs that work on %s alignments (& possibly VCFs) for %s chromosomes/contigs ..."%\
+						(len(alignmentDataLs), len(chrIDSet)))
 		refFastaFList = registerReferenceData.refFastaFList
 		refFastaF = refFastaFList[0]
-		
+
 		topOutputDir = "%sMap"%(outputDirPrefix)
 		topOutputDirJob = self.addMkDirJob(outputDir=topOutputDir)
 		
@@ -211,8 +344,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		reduceOutputDirJob = self.addMkDirJob(outputDir=reduceOutputDir)
 		
 		if needFastaDictJob or registerReferenceData.needPicardFastaDictJob:
-			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
-												refFastaF=refFastaF)
+			fastaDictJob = self.addRefFastaDictJob(CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
+										CreateSequenceDictionaryJar=CreateSequenceDictionaryJar, refFastaF=refFastaF)
 			refFastaDictF = fastaDictJob.refFastaDictF
 		else:
 			fastaDictJob = None
@@ -236,16 +369,26 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		#	mapEachChromosomeDataLs is reset right after a new alignment is chosen.
 		#	mapEachIntervalDataLs is reset right after each chromosome is chosen.
 		#	all reduce dataLs never gets reset.
-		passingData = PassingData(AlignmentJobAndOutputLs=[], bamFnamePrefix=None, \
-					chrIDSet=chrIDSet,\
-					chr2IntervalDataLs=chr2IntervalDataLs,\
+		passingData = PassingData(AlignmentJobAndOutputLs=[], \
+					alignmentDataLs = alignmentDataLs,\
+					bamFnamePrefix=None, \
 					
+					outputDirPrefix=outputDirPrefix, \
 					topOutputDirJob=topOutputDirJob,\
 					plotOutputDirJob=plotOutputDirJob,\
 					reduceOutputDirJob = reduceOutputDirJob,\
 					
-					outputDirPrefix=outputDirPrefix, refFastaFList=refFastaFList, \
+					refFastaFList=refFastaFList, \
 					registerReferenceData= registerReferenceData,\
+					refFastaF=refFastaFList[0],\
+					
+					fastaDictJob = fastaDictJob,\
+					refFastaDictF = refFastaDictF,\
+					fastaIndexJob = fastaIndexJob,\
+					refFastaIndexF = refFastaIndexF,\
+					
+					chrIDSet=chrIDSet,\
+					chr2IntervalDataLs=chr2IntervalDataLs,\
 					
 					mapEachAlignmentData = None,\
 					mapEachChromosomeData=None, \
@@ -270,8 +413,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		preReduceReturnData = self.preReduce(workflow=workflow, passingData=passingData, transferOutput=False,\
 											**keywords)
 		passingData.preReduceReturnData = preReduceReturnData
-		
-		for alignmentData in alignmentDataLs:
+		for alignmentData in passingData.alignmentDataLs:
 			alignment = alignmentData.alignment
 			parentJobLs = alignmentData.jobLs
 			bamF = alignmentData.bamF
@@ -323,7 +465,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						report=False)
 			passingData.gzipReduceAfterEachAlignmentFolderJob = gzipReduceAfterEachAlignmentData.topOutputDirJob
 		reduceReturnData = self.reduce(workflow=workflow, passingData=passingData, \
-							mapEachAlignmentData=mapEachAlignmentData, \
+							mapEachAlignmentData=passingData.mapEachAlignmentData, \
 							reduceAfterEachAlignmentDataLs=passingData.reduceAfterEachAlignmentDataLs,\
 							**keywords)
 		passingData.reduceReturnData = reduceReturnData
