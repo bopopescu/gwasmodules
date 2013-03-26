@@ -33,11 +33,10 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 								used only when unable to guess based on individual_sequence.sequencer and individual_sequence.sequence_type'],\
 						("needRefIndexJob", 0, int): [0, '', 0, 'need to add a reference index job by bwa?'],\
 						('no_of_aln_threads', 1, int): [1, '', 1, 'number of threads during alignment'],\
-						('cluster_size_for_aln_jobs', 1, float): [0.01, '', 1, 'alignment job cluster size relative to self.clusters_size, \n\
+						('alignmentJobClustersSizeFraction', 1, float): [0.01, '', 1, 'alignment job cluster size relative to self.clusters_size, \n\
 	for bwa/PEAlignmentByBWA/LongSEAlignmentByBWA/addOrReplaceReadGroupsJava/SortSamFilesJava/samtools jobs'],\
 						('notStageOutFinalOutput', 0, int):[0, '', 0, 'toggle to not stage out final output (bam + bam.bai)'],\
-						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, default is /tmp/ but sometimes it is too small'],\
-						("coreAlignmentJobWallTimeMultiplier", 1, float): [1.0, '', 1, 'The default wall time is 23 hours (for bwa aln, stampy, etc.).\
+						("coreAlignmentJobWallTimeMultiplier", 1, float): [0.2, '', 1, 'The default wall time is 23 hours (for bwa aln, stampy, etc.).\
 	This option controls walltime by multiplying the default with this number.'],\
 						
 							}
@@ -83,7 +82,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 	def registerCustomExecutables(self, workflow=None):
 		"""
 		2012.5.3
-			add clusters.size profile for alignment specific jobs (self.cluster_size_for_aln_jobs)
+			add clusters.size profile for alignment specific jobs (self.alignmentJobClustersSizeFraction)
 		2012.1.3
 		"""
 		if workflow is None:
@@ -102,42 +101,42 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		stampy = Executable(namespace=namespace, name="stampy", version=version, os=operatingSystem, \
 						arch=architecture, installed=True)
 		stampy.addPFN(PFN("file://" + self.stampy_path, site_handler))
-		executableClusterSizeMultiplierList.append((stampy, self.cluster_size_for_aln_jobs))
+		executableClusterSizeMultiplierList.append((stampy, self.alignmentJobClustersSizeFraction))
 		
-		#workflow.BuildBamIndexFilesJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.cluster_size_for_aln_jobs))
-		self.setOrChangeExecutableClusterSize(executable=workflow.addOrReplaceReadGroupsJava, clusterSizeMultipler=self.cluster_size_for_aln_jobs, \
+		#workflow.BuildBamIndexFilesJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%self.alignmentJobClustersSizeFraction))
+		self.setOrChangeExecutableClusterSize(executable=workflow.addOrReplaceReadGroupsJava, clusterSizeMultipler=self.alignmentJobClustersSizeFraction, \
 											defaultClustersSize=None)
-		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=self.cluster_size_for_aln_jobs, \
+		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=self.alignmentJobClustersSizeFraction, \
 											defaultClustersSize=None)
 		
 		
 		bwa = Executable(namespace=namespace, name="bwa", version=version, os=operatingSystem, arch=architecture, installed=True)
 		bwa.addPFN(PFN("file://" + self.bwa_path, site_handler))
-		executableClusterSizeMultiplierList.append((bwa, self.cluster_size_for_aln_jobs))
+		executableClusterSizeMultiplierList.append((bwa, self.alignmentJobClustersSizeFraction))
 		
 		PEAlignmentByBWA = Executable(namespace=namespace, name="PEAlignmentByBWA", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		PEAlignmentByBWA.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/PEAlignmentByBWA.sh"), site_handler))
-		executableClusterSizeMultiplierList.append((PEAlignmentByBWA, self.cluster_size_for_aln_jobs))
+		executableClusterSizeMultiplierList.append((PEAlignmentByBWA, self.alignmentJobClustersSizeFraction))
 		
 		ShortSEAlignmentByBWA = Executable(namespace=namespace, name="ShortSEAlignmentByBWA", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		ShortSEAlignmentByBWA.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/ShortSEAlignmentByBWA.sh"), site_handler))
-		executableClusterSizeMultiplierList.append((ShortSEAlignmentByBWA, self.cluster_size_for_aln_jobs))
+		executableClusterSizeMultiplierList.append((ShortSEAlignmentByBWA, self.alignmentJobClustersSizeFraction))
 		
 		LongSEAlignmentByBWA = Executable(namespace=namespace, name="LongSEAlignmentByBWA", version=version, os=operatingSystem, \
 							arch=architecture, installed=True)
 		LongSEAlignmentByBWA.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/LongSEAlignmentByBWA.sh"), site_handler))
-		executableClusterSizeMultiplierList.append((LongSEAlignmentByBWA, self.cluster_size_for_aln_jobs))
+		executableClusterSizeMultiplierList.append((LongSEAlignmentByBWA, self.alignmentJobClustersSizeFraction))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, \
-													name="SAM2BAMJava", clusterSizeMultipler=0.7)
+													name="SAM2BAMJava", clusterSizeMultipler=0.5)
 		
 	def addBWAReferenceIndexJob(self, workflow=None, refFastaFList=None, refSequenceBaseCount=3000000000, bwa=None,\
 					bwaIndexFileSuffixLs = None,\
-					transferOutput=True, job_max_memory=4000, max_walltime=200):
+					transferOutput=True, job_max_memory=4000, walltime=200):
 		"""
 		2012.10.10
 			renamed from addRefIndexJob to addBWAReferenceIndexJob()
@@ -179,11 +178,11 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						transferOutput=transferOutput, \
 						extraArguments=None, extraArgumentList=extraArgumentList, \
 						key2ObjectForJob=None,\
-						job_max_memory=job_max_memory, max_walltime=max_walltime)
+						job_max_memory=job_max_memory, walltime=walltime)
 		return bwa_index_job
 	
 	def addStampyGenomeIndexHashJob(self, workflow=None, executable=None, refFastaFList=None, \
-						parentJobLs=None, job_max_memory=100, job_max_walltime = 60, \
+						parentJobLs=None, job_max_memory=100, walltime = 60, \
 						extraDependentInputLs=None, \
 						transferOutput=True, **keywords):
 		"""
@@ -204,7 +203,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			stampyGenomeIndexJob.uses(input, transfer=True, register=True, link=Link.INPUT)
 		for parentJob in parentJobLs:
 			workflow.depends(parent=parentJob, child=stampyGenomeIndexJob)
-		yh_pegasus.setJobProperRequirement(stampyGenomeIndexJob, job_max_memory=job_max_memory, max_walltime=job_max_walltime)
+		yh_pegasus.setJobProperRequirement(stampyGenomeIndexJob, job_max_memory=job_max_memory, walltime=walltime)
 		
 		stampyGenomeHashJob = Job(namespace=workflow.namespace, name=executable.name, version=workflow.version)
 		stampyGenomeHashJob.addArguments("-g", refFastaFile, "-H", refFastaFile)
@@ -218,7 +217,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		
 		workflow.addJob(stampyGenomeHashJob)
 		workflow.depends(parent=stampyGenomeIndexJob, child=stampyGenomeHashJob)
-		yh_pegasus.setJobProperRequirement(stampyGenomeHashJob, job_max_memory=job_max_memory, max_walltime=job_max_walltime)
+		yh_pegasus.setJobProperRequirement(stampyGenomeHashJob, job_max_memory=job_max_memory, walltime=walltime)
 		"""
 		
 		refFastaFile = refFastaFList[0]
@@ -232,7 +231,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						transferOutput=transferOutput, \
 						extraArguments=None, extraArgumentList=extraArgumentList, \
 						key2ObjectForJob=None,\
-						job_max_memory=job_max_memory, max_walltime=job_max_walltime)
+						job_max_memory=job_max_memory, walltime=walltime)
 		
 		genomeHashFile = File('%s.sthash'%(refFastaFile.name))
 		extraOutputLs = [genomeHashFile, genomeIndexFile]
@@ -244,7 +243,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						transferOutput=transferOutput, \
 						extraArguments=None, extraArgumentList=extraArgumentList, \
 						key2ObjectForJob=None,\
-						job_max_memory=job_max_memory, max_walltime=job_max_walltime)
+						job_max_memory=job_max_memory, walltime=walltime)
 		return stampyGenomeHashJob
 	
 	def registerISQFileObjLsToWorkflow(self, fileObjectLs=None, workflow=None, data_dir=None):
@@ -313,7 +312,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		sampe_job_max_memory = 6000	#in MB
 		addRGJob_max_memory = 2500	#in MB
 		#2013.3.1 change the walltime by multiplying it
-		aln_job_max_walltime = 1380*self.coreAlignmentJobWallTimeMultiplier
+		aln_job_walltime = 1380*self.coreAlignmentJobWallTimeMultiplier
 			#1380 is 23 hours, because all reads are stored in chunks of 5-million-read files
 		
 		refFastaFile = refFastaFList[0]
@@ -339,7 +338,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		for refFastaFile in refFastaFList:
 			alignmentJob.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
 		yh_pegasus.setJobProperRequirement(alignmentJob, job_max_memory=aln_job_max_memory, \
-										no_of_cpus=no_of_aln_threads, max_walltime=aln_job_max_walltime)
+										no_of_cpus=no_of_aln_threads, walltime=aln_job_walltime)
 		workflow.addJob(alignmentJob)
 		#add fastq files after "-M"
 		alignmentJob.addArguments(" -M ")	# -M FILE[,FILE] Map fastq file(s).  Use FILE.recaldata for recalibration if available
@@ -362,7 +361,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					refIndexJob=None,\
 					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000, \
-					key2ObjectForJob=None, max_walltime=None, \
+					key2ObjectForJob=None, walltime=None, \
 					**keywords):
 		"""
 		2012.10.10
@@ -380,7 +379,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 			alignmentJob.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
 		alignmentJob.uses(saiOutput, transfer=False, register=True, link=Link.OUTPUT)
 		yh_pegasus.setJobProperRequirement(alignmentJob, job_max_memory=aln_job_max_memory, \
-										no_of_cpus=no_of_aln_threads, max_walltime=aln_job_max_walltime)
+										no_of_cpus=no_of_aln_threads, walltime=aln_job_walltime)
 		
 		workflow.addJob(alignmentJob)
 		"""
@@ -416,7 +415,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 						transferOutput=transferOutput, \
 						extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
 						key2ObjectForJob=None,\
-						job_max_memory=job_max_memory, no_of_cpus=no_of_aln_threads, max_walltime=max_walltime)
+						job_max_memory=job_max_memory, no_of_cpus=no_of_aln_threads, walltime=walltime)
 		if refIndexJob:
 			self.addRefIndexJobAndItsOutputAsParent(workflow, refIndexJob, childJob=alignmentJob)
 		return alignmentJob
@@ -470,7 +469,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		addRGJob_max_memory = 2500	#in MB
 		
 		#2013.3.1 change the walltime by multiplying it
-		aln_job_max_walltime = int(1380*self.coreAlignmentJobWallTimeMultiplier)
+		aln_job_walltime = int(1380*self.coreAlignmentJobWallTimeMultiplier)
 			#1380 is 23 hours, because all reads are stored in chunks of 5-million-read files
 		
 		memRequirementData = self.getJVMMemRequirment(job_max_memory=addRGJob_max_memory, minMemory=2000)
@@ -498,7 +497,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					refIndexJob=refIndexJob, parentJobLs=parentJobLs, \
 					extraDependentInputLs=None, extraOutputLs=None, transferOutput=transferOutput, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=aln_job_max_memory, \
-					key2ObjectForJob=None, max_walltime=aln_job_max_walltime)
+					key2ObjectForJob=None, walltime=aln_job_walltime)
 				
 				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
 				sai2samJob = Job(namespace=namespace, name=ShortSEAlignmentByBWA.name, version=version)
@@ -524,7 +523,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					alignmentJob.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
 				alignmentJob.uses(fastqF, transfer=True, register=True, link=Link.INPUT)
 				yh_pegasus.setJobProperRequirement(alignmentJob, job_max_memory=bwasw_job_max_memory, \
-												no_of_cpus=no_of_aln_threads, max_walltime=aln_job_max_walltime)
+												no_of_cpus=no_of_aln_threads, walltime=aln_job_walltime)
 				workflow.addJob(alignmentJob)
 				#fake a sai2samJob
 				sai2samJob = alignmentJob
@@ -572,7 +571,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 					refIndexJob=refIndexJob, parentJobLs=parentJobLs, \
 					extraDependentInputLs=None, extraOutputLs=None, transferOutput=transferOutput, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=aln_job_max_memory, \
-					key2ObjectForJob=None, max_walltime=aln_job_max_walltime)
+					key2ObjectForJob=None, walltime=aln_job_walltime)
 				
 				sai2samJob.addArguments(saiOutput)
 				sai2samJob.uses(saiOutput, transfer=True, register=True, link=Link.INPUT)
@@ -640,7 +639,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		sampe_job_max_memory = 6000	#in MB
 		addRGJob_max_memory = 2500	#in MB
 		
-		aln_job_max_walltime= 4800	#80 hours, in minutes		
+		aln_job_walltime= 4800	#80 hours, in minutes		
 		
 		if alignment_method.short_name=='stampy':
 			alignmentJob = self.addStampyAlignmentJob(workflow=workflow, fileObjectLs=fileObjectLs,\
@@ -729,7 +728,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 								outputBamFile=None,\
 								addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 								parentJobLs=None, extraDependentInputLs=None, \
-								extraArguments=None, job_max_memory = 2500, transferOutput=False, **keywords):
+								extraArguments=None, job_max_memory = 2500, transferOutput=False, walltime=280,  **keywords):
 		"""
 		2012.9.19 split out of addAlignmentJob()
 		"""
@@ -767,14 +766,15 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							extraOutputLs=[outputBamFile],\
 							transferOutput=transferOutput, \
 							extraArgumentList=extraArgumentList, \
-							job_max_memory=memRequirementData.memRequirement, **keywords)
+							job_max_memory=memRequirementData.memRequirement, walltime=walltime, **keywords)
 		return job
 	
 	def addSortAlignmentJob(self, workflow=None, inputBamFile=None, \
 					outputBamFile=None,\
 					SortSamFilesJava=None, SortSamJar=None,\
 					parentJobLs=None, extraDependentInputLs=None, \
-					extraArguments=None, job_max_memory = 2500, transferOutput=False, **keywords):
+					extraArguments=None, job_max_memory = 2500, transferOutput=False, \
+					walltime=180, **keywords):
 		"""
 		2012.9.19
 		"""
@@ -799,13 +799,14 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							extraOutputLs=[outputBamFile],\
 							transferOutput=transferOutput, \
 							extraArgumentList=extraArgumentList, \
-							job_max_memory=memRequirementData.memRequirement, **keywords)
+							job_max_memory=memRequirementData.memRequirement, \
+							walltime=walltime, **keywords)
 		return job
 	
 	def addSAM2BAMJob(self, inputFile=None, outputFile=None,\
 					executable=None, SamFormatConverterJar=None,\
 					parentJobLs=None, extraDependentInputLs=None, \
-					extraArguments=None, job_max_memory = 2500, transferOutput=False, **keywords):
+					extraArguments=None, job_max_memory = 2500, transferOutput=False, walltime=180, **keywords):
 		"""
 		2013.3.18
 		"""
@@ -828,7 +829,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 							extraOutputLs=[outputFile],\
 							transferOutput=transferOutput, \
 							extraArgumentList=extraArgumentList, \
-							job_max_memory=memRequirementData.memRequirement, **keywords)
+							job_max_memory=memRequirementData.memRequirement, walltime=walltime,\
+							**keywords)
 		return job
 	
 	def addAlignmentMergeBySAMtoolsJob(self, workflow, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
@@ -865,7 +867,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, \
 						BuildBamIndexJar=BuildBamIndexJar, \
 						inputBamF=outputBamFile, parentJobLs=[merge_sam_job], \
-						transferOutput=transferOutput, javaMaxMemory=javaMaxMemory)
+						transferOutput=transferOutput, javaMaxMemory=javaMaxMemory, walltime=180)
 		return merge_sam_job, bamIndexJob
 	
 	def addMarkDupJob(self, workflow, parentJobLs=[], inputBamF=None, inputBaiF=None, outputBamFile=None,\
@@ -913,7 +915,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow):
 								BuildBamIndexJar=BuildBamIndexJar, \
 								inputBamF=MarkDupOutputF,\
 								parentJobLs=[MarkDupJob], namespace=namespace, version=version,\
-								transferOutput=transferOutput)
+								transferOutput=transferOutput, walltime=680)
 		return MarkDupJob, bamIndexJob
 		
 	def addSAMtoolsCalmdJob(self, workflow, samtoolsCalmd=None, inputBamF=None, \
