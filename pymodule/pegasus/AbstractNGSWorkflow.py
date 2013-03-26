@@ -46,6 +46,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						
+						("needFastaIndexJob", 0, int): [0, 'A', 0, 'need to add a reference index job by samtools?'],\
+						("needFastaDictJob", 0, int): [0, 'B', 0, 'need to add a reference dict job by picard CreateSequenceDictionary.jar?'],\
+						
 						#to filter alignment or individual_sequence
 						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments or sequences that are from contaminated individuals, \n\
 		(IndividualSequence.is_contaminated=1)'],\
@@ -113,7 +116,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 								('sequence_type_id_ls', int), ('sequencer_id_ls', int), \
 								('sequence_batch_id_ls', int),('version_ls', int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
-	
+		
+		self.samtoolsFile = self.registerOneInputFile(inputFname=self.samtools_path,\
+													input_site_handler=self.input_site_handler, folderName="")
 	
 	def registerJars(self, workflow=None, ):
 		"""
@@ -435,58 +440,87 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		AbstractWorkflow.registerCustomExecutables(self, workflow=workflow)
 	
 	
-	def addRefFastaFaiIndexJob(self, workflow=None, samtools=None, refFastaF=None, ):
+	def addRefFastaFaiIndexJob(self, workflow=None, samtools=None, refFastaF=None, \
+							parentJobLs=None, transferOutput=True, job_max_memory=1000,\
+							walltime=300, **keywords):
 		"""
+		2013.3.23 use addGenericJob()
 		2011-11-25
 			the *.fai file of refFastaF is required for GATK
 		"""
+		sys.stderr.write("\t Adding SAMtools index fasta job ...")
 		refFastaIndexFname = '%s.fai'%(refFastaF.name)	# the .fai file is required for GATK
 		refFastaIndexF = File(refFastaIndexFname)
-		#not os.path.isfile(refFastaIndexFname)
-		fastaIndexJob = Job(namespace=self.namespace, name=samtools.name, version=self.version)
-		fastaIndexJob.addArguments("faidx", refFastaF)
-		fastaIndexJob.uses(refFastaF,  transfer=True, register=True, link=Link.INPUT)
-		fastaIndexJob.uses(refFastaIndexFname, transfer=True, register=True, link=Link.OUTPUT)
+		frontArgumentList = ["faidx", refFastaF]
+		fastaIndexJob = self.addGenericJob(executable=samtools, inputFile=None,\
+							outputFile=None, outputArgumentOption=None, \
+							parentJobLs=parentJobLs, extraDependentInputLs=[refFastaF], \
+							extraOutputLs=[refFastaIndexF],\
+							frontArgumentList=frontArgumentList,\
+							transferOutput=transferOutput, \
+							extraArgumentList=None, \
+							job_max_memory=job_max_memory, walltime=walltime, **keywords)
+		
+		
 		fastaIndexJob.refFastaIndexF = refFastaIndexF
-		yh_pegasus.setJobProperRequirement(fastaIndexJob, job_max_memory=1000)
-		self.addJob(fastaIndexJob)
-		self.no_of_jobs += 1
+		sys.stderr.write("\n")
 		return fastaIndexJob
 	
-	def addRefFastaDictJob(self, workflow=None, CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, refFastaF=None):
+	def addRefFastaDictJob(self, workflow=None, CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
+						refFastaF=None, parentJobLs=None, transferOutput=True, job_max_memory=1000,\
+						walltime=120, **keywords):
 		"""
+		2013.3.23 use addGenericJob()
 		2012.9.14 bugfix. add argument CreateSequenceDictionaryJar
 		2011-11-25
 			# the .dict file is required for GATK
 		"""
+		sys.stderr.write("\t Adding picard CreateSequenceDictionaryJar job ...")
 		refFastaDictFname = '%s.dict'%(os.path.splitext(refFastaF.name)[0])
 		refFastaDictF = File(refFastaDictFname)
-		#not os.path.isfile(refFastaDictFname) or 
-		fastaDictJob = Job(namespace=self.namespace, name=CreateSequenceDictionaryJava.name, version=self.version)
-		fastaDictJob.addArguments('-jar', CreateSequenceDictionaryJar, \
-				'REFERENCE=', refFastaF, 'OUTPUT=', refFastaDictF)
-		self.addJobUse(fastaDictJob, file=CreateSequenceDictionaryJar, transfer=True, register=True, link=Link.INPUT)
-		fastaDictJob.uses(refFastaF, transfer=True, register=True, link=Link.INPUT)
-		fastaDictJob.uses(refFastaDictF, transfer=True, register=True, link=Link.OUTPUT)
-		yh_pegasus.setJobProperRequirement(fastaDictJob, job_max_memory=1000)
+		fastaDictJob = self.addGenericJavaJob(executable=CreateSequenceDictionaryJava, jarFile=CreateSequenceDictionaryJar, \
+					inputFile=refFastaF, inputArgumentOption="REFERENCE=", \
+					inputFileList=None, argumentForEachFileInInputFileList=None,\
+					outputFile=refFastaDictF, outputArgumentOption="OUTPUT=",\
+					parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
+					extraDependentInputLs=None, no_of_cpus=None, walltime=walltime, sshDBTunnel=None, **keywords)
+		
 		fastaDictJob.refFastaDictF = refFastaDictF
-		self.addJob(fastaDictJob)
-		self.no_of_jobs += 1
+		sys.stderr.write("\n")
 		return fastaDictJob
 	
 	def addRefFastaJobDependency(self, workflow=None, job=None, refFastaF=None, fastaDictJob=None, refFastaDictF=None, \
-								fastaIndexJob = None, refFastaIndexF = None):
+								fastaIndexJob = None, refFastaIndexF = None, **keywords):
 		"""
+		Examples:
+			self.addRefFastaJobDependency(job=job, refFastaF=refFastaF, fastaDictJob=fastaDictJob, \
+							refFastaDictF=refFastaDictF, fastaIndexJob = fastaIndexJob, refFastaIndexF = refFastaIndexF)
+					
+		2013.3.23 refFastaDictF and refFastaIndexF are optional if fastaDictJob & fastaIndexJob are for sure not None.
+			also call self.addJobUse()
 		2011-9-14
 		"""
+		if workflow is None:
+			workflow = self
 		if fastaIndexJob:	#2011-7-22 if job doesn't exist, don't add it. means this job isn't necessary to run.
 			self.depends(parent=fastaIndexJob, child=job)
-			job.uses(refFastaIndexF, transfer=True, register=True, link=Link.INPUT)
+			if refFastaIndexF is None:
+				refFastaIndexF = fastaIndexJob.output
+			self.addJobUse(job=job, file=refFastaIndexF, transfer=True, register=True, link=Link.INPUT)
+		elif refFastaIndexF:
+			self.addJobUse(job=job, file=refFastaIndexF, transfer=True, register=True, link=Link.INPUT)
+			
 		if fastaDictJob:
 			self.depends(parent=fastaDictJob, child=job)
-			job.uses(refFastaDictF, transfer=True, register=True, link=Link.INPUT)
+			if refFastaDictF is None:
+				refFastaDictF = fastaDictJob.output
+			self.addJobUse(job=job, file=refFastaDictF, transfer=True, register=True, link=Link.INPUT)
+		elif refFastaDictF:
+			self.addJobUse(job=job, file=refFastaDictF, transfer=True, register=True, link=Link.INPUT)
+			
 		if fastaIndexJob or fastaDictJob:
-			job.uses(refFastaF, transfer=True, register=True, link=Link.INPUT)
+			self.addJobUse(job=job, file=refFastaF, transfer=True, register=True, link=Link.INPUT)
 	
 	def addVCFFormatConvertJob(self, workflow=None, vcf_convert=None, parentJob=None, inputF=None, outputF=None, \
 							namespace=None, version=None, transferOutput=False):
@@ -575,7 +609,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 	def addGATKCombineVariantsJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, \
 							refFastaFList=None, inputFileList=None, argumentForEachFileInInputFileList="--variant",\
 							outputFile=None, genotypeMergeOptions='UNSORTED', \
-					parentJobLs=None, transferOutput=True, job_max_memory=2000,max_walltime=None,\
+					parentJobLs=None, transferOutput=True, job_max_memory=2000,walltime=None,\
 					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
 		"""
 		add input file to this job via
@@ -618,7 +652,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
 					frontArgumentList=None, extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
 					extraOutputLs=None, \
-					extraDependentInputLs=extraDependentInputLs, no_of_cpus=None, max_walltime=max_walltime, **keywords)
+					extraDependentInputLs=extraDependentInputLs, no_of_cpus=None, walltime=walltime, **keywords)
 		return job
 	
 	def addGATKJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, GATKAnalysisType=None,\
@@ -627,7 +661,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					interval=None, outputFile=None, \
 					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
-					extraDependentInputLs=None, no_of_cpus=None, max_walltime=None, **keywords):
+					extraDependentInputLs=None, no_of_cpus=None, walltime=120, **keywords):
 		"""
 		i.e.
 			indelUnionOutputF = File(os.path.join(gatkIndelDirJob.folder, '%s.indel.vcf'%chromosome))
@@ -638,7 +672,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 				parentJobLs=[gatkIndelDirJob, gatkUnionJob], transferOutput=False, job_max_memory=job_max_memory,\
 				frontArgumentList=None, extraArguments="-selectType INDEL", \
 				extraArgumentList=None, extraOutputLs=None, \
-				extraDependentInputLs=None, no_of_cpus=None, max_walltime=None)
+				extraDependentInputLs=None, no_of_cpus=None, walltime=None)
 		2013.2.26 add gatkVCFIndexOutput to the extraOutputLs if outputFile is a .vcf file
 		2013.2.26 a generic function to add GATK jobs
 		"""
@@ -692,7 +726,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					transferOutput=transferOutput, \
 					frontArgumentList=frontArgumentList, extraArguments=extraArguments, \
 					extraArgumentList=extraArgumentList, job_max_memory=job_max_memory,  sshDBTunnel=None, \
-					key2ObjectForJob=None, no_of_cpus=no_of_cpus, max_walltime=max_walltime, **keywords)
+					key2ObjectForJob=None, no_of_cpus=no_of_cpus, walltime=walltime, **keywords)
 		
 		job.gatkVCFIndexOutput = gatkVCFIndexOutput
 		return job
@@ -1681,57 +1715,56 @@ Contig966       3160    50
 		sys.stderr.write("%s intervals.\n"%(counter))
 		return chr2IntervalDataLs
 	
-	def addPutStuffIntoDBJob(self, workflow=None, executable=None, inputFileLs=[], \
+	def addPutStuffIntoDBJob(self, workflow=None, executable=None, inputFileList=None, \
 					logFile=None, commit=False, \
-					parentJobLs=[], extraDependentInputLs=[], transferOutput=True, extraArguments=None, \
+					parentJobLs=None, extraDependentInputLs=None, transferOutput=True, extraArguments=None, \
 					job_max_memory=10, sshDBTunnel=0, **keywords):
 		"""
+		2013.3.24 use addGenericFile2DBJob()
 		2012.5.8 add sshDBTunnel
 		2012.4.3
 		"""
-		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
-		job.addArguments("--drivername", self.drivername, "--hostname", self.hostname, "--dbname", self.dbname, \
-						"--db_user", self.db_user, "--db_passwd", self.db_passwd)
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if inputFileList:
+			extraDependentInputLs.extend(inputFileList)
+		extraArgumentList = []
+		key2ObjectForJob = {}
 		if extraArguments:
-			job.addArguments(extraArguments)
-		if commit:
-			job.addArguments("--commit")
-		if logFile:
-			job.addArguments("--logFilename", logFile)
-			job.uses(logFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			job.output = logFile
-		for inputFile in inputFileLs:	#2012.4.3 this inputFile addition has to be at last. as it doesn't have options ahead of them. 
-			job.addArguments(inputFile)
-			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
-		self.addJob(job)
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel)
-		for parentJob in parentJobLs:
-			self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+			extraArgumentList.append(extraArguments)
+		job = self.addGenericFile2DBJob(workflow=workflow, executable=executable, \
+					inputFile=None, inputArgumentOption="-i", \
+					outputFile=None, outputArgumentOption="-o", inputFileList=inputFileList, \
+					data_dir=None, logFile=logFile, commit=commit,\
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=None, \
+					transferOutput=transferOutput, \
+					extraArguments=None, extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, \
+					sshDBTunnel=sshDBTunnel, \
+					key2ObjectForJob=key2ObjectForJob, objectWithDBArguments=self, **keywords)
 		return job
 	
-	def addSamtoolsFlagstatJob(self, workflow=None, executable=None, inputF=None, outputF=None, \
-					parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
-					extraArguments=None, job_max_memory=2000, **keywords):
+	def addSamtoolsFlagstatJob(self, workflow=None, executable=None, samtoolsFile=None, \
+					inputFile=None, outputFile=None, \
+					parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
+					extraArguments=None, job_max_memory=2000, walltime=120, **keywords):
 		"""
+		2013.03.25 use pipeCommandOutput2File to get output piped into outputF
+		2013.3.24 use addGenericJob()
 		2012.4.3
 			samtools (sam_stat.c) has been modified so that it could take one more optional argument to store the
 				stats that are usually directed to stdout. 
 			inputF is bam file. outputF is to store the output.
 			
 		"""
-		job = Job(namespace=self.namespace, name=executable.name, version=self.version)
-		job.addArguments('flagstat', inputF, outputF)
-		job.uses(inputF, transfer=True, register=True, link=Link.INPUT)
-		job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		job.output = outputF
-		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory)
-		self.addJob(job)
-		for parentJob in parentJobLs:
-			self.depends(parent=parentJob, child=job)
-		for input in extraDependentInputLs:
-			job.uses(input, transfer=True, register=True, link=Link.INPUT)
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraDependentInputLs.append(inputFile)
+		job = self.addGenericPipeCommandOutput2FileJob(workflow=workflow, executableFile=samtoolsFile, \
+					outputFile=outputFile, \
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=None, transferOutput=transferOutput, \
+					extraArguments=extraArguments, extraArgumentList=['flagstat', inputFile], sshDBTunnel=None,\
+					job_max_memory=job_max_memory, walltime=walltime)
 		return job
 	
 	def addAddAlignmentFile2DBJob(self, workflow=None, executable=None, inputFile=None, otherInputFileList=None,\
@@ -1746,7 +1779,7 @@ Contig966       3160    50
 						parentJobLs=None, \
 						extraDependentInputLs=None, \
 						extraArguments=None, transferOutput=True, \
-						job_max_memory=2000, sshDBTunnel=False, commit=True, **keywords):
+						job_max_memory=2000, walltime=120, sshDBTunnel=False, commit=True, **keywords):
 		"""
 		2012.9.20
 			To specify individual_alignment:
@@ -1789,7 +1822,7 @@ Contig966       3160    50
 				extraOutputLs=extraOutputLs,\
 				transferOutput=transferOutput, \
 				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
-				sshDBTunnel=sshDBTunnel, **keywords)
+				sshDBTunnel=sshDBTunnel, walltime=walltime, **keywords)
 		job.logFile = logFile
 		self.addDBArgumentsToOneJob(job=job, objectWithDBArguments=self)
 		
@@ -1804,7 +1837,7 @@ Contig966       3160    50
 					java=None, MergeSamFilesJava=None, MergeSamFilesJar=None, \
 					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					mv=None, parentJobLs=None, namespace='workflow', version='1.0', transferOutput=False,\
-					**keywords):
+					walltime=680, **keywords):
 		"""
 		2012.9.17 copied from vervet/src/ShortRead2AlignmentPipeline.py
 		2012.7.4 bugfix. add job dependency between alignmentJob and merge_sam_job after all have been added to the workflow.
@@ -1834,7 +1867,7 @@ Contig966       3160    50
 			# 'USE_THREADING=true', threading might be causing process hanging forever (sleep).
 			self.addJobUse(merge_sam_job, file=MergeSamFilesJar, transfer=True, register=True, link=Link.INPUT)
 			self.addJobUse(merge_sam_job, file=outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			yh_pegasus.setJobProperRequirement(merge_sam_job, job_max_memory=job_max_memory)
+			yh_pegasus.setJobProperRequirement(merge_sam_job, job_max_memory=job_max_memory, walltime=walltime)
 			workflow.addJob(merge_sam_job)
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
 				alignmentJob, alignmentOutput = AlignmentJobAndOutput[:2]
@@ -1862,7 +1895,7 @@ Contig966       3160    50
 		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexJar=BuildBamIndexJar, \
 					inputBamF=outputBamFile,\
 					parentJobLs=[merge_sam_job], namespace=namespace, version=version,\
-					transferOutput=transferOutput, job_max_memory=3000)
+					transferOutput=transferOutput, job_max_memory=3000, walltime=180)
 		return merge_sam_job, bamIndexJob
 	
 	
