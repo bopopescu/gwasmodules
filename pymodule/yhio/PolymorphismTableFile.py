@@ -78,8 +78,7 @@ class IndividualTable(tables.IsDescription):
 	mother_name = StringCol(512, pos=4)
 	sex = UInt64Col(pos=5)	#0 is unknown, 1=male, 2=female
 	phenotype = Float64Col(pos=6)
-	species_id = UInt64Col(pos=7)
-	population_id = UInt64Col(pos=8)
+	population_id = UInt64Col(pos=7)
 	
 
 class PolymorphismTable(tables.IsDescription):
@@ -90,7 +89,7 @@ class PolymorphismTable(tables.IsDescription):
 	name = StringCol(512, pos=1)	#name should be "individualName.locusName.chromosome_copy" to ensure uniqueness
 	individual_id = UInt64Col(pos=2)
 	locus_id = UInt64Col(pos=3)
-	chromosome_copy = UInt64Col(pos=4, dflt=0)
+	chromosome_copy = UInt64Col(pos=4, dflt=0)	#starting from 0
 	allele_sequence = StringCol(512, pos=5)
 	allele_sequence_length = UInt64Col(pos=6)
 	allele_type = StringCol(512, pos=7)
@@ -515,7 +514,7 @@ class PolymorphismTableFile(YHFile):
 					population_id = population.id
 			oneCell = PassingData(name=name,family_id =family_id, father_name=father_name,\
 								mother_name=mother_name, sex=sex, phenotype=phenotype,\
-								species_id=species_id, population_id=population_id)
+								population_id=population_id)
 			self.individualTable.writeOneCell(oneCell, cellType=2)
 			self.flush()
 			if name in self._individualName2ID:
