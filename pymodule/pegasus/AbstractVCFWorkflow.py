@@ -607,15 +607,14 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			refFastaDictF = fastaDictJob.refFastaDictF
 		else:
 			fastaDictJob = None
-			refFastaDictF = None
+			refFastaDictF = registerReferenceData.refPicardFastaDictF
 		
 		if needFastaIndexJob or registerReferenceData.needSAMtoolsFastaIndexJob:
 			fastaIndexJob = self.addRefFastaFaiIndexJob(workflow, samtools=samtools, refFastaF=refFastaF)
 			refFastaIndexF = fastaIndexJob.refFastaIndexF
 		else:
 			fastaIndexJob = None
-			refFastaIndexF = None
-		
+			refFastaIndexF = registerReferenceData.refSAMtoolsFastaIndexF
 		
 		returnData = PassingData()
 		returnData.jobDataLs = []
@@ -625,11 +624,22 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		#	mapEachChromosomeDataLs is reset right after a new alignment is chosen.
 		#	mapEachIntervalDataLs is reset right after each chromosome is chosen.
 		#	all reduce dataLs never gets reset.
-		passingData = PassingData(fnamePrefix=None, topOutputDirJob=topOutputDirJob, chromosome=None, \
+		passingData = PassingData(fnamePrefix=None, \
+					chromosome=None, \
+					
+					topOutputDirJob=topOutputDirJob, \
 					outputDirPrefix=outputDirPrefix, \
 					intervalFnamePrefix=None,\
+					
 					refFastaFList=refFastaFList, \
 					registerReferenceData=registerReferenceData, \
+					refFastaF=refFastaFList[0],\
+					
+					fastaDictJob = fastaDictJob,\
+					refFastaDictF = refFastaDictF,\
+					fastaIndexJob = fastaIndexJob,\
+					refFastaIndexF = refFastaIndexF,\
+					
 					intervalOverlapSize =intervalOverlapSize, intervalSize=intervalSize,\
 					jobData=None,\
 					VCFFile=None,\
