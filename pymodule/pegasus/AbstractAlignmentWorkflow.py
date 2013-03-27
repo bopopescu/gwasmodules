@@ -349,14 +349,15 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			refFastaDictF = fastaDictJob.refFastaDictF
 		else:
 			fastaDictJob = None
-			refFastaDictF = None
+			refFastaDictF = registerReferenceData.refPicardFastaDictF
 		
 		if needFastaIndexJob or registerReferenceData.needSAMtoolsFastaIndexJob:
 			fastaIndexJob = self.addRefFastaFaiIndexJob(workflow, samtools=samtools, refFastaF=refFastaF)
 			refFastaIndexF = fastaIndexJob.refFastaIndexF
 		else:
 			fastaIndexJob = None
-			refFastaIndexF = None
+			refFastaIndexF = registerReferenceData.refSAMtoolsFastaIndexF
+			
 		
 		
 		returnData = PassingData()
