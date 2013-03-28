@@ -39,9 +39,10 @@ UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
 
-UCLA_CLUSTER_SCRATCH_Type1="/u/scratch2/p/polyacti/pegasus"
+UCLA_CLUSTER_SCRATCH_Type1="/u/scratch/p/polyacti/pegasus"
 UCLA_CLUSTER_SCRATCH_Type2="$UCLA_CLUSTER_HOME/NetworkData/scratch/"
-#2013.3.21 the old scratch
+# 2013.03.21 the old scratch
+# 2013.03.28 replaced by the new scratch completely
 UCLA_CLUSTER_SCRATCH_Type3="/u/scratch/p/polyacti/pegasus"
 # 2013.3.6 on 2013.3.4, hoffman2 upgraded to the new /u/scratch2 system. this will phase out eventually
 #UCLA_CLUSTER_SCRATCH_Type1_old="/u/scratch/p/polyacti/pegasus"
