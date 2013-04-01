@@ -49,8 +49,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 			intervalDataLs = chr2IntervalDataLs.get(chr)
 			VCFFile = chr2VCFFile.get(chr)
 			if VCFFile is None:
-				sys.stderr.write("WARNING: no VCFFile for chromosome %s. skipped.\n"%(chr))
-				continue
+				sys.stderr.write("WARNING: no VCFFile for chromosome %s. \n"%(chr))
+				#continue
 			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, alignmentData=alignmentData, chromosome=chr, \
 								VCFFile=VCFFile, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
 								mapEachAlignmentData=mapEachAlignmentData,\
@@ -79,13 +79,15 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 				passingData.mapEachIntervalData = mapEachIntervalData
 				mapEachIntervalDataLs.append(mapEachIntervalData)
 				
-				linkMapToReduceData = self.linkMapToReduce(workflow=workflow, mapEachIntervalData=mapEachIntervalData, preReduceReturnData=preReduceReturnData, \
+				linkMapToReduceData = self.linkMapToReduce(workflow=workflow, mapEachIntervalData=mapEachIntervalData, \
+									preReduceReturnData=preReduceReturnData, \
 									reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
 									mapEachAlignmentData=mapEachAlignmentData,\
 									passingData=passingData, \
 									**keywords)
 			
-			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chr, passingData=passingData, \
+			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chr, \
+								passingData=passingData, \
 								mapEachIntervalDataLs=passingData.mapEachIntervalDataLs,\
 								transferOutput=False, data_dir=self.data_dir, \
 								**keywords)
@@ -100,14 +102,16 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 	
 	def setup(self, inputVCFData=None, chr2IntervalDataLs=None, **keywords):
 		"""
+		2013.04.01 derive chr2VCFFile only when inputVCFData is available
 		2013.1.25
 		"""
 		#2012.8.26 so that each recalibration will pick up the right vcf
 		chr2VCFFile = {}
-		for jobData in inputVCFData.jobDataLs:
-			inputF = jobData.file
-			chr = self.getChrFromFname(os.path.basename(inputF.name))
-			chr2VCFFile[chr] = inputF
+		if inputVCFData:
+			for jobData in inputVCFData.jobDataLs:
+				inputF = jobData.file
+				chr = self.getChrFromFname(os.path.basename(inputF.name))
+				chr2VCFFile[chr] = inputF
 		chrIDSet = set(chr2VCFFile.keys())&set(chr2IntervalDataLs.keys())
 		return PassingData(chrIDSet=chrIDSet, chr2VCFFile=chr2VCFFile)
 	
