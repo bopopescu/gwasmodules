@@ -697,7 +697,7 @@ class ElixirDB(object):
 			if dstFilename is None:	#still nothing , use newPath instead
 				dstFilename = os.path.join(outputDir, newPath)
 		if os.path.isfile(dstFilename):
-			sys.stderr.write("Error: destination %s already exits.\n"%(dstFilename))
+			sys.stderr.write("Error: destination %s already exists.\n"%(dstFilename))
 			exitCode = 2
 		else:
 			#21012.12.15 create folder if not existent
