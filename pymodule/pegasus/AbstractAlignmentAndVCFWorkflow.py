@@ -45,13 +45,13 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		mapEachAlignmentData = passingData.mapEachAlignmentData
 		preReduceReturnData = passingData.preReduceReturnData
 		
-		for chr in chrIDSet:
-			intervalDataLs = chr2IntervalDataLs.get(chr)
-			VCFFile = chr2VCFFile.get(chr)
+		for chromosome in chrIDSet:
+			intervalDataLs = chr2IntervalDataLs.get(chromosome)
+			VCFFile = chr2VCFFile.get(chromosome)
 			if VCFFile is None:
-				sys.stderr.write("WARNING: no VCFFile for chromosome %s. \n"%(chr))
+				sys.stderr.write("WARNING: no VCFFile for chromosome %s. \n"%(chromosome))
 				#continue
-			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, alignmentData=alignmentData, chromosome=chr, \
+			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, alignmentData=alignmentData, chromosome=chromosome, \
 								VCFFile=VCFFile, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
 								mapEachAlignmentData=mapEachAlignmentData,\
 								transferOutput=False, **keywords)
@@ -86,7 +86,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 									passingData=passingData, \
 									**keywords)
 			
-			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chr, \
+			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chromosome, \
 								passingData=passingData, \
 								mapEachIntervalDataLs=passingData.mapEachIntervalDataLs,\
 								transferOutput=False, data_dir=self.data_dir, \
@@ -110,8 +110,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		if inputVCFData:
 			for jobData in inputVCFData.jobDataLs:
 				inputF = jobData.file
-				chr = self.getChrFromFname(os.path.basename(inputF.name))
-				chr2VCFFile[chr] = inputF
+				chromosome = self.getChrFromFname(os.path.basename(inputF.name))
+				chr2VCFFile[chromosome] = inputF
 		chrIDSet = set(chr2VCFFile.keys())&set(chr2IntervalDataLs.keys())
 		return PassingData(chrIDSet=chrIDSet, chr2VCFFile=chr2VCFFile)
 	
