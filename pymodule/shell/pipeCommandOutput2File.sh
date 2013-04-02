@@ -26,7 +26,9 @@ commandline="$commandPath $arguments"
 outputFilenameLength=`expr length $outputFname`
 gzSuffixStartPosition=`echo $outputFilenameLength-3+1|bc`
 gzSuffix=`expr substr $outputFname $gzSuffixStartPosition 3`
+
 echo gzSuffix is $gzSuffix.
+echo commandline is $commandline.
 
 if test "$gzSuffix" = ".gz"; then
 	$commandline | gzip > $outputFname
