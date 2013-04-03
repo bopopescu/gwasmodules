@@ -37,7 +37,7 @@ class ConvertMSOutput2FASTQ(AbstractMapper):
 		Assuming Sanger format. z is ascii no. 122, corresponding to quality 87 ",],\
 							('ploidy', 1, int): [2, '', 1, "1: haploid, one sample, one individual; \
 					2: diploid, take every two consecutive samples as one individual. Other ploids are not supported yet.", ],\
-							('inputFileFormat', 1, int): [1, '', 1, "1: input is ms/msHOT output; 2: in Heng Li output", ],\
+							('inputFileFormat', 1, int): [1, '', 1, "1: input is ms/msHOT output (no good, non-polymorphic sites ignored); 2: in Heng Li output", ],\
 							})
 	def __init__(self,  **keywords):
 		"""
