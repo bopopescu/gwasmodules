@@ -476,13 +476,15 @@ class ElixirDB(object):
 	
 	def checkIfEntryInTable(self, TableClass=None, short_name=None, id=None):
 		"""
+		2013.04.03 bugfix. query = query.filter_by...
+			and check how many entries return from db query. should be one. otherwise raise exception.
 		2013.3.14
 			this could be used as generic way to query tables with short_name (unique) & id columns
 		"""
 		query = TableClass.query
 		if short_name or id:
 			if short_name:
-				query.filter_by(short_name=short_name)
+				query = query.filter_by(short_name=short_name)
 			if id is not None:
 				db_entry = TableClass.get(id)
 				return db_entry
@@ -490,6 +492,11 @@ class ElixirDB(object):
 			sys.stderr.write("Either short_name (%s) or id (%s) have to be non-None.\n"%(short_name, id))
 			raise
 		db_entry = query.first()
+		no_of_entries = query.count()
+		if no_of_entries>1:
+			sys.stderr.write("Error, query table %s by short_name=%s, id=%s returns %s entries (>1).\n"%\
+							(TableClass, short_name, id, no_of_entries))
+			raise
 		if db_entry:
 			return db_entry
 		else:
