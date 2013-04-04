@@ -538,7 +538,7 @@ class ElixirDB(object):
 													newDataDir=data_dir)
 		
 		if absPath and not os.path.isfile(absPath):
-			sys.stderr.write("Warning: file %s doesn't exist.\n"%(absPath))
+			sys.stderr.write("updateDBEntryMD5SUM() Warning: target file %s doesn't exist. Could not update its md5sum.\n"%(absPath))
 			return
 		md5sum = utils.get_md5sum(absPath)
 		if db_entry.md5sum is  not None and db_entry.md5sum!=md5sum:
