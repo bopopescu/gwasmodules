@@ -489,6 +489,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def registerAlignmentAndItsIndexFile(self, workflow=None, alignmentLs=None, data_dir=None, checkFileExistence=True):
 		"""
+		2013.04.03 cosmetic
 		2012.9.18 copied from AlignmentToCallPipeline.py
 		2012.6.12
 			add argument checkFileExistence
@@ -502,6 +503,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			input = File(alignment.path)	#relative path, induces symlinking or stage-in
 			baiFilepath = '%s.bai'%(inputFname)
 			if checkFileExistence and (not os.path.isfile(inputFname) or not os.path.isfile(baiFilepath)):
+				if not os.path.isfile(inputFname):
+					sys.stderr.write("registerAlignmentAndItsIndexFile() Warning: %s does not exist. skip entire alignment.\n"%(inputFname))
+				if not os.path.isfile(baiFilepath):
+					sys.stderr.write("registerAlignmentAndItsIndexFile() Warning: %s does not exist. skip entire alignment.\n"%(baiFilepath))
 				continue
 			input.addPFN(PFN("file://" + inputFname, workflow.input_site_handler))
 			workflow.addFile(input)
@@ -534,7 +539,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		executableClusterSizeMultiplierList = []
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
-	
+		#self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name="exampleJava", clusterSizeMultipler=0.3)
 	
 	def run(self):
 		"""
