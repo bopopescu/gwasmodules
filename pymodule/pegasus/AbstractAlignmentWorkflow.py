@@ -541,6 +541,26 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		#self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name="exampleJava", clusterSizeMultipler=0.3)
 	
+	
+	def getAlignments(self, db=None):
+		"""
+		2013.04.03
+			wrapper so that derivatives could call it easily
+		"""
+		if db is None:
+			db = self.db
+		alignmentLs = db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
+										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
+										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
+										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
+		alignmentLs = db.filterAlignments(alignmentLs=alignmentLs, min_coverage=self.sequence_min_coverage,\
+						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
+						individual_site_id_set=set(self.site_id_ls),\
+						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
+						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls),\
+						excludeContaminant=self.excludeContaminant)
+		return alignmentLs
+	
 	def run(self):
 		"""
 		2013.1.25
@@ -565,15 +585,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 													intervalSize=self.intervalSize, \
 													intervalOverlapSize=self.intervalOverlapSize)
 		
-		alignmentLs = self.db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
-										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
-										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
-										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
-		alignmentLs = self.db.filterAlignments(alignmentLs=alignmentLs, min_coverage=self.sequence_min_coverage,\
-						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
-						individual_site_id_set=set(self.site_id_ls),\
-						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
-						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls))
+		alignmentLs = self.getAlignments()
 		
 		workflow = self.initiateWorkflow()
 		
