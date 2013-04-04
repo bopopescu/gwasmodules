@@ -1133,7 +1133,7 @@ class AbstractWorkflow(ADAG):
 		
 		return job
 	
-	def addGenericPipeCommandOutput2FileJob(self, workflow=None, executableFile=None, \
+	def addGenericPipeCommandOutput2FileJob(self, workflow=None, executable=None, executableFile=None, \
 					outputFile=None, \
 					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					extraArguments=None, extraArgumentList=None, sshDBTunnel=None,\
@@ -1143,7 +1143,8 @@ class AbstractWorkflow(ADAG):
 		"""
 		if workflow is None:
 			workflow = self
-		executable = self.pipeCommandOutput2File
+		if executable is None:
+			executable = self.pipeCommandOutput2File
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
 		extraDependentInputLs.append(executableFile)
@@ -1309,22 +1310,25 @@ class AbstractWorkflow(ADAG):
 						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
 		return job
 	
-	def getJVMMemRequirment(self, job_max_memory=4000, minMemory=2000):
+	def getJVMMemRequirment(self, job_max_memory=5000, minMemory=2000, permSizeFraction=0.4,
+						MaxPermSizeUpperBound=35000):
 		"""
+		2013.04.01
+			now job_max_memory = MaxPermSize + mxMemory, unless either is below minMemory
+			added argument permSizeFraction, MaxPermSizeUpperBound
 		2012.8.2
 			job_max_memory could be set by user to lower than minMemory.
 			but minMemory makes sure it's never too low.
 		"""
-		MaxPermSize_user = job_max_memory*2/5
-		mxMemory_user = job_max_memory*3/5
-		MaxPermSize= min(35000, max(minMemory, MaxPermSize_user))
+		MaxPermSize_user = int(job_max_memory*permSizeFraction)
+		mxMemory_user = int(job_max_memory*(1-permSizeFraction))
+		MaxPermSize= min(MaxPermSizeUpperBound, max(minMemory, MaxPermSize_user))
 		PermSize=MaxPermSize*3/4
-		mxMemory = max(minMemory, job_max_memory)
+		mxMemory = max(minMemory, mxMemory_user)
 		msMemory = mxMemory*3/4
 		memRequirementInStr = "-Xms%sm -Xmx%sm -XX:PermSize=%sm -XX:MaxPermSize=%sm"%\
 				(msMemory, mxMemory, PermSize, MaxPermSize)
 		memRequirement = MaxPermSize + mxMemory
-		
 		return PassingData(memRequirementInStr=memRequirementInStr, memRequirement=memRequirement)
 	
 	def addPlotLDJob(self, workflow=None, executable=None, inputFile=None, inputFileList=None, outputFile=None, \
