@@ -130,6 +130,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		#add the MergeSamFiles.jar file into workflow
 		self.registerOneJar(name="MergeSamFilesJar", path=os.path.join(self.picard_path, 'MergeSamFiles.jar'))
 		self.registerOneJar(name="BuildBamIndexJar", path=os.path.join(self.picard_path, 'BuildBamIndex.jar'))
+		self.registerOneJar(name="SamToFastqJar", path=os.path.join(self.picard_path, 'SamToFastq.jar'))	#2013.04.03
 		
 		self.registerOneJar(name="CreateSequenceDictionaryJar", path=os.path.join(self.picard_path, 'CreateSequenceDictionary.jar'))
 		self.registerOneJar(name="AddOrReplaceReadGroupsAndCleanSQHeaderJar", path=os.path.join(self.picard_path, 'AddOrReplaceReadGroupsAndCleanSQHeader.jar'))
@@ -1779,7 +1780,7 @@ Contig966       3160    50
 						parentJobLs=None, \
 						extraDependentInputLs=None, \
 						extraArguments=None, transferOutput=True, \
-						job_max_memory=2000, walltime=120, sshDBTunnel=False, commit=True, **keywords):
+						job_max_memory=2000, walltime=180, sshDBTunnel=False, commit=True, **keywords):
 		"""
 		2012.9.20
 			To specify individual_alignment:
@@ -1833,12 +1834,15 @@ Contig966       3160    50
 					job.addArguments(inputFile)
 		return job
 	
-	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=[], outputBamFile=None,samtools=None,\
+	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=None, outputBamFile=None,samtools=None,\
 					java=None, MergeSamFilesJava=None, MergeSamFilesJar=None, \
 					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 					mv=None, parentJobLs=None, namespace='workflow', version='1.0', transferOutput=False,\
-					walltime=680, **keywords):
+					job_max_memory=7000, walltime=680, **keywords):
 		"""
+		not certain, but it looks like MergeSamFilesJar does not require the .bai (bam index) file.
+		
+		2013.03.31 AlignmentJobAndOutputLs has changed it cell structure
 		2012.9.17 copied from vervet/src/ShortRead2AlignmentPipeline.py
 		2012.7.4 bugfix. add job dependency between alignmentJob and merge_sam_job after all have been added to the workflow.
 		2012.3.29
@@ -1854,36 +1858,50 @@ Contig966       3160    50
 		"""
 		if workflow is None:
 			workflow = self
-		memRequirementObject = self.getJVMMemRequirment(job_max_memory=5000, minMemory=2000)
+		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
 		job_max_memory = memRequirementObject.memRequirement
 		javaMemRequirement = memRequirementObject.memRequirementInStr
 		namespace = getattr(workflow, 'namespace', namespace)
 		version = getattr(workflow, 'version', version)
 		
 		if len(AlignmentJobAndOutputLs)>1:
-			merge_sam_job = Job(namespace=namespace, name=MergeSamFilesJava.name, version=version)
-			merge_sam_job.addArguments(javaMemRequirement, "-jar", MergeSamFilesJar, 'SORT_ORDER=coordinate', \
-						'ASSUME_SORTED=true', 'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT")
 			# 'USE_THREADING=true', threading might be causing process hanging forever (sleep).
-			self.addJobUse(merge_sam_job, file=MergeSamFilesJar, transfer=True, register=True, link=Link.INPUT)
-			self.addJobUse(merge_sam_job, file=outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			yh_pegasus.setJobProperRequirement(merge_sam_job, job_max_memory=job_max_memory, walltime=walltime)
-			workflow.addJob(merge_sam_job)
+			alignmentJobLs = []
+			alignmentOutputLs = []
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
-				alignmentJob, alignmentOutput = AlignmentJobAndOutput[:2]
-				merge_sam_job.addArguments('INPUT=', alignmentOutput)
-				merge_sam_job.uses(alignmentOutput, transfer=True, register=True, link=Link.INPUT)
-				workflow.depends(parent=alignmentJob, child=merge_sam_job)
-		else:	#one input file, no samtools merge. use "mv" to rename it instead. should use "cp", then the input would be cleaned by cleaning job.
-			alignmentJob, alignmentOutput = AlignmentJobAndOutputLs[0][:2]
-			merge_sam_job = Job(namespace=namespace, name=mv.name, version=version)
-			merge_sam_job.addArguments(alignmentOutput, outputBamFile)
-			merge_sam_job.uses(alignmentOutput, transfer=True, register=True, link=Link.INPUT)
-			merge_sam_job.uses(outputBamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
-			workflow.addJob(merge_sam_job)
-			workflow.depends(parent=alignmentJob, child=merge_sam_job)	#2012.7.4
+				if AlignmentJobAndOutput.parentJobLs:
+					alignmentJobLs.extend(AlignmentJobAndOutput.parentJobLs)
+				alignmentOutput = AlignmentJobAndOutput.file
+				if alignmentOutput:
+					alignmentOutputLs.append(alignmentOutput)
+						#2013.04.01
+			merge_sam_job = self.addGenericJavaJob(executable=MergeSamFilesJava, jarFile=MergeSamFilesJar, \
+					inputFile=None, inputArgumentOption=None, \
+					inputFileList=alignmentOutputLs, argumentForEachFileInInputFileList="INPUT=",\
+					outputFile=outputBamFile, outputArgumentOption="OUTPUT=",\
+					parentJobLs=alignmentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+					frontArgumentList=None, extraArguments=None, extraArgumentList=['SORT_ORDER=coordinate', \
+						'ASSUME_SORTED=true', "VALIDATION_STRINGENCY=LENIENT"], extraOutputLs=None, \
+					extraDependentInputLs=None, no_of_cpus=None, walltime=walltime, sshDBTunnel=None, **keywords)
+		elif len(AlignmentJobAndOutputLs)==1:	#one input file, no samtools merge. use "mv" to rename it instead. should use "cp", then the input would be cleaned by cleaning job.
+			AlignmentJobAndOutput = AlignmentJobAndOutputLs[0]
+			alignmentJobLs = AlignmentJobAndOutput.parentJobLs
+			alignmentOutput = AlignmentJobAndOutput.file
+			#2012.7.4
 			sys.stderr.write(" copy (instead of merging small alignment files) due to only one alignment file, from %s to %s.\n"%\
 							(alignmentOutput.name, outputBamFile.name))
+			#2013.04.01
+			merge_sam_job = self.addGenericJob(executable=mv, inputFile=alignmentOutput, inputArgumentOption=None, \
+					outputFile=outputBamFile, outputArgumentOption=None, \
+					inputFileList=None, argumentForEachFileInInputFileList=None, \
+					parentJob=None, parentJobLs=alignmentJobLs, extraDependentInputLs=None, \
+					extraOutputLs=None, transferOutput=transferOutput, \
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, \
+					job_max_memory=1000,  sshDBTunnel=None, \
+					key2ObjectForJob=None, objectWithDBArguments=None, no_of_cpus=None, walltime=40)
+		else:
+			sys.stderr.write("Error: no input for MergeSamFilesJar to output %s.\n"%(outputBamFile))
+			raise
 		#assign output
 		merge_sam_job.output = outputBamFile
 		#2012.9.21
@@ -1895,7 +1913,7 @@ Contig966       3160    50
 		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexJar=BuildBamIndexJar, \
 					inputBamF=outputBamFile,\
 					parentJobLs=[merge_sam_job], namespace=namespace, version=version,\
-					transferOutput=transferOutput, job_max_memory=3000, walltime=180)
+					transferOutput=transferOutput, job_max_memory=3000, walltime=max(180, int(walltime/3)))
 		return merge_sam_job, bamIndexJob
 	
 	
