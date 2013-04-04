@@ -496,6 +496,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		2012.1.9
 			register the input alignments and return in a data structure usd by several other functions
 		"""
+		if workflow is None:
+			workflow = self
 		sys.stderr.write("Registering %s alignments ..."%(len(alignmentLs)))
 		returnData = []
 		for alignment in alignmentLs:
@@ -561,11 +563,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						excludeContaminant=self.excludeContaminant)
 		return alignmentLs
 	
-	def run(self):
+	def setup_run(self):
 		"""
-		2013.1.25
+		2013.04.03 wrap all standard alignment related functions into this function (from run())
 		"""
-		
 		if self.debug:
 			import pdb
 			pdb.set_trace()
@@ -594,16 +595,28 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		self.registerJars()
 		self.registerExecutables()
 		self.registerCustomExecutables()
-		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow, alignmentLs=alignmentLs, data_dir=self.data_dir)
+		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow=workflow, alignmentLs=alignmentLs, data_dir=self.data_dir)
 		
-		self.addAllJobs(workflow=workflow, alignmentDataLs=alignmentDataLs, \
-				chr2IntervalDataLs=chr2IntervalDataLs, samtools=workflow.samtools, \
+		return PassingData(workflow=workflow, alignmentLs=alignmentLs, alignmentDataLs=alignmentDataLs, \
+						chr2IntervalDataLs=chr2IntervalDataLs, registerReferenceData=registerReferenceData)
+	
+	def run(self):
+		"""
+		2013.1.25
+		"""
+		
+		pdata = self.setup_run()
+		workflow = pdata.workflow
+		
+		self.addAllJobs(workflow=workflow, alignmentDataLs=pdata.alignmentDataLs, \
+				chr2IntervalDataLs=pdata.chr2IntervalDataLs, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
 				MergeSamFilesJar=workflow.MergeSamFilesJar, \
-				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
+				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, \
+				CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
-				registerReferenceData=registerReferenceData,\
+				registerReferenceData=pdata.registerReferenceData,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
 				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
 				outputDirPrefix=self.pegasusFolderName)
