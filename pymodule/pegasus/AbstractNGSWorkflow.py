@@ -1760,7 +1760,8 @@ Contig966       3160    50
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
 		extraDependentInputLs.append(inputFile)
-		job = self.addGenericPipeCommandOutput2FileJob(workflow=workflow, executableFile=samtoolsFile, \
+		job = self.addGenericPipeCommandOutput2FileJob(workflow=workflow, executable=executable, \
+					executableFile=samtoolsFile, \
 					outputFile=outputFile, \
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					extraOutputLs=None, transferOutput=transferOutput, \
