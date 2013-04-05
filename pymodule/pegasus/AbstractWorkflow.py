@@ -726,6 +726,21 @@ class AbstractWorkflow(ADAG):
 											folderName=folderName, useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
 		setattr(workflow, name, pegasusFile)
 	
+	def registerOneExecutableAsFile(self, name=None, path=None, site_handler=None, workflow=None, folderName="", useAbsolutePathAsPegasusFileName=False):
+		"""
+		2014.04.04 need an executable (bwa) to be file dependency when running pipeCommandOutput2File for "bwa mem"
+			useAbsolutePathAsPegasusFileName=True if you do not plan to add the file as INPUT dependency for jobs
+		"""
+		if workflow is None:
+			workflow = self
+		if site_handler is None:
+			site_handler = self.site_handler	#usually they are same
+		if not folderName:
+			folderName = "executable"
+		pegasusFile = self.registerOneInputFile(workflow=workflow, inputFname=path, input_site_handler=site_handler, \
+											folderName=folderName, useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
+		setattr(workflow, name, pegasusFile)
+	
 	def registerBlastNucleotideDatabaseFile(self, ntDatabaseFname=None, input_site_handler=None, folderName=""):
 		"""
 		2013.3.20 yh_pegasus.registerRefFastaFile() returns a PassingData
@@ -899,6 +914,16 @@ class AbstractWorkflow(ADAG):
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
 					key2ObjectForJob=None, objectWithDBArguments=None, **keywords):
 		"""
+			
+			job = self.addGenericFile2DBJob(executable=executable, inputFile=None, inputArgumentOption="-i", \
+					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
+					data_dir=None, logFile=logFile, commit=commit,\
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=None, transferOutput=transferOutput, \
+					extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
+					job_max_memory=job_max_memory,  sshDBTunnel=sshDBTunnel, walltime=walltime,\
+					key2ObjectForJob=None, objectWithDBArguments=self, **keywords)
+					
 		2012.12.21 a generic wrapper for jobs that "inserting" data (from file) into database
 		"""
 		if extraArgumentList is None:
@@ -1140,6 +1165,17 @@ class AbstractWorkflow(ADAG):
 					job_max_memory=2000, walltime=120, **keywords):
 		"""
 		2013.03.25 use pipeCommandOutput2File to get output piped into outputF
+			no frontArgumentList exposed because the order of initial arguments are fixed.
+				~/pymodule/shell/pipeCommandOutput2File.sh commandPath outputFname [commandArguments]
+		
+		alignmentJob = self.addGenericPipeCommandOutput2FileJob(executable=self.BWA_Mem, executableFile=self.bwa, \
+					outputFile=alignmentSamF, \
+					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=None, transferOutput=transferOutput, \
+					extraArguments=None, extraArgumentList=extraArgumentList, \
+					sshDBTunnel=None,\
+					job_max_memory=aln_job_max_memory, walltime=aln_job_walltime, no_of_cpus=no_of_aln_threads, \
+					**keywords)
 		"""
 		if workflow is None:
 			workflow = self
@@ -1330,6 +1366,17 @@ class AbstractWorkflow(ADAG):
 				(msMemory, mxMemory, PermSize, MaxPermSize)
 		memRequirement = MaxPermSize + mxMemory
 		return PassingData(memRequirementInStr=memRequirementInStr, memRequirement=memRequirement)
+	
+	def scaleJobWalltimeOrMemoryBasedOnInput(self, realInputVolume=10, baseInputVolume=4, baseJobPropertyValue=120, \
+											minJobPropertyValue=120, maxJobPropertyValue=1440):
+		"""
+		2013.04.04
+			assume it's integer
+			walltime is in minutes.
+		"""
+		walltime = min(max(minJobPropertyValue, float(realInputVolume)/float(baseInputVolume)*baseJobPropertyValue), \
+									maxJobPropertyValue)	#in minutes
+		return PassingData(value=int(walltime))
 	
 	def addPlotLDJob(self, workflow=None, executable=None, inputFile=None, inputFileList=None, outputFile=None, \
 					outputFnamePrefix=None,
