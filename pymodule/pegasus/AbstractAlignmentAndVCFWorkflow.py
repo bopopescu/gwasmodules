@@ -49,7 +49,9 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 			intervalDataLs = chr2IntervalDataLs.get(chromosome)
 			VCFFile = chr2VCFFile.get(chromosome)
 			if VCFFile is None:
-				sys.stderr.write("WARNING: no VCFFile for chromosome %s. \n"%(chromosome))
+				if self.report:
+					sys.stderr.write("WARNING: no VCFFile for chromosome %s. no base-quality recalibration. only local realignment.\n"%\
+									(chromosome))
 				#continue
 			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, alignmentData=alignmentData, chromosome=chromosome, \
 								VCFFile=VCFFile, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
