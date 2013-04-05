@@ -41,4 +41,4 @@ pegasus.gridstart.arguments=-B 4000000
 #pegasus.file.cleanup.clusters.num=50
 
 #2013.03.26 enable cleanup job clustering. This parameter means N cleanup jobs on each level would be clustered as one job.
-pegasus.file.cleanup.clusters.size=25
+pegasus.file.cleanup.clusters.size=15
