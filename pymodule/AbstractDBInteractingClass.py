@@ -101,7 +101,20 @@ class AbstractDBInteractingClass(AbstractMapper):
 		"""
 		if getattr(self, 'logF', None):
 			self.logF.close()
-		
+	
+	def sessionRollback(self, session=None):
+		"""
+		2013.04.05
+			wrap try...except around it because sometimes db connection is gone halfway through
+			and it causes program to exit without proper cleanup
+		"""
+		try:
+			session.rollback()
+		except:
+			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+			import traceback
+			traceback.print_exc()
+
 	def run(self):
 		pass
 	
