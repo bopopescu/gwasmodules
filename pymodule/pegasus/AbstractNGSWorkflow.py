@@ -55,7 +55,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						("sequence_filtered", 0, int): [None, 'Q', 1, 'to filter alignments/individual_sequences. None: whatever; 0: unfiltered sequences, 1: filtered sequences: 2: ...'],\
 						("site_id_ls", 0, ): ["", 'S', 1, 'comma/dash-separated list of site IDs. individuals must come from these sites.'],\
 						("country_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of country IDs. individuals must come from these countries.'],\
-						("tax_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of taxonomy IDs. individuals must come from these taxonomies.'],\
+						("tax_id_ls", 0, ): ["60711", '', 1, 'comma/dash-separated list of taxonomy IDs. individuals must come from these taxonomies.'],\
 						("sequence_type_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.sequence_type_id. Empty for no filtering'],\
 						("sequencer_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.sequencer_id. Empty for no filtering'],\
 						("sequence_batch_id_ls", 0, ): ["", '', 1, 'comma/dash-separated list of IndividualSequence.sequence_batch_id. Empty for no filtering'],\
@@ -933,6 +933,41 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					key2ObjectForJob=None, **keywords)
 		return job
 	
+	def addSortAlignmentJob(self, workflow=None, inputBamFile=None, \
+					outputBamFile=None,\
+					SortSamFilesJava=None, SortSamJar=None,\
+					parentJobLs=None, extraDependentInputLs=None, \
+					extraArguments=None, job_max_memory = 2500, transferOutput=False, \
+					walltime=180, **keywords):
+		"""
+		2013.04.05 moved from ShortRead2AlignmentWorkflow
+		2012.9.19
+		"""
+		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementData.memRequirement
+		javaMemRequirement = memRequirementData.memRequirementInStr
+		
+		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', SortSamJar,\
+							"SORT_ORDER=coordinate", "I=", inputBamFile, \
+							"O=", outputBamFile, "VALIDATION_STRINGENCY=LENIENT"]
+					#not including 'SORT_ORDER=coordinate'
+					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		if extraDependentInputLs is None:
+			extraDependentInputLs=[]
+		extraDependentInputLs.extend([inputBamFile, SortSamJar])
+		
+		job= self.addGenericJob(executable=SortSamFilesJava, inputFile=None,\
+							outputFile=None, outputArgumentOption="-o", \
+							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							extraOutputLs=[outputBamFile],\
+							transferOutput=transferOutput, \
+							extraArgumentList=extraArgumentList, \
+							job_max_memory=memRequirementData.memRequirement, \
+							walltime=walltime, **keywords)
+		return job
+	
 	def addSelectAlignmentJob(self, executable=None, inputFile=None, \
 							outputFile=None, region=None, parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 							extraArguments=None, job_max_memory=2000, needBAMIndexJob=True, **keywords):
@@ -1776,13 +1811,14 @@ Contig966       3160    50
 						parent_individual_alignment_id=None, \
 						mask_genotype_method_id=None,\
 						individual_sequence_file_raw_id=None,\
-						format=None,\
+						format=None, local_realigned=0,\
 						logFile=False, data_dir=None, \
 						parentJobLs=None, \
 						extraDependentInputLs=None, \
 						extraArguments=None, transferOutput=True, \
 						job_max_memory=2000, walltime=180, sshDBTunnel=False, commit=True, **keywords):
 		"""
+		2013.04.05 added argument local_realigned
 		2012.9.20
 			To specify individual_alignment:
 				either individual_alignment_id or (parent_individual_alignment_id + mask_genotype_method_id)
@@ -1790,12 +1826,13 @@ Contig966       3160    50
 		"""
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
-		extraArgumentList = ['--logFilename', logFile]
+		extraArgumentList = []
 		extraOutputLs = []
 		key2ObjectForJob = {}
 		if otherInputFileList:
 			extraDependentInputLs.extend(otherInputFileList)
 		if logFile:
+			extraArgumentList.extend(['--logFilename', logFile])
 			extraOutputLs.append(logFile)
 		if individual_alignment_id:
 			extraArgumentList.append("--individual_alignment_id %s"%(individual_alignment_id))
@@ -1817,6 +1854,9 @@ Contig966       3160    50
 			extraArgumentList.append("--data_dir %s"%(data_dir))
 		if commit:
 			extraArgumentList.append("--commit")
+		if local_realigned is not None:
+			extraArgumentList.append("--local_realigned %s"%(local_realigned))
+		
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		job= self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=None, \
