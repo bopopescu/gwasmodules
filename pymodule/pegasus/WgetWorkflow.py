@@ -218,9 +218,9 @@ class WgetWorkflow(AbstractWorkflow):
 						targetFolder=outputDir, logFile=logFile, cut_dir_number=self.cut_dir_number, parentJobLs=[topOutputDirJob], extraDependentInputLs=[], \
 						transferOutput=transferOutput, \
 						extraArguments=None, job_max_memory=50)
-			#include the tfam (outputList[1]) into the fileList
+			#include the tfam (outputList[1]) into the fileLs
 			returnData.jobDataLs.append(PassingData(jobLs=[wgetJob], file=wgetJob.output, \
-											fileList=wgetJob.outputLs))
+											fileLs=wgetJob.outputLs))
 			no_of_jobs += 1
 		sys.stderr.write("%s jobs.\n"%(no_of_jobs))
 		

@@ -96,6 +96,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		"""
 		"""
 		parentClass.__init__(self, **keywords)
+		self.chr2IndelVCFJobData = None	#2013.04.04 mark this variable. setup in setup()
 		#AlignmentToCallPipeline.__init__(self, **keywords)
 		#self.inputDir = os.path.abspath(self.inputDir)
 	
@@ -109,7 +110,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		return returnData
 	
 	def mapEachChromosome(self, workflow=None, alignmentData=None, chromosome=None,\
-				VCFFile=None, passingData=None, reduceBeforeEachAlignmentData=None, transferOutput=True, **keywords):
+				VCFJobData=None, passingData=None, reduceBeforeEachAlignmentData=None, transferOutput=True, **keywords):
 		"""
 		2012.9.17
 		"""
@@ -150,17 +151,17 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		self.no_of_jobs += 1
 		returnData.countCovariatesJob = countCovariatesJob
 		returnData.jobDataLs.append(PassingData(jobLs=[countCovariatesJob], file=countCovariatesJob.recalFile, \
-											fileList=[countCovariatesJob.recalFile]))
+											fileLs=[countCovariatesJob.recalFile]))
 		"""
 		
 		return returnData
 	
-	def mapEachInterval(self, workflow=None, alignmentData=None, intervalData=None,\
-							VCFFile=None, passingData=None, reduceBeforeEachAlignmentData=None,\
+	def mapEachInterval(self, workflow=None, alignmentData=None, intervalData=None, chromosome=None, \
+							VCFJobData=None, passingData=None, reduceBeforeEachAlignmentData=None,\
 							mapEachChromosomeData=None, transferOutput=False, \
 							**keywords):
 		"""
-		2013.03.31 use VCFFile to decide whether to add BQSR jobs, called in ShortRead2AlignmentWorkflow.py
+		2013.03.31 use VCFJobData to decide whether to add BQSR jobs, called in ShortRead2AlignmentWorkflow.py
 		2012.9.17
 		"""
 		if workflow is None:
@@ -171,12 +172,14 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		topOutputDirJob = passingData.topOutputDirJob
 		
 		alignment = alignmentData.alignment
-		parentJobLs = alignmentData.jobLs
 		bamF = alignmentData.bamF
 		baiF = alignmentData.baiF
 		bamFnamePrefix = passingData.bamFnamePrefix
 		
+		VCFFile = VCFJobData.file
+		VCFJobLs = VCFJobData.jobLs
 		
+		parentJobLs = alignmentData.jobLs + VCFJobData.jobLs
 		if intervalData.file:
 			mpileupInterval = intervalData.interval
 			bcftoolsInterval = intervalData.file
@@ -186,6 +189,9 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		intervalFnameSignature = intervalData.intervalFnameSignature
 		overlapInterval = intervalData.overlapInterval
 		overlapFilenameSignature = intervalData.overlapIntervalFnameSignature
+		
+		if chromosome is None:
+			chromosome = getattr(passingData, 'chromosome', None)
 		
 		"""
 		outputFname = os.path.join(topOutputDirJob.output, '%s_%s.bam'%(bamFnamePrefix, overlapFilenameSignature))
@@ -209,37 +215,47 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 
 		"""
 		if self.local_realigned:
-			if not self.indelVCFInputData.jobDataLs:
+			#get the indel VCF file
+			if not self.chr2IndelVCFJobData:
 				sys.stderr.write("Warning from mapEachInterval(): no indel VCF for local realignment. resort to ab-initial local-realignment.\n \
 		(not ideal because intervals with too many reads will be skipped.).\n")
-			#get the indel VCF file
+				indelVCFFile = None
+				indelVCFFileLs = []
+				indelVCFFileJobLs = []
+			else:
+				indelVCFJobData = self.chr2IndelVCFJobData.get(chromosome)
+				indelVCFFile = indelVCFJobData.file
+				indelVCFFileLs = indelVCFJobData.fileLs
+				indelVCFFileJobLs = indelVCFJobData.jobLs
 			
 			realignerTargetIntervalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.forIndelRealigner.intervals'%\
 														(bamFnamePrefix, overlapFilenameSignature)))
-			realignerTargetIntervalJob = self.addGATKJob(executable=self.RealignerTargetCreatorJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
-						GATKAnalysisType='RealignerTargetCreator',\
-						inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
-						argumentForEachFileInInputFileList=None,\
-						interval=overlapInterval, outputFile=realignerTargetIntervalFile, \
-						parentJobLs=[topOutputDirJob]+parentJobLs, transferOutput=False, job_max_memory=4000,\
-						frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
-						extraDependentInputLs=[baiF], no_of_cpus=None, walltime=60)
+			realignerTargetIntervalJob = self.addGATKRealignerTargetCreatorJob(executable=self.RealignerTargetCreatorJava, \
+																GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
+							refFastaFList=passingData.refFastaFList, inputFile=bamF, inputArgumentOption="-I", indelVCFFile=indelVCFFile, \
+							outputFile=realignerTargetIntervalFile, interval=overlapInterval, \
+					parentJobLs=[topOutputDirJob]+parentJobLs+indelVCFFileJobLs, transferOutput=False, job_max_memory=4000,walltime=60,\
+					extraArguments=None, extraArgumentList=None, extraDependentInputLs=[baiF]+indelVCFFileLs)
 			
 			realignedBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.bam'%\
 												(bamFnamePrefix, overlapFilenameSignature)))
 			indelRealignmentJobWalltime=200
+			extraArgumentList=['-targetIntervals',realignerTargetIntervalJob.output,\
+							'--read_filter NotPrimaryAlignment', \
+							'--maxReadsForConsensuses 250', '--maxReadsForRealignment 90000', '--maxReadsInMemory 300000']
+			if indelVCFFile:
+				extraArgumentList.extend(["-known", indelVCFFile])	#"--consensusDeterminationModel KNOWNS_ONLY" is not added since vervet indels are not clear
+			
 			indelRealignmentJob = self.addGATKJob(executable=self.IndelRealignerJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
 						GATKAnalysisType='IndelRealigner',\
 						inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
 						argumentForEachFileInInputFileList=None,\
 						interval=overlapInterval, outputFile=realignedBamFile, \
-						parentJobLs=[realignerTargetIntervalJob]+parentJobLs, transferOutput=False, job_max_memory=9000,\
+						parentJobLs=[realignerTargetIntervalJob]+parentJobLs+indelVCFFileJobLs, transferOutput=False, job_max_memory=9000,\
 						frontArgumentList=None, extraArguments=None, \
-						extraArgumentList=['-targetIntervals',realignerTargetIntervalJob.output,\
-										'--read_filter NotPrimaryAlignment', \
-										'--maxReadsForConsensuses 250', '--maxReadsForRealignment 90000', '--maxReadsInMemory 300000'], \
+						extraArgumentList=extraArgumentList, \
 						extraOutputLs=None, \
-						extraDependentInputLs=[realignerTargetIntervalJob.output, baiF], no_of_cpus=None, \
+						extraDependentInputLs=[realignerTargetIntervalJob.output, baiF]+indelVCFFileLs, no_of_cpus=None, \
 						walltime=indelRealignmentJobWalltime)
 			"""
 			# 2013.04.07 Sun
@@ -319,8 +335,6 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		
 		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=[selectAlignmentJob, indexSelectedAlignmentJob], \
 															file=selectAlignmentJob.output))
-		#add the sub-alignment to the alignment merge job
-		self.no_of_jobs += 5
 		return returnData
 	
 	def reduceAfterEachAlignment(self, workflow=None, passingData=None, transferOutput=False, data_dir=None, **keywords):
@@ -358,7 +372,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 								job_max_memory=2000, sshDBTunnel=self.needSSHDBTunnel, commit=True)
 			self.no_of_jobs += 1
 			returnData.jobDataLs.append(PassingData(jobLs=[alignment2DBJob], file=alignment2DBJob.logFile, \
-											fileList=[alignment2DBJob.logFile]))
+											fileLs=[alignment2DBJob.logFile]))
 		return returnData
 
 	
@@ -479,7 +493,17 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		self.indelVCFInputData = self.registerAllInputFiles(inputDir=self.indelVCFFolder, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
 											pegasusFolderName="%sIndelVCF"%self.pegasusFolderName)
-		return parentClass.setup(inputVCFData=inputVCFData, chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
+		#2012.8.26 so that each recalibration will pick up the right vcf
+		chr2IndelVCFJobData = {}
+		if self.indelVCFInputData:
+			for jobData in self.indelVCFInputData.jobDataLs:
+				inputF = jobData.file
+				chromosome = self.getChrFromFname(os.path.basename(inputF.name))
+				chr2IndelVCFJobData[chromosome] = jobData
+		pdata = parentClass.setup(inputVCFData=inputVCFData, chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
+		pdata.chr2IndelVCFJobData = chr2IndelVCFJobData
+		self.chr2IndelVCFJobData = chr2IndelVCFJobData
+		return pdata
 	
 	def registerCustomExecutables(self, workflow=None):
 		"""

@@ -1312,7 +1312,7 @@ class AbstractWorkflow(ADAG):
 			
 			returnData.topOutputDirJob = topOutputDirJob
 			for jobData in inputData.jobDataLs:
-				for inputF in jobData.fileList:
+				for inputF in jobData.fileLs:
 					inputFBaseName = os.path.basename(inputF.name)
 					outputF = File(os.path.join(topOutputDirJob.output, '%s.gz'%(inputFBaseName)))
 					key2ObjectForJob = {}
@@ -1334,7 +1334,7 @@ class AbstractWorkflow(ADAG):
 							extraArguments=None, extraDependentInputLs=[inputF], )
 					"""
 					returnData.jobDataLs.append(PassingData(jobLs=[job], vcfFile=None, file=outputF,\
-											fileList=[outputF]))
+											fileLs=[outputF]))
 		if report:
 			sys.stderr.write("no_of_jobs = %s.\n"%(self.no_of_jobs))
 		return returnData

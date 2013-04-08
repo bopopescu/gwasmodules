@@ -203,7 +203,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		return returnData
 	
 	def mapEachChromosome(self, workflow=None, alignmentData=None, chromosome=None,\
-				VCFFile=None, passingData=None, reduceBeforeEachAlignmentData=None, transferOutput=True, **keywords):
+				VCFJobData=None, passingData=None, reduceBeforeEachAlignmentData=None, transferOutput=True, **keywords):
 		"""
 		2012.9.17
 		"""
@@ -212,7 +212,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		return returnData
 	
 	def map(self, workflow=None, alignmentData=None, intervalData=None,\
-		VCFFile=None, passingData=None, mapEachChromosomeData=None, transferOutput=True, **keywords):
+		VCFJobData=None, passingData=None, mapEachChromosomeData=None, transferOutput=True, **keywords):
 		"""
 		2012.9.17
 		"""
@@ -299,7 +299,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		return returnData
 	
 	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
-						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFFile=None, \
+						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFJobData=None, \
 						outputDirPrefix=None, transferOutput=False, **keywords):
 		"""
 		2013.1.25
@@ -309,10 +309,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	def setup(self, chr2IntervalDataLs=None, **keywords):
 		"""
 		2013.1.25
-			chr2VCFFile is None.
+			chr2VCFJobData is None.
 		"""
 		chrIDSet = set(chr2IntervalDataLs.keys())
-		return PassingData(chrIDSet=chrIDSet, chr2VCFFile=None)
+		return PassingData(chrIDSet=chrIDSet, chr2VCFJobData=None)
 	
 	def addAllJobs(self, workflow=None, alignmentDataLs=None, chr2IntervalDataLs=None, samtools=None, \
 				GenomeAnalysisTKJar=None, \
@@ -329,7 +329,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		"""
 		prePreprocessData = self.setup(chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
 		chrIDSet = prePreprocessData.chrIDSet
-		chr2VCFFile = prePreprocessData.chr2VCFFile
+		chr2VCFJobData = prePreprocessData.chr2VCFJobData
 		
 		sys.stderr.write("Adding jobs that work on %s alignments (& possibly VCFs) for %s chromosomes/contigs ..."%\
 						(len(alignmentDataLs), len(chrIDSet)))
@@ -390,6 +390,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 					fastaIndexJob = fastaIndexJob,\
 					refFastaIndexF = refFastaIndexF,\
 					
+					chromosome=None,\
 					chrIDSet=chrIDSet,\
 					chr2IntervalDataLs=chr2IntervalDataLs,\
 					
@@ -443,7 +444,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			
 			
 			self.mapReduceOneAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
-							chrIDSet=chrIDSet, chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFFile=chr2VCFFile, \
+							chrIDSet=chrIDSet, chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFJobData=chr2VCFJobData, \
 							outputDirPrefix=outputDirPrefix, transferOutput=transferOutput)
 			
 			reduceAfterEachAlignmentData = self.reduceAfterEachAlignment(workflow=workflow, \

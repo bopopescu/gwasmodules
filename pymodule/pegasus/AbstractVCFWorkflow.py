@@ -485,7 +485,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		return returnData
 	
 	def mapEachChromosome(self, workflow=None, chromosome=None,\
-				VCFFile=None, passingData=None, transferOutput=True, **keywords):
+				VCFJobData=None, passingData=None, transferOutput=True, **keywords):
 		"""
 		2012.9.17
 		"""
@@ -502,8 +502,9 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		return returnData
 	
-	def mapEachVCF(self, workflow=None, chromosome=None, passingData=None, transferOutput=False, **keywords):
+	def mapEachVCF(self, workflow=None, chromosome=None,VCFJobData=None, passingData=None, transferOutput=False, **keywords):
 		"""
+		2013.04.07 use VCFJobData
 		2012.9.22
 			default is to split each VCF into intervals
 		"""
@@ -513,7 +514,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		
 		topOutputDirJob = passingData.topOutputDirJob
 		fnamePrefix = passingData.fnamePrefix
-		VCFFile = passingData.VCFFile
+		VCFJobData = passingData.VCFJobData
+		VCFFile = VCFJobData.file	#2013.04.08
 		jobData = passingData.jobData
 		intervalOverlapSize = passingData.intervalOverlapSize
 		intervalSize = passingData.intervalSize
@@ -528,7 +530,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				extraArguments=None, transferOutput=transferOutput, job_max_memory=2000)
 		self.no_of_jobs +=1
 		returnData.jobDataLs.append(PassingData(jobLs=[splitVCFJob], file=splitVCFJob.output, \
-											fileList=splitVCFJob.outputLs))
+											fileLs=splitVCFJob.outputLs))
 		returnData.splitVCFJob = splitVCFJob
 		
 		return returnData
@@ -645,7 +647,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					
 					intervalOverlapSize =intervalOverlapSize, intervalSize=intervalSize,\
 					jobData=None,\
-					VCFFile=None,\
+					VCFJobData=None,\
 					splitVCFFile=None,\
 					preReduceReturnData=None,\
 					
@@ -710,10 +712,10 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				commonPrefix = inputFBaseName.split('.')[0]
 				
 				passingData.fnamePrefix = commonPrefix
-				passingData.VCFFile = VCFFile
+				passingData.VCFJobData = jobData
 				
 				mapEachVCFData = self.mapEachVCF(workflow=workflow,\
-												VCFFile=VCFFile, passingData=passingData, \
+												VCFJobData=jobData, passingData=passingData, \
 												transferOutput=False, **keywords)
 				passingData.mapEachVCFData = mapEachVCFData
 				passingData.mapEachVCFDataLs.append(mapEachVCFData)
@@ -731,7 +733,9 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 						passingData.intervalFnamePrefix = '%s_%s_splitVCF_u%s'%(chr, commonPrefix, unitNumber)
 						
 						mapEachIntervalData = self.mapEachInterval(workflow=workflow, \
-												VCFFile=splitVCFFile, passingData=passingData, transferOutput=False, \
+												VCFJobData=PassingData(file=splitVCFFile, vcfFile=splitVCFFile, fileLs=[splitVCFFile], \
+																	job=splitVCFJob, jobLs=[splitVCFJob], tbi_F=None), \
+												passingData=passingData, transferOutput=False, \
 												**keywords)
 						passingData.mapEachIntervalData = mapEachIntervalData
 						passingData.mapEachIntervalDataLs.append(mapEachIntervalData)

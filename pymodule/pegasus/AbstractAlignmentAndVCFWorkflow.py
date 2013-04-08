@@ -34,9 +34,10 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 	registerAllInputFiles = AbstractVCFWorkflow.registerAllInputFiles
 	
 	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
-						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFFile=None, \
-						outputDirPrefix=None, transferOutput=False, **keywords):
+						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFJobData=None, \
+						outputDirPrefix=None, transferOutput=False, skipChromosomeIfVCFMissing=True, **keywords):
 		"""
+		2013.04.08, added skipChromosomeIfVCFMissing
 		2013.1.25
 		"""
 		mapEachChromosomeDataLs = passingData.mapEachChromosomeDataLs
@@ -47,14 +48,16 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		
 		for chromosome in chrIDSet:
 			intervalDataLs = chr2IntervalDataLs.get(chromosome)
-			VCFFile = chr2VCFFile.get(chromosome)
+			VCFJobData = chr2VCFJobData.get(chromosome)
+			VCFFile = VCFJobData.file
 			if VCFFile is None:
-				if self.report:
-					sys.stderr.write("WARNING: no VCFFile for chromosome %s. no base-quality recalibration. only local realignment.\n"%\
+				sys.stderr.write("WARNING: no VCFFile for chromosome %s. no base-quality recalibration. only local realignment.\n"%\
 									(chromosome))
-				#continue
+				if skipChromosomeIfVCFMissing:
+					continue
+			passingData.chromosome = chromosome	#2013.04.08
 			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, alignmentData=alignmentData, chromosome=chromosome, \
-								VCFFile=VCFFile, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
+								VCFJobData=VCFJobData, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
 								mapEachAlignmentData=mapEachAlignmentData,\
 								transferOutput=False, **keywords)
 			passingData.mapEachChromosomeData = mapEachChromosomeData
@@ -75,7 +78,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 				overlapFilenameSignature = intervalData.overlapIntervalFnameSignature
 				
 				mapEachIntervalData = self.mapEachInterval(workflow=workflow, alignmentData=alignmentData, intervalData=intervalData,\
-									VCFFile=VCFFile, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
+									chromosome=chromosome,\
+									VCFJobData=VCFJobData, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
 									mapEachAlignmentData=mapEachAlignmentData,\
 									mapEachChromosomeData=mapEachChromosomeData, transferOutput=False, **keywords)
 				passingData.mapEachIntervalData = mapEachIntervalData
@@ -104,18 +108,18 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 	
 	def setup(self, inputVCFData=None, chr2IntervalDataLs=None, **keywords):
 		"""
-		2013.04.01 derive chr2VCFFile only when inputVCFData is available
+		2013.04.01 derive chr2VCFJobData only when inputVCFData is available
 		2013.1.25
 		"""
 		#2012.8.26 so that each recalibration will pick up the right vcf
-		chr2VCFFile = {}
+		chr2VCFJobData = {}
 		if inputVCFData:
 			for jobData in inputVCFData.jobDataLs:
 				inputF = jobData.file
 				chromosome = self.getChrFromFname(os.path.basename(inputF.name))
-				chr2VCFFile[chromosome] = inputF
-		chrIDSet = set(chr2VCFFile.keys())&set(chr2IntervalDataLs.keys())
-		return PassingData(chrIDSet=chrIDSet, chr2VCFFile=chr2VCFFile)
+				chr2VCFJobData[chromosome] = jobData
+		chrIDSet = set(chr2VCFJobData.keys())&set(chr2IntervalDataLs.keys())
+		return PassingData(chrIDSet=chrIDSet, chr2VCFJobData=chr2VCFJobData)
 	
 	def registerCustomExecutables(self, workflow=None):
 		

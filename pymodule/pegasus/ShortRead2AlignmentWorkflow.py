@@ -1038,7 +1038,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 			
 		"""
 		chrIDSet = set(chr2IntervalDataLs.keys())
-		chr2VCFFile = {}
+		chr2VCFJobData = {}
 		
 		if self.report:
 			sys.stderr.write("Adding local indel-realignment jobs for %s chromosomes/contigs ..."%\
@@ -1121,8 +1121,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		
 		
 		self.mapReduceOneAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
-						chrIDSet=chrIDSet, chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFFile=chr2VCFFile, \
-						outputDirPrefix=outputDirPrefix, transferOutput=transferOutput)
+						chrIDSet=chrIDSet, chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFJobData=chr2VCFJobData, \
+						outputDirPrefix=outputDirPrefix, transferOutput=transferOutput, skipChromosomeIfVCFMissing=False)
 		
 		"""
 		2013.03.31 not needed
@@ -1151,7 +1151,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		return alignmentMergeJob, bamIndexJob
 	
 	def mapEachInterval(self, workflow=None, alignmentData=None, intervalData=None,\
-							VCFFile=None, passingData=None, reduceBeforeEachAlignmentData=None,\
+							VCFJobData=None, passingData=None, reduceBeforeEachAlignmentData=None,\
 							mapEachChromosomeData=None, transferOutput=False, **keywords):
 		"""
 		2013.03.31 copied from AlignmentReadBaseQualityRecalibrationWorkflow.py
@@ -1162,7 +1162,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		returnData = AlignmentReadBaseQualityRecalibrationWorkflow.mapEachInterval(self, workflow=workflow, \
 							alignmentData=alignmentData, \
 							intervalData=intervalData,\
-							VCFFile=None, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
+							VCFJobData=None, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
 							mapEachChromosomeData=mapEachChromosomeData, transferOutput=transferOutput, \
 							**keywords)
 		return returnData

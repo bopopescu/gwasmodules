@@ -158,9 +158,9 @@ class BlastWorkflow(AbstractWorkflow):
 								inputF=blastJob.output, parentJobLs=[blastJob])
 				no_of_jobs += 1
 		sys.stderr.write("%s jobs. Done.\n"%(no_of_jobs))
-		#include the tfam (outputList[1]) into the fileList
+		#include the tfam (outputList[1]) into the fileLs
 		returnData.jobDataLs.append(PassingData(jobLs=[allBlastMergeJob], file=allBlastResultFile, \
-											fileList=[allBlastResultFile]))
+											fileLs=[allBlastResultFile]))
 		return returnData
 	
 				

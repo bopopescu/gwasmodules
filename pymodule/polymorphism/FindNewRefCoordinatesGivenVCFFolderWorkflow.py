@@ -216,8 +216,9 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		return findNewRefCoordinateJob
 	
 	def mapEachInterval(self, workflow=None, \
-					VCFFile=None, passingData=None, transferOutput=False, **keywords):
+					VCFJobData=None, passingData=None, transferOutput=False, **keywords):
 		"""
+		2013.04.08 use VCFJobData
 		2012.10.3
 			#. extract flanking sequences from the input VCF (ref sequence file => contig ref sequence)
 			#. blast them
@@ -241,7 +242,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		
 		intervalFnamePrefix = passingData.intervalFnamePrefix
 		jobData = passingData.jobData
-		
+		VCFFile = VCFJobData.file	#2013.04.08
 		
 		splitVCFJob = passingData.mapEachVCFData.splitVCFJob
 		chr = passingData.chromosome
@@ -257,7 +258,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		# alignmentMethodType 2 => fastq
 		extractFlankSeqJob = self.addAbstractMapperLikeJob(workflow=workflow, executable=self.ExtractFlankingSequenceForVCFLoci, \
 					inputF=VCFFile, outputF=outputFile, \
-					parentJobLs=[mapDirJob, splitVCFJob], transferOutput=transferOutput, job_max_memory=2000,\
+					parentJobLs=[mapDirJob]+VCFJobData.jobLs, transferOutput=transferOutput, job_max_memory=2000,\
 					extraArguments=None, extraArgumentList=extraArgumentList, extraDependentInputLs=[oldRefFastaFile])
 		
 		if self.alignmentMethodType==1:	#blast
@@ -342,7 +343,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 									parentJobLs=[reduceOutputDirJob],extraOutputLs=[], \
 									extraDependentInputLs=[], transferOutput=transferOutput,)
 		returnData.jobDataLs.append(PassingData(jobLs=[reduceJob], file=reduceJob.output, \
-											fileList=[reduceJob.output]))
+											fileLs=[reduceJob.output]))
 		
 		for mapEachIntervalDataLs in passingData.mapEachIntervalDataLsLs:
 			for mapEachIntervalData in mapEachIntervalDataLs:

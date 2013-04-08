@@ -396,6 +396,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		executableClusterSizeMultiplierList.append((SortSamFilesJava, 1))
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='GATKJava', clusterSizeMultipler=0.2)
 	
 	bwaIndexFileSuffixLs = ['amb', 'ann', 'bwt', 'pac', 'sa']
 	#, 'nhr', 'nin', 'nsq' are formatdb (blast) output, 2012.10.18 i think
@@ -758,6 +760,40 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		job.gatkVCFIndexOutput = gatkVCFIndexOutput
 		return job
 	
+	
+	def addGATKRealignerTargetCreatorJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, \
+							refFastaFList=None, inputFile=None, inputArgumentOption="-I", indelVCFFile=None, \
+							outputFile=None, interval=None, \
+					parentJobLs=None, transferOutput=True, job_max_memory=2000,walltime=60,\
+					extraArguments=None, extraArgumentList=None, extraDependentInputLs=None, **keywords):
+		"""
+		2013.04.08
+		"""
+		if workflow is None:
+			workflow = self
+		if executable is None:
+			executable = self.GATKJava
+		if GenomeAnalysisTKJar is None:
+			GenomeAnalysisTKJar = self.GenomeAnalysisTK2Jar
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		
+		if indelVCFFile:
+			extraArgumentList.extend(["-known", indelVCFFile])
+			if indelVCFFile not in extraDependentInputLs:
+				extraDependentInputLs.append(indelVCFFile)
+		job = self.addGATKJob(executable=self.RealignerTargetCreatorJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
+						GATKAnalysisType='RealignerTargetCreator',\
+						inputFile=inputFile, inputArgumentOption="-I", refFastaFList=refFastaFList, inputFileList=None,\
+						argumentForEachFileInInputFileList=None,\
+						interval=interval, outputFile=outputFile, \
+						parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+						frontArgumentList=None, extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
+						extraOutputLs=None, \
+						extraDependentInputLs=extraDependentInputLs, no_of_cpus=None, walltime=walltime)
+		return job
 	
 	def addVCFSubsetJob(self, workflow=None, executable=None, vcfSubsetPath=None, sampleIDFile=None,\
 					inputVCF=None, outputF=None, \
