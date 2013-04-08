@@ -143,56 +143,24 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		"""
 		2011-9-28
 		"""
-		
-		if self.debug:
-			import pdb
-			pdb.set_trace()
-		
-		if not self.data_dir:
-			self.data_dir = self.db.data_dir
-		
-		if not self.local_data_dir:
-			self.local_data_dir = self.db.data_dir
-		
-		chrLs = self.chr2size.keys()
-		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
-													intervalSize=self.intervalSize, \
-													intervalOverlapSize=self.intervalOverlapSize)
-		
-		alignmentLs = self.db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
-										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
-										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
-										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
-		alignmentLs = self.db.filterAlignments(alignmentLs, min_coverage=self.sequence_min_coverage,\
-						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
-						individual_site_id_set=set(self.site_id_ls),\
-						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
-						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls))
-		
-		workflow = self.initiateWorkflow()
-		
-		registerReferenceData = self.getReferenceSequence(workflow)
-		
-		self.registerJars()
-		self.registerExecutables()
-		self.registerCustomExecutables()
-		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow, alignmentLs, data_dir=self.data_dir)
-		
-		inputData = self.registerAllInputFiles(workflow, self.inputDir, input_site_handler=self.input_site_handler, \
+		pdata = self.setup_run()
+		workflow = pdata.workflow
+				
+		inputData = self.registerAllInputFiles(inputDir=self.inputDir, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
 											pegasusFolderName=self.pegasusFolderName)
 		if len(inputData.jobDataLs)<=0:
-			sys.stderr.write("No VCF files in this folder , %s.\n"%self.inputDir)
-			sys.exit(0)
+			sys.stderr.write("Error: No VCF files in the input VCF folder %s.\n"%self.inputDir)
+			raise
 		#adding inputVCFData=... is the key difference from the parent class
-		self.addAllJobs(workflow=workflow, inputVCFData=inputData, alignmentDataLs=alignmentDataLs, \
-					chr2IntervalDataLs=chr2IntervalDataLs, samtools=workflow.samtools, \
+		self.addAllJobs(workflow=workflow, inputVCFData=inputData, alignmentDataLs=pdata.alignmentDataLs, \
+					chr2IntervalDataLs=pdata.chr2IntervalDataLs, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
 				MergeSamFilesJar=workflow.MergeSamFilesJar, \
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
-				registerReferenceData=registerReferenceData,\
+				registerReferenceData=pdata.registerReferenceData,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
 				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
 				outputDirPrefix=self.pegasusFolderName)

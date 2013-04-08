@@ -157,70 +157,73 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			vcf files only
 		"""
 		sys.stderr.write("Registering input files from %s ..."%(inputDir))
+		if workflow is None:
+			workflow = self
 		returnData = PassingData(jobDataLs = [])
-		fnameLs = os.listdir(inputDir)
-		counter = 0
-		real_counter = 0
-		previous_reported_real_counter = ''
-		for fname in fnameLs:
-			counter += 1
-			inputFname = os.path.realpath(os.path.join(inputDir, fname))
-			if (maxContigID is not None and maxContigID!=0) or (minContigID is not None and minContigID!=0):
-				try:
-					contigID = int(self.getContigIDFromFname(os.path.basename(fname)))
-					if (maxContigID is not None and maxContigID!=0) and contigID>maxContigID:
-						continue
-					if (minContigID is not None and minContigID!=0) and contigID<minContigID:
-						continue
-				except:
-					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
-					import traceback
-					traceback.print_exc()
-			if NextGenSeq.isFileNameVCF(fname, includeIndelVCF=includeIndelVCF) and \
-					not NextGenSeq.isVCFFileEmpty(inputFname, checkContent=checkEmptyVCFByReading):
-				real_counter += 1
-				inputBaseFname = os.path.basename(inputFname)
-				inputF = File(os.path.join(pegasusFolderName, inputBaseFname))
-				inputF.addPFN(PFN("file://" + inputFname, input_site_handler))
-				inputF.absPath = inputFname
-				inputF.abspath = inputFname
-				no_of_loci = None
-				no_of_individuals = None
-				if needToKnowNoOfLoci:
-					if db_vervet:
-						genotype_file = db_vervet.parseGenotypeFileGivenDBAffiliatedFilename(filename=inputFname)
-						if genotype_file and inputFname.find(genotype_file.path)>=0:	#2012.9.6 make sure same file
-							no_of_loci = genotype_file.no_of_loci
-							no_of_individuals = genotype_file.no_of_individuals
-					if no_of_loci is None:
-						#do file parsing
-						vcfFile = VCFFile(inputFname=inputFname, report=False)
-						counter = 0
-						no_of_loci = vcfFile.getNoOfLoci()
-						no_of_individuals = len(vcfFile.getSampleIDList())
-						vcfFile.close()
-				inputF.noOfLoci = no_of_loci
-				inputF.no_of_loci = no_of_loci
-				inputF.no_of_individuals = no_of_individuals
-				inputF.noOfIndividuals = no_of_individuals
-				
-				if minNoOfLoci is None or inputF.no_of_loci is None or (minNoOfLoci and inputF.no_of_loci and  inputF.no_of_loci >=minNoOfLoci):
-					workflow.addFile(inputF)
+		if inputDir and os.path.isdir(inputDir):	#2013.04.07
+			fnameLs = os.listdir(inputDir)
+			counter = 0
+			real_counter = 0
+			previous_reported_real_counter = ''
+			for fname in fnameLs:
+				counter += 1
+				inputFname = os.path.realpath(os.path.join(inputDir, fname))
+				if (maxContigID is not None and maxContigID!=0) or (minContigID is not None and minContigID!=0):
+					try:
+						contigID = int(self.getContigIDFromFname(os.path.basename(fname)))
+						if (maxContigID is not None and maxContigID!=0) and contigID>maxContigID:
+							continue
+						if (minContigID is not None and minContigID!=0) and contigID<minContigID:
+							continue
+					except:
+						sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+						import traceback
+						traceback.print_exc()
+				if NextGenSeq.isFileNameVCF(fname, includeIndelVCF=includeIndelVCF) and \
+						not NextGenSeq.isVCFFileEmpty(inputFname, checkContent=checkEmptyVCFByReading):
+					real_counter += 1
+					inputBaseFname = os.path.basename(inputFname)
+					inputF = File(os.path.join(pegasusFolderName, inputBaseFname))
+					inputF.addPFN(PFN("file://" + inputFname, input_site_handler))
+					inputF.absPath = inputFname
+					inputF.abspath = inputFname
+					no_of_loci = None
+					no_of_individuals = None
+					if needToKnowNoOfLoci:
+						if db_vervet:
+							genotype_file = db_vervet.parseGenotypeFileGivenDBAffiliatedFilename(filename=inputFname)
+							if genotype_file and inputFname.find(genotype_file.path)>=0:	#2012.9.6 make sure same file
+								no_of_loci = genotype_file.no_of_loci
+								no_of_individuals = genotype_file.no_of_individuals
+						if no_of_loci is None:
+							#do file parsing
+							vcfFile = VCFFile(inputFname=inputFname, report=False)
+							counter = 0
+							no_of_loci = vcfFile.getNoOfLoci()
+							no_of_individuals = len(vcfFile.getSampleIDList())
+							vcfFile.close()
+					inputF.noOfLoci = no_of_loci
+					inputF.no_of_loci = no_of_loci
+					inputF.no_of_individuals = no_of_individuals
+					inputF.noOfIndividuals = no_of_individuals
 					
-					tbi_F_absPath = "%s.tbi"%inputFname
-					if os.path.isfile(tbi_F_absPath):	#it exists
-						tbi_F = File(os.path.join(pegasusFolderName, "%s.tbi"%inputBaseFname))
-						tbi_F.addPFN(PFN("file://" + tbi_F_absPath, input_site_handler))
-						tbi_F.abspath = tbi_F_absPath
-						workflow.addFile(tbi_F)
-					else:
-						tbi_F = None
-					inputF.tbi_F = tbi_F
-					returnData.jobDataLs.append(PassingData(job=None, jobLs=[], \
-												vcfFile=inputF, tbi_F=tbi_F, file=inputF, fileLs=[inputF, tbi_F]))
-				if real_counter%200==0:
-					sys.stderr.write("%s%s"%('\x08'*len(previous_reported_real_counter), real_counter))
-					previous_reported_real_counter = repr(real_counter)
+					if minNoOfLoci is None or inputF.no_of_loci is None or (minNoOfLoci and inputF.no_of_loci and  inputF.no_of_loci >=minNoOfLoci):
+						workflow.addFile(inputF)
+						
+						tbi_F_absPath = "%s.tbi"%inputFname
+						if os.path.isfile(tbi_F_absPath):	#it exists
+							tbi_F = File(os.path.join(pegasusFolderName, "%s.tbi"%inputBaseFname))
+							tbi_F.addPFN(PFN("file://" + tbi_F_absPath, input_site_handler))
+							tbi_F.abspath = tbi_F_absPath
+							workflow.addFile(tbi_F)
+						else:
+							tbi_F = None
+						inputF.tbi_F = tbi_F
+						returnData.jobDataLs.append(PassingData(job=None, jobLs=[], \
+													vcfFile=inputF, tbi_F=tbi_F, file=inputF, fileLs=[inputF, tbi_F]))
+					if real_counter%200==0:
+						sys.stderr.write("%s%s"%('\x08'*len(previous_reported_real_counter), real_counter))
+						previous_reported_real_counter = repr(real_counter)
 		sys.stderr.write("  %s non-empty VCF out of %s files.\n"%(len(returnData.jobDataLs), counter))
 		return returnData
 
@@ -783,24 +786,21 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		sys.stderr.write("%s jobs.\n"%(self.no_of_jobs))
 		return reduceReturnData
 	
-	def run(self):
+	def setup_run(self):
 		"""
-		2012.9.24
+		2013.04.07 wrap all standard pre-run() related functions into this function.
+			setting up for run(), called by run()
 		"""
+		pdata = AbstractNGSWorkflow.setup_run(self)
+		workflow = pdata.workflow
 		
-		if self.debug:
-			import pdb
-			pdb.set_trace()
-		
-		self.connectDB()
-		
-		
-		workflow = self.initiateWorkflow()
-		self.registerJars()
-		self.registerCustomJars()
-		self.registerExecutables()
-		self.registerCustomExecutables()
-		
+		#self.chr2size = {}
+		#self.chr2size = set(['Contig149'])	#temporary when testing Contig149
+		#self.chr2size = set(['1MbBAC'])	#temporary when testing the 1Mb-BAC (formerly vervet_path2)
+		chrLs = self.chr2size.keys()
+		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
+													intervalSize=self.intervalSize, \
+													intervalOverlapSize=self.intervalOverlapSize)
 		
 		inputData = self.registerAllInputFiles(workflow, self.inputDir, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
@@ -811,19 +811,33 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 											needToKnowNoOfLoci=True,\
 											minNoOfLoci=getattr(self, 'minNoOfLoci', 10))
 		
+		registerReferenceData = self.getReferenceSequence()
+		
+		
+		return PassingData(workflow=workflow, inputData=inputData,\
+						chr2IntervalDataLs=chr2IntervalDataLs, registerReferenceData=registerReferenceData)
+	
+	def run(self):
+		"""
+		2012.9.24
+		"""
+		pdata = self.setup_run()
+		workflow = pdata.workflow
+		
+		
+		inputData=pdata.inputData
+		
 		if len(inputData.jobDataLs)<=0:
 			sys.stderr.write("No VCF files in this folder , %s.\n"%self.inputDir)
 			sys.exit(0)
-		
-		self.registerReferenceData = self.getReferenceSequence(workflow=self)	#2013.2.14
-		
+				
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, \
 					chr2IntervalDataLs=None, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
-				registerReferenceData=self.registerReferenceData,\
+				registerReferenceData=pdata.registerReferenceData,\
 				needFastaIndexJob=getattr(self, 'needFastaIndexJob',False), needFastaDictJob=getattr(self, 'needFastaDictJob', False), \
 				data_dir=self.data_dir, no_of_gatk_threads = 1,\
 				intervalSize=self.intervalSize, intervalOverlapSize=self.intervalOverlapSize, \

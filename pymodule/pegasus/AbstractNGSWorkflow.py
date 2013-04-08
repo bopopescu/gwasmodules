@@ -29,6 +29,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						("gatk_path", 1, ): ["%s/script/gatk/dist", '', 1, 'GATK folder containing its jar binaries'],\
 						("gatk2_path", 1, ): ["%s/script/gatk2/", '', 1, 'GATK version 2 or afterwards, no more source code, just binary jar files.'],\
 						('tabixPath', 1, ): ["%s/bin/tabix", '', 1, 'path to the tabix binary', ],\
+						('bgzipPath', 1, ): ["%s/bin/bgzip", '', 1, 'path to the bgzip binary', ],\
 						('vcftoolsPath', 1, ): ["%s/bin/vcftools/vcftools", '', 1, 'path to the vcftools binary', ],\
 						('vcfSubsetPath', 1, ): ["%s/bin/vcftools/vcf-subset", '', 1, 'path to the vcf-subset program', ],\
 						
@@ -82,7 +83,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2011-7-11
 		"""
-		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'gatk2_path',\
+		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'bgzipPath', 'gatk2_path',\
 											'vcftoolsPath', 'vcfSubsetPath'])
 		#inserted before AbstractWorkflow.__init__()
 		AbstractWorkflow.__init__(self, **keywords)
@@ -117,8 +118,31 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 								('sequence_batch_id_ls', int),('version_ls', int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
 		
-		self.samtoolsFile = self.registerOneInputFile(inputFname=self.samtools_path,\
-													input_site_handler=self.input_site_handler, folderName="")
+		self.samtoolsExecutableFile = self.registerOneExecutableAsFile(path=self.samtools_path,\
+													site_handler=self.input_site_handler)
+		self.tabixExecutableFile = self.registerOneExecutableAsFile(path=self.tabixPath)
+		self.bgzipExecutableFile = self.registerOneExecutableAsFile(path=self.bgzipPath)
+	
+	
+	def getAlignments(self, db=None):
+		"""
+		2013.04.03
+			wrapper so that derivatives could call it easily
+		"""
+		if db is None:
+			db = self.db
+		alignmentLs = db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
+										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
+										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
+										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls,\
+										local_realigned=self.local_realigned)
+		alignmentLs = db.filterAlignments(alignmentLs=alignmentLs, min_coverage=self.sequence_min_coverage,\
+						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
+						individual_site_id_set=set(self.site_id_ls),\
+						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
+						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls),\
+						excludeContaminant=self.excludeContaminant)
+		return alignmentLs
 	
 	def registerJars(self, workflow=None, ):
 		"""
@@ -567,6 +591,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			parentJobLs = []
 		if parentJob:
 			parentJobLs.append(parentJob)
+		extraDependentInputLs.append(self.tabixExecutableFile)
+		extraDependentInputLs.append(self.bgzipExecutableFile)
 		
 		job = self.addGenericJob(executable=bgzip_tabix, inputFile=inputF, inputArgumentOption="", \
 					outputFile=outputF, outputArgumentOption="", \
@@ -1779,7 +1805,7 @@ Contig966       3160    50
 					key2ObjectForJob=key2ObjectForJob, objectWithDBArguments=self, **keywords)
 		return job
 	
-	def addSamtoolsFlagstatJob(self, workflow=None, executable=None, samtoolsFile=None, \
+	def addSamtoolsFlagstatJob(self, workflow=None, executable=None, samtoolsExecutableFile=None, \
 					inputFile=None, outputFile=None, \
 					parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 					extraArguments=None, job_max_memory=2000, walltime=120, **keywords):
@@ -1796,7 +1822,7 @@ Contig966       3160    50
 			extraDependentInputLs = []
 		extraDependentInputLs.append(inputFile)
 		job = self.addGenericPipeCommandOutput2FileJob(workflow=workflow, executable=executable, \
-					executableFile=samtoolsFile, \
+					executableFile=samtoolsExecutableFile, \
 					outputFile=outputFile, \
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					extraOutputLs=None, transferOutput=transferOutput, \

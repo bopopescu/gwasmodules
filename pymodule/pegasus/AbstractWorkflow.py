@@ -209,8 +209,9 @@ class AbstractWorkflow(ADAG):
 		# Close tag
 		out.write('</adag>\n')
 	
-	def constructOneExecutableObject(self, path=None, name=None):
+	def constructOneExecutableObject(self, path=None, name=None, checkPathExecutable=True):
 		"""
+		2013.04.07 check if path is executable file
 		2013.2.7
 		"""
 		namespace = self.namespace
@@ -221,6 +222,16 @@ class AbstractWorkflow(ADAG):
 		
 		executable = Executable(namespace=namespace, name=name, version=version, \
 						os=operatingSystem, arch=architecture, installed=True)
+		if checkPathExecutable:
+			if path.find('file://')==0:
+				fs_path = path[6:]
+			else:
+				fs_path = path
+			
+			if not (os.path.isfile(fs_path) and os.access(fs_path, os.X_OK)):
+				sys.stderr.write("Error from constructOneExecutableObject(): \
+		executable %s is not an executable.\n"%(path))
+				raise
 		executable.addPFN(PFN("file://" + os.path.expanduser(path), site_handler))
 		return executable
 	
@@ -661,6 +672,8 @@ class AbstractWorkflow(ADAG):
 		2012.3.3
 		"""
 		sys.stderr.write("Registering %s input file ..."%(len(inputFnameLs)))
+		if workflow is None:
+			workflow = self
 		returnData = PassingData(jobDataLs = [])
 		counter = 0
 		for inputFname in inputFnameLs:
@@ -675,14 +688,20 @@ class AbstractWorkflow(ADAG):
 	
 	def registerFilesAsInputToJob(self, job, inputFileList):
 		"""
+		2013.04.07 call addJobUse()
 		2011-11-25
 		"""
 		for inputFile in inputFileList:
-			job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
+			self.addJobUse(job=job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
+			#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 	
 	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName="", useAbsolutePathAsPegasusFileName=False,\
 							pegasusFileName=None):
 		"""
+		Examples:
+			pegasusFile = self.registerOneInputFile(workflow=workflow, inputFname=path, input_site_handler=site_handler, \
+											folderName=folderName, useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
+		2013.04.07 raise if inputFname is not a file 
 		2013.2.14 added argument useAbsolutePathAsPegasusFileName
 			This would render the file to be referred as the absolute path on the running computer.
 			And pegasus will not seek to symlink or copy/transfer the file.
@@ -704,6 +723,9 @@ class AbstractWorkflow(ADAG):
 			else:
 				pegasusFileName = os.path.join(folderName, os.path.basename(inputFname))
 		pegasusFile = File(pegasusFileName)
+		if not os.path.isfile(inputFname):
+			sys.stderr.write("Error from registerOneInputFile(): %s does not exist.\n"%(inputFname))
+			raise
 		pegasusFile.abspath = os.path.abspath(inputFname)
 		pegasusFile.absPath = pegasusFile.abspath
 		pegasusFile.addPFN(PFN("file://" + pegasusFile.abspath, input_site_handler))
@@ -725,9 +747,17 @@ class AbstractWorkflow(ADAG):
 		pegasusFile = self.registerOneInputFile(workflow=workflow, inputFname=path, input_site_handler=site_handler, \
 											folderName=folderName, useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
 		setattr(workflow, name, pegasusFile)
+		return pegasusFile
 	
-	def registerOneExecutableAsFile(self, name=None, path=None, site_handler=None, workflow=None, folderName="", useAbsolutePathAsPegasusFileName=False):
+	def registerOneExecutableAsFile(self, pythonVariableName=None, path=None, site_handler=None, \
+								workflow=None, folderName="", useAbsolutePathAsPegasusFileName=False):
 		"""
+		Examples:
+			self.samtoolsExecutableFile = self.registerOneExecutableAsFile(path=self.samtools_path,\
+													input_site_handler=self.input_site_handler)
+			self.registerOneExecutableAsFile(pythonVariableName="bwaExecutableFile", path=self.bwa_path)
+			
+		2014.04.07 pythonVariableName is used for access like self.pythonVariableName within python dag generator
 		2014.04.04 need an executable (bwa) to be file dependency when running pipeCommandOutput2File for "bwa mem"
 			useAbsolutePathAsPegasusFileName=True if you do not plan to add the file as INPUT dependency for jobs
 		"""
@@ -737,9 +767,13 @@ class AbstractWorkflow(ADAG):
 			site_handler = self.site_handler	#usually they are same
 		if not folderName:
 			folderName = "executable"
+		if not pythonVariableName:	#2013.04.07
+			pythonVariableName = '%sExecutableFile'%(os.path.basename(path))
 		pegasusFile = self.registerOneInputFile(workflow=workflow, inputFname=path, input_site_handler=site_handler, \
-											folderName=folderName, useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
-		setattr(workflow, name, pegasusFile)
+											folderName=folderName, \
+											useAbsolutePathAsPegasusFileName=useAbsolutePathAsPegasusFileName)
+		setattr(workflow, pythonVariableName, pegasusFile)
+		return pegasusFile
 	
 	def registerBlastNucleotideDatabaseFile(self, ntDatabaseFname=None, input_site_handler=None, folderName=""):
 		"""
@@ -1888,6 +1922,32 @@ class AbstractWorkflow(ADAG):
 			extraOutputLs.append(outputFile)
 			key2ObjectForJob['%sFile'%(name)] = outputFile
 
+	def setup_run(self):
+		"""
+		2013.04.07 wrap all standard pre-run() related functions into this function.
+			setting up for run(), called by run()
+		"""
+		if self.debug:
+			import pdb
+			pdb.set_trace()
+		
+		
+		if not self.data_dir:
+			self.data_dir = self.db.data_dir
+		
+		if not self.local_data_dir:
+			self.local_data_dir = self.db.data_dir
+		
+		workflow = self.initiateWorkflow()
+		
+		
+		self.registerJars()
+		self.registerCustomJars()
+		self.registerExecutables()
+		self.registerCustomExecutables()
+		
+		return PassingData(workflow=workflow)
+	
 
 if __name__ == '__main__':
 	main_class = AbstractWorkflow

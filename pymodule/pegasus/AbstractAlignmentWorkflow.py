@@ -25,6 +25,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						('ind_seq_id_ls', 0, ): ['', 'i', 1, 'a comma/dash-separated list of IndividualSequence.id. alignments come from these', ],\
 						('ind_aln_id_ls', 0, ): ['', '', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
 						("alignment_method_id", 0, int): [None, 'G', 1, 'To filter alignments. None: whatever; integer: AlignmentMethod.id'],\
+						("local_realigned", 0, int): [1, '', 1, 'To filter which input alignments to fetch from db (i.e. AlignmentReadBaseQualityRecalibrationWorkflow.py)\
+	OR to instruct whether local_realigned should be applied (i.e. ShortRead2AlignmentWorkflow.py)'],\
 						('defaultSampleAlignmentDepth', 1, int): [10, '', 1, "when database doesn't have median_depth info for one alignment, use this number instead.", ],\
 						('individual_sequence_file_raw_id_type', 1, int): [1, '', 1, "1: only all-library-fused libraries,\n\
 		2: only library-specific alignments,\n\
@@ -543,44 +545,14 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		#self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name="exampleJava", clusterSizeMultipler=0.3)
 	
-	
-	def getAlignments(self, db=None):
-		"""
-		2013.04.03
-			wrapper so that derivatives could call it easily
-		"""
-		if db is None:
-			db = self.db
-		alignmentLs = db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
-										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
-										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
-										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls)
-		alignmentLs = db.filterAlignments(alignmentLs=alignmentLs, min_coverage=self.sequence_min_coverage,\
-						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
-						individual_site_id_set=set(self.site_id_ls),\
-						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
-						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls),\
-						excludeContaminant=self.excludeContaminant)
-		return alignmentLs
-	
 	def setup_run(self):
 		"""
-		2013.04.03 wrap all standard alignment related functions into this function (from run())
+		2013.04.07 wrap all standard pre-run() related functions into this function.
+			setting up for run(), called by run()
 		"""
-		if self.debug:
-			import pdb
-			pdb.set_trace()
+		pdata = AbstractNGSWorkflow.setup_run(self)
+		workflow = pdata.workflow
 		
-		
-		if not self.data_dir:
-			self.data_dir = self.db.data_dir
-		
-		if not self.local_data_dir:
-			self.local_data_dir = self.db.data_dir
-		
-		#self.chr2size = {}
-		#self.chr2size = set(['Contig149'])	#temporary when testing Contig149
-		#self.chr2size = set(['1MbBAC'])	#temporary when testing the 1Mb-BAC (formerly vervet_path2)
 		chrLs = self.chr2size.keys()
 		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
 													intervalSize=self.intervalSize, \
@@ -588,13 +560,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		alignmentLs = self.getAlignments()
 		
-		workflow = self.initiateWorkflow()
-		
 		registerReferenceData = self.getReferenceSequence()
 		
-		self.registerJars()
-		self.registerExecutables()
-		self.registerCustomExecutables()
 		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow=workflow, alignmentLs=alignmentLs, data_dir=self.data_dir)
 		
 		return PassingData(workflow=workflow, alignmentLs=alignmentLs, alignmentDataLs=alignmentDataLs, \
