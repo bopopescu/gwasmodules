@@ -141,7 +141,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						individual_site_id_set=set(self.site_id_ls),\
 						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
 						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls),\
-						excludeContaminant=self.excludeContaminant)
+						excludeContaminant=self.excludeContaminant,local_realigned=self.local_realigned)
 		return alignmentLs
 	
 	def registerJars(self, workflow=None, ):
@@ -1088,6 +1088,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		if outputF is None and outputFnamePrefix:
 			outputF = File('%s.tsv'%(outputFnamePrefix))
+		if outputF and outputFnamePrefix is None:	#2013.04.09 to register _overlapSitePos.tsv file
+			outputFnamePrefix = os.path.splitext(outputF.name)
+		
 		extraOutputLs = []
 		extraArgumentList = []
 		key2ObjectForJob = {}
