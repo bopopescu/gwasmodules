@@ -1131,6 +1131,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 							job_max_memory=1000, extraDependentInputLs=[], onlyKeepBiAllelicSNP=False, \
 							namespace=None, version=None, transferOutput=False, **keywords):
 		"""
+		2013.04.09 added the VCFIndexFile in output (transfer=False)
 		2011.12.20
 			moved from FilterVCFPipeline.py
 			add argument transferOutput, outputSiteStatF
@@ -1146,6 +1147,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			filterByDepthJob.addArguments("-o", outputVCFF)
 			filterByDepthJob.uses(outputVCFF, transfer=transferOutput, register=True, link=Link.OUTPUT)
 			filterByDepthJob.output = outputVCFF
+			
+			VCFIndexFile = File('%s.idx'%(outputVCFF.name))
+			self.addJobUse(job=filterByDepthJob, file=VCFIndexFile, transfer=False, register=True, link=Link.OUTPUT)
 		
 		if outputSiteStatF:
 			filterByDepthJob.addArguments("-ssFname", outputSiteStatF)
@@ -1159,12 +1163,13 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			filterByDepthJob.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
 		filterByDepthJob.uses(alnStatForFilterF, transfer=True, register=True, link=Link.INPUT)
 		filterByDepthJob.uses(inputVCFF, transfer=True, register=True, link=Link.INPUT)		
-		for input in extraDependentInputLs:
-			filterByDepthJob.uses(input, transfer=True, register=True, link=Link.INPUT)
+		for inputF in extraDependentInputLs:
+			filterByDepthJob.uses(inputF, transfer=True, register=True, link=Link.INPUT)
 		self.addJob(filterByDepthJob)
 		for parentJob in parentJobLs:
 			self.depends(parent=parentJob, child=filterByDepthJob)
 		yh_pegasus.setJobProperRequirement(filterByDepthJob, job_max_memory=job_max_memory)
+		self.no_of_jobs += 1
 		return filterByDepthJob
 	
 	def addFilterJobByvcftools(self, workflow=None, vcftoolsWrapper=None, inputVCFF=None, outputFnamePrefix=None, \
