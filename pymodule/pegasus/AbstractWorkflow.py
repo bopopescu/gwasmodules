@@ -121,10 +121,17 @@ class AbstractWorkflow(ADAG):
 	
 	def writeXML(self, out):
 		"""
+		2013.04.09
+			call ADAG.writeXML() and then add my commandline comment
 		2012.8.29
 			copied from /usr/lib/pegasus/python/Pegasus/DAX3.py because i want to output comment.
 			overwrite its parent. ADAG.writeXML()
 			Write the ADAG as XML to a stream
+		"""
+		sys.stderr.write("Writing XML job to %s ..."%(out))
+		ADAG.writeXML(self, out)
+		out.write('<!-- commandline: %s -->\n'%(self.commandline.replace("--", "~~")))	#2012.9.4 -- is not allowed in xml comment.
+		sys.stderr.write(".\n")
 		"""
 		import datetime, pwd, os, sys
 		
@@ -208,7 +215,9 @@ class AbstractWorkflow(ADAG):
 		
 		# Close tag
 		out.write('</adag>\n')
-	
+		sys.stderr.write(".\n")
+		"""
+		
 	def constructOneExecutableObject(self, path=None, name=None, checkPathExecutable=True):
 		"""
 		2013.04.07 check if path is executable file
