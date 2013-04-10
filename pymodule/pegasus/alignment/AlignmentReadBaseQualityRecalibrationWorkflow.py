@@ -10,9 +10,11 @@ Examples:
 		-a 524 -o dags/BaseQualityRecalibration/BaseQualityRecalibration_VRC447_vsMethod17.xml
 		-l hcondor -j hcondor -z localhost -u yh --contigMaxRankBySize 1000 
 		--intervalSize 10000000 --intervalOverlapSize 30000
+		--indelVCFFolder ...
 		-e /u/home/eeskin/polyacti
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
 		--needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 17
+		 --commit --skipDoneAlignment
 
 	# 2012.9.18
 	%s  --inputDir ~/NetworkData/vervet/db/genotype_file/method_41 --ind_seq_id_ls 633,634,635,636,637,638 
@@ -20,8 +22,10 @@ Examples:
 		-o dags/BaseQualityRecalibration/BaseQualityRecalibration_ISQ633_638_vsMethod41.xml -l hcondor
 		-j hcondor -z localhost -u yh --intervalSize 10000000 --intervalOverlapSize 30000
 		-e /u/home/eeskin/polyacti
+		--indelVCFFolder ...
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
 		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 41
+		 --commit --skipDoneAlignment
 	
 	# 2013.3.19 use sequence coverage to filter alignments
 	%s  --inputDir ~/NetworkData/vervet/db/genotype_file/method_41
@@ -31,21 +35,16 @@ Examples:
 		-e /u/home/eeskin/polyacti --contigMaxRankBySize 250
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
 		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 41
+		--indelVCFFolder ~/NetworkData/vervet/db/genotype_file/method_88 --commit --skipDoneAlignment
 		# --ref_genome_version 2 #(optional, as by default, it gets the outdated_index=0 reference chromosomes from GenomeDB)
 		# --ref_genome_outdated_index 1 #to get old reference. incompatible here as alignment is based on 3280, new ref.
 		# --needFastaDictJob --needFastaIndexJob
 	
 Description:
-	#2012.9.21  recalibration needs ~500K reads to get accurate estimate. So adjust the --intervalSize according to coverage.  
+	#2013.04.09  recalibration needs ~500K reads to get accurate estimate. So adjust the --intervalSize according to coverage.  
 	Input: a VCF folder, list of alignment IDs (or use site_id, ref_ind_seq_id to filter )
+	It could run local_realignment with or without indel VCF and BQSR with or without SNPVCF. Without a SNPVCF from particular chromosome, it uses a random chromosome. If the interval-span is too short , it use BQSR result from long-intervals.
 	
-	for each whole-genome alignment
-	select a whole-genome alignment into several interval alignment (5Mb of each chr/contig)
-			using samtools view -h ... (AlignmentToCallPipeline.addSelectAndSplitBamJobs())
-		each sub-alignment is paired with the VCF from the same contig/chromosome.
-		run CountCovariates job (skeleton in ShortRead2AlignmentPipeline.py)
-		TableRecalibration job
-	Merge all sub-alignment into one
 	add alignment file into db (input: parent alignment ID, alignment file path)
 """
 import sys, os, math
@@ -76,7 +75,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 	required if argument local_realigned is non-zero', ],\
 							})
 	option_default_dict[('intervalSize', 1, int)][0] = 10000000
-	option_default_dict[('local_realigned', 0, int)][0] = 1
+	option_default_dict[('local_realigned', 0, int)][0] = 0
 	"""
 	option_default_dict.update({
 						('ind_aln_id_ls', 0, ): ['', 'I', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
@@ -97,6 +96,8 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		"""
 		parentClass.__init__(self, **keywords)
 		self.chr2IndelVCFJobData = None	#2013.04.04 mark this variable. setup in setup()
+		self.candidateCountCovariatesJob = None	#2013.04.09 this BQSR count-variates job encompasses one of the top big intervals.
+			# replacing equivalent jobs for small intervals (not accurate if intervals are too small)
 		#AlignmentToCallPipeline.__init__(self, **keywords)
 		#self.inputDir = os.path.abspath(self.inputDir)
 	
@@ -176,10 +177,13 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		baiF = alignmentData.baiF
 		bamFnamePrefix = passingData.bamFnamePrefix
 		
-		VCFFile = VCFJobData.file
-		VCFJobLs = VCFJobData.jobLs
+		SNPVCFFile = VCFJobData.file
+		if SNPVCFFile is None or VCFJobData is None:	#2013.04.09	BQSR requires a VCF input regardless of the chromosome
+			VCFJobData = self.randomSNPVCFJobDataForBQSR
 		
-		parentJobLs = alignmentData.jobLs + VCFJobData.jobLs
+		SNPVCFFile = VCFJobData.file
+		SNPVCFJobLs = VCFJobData.jobLs
+		
 		if intervalData.file:
 			mpileupInterval = intervalData.interval
 			bcftoolsInterval = intervalData.file
@@ -189,6 +193,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		intervalFnameSignature = intervalData.intervalFnameSignature
 		overlapInterval = intervalData.overlapInterval
 		overlapFilenameSignature = intervalData.overlapIntervalFnameSignature
+		span = intervalData.span
 		
 		if chromosome is None:
 			chromosome = getattr(passingData, 'chromosome', None)
@@ -214,124 +219,158 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 			[-compress 0]    (this argument recommended to speed up the process *if* this is only a temporary file; otherwise, use the default value)
 
 		"""
-		if self.local_realigned:
-			#get the indel VCF file
-			if not self.chr2IndelVCFJobData:
-				sys.stderr.write("Warning from mapEachInterval(): no indel VCF for local realignment. resort to ab-initial local-realignment.\n \
-		(not ideal because intervals with too many reads will be skipped.).\n")
-				indelVCFFile = None
-				indelVCFFileLs = []
-				indelVCFFileJobLs = []
-			else:
-				indelVCFJobData = self.chr2IndelVCFJobData.get(chromosome)
-				indelVCFFile = indelVCFJobData.file
-				indelVCFFileLs = indelVCFJobData.fileLs
-				indelVCFFileJobLs = indelVCFJobData.jobLs
-			
-			realignerTargetIntervalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.forIndelRealigner.intervals'%\
-														(bamFnamePrefix, overlapFilenameSignature)))
-			realignerTargetIntervalJob = self.addGATKRealignerTargetCreatorJob(executable=self.RealignerTargetCreatorJava, \
-																GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
-							refFastaFList=passingData.refFastaFList, inputFile=bamF, inputArgumentOption="-I", indelVCFFile=indelVCFFile, \
-							outputFile=realignerTargetIntervalFile, interval=overlapInterval, \
-					parentJobLs=[topOutputDirJob]+parentJobLs+indelVCFFileJobLs, transferOutput=False, job_max_memory=4000,walltime=60,\
-					extraArguments=None, extraArgumentList=None, extraDependentInputLs=[baiF]+indelVCFFileLs)
-			
-			realignedBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.bam'%\
-												(bamFnamePrefix, overlapFilenameSignature)))
-			indelRealignmentJobWalltime=200
-			extraArgumentList=['-targetIntervals',realignerTargetIntervalJob.output,\
-							'--read_filter NotPrimaryAlignment', \
-							'--maxReadsForConsensuses 250', '--maxReadsForRealignment 90000', '--maxReadsInMemory 300000']
-			if indelVCFFile:
-				extraArgumentList.extend(["-known", indelVCFFile])	#"--consensusDeterminationModel KNOWNS_ONLY" is not added since vervet indels are not clear
-			
-			indelRealignmentJob = self.addGATKJob(executable=self.IndelRealignerJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
-						GATKAnalysisType='IndelRealigner',\
-						inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
-						argumentForEachFileInInputFileList=None,\
-						interval=overlapInterval, outputFile=realignedBamFile, \
-						parentJobLs=[realignerTargetIntervalJob]+parentJobLs+indelVCFFileJobLs, transferOutput=False, job_max_memory=9000,\
-						frontArgumentList=None, extraArguments=None, \
-						extraArgumentList=extraArgumentList, \
-						extraOutputLs=None, \
-						extraDependentInputLs=[realignerTargetIntervalJob.output, baiF]+indelVCFFileLs, no_of_cpus=None, \
-						walltime=indelRealignmentJobWalltime)
-			"""
-			# 2013.04.07 Sun
-			--maxReadsForConsensuses / -greedy ( int with default value 120 )
-			max reads used for finding the alternate consensuses (necessary to improve performance in deep coverage). For expert users only! If you need to find the optimal solution regardless of running time, use a higher number.
-			
-			--maxReadsForRealignment / -maxReads ( int with default value 20000 )
-			max reads allowed at an interval for realignment. For expert users only! If this value is exceeded at a given interval, realignment is not attempted and the reads are passed to the output file(s) as-is. If you need to allow more reads (e.g. with very deep coverage) regardless of memory, use a higher number.
-			
-			--maxReadsInMemory / -maxInMemory ( int with default value 150000 )
-			max reads allowed to be kept in memory at a time by the SAMFileWriter. For expert users only! To minimize memory consumption you can lower this number (but then the tool may skip realignment on regions with too much coverage; and if the number is too low, it may generate errors during realignment). Just make sure to give Java enough memory! 4Gb should be enough with the default value.
-			
-			"""
-			
-			"""
-			# 2013.04.05 Fri
-			# '--read_filter NotPrimaryAlignment' is due to this error
-			Error caching SAM record, ..., which is usually caused by malformed SAM/BAMfiles in which multiple identical copies of a read are present.
-			"""
-			
-			sortBamF = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.sorted.bam'%\
-												(bamFnamePrefix, overlapFilenameSignature)))
-			sortAlignmentJob = self.addSortAlignmentJob(workflow=workflow, inputBamFile=indelRealignmentJob.output, \
-						outputBamFile=sortBamF,\
-						SortSamFilesJava=self.SortSamFilesJava, SortSamJar=self.SortSamJar,\
-						parentJobLs=[indelRealignmentJob], extraDependentInputLs=None, \
-						extraArguments=None, job_max_memory = 2500, walltime=max(120, int(indelRealignmentJobWalltime/3)), \
-						transferOutput=False)
-			"""
-			# 2013.03.31 add the index job on bam file
-			indexRealignedBamJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
-											BuildBamIndexJar=self.BuildBamIndexJar, \
-						inputBamF=sortAlignmentJob.output,\
-						parentJobLs=[sortAlignmentJob], \
-						transferOutput=transferOutput, job_max_memory=3000, \
-						walltime=max(120, int(indelRealignmentJobWalltime/3)))
-			"""		
-			countCovariatesParentJobLs = [sortAlignmentJob]
-			countCovariatesJobInput = sortAlignmentJob.output
+		#get the indel VCF file
+		indelVCFJobData = self.chr2IndelVCFJobData.get(chromosome)
+		if not indelVCFJobData:
+			if self.report:
+				sys.stderr.write("Warning from mapEachInterval(): no indel VCF for local realignment for chromosome %s. resort to ab-initial local-realignment.\n \
+	(not ideal because intervals with too many reads will be skipped.).\n"%(chromosome))
+			indelVCFFile = None
+			indelVCFFileLs = []
+			indelVCFFileJobLs = []
 		else:
-			countCovariatesParentJobLs = parentJobLs
-			countCovariatesJobInput = bamF
+			indelVCFFile = indelVCFJobData.file
+			indelVCFFileLs = indelVCFJobData.fileLs
+			indelVCFFileJobLs = indelVCFJobData.jobLs
+		
+		median_depth = getattr(alignment, 'median_depth', 4)
+		readSpace = median_depth * span
+		#base is 4X coverage in 10Mb region => 120 minutes
+		indelRealignmentJobWalltime = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=readSpace, \
+							baseInputVolume=4*10000000, baseJobPropertyValue=120, \
+							minJobPropertyValue=60, maxJobPropertyValue=500).value
+		#base is 4X, => 5000M
+		indelRealignmentJobMaxMemory = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=median_depth, \
+							baseInputVolume=4, baseJobPropertyValue=5000, \
+							minJobPropertyValue=4000, maxJobPropertyValue=9000).value
+		realignerTargetIntervalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.forIndelRealigner.intervals'%\
+													(bamFnamePrefix, overlapFilenameSignature)))
+		realignerTargetIntervalJob = self.addGATKRealignerTargetCreatorJob(executable=self.RealignerTargetCreatorJava, \
+															GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
+						refFastaFList=passingData.refFastaFList, inputFile=bamF, inputArgumentOption="-I", indelVCFFile=indelVCFFile, \
+						outputFile=realignerTargetIntervalFile, interval=overlapInterval, \
+				parentJobLs=[topOutputDirJob]+alignmentData.jobLs+indelVCFFileJobLs, transferOutput=False, \
+				job_max_memory=max(4000, indelRealignmentJobMaxMemory/2),walltime=indelRealignmentJobWalltime/2,\
+				extraArguments=None, extraArgumentList=None, extraDependentInputLs=[baiF]+indelVCFFileLs)
+		
+		realignedBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.bam'%\
+											(bamFnamePrefix, overlapFilenameSignature)))
+		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. 
+		realignedBaiFile = File('%s.bai'%(os.path.splitext(realignedBamFile.name)[0]))
+		extraArgumentList=['-targetIntervals',realignerTargetIntervalJob.output,\
+						'--read_filter NotPrimaryAlignment', \
+						'--maxReadsForConsensuses 250', '--maxReadsForRealignment 90000', '--maxReadsInMemory 300000']
+		if indelVCFFile:
+			extraArgumentList.extend(["-known:vcf", indelVCFFile])	#"--consensusDeterminationModel KNOWNS_ONLY" is not added since vervet indels are not clear
+		
+		indelRealignmentJob = self.addGATKJob(executable=self.IndelRealignerJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
+					GATKAnalysisType='IndelRealigner',\
+					inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
+					argumentForEachFileInInputFileList=None,\
+					interval=overlapInterval, outputFile=realignedBamFile, \
+					parentJobLs=[realignerTargetIntervalJob]+alignmentData.jobLs+indelVCFFileJobLs, transferOutput=False, \
+					job_max_memory=indelRealignmentJobMaxMemory,\
+					frontArgumentList=None, extraArguments=None, \
+					extraArgumentList=extraArgumentList, \
+					extraOutputLs=[realignedBaiFile], \
+					extraDependentInputLs=[realignerTargetIntervalJob.output, baiF]+indelVCFFileLs, no_of_cpus=None, \
+					walltime=indelRealignmentJobWalltime)
+		"""
+		# 2013.04.07 Sun
+		--maxReadsForConsensuses / -greedy ( int with default value 120 )
+		max reads used for finding the alternate consensuses (necessary to improve performance in deep coverage). For expert users only! If you need to find the optimal solution regardless of running time, use a higher number.
+		
+		--maxReadsForRealignment / -maxReads ( int with default value 20000 )
+		max reads allowed at an interval for realignment. For expert users only! If this value is exceeded at a given interval, realignment is not attempted and the reads are passed to the output file(s) as-is. If you need to allow more reads (e.g. with very deep coverage) regardless of memory, use a higher number.
+		
+		--maxReadsInMemory / -maxInMemory ( int with default value 150000 )
+		max reads allowed to be kept in memory at a time by the SAMFileWriter. For expert users only! To minimize memory consumption you can lower this number (but then the tool may skip realignment on regions with too much coverage; and if the number is too low, it may generate errors during realignment). Just make sure to give Java enough memory! 4Gb should be enough with the default value.
+		
+		"""
+		
+		"""
+		# 2013.04.05 Fri
+		# '--read_filter NotPrimaryAlignment' is due to this error
+		Error caching SAM record, ..., which is usually caused by malformed SAM/BAMfiles in which multiple identical copies of a read are present.
+		"""
+		
+		sortBamF = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.sorted.bam'%\
+											(bamFnamePrefix, overlapFilenameSignature)))
+		sortAlignmentJob = self.addSortAlignmentJob(workflow=workflow, inputBamFile=indelRealignmentJob.output, \
+					outputBamFile=sortBamF,\
+					SortSamFilesJava=self.SortSamFilesJava, SortSamJar=self.SortSamJar,\
+					parentJobLs=[indelRealignmentJob], extraDependentInputLs=indelRealignmentJob.outputLs[1:], \
+					extraArguments=None, job_max_memory =max(3000, indelRealignmentJobMaxMemory/3), \
+					walltime=max(120, indelRealignmentJobWalltime/3), \
+					transferOutput=False)
+		"""
+		# 2013.03.31 add the index job on bam file
+		indexRealignedBamJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
+										BuildBamIndexJar=self.BuildBamIndexJar, \
+					inputBamF=sortAlignmentJob.output,\
+					parentJobLs=[sortAlignmentJob], \
+					transferOutput=transferOutput, job_max_memory=3000, \
+					walltime=max(120, int(indelRealignmentJobWalltime/3)))
+		"""		
+		countCovariatesParentJobLs = [sortAlignmentJob, sortAlignmentJob.bamIndexJob]
+		countCovariatesJobInput = sortAlignmentJob.output
+		countCovariatesJobExtraDependentInputLs = [sortAlignmentJob.bamIndexJob.output]
+		#else:
+		#	countCovariatesParentJobLs = parentJobLs
+		#	countCovariatesJobInput = bamF
 			
-		if VCFFile:	#2013.03.31
+		
+		if span<1000000 and self.candidateCountCovariatesJob:	#2013.04.09 use the candidate job (interval big enough)
+			countCovariatesJob = self.candidateCountCovariatesJob
+		else:
 			recalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.grp'%(bamFnamePrefix, overlapFilenameSignature)))
 			countCovariatesJob = self.addGATKBaseRecalibratorJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
-									inputFile=countCovariatesJobInput, \
-									VCFFile=VCFFile, interval=overlapInterval, outputFile=recalFile, \
-									refFastaFList=passingData.refFastaFList, parentJobLs=[topOutputDirJob] + countCovariatesParentJobLs, 
-									extraDependentInputLs=[VCFFile.tbi_F], \
-									transferOutput=True, \
-									extraArguments=None, job_max_memory=4000, walltime=300)
-			"""
-			countCovariatesJob = mapEachChromosomeData.countCovariatesJob
-			"""
-			
-			recalBAMFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.bam'%(bamFnamePrefix, overlapFilenameSignature)))
-			selectAlignmentParentJob, selectAlignmentParentBamIndexJob = self.addGATKPrintRecalibratedReadsJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
-								inputFile=bamF, \
-								recalFile=countCovariatesJob.recalFile, interval=overlapInterval, outputFile=recalBAMFile, \
-								refFastaFList=passingData.refFastaFList, parentJobLs=[countCovariatesJob,], \
-								extraDependentInputLs=[VCFFile.tbi_F], transferOutput=False, \
-								extraArguments=None, job_max_memory=3000, needBAMIndexJob=True, walltime=300)
+								inputFile=countCovariatesJobInput, \
+								VCFFile=SNPVCFFile, interval=overlapInterval, outputFile=recalFile, \
+								refFastaFList=passingData.refFastaFList, parentJobLs=[topOutputDirJob] + countCovariatesParentJobLs + SNPVCFJobLs, 
+								extraDependentInputLs=[SNPVCFFile.tbi_F] + countCovariatesJobExtraDependentInputLs, \
+								transferOutput=True, \
+								extraArguments=None, job_max_memory=max(4000, indelRealignmentJobMaxMemory/2), \
+								walltime=indelRealignmentJobWalltime/2)
+		if span>self.intervalSize and self.candidateCountCovariatesJob is None:	#big chromosomes are first encountered so this should happen in 1st call()
+			self.candidateCountCovariatesJob = countCovariatesJob
+		
+		"""
+		countCovariatesJob = mapEachChromosomeData.countCovariatesJob
+		"""
+		
+		recalBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.bam'%(bamFnamePrefix, overlapFilenameSignature)))
+		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. 
+		recalBaiFile = File('%s.bai'%(os.path.splitext(recalBamFile.name)[0]))
+		selectAlignmentParentJob, selectAlignmentParentBamIndexJob = self.addGATKPrintRecalibratedReadsJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
+							inputFile=bamF, \
+							recalFile=countCovariatesJob.recalFile, interval=overlapInterval, outputFile=recalBamFile, \
+							refFastaFList=passingData.refFastaFList, parentJobLs=[countCovariatesJob,], \
+							extraDependentInputLs=[baiF], transferOutput=False, \
+							extraArguments=None, job_max_memory=max(4000, indelRealignmentJobMaxMemory/3), \
+							needBAMIndexJob=True, walltime=indelRealignmentJobWalltime/2)
+		selectAlignmentParentJobLs = [selectAlignmentParentJob, selectAlignmentParentBamIndexJob]
+		selectAlignmentParentJobOutput = selectAlignmentParentJob.output
+		selectAlignmentJobExtraDependentInputLs = [selectAlignmentParentBamIndexJob.outputLs[1:]]
+		"""
 		else:
+			sys.stderr.write("Warning from mapEachInterval(): no SNP VCF for BQSR for chromosome %s. skip BQSR.\n"%(chromosome))
 			if countCovariatesParentJobLs:
-				selectAlignmentParentJob = countCovariatesParentJobLs[0]
+				selectAlignmentParentJobLs = countCovariatesParentJobLs
+				selectAlignmentParentJobOutput = countCovariatesJobInput
+				selectAlignmentJobExtraDependentInputLs = countCovariatesJobExtraDependentInputLs
 			else:
-				selectAlignmentParentJob = None
-			selectAlignmentParentBamIndexJob = None
+				selectAlignmentParentJobLs = parentJobLs
+				selectAlignmentParentJobOutput = bamF
+				selectAlignmentJobExtraDependentInputLs = [baiF]
+		"""
 		nonOverlapBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.bam'%(bamFnamePrefix, intervalFnameSignature)))
 		selectAlignmentJob, indexSelectedAlignmentJob = self.addSelectAlignmentJob(executable=workflow.samtools, \
-				inputFile=selectAlignmentParentJob.output, \
-				outputFile=nonOverlapBamFile, region=mpileupInterval, parentJobLs=[selectAlignmentParentJob, \
-														selectAlignmentParentBamIndexJob], \
-				extraDependentInputLs=[getattr(selectAlignmentParentBamIndexJob, 'output', None)], transferOutput=False, \
-				extraArguments=None, job_max_memory=2000, needBAMIndexJob=False)	#the next mergeBamJob doesn't need bai files.
+				inputFile=selectAlignmentParentJobOutput, \
+				outputFile=nonOverlapBamFile, region=mpileupInterval, parentJobLs=selectAlignmentParentJobLs, \
+				extraDependentInputLs=selectAlignmentJobExtraDependentInputLs, transferOutput=False, \
+				extraArguments=None, job_max_memory=2000, needBAMIndexJob=False, \
+				walltime=indelRealignmentJobWalltime/2)	#the next mergeBamJob doesn't need bai files.
 		
 		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=[selectAlignmentJob, indexSelectedAlignmentJob], \
 															file=selectAlignmentJob.output))
@@ -344,26 +383,49 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		returnData.jobDataLs = []
 		if workflow is None:
 			workflow = self
-		getattr(passingData, 'mapEach', [])
 		AlignmentJobAndOutputLs = getattr(passingData, 'AlignmentJobAndOutputLs', [])
 		bamFnamePrefix = passingData.bamFnamePrefix
 		topOutputDirJob = passingData.topOutputDirJob
 		individual_alignment = passingData.individual_alignment
+		reduceOutputDirJob = passingData.reduceOutputDirJob
+		
 		if len(AlignmentJobAndOutputLs)>0:	#2012.3.29	merge alignment output only when there is something to merge!
-			mergedBamFile = File(os.path.join(topOutputDirJob.output, '%s_recal.bam'%(bamFnamePrefix)))
-			alignmentMergeJob, bamIndexJob = self.addAlignmentMergeJob(workflow, AlignmentJobAndOutputLs=AlignmentJobAndOutputLs, \
+			#2013.04.09 create a new child alignment local_realigned =1, etc.
+			new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
+										mask_genotype_method_id=self.mask_genotype_method_id,\
+										data_dir=self.data_dir, local_realigned=1)
+			
+			#2013.04.09 replace read_group with the new one to each alignment job
+			NewAlignmentJobAndOutputLs = []
+			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
+				#2012.9.19 add a AddReadGroup job
+				alignmentJob, indexAlignmentJob = AlignmentJobAndOutput.parentJobLs
+				fname_prefix = os.path.splitext(alignmentJob.output.name)[0]
+				outputRGBAM = File("%s.isq_RG.bam"%(fname_prefix))
+				addRGJob = self.addReadGroupInsertionJob(workflow=workflow, individual_alignment=new_individual_alignment, \
+									inputBamFile=alignmentJob.output, \
+									outputBamFile=outputRGBAM,\
+									addOrReplaceReadGroupsJava=self.addOrReplaceReadGroupsJava, \
+									AddOrReplaceReadGroupsJar=self.AddOrReplaceReadGroupsJar,\
+									parentJobLs=[alignmentJob, indexAlignmentJob], extraDependentInputLs=None, \
+									extraArguments=None, job_max_memory = 2500, transferOutput=False)
+				
+				NewAlignmentJobAndOutputLs.append(PassingData(parentJobLs=[addRGJob], file=addRGJob.output))
+			#
+			mergedBamFile = File(os.path.join(reduceOutputDirJob.output, '%s_recal.bam'%(bamFnamePrefix)))
+			alignmentMergeJob, bamIndexJob = self.addAlignmentMergeJob(workflow, AlignmentJobAndOutputLs=NewAlignmentJobAndOutputLs, \
 					outputBamFile=mergedBamFile, \
 					samtools=workflow.samtools, java=workflow.java, \
 					MergeSamFilesJava=workflow.MergeSamFilesJava, MergeSamFilesJar=workflow.MergeSamFilesJar, \
 					BuildBamIndexFilesJava=workflow.IndexMergedBamIndexJava, BuildBamIndexJar=workflow.BuildBamIndexJar, \
-					mv=workflow.mv, parentJobLs=[topOutputDirJob], \
+					mv=workflow.mv, parentJobLs=[reduceOutputDirJob], \
 					transferOutput=False)
 			#2012.9.19 add/copy the alignment file to db-affliated storage
 			#add the metric file to AddAlignmentFile2DB.py as well (to be moved into db-affiliated storage)
-			logFile = File(os.path.join(topOutputDirJob.output, '%s_2db.log'%(bamFnamePrefix)))
+			logFile = File(os.path.join(reduceOutputDirJob.output, '%s_2db.log'%(bamFnamePrefix)))
 			alignment2DBJob = self.addAddAlignmentFile2DBJob(workflow=workflow, executable=self.AddAlignmentFile2DB, \
 								inputFile=alignmentMergeJob.output, otherInputFileList=[],\
-								parent_individual_alignment_id=individual_alignment.id, \
+								individual_alignment_id=new_individual_alignment.id, \
 								mask_genotype_method_id=self.mask_genotype_method_id,\
 								logFile=logFile, data_dir=data_dir, \
 								parentJobLs=[alignmentMergeJob, bamIndexJob], \
@@ -414,7 +476,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', GenomeAnalysisTKJar, "-T BaseRecalibrator",\
 						"-I", inputFile, "-R", refFastaFile,\
 						"-L", interval, self.defaultGATKArguments, \
-						"-knownSites", VCFFile,\
+						"-knownSites:vcf", VCFFile,\
 						"--out", outputFile]
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
@@ -433,10 +495,12 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		return job
 	
 	def addGATKPrintRecalibratedReadsJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, inputFile=None, \
-								recalFile=None, interval=None, outputFile=None, \
+								recalFile=None, interval=None, outputFile=None, extraOutputLs=None, \
 					refFastaFList=[], parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
-					extraArguments=None, job_max_memory=2000, no_of_gatk_threads=1, needBAMIndexJob=False, **keywords):
+					extraArguments=None, job_max_memory=2000, no_of_gatk_threads=1, needBAMIndexJob=False,\
+					walltime=None,**keywords):
 		"""
+		2013.04.09 added extraOutputLs
 		2013.2.14 upgraded to GATK2's "-T PrintReads"
 			java -jar GenomeAnalysisTK.jar -T PrintReads -R reference.fasta -I input.bam -BQSR recalibration_report.grp 
 					-o output.bam
@@ -452,6 +516,10 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 			executable = workflow.PrintRecalibratedReadsJava
 		if GenomeAnalysisTKJar is None:
 			GenomeAnalysisTKJar = workflow.GenomeAnalysisTK2Jar
+		if extraOutputLs is None:
+			extraOutputLs = []
+		if extraDependentInputLs is None:
+			extraDependentInputLs=[]
 		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory)
 		#MaxPermSize= min(35000, max(1024, job_max_memory*7/9))
 		javaMemRequirement = memRequirementData.memRequirementInStr
@@ -466,21 +534,20 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 						"-BQSR", recalFile, "--out", outputFile]
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
-		if extraDependentInputLs is None:
-			extraDependentInputLs=[]
 		extraDependentInputLs.extend([inputFile, recalFile, GenomeAnalysisTKJar] + refFastaFList)
-		
+		extraOutputLs.append(outputFile)
 		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
-						extraOutputLs=[outputFile],\
+						extraOutputLs=extraOutputLs,\
 						transferOutput=transferOutput, \
-						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
+						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, walltime=walltime,\
+						**keywords)
 		if needBAMIndexJob:
 			# add the index job on the bam file
 			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
 						BuildBamIndexJar=self.BuildBamIndexJar, \
 						inputBamF=job.output, parentJobLs=[job], \
-						transferOutput=transferOutput, job_max_memory=job_max_memory)
+						transferOutput=transferOutput, job_max_memory=job_max_memory, walltime=walltime/2)
 		else:
 			bamIndexJob = None
 		return job, bamIndexJob
@@ -490,6 +557,12 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		2013.04.07
 			register the indel vcfs
 		"""
+		pdata = parentClass.setup(self, inputVCFData=inputVCFData, chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
+		
+		##2013.04.09 used in case a corresponding VCFFile for one interval is not available for BQSR
+		biggestChromosome = pdata.chrSizeIDList[0][1]
+		self.randomSNPVCFJobDataForBQSR = pdata.chr2VCFJobData[biggestChromosome]
+		
 		self.indelVCFInputData = self.registerAllInputFiles(inputDir=self.indelVCFFolder, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
 											pegasusFolderName="%sIndelVCF"%self.pegasusFolderName)
@@ -500,10 +573,20 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 				inputF = jobData.file
 				chromosome = self.getChrFromFname(os.path.basename(inputF.name))
 				chr2IndelVCFJobData[chromosome] = jobData
-		pdata = parentClass.setup(inputVCFData=inputVCFData, chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
 		pdata.chr2IndelVCFJobData = chr2IndelVCFJobData
 		self.chr2IndelVCFJobData = chr2IndelVCFJobData
+		
 		return pdata
+	
+	def isThisAlignmentComplete(self, individual_alignment=None, data_dir=None):
+		"""
+		2013.04.09 this is more complicated as it tests the local_realigned version of individual_alignment is complete or not.
+			not individual_alignment itself
+		"""
+		new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
+										mask_genotype_method_id=self.mask_genotype_method_id,\
+										data_dir=self.data_dir, local_realigned=1)
+		return self.db.isThisAlignmentComplete(individual_alignment=new_individual_alignment, data_dir=data_dir)
 	
 	def registerCustomExecutables(self, workflow=None):
 		"""
@@ -516,6 +599,9 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		
 		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
+		
+		#samtools is only used for select alignment, which is very fast, increase the clustering 
+		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=1)
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='BaseRecalibratorJava', clusterSizeMultipler=0.5)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='PrintRecalibratedReadsJava', clusterSizeMultipler=0.5)
