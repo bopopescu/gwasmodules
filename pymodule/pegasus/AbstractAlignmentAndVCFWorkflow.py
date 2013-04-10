@@ -13,9 +13,10 @@ from pymodule import ProcessOptions, getListOutOfStr, PassingData, yh_pegasus, N
 from AbstractAlignmentWorkflow import AbstractAlignmentWorkflow
 from AbstractVCFWorkflow import AbstractVCFWorkflow
 
-class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWorkflow):
+parentClass = AbstractAlignmentWorkflow
+class AbstractAlignmentAndVCFWorkflow(parentClass, AbstractVCFWorkflow):
 	__doc__ = __doc__
-	option_default_dict = copy.deepcopy(AbstractAlignmentWorkflow.option_default_dict)
+	option_default_dict = copy.deepcopy(parentClass.option_default_dict)
 	option_default_dict.update({
 						('inputDir', 0, ): ['', 'L', 1, 'input folder that contains vcf or vcf.gz files', ],\
 						('minDepth', 0, float): [0, 'm', 1, 'minimum depth for a call to regarded as non-missing', ],\
@@ -29,13 +30,13 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		"""
 		2012.1.17
 		"""
-		AbstractAlignmentWorkflow.__init__(self, **keywords)
+		parentClass.__init__(self, **keywords)
 	
 	registerAllInputFiles = AbstractVCFWorkflow.registerAllInputFiles
 	
 	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
-						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFJobData=None, \
-						outputDirPrefix=None, transferOutput=False, skipChromosomeIfVCFMissing=True, **keywords):
+						chrIDSet=None, chrSizeIDList=None, chr2IntervalDataLs=None, chr2VCFJobData=None, \
+						outputDirPrefix=None, transferOutput=False, skipChromosomeIfVCFMissing=False, **keywords):
 		"""
 		2013.04.08, added skipChromosomeIfVCFMissing
 		2013.1.25
@@ -46,15 +47,24 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		mapEachAlignmentData = passingData.mapEachAlignmentData
 		preReduceReturnData = passingData.preReduceReturnData
 		
-		for chromosome in chrIDSet:
+		for chromosomeSize, chromosome in chrSizeIDList:
 			intervalDataLs = chr2IntervalDataLs.get(chromosome)
 			VCFJobData = chr2VCFJobData.get(chromosome)
-			VCFFile = VCFJobData.file
-			if VCFFile is None:
-				sys.stderr.write("WARNING: no VCFFile for chromosome %s. no base-quality recalibration. only local realignment.\n"%\
-									(chromosome))
+			if VCFJobData is None:
+				if self.report:
+					sys.stderr.write("WARNING: no VCFJobData for chromosome %s.\n"%(chromosome))
 				if skipChromosomeIfVCFMissing:
 					continue
+				VCFJobData = PassingData(job=None, jobLs=[],\
+									vcfFile=None, tbi_F=None, file=None, fileLs=[])
+				VCFFile = None
+			else:
+				VCFFile = VCFJobData.file
+				if VCFFile is None:
+					if self.report:
+						sys.stderr.write("WARNING: no VCFFile for chromosome %s.\n"%(chromosome))
+					if skipChromosomeIfVCFMissing:
+						continue
 			passingData.chromosome = chromosome	#2013.04.08
 			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, alignmentData=alignmentData, chromosome=chromosome, \
 								VCFJobData=VCFJobData, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
@@ -111,6 +121,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		2013.04.01 derive chr2VCFJobData only when inputVCFData is available
 		2013.1.25
 		"""
+		pdata = parentClass.setup(self, chr2IntervalDataLs=chr2IntervalDataLs, inputVCFData=inputVCFData, **keywords)
+		
 		#2012.8.26 so that each recalibration will pick up the right vcf
 		chr2VCFJobData = {}
 		if inputVCFData:
@@ -118,14 +130,14 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 				inputF = jobData.file
 				chromosome = self.getChrFromFname(os.path.basename(inputF.name))
 				chr2VCFJobData[chromosome] = jobData
-		chrIDSet = set(chr2VCFJobData.keys())&set(chr2IntervalDataLs.keys())
-		return PassingData(chrIDSet=chrIDSet, chr2VCFJobData=chr2VCFJobData)
+		pdata.chr2VCFJobData = chr2VCFJobData
+		return pdata
 	
 	def registerCustomExecutables(self, workflow=None):
 		
 		"""
 		"""
-		AbstractAlignmentWorkflow.registerCustomExecutables(self, workflow=workflow)
+		parentClass.registerCustomExecutables(self, workflow=workflow)
 		AbstractVCFWorkflow.registerCustomExecutables(self, workflow=workflow)
 		
 		if workflow is None:
@@ -149,7 +161,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		"""
 		pdata = self.setup_run()
 		workflow = pdata.workflow
-				
+		
 		inputData = self.registerAllInputFiles(inputDir=self.inputDir, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
 											pegasusFolderName=self.pegasusFolderName)
@@ -163,7 +175,7 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 				MergeSamFilesJar=workflow.MergeSamFilesJar, \
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
-				mv=workflow.mv, \
+				mv=workflow.mv, skipDoneAlignment=self.skipDoneAlignment, \
 				registerReferenceData=pdata.registerReferenceData,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
 				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
@@ -171,6 +183,8 @@ class AbstractAlignmentAndVCFWorkflow(AbstractAlignmentWorkflow, AbstractVCFWork
 		
 		outf = open(self.outputFname, 'w')
 		workflow.writeXML(outf)
+		
+		self.end_run()
 
 if __name__ == '__main__':
 	main_class = AbstractAlignmentAndVCFWorkflow

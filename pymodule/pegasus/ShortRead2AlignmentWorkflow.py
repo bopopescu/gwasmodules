@@ -46,7 +46,9 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 						('refSequenceFname', 1, ): ["", '', 1, 'path to the reference file', ],\
 						})
 	option_default_dict[('local_realigned', 0, int)][0] = 0	#by default not to apply known-indel-free local re-alignment 
-
+	
+	connectDB = AlignmentReadBaseQualityRecalibrationWorkflow.connectDB
+	
 	def __init__(self,  **keywords):
 		"""
 		2012.3.29
@@ -76,10 +78,6 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		if workflow is None:
 			workflow = self
 		AbstractNGSWorkflow.registerCustomJars(self, workflow=workflow)
-		
-		self.registerOneJar(name="SortSamJar", path=os.path.join(self.picard_path, 'SortSam.jar'))
-		self.registerOneJar(name="SamFormatConverterJar", path=os.path.join(self.picard_path, 'SamFormatConverter.jar'))
-		
 	
 	def registerCustomExecutables(self, workflow=None):
 		"""
@@ -699,6 +697,22 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 					maxMissingAlignmentFraction=None, maxNoOfGaps=None, addBamIndexJob=False,\
 					transferOutput=False, **keywords):
 		"""
+		Examples:
+		
+		#2012.9.19 individual_alignment is passed as None so that ReadGroup addition job is not added in addAlignmentJob()
+		alignmentJob, alignmentOutput = self.addAlignmentJob(workflow=workflow, fileObjectLs=newFileObjLs, \
+							individual_alignment=None, \
+							data_dir=data_dir, refFastaFList=refFastaFList, bwa=bwa, \
+							additionalArguments=additionalArguments, samtools=samtools, \
+							refIndexJob=refIndexJob, parentJobLs=[refIndexJob, mkdirJob], \
+							alignment_method=alignment_method, \
+							outputDir=tmpOutputDir, namespace=namespace, version=version,\
+							PEAlignmentByBWA=PEAlignmentByBWA, ShortSEAlignmentByBWA=ShortSEAlignmentByBWA, \
+							LongSEAlignmentByBWA=LongSEAlignmentByBWA,\
+							java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
+							addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
+							no_of_aln_threads=no_of_aln_threads, stampy=stampy)
+		
 		2013.04.04 new alignment method (bwa-mem) from Heng Li
 		2012.10.18 add argument addBamIndexJob,
 		2012.10.10
@@ -825,51 +839,6 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		else:
 			returnJob = sortAlignmentJob
 		return returnJob, returnJob.output
-	
-	def addReadGroupInsertionJob(self, workflow=None, individual_alignment=None, inputBamFile=None, \
-								outputBamFile=None,\
-								addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
-								parentJobLs=None, extraDependentInputLs=None, \
-								extraArguments=None, job_max_memory = 2500, transferOutput=False, walltime=180,  **keywords):
-		"""
-		2012.9.19 split out of addAlignmentJob()
-		"""
-		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
-		job_max_memory = memRequirementData.memRequirement
-		javaMemRequirement = memRequirementData.memRequirementInStr
-		
-		# add RG to this bam
-		sequencer = individual_alignment.individual_sequence.sequencer
-		read_group = individual_alignment.getReadGroup()	#2012.9.19
-		if sequencer.short_name=='454':
-			platform_id = 'LS454'
-		elif sequencer.short_name=='GA':
-			platform_id = 'ILLUMINA'
-		else:
-			platform_id = 'ILLUMINA'
-		# the add-read-group job
-		
-		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', AddOrReplaceReadGroupsJar,\
-							"INPUT=", inputBamFile,\
-							'RGID=%s'%(read_group), 'RGLB=%s'%(platform_id), 'RGPL=%s'%(platform_id), \
-							'RGPU=%s'%(read_group), 'RGSM=%s'%(read_group),\
-							'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT"]
-					#not including 'SORT_ORDER=coordinate'
-					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
-		if extraArguments:
-			extraArgumentList.append(extraArguments)
-		if extraDependentInputLs is None:
-			extraDependentInputLs=[]
-		extraDependentInputLs.extend([inputBamFile, AddOrReplaceReadGroupsJar])
-		
-		job= self.addGenericJob(executable=addOrReplaceReadGroupsJava, inputFile=None,\
-							outputFile=None, outputArgumentOption="-o", \
-							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
-							extraOutputLs=[outputBamFile],\
-							transferOutput=transferOutput, \
-							extraArgumentList=extraArgumentList, \
-							job_max_memory=memRequirementData.memRequirement, walltime=walltime, **keywords)
-		return job
 	
 	def addSAM2BAMJob(self, inputFile=None, outputFile=None,\
 					executable=None, SamFormatConverterJar=None,\

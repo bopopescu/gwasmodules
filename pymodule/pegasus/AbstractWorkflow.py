@@ -1940,12 +1940,15 @@ class AbstractWorkflow(ADAG):
 			import pdb
 			pdb.set_trace()
 		
+		if self.db:
+			session = self.db.session
+			session.begin()
 		
-		if not self.data_dir:
-			self.data_dir = self.db.data_dir
-		
-		if not self.local_data_dir:
-			self.local_data_dir = self.db.data_dir
+			if not self.data_dir:
+				self.data_dir = self.db.data_dir
+			
+			if not self.local_data_dir:
+				self.local_data_dir = self.db.data_dir
 		
 		workflow = self.initiateWorkflow()
 		
@@ -1957,6 +1960,16 @@ class AbstractWorkflow(ADAG):
 		
 		return PassingData(workflow=workflow)
 	
+	def end_run(self):
+		"""
+		2013.04.09 to be called in the end of run()
+		"""
+		if self.db:
+			session = self.db.session
+			if self.commit:
+				session.commit()
+			else:
+				session.rollback()
 
 if __name__ == '__main__':
 	main_class = AbstractWorkflow

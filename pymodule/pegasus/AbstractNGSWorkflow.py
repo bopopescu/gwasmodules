@@ -16,11 +16,11 @@ from pymodule import ProcessOptions
 from Pegasus.DAX3 import *
 from AbstractWorkflow import AbstractWorkflow
 
-
-class AbstractNGSWorkflow(AbstractWorkflow):
+parentClass = AbstractWorkflow
+class AbstractNGSWorkflow(parentClass):
 	__doc__ = __doc__
-	option_default_dict = AbstractWorkflow.option_default_dict.copy()
-	option_default_dict.update(AbstractWorkflow.db_option_dict)
+	option_default_dict = parentClass.option_default_dict.copy()
+	option_default_dict.update(parentClass.db_option_dict)
 	
 	option_default_dict.update({
 						('ref_ind_seq_id', 1, int): [524, 'a', 1, 'IndividualSequence.id. To pick alignments with this sequence as reference', ],\
@@ -45,6 +45,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						('ref_genome_version', 0, int):[None, '', 1, 'used to fetch chromosome info from GenomeDB'],\
 						('ref_genome_outdated_index', 0, int):[0, '', 1, 'used to fetch chromosome info from GenomeDB. 0 means not outdated.'],\
 						
+						('skipDoneAlignment', 0, int):[0, '', 0, 'skip alignment whose db_entry is complete and affiliated file is valid\n\
+	(for ShortRead2AlignmentWorkflow or AlignmentReadBaseQualityRecalibrationWorkflow)'],\
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
 						
 						("needFastaIndexJob", 0, int): [0, 'A', 0, 'need to add a reference index job by samtools?'],\
@@ -85,8 +87,8 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'bgzipPath', 'gatk2_path',\
 											'vcftoolsPath', 'vcfSubsetPath'])
-		#inserted before AbstractWorkflow.__init__()
-		AbstractWorkflow.__init__(self, **keywords)
+		#inserted before parentClass.__init__()
+		parentClass.__init__(self, **keywords)
 		#from pymodule import ProcessOptions
 		#self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 		#												class_to_have_attr=self)
@@ -102,7 +104,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		"""
 		2013.2.15
 		"""
-		AbstractWorkflow.extra__init__(self)
+		parentClass.extra__init__(self)
 		
 		if hasattr(self, 'contigMaxRankBySize') and hasattr(self, 'contigMinRankBySize'):
 			#2013.2.6 non-public schema dbs should be connected before the main vervetdb or other db (schema=public) is connected.
@@ -149,7 +151,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		2011-11-22
 			register jars to be used in the worflow
 		"""
-		AbstractWorkflow.registerJars(self)
+		parentClass.registerJars(self)
 		
 		#add the MergeSamFiles.jar file into workflow
 		self.registerOneJar(name="MergeSamFilesJar", path=os.path.join(self.picard_path, 'MergeSamFiles.jar'))
@@ -167,13 +169,15 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		#have to be a different folder, otherwise name clash with the old gatk jar file
 		self.registerOneJar(name="GenomeAnalysisTK2Jar", path=os.path.join(self.gatk2_path, 'GenomeAnalysisTK.jar'),\
 						folderName='gatk2Jar')
-	
+		self.registerOneJar(name="SortSamJar", path=os.path.join(self.picard_path, 'SortSam.jar'))
+		self.registerOneJar(name="SamFormatConverterJar", path=os.path.join(self.picard_path, 'SamFormatConverter.jar'))
+		
 	def registerCustomJars(self, workflow=None, ):
 		"""
 		2012.1.9
 		"""
-		pass
-	
+		parentClass.registerCustomJars(self, workflow=workflow)
+
 	def registerCommonExecutables(self, workflow=None):
 		"""
 		2012.7.30
@@ -189,7 +193,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		2012.8.7 remove noDefaultClustersSizeExecutableList, use executableClusterSizeMultiplierList instead
 		2012.1.9 a symlink to registerCommonExecutables()
 		"""
-		AbstractWorkflow.registerExecutables(self)
+		parentClass.registerExecutables(self)
 		
 		namespace = self.namespace
 		version = self.version
@@ -211,23 +215,6 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 										os=operatingSystem, arch=architecture, installed=True)
 		selectAndSplitFasta.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "SelectAndSplitFastaRecords.py"), site_handler))
 		executableClusterSizeMultiplierList.append((selectAndSplitFasta, 0))
-		
-		samtools = Executable(namespace=namespace, name="samtools", version=version, os=operatingSystem, arch=architecture, installed=True)
-		samtools.addPFN(PFN("file://" + self.samtools_path, site_handler))
-		executableClusterSizeMultiplierList.append((samtools, 0))
-		
-		
-		addOrReplaceReadGroupsJava = Executable(namespace=namespace, name="addOrReplaceReadGroupsJava", version=version, os=operatingSystem,\
-											arch=architecture, installed=True)
-		addOrReplaceReadGroupsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((addOrReplaceReadGroupsJava, 0))
-		
-		genotyperJava = Executable(namespace=namespace, name="genotyperJava", version=version, os=operatingSystem,\
-											arch=architecture, installed=True)
-		genotyperJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((genotyperJava, 0))
-		#clustering is controlled by a separate parameter
-		#genotyperJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
 		
 		BuildBamIndexFilesJava = Executable(namespace=namespace, name="BuildBamIndexFilesJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
@@ -390,14 +377,20 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		MergeSamFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
 		executableClusterSizeMultiplierList.append((MergeSamFilesJava, 0))
 		
-		SortSamFilesJava = Executable(namespace=namespace, name="SortSamFilesJava", version=version, os=operatingSystem,\
-											arch=architecture, installed=True)
-		SortSamFilesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((SortSamFilesJava, 1))
-		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='GATKJava', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.samtools_path, name='samtools', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='genotyperJava', clusterSizeMultipler=0.2)
+		
+		#clustering is controlled by a separate parameter
+		#genotyperJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='SortSamFilesJava', clusterSizeMultipler=1)
+		#2013.04.09 
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='addOrReplaceReadGroupsJava', clusterSizeMultipler=0.5)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='AddOrReplaceReadGroupsJava', clusterSizeMultipler=0.5)
+		
 	
 	bwaIndexFileSuffixLs = ['amb', 'ann', 'bwt', 'pac', 'sa']
 	#, 'nhr', 'nin', 'nsq' are formatdb (blast) output, 2012.10.18 i think
@@ -418,7 +411,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					inputBamF=None,\
 					extraArguments=None, parentJobLs=None, extraDependentInputLs=None, \
 					transferOutput=True, job_max_memory=None, javaMaxMemory=2500,\
-					**keywords):
+					walltime=60, **keywords):
 		"""
 		2012.10.18 use addGenericJob() instead
 		2012.4.12
@@ -453,7 +446,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 							extraOutputLs=[baiFile],\
 							transferOutput=transferOutput, \
 							extraArgumentList=extraArgumentList, \
-							job_max_memory=memRequirementData.memRequirement, **keywords)
+							job_max_memory=memRequirementData.memRequirement, walltime=walltime, **keywords)
 		job.bamFile = inputBamF
 		job.baiFile = baiFile
 		#job.parentJobLs is where the actual alignment job and its bam/sam output are.
@@ -464,7 +457,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 		2012.1.9
 			abstract function
 		"""
-		AbstractWorkflow.registerCustomExecutables(self, workflow=workflow)
+		parentClass.registerCustomExecutables(self, workflow=workflow)
 	
 	
 	def addRefFastaFaiIndexJob(self, workflow=None, samtools=None, refFastaF=None, \
@@ -781,7 +774,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 			extraDependentInputLs = []
 		
 		if indelVCFFile:
-			extraArgumentList.extend(["-known", indelVCFFile])
+			extraArgumentList.extend(["-known:vcf", indelVCFFile])
 			if indelVCFFile not in extraDependentInputLs:
 				extraDependentInputLs.append(indelVCFFile)
 		job = self.addGATKJob(executable=self.RealignerTargetCreatorJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
@@ -1000,8 +993,9 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 					SortSamFilesJava=None, SortSamJar=None,\
 					parentJobLs=None, extraDependentInputLs=None, \
 					extraArguments=None, job_max_memory = 2500, transferOutput=False, \
-					walltime=180, **keywords):
+					walltime=180, needBAMIndexJob=True, **keywords):
 		"""
+		2013.04.09 added argument needBAMIndexJob
 		2013.04.05 moved from ShortRead2AlignmentWorkflow
 		2012.9.19
 		"""
@@ -1028,6 +1022,72 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 							extraArgumentList=extraArgumentList, \
 							job_max_memory=memRequirementData.memRequirement, \
 							walltime=walltime, **keywords)
+		if needBAMIndexJob:
+			# add the index job on the bam file
+			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
+						BuildBamIndexJar=self.BuildBamIndexJar, \
+						inputBamF=job.output, parentJobLs=[job], \
+						transferOutput=transferOutput, job_max_memory=2500, walltime=max(50, walltime/2))
+		else:
+			bamIndexJob = None
+		job.bamIndexJob = bamIndexJob
+		return job
+	
+	def addReadGroupInsertionJob(self, workflow=None, individual_alignment=None, inputBamFile=None, \
+								outputBamFile=None,\
+								addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
+								parentJobLs=None, extraDependentInputLs=None, \
+								extraArguments=None, job_max_memory = 2500, transferOutput=False, walltime=180,  \
+								needBAMIndexJob=True, **keywords):
+		"""
+		2013.04.09 moved from ShortRead2AlignmentWorkflow.py
+			added argument needBAMIndexJob and the bamIndexJob
+		2012.9.19 split out of addAlignmentJob()
+		"""
+		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		job_max_memory = memRequirementData.memRequirement
+		javaMemRequirement = memRequirementData.memRequirementInStr
+		
+		# add RG to this bam
+		sequencer = individual_alignment.individual_sequence.sequencer
+		read_group = individual_alignment.getReadGroup()	#2012.9.19
+		if sequencer.short_name=='454':
+			platform_id = 'LS454'
+		elif sequencer.short_name=='GA':
+			platform_id = 'ILLUMINA'
+		else:
+			platform_id = 'ILLUMINA'
+		# the add-read-group job
+		
+		extraArgumentList = [memRequirementData.memRequirementInStr, '-jar', AddOrReplaceReadGroupsJar,\
+							"INPUT=", inputBamFile,\
+							'RGID=%s'%(read_group), 'RGLB=%s'%(platform_id), 'RGPL=%s'%(platform_id), \
+							'RGPU=%s'%(read_group), 'RGSM=%s'%(read_group),\
+							'OUTPUT=', outputBamFile, "VALIDATION_STRINGENCY=LENIENT"]
+					#not including 'SORT_ORDER=coordinate'
+					#(adding the SORT_ORDER doesn't do sorting but it marks the header as sorted so that BuildBamIndexJar won't fail.)
+		if extraArguments:
+			extraArgumentList.append(extraArguments)
+		if extraDependentInputLs is None:
+			extraDependentInputLs=[]
+		extraDependentInputLs.extend([inputBamFile, AddOrReplaceReadGroupsJar])
+		
+		job= self.addGenericJob(executable=addOrReplaceReadGroupsJava, inputFile=None,\
+							outputFile=None, outputArgumentOption="-o", \
+							parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							extraOutputLs=[outputBamFile],\
+							transferOutput=transferOutput, \
+							extraArgumentList=extraArgumentList, \
+							job_max_memory=memRequirementData.memRequirement, walltime=walltime, **keywords)
+		if needBAMIndexJob:
+			# add the index job on the bam file
+			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
+						BuildBamIndexJar=self.BuildBamIndexJar, \
+						inputBamF=job.output, parentJobLs=[job], \
+						transferOutput=transferOutput, job_max_memory=job_max_memory)
+		else:
+			bamIndexJob = None
+		job.bamIndexJob = bamIndexJob	#2013.04.09
 		return job
 	
 	def addSelectAlignmentJob(self, executable=None, inputFile=None, \
@@ -1058,6 +1118,7 @@ class AbstractNGSWorkflow(AbstractWorkflow):
 						transferOutput=transferOutput, job_max_memory=job_max_memory)
 		else:
 			bamIndexJob = None
+		job.bamIndexJob = bamIndexJob	#2013.04.09
 		return job, bamIndexJob
 	
 	def getVCFFileID2path(self, inputDir):
@@ -1786,6 +1847,7 @@ Contig966       3160    50
 	
 	def getChr2IntervalDataLsBySplitChrSize(self, chr2size=None, intervalSize=None, intervalOverlapSize=None):
 		"""
+		2013.04.09 added interval-span, chromosomeSize in returning data, 
 		2012.7.30
 		"""
 		sys.stderr.write("Splitting %s references into intervals of %s bp (overlap=%s) ... "%(len(chr2size), intervalSize,\
@@ -1811,11 +1873,14 @@ Contig966       3160    50
 				overlapIntervalFnameSignature = '%s_%s_%s'%(chr, startPos, stopPos)
 				if chr not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chr] = []
+				span = stopPos-startPos+1
 				intervalData = PassingData(overlapInterval=overlapInterval, overlapIntervalFnameSignature=overlapIntervalFnameSignature,\
 							interval=interval, intervalFnameSignature=intervalFnameSignature, \
 							file=None,\
-							chr=chr, start=originalStartPos,\
-							stop=originalStopPos, overlapStart=startPos, overlapStop=stopPos, jobLs=[])
+							chr=chr, chromosomeSize=refSize,\
+							start=originalStartPos, stop=originalStopPos, \
+							overlapStart=startPos, overlapStop=stopPos, span=span, \
+							jobLs=[])
 				chr2IntervalDataLs[chr].append(intervalData)
 				counter += 1
 		sys.stderr.write("%s intervals.\n"%(counter))
@@ -2083,7 +2148,13 @@ Contig966       3160    50
 						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory)
 		
 		return job
-
+	
+	def isThisAlignmentComplete(self, individual_alignment=None, data_dir=None):
+		"""
+		2013.04.09 for subsequent children to override
+		"""
+		return self.db.isThisAlignmentComplete(individual_alignment=individual_alignment, data_dir=data_dir)
+	
 if __name__ == '__main__':
 	main_class = AbstractNGSWorkflow
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)

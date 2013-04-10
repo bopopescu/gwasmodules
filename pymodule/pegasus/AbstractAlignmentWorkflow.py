@@ -25,7 +25,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						('ind_seq_id_ls', 0, ): ['', 'i', 1, 'a comma/dash-separated list of IndividualSequence.id. alignments come from these', ],\
 						('ind_aln_id_ls', 0, ): ['', '', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
 						("alignment_method_id", 0, int): [None, 'G', 1, 'To filter alignments. None: whatever; integer: AlignmentMethod.id'],\
-						("local_realigned", 0, int): [1, '', 1, 'To filter which input alignments to fetch from db (i.e. AlignmentReadBaseQualityRecalibrationWorkflow.py)\
+						("local_realigned", 0, int): [None, '', 1, 'To filter which input alignments to fetch from db (i.e. AlignmentReadBaseQualityRecalibrationWorkflow.py)\
 	OR to instruct whether local_realigned should be applied (i.e. ShortRead2AlignmentWorkflow.py)'],\
 						('defaultSampleAlignmentDepth', 1, int): [10, '', 1, "when database doesn't have median_depth info for one alignment, use this number instead.", ],\
 						('individual_sequence_file_raw_id_type', 1, int): [1, '', 1, "1: only all-library-fused libraries,\n\
@@ -299,7 +299,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		return returnData
 	
 	def mapReduceOneAlignment(self, workflow=None, alignmentData=None, passingData=None, \
-						chrIDSet=None, chr2IntervalDataLs=None, chr2VCFJobData=None, \
+						chrIDSet=None, chrSizeIDList=None, chr2IntervalDataLs=None, chr2VCFJobData=None, \
 						outputDirPrefix=None, transferOutput=False, **keywords):
 		"""
 		2013.1.25
@@ -308,18 +308,22 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def setup(self, chr2IntervalDataLs=None, **keywords):
 		"""
+		2013.04.09 added chrSizeIDList in return
 		2013.1.25
 			chr2VCFJobData is None.
 		"""
 		chrIDSet = set(chr2IntervalDataLs.keys())
-		return PassingData(chrIDSet=chrIDSet, chr2VCFJobData=None)
+		chrSizeIDList = [(chromosomeSize, chromosome) for chromosome, chromosomeSize in self.chr2size.iteritems()]
+		chrSizeIDList.sort()
+		chrSizeIDList.reverse()	#from big to small
+		return PassingData(chrIDSet=chrIDSet, chr2VCFJobData=None, chrSizeIDList=chrSizeIDList)
 	
 	def addAllJobs(self, workflow=None, alignmentDataLs=None, chr2IntervalDataLs=None, samtools=None, \
 				GenomeAnalysisTKJar=None, \
 				MergeSamFilesJar=None, \
 				CreateSequenceDictionaryJava=None, CreateSequenceDictionaryJar=None, \
 				BuildBamIndexFilesJava=None, BuildBamIndexJar=None,\
-				mv=None, \
+				mv=None, skipDoneAlignment=False,\
 				registerReferenceData=None, \
 				needFastaIndexJob=False, needFastaDictJob=False, \
 				data_dir=None, no_of_gatk_threads = 1, \
@@ -329,6 +333,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		"""
 		prePreprocessData = self.setup(chr2IntervalDataLs=chr2IntervalDataLs, **keywords)
 		chrIDSet = prePreprocessData.chrIDSet
+		chrSizeIDList = prePreprocessData.chrSizeIDList
 		chr2VCFJobData = prePreprocessData.chr2VCFJobData
 		
 		sys.stderr.write("Adding jobs that work on %s alignments (& possibly VCFs) for %s chromosomes/contigs ..."%\
@@ -392,6 +397,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 					
 					chromosome=None,\
 					chrIDSet=chrIDSet,\
+					chrSizeIDList = chrSizeIDList,\
 					chr2IntervalDataLs=chr2IntervalDataLs,\
 					
 					mapEachAlignmentData = None,\
@@ -430,6 +436,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			passingData.individual_alignment = alignment
 			passingData.alignmentData = alignmentData
 			
+			if skipDoneAlignment and self.isThisAlignmentComplete(individual_alignment=alignment, data_dir=data_dir):
+				continue
 			mapEachAlignmentData = self.mapEachAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
 								transferOutput=False, \
 								preReduceReturnData=preReduceReturnData, **keywords)
@@ -444,7 +452,8 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			
 			
 			self.mapReduceOneAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
-							chrIDSet=chrIDSet, chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFJobData=chr2VCFJobData, \
+							chrIDSet=chrIDSet, chrSizeIDList=chrSizeIDList, \
+							chr2IntervalDataLs=chr2IntervalDataLs, chr2VCFJobData=chr2VCFJobData, \
 							outputDirPrefix=outputDirPrefix, transferOutput=transferOutput)
 			
 			reduceAfterEachAlignmentData = self.reduceAfterEachAlignment(workflow=workflow, \
@@ -583,7 +592,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, \
 				CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
-				mv=workflow.mv, \
+				mv=workflow.mv, skipDoneAlignment=self.skipDoneAlignment,\
 				registerReferenceData=pdata.registerReferenceData,\
 				needFastaIndexJob=self.needFastaIndexJob, needFastaDictJob=self.needFastaDictJob, \
 				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
@@ -591,6 +600,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		outf = open(self.outputFname, 'w')
 		workflow.writeXML(outf)
+		self.end_run()
 
 if __name__ == '__main__':
 	main_class = AbstractAlignmentWorkflow
