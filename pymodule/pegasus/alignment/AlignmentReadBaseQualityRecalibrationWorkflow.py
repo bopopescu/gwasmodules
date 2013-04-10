@@ -242,7 +242,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		#base is 4X, => 5000M
 		indelRealignmentJobMaxMemory = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=median_depth, \
 							baseInputVolume=4, baseJobPropertyValue=5000, \
-							minJobPropertyValue=4000, maxJobPropertyValue=9000).value
+							minJobPropertyValue=4000, maxJobPropertyValue=10000).value
 		realignerTargetIntervalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.forIndelRealigner.intervals'%\
 													(bamFnamePrefix, overlapFilenameSignature)))
 		realignerTargetIntervalJob = self.addGATKRealignerTargetCreatorJob(executable=self.RealignerTargetCreatorJava, \
