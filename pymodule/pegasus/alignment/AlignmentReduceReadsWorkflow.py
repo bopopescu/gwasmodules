@@ -220,7 +220,8 @@ class AlignmentReduceReadsWorkflow(parentClass):
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=1)
 		
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='ReduceReadsJava', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='ReduceReadsJava', \
+															clusterSizeMultipler=1)
 
 
 if __name__ == '__main__':
