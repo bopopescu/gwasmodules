@@ -135,6 +135,8 @@ class AlignmentReduceReadsWorkflow(parentClass):
 											(bamFnamePrefix, overlapFilenameSignature)))
 		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. check if this is True 
 		reduceReadsBaiFile = File('%s.bai'%(os.path.splitext(reduceReadsBamFile.name)[0]))
+		#Default downsampling setting is 40 in GATK 2.4.9
+		extraArgumentList= ["--downsample_to_coverage 60", "--downsampling_type BY_SAMPLE"]
 		reduceReadsJob = self.addGATKJob(executable=self.IndelRealignerJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
 					GATKAnalysisType='ReduceReads',\
 					inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
@@ -143,7 +145,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 					parentJobLs=alignmentData.jobLs, transferOutput=False, \
 					job_max_memory=reduceReadsJobMaxMemory,\
 					frontArgumentList=None, extraArguments=None, \
-					extraArgumentList=None, \
+					extraArgumentList=extraArgumentList, \
 					extraOutputLs=[reduceReadsBaiFile], \
 					extraDependentInputLs=[baiF], no_of_cpus=None, \
 					walltime=reduceReadsJobWalltime)
