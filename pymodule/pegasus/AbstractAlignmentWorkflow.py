@@ -24,6 +24,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	commonAlignmentWorkflowOptionDict = {
 						('ind_seq_id_ls', 0, ): ['', 'i', 1, 'a comma/dash-separated list of IndividualSequence.id. alignments come from these', ],\
 						('ind_aln_id_ls', 0, ): ['', '', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
+						('alignment_outdated_index', 0, int): [0, '', 1, 'filter based on value of IndividualAlignment.outdated_index.', ],\
 						("alignment_method_id", 0, int): [None, 'G', 1, 'To filter alignments. None: whatever; integer: AlignmentMethod.id'],\
 						("local_realigned", 0, int): [None, '', 1, 'To filter which input alignments to fetch from db (i.e. AlignmentReadBaseQualityRecalibrationWorkflow.py)\
 	OR to instruct whether local_realigned should be applied (i.e. ShortRead2AlignmentWorkflow.py)'],\
@@ -315,7 +316,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		
 		for chromosomeSize, chromosome in chrSizeIDList:
 			intervalDataLs = chr2IntervalDataLs.get(chromosome)
-			VCFJobData = chr2VCFJobData.get(chromosome)
+			if chr2VCFJobData:
+				VCFJobData = chr2VCFJobData.get(chromosome)
+			else:
+				VCFJobData = None
 			if VCFJobData is None:
 				if self.report:
 					sys.stderr.write("WARNING: no VCFJobData for chromosome %s.\n"%(chromosome))
