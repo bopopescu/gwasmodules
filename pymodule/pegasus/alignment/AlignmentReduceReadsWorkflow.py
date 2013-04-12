@@ -1,51 +1,29 @@
 #!/usr/bin/env python
 """
 Examples:
-	# 2012.9.21 run base quality recalibration on VRC alignments (-S 447), individual_sequence_id from 639-642 (--ind_seq_id_ls ...)
-	# filtered sequences (-Q 1), alignment method 2 (-G 2)
-	# --contigMaxRankBySize 1000 (top 1000 contigs)
-	#  --intervalSize 10000000 (10 million bp for each interval) --intervalOverlapSize 30000 (30kb overlap between intervals),
-	%s --inputDir ~/NetworkData/vervet/db/genotype_file/method_17/ --ind_seq_id_ls 639-642
-		-S 447 -u yh -z localhost --sequence_filtered 1 --alignment_method_id 2
-		-a 524 -o dags/BaseQualityRecalibration/BaseQualityRecalibration_VRC447_vsMethod17.xml
-		-l hcondor -j hcondor -z localhost -u yh --contigMaxRankBySize 1000 
-		--intervalSize 10000000 --intervalOverlapSize 30000
-		--indelVCFFolder ...
-		-e /u/home/eeskin/polyacti
-		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
-		--needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 17
-		 --commit --skipDoneAlignment
-
-	# 2012.9.18
-	%s  --inputDir ~/NetworkData/vervet/db/genotype_file/method_41 --ind_seq_id_ls 633,634,635,636,637,638 
-		--ref_ind_seq_id 524
-		-o dags/BaseQualityRecalibration/BaseQualityRecalibration_ISQ633_638_vsMethod41.xml -l hcondor
-		-j hcondor -z localhost -u yh --intervalSize 10000000 --intervalOverlapSize 30000
-		-e /u/home/eeskin/polyacti
-		--indelVCFFolder ...
-		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
-		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 41
-		 --commit --skipDoneAlignment
+	#2013.04.12 test on one outdated alignment (--local_realigned 0 --alignment_outdated_index 1)
+	%s --ind_aln_id_ls 552 --ref_ind_seq_id 524  --ref_genome_outdated_index 1 -o dags/ReduceReads/ReduceReadsAln552.xml
+		-l condorpool -j condorpool -z uclaOffice -u yh --intervalSize 20000000
+		--intervalOverlapSize 0 --contigMaxRankBySize 1000  --clusters_size 5
+		-J ~/bin/jdk/bin/java --commit --skipDoneAlignment --local_realigned 0 --alignment_outdated_index 1
 	
-	# 2013.3.19 use sequence coverage to filter alignments
-	%s  --inputDir ~/NetworkData/vervet/db/genotype_file/method_41
-		--sequence_min_coverage 0 --sequence_max_coverage 2  --ind_seq_id_ls 632-3230
-		--ref_ind_seq_id 3280 -o dags/BaseQualityRecalibration/BaseQualityRecalibration_ISQ632_3230_coverage0_2_vsMethod41.xml
-		-l hcondor -j hcondor -z localhost -u yh --intervalSize 10000000 --intervalOverlapSize 30000
+	# 2013.04.12 use sequence coverage to filter alignments
+	%s 	--sequence_min_coverage 0 --sequence_max_coverage 2  --ind_seq_id_ls 632-3230  --ind_aln_id_ls 32
+		--ref_ind_seq_id 3280 -o dags/ReduceReads/ReduceReads_ISQ632_3230_coverage0_2.xml
+		-l hcondor -j hcondor -z localhost -u yh --intervalSize 20000000 --intervalOverlapSize 0
 		-e /u/home/eeskin/polyacti --contigMaxRankBySize 250
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
-		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 41
-		--indelVCFFolder ~/NetworkData/vervet/db/genotype_file/method_88 --commit --skipDoneAlignment
+		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java
+		--commit --skipDoneAlignment
 		# --ref_genome_version 2 #(optional, as by default, it gets the outdated_index=0 reference chromosomes from GenomeDB)
 		# --ref_genome_outdated_index 1 #to get old reference. incompatible here as alignment is based on 3280, new ref.
-		# --needFastaDictJob --needFastaIndexJob
 	
 Description:
 	#2013.04.11 workflow that carries out ReduceReads for all alignments in map-reduce fashion.
 		preferably on local_realigned=1 alignments. It is set to 1 by default.
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
+__doc__ = __doc__%(sys.argv[0], sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
@@ -66,6 +44,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 	option_default_dict.update({
 							})
 	option_default_dict[('intervalSize', 1, int)][0] = 20000000
+	option_default_dict[('intervalOverlapSize', 1, int)][0] = 0
 	option_default_dict[('local_realigned', 0, int)][0] = 1
 	
 	def __init__(self,  **keywords):
@@ -124,7 +103,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 		readSpace = median_depth * span
 		#base is 4X coverage in 20Mb region => 120 minutes
 		reduceReadsJobWalltime = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=readSpace, \
-							baseInputVolume=4*20000000, baseJobPropertyValue=120, \
+							baseInputVolume=4*20000000, baseJobPropertyValue=60, \
 							minJobPropertyValue=60, maxJobPropertyValue=500).value
 		#base is 4X, => 5000M
 		reduceReadsJobMaxMemory = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=median_depth, \
@@ -133,11 +112,9 @@ class AlignmentReduceReadsWorkflow(parentClass):
 							
 		reduceReadsBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.reduceReads.bam'%\
 											(bamFnamePrefix, overlapFilenameSignature)))
-		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. check if this is True 
-		reduceReadsBaiFile = File('%s.bai'%(os.path.splitext(reduceReadsBamFile.name)[0]))
 		#Default downsampling setting is 40 in GATK 2.4.9
 		extraArgumentList= ["--downsample_to_coverage 60", "--downsampling_type BY_SAMPLE"]
-		reduceReadsJob = self.addGATKJob(executable=self.IndelRealignerJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
+		reduceReadsJob = self.addGATKJob(executable=self.ReduceReadsJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
 					GATKAnalysisType='ReduceReads',\
 					inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
 					argumentForEachFileInInputFileList=None,\
@@ -146,7 +123,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 					job_max_memory=reduceReadsJobMaxMemory,\
 					frontArgumentList=None, extraArguments=None, \
 					extraArgumentList=extraArgumentList, \
-					extraOutputLs=[reduceReadsBaiFile], \
+					extraOutputLs=[], \
 					extraDependentInputLs=[baiF], no_of_cpus=None, \
 					walltime=reduceReadsJobWalltime)
 		indexBamJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
@@ -175,7 +152,6 @@ class AlignmentReduceReadsWorkflow(parentClass):
 		if len(AlignmentJobAndOutputLs)>0:	#2012.3.29	merge alignment output only when there is something to merge!
 			#2013.04.09 create a new child alignment local_realigned =1, etc.
 			new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
-										mask_genotype_method_id=self.mask_genotype_method_id,\
 										data_dir=self.data_dir, local_realigned=individual_alignment.local_realigned,\
 										reduce_reads=1)
 			
@@ -210,7 +186,6 @@ class AlignmentReduceReadsWorkflow(parentClass):
 			alignment2DBJob = self.addAddAlignmentFile2DBJob(workflow=workflow, executable=self.AddAlignmentFile2DB, \
 								inputFile=alignmentMergeJob.output, otherInputFileList=[],\
 								individual_alignment_id=new_individual_alignment.id, \
-								mask_genotype_method_id=self.mask_genotype_method_id,\
 								logFile=logFile, data_dir=data_dir, \
 								parentJobLs=[alignmentMergeJob, bamIndexJob], \
 								extraDependentInputLs=[bamIndexJob.output], \
@@ -228,8 +203,8 @@ class AlignmentReduceReadsWorkflow(parentClass):
 			not individual_alignment itself
 		"""
 		new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
-										mask_genotype_method_id=self.mask_genotype_method_id,\
-										data_dir=self.data_dir, local_realigned=1)
+										data_dir=self.data_dir, local_realigned=individual_alignment.local_realigned,\
+										reduce_reads=1)
 		return self.db.isThisAlignmentComplete(individual_alignment=new_individual_alignment, data_dir=data_dir)
 	
 	def registerCustomExecutables(self, workflow=None):
@@ -245,7 +220,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=1)
 		
-		#self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='IndelRealignerJava', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='ReduceReadsJava', clusterSizeMultipler=0.2)
 
 
 if __name__ == '__main__':
