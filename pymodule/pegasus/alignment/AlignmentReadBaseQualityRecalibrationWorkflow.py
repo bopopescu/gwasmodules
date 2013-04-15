@@ -603,10 +603,10 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		#samtools is only used for select alignment, which is very fast, increase the clustering 
 		self.setOrChangeExecutableClusterSize(executable=workflow.samtools, clusterSizeMultipler=1)
 		
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='BaseRecalibratorJava', clusterSizeMultipler=0.5)
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='PrintRecalibratedReadsJava', clusterSizeMultipler=0.5)
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='RealignerTargetCreatorJava', clusterSizeMultipler=0.7)
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='IndelRealignerJava', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='BaseRecalibratorJava', clusterSizeMultipler=1)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='PrintRecalibratedReadsJava', clusterSizeMultipler=1)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='RealignerTargetCreatorJava', clusterSizeMultipler=1)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='IndelRealignerJava', clusterSizeMultipler=1)
 
 
 if __name__ == '__main__':
