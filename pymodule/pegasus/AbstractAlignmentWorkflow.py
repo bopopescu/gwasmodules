@@ -680,8 +680,6 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				data_dir=self.data_dir, no_of_gatk_threads = 1, transferOutput=True,\
 				outputDirPrefix=self.pegasusFolderName)
 		
-		outf = open(self.outputFname, 'w')
-		workflow.writeXML(outf)
 		self.end_run()
 
 if __name__ == '__main__':

@@ -109,7 +109,9 @@ class AbstractWorkflow(ADAG):
 		
 		#2012.9.25 global counter
 		self.no_of_jobs = 0
-	
+		#2013.04.16 flag to check if dag has been outputted or not
+		self.isDAGWrittenToDisk = False
+		
 		self.extra__init__()	#this has to be ahead of connectDB() as this connects to GenomeDB 
 		self.connectDB()
 	
@@ -121,6 +123,8 @@ class AbstractWorkflow(ADAG):
 	
 	def writeXML(self, out):
 		"""
+		2013.04.16
+			check self.isDAGWrittenToDisk first
 		2013.04.09
 			call ADAG.writeXML() and then add my commandline comment
 		2012.8.29
@@ -128,10 +132,14 @@ class AbstractWorkflow(ADAG):
 			overwrite its parent. ADAG.writeXML()
 			Write the ADAG as XML to a stream
 		"""
-		sys.stderr.write("Writing XML job to %s ..."%(out))
-		ADAG.writeXML(self, out)
-		out.write('<!-- commandline: %s -->\n'%(self.commandline.replace("--", "~~")))	#2012.9.4 -- is not allowed in xml comment.
-		sys.stderr.write(".\n")
+		if self.isDAGWrittenToDisk:
+			sys.stderr.write("Warning: the dag has been written to a file already (writeXML() has been called). No more calling.\n")
+		else:
+			sys.stderr.write("Writing XML job to %s ..."%(out))
+			ADAG.writeXML(self, out)
+			out.write('<!-- commandline: %s -->\n'%(self.commandline.replace("--", "~~")))	#2012.9.4 -- is not allowed in xml comment.
+			sys.stderr.write(".\n")
+			self.isDAGWrittenToDisk = True
 		"""
 		import datetime, pwd, os, sys
 		
@@ -1964,6 +1972,15 @@ class AbstractWorkflow(ADAG):
 		"""
 		2013.04.09 to be called in the end of run()
 		"""
+		# 2013.4.16 
+		# Write the DAX to stdout
+		if self.isDAGWrittenToDisk:
+			sys.stderr.write("Warning: the dag has been written to a file already (writeXML() has been called). No more calling.\n")
+		else:
+			outf = open(self.outputFname, 'w')
+			self.writeXML(outf)
+			self.isDAGWrittenToDisk = True
+		
 		if self.db:
 			session = self.db.session
 			if self.commit:
