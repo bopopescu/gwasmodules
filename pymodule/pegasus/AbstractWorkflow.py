@@ -39,6 +39,7 @@ class AbstractWorkflow(ADAG):
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
 						("javaPath", 1, ): ["/usr/bin/java", 'J', 1, 'path to java interpreter binary'],\
 						("plinkPath", 1, ): ["%s/bin/plink", '', 1, 'path to the plink binary, http://pngu.mgh.harvard.edu/~purcell/plink/index.shtml'],\
+						("pegasusCleanupPath", 1, ): ["%s/bin/pegasus/bin/pegasus-cleanup", '', 1, 'path to pegasus-cleanup script, it will be registered and run on local universe of condor pool (rather than the vanilla universe)'],\
 						("site_handler", 1, ): ["condorpool", 'l', 1, 'which site to run the jobs: condorpool, hoffman2'],\
 						("input_site_handler", 1, ): ["local", 'j', 1, 'which site has all the input files: local, condorpool, hoffman2. \
 							If site_handler is condorpool, this must be condorpool and files will be symlinked. \
@@ -57,7 +58,7 @@ class AbstractWorkflow(ADAG):
 						}
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
 	
-	pathToInsertHomePathList = ['javaPath', 'pymodulePath', 'vervetSrcPath', 'plinkPath', 'variationSrcPath']
+	pathToInsertHomePathList = ['javaPath', 'pymodulePath', 'vervetSrcPath', 'plinkPath', 'variationSrcPath', 'pegasusCleanupPath']
 
 	def __init__(self,  **keywords):
 		"""
@@ -102,7 +103,7 @@ class AbstractWorkflow(ADAG):
 		# the remote PEGASUS_HOME to build the path.
 		self.architecture = "x86_64"
 		self.operatingSystem = "linux"
-		self.namespace = "workflow"
+		self.namespace = "pegasus"
 		self.version="1.0"
 		
 		self.commandline = ' '.join(sys.argv)
@@ -226,19 +227,29 @@ class AbstractWorkflow(ADAG):
 		sys.stderr.write(".\n")
 		"""
 		
-	def constructOneExecutableObject(self, path=None, name=None, checkPathExecutable=True):
+	def constructOneExecutableObject(self, path=None, name=None, checkPathExecutable=True, version=None, namespace=None,\
+									noVersion=False):
 		"""
+		2013.04.19 added argument noVersion, version, namespace
 		2013.04.07 check if path is executable file
 		2013.2.7
 		"""
-		namespace = self.namespace
-		version = self.version
+		if not namespace:
+			namespace = self.namespace
+		if not version:
+			version = self.version
 		operatingSystem = self.operatingSystem
 		architecture = self.architecture
 		site_handler = self.site_handler
 		
-		executable = Executable(namespace=namespace, name=name, version=version, \
+		if noVersion:
+			#2013.04.19 removed argument version from Executable()
+			executable = Executable(namespace=namespace, name=name,\
 						os=operatingSystem, arch=architecture, installed=True)
+		else:
+			executable = Executable(namespace=namespace, name=name, version=version,\
+						os=operatingSystem, arch=architecture, installed=True)
+		# 
 		if checkPathExecutable:
 			if path.find('file://')==0:
 				fs_path = path[6:]
@@ -576,6 +587,15 @@ class AbstractWorkflow(ADAG):
 										name='PlotGenomeWideData', clusterSizeMultipler=1)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/pipeCommandOutput2File.sh'), \
 										name='pipeCommandOutput2File', clusterSizeMultipler=1)
+		
+		#2013.04.19 to make pegasus cleanup run on local universe of condor pool
+		cleanupExecutable = self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.pegasusCleanupPath, name='cleanup', \
+																clusterSizeMultipler=0, noVersion=True)
+		condorUniverseProfile = Profile(Namespace.CONDOR, key="universe", value="local")
+		if cleanupExecutable.hasProfile(condorUniverseProfile):	#2012.8.26 check this first
+			cleanupExecutable.removeProfile(condorUniverseProfile)
+		cleanupExecutable.addProfile(condorUniverseProfile)
+		
 	
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
 		"""
@@ -628,14 +648,15 @@ class AbstractWorkflow(ADAG):
 		return executable
 		
 	
-	def addOneExecutableFromPathAndAssignProperClusterSize(self, path=None, name=None, clusterSizeMultipler=1):
+	def addOneExecutableFromPathAndAssignProperClusterSize(self, path=None, name=None, clusterSizeMultipler=1, noVersion=False):
 		"""
+		2013.04.19 added argument noVersion
 		2013.2.7
 			combination of constructOneExecutableObject() & addOneExecutableAndAssignProperClusterSize()
 		"""
 		if clusterSizeMultipler is None:
 			clusterSizeMultipler = 1
-		executable = self.constructOneExecutableObject(path=path, name=name)
+		executable = self.constructOneExecutableObject(path=path, name=name, noVersion=noVersion)
 		self.addOneExecutableAndAssignProperClusterSize(executable=executable, clusterSizeMultipler=clusterSizeMultipler)
 		return executable
 	
