@@ -329,7 +329,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 								VCFFile=SNPVCFFile, interval=overlapInterval, outputFile=recalFile, \
 								refFastaFList=passingData.refFastaFList, parentJobLs=[topOutputDirJob] + countCovariatesParentJobLs + SNPVCFJobLs, 
 								extraDependentInputLs=[SNPVCFFile.tbi_F] + countCovariatesJobExtraDependentInputLs, \
-								transferOutput=True, \
+								transferOutput=False, \
 								extraArguments=None, job_max_memory=max(4000, indelRealignmentJobMaxMemory/2), \
 								walltime=indelRealignmentJobWalltime/2)
 		if span>self.intervalSize and self.candidateCountCovariatesJob is None:	#big chromosomes are first encountered so this should happen in 1st call()
@@ -395,6 +395,20 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 										mask_genotype_method_id=self.mask_genotype_method_id,\
 										data_dir=self.data_dir, local_realigned=1)
 			
+			baseCoverage = 4	#baseline
+			actualCoverage = getattr(individual_alignment.individual_sequence, 'coverage', baseCoverage)
+			minMergeAlignmentWalltime = 240	#in minutes, 4 hours, when coverage is defaultCoverage
+			maxMergeAlignmentWalltime = 2880	#in minutes, 2 days
+			minMergeAlignmentMaxMemory = 5000	#in MB, when coverage is defaultCoverage
+			maxMergeAlignmentMaxMemory = 12000	#in MB
+			
+			mergeAlignmentWalltime = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=actualCoverage, \
+									baseInputVolume=baseCoverage, baseJobPropertyValue=minMergeAlignmentWalltime*2, \
+									minJobPropertyValue=minMergeAlignmentWalltime, maxJobPropertyValue=maxMergeAlignmentWalltime).value
+			mergeAlignmentMaxMemory = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=actualCoverage, \
+									baseInputVolume=baseCoverage, baseJobPropertyValue=minMergeAlignmentMaxMemory, \
+									minJobPropertyValue=minMergeAlignmentMaxMemory, maxJobPropertyValue=maxMergeAlignmentMaxMemory).value
+			
 			#2013.04.09 replace read_group with the new one to each alignment job
 			NewAlignmentJobAndOutputLs = []
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
@@ -408,18 +422,21 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 									addOrReplaceReadGroupsJava=self.addOrReplaceReadGroupsJava, \
 									AddOrReplaceReadGroupsJar=self.AddOrReplaceReadGroupsJar,\
 									parentJobLs=[alignmentJob, indexAlignmentJob], extraDependentInputLs=None, \
-									extraArguments=None, job_max_memory = 2500, transferOutput=False)
+									extraArguments=None, job_max_memory = 2500, transferOutput=False,\
+									walltime=max(180, mergeAlignmentWalltime/20))
 				
 				NewAlignmentJobAndOutputLs.append(PassingData(parentJobLs=[addRGJob], file=addRGJob.output))
 			#
+			
+			
 			mergedBamFile = File(os.path.join(reduceOutputDirJob.output, '%s_recal.bam'%(bamFnamePrefix)))
 			alignmentMergeJob, bamIndexJob = self.addAlignmentMergeJob(workflow, AlignmentJobAndOutputLs=NewAlignmentJobAndOutputLs, \
 					outputBamFile=mergedBamFile, \
 					samtools=workflow.samtools, java=workflow.java, \
 					MergeSamFilesJava=workflow.MergeSamFilesJava, MergeSamFilesJar=workflow.MergeSamFilesJar, \
 					BuildBamIndexFilesJava=workflow.IndexMergedBamIndexJava, BuildBamIndexJar=workflow.BuildBamIndexJar, \
-					mv=workflow.mv, parentJobLs=[reduceOutputDirJob], \
-					transferOutput=False)
+					mv=workflow.mv, parentJobLs=[reduceOutputDirJob], walltime=mergeAlignmentWalltime,\
+					job_max_memory=mergeAlignmentMaxMemory, transferOutput=False)
 			#2012.9.19 add/copy the alignment file to db-affliated storage
 			#add the metric file to AddAlignmentFile2DB.py as well (to be moved into db-affiliated storage)
 			logFile = File(os.path.join(reduceOutputDirJob.output, '%s_2db.log'%(bamFnamePrefix)))
@@ -431,7 +448,8 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 								parentJobLs=[alignmentMergeJob, bamIndexJob], \
 								extraDependentInputLs=[bamIndexJob.output], \
 								extraArguments=None, transferOutput=transferOutput, \
-								job_max_memory=2000, sshDBTunnel=self.needSSHDBTunnel, commit=True)
+								job_max_memory=2000, sshDBTunnel=self.needSSHDBTunnel, commit=True,\
+								walltime=max(180, mergeAlignmentWalltime/2))
 			self.no_of_jobs += 1
 			returnData.jobDataLs.append(PassingData(jobLs=[alignment2DBJob], file=alignment2DBJob.logFile, \
 											fileLs=[alignment2DBJob.logFile]))
