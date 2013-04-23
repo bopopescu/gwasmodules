@@ -6,6 +6,9 @@ if test $# -lt 1
 	echo "Usage:"
 	echo " $0 WORKFLOW1_FOLDER [WORKFLOW2_FOLDER] ...."
 	echo
+	echo "Note:"
+	echo "	#. WORKFLOW1_FOLDER could also be a file that contains workflow folder names (one on each line)"
+	echo
 	echo "This program shows last 10 lines of pegasus-status for each workflow every $noOfWaitingSecondsDefault seconds."
 	echo
 	exit
@@ -21,8 +24,19 @@ while [ "1" = "1" ]; do
 	echo -n "==============  current date is  "
 	date
 	for i in $workflowFolders; do
-		echo $i
-		pegasus-status $i|tail -n 10
-		sleep $noOfWaitingSeconds
+		if test -r $i; then
+			#it is a file that contains workflow folder names
+			fileWithWorkflowFolderNames=$i
+			for workdir in `cat $fileWithWorkflowFolderNames`; do
+				echo $workdir
+				pegasus-status $workdir|tail -n 10
+				sleep $noOfWaitingSeconds
+			done
+		else
+			workdir=$i
+			echo $workdir
+			pegasus-status $workdir|tail -n 10
+			sleep $noOfWaitingSeconds
+		fi
 	done
 done
