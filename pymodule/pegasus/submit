@@ -86,7 +86,7 @@ if test $# -lt 2 ; then
 	echo "  $0 dagFile computingSiteName [keepIntermediateFiles] [cleanupClustersSize] [scratchType] [submitOption] [storageSiteName] [finalOutputDir] [submitFolderName]"
 	echo ""
 	echo "Note:"
-	echo "	#. computingSiteName is the site on which the computing jobs run. could be local, condorpool, hcondor, hoffman2, uschpc. Setup in the dagFile should match this."
+	echo "	#. computingSiteName is the site on which the computing jobs run. could be local, ycondor, hcondor, hoffman2, uschpc. Setup in the dagFile should match this."
 	echo ""
 	echo "	#. keepIntermediateFiles (setting it to 1 means no cleanup, otherwise or default is cleanup.). It changes the default submit option ($submitOptionDefault) to --submit --nocleanup."
 	echo "	#. cleanupClustersSize controls how many jobs get clustered into one on each level. Default is $cleanupClustersSizeDefault ."
@@ -107,14 +107,14 @@ if test $# -lt 2 ; then
 	echo ""
 	echo "Examples:"
 	echo "	#plan & submit and do not keep intermediate files, cleanup clustering=30"
-	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool"
-	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml condorpool 0 30"
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml ycondor"
+	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml ycondor 0 30"
 	echo
 	echo "	#plan & submit, keep intermediate files, cleanupClustersSize=10 doesn't matter, run on scratch type 2 ($UCLA_CLUSTER_SCRATCH_Type2) on hcondor"
 	echo "	$0 dags/TrioInconsistency15DistantVRC.xml hcondor 1 10 2"
 	echo
 	echo "	#only planning, no running (keepIntermediateFiles & cleanupClustersSize & scratchType do not matter) by assigning empty spaces to submitOption"
-	echo "	$0 dags/TrioInconsistency15DistantVRC.xml condorpool 0 20 1 \"  \" "
+	echo "	$0 dags/TrioInconsistency15DistantVRC.xml ycondor 0 20 1 \"  \" "
 	echo
 	echo "	#run the workflow while keeping intermediate files. good for testing in which you often need to modify .dag.rescue log to backtrack finished jobs"
 	echo "	$0 dags/TrioInconsistency/TrioInconsistency15DistantVRC.xml hcondor 1 20 1 \"--submit\" local TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 TrioInconsistency/TrioInconsistency15DistantVRC_20110929T1726 "
@@ -222,7 +222,7 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="PATH" >$HOME_DIR/bin:$PATH</profile>
 		<profile namespace="env" key="PYTHONPATH">$PYTHONPATH:$PEGASUS_PYTHON_LIB_DIR</profile>
 	</site>
-	<site  handle="condorpool" arch="x86_64" os="LINUX">
+	<site  handle="ycondor" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="unknown" jobtype="compute"/>
 		<head-fs>
