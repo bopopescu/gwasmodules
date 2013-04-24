@@ -32,7 +32,7 @@ stagein.clusters=10
 
 #2011.11.29 -B sz	Resizes the data section size for stdio capture, default is 262144.
 #pegasus.gridstart.arguments -B 400000
-pegasus.gridstart.arguments=-B 4000000
+pegasus.gridstart.arguments=-B 10000
 
 #2012.4.9 monitord could blow out the memory on large worklfows. run it later with '--replay' to re-create the jobstate.log file, or re-populate the stats database from scratch.
 #pegasus.monitord.event=false
