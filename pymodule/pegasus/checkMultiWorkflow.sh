@@ -24,7 +24,13 @@ while [ "1" = "1" ]; do
 	echo -n "==============  current date is  "
 	date
 	for i in $workflowFolders; do
-		if test -r $i; then
+		if test -d $i; then
+			# it is a folder
+			workdir=$i
+			echo $workdir
+			pegasus-status $workdir|tail -n 10
+			sleep $noOfWaitingSeconds
+		elif test -r $i; then
 			#it is a file that contains workflow folder names
 			fileWithWorkflowFolderNames=$i
 			for workdir in `cat $fileWithWorkflowFolderNames`; do
@@ -32,11 +38,6 @@ while [ "1" = "1" ]; do
 				pegasus-status $workdir|tail -n 10
 				sleep $noOfWaitingSeconds
 			done
-		else
-			workdir=$i
-			echo $workdir
-			pegasus-status $workdir|tail -n 10
-			sleep $noOfWaitingSeconds
 		fi
 	done
 done
