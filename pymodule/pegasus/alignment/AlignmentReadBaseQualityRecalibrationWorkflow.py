@@ -330,7 +330,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 								refFastaFList=passingData.refFastaFList, parentJobLs=[topOutputDirJob] + countCovariatesParentJobLs + SNPVCFJobLs, 
 								extraDependentInputLs=[SNPVCFFile.tbi_F] + countCovariatesJobExtraDependentInputLs, \
 								transferOutput=False, \
-								extraArguments=None, job_max_memory=max(4000, indelRealignmentJobMaxMemory/2), \
+								extraArguments=None, job_max_memory=max(2500, indelRealignmentJobMaxMemory/4), \
 								walltime=indelRealignmentJobWalltime/2)
 		if span>self.intervalSize and self.candidateCountCovariatesJob is None:	#big chromosomes are first encountered so this should happen in 1st call()
 			self.candidateCountCovariatesJob = countCovariatesJob
@@ -342,16 +342,16 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		recalBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.bam'%(bamFnamePrefix, overlapFilenameSignature)))
 		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. 
 		recalBaiFile = File('%s.bai'%(os.path.splitext(recalBamFile.name)[0]))
-		selectAlignmentParentJob, selectAlignmentParentBamIndexJob = self.addGATKPrintRecalibratedReadsJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
+		printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob = self.addGATKPrintRecalibratedReadsJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
 							inputFile=bamF, \
 							recalFile=countCovariatesJob.recalFile, interval=overlapInterval, outputFile=recalBamFile, \
 							refFastaFList=passingData.refFastaFList, parentJobLs=[countCovariatesJob,], \
 							extraDependentInputLs=[baiF], transferOutput=False, \
-							extraArguments=None, job_max_memory=max(4000, indelRealignmentJobMaxMemory/3), \
+							extraArguments=None, job_max_memory=max(3000, indelRealignmentJobMaxMemory/3), \
 							needBAMIndexJob=True, walltime=indelRealignmentJobWalltime/2)
-		selectAlignmentParentJobLs = [selectAlignmentParentJob, selectAlignmentParentBamIndexJob]
-		selectAlignmentParentJobOutput = selectAlignmentParentJob.output
-		selectAlignmentJobExtraDependentInputLs = [selectAlignmentParentBamIndexJob.outputLs[1:]]
+		selectAlignmentParentJobLs = [printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob]
+		selectAlignmentParentJobOutput = printRecalibratedReadsJob.output
+		selectAlignmentJobExtraDependentInputLs = [printRecalibratedReadsBamIndexJob.outputLs[1:]]
 		"""
 		else:
 			sys.stderr.write("Warning from mapEachInterval(): no SNP VCF for BQSR for chromosome %s. skip BQSR.\n"%(chromosome))
@@ -399,7 +399,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 			actualCoverage = getattr(individual_alignment.individual_sequence, 'coverage', baseCoverage)
 			minMergeAlignmentWalltime = 240	#in minutes, 4 hours, when coverage is defaultCoverage
 			maxMergeAlignmentWalltime = 2880	#in minutes, 2 days
-			minMergeAlignmentMaxMemory = 5000	#in MB, when coverage is defaultCoverage
+			minMergeAlignmentMaxMemory = 7000	#in MB, when coverage is defaultCoverage
 			maxMergeAlignmentMaxMemory = 12000	#in MB
 			
 			mergeAlignmentWalltime = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=actualCoverage, \
