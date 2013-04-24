@@ -9,6 +9,10 @@ submitOptionDefault="--submit"
 scratchTypeDefault="1"
 cleanupClustersSizeDefault=15
 
+#2013.04.24
+runningWorkflowLogFnameDefault=runningWorkflows.txt
+failedWorkflowLogFnameDefault=failedWorkflows.txt
+
 # figure out where Pegasus is installed
 export PEGASUS_HOME=`which pegasus-plan | sed 's/\/bin\/*pegasus-plan//'`
 if [ "x$PEGASUS_HOME" = "x" ]; then
@@ -46,10 +50,6 @@ UCLA_CLUSTER_SCRATCH_Type2="/u/scratch/p/polyacti/pegasus"
 UCLA_CLUSTER_SCRATCH_Type3="/u/scratch/p/polyacti/pegasus"
 # 2013.3.6 on 2013.3.4, hoffman2 upgraded to the new /u/scratch2 system. this will phase out eventually
 #UCLA_CLUSTER_SCRATCH_Type1_old="/u/scratch/p/polyacti/pegasus"
-
-#UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
-#if you choose hcondor as storage site, final output is staged out to local scratch!! make sure it's in shared storage.
-UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 
 UCLA_CLUSTER_PEGASUS_CONFIG_PATH=$UCLA_CLUSTER_PEGASUS_HOME/bin/pegasus-config
 if test -f $UCLA_CLUSTER_PEGASUS_CONFIG_PATH; then
@@ -181,10 +181,18 @@ then
 	submitFolderName=$finalOutputDir
 fi
 
+#UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyacti/pegasus"
+#if you choose hcondor as storage site, final output is staged out to local scratch!! make sure it's in shared storage.
+UCLA_CLUSTER_LOCAL_SCRATCH=$UCLA_CLUSTER_SCRATCH
 
+runningWorkflowLogFname=$runningWorkflowLogFnameDefault
+failedWorkflowLogFname=$failedWorkflowLogFnameDefault
 
 echo "Submitting to $computingSiteName for computing."
+echo "runningWorkflowLogFname is $runningWorkflowLogFname."
+echo "failedWorkflowLogFname is $failedWorkflowLogFname."
 echo "UCLA_CLUSTER_SCRATCH is $UCLA_CLUSTER_SCRATCH."
+echo "UCLA_CLUSTER_LOCAL_SCRATCH is $UCLA_CLUSTER_LOCAL_SCRATCH."
 echo "storageSiteName is $storageSiteName."
 echo "Final workflow submit option is $submitOption."
 
@@ -202,15 +210,27 @@ cat >sites.xml <<EOF
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
 		<head-fs>
 			<scratch>
+				<local>
+					<!-- this is used by condor local universe executables (i.e. pegasus-cleanup/transfer if you setup that way) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+					<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
+				</local>
 				<shared>
-				<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
-				<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+					<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
 				</shared>
 			</scratch>
 			<storage>
+				<!-- this is where the final output will be staged (when the storageSiteName is "local", default) -->
+				<local>
+					<!-- this is used when pegasus-cleanup/transfer are set in condor local universe) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+					<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+				</local>
 				<shared>
-				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
-				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+					<!-- this is used when pegasus-cleanup/transfer are set in condor vanilla universe) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+					<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
 				</shared>
 			</storage>
 		</head-fs>
@@ -227,16 +247,30 @@ cat >sites.xml <<EOF
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="unknown" jobtype="compute"/>
 		<head-fs>
 			<scratch>
-			<shared>
-				<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
-				<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
-			</shared>
+				<!-- this is where the computing output will be at for ycondor site -->
+				<local>
+					<!-- this is used by condor local universe executables (i.e. pegasus-cleanup/transfer if you setup that way) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+					<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
+				</local>
+				<shared>
+					<!-- this is used by condor vanilla universe executables (most executables should be) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+					<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
+				</shared>
 			</scratch>
 			<storage>
-			<shared>
-				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
-				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
-			</shared>
+				<!-- this is where the final output will be staged when the storageSiteName is "ycondor", otherwise never used. -->
+				<local>
+					<!-- this is used when pegasus-cleanup/transfer are set in condor local universe) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+					<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+				</local>
+				<shared>
+					<!-- this is used when pegasus-cleanup/transfer are set in condor vanilla universe) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+					<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+				</shared>
 			</storage>
 		</head-fs>
 		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
@@ -253,24 +287,30 @@ cat >sites.xml <<EOF
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="unknown" jobtype="compute"/>
 		<head-fs>
 			<scratch>
-			<local>
-				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
-				<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
-			</local>
-			<shared>
-				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_SCRATCH"/>
-				<internal-mount-point mount-point="$UCLA_CLUSTER_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
-			</shared>
+				<!-- this is where the computing output will be at for hcondor site -->
+				<local>
+					<!-- this is used by condor local universe executables (some cleanup/stage-in/out jobs if you setup that way) -->
+					<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
+					<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+				</local>
+				<shared>
+					<!-- this is used by condor vanilla universe executables (most executables should be) -->
+					<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_SCRATCH"/>
+					<internal-mount-point mount-point="$UCLA_CLUSTER_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+				</shared>
 			</scratch>
 			<storage>
-			<local>
-				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
-				<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
-			</local>
-			<shared>
-				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
-				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR" free-size="$freeSpace" total-size="$freeSpace"/>
-			</shared>
+				<!-- this is where the final output will be staged when the storageSiteName is "hcondor", otherwise never used. -->
+				<local>
+					<!-- this is used when pegasus-cleanup/transfer are set in condor local universe) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+					<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+				</local>
+				<shared>
+					<!-- this is used when pegasus-cleanup/transfer are set in condor vanilla universe) -->
+					<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+					<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
+				</shared>
 			</storage>
 		</head-fs>
 		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
@@ -300,16 +340,16 @@ cat >sites.xml <<EOF
 		<grid  type="gt5" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-$UCLA_CLUSTER_SCHEDULER" scheduler="unknown" jobtype="compute"/>
 		<head-fs>
 			<scratch>
-			<shared>
-				<file-server protocol="gsiftp" url="gsiftp://$UCLA_CLUSTER_HOSTNAME/" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
-				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR" />
-			</shared>
+				<shared>
+					<file-server protocol="gsiftp" url="gsiftp://$UCLA_CLUSTER_HOSTNAME/" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+					<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR" />
+				</shared>
 			</scratch>
 			<storage>
-			<shared>
-				<file-server protocol="gsiftp" url="gsiftp://$UCLA_CLUSTER_HOSTNAME" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
-				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR"/>
-			</shared>
+				<shared>
+					<file-server protocol="gsiftp" url="gsiftp://$UCLA_CLUSTER_HOSTNAME" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+					<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+				</shared>
 			</storage>
 		</head-fs>
 		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
@@ -334,10 +374,10 @@ cat >sites.xml <<EOF
 		<grid  type="gt2" contact="$USC_CLUSTER_HOSTNAME/jobmanager-$USC_CLUSTER_SCHEDULER" scheduler="unknown" jobtype="compute"/>
 		<head-fs>
 			<scratch>
-			<shared>
-				<file-server protocol="gsiftp" url="gsiftp://$USC_CLUSTER_HOSTNAME/" mount-point="$USC_CLUSTER_HOME/pg_work"/>
-				<internal-mount-point mount-point="$USC_CLUSTER_HOME/pg_work" />
-			</shared>
+				<shared>
+					<file-server protocol="gsiftp" url="gsiftp://$USC_CLUSTER_HOSTNAME/" mount-point="$USC_CLUSTER_HOME/pg_work"/>
+					<internal-mount-point mount-point="$USC_CLUSTER_HOME/pg_work" />
+				</shared>
 			</scratch>
 			<storage />
 		</head-fs>
@@ -365,6 +405,14 @@ commandLine="pegasus-plan -Dpegasus.file.cleanup.clusters.size=$cleanupClustersS
 echo commandLine is $commandLine
 
 $commandLine
+
+exitCode=$?
+#2013.04.24
+if test $exitCode = "0"; then
+	echo work/$submitFolderName >> $runningWorkflowLogFname
+else
+	echo work/$submitFolderName >>$failedWorkflowLogFname
+fi
 
 # add the option below for debugging
 #	-vvvvv \
