@@ -4,6 +4,7 @@
 """
 import math
 from numpy import array, arange, sin, cos, pi, sqrt, sqrt, nonzero, equal, asarray, dot, concatenate
+import numpy
 #2012.7.9 replace matplotlib.numerix with numpy. the former is gone.
 from matplotlib.artist import Artist, setp, kwdoc
 from matplotlib.cbook import dedent
@@ -235,9 +236,9 @@ class ExonIntronCollection20081130(PolyCollection, LineCollection):
 		self.set_linestyle(linestyle)
 		self._uniform_offsets = None
 		if offsets is not None:
-			offsets = npy.asarray(offsets)
+			offsets = asarray(offsets)
 			if len(offsets.shape) == 1:
-				offsets = offsets[npy.newaxis,:]  # Make it Nx2.
+				offsets = offsets[numpy.newaxis,:]  # Make it Nx2.
 		if transOffset is None:
 			if offsets is not None:
 				self._uniform_offsets = offsets
