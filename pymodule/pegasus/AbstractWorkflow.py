@@ -39,7 +39,8 @@ class AbstractWorkflow(ADAG):
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
 						("javaPath", 1, ): ["/usr/bin/java", 'J', 1, 'path to java interpreter binary'],\
 						("plinkPath", 1, ): ["%s/bin/plink", '', 1, 'path to the plink binary, http://pngu.mgh.harvard.edu/~purcell/plink/index.shtml'],\
-						("pegasusCleanupPath", 1, ): ["%s/bin/pegasus/bin/pegasus-cleanup", '', 1, 'path to pegasus-cleanup script, it will be registered and run on local universe of condor pool (rather than the vanilla universe)'],\
+						("pegasusCleanupPath", 1, ): ["%s/bin/pegasus/bin/pegasus-cleanup", '', 1, 'path to pegasus-cleanup executable, it will be registered and run on local universe of condor pool (rather than the vanilla universe)'],\
+						("pegasusTransferPath", 1, ): ["%s/bin/pegasus/bin/pegasus-transfer", '', 1, 'path to pegasus-transfer executable, it will be registered and run on local universe of condor pool (rather than the vanilla universe)'],\
 						("site_handler", 1, ): ["condorpool", 'l', 1, 'which site to run the jobs: condorpool, hoffman2'],\
 						("input_site_handler", 1, ): ["local", 'j', 1, 'which site has all the input files: local, condorpool, hoffman2. \
 							If site_handler is condorpool, this must be condorpool and files will be symlinked. \
@@ -58,7 +59,8 @@ class AbstractWorkflow(ADAG):
 						}
 						#('bamListFname', 1, ): ['/tmp/bamFileList.txt', 'L', 1, 'The file contains path to each bam file, one file per line.'],\
 	
-	pathToInsertHomePathList = ['javaPath', 'pymodulePath', 'vervetSrcPath', 'plinkPath', 'variationSrcPath', 'pegasusCleanupPath']
+	pathToInsertHomePathList = ['javaPath', 'pymodulePath', 'vervetSrcPath', 'plinkPath', 'variationSrcPath', 'pegasusCleanupPath',\
+							'pegasusTransferPath']
 
 	def __init__(self,  **keywords):
 		"""
@@ -588,13 +590,26 @@ class AbstractWorkflow(ADAG):
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/pipeCommandOutput2File.sh'), \
 										name='pipeCommandOutput2File', clusterSizeMultipler=1)
 		
-		#2013.04.19 to make pegasus cleanup run on local universe of condor pool
-		cleanupExecutable = self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.pegasusCleanupPath, name='cleanup', \
-																clusterSizeMultipler=0, noVersion=True)
-		condorUniverseProfile = Profile(Namespace.CONDOR, key="universe", value="local")
-		if cleanupExecutable.hasProfile(condorUniverseProfile):	#2012.8.26 check this first
-			cleanupExecutable.removeProfile(condorUniverseProfile)
-		cleanupExecutable.addProfile(condorUniverseProfile)
+		if self.site_handler=='hcondor' and self.input_site_handler=='hcondor':
+			#2013.04.19 to make pegasus cleanup run on local universe of condor pool
+			# only enable this on hcondor because
+			#	1) its filesystem is very slow and these cleanup & transfer jobs take forever.
+			#	2) workers in vanilla universe expire after certain time.
+			#	3) it does not run on ycondor local universe somehow. pegasus keeps submitting but no condor jobs in the queue.
+			# this works because in most of my cases, vanilla universe and local universe share the same underlying filesystem.
+			cleanupExecutable = self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.pegasusCleanupPath, name='cleanup', \
+																	clusterSizeMultipler=0, noVersion=True)
+			condorUniverseProfile = Profile(Namespace.CONDOR, key="universe", value="local")
+			if cleanupExecutable.hasProfile(condorUniverseProfile):
+				cleanupExecutable.removeProfile(condorUniverseProfile)
+			cleanupExecutable.addProfile(condorUniverseProfile)
+			
+			transferExecutable = self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.pegasusTransferPath, name='transfer', \
+																	clusterSizeMultipler=0, noVersion=True)
+			condorUniverseProfile = Profile(Namespace.CONDOR, key="universe", value="local")
+			if transferExecutable.hasProfile(condorUniverseProfile):
+				transferExecutable.removeProfile(condorUniverseProfile)
+			transferExecutable.addProfile(condorUniverseProfile)
 		
 	
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
@@ -1418,9 +1433,10 @@ class AbstractWorkflow(ADAG):
 						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory, **keywords)
 		return job
 	
-	def getJVMMemRequirment(self, job_max_memory=5000, minMemory=2000, permSizeFraction=0.4,
+	def getJVMMemRequirment(self, job_max_memory=5000, minMemory=2000, permSizeFraction=0.2,
 						MaxPermSizeUpperBound=35000):
 		"""
+		2013.05.01 lower permSizeFraction from 0.4 to 0.2
 		2013.04.01
 			now job_max_memory = MaxPermSize + mxMemory, unless either is below minMemory
 			added argument permSizeFraction, MaxPermSizeUpperBound
