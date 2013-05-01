@@ -162,6 +162,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 							mapEachChromosomeData=None, transferOutput=False, \
 							**keywords):
 		"""
+		2013.04.30 no more overlap intervals. use straight non-overlap interval (mpileupInterval)
 		2013.03.31 use VCFJobData to decide whether to add BQSR jobs, called in ShortRead2AlignmentWorkflow.py
 		2012.9.17
 		"""
@@ -244,17 +245,17 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 							baseInputVolume=4, baseJobPropertyValue=5000, \
 							minJobPropertyValue=4000, maxJobPropertyValue=10000).value
 		realignerTargetIntervalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.forIndelRealigner.intervals'%\
-													(bamFnamePrefix, overlapFilenameSignature)))
+													(bamFnamePrefix, intervalFnameSignature)))
 		realignerTargetIntervalJob = self.addGATKRealignerTargetCreatorJob(executable=self.RealignerTargetCreatorJava, \
 															GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
 						refFastaFList=passingData.refFastaFList, inputFile=bamF, inputArgumentOption="-I", indelVCFFile=indelVCFFile, \
-						outputFile=realignerTargetIntervalFile, interval=overlapInterval, \
+						outputFile=realignerTargetIntervalFile, interval=mpileupInterval, \
 				parentJobLs=[topOutputDirJob]+alignmentData.jobLs+indelVCFFileJobLs, transferOutput=False, \
 				job_max_memory=max(4000, indelRealignmentJobMaxMemory/2),walltime=indelRealignmentJobWalltime/2,\
 				extraArguments=None, extraArgumentList=None, extraDependentInputLs=[baiF]+indelVCFFileLs)
 		
 		realignedBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.bam'%\
-											(bamFnamePrefix, overlapFilenameSignature)))
+											(bamFnamePrefix, intervalFnameSignature)))
 		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. 
 		realignedBaiFile = File('%s.bai'%(os.path.splitext(realignedBamFile.name)[0]))
 		extraArgumentList=['-targetIntervals',realignerTargetIntervalJob.output,\
@@ -267,7 +268,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 					GATKAnalysisType='IndelRealigner',\
 					inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
 					argumentForEachFileInInputFileList=None,\
-					interval=overlapInterval, outputFile=realignedBamFile, \
+					interval=mpileupInterval, outputFile=realignedBamFile, \
 					parentJobLs=[realignerTargetIntervalJob]+alignmentData.jobLs+indelVCFFileJobLs, transferOutput=False, \
 					job_max_memory=indelRealignmentJobMaxMemory,\
 					frontArgumentList=None, extraArguments=None, \
@@ -295,7 +296,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		"""
 		
 		sortBamF = File(os.path.join(topOutputDirJob.output, '%s_%s.indelRealigned.sorted.bam'%\
-											(bamFnamePrefix, overlapFilenameSignature)))
+											(bamFnamePrefix, intervalFnameSignature)))
 		sortAlignmentJob = self.addSortAlignmentJob(workflow=workflow, inputBamFile=indelRealignmentJob.output, \
 					outputBamFile=sortBamF,\
 					SortSamFilesJava=self.SortSamFilesJava, SortSamJar=self.SortSamJar,\
@@ -323,10 +324,10 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		if span<1000000 and self.candidateCountCovariatesJob:	#2013.04.09 use the candidate job (interval big enough)
 			countCovariatesJob = self.candidateCountCovariatesJob
 		else:
-			recalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.grp'%(bamFnamePrefix, overlapFilenameSignature)))
+			recalFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.grp'%(bamFnamePrefix, intervalFnameSignature)))
 			countCovariatesJob = self.addGATKBaseRecalibratorJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
 								inputFile=countCovariatesJobInput, \
-								VCFFile=SNPVCFFile, interval=overlapInterval, outputFile=recalFile, \
+								VCFFile=SNPVCFFile, interval=mpileupInterval, outputFile=recalFile, \
 								refFastaFList=passingData.refFastaFList, parentJobLs=[topOutputDirJob] + countCovariatesParentJobLs + SNPVCFJobLs, 
 								extraDependentInputLs=[SNPVCFFile.tbi_F] + countCovariatesJobExtraDependentInputLs, \
 								transferOutput=False, \
@@ -339,20 +340,20 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		countCovariatesJob = mapEachChromosomeData.countCovariatesJob
 		"""
 		
-		recalBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.bam'%(bamFnamePrefix, overlapFilenameSignature)))
+		recalBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.recal_data.bam'%(bamFnamePrefix, intervalFnameSignature)))
 		#2013.04.09 GATK generates this file. it is not .bam.bai but just .bai. 
 		recalBaiFile = File('%s.bai'%(os.path.splitext(recalBamFile.name)[0]))
 		printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob = self.addGATKPrintRecalibratedReadsJob(GenomeAnalysisTKJar=workflow.GenomeAnalysisTK2Jar, \
 							inputFile=bamF, \
-							recalFile=countCovariatesJob.recalFile, interval=overlapInterval, outputFile=recalBamFile, \
+							recalFile=countCovariatesJob.recalFile, interval=mpileupInterval, outputFile=recalBamFile, \
 							refFastaFList=passingData.refFastaFList, parentJobLs=[countCovariatesJob,], \
-							extraDependentInputLs=[baiF], transferOutput=False, \
-							extraArguments=None, job_max_memory=max(3000, indelRealignmentJobMaxMemory/3), \
+							extraDependentInputLs=[baiF], extraOutputLs=[recalBaiFile], transferOutput=False, \
+							extraArguments=None, job_max_memory=max(3000, indelRealignmentJobMaxMemory/2), \
 							needBAMIndexJob=True, walltime=indelRealignmentJobWalltime/2)
+		"""
 		selectAlignmentParentJobLs = [printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob]
 		selectAlignmentParentJobOutput = printRecalibratedReadsJob.output
-		selectAlignmentJobExtraDependentInputLs = [printRecalibratedReadsBamIndexJob.outputLs[1:]]
-		"""
+		selectAlignmentJobExtraDependentInputLs = printRecalibratedReadsBamIndexJob.outputLs[1:] + printRecalibratedReadsBamIndexJob.outputLs
 		else:
 			sys.stderr.write("Warning from mapEachInterval(): no SNP VCF for BQSR for chromosome %s. skip BQSR.\n"%(chromosome))
 			if countCovariatesParentJobLs:
@@ -363,17 +364,18 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 				selectAlignmentParentJobLs = parentJobLs
 				selectAlignmentParentJobOutput = bamF
 				selectAlignmentJobExtraDependentInputLs = [baiF]
-		"""
 		nonOverlapBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.bam'%(bamFnamePrefix, intervalFnameSignature)))
 		selectAlignmentJob, indexSelectedAlignmentJob = self.addSelectAlignmentJob(executable=workflow.samtools, \
-				inputFile=selectAlignmentParentJobOutput, \
+				inputFile=recalBamFile, \
 				outputFile=nonOverlapBamFile, region=mpileupInterval, parentJobLs=selectAlignmentParentJobLs, \
 				extraDependentInputLs=selectAlignmentJobExtraDependentInputLs, transferOutput=False, \
 				extraArguments=None, job_max_memory=2000, needBAMIndexJob=False, \
 				walltime=indelRealignmentJobWalltime/2)	#the next mergeBamJob doesn't need bai files.
+		"""
 		
-		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=[selectAlignmentJob, indexSelectedAlignmentJob], \
-															file=selectAlignmentJob.output))
+		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=[printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob], \
+															file=printRecalibratedReadsJob.output, \
+															fileLs=[printRecalibratedReadsJob.output, printRecalibratedReadsBamIndexJob.baiFile]))
 		return returnData
 	
 	def reduceAfterEachAlignment(self, workflow=None, passingData=None, transferOutput=False, data_dir=None, **keywords):
@@ -553,7 +555,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 		extraDependentInputLs.extend([inputFile, recalFile, GenomeAnalysisTKJar] + refFastaFList)
-		extraOutputLs.append(outputFile)
+		extraOutputLs.insert(0, outputFile)	#2013.04.30 shuld be ahead of any other output
 		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 						extraOutputLs=extraOutputLs,\
