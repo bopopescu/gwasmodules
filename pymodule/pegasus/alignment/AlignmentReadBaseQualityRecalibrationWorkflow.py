@@ -301,7 +301,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 					outputBamFile=sortBamF,\
 					SortSamFilesJava=self.SortSamFilesJava, SortSamJar=self.SortSamJar,\
 					parentJobLs=[indelRealignmentJob], extraDependentInputLs=indelRealignmentJob.outputLs[1:], \
-					extraArguments=None, job_max_memory =max(3000, indelRealignmentJobMaxMemory/3), \
+					extraArguments=None, job_max_memory =max(3000, indelRealignmentJobMaxMemory/2), \
 					walltime=max(120, indelRealignmentJobWalltime/3), \
 					transferOutput=False)
 		"""
@@ -331,7 +331,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 								refFastaFList=passingData.refFastaFList, parentJobLs=[topOutputDirJob] + countCovariatesParentJobLs + SNPVCFJobLs, 
 								extraDependentInputLs=[SNPVCFFile.tbi_F] + countCovariatesJobExtraDependentInputLs, \
 								transferOutput=False, \
-								extraArguments=None, job_max_memory=max(2500, indelRealignmentJobMaxMemory/4), \
+								extraArguments=None, job_max_memory=max(2500, indelRealignmentJobMaxMemory/3), \
 								walltime=indelRealignmentJobWalltime/2)
 		if span>self.intervalSize and self.candidateCountCovariatesJob is None:	#big chromosomes are first encountered so this should happen in 1st call()
 			self.candidateCountCovariatesJob = countCovariatesJob
@@ -348,7 +348,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 							recalFile=countCovariatesJob.recalFile, interval=mpileupInterval, outputFile=recalBamFile, \
 							refFastaFList=passingData.refFastaFList, parentJobLs=[countCovariatesJob,], \
 							extraDependentInputLs=[baiF], extraOutputLs=[recalBaiFile], transferOutput=False, \
-							extraArguments=None, job_max_memory=max(3000, indelRealignmentJobMaxMemory/2), \
+							extraArguments=None, job_max_memory=max(3000, indelRealignmentJobMaxMemory*2/3), \
 							needBAMIndexJob=True, walltime=indelRealignmentJobWalltime/2)
 		"""
 		selectAlignmentParentJobLs = [printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob]
