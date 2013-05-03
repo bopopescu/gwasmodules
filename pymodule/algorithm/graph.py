@@ -119,6 +119,57 @@ class GraphWrapper(Graph):
 		sys.stderr.write("%s nodes with hierarchy level.\n"%(len(node2HierarchyLevel)))
 		return node2HierarchyLevel
 	
+	def findAllFounders(self):
+		"""
+		2013.3.5
+			opposite of findAllLeafNodes()
+		"""
+		sys.stderr.write("Finding all founders ...")
+		nodeList = []
+		for n in self.nodes():
+			if self.in_degree(n)==0:
+				nodeList.append(n)
+		sys.stderr.write(" %s founders \n"%(len(nodeList)))
+		return nodeList
+	
+	def orderMembersByDistanceToFounders(self, founderSet=None):
+		"""
+		2013.3.5
+			similar to calculateNodeHierarchyLevel
+				but calculates shortest path to all founders (not leaf nodes)
+					and the distance of the longest (not shortest) shortest path is the level.
+				level of founder = 0
+				level of founders' kids = 1
+			This is good to simulate genotype of pedigree from founders to everyone.
+		"""
+		if founderSet is None:
+			founderSet = set(self.findAllFounders())
+		
+		sys.stderr.write("Ordering members of the pedigree based on distance to founders ...")
+		founderDistance2NodeList = {}
+		#leaf nodes' hierarchy level=0
+		counter = 0
+		for source in self.nodes():
+			if source in founderSet:
+				founderDistance2NodeList[source] = 0
+			else:
+				level = None
+				for target in founderSet:
+					try:
+						l = nx.astar_path_length(self, source, target)
+						if level is None:
+							level = l
+						elif l>level:
+							level = l
+					except:
+						#no path between source and target
+						pass
+				founderDistance2NodeList[source] = level
+			counter += 1
+		sys.stderr.write("%s different hierarchy level.\n"%(len(founderDistance2NodeList)))
+		return founderDistance2NodeList
+	
+	
 class DiGraphWrapper(DiGraph, GraphWrapper):
 	def __init__(self, data=None, **keywords):
 		"""
