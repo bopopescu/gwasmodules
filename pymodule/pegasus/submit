@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ~/.bash_profile
+
 set -e
 
 TOPDIR=`pwd`
