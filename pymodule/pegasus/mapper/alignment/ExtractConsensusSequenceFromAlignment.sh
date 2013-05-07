@@ -63,19 +63,19 @@ then
 fi
 
 minBaseQ=$7
-if [ -z $minBaseQ]
+if [ -z $minBaseQ ]
 then
 	minBaseQ=$minBaseQDefault
 fi
 
 minRMSMapQ=$8
-if [ -z $minRMSMapQ]
+if [ -z $minRMSMapQ ]
 then
 	minRMSMapQ=$minRMSMapQDefault
 fi
 
 minDistanceToIndel=$9
-if [ -z $minDistanceToIndel]
+if [ -z $minDistanceToIndel ]
 then
 	minDistanceToIndel=$minDistanceToIndel
 fi
