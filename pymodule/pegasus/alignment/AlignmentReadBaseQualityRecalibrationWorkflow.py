@@ -13,7 +13,7 @@ Examples:
 		--indelVCFFolder ...
 		-e /u/home/eeskin/polyacti
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
-		--needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 17
+		--needSSHDBTunnel -J ~/bin/jdk/bin/java --new_mask_genotype_method_id 17
 		 --commit --skipDoneAlignment
 
 	# 2012.9.18
@@ -24,7 +24,7 @@ Examples:
 		-e /u/home/eeskin/polyacti
 		--indelVCFFolder ...
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
-		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 41
+		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --new_mask_genotype_method_id 41
 		 --commit --skipDoneAlignment
 	
 	# 2013.3.19 use sequence coverage to filter alignments
@@ -34,7 +34,7 @@ Examples:
 		-l hcondor -j hcondor -z localhost -u yh --intervalSize 10000000 --intervalOverlapSize 30000
 		-e /u/home/eeskin/polyacti --contigMaxRankBySize 250
 		--local_data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/ --data_dir /u/home/eeskin/polyacti/NetworkData/vervet/db/
-		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --mask_genotype_method_id 41
+		--clusters_size 5 --needSSHDBTunnel -J ~/bin/jdk/bin/java --new_mask_genotype_method_id 41
 		--indelVCFFolder ~/NetworkData/vervet/db/genotype_file/method_88 --commit --skipDoneAlignment
 		# --ref_genome_version 2 #(optional, as by default, it gets the outdated_index=0 reference chromosomes from GenomeDB)
 		# --ref_genome_outdated_index 1 #to get old reference. incompatible here as alignment is based on 3280, new ref.
@@ -70,12 +70,14 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 	option_default_dict.update(parentClass.commonAlignmentWorkflowOptionDict.copy())
 	option_default_dict.update(parentClass.partitionWorkflowOptionDict.copy())
 	option_default_dict.update({
-				('mask_genotype_method_id', 0, int):[None, '', 1, 'which genotype method is used to mask out polymorphic sites for recalibration'],\
+				('new_mask_genotype_method_id', 0, int):[None, '', 1, 'which genotype method is used to mask out polymorphic sites for newly-recalibrated of alignment.\n\
+	This is different from --mask_genotype_method_id, which is used to filter input alignments and should be set to None (leave it at default) for this purpose..'],\
 				('indelVCFFolder', 0, ): [None, '', 1, 'folder that contains in-del vcf or vcf.gz files that will be used for GATK2 indel-realigner,\
 	required if argument local_realigned is non-zero', ],\
 							})
 	option_default_dict[('intervalSize', 1, int)][0] = 10000000
 	option_default_dict[('local_realigned', 0, int)][0] = 0
+	option_default_dict[('completedAlignment', 0, int)][0]=1	#2013.05.03
 	"""
 	option_default_dict.update({
 						('ind_aln_id_ls', 0, ): ['', 'I', 1, 'a comma/dash-separated list of IndividualAlignment.id. This overrides ind_seq_id_ls.', ],\
@@ -260,7 +262,8 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		realignedBaiFile = File('%s.bai'%(os.path.splitext(realignedBamFile.name)[0]))
 		extraArgumentList=['-targetIntervals',realignerTargetIntervalJob.output,\
 						'--read_filter NotPrimaryAlignment', \
-						'--maxReadsForConsensuses 250', '--maxReadsForRealignment 90000', '--maxReadsInMemory 300000']
+						'--maxReadsForConsensuses 250', '--maxReadsForRealignment 90000', '--maxReadsInMemory 300000',\
+						'--noOriginalAlignmentTags']
 		if indelVCFFile:
 			extraArgumentList.extend(["-known:vcf", indelVCFFile])	#"--consensusDeterminationModel KNOWNS_ONLY" is not added since vervet indels are not clear
 		
@@ -394,7 +397,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 		if len(AlignmentJobAndOutputLs)>0:	#2012.3.29	merge alignment output only when there is something to merge!
 			#2013.04.09 create a new child alignment local_realigned =1, etc.
 			new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
-										mask_genotype_method_id=self.mask_genotype_method_id,\
+										mask_genotype_method_id=self.new_mask_genotype_method_id,\
 										data_dir=self.data_dir, local_realigned=1)
 			
 			baseCoverage = 4	#baseline
@@ -445,7 +448,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 			alignment2DBJob = self.addAddAlignmentFile2DBJob(workflow=workflow, executable=self.AddAlignmentFile2DB, \
 								inputFile=alignmentMergeJob.output, otherInputFileList=[],\
 								individual_alignment_id=new_individual_alignment.id, \
-								mask_genotype_method_id=self.mask_genotype_method_id,\
+								mask_genotype_method_id=self.new_mask_genotype_method_id,\
 								logFile=logFile, data_dir=data_dir, \
 								parentJobLs=[alignmentMergeJob, bamIndexJob], \
 								extraDependentInputLs=[bamIndexJob.output], \
@@ -604,7 +607,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 			not individual_alignment itself
 		"""
 		new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
-										mask_genotype_method_id=self.mask_genotype_method_id,\
+										mask_genotype_method_id=self.new_mask_genotype_method_id,\
 										data_dir=self.data_dir, local_realigned=1)
 		return self.db.isThisAlignmentComplete(individual_alignment=new_individual_alignment, data_dir=data_dir)
 	
