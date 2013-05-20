@@ -25,6 +25,7 @@ class AbstractNGSWorkflow(parentClass):
 	option_default_dict.update({
 						('ref_ind_seq_id', 1, int): [524, 'a', 1, 'IndividualSequence.id. To pick alignments with this sequence as reference', ],\
 						("samtools_path", 1, ): ["%s/bin/samtools", '', 1, 'samtools binary'],\
+						("platypus_path", 1, ): ["%s/bin/Platypus/Platypus.py", '', 1, 'haplotype caller from http://www.well.ox.ac.uk/platypus'],\
 						("picard_path", 1, ): ["%s/script/picard/dist", '', 1, 'picard folder containing its jar binaries'],\
 						("gatk_path", 1, ): ["%s/script/gatk/dist", '', 1, 'GATK folder containing its jar binaries'],\
 						("gatk2_path", 1, ): ["%s/script/gatk2/", '', 1, 'GATK version 2 or afterwards, no more source code, just binary jar files.'],\
@@ -45,6 +46,9 @@ class AbstractNGSWorkflow(parentClass):
 						('ref_genome_version', 0, int):[None, '', 1, 'used to fetch chromosome info from GenomeDB'],\
 						('ref_genome_outdated_index', 0, int):[0, '', 1, 'used to fetch chromosome info from GenomeDB. 0 means not outdated.'],\
 						
+						('completedAlignment', 0, int):[None, '', 1, 'a flag requiring whether user chooses alignment that has been completed or not.\n\
+	--completedAlignment 0 is same as --skipDoneAlignment. --completedAlignment 1 gets you only the alignments that has been completed. Default (None) has no effect.'],\
+						('mask_genotype_method_id', 0, int):[None, '', 1, 'to filter alignments with this field'],\
 						('skipDoneAlignment', 0, int):[0, '', 0, 'skip alignment whose db_entry is complete and affiliated file is valid\n\
 	(for ShortRead2AlignmentWorkflow or AlignmentReadBaseQualityRecalibrationWorkflow)'],\
 						('checkEmptyVCFByReading', 0, int):[0, 'E', 0, 'toggle to check if a vcf file is empty by reading its content'],\
@@ -53,6 +57,7 @@ class AbstractNGSWorkflow(parentClass):
 						("needFastaDictJob", 0, int): [0, 'B', 0, 'need to add a reference dict job by picard CreateSequenceDictionary.jar?'],\
 						
 						#to filter alignment or individual_sequence
+						("reduce_reads", 0, int): [None, '', 1, 'To filter which input alignments to fetch from db'],\
 						('excludeContaminant', 0, int):[0, '', 0, 'toggle this to exclude alignments or sequences that are from contaminated individuals, \n\
 		(IndividualSequence.is_contaminated=1)'],\
 						("sequence_filtered", 0, int): [None, 'Q', 1, 'to filter alignments/individual_sequences. None: whatever; 0: unfiltered sequences, 1: filtered sequences: 2: ...'],\
@@ -85,8 +90,9 @@ class AbstractNGSWorkflow(parentClass):
 		"""
 		2011-7-11
 		"""
-		self.pathToInsertHomePathList.extend(['samtools_path', 'picard_path', 'gatk_path', 'tabixPath', 'bgzipPath', 'gatk2_path',\
-											'vcftoolsPath', 'vcfSubsetPath'])
+		self.pathToInsertHomePathList.extend(['samtools_path', 'platypus_path', 'picard_path', 'gatk_path', 'tabixPath', \
+									'bgzipPath', 'gatk2_path',\
+									'vcftoolsPath', 'vcfSubsetPath'])
 		#inserted before parentClass.__init__()
 		parentClass.__init__(self, **keywords)
 		#from pymodule import ProcessOptions
@@ -134,16 +140,23 @@ class AbstractNGSWorkflow(parentClass):
 		if db is None:
 			db = self.db
 		alignmentLs = db.getAlignments(self.ref_ind_seq_id, ind_seq_id_ls=self.ind_seq_id_ls, ind_aln_id_ls=self.ind_aln_id_ls,\
-										alignment_method_id=self.alignment_method_id, data_dir=self.local_data_dir,\
+										alignment_method_id=self.alignment_method_id, data_dir=self.data_dir,\
 										individual_sequence_file_raw_id_type=self.individual_sequence_file_raw_id_type,\
 										country_id_ls=self.country_id_ls, tax_id_ls=self.tax_id_ls,\
-										local_realigned=self.local_realigned, outdated_index=self.alignment_outdated_index)
-		alignmentLs = db.filterAlignments(alignmentLs=alignmentLs, min_coverage=self.sequence_min_coverage,\
+										local_realigned=self.local_realigned, outdated_index=self.alignment_outdated_index,\
+										mask_genotype_method_id=self.mask_genotype_method_id,\
+										completedAlignment=self.completedAlignment, \
+										completeAlignmentCheckFunction=self.isThisInputAlignmentComplete,\
+										reduce_reads=self.reduce_reads)
+		alignmentLs = db.filterAlignments(data_dir=self.data_dir, alignmentLs=alignmentLs, min_coverage=self.sequence_min_coverage,\
 						max_coverage=self.sequence_max_coverage, sequence_filtered=self.sequence_filtered, \
 						individual_site_id_set=set(self.site_id_ls),\
-						mask_genotype_method_id=None, parent_individual_alignment_id=None,\
+						mask_genotype_method_id=self.mask_genotype_method_id, parent_individual_alignment_id=None,\
 						country_id_set=set(self.country_id_ls), tax_id_set=set(self.tax_id_ls),\
-						excludeContaminant=self.excludeContaminant,local_realigned=self.local_realigned)
+						excludeContaminant=self.excludeContaminant,local_realigned=self.local_realigned,\
+						completedAlignment=self.completedAlignment,\
+						completeAlignmentCheckFunction=self.isThisInputAlignmentComplete,\
+						reduce_reads=self.reduce_reads)
 		return alignmentLs
 	
 	def registerJars(self, workflow=None, ):
@@ -256,7 +269,7 @@ class AbstractNGSWorkflow(parentClass):
 		SelectVariantsJava = Executable(namespace=namespace, name="SelectVariantsJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
 		SelectVariantsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((SelectVariantsJava, 0.3))
+		executableClusterSizeMultiplierList.append((SelectVariantsJava, 0.5))
 		
 		CombineVariantsJava = Executable(namespace=namespace, name="CombineVariantsJava", version=version, os=operatingSystem,\
 											arch=architecture, installed=True)
@@ -390,6 +403,7 @@ class AbstractNGSWorkflow(parentClass):
 		#2013.04.09 
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='addOrReplaceReadGroupsJava', clusterSizeMultipler=0.5)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='AddOrReplaceReadGroupsJava', clusterSizeMultipler=0.5)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.platypus_path, name='platypus', clusterSizeMultipler=0)
 		
 	
 	bwaIndexFileSuffixLs = ['amb', 'ann', 'bwt', 'pac', 'sa']
@@ -683,7 +697,7 @@ class AbstractNGSWorkflow(parentClass):
 					interval=None, outputFile=None, \
 					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
-					extraDependentInputLs=None, no_of_cpus=None, walltime=120, **keywords):
+					extraDependentInputLs=None, no_of_cpus=None, walltime=120, key2ObjectForJob=None, **keywords):
 		"""
 		i.e.
 			indelUnionOutputF = File(os.path.join(gatkIndelDirJob.folder, '%s.indel.vcf'%chromosome))
@@ -739,6 +753,14 @@ class AbstractNGSWorkflow(parentClass):
 			extraOutputLs.append(gatkVCFIndexOutput)
 		else:
 			gatkVCFIndexOutput = None
+		
+		if inputFile:	#2013.05.04 this could be None in some cases (addGATKCombineVariantsJob, inputFile is added in later)
+			inputFnameSuffix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(inputFile.name)
+			if inputFnameSuffix=='.vcf':	#2013.04.16 GATK will generate an index file along with the VCF input
+				inputGATKVCFIndexFname = '%s.idx'%(inputFile.name)
+				inputGATKVCFIndexFile = File(inputGATKVCFIndexFname)
+				extraOutputLs.append(inputGATKVCFIndexFile)
+			
 		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
 					inputArgumentOption=inputArgumentOption,  inputFileList=inputFileList,\
 					argumentForEachFileInInputFileList=argumentForEachFileInInputFileList,\
@@ -748,7 +770,7 @@ class AbstractNGSWorkflow(parentClass):
 					transferOutput=transferOutput, \
 					frontArgumentList=frontArgumentList, extraArguments=extraArguments, \
 					extraArgumentList=extraArgumentList, job_max_memory=job_max_memory,  sshDBTunnel=None, \
-					key2ObjectForJob=None, no_of_cpus=no_of_cpus, walltime=walltime, **keywords)
+					key2ObjectForJob=key2ObjectForJob, no_of_cpus=no_of_cpus, walltime=walltime, **keywords)
 		
 		job.gatkVCFIndexOutput = gatkVCFIndexOutput
 		return job
@@ -910,11 +932,13 @@ class AbstractNGSWorkflow(parentClass):
 		return vcf1Name
 	
 	def addSelectVariantsJob(self, workflow=None, SelectVariantsJava=None, GenomeAnalysisTKJar=None, inputF=None, outputF=None, \
-					refFastaFList=[], sampleIDKeepFile=None, snpIDKeepFile=None, sampleIDExcludeFile=None, \
-					parentJobLs=None, \
-					extraDependentInputLs=None, transferOutput=True, extraArguments=None, job_max_memory=2000, interval=None,\
+					refFastaFList=None, sampleIDKeepFile=None, snpIDKeepFile=None, sampleIDExcludeFile=None, \
+					interval=None,\
+					parentJobLs=None, extraDependentInputLs=None, transferOutput=True, \
+					extraArguments=None, extraArgumentList=None, job_max_memory=2000, walltime=None,\
 					**keywords):
 		"""
+		2013.04.16 updated to use addGATKJob
 		2012.10.17 add argument sampleIDKeepFile, snpIDKeepFile, sampleIDExcludeFile
 		2012.10.10 use addGenericJob()
 		2012.10.5 try add new option "--regenotype" (to extraArguments) to allow re-genotype the selected samples based on their GLs (or PLs)
@@ -952,20 +976,14 @@ class AbstractNGSWorkflow(parentClass):
 						Valid types are INDEL, SNP, MIXED, MNP, SYMBOLIC, NO_VARIATION. Can be specified multiple times
 				 
 		"""
-		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
-		job_max_memory = memRequirementObject.memRequirement
-		javaMemRequirement = memRequirementObject.memRequirementInStr
-		
-		refFastaF = refFastaFList[0]
-		extraArgumentList = [javaMemRequirement, '-jar', GenomeAnalysisTKJar, "-T SelectVariants", "-R", refFastaF, \
-						"--variant", inputF, "-o ", outputF]
-		if interval:
-			extraArgumentList.append("-L %s"%(interval))
+		if extraArgumentList is None:
+			extraArgumentList = []
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
-		extraDependentInputLs.append(inputF)
-		extraDependentInputLs.append(GenomeAnalysisTKJar)	#2013.2.14
-		extraDependentInputLs = extraDependentInputLs + refFastaFList
+		#2013.05.02 addGATKJob will take care of these two
+		#extraDependentInputLs.append(inputF)
+		#extraDependentInputLs.append(GenomeAnalysisTKJar)	#2013.2.14
+		#extraDependentInputLs = extraDependentInputLs + refFastaFList
 		if sampleIDKeepFile:
 			extraArgumentList.extend(['--sample_file', sampleIDKeepFile])
 			extraDependentInputLs.append(sampleIDKeepFile)
@@ -976,16 +994,16 @@ class AbstractNGSWorkflow(parentClass):
 			extraArgumentList.extend(['--exclude_sample_file', sampleIDExcludeFile])
 			extraDependentInputLs.append(sampleIDExcludeFile)
 		
-		#register the two idx files so they will be cleaned out
-		extraOutputLs = [outputF, File('%s.idx'%(outputF.name)), File('%s.idx'%(inputF.name))]
-		
-		job = self.addGenericJob(executable=SelectVariantsJava, inputFile=None,\
-					outputFile=None, \
-					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
-					transferOutput=transferOutput, \
-					extraArguments=extraArguments, extraArgumentList=extraArgumentList, \
-					job_max_memory=job_max_memory, sshDBTunnel=None, \
-					key2ObjectForJob=None, **keywords)
+		job = self.addGATKJob(executable=SelectVariantsJava, GenomeAnalysisTKJar=GenomeAnalysisTKJar, \
+				GATKAnalysisType="SelectVariants",\
+				inputFile=inputF, inputArgumentOption="--variant:vcf", refFastaFList=refFastaFList, inputFileList=None,\
+				argumentForEachFileInInputFileList=None,\
+				interval=interval, outputFile=outputF, \
+				parentJobLs=parentJobLs, transferOutput=transferOutput, job_max_memory=job_max_memory,\
+				frontArgumentList=None, extraArguments=extraArguments, \
+				extraArgumentList=extraArgumentList, extraOutputLs=None, \
+				extraDependentInputLs=extraDependentInputLs, no_of_cpus=None, walltime=walltime,\
+				key2ObjectForJob=None, **keywords)
 		return job
 	
 	def addSortAlignmentJob(self, workflow=None, inputBamFile=None, \
@@ -1143,6 +1161,7 @@ class AbstractNGSWorkflow(parentClass):
 					extraDependentInputLs=None, transferOutput=False, extraArguments=None, job_max_memory=1000, \
 					perSampleMatchFraction=False, **keywords):
 		"""
+		2013.05.20 bugfix
 		2012.8.16
 			now perSampleMatchFraction output is in a separate output file.
 		2011.12.9
@@ -1150,7 +1169,7 @@ class AbstractNGSWorkflow(parentClass):
 		if outputF is None and outputFnamePrefix:
 			outputF = File('%s.tsv'%(outputFnamePrefix))
 		if outputF and outputFnamePrefix is None:	#2013.04.09 to register _overlapSitePos.tsv file
-			outputFnamePrefix = os.path.splitext(outputF.name)
+			outputFnamePrefix = os.path.splitext(outputF.name)[0]	#2013.05.20 bugfix
 		
 		extraOutputLs = []
 		extraArgumentList = []
@@ -2149,11 +2168,26 @@ Contig966       3160    50
 		
 		return job
 	
-	def isThisAlignmentComplete(self, individual_alignment=None, data_dir=None):
+	def isThisAlignmentComplete(self, individual_alignment=None, data_dir=None, returnFalseIfInexitentFile=False,**keywords):
 		"""
+		this is to check whether the new and to-be-generated alignment is completed already or not.
+			in contrast to isThisInputAlignmentComplete().
+		2013.05.04 added argument returnFalseIfInexitentFile
+			
 		2013.04.09 for subsequent children to override
 		"""
-		return self.db.isThisAlignmentComplete(individual_alignment=individual_alignment, data_dir=data_dir)
+		return self.db.isThisAlignmentComplete(individual_alignment=individual_alignment, data_dir=data_dir,\
+											returnFalseIfInexitentFile=returnFalseIfInexitentFile, **keywords)
+
+	def isThisInputAlignmentComplete(self, individual_alignment=None, data_dir=None, returnFalseIfInexitentFile=True, \
+									**keywords):
+		"""
+		2013.05.04 this is used to check whether an input (to be worked on by downstream programs) is completed or not.
+			watch returnFalseIfInexitentFile is True (because you need the file for an input)
+		
+		"""
+		return self.db.isThisAlignmentComplete(individual_alignment=individual_alignment, data_dir=data_dir, \
+											returnFalseIfInexitentFile=returnFalseIfInexitentFile, **keywords)
 	
 if __name__ == '__main__':
 	main_class = AbstractNGSWorkflow
