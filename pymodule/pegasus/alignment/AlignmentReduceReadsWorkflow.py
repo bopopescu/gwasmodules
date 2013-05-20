@@ -46,6 +46,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 	option_default_dict[('intervalSize', 1, int)][0] = 20000000
 	option_default_dict[('intervalOverlapSize', 1, int)][0] = 0
 	option_default_dict[('local_realigned', 0, int)][0] = 1
+	option_default_dict[('completedAlignment', 0, int)][0]=1	#2013.05.03
 	
 	def __init__(self,  **keywords):
 		"""
@@ -199,13 +200,39 @@ class AlignmentReduceReadsWorkflow(parentClass):
 	
 	def isThisAlignmentComplete(self, individual_alignment=None, data_dir=None):
 		"""
-		2013.04.09 this is more complicated as it tests the local_realigned version of individual_alignment is complete or not.
-			not individual_alignment itself
+		2013.05.04
+			this is to check whether the new and to-be-generated alignment is completed already or not.
+			in contrast to isThisInputAlignmentComplete()
+			
+			different from usual: reduce_reads =1
 		"""
 		new_individual_alignment = self.db.copyParentIndividualAlignment(parent_individual_alignment_id=individual_alignment.id,\
+										mask_genotype_method_id=individual_alignment.mask_genotype_method_id,\
 										data_dir=self.data_dir, local_realigned=individual_alignment.local_realigned,\
 										reduce_reads=1)
 		return self.db.isThisAlignmentComplete(individual_alignment=new_individual_alignment, data_dir=data_dir)
+
+	def isThisInputAlignmentComplete(self, individual_alignment=None, data_dir=None, returnFalseIfInexitentFile=True, \
+									**keywords):
+		"""
+		2013.05.04 
+			 this checks whether
+			#. an alignment file exists
+			#. file_size not null in db,
+			#. median_depth is not null from db
+			
+		this is used to check whether an input (to be worked on by downstream programs) is completed or not.
+			watch returnFalseIfInexitentFile is True (because you need the file for input)
+			
+		"""
+		stockAnswer = self.db.isThisAlignmentComplete(individual_alignment=individual_alignment, data_dir=data_dir,\
+													returnFalseIfInexitentFile=returnFalseIfInexitentFile, **keywords)
+		if stockAnswer is True:
+			if individual_alignment.median_depth is None:
+				#change stockAnswer if median_depth is null
+				stockAnswer = False
+		return stockAnswer	
+			
 	
 	def registerCustomExecutables(self, workflow=None):
 		"""
