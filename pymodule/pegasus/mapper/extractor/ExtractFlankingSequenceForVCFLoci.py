@@ -23,17 +23,13 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv, re
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter, SNPData
-from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
-from pymodule import yh_matplotlib, GenomeDB, utils
-from pymodule import MatrixFile
-from pymodule import SNP
+from pymodule import ProcessOptions
 
 #used in getattr(individual_site_id_set, '__len__', returnZeroFunc)()
 from pymodule.utils import returnZeroFunc
 from pymodule.yhio.VCFFile import VCFFile
-from pymodule.Genome.FastaFile import FastaFile
-from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule.yhio.FastaFile import FastaFile
+from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 
 
 class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
