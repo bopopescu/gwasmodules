@@ -53,6 +53,7 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 							originalSNPID2NewRefCoordinateOutputFname=None, newSNPDataOutputFname=None, \
 							minAlignmentSpan=10, **keywords):
 		"""
+		#2013.05.21 bugfix, read.qend is occasionally not available
 		2012.10.14 
 		2012.10.8
 			argument minAlignmentSpan: the number of bases involved in the blast query-target alignment
@@ -75,26 +76,34 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 		queryIDSet= set()
 		originalSNPID2BlastRefCoordinateLs = {}
 		no_of_reads_mapped = samfile.mapped	#: not good, segmentation fault because bai file is missing
-		
+		no_of_hits_with_exception = 0
 		for read in samfile:	#.fetch():
 			counter += 1
 			if read.is_unmapped:
 				continue
 			#read.mapq
-			yhRead = YHAlignedRead(read)
-			queryID = read.qname
-			queryStart = read.qstart + 1	#qstart is 0-based
-			queryEnd = read.qend	#qend is 0-based but exclusive. same as 1-based but inclusive.
-			
-			targetChr = samfile.getrname(read.tid)
-			targetStart = read.pos + 1	#pos is 0-based
-			targetStop = read.aend	#aend is 0-based but exclusive. same as 1-based but inclusive.
+			queryID = None
+			try:
+				yhRead = YHAlignedRead(read)
+				queryID = read.qname
+				queryStart = read.qstart + 1	#qstart is 0-based
+				queryEnd = read.qend	#qend is 0-based but exclusive. same as 1-based but inclusive.
+				
+				targetChr = samfile.getrname(read.tid)
+				targetStart = read.pos + 1	#pos is 0-based
+				targetStop = read.aend	#aend is 0-based but exclusive. same as 1-based but inclusive.
+				
+				
+				queryAlignmentSpan = read.qlen
+				targetAlignmentSpan = read.alen
+			except:	#2013.05.21 bugfix, read.qend is occasionally not available
+				sys.stderr.write('Except type for query %s : %s\n'%(queryID, repr(sys.exc_info())))
+				import traceback
+				traceback.print_exc()
+				no_of_hits_with_exception += 1
+				continue
 			
 			queryIDSet.add(queryID)
-			
-			queryAlignmentSpan = read.qlen
-			targetAlignmentSpan = read.alen
-			
 			if read.is_reverse:
 				strand = -1
 				#reverse the query coordinates (pysam stores the two coordinates in ascending order regardless of strand).
@@ -165,8 +174,8 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 						originalSNPID2BlastRefCoordinateLs[queryID].append(newRefCoordinate)
 						real_counter += 1
 						
-		sys.stderr.write(" from %s reads, no_of_reads_mapped=%s, %s/%s SNPs found new-reference coordinates.\n"%\
-						(counter, no_of_reads_mapped, real_counter, len(queryIDSet)))
+		sys.stderr.write(" from %s reads, no_of_hits_with_exception=%s, no_of_reads_mapped=%s, %s/%s SNPs found new-reference coordinates.\n"%\
+						(counter, no_of_hits_with_exception, no_of_reads_mapped, real_counter, len(queryIDSet)))
 		
 		#output the mapping
 		if originalSNPID2NewRefCoordinateOutputFname:
