@@ -38,6 +38,11 @@ class ConvertMSOutput2FASTQ(AbstractMapper):
 							('ploidy', 1, int): [2, '', 1, "1: haploid, one sample, one individual; \
 					2: diploid, take every two consecutive samples as one individual. Other ploids are not supported yet.", ],\
 							('inputFileFormat', 1, int): [1, '', 1, "1: input is ms/msHOT output (no good, non-polymorphic sites ignored); 2: in Heng Li output", ],\
+							('noOfHaplotypesDefault', 1, int): [2, '', 1, "default number of haplotypes in input simulation, used only\
+	when the number of segregating sites is 0."],\
+							
+							('chromosomeLengthToSimulate', 1, int): [20000000, '', 1, "default chromosome length in input simulation used only\
+	when the number of segregating sites is 0."],\
 							})
 	def __init__(self,  **keywords):
 		"""
@@ -46,7 +51,7 @@ class ConvertMSOutput2FASTQ(AbstractMapper):
 		
 		self.convertFuncDict = {1: self.convertMSOutput, 2: self.convertMSHOTLiteOutput}
 	
-	def convertMSOutput(self, inf=None, outf=None):
+	def convertMSOutput(self, inf=None, outf=None, **keywords):
 		"""
 		2013.2.11
 			not right, as it ignored all the non-polymorphic loci
@@ -90,8 +95,12 @@ class ConvertMSOutput2FASTQ(AbstractMapper):
 				outf.write("%s\n"%(self.defaultBaseQuality*len(outputBaseList)))
 				chromosomeNumber += 1
 		
-	def convertMSHOTLiteOutput(self, inf=None, outf=None):
+	def convertMSHOTLiteOutput(self, inf=None, outf=None, noOfHaplotypesDefault=2, chromosomeLengthToSimulate=20000000):
 		"""
+		2013.05.09
+		added argument noOfHaplotypesDefault, chromosomeLengthToSimulate
+			used when the number of segregating sites is 0.
+			
 		2013.2.11
 		./msHOT-lite 2 1 -t 84989.8346003745 -r 34490.1412746802 30000000 -l -en 0.0013 1 0.0670 -en 0.0022 1 0.3866 -en 0.0032 1 0.3446 -en 0.0044 1 0.21
 				79 -en 0.0059 1 0.1513 -en 0.0076 1 0.1144 -en 0.0096 1 0.0910 -en 0.0121 1 0.0757 -en 0.0150 1 0.0662 -en 0.0184 1 0.0609 -en 0.0226 1 0.0583 -en
@@ -121,6 +130,12 @@ class ConvertMSOutput2FASTQ(AbstractMapper):
 			if content=="//":
 				segsitesLineContent = inf.next().strip()
 				no_of_segsites = int(segsitesLineContent.split()[-1])
+				if no_of_segsites==0:	#2013.05.09 no segregating sites, fill it with reference bases.
+					for i in xrange(0, noOfHaplotypesDefault, self.ploidy):	#go through each indivdiual at a time
+						individualByGenotypeMatrix.append([])
+						for j in xrange(self.chromosomeLengthToSimulate):
+							individualByGenotypeMatrix[i].append(self.defaultBase)
+					continue
 				no_of_sites = int(inf.next().strip())
 				isSampleBegun =True
 			elif content =="@end":
@@ -179,7 +194,9 @@ class ConvertMSOutput2FASTQ(AbstractMapper):
 		inf = utils.openGzipFile(self.inputFname, 'r')
 		
 		outf = utils.openGzipFile(self.outputFname, openMode='w')
-		self.convertFuncDict[self.inputFileFormat](inf=inf, outf=outf)
+		self.convertFuncDict[self.inputFileFormat](inf=inf, outf=outf, \
+							noOfHaplotypesDefault=self.noOfHaplotypesDefault,\
+							chromosomeLengthToSimulate=self.chromosomeLengthToSimulate)
 		
 		inf.close()
 		outf.close()

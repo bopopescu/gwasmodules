@@ -83,4 +83,16 @@ class AbstractMapper(object):
 									hostname=self.hostname, database=self.dbname, schema=self.schema, port=self.port)
 		db_vervet.setup(create_tables=False)
 		self.db_vervet = db_vervet
-		"""	
+		"""
+	
+	def run(self):
+		"""
+		2013.05.01 place holder
+		"""
+		pass
+
+if __name__ == '__main__':
+	main_class = AbstractMapper
+	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
+	instance = main_class(**po.long_option2value)
+	instance.run()	

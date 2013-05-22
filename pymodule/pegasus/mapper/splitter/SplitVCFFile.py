@@ -24,14 +24,14 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import csv
+import copy
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.yhio.VCFFile import VCFFile
 from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 
 class SplitVCFFile(AbstractVCFMapper):
 	__doc__ = __doc__
-	option_default_dict = AbstractVCFMapper.option_default_dict.copy()
+	option_default_dict = copy.deepcopy(AbstractVCFMapper.option_default_dict)
 	option_default_dict.pop(("chromosome", 0, ))
 	option_default_dict.pop(("chrLength", 1, int))
 	option_default_dict.pop(('outputFname', 0, ))

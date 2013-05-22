@@ -712,7 +712,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 							java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
 							addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
 							no_of_aln_threads=no_of_aln_threads, stampy=stampy)
-		
+		2013.04.27 used to be 'mem', now is 'bwamem'
 		2013.04.04 new alignment method (bwa-mem) from Heng Li
 		2012.10.18 add argument addBamIndexJob,
 		2012.10.10
@@ -755,7 +755,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
 						no_of_aln_threads=no_of_aln_threads, stampy=stampy,\
 						transferOutput=transferOutput)
-		elif alignment_method.short_name.find('mem')==0:
+		elif alignment_method.short_name.find('bwamem')==0:	#2013.04.27 used to be 'mem', now is 'bwamem'
 			alignmentJob = self.addBWAMemAlignmentJob(workflow=workflow, fileObjectLs=fileObjectLs, \
 						refFastaFList=refFastaFList, bwa=bwa, \
 						additionalArguments=additionalArguments, samtools=samtools, \
@@ -924,7 +924,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		MarkDupOutputF = outputBamFile
 		MarkDupOutputMetricF = File('%s.metric'%(bamFnamePrefix))	#2013.2.27 bugfix
 		
-		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
+		memRequirementData = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000, \
+													permSizeFraction=0.3)
 		job_max_memory = memRequirementData.memRequirement
 		javaMemRequirement = memRequirementData.memRequirementInStr
 		

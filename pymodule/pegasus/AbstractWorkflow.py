@@ -590,6 +590,8 @@ class AbstractWorkflow(ADAG):
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/pipeCommandOutput2File.sh'), \
 										name='pipeCommandOutput2File', clusterSizeMultipler=1)
 		
+		"""
+		# 2013.05.20 DISABLE this
 		if self.site_handler=='hcondor' and self.input_site_handler=='hcondor':
 			#2013.04.19 to make pegasus cleanup run on local universe of condor pool
 			# only enable this on hcondor because
@@ -610,7 +612,7 @@ class AbstractWorkflow(ADAG):
 			if transferExecutable.hasProfile(condorUniverseProfile):
 				transferExecutable.removeProfile(condorUniverseProfile)
 			transferExecutable.addProfile(condorUniverseProfile)
-		
+		"""
 	
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
 		"""
@@ -1437,6 +1439,7 @@ class AbstractWorkflow(ADAG):
 						MaxPermSizeUpperBound=35000):
 		"""
 		2013.05.01 lower permSizeFraction from 0.4 to 0.2
+			minimum for MaxPermSize is now minMemory/2
 		2013.04.01
 			now job_max_memory = MaxPermSize + mxMemory, unless either is below minMemory
 			added argument permSizeFraction, MaxPermSizeUpperBound
@@ -1446,7 +1449,7 @@ class AbstractWorkflow(ADAG):
 		"""
 		MaxPermSize_user = int(job_max_memory*permSizeFraction)
 		mxMemory_user = int(job_max_memory*(1-permSizeFraction))
-		MaxPermSize= min(MaxPermSizeUpperBound, max(minMemory, MaxPermSize_user))
+		MaxPermSize= min(MaxPermSizeUpperBound, max(minMemory/2, MaxPermSize_user))
 		PermSize=MaxPermSize*3/4
 		mxMemory = max(minMemory, mxMemory_user)
 		msMemory = mxMemory*3/4
@@ -1985,7 +1988,7 @@ class AbstractWorkflow(ADAG):
 			import pdb
 			pdb.set_trace()
 		
-		if self.db:
+		if getattr(self, 'db', None):
 			session = self.db.session
 			session.begin()
 		
@@ -2018,7 +2021,7 @@ class AbstractWorkflow(ADAG):
 			self.writeXML(outf)
 			self.isDAGWrittenToDisk = True
 		
-		if self.db:
+		if getattr(self, 'db', None):	#bugfix
 			session = self.db.session
 			if self.commit:
 				session.commit()

@@ -60,11 +60,14 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		listArgumentName_data_type_ls = [('ind_seq_id_ls', int), ("ind_aln_id_ls", int)]
 		listArgumentName2hasContent = self.processListArguments(listArgumentName_data_type_ls, emptyContent=[])
 	
-	def addAlignmentAsInputToJobLs(self, workflow, alignmentDataLs, jobLs=[], jobInputOption=""):
+	def addAlignmentAsInputToJobLs(self, workflow=None, alignmentDataLs=None, jobLs=[], jobInputOption=""):
 		"""
 		2012.1.9
 			used in addGenotypeCallJobs() to add alignment files as input to calling jobs
 		"""
+		if workflow is None:
+			workflow = self
+			
 		for alignmentData in alignmentDataLs:
 			alignment = alignmentData.alignment
 			parentJobLs = alignmentData.jobLs
@@ -79,8 +82,42 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				job.uses(baiF, transfer=True, register=True, link=Link.INPUT)
 				for parentJob in parentJobLs:
 					if parentJob:
-						workflow.depends(parent=parentJob, child=job)
+						self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
 		
+	def addAlignmentAsInputToPlatypusJobLs(self, workflow=None, alignmentDataLs=None, jobLs=[], jobInputOption="--bamFiles"):
+		"""
+		2013.05.21 bugfix: pegasus/condor would truncate long single-argument.
+		2013.05.16 different from addAlignmentAsInputToJobLs, that platypus is like this:
+				--bamFiles=1.bam,2.bam,3.bam
+			used in addGenotypeCallJobs() to add alignment files as input to calling jobs
+		"""
+		if workflow is None:
+			workflow = self
+		for job in jobLs:
+			if jobInputOption:
+				job.addArguments(jobInputOption)
+			fileArgumentLs = []
+			alignmentFileFolder = None
+			for alignmentData in alignmentDataLs:
+				alignment = alignmentData.alignment
+				parentJobLs = alignmentData.jobLs
+				bamF = alignmentData.bamF
+				baiF = alignmentData.baiF
+				
+				fileArgumentLs.append(bamF.name)
+				if alignmentFileFolder is None:
+					alignmentFileFolder = os.path.split(bamF.name)[0]
+				#it's either symlink or stage-in
+				job.uses(bamF, transfer=True, register=True, link=Link.INPUT)
+				job.uses(baiF, transfer=True, register=True, link=Link.INPUT)
+				for parentJob in parentJobLs:
+					if parentJob:
+						self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
+			if alignmentFileFolder:	#2013.05.21 pegasus/condor would truncate long single-argument.
+				job.addArguments('%s/*.bam'%(alignmentFileFolder))
+			else:
+				job.addArguments(','.join(fileArgumentLs))
+	
 	def addAddRG2BamJobsAsNeeded(self, workflow=None, alignmentDataLs=None, site_handler=None, input_site_handler=None, \
 							addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None, \
 							BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
@@ -504,6 +541,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		preReduceReturnData = self.preReduce(workflow=workflow, passingData=passingData, transferOutput=False,\
 											**keywords)
 		passingData.preReduceReturnData = preReduceReturnData
+		no_of_alignments_worked_on= 0
 		for alignmentData in passingData.alignmentDataLs:
 			alignment = alignmentData.alignment
 			parentJobLs = alignmentData.jobLs
@@ -519,6 +557,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			
 			if skipDoneAlignment and self.isThisAlignmentComplete(individual_alignment=alignment, data_dir=data_dir):
 				continue
+			no_of_alignments_worked_on += 1
 			mapEachAlignmentData = self.mapEachAlignment(workflow=workflow, alignmentData=alignmentData, passingData=passingData, \
 								transferOutput=False, \
 								preReduceReturnData=preReduceReturnData, **keywords)
@@ -578,7 +617,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 						report=False)
 		passingData.gzipReduceFolderJob = newReturnData.topOutputDirJob
 		
-		sys.stderr.write("%s jobs.\n"%(self.no_of_jobs))
+		sys.stderr.write("%s alignments to be worked on. %s jobs.\n"%(no_of_alignments_worked_on, self.no_of_jobs))
 		return returnData
 	
 	def registerAlignmentAndItsIndexFile(self, workflow=None, alignmentLs=None, data_dir=None, checkFileExistence=True):
@@ -655,9 +694,11 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		registerReferenceData = self.getReferenceSequence()
 		
 		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow=workflow, alignmentLs=alignmentLs, data_dir=self.data_dir)
-		
-		return PassingData(workflow=workflow, alignmentLs=alignmentLs, alignmentDataLs=alignmentDataLs, \
-						chr2IntervalDataLs=chr2IntervalDataLs, registerReferenceData=registerReferenceData)
+		pdata.alignmentLs = alignmentLs
+		pdata.alignmentDataLs = alignmentDataLs
+		pdata.chr2IntervalDataLs = chr2IntervalDataLs
+		pdata.registerReferenceData = registerReferenceData
+		return pdata
 	
 	def run(self):
 		"""

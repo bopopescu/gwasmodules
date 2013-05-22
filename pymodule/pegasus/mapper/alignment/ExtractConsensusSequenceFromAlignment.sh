@@ -220,6 +220,14 @@ bcftoolsArguments=""
 
 echo "bcftoolsArguments is $bcftoolsArguments."
 
+#2013.05.08 trace what commands are being executed....
+set -vx
+
+
+echo "outputFname is $outputFname"
+#2013.05.08 need "bash -c" if  "-" or "|" or ">" is put into a command "" string, but you will lose PIPESTATUS
+#bash -c "$samtoolsCommandline | $bcftoolsCommandline" 
+
 $samtoolsPath mpileup -C50 -q $minMapQ -Q $minBaseQ $mpileupIntervalArgument -u -f $refFastaFname $inputAlignmentFname | $bcftoolsPath view $bcftoolsArguments -c - | $vcfutilsPath vcf2fq -d $minDP -D $maxDP -Q $minRMSMapQ -l $minDistanceToIndel | gzip > $outputFname
 
 exitCodeAll="${PIPESTATUS[0]} ${PIPESTATUS[1]} ${PIPESTATUS[2]} ${PIPESTATUS[3]}"
