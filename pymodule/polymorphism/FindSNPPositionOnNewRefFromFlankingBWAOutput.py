@@ -27,12 +27,12 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, SNP
-from pymodule.pegasus.mapper.ExtractFlankingSequenceForVCFLoci import ExtractFlankingSequenceForVCFLoci
-import numpy, re
-from pymodule import figureOutDelimiter, getColName2IndexFromHeader
-from pymodule.BamFile import YHAlignedRead
 import pysam
+import numpy, re
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, SNP
+from pymodule.pegasus.mapper.extractor.ExtractFlankingSequenceForVCFLoci import ExtractFlankingSequenceForVCFLoci
+from pymodule import figureOutDelimiter, getColName2IndexFromHeader
+from pymodule.yhio.BamFile import YHAlignedRead
 from FindSNPPositionOnNewRefFromFlankingBlastOutput import FindSNPPositionOnNewRefFromFlankingBlastOutput
 
 class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFlankingBlastOutput):

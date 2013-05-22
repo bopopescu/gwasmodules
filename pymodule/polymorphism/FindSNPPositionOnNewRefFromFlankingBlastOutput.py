@@ -33,7 +33,7 @@ import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, SNP
 from pymodule import figureOutDelimiter, getColName2IndexFromHeader
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
-from pymodule.pegasus.mapper.ExtractFlankingSequenceForVCFLoci import ExtractFlankingSequenceForVCFLoci
+from pymodule.pegasus.mapper.extractor.ExtractFlankingSequenceForVCFLoci import ExtractFlankingSequenceForVCFLoci
 import numpy, re
 
 

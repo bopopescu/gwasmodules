@@ -23,7 +23,7 @@ Examples:
 		#--flankingLength 50
 
 Description:
-	2012-10-03
+	2012-10-03 --intervalSize refers to the number of polymorphic sites, not chromosomal intervals.
 	#. preReduce: split the fasta into difference chromosomes (necessary?) 
     #. mapEachVCF:
     		split VCF into several small ones, N-SNP each
@@ -290,9 +290,10 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 			# db_entry is supposedly a individual_sequence_file object 
 			fileObjectLs = [PassingData(fastqF=extractFlankSeqJob.output, \
 									db_entry=PassingData(quality_score_format='Standard', \
-														individual_sequence=PassingData(sequencer='GA', sequence_type='SR')))]
+												individual_sequence=PassingData(sequencer='GA', sequence_type='SR'),\
+												read_count=splitVCFJob.noOfSitesPerUnit))]
 			#2012.10.10 fake one
-			alignment_method = PassingData(short_name='bwa-short-read', command='aln')
+			alignment_method = PassingData(short_name='bwamem', command='mem')	#2013.05.21 use mem instead of aln
 			
 			#2012.10.10 individual_alignment is not passed so that ReadGroup addition job is not added in addAlignmentJob()
 			bamIndexJob = self.addAlignmentJob(workflow=workflow, fileObjectLs=fileObjectLs, \
