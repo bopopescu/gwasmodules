@@ -27,10 +27,10 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv
+import random
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
 from pymodule import yh_matplotlib, SNP
-import random
-from pymodule.AbstractMatrixFileWalker import AbstractMatrixFileWalker
+from pymodule.yhio.AbstractMatrixFileWalker import AbstractMatrixFileWalker
 from vervet.src.mapper.AbstractVervetMapper import AbstractVervetMapper
 
 class SampleRows(AbstractMatrixFileWalker):
