@@ -655,7 +655,6 @@ def readAdjacencyListDataIntoMatrix(inputFname=None, rowIDHeader=None, colIDHead
 	"""
 	sys.stderr.write("Reading a matrix out of an adjacency-list based file %s ..."%(inputFname))
 	from pymodule import MatrixFile
-	from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
 	import numpy
 	if defaultValue is None:
 		defaultValue = numpy.nan
@@ -733,8 +732,6 @@ def getKey2ValueFromMatrixLikeFile(inputFname=None, keyHeaderLs=None, valueHeade
 	"""
 	sys.stderr.write("Getting a dictionary out of  %s ..."%(inputFname))
 	from pymodule import MatrixFile
-	from pymodule.utils import getColName2IndexFromHeader, getListOutOfStr, figureOutDelimiter
-	import numpy
 	
 	reader = MatrixFile(inputFname=inputFname)
 	if hasHeader:
