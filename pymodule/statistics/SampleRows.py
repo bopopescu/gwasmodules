@@ -39,7 +39,7 @@ class SampleRows(AbstractMatrixFileWalker):
 	option_default_dict.update({
 						('sampleSize', 1, int): [None, '', 1, 'number of samples (rows) to be sampled from input, \n\
 	uniformly if plinkIBDCheckOutputFname is not given.'],\
-						('plinkIBDCheckOutputFname', 0, ): [None, '', 1, 'file that contains IBD check result, PI_HAT=relateness.\n\
+						('plinkIBDCheckOutputFname', 0, ): [None, '', 1, 'file that contains IBD check result, PI_HAT=relatedness.\n\
 	at least 3-columns with header: IID1, IID2, PI_HAT. IID1 and IID2 should match the whichColumn (whichColumnHeader) of inputFname.\n\
 	The sampling will try to avoid sampling close pairs, PI_HAT(i,j)<=maxIBDSharing'],\
 						('maxIBDSharing', 1, float): [0.1, '', 1, 'This argument caps the maximum IBD sharing among any pair within the sampled.'],\
@@ -105,9 +105,9 @@ class SampleRows(AbstractMatrixFileWalker):
 							includeInTheSampling = True
 							for sampledRowIndex in sampledRowIndexSet:	#not too close to anyone previously sampled
 								previousSampledRowID = self.data_matrix[sampledRowIndex][whichColumn]
-								#getting the relateness
-								relateness = self.ibdData.getCellDataGivenRowColID(rowID, previousSampledRowID)
-								if relateness>=self.maxIBDSharing:
+								#getting the relatedness
+								relatedness = self.ibdData.getCellDataGivenRowColID(rowID, previousSampledRowID)
+								if relatedness>=self.maxIBDSharing:
 									includeInTheSampling = False
 							if includeInTheSampling:
 								sampledRowIndexSet.add(randomIndex)
