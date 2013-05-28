@@ -444,7 +444,7 @@ class CNVCompareByOverlapLen(object):
 					overlapFraction1 = overlapData.overlapFraction1
 					overlapFraction2 = overlapData.overlapFraction2
 					overlap_length = overlapData.overlap_length
-					if overlap_len>=min_overlap_len:	#should be equal,
+					if overlap_length>=min_overlap_len:	#should be equal,
 						return False
 					else:
 						return key1.span_ls[0]<key2.span_ls[0]	# whether the start of key1 is ahead of the start of key2
@@ -797,7 +797,6 @@ def turnSegmentGWRIntoRBDict(gwr, extend_dist=20000, min_reciprocal_overlap=0.6,
 	
 	segment_ls = mergeOverlappingAmongSegments(segment_ls)
 	
-	from RBTree import RBDict	# 2010-1-26 RBDict is more efficiency than binary_tree.
 	rbDict = RBDict(cmpfn=leftWithinRightAlsoEqualCmp)
 
 	for segment in segment_ls:
@@ -1144,7 +1143,6 @@ def readQuanLongPECoverageIntoGWR(input_fname, additionalTitle=None, windowSize=
 		
 		the coverage data is split into different chromosomes. so argument chr is not used here.
 	"""
-	from CNV import CNVSegmentBinarySearchTreeKey
 	from SNP import GenomeWideResult, DataObject
 	import os, sys, re, csv
 	sys.stderr.write("Reading Quan's coverage data from %s ... "%(input_fname))
@@ -1246,7 +1244,7 @@ if __name__ == "__main__":
 	
 	#from BinarySearchTree import binary_tree
 	#tree = binary_tree()
-	from RBTree import RBDict	#2010-1-26 binary_tree and RBDict are swappable. but RBDict is more efficient (balanced).
+	from pymodule.algorithm.RBTree import RBDict	#2010-1-26 binary_tree and RBDict are swappable. but RBDict is more efficient (balanced).
 	tree = RBDict(cmpfn=leftWithinRightAlsoEqualCmp)	# 2010-1-28 use the custom cmpfn if you want the case that left within right is regarded as equal as well.  
 	tree = RBDict(cmpfn=rightWithinLeftAlsoEqualCmp)
 	
