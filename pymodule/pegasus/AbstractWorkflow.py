@@ -53,6 +53,7 @@ class AbstractWorkflow(ADAG):
 						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, etc., default is /tmp/ but sometimes it is too small'],\
 						('max_walltime', 1, int):[4320, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
 	used in addGenericJob().'],\
+						('jvmVirtualByPhysicalMemoryRatio', 1, float):[1.2, '', 1, "if a job's virtual memory (usually 1.2X of memory request) exceeds request, it will abort on hoffman2. "],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('needSSHDBTunnel', 0, int):[0, 'H', 0, 'DB-interacting jobs need a ssh tunnel (running on cluster behind firewall).'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
@@ -1075,11 +1076,13 @@ class AbstractWorkflow(ADAG):
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, argumentForEachFileInInputFileList=None, \
 					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-					key2ObjectForJob=None, objectWithDBArguments=None, no_of_cpus=None, walltime=180, **keywords):
+					key2ObjectForJob=None, objectWithDBArguments=None, no_of_cpus=None, walltime=180, max_walltime=None, **keywords):
 		"""
 		order in commandline:
 			executable [frontArgumentList] [DBArguments] [inputArgumentOption] [inputFile] [outputArgumentOption] [outputFile]
 				[extraArgumentList] [extraArguments]
+		2013.06.06 added argument max_walltime, maximum walltime for a cluster of jobs.
+			argument walltime controls it for single job.
 		#2013.3.25 added argument objectWithDBArguments
 		#2013.3.21 scale walltime according to clusters_size
 		2013.2.26 added argument argumentForEachFileInInputFileList, to be added in front of each file in inputFileList
@@ -1142,7 +1145,9 @@ class AbstractWorkflow(ADAG):
 		if clusters_size is not None and clusters_size and walltime is not None:
 			clusters_size = int(clusters_size)
 			if clusters_size>1:
-				walltime = min(walltime*clusters_size, self.max_walltime)
+				if max_walltime is None:
+					max_walltime = self.max_walltime
+				walltime = min(walltime*clusters_size, max_walltime)
 			
 		yh_pegasus.setJobProperRequirement(job, job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel,\
 									no_of_cpus=no_of_cpus, walltime=walltime)
@@ -1438,6 +1443,8 @@ class AbstractWorkflow(ADAG):
 	def getJVMMemRequirment(self, job_max_memory=5000, minMemory=2000, permSizeFraction=0.2,
 						MaxPermSizeUpperBound=35000):
 		"""
+		#2013.06.07 if a job's virtual memory (1.2X=self.jvmVirtualByPhysicalMemoryRatio, of memory request) exceeds request, it'll abort.
+			so set memRequirement accordingly.
 		2013.05.01 lower permSizeFraction from 0.4 to 0.2
 			minimum for MaxPermSize is now minMemory/2
 		2013.04.01
@@ -1455,7 +1462,9 @@ class AbstractWorkflow(ADAG):
 		msMemory = mxMemory*3/4
 		memRequirementInStr = "-Xms%sm -Xmx%sm -XX:PermSize=%sm -XX:MaxPermSize=%sm"%\
 				(msMemory, mxMemory, PermSize, MaxPermSize)
-		memRequirement = MaxPermSize + mxMemory
+		
+		memRequirement = int((MaxPermSize + mxMemory)*self.jvmVirtualByPhysicalMemoryRatio)
+		#2013.06.07 if a job's virtual memory (1.2X of memory request) exceeds request, it'll abort.
 		return PassingData(memRequirementInStr=memRequirementInStr, memRequirement=memRequirement)
 	
 	def scaleJobWalltimeOrMemoryBasedOnInput(self, realInputVolume=10, baseInputVolume=4, baseJobPropertyValue=120, \
