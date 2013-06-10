@@ -33,6 +33,7 @@
 // This is a typedef for a random number generator.
 // Try boost::mt19937 or boost::ecuyer1988 instead of boost::minstd_rand
 typedef boost::mt19937 base_generator_type;
+typedef boost::tokenizer<boost::char_separator<char> > tokenizerCharType;	//to break a line into list by some delimiter
 
 using namespace arma;
 using namespace std;
@@ -42,26 +43,37 @@ namespace po = boost::program_options;
 
 class CalculateMedianMeanOfInputColumn{
 	string inputFname;
+	int inputFileFormat;
 	std::ifstream inputFile;
-	boost::iostreams::filtering_streambuf<boost::iostreams::input> input;
+	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
+
 	string outputFname;
 	std::ofstream outputFile;
-	int alignmentID;
 	float fractionToSample;
-	int noOfLinesInHeader;
 	int whichColumn;
-	int maxNumberOfSamplings;
+	long maxNumberOfSamplings;
 	string inputStatName;	//name of the statistics in the input file
 	arma::mat statList;	//armadillo matrix storing all the sampled stats
-	__gnu_cxx::hash_map <int, int> stat2Occurrence;
-	int modeStat;
+	int statListExpansionStepSize;	//each time, statList is expanded, this parameter controls the size of expansion
+	__gnu_cxx::hash_map <long, long> stat2Frequency;	//needed to calculate mode
 	// Define an accumulator set for calculating the mean and the median
-	ba::accumulator_set<double, ba::stats<ba::tag::mean, ba::tag::median > > acc;
+	ba::accumulator_set<double, ba::stats<ba::tag::mean, ba::tag::median > > accumulatorSet;
+
+	//2013.06.09 for output
+	int alignmentID;
+	long noOfData;	//watch "long" is needed, big integer, 3 billion or so loci for one genome
+	long noOfSampledData;
+	double meanStat;
+	double medianStat;
+	long modeStat;
 
 public:
 	CalculateMedianMeanOfInputColumn(string _inputFname, string _outputFname, int _alignmentID,
-			float _fractionToSample, int _noOfLinesInHeader, int _whichColumn, int _maxNumberOfSamplings,
-			string _inputStatName);
+			float _fractionToSample, int _whichColumn, long _maxNumberOfSamplings,
+			int _inputFileFormat, string _inputStatName);
 	~CalculateMedianMeanOfInputColumn();
+	void skipHeaderInInput(int noOfLinesInHeader);
+	int readInRawDataFromSAMtoolsDepthFile();
+	int readInRawDataFromGATKDOCOutput();
 	void run();
 };
