@@ -712,7 +712,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 							java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
 							addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
 							no_of_aln_threads=no_of_aln_threads, stampy=stampy)
-		2013.04.27 used to be 'mem', now is 'bwamem'
+		
+		2013.04.27 used to be 'mem', now is 'bwamem' in db
 		2013.04.04 new alignment method (bwa-mem) from Heng Li
 		2012.10.18 add argument addBamIndexJob,
 		2012.10.10
@@ -828,16 +829,12 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 					SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
 					parentJobLs=[sortAlnParentJob], extraDependentInputLs=None, \
 					extraArguments=None, job_max_memory = 2500, walltime=80, \
-					transferOutput=transferOutput)
+					transferOutput=transferOutput, needBAMIndexJob=addBamIndexJob)
+		
 		if addBamIndexJob:
-			# add the index job on the merged bam file
-			bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=self.BuildBamIndexFilesJava, \
-						BuildBamIndexJar=self.BuildBamIndexJar, \
-						inputBamF=sortAlignmentJob.output, parentJobLs=[sortAlignmentJob], \
-						transferOutput=transferOutput, javaMaxMemory=2000, walltime=60)
-			returnJob = bamIndexJob	#bamIndexJob.parentJobLs[0] is sortAlignmentJob.
+				returnJob = sortAlignmentJob.bamIndexJob	#bamIndexJob.parentJobLs[0] is sortAlignmentJob.
 		else:
-			returnJob = sortAlignmentJob
+				returnJob = sortAlignmentJob
 		return returnJob, returnJob.output
 	
 	def addSAM2BAMJob(self, inputFile=None, outputFile=None,\

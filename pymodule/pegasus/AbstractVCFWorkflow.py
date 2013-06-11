@@ -224,7 +224,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 
 	def addPlotVCFtoolsStatJob(self, workflow=None, executable=None, inputFileList=None, outputFnamePrefix=None, \
 							whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, need_svg=False, \
-							logWhichColumn=True, positiveLog=False, valueForNonPositiveYValue=-1, \
+							logY=0, valueForNonPositiveYValue=-1, \
 							xColumnPlotLabel=None, xColumnHeader=None, chrLengthColumnHeader=None, chrColumnHeader=None, \
 							minChrLength=1000000, minNoOfTotal=100,\
 							figureDPI=300, ylim_type=2, samplingRate=0.0001, logCount=False,\
@@ -232,6 +232,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 							extraDependentInputLs=None, \
 							extraArguments=None, transferOutput=True, job_max_memory=2000, sshDBTunnel=False, **keywords):
 		"""
+		2013.05.27 remove argument positiveLog, rename logWhichColumn to logY
 		2012.10.6 use addGenericDBJob() instead of addGenericJob()
 		2012.8.31 add argument positiveLog and valueForNonPositiveYValue
 		# whichColumnPlotLabel and xColumnPlotLabel should not contain spaces or ( or ). because they will disrupt shell commandline
@@ -241,7 +242,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			
 			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
 			('whichColumnHeader', 0, ): ["", 'W', 1, 'column label (in the header) for the data to be plotted as y-axis value, substitute whichColumn'],\
-			('logWhichColumn', 0, int): [0, 'g', 0, 'whether to take log of whichColumn'],\
+			('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: log(), 2: -log(). replacing self.logWhichColumn.'],\
 			('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
 			('whichColumnPlotLabel', 1, ): ['#SNPs in 100kb window', 'D', 1, 'plot label for data of the whichColumn', ],\
 			('xColumnPlotLabel', 1, ): ['position', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
@@ -275,10 +276,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			extraArgumentList.append("--whichColumnHeader %s"%(whichColumnHeader))
 		if whichColumn:
 			extraArgumentList.append("--whichColumn %s"%(whichColumn))
-		if logWhichColumn:
-			extraArgumentList.append('--logWhichColumn')
-			if positiveLog:
-				extraArgumentList.append('--positiveLog')
+		if logY is not None:
+			extraArgumentList.append('--logY %s'%(logY))
 		if whichColumnPlotLabel:
 			extraArgumentList.append("--whichColumnPlotLabel %s"%(whichColumnPlotLabel))
 		if xColumnPlotLabel:

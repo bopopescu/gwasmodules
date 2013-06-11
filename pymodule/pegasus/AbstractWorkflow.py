@@ -1302,7 +1302,7 @@ class AbstractWorkflow(ADAG):
 	
 	def addCalculateDepthMeanMedianModeJob(self, workflow=None, executable=None, \
 							inputFile=None, outputFile=None, alignmentID=None, fractionToSample=0.001, \
-							noOfLinesInHeader=0, whichColumn=2, maxNumberOfSamplings=1E7, inputStatName=None,\
+							whichColumn=None, maxNumberOfSamplings=1E7, inputStatName=None,\
 							parentJobLs=None, job_max_memory = 500, extraArguments=None, \
 							transferOutput=False, **keywords):
 		"""
@@ -1314,8 +1314,6 @@ class AbstractWorkflow(ADAG):
 		extraArgumentList = []
 		if alignmentID is not None:
 			extraArgumentList.append("--alignmentID %s"%(alignmentID))
-		if noOfLinesInHeader is not None:
-			extraArgumentList.append("--noOfLinesInHeader %s"%(noOfLinesInHeader))
 		if fractionToSample is not None:
 			extraArgumentList.append("--fractionToSample %s"%(fractionToSample))
 		if whichColumn is not None:

@@ -113,10 +113,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				for parentJob in parentJobLs:
 					if parentJob:
 						self.addJobDependency(workflow=workflow, parentJob=parentJob, childJob=job)
-			if alignmentFileFolder:	#2013.05.21 pegasus/condor would truncate long single-argument.
-				job.addArguments('%s/*.bam'%(alignmentFileFolder))
-			else:
-				job.addArguments(','.join(fileArgumentLs))
+			#if alignmentFileFolder:	#2013.05.21 pegasus/condor would truncate long single-argument.
+			#	job.addArguments('%s/*.bam'%(alignmentFileFolder))
+			#else:
+			job.addArguments(','.join(fileArgumentLs))
 	
 	def addAddRG2BamJobsAsNeeded(self, workflow=None, alignmentDataLs=None, site_handler=None, input_site_handler=None, \
 							addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None, \
