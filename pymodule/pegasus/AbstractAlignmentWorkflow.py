@@ -678,6 +678,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def setup_run(self):
 		"""
+		2013.06.11 assign all returned data to self, rather than pdata (pdata has become self)
 		2013.04.07 wrap all standard pre-run() related functions into this function.
 			setting up for run(), called by run()
 		"""
@@ -694,11 +695,11 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		registerReferenceData = self.getReferenceSequence()
 		
 		alignmentDataLs = self.registerAlignmentAndItsIndexFile(workflow=workflow, alignmentLs=alignmentLs, data_dir=self.data_dir)
-		pdata.alignmentLs = alignmentLs
-		pdata.alignmentDataLs = alignmentDataLs
-		pdata.chr2IntervalDataLs = chr2IntervalDataLs
-		pdata.registerReferenceData = registerReferenceData
-		return pdata
+		self.alignmentLs = alignmentLs
+		self.alignmentDataLs = alignmentDataLs
+		self.chr2IntervalDataLs = chr2IntervalDataLs
+		self.registerReferenceData = registerReferenceData
+		return self
 	
 	def run(self):
 		"""

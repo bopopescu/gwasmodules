@@ -578,7 +578,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				needFastaIndexJob=False, needFastaDictJob=False, \
 				data_dir=None, no_of_gatk_threads = 1, \
 				intervalSize=3000, intervalOverlapSize=0, \
-				outputDirPrefix="", transferOutput=True, job_max_memory=2000, **keywords):
+				outputDirPrefix="", passingData=None, \
+				transferOutput=True, job_max_memory=2000, **keywords):
 		"""
 		2012.7.26
 			architect of the whole map-reduce framework
@@ -792,6 +793,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	
 	def setup_run(self):
 		"""
+		2013.06.11 added firstVCFJobData in return
+			assign all returned data to self, rather than pdata (pdata has become self)
 		2013.04.07 wrap all standard pre-run() related functions into this function.
 			setting up for run(), called by run()
 		"""
@@ -807,6 +810,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 													intervalOverlapSize=self.intervalOverlapSize)
 		
 		inputData = None
+		firstVCFJobData = None
 		if getattr(self, 'inputDir', None):	#2013.05.20 bugfix
 			inputData = self.registerAllInputFiles(workflow, self.inputDir, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
@@ -816,13 +820,16 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 											db_vervet=getattr(self, 'db_vervet', None), \
 											needToKnowNoOfLoci=True,\
 											minNoOfLoci=getattr(self, 'minNoOfLoci', 10))
+			firstVCFJobData = inputData.jobDataLs[0]
+			#job=None, jobLs=[], vcfFile=inputF, tbi_F=tbi_F, file=inputF, fileLs=[inputF, tbi_F]
 		
 		registerReferenceData = self.getReferenceSequence()
 		
-		pdata.inputData = inputData
-		pdata.chr2IntervalDataLs = chr2IntervalDataLs
-		pdata.registerReferenceData = registerReferenceData
-		return pdata
+		self.inputData = inputData
+		self.chr2IntervalDataLs = chr2IntervalDataLs
+		self.registerReferenceData = registerReferenceData
+		self.firstVCFJobData = firstVCFJobData
+		return self
 	
 	def run(self):
 		"""

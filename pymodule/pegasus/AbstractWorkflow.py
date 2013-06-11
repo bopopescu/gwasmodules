@@ -1988,6 +1988,7 @@ class AbstractWorkflow(ADAG):
 
 	def setup_run(self):
 		"""
+		2013.06.11 assign all returned data to self, rather than pdata (pdata has become self)
 		2013.04.07 wrap all standard pre-run() related functions into this function.
 			setting up for run(), called by run()
 		"""
@@ -2005,7 +2006,7 @@ class AbstractWorkflow(ADAG):
 			if not self.local_data_dir:
 				self.local_data_dir = self.db.data_dir
 		
-		workflow = self.initiateWorkflow()
+		self.workflow = self.initiateWorkflow()
 		
 		
 		self.registerJars()
@@ -2013,7 +2014,7 @@ class AbstractWorkflow(ADAG):
 		self.registerExecutables()
 		self.registerCustomExecutables()
 		
-		return PassingData(workflow=workflow)
+		return self
 	
 	def end_run(self):
 		"""
