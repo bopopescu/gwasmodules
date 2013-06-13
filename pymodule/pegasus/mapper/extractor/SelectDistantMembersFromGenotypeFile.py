@@ -3,7 +3,7 @@
 Examples:
 	%s 
 	
-	%s 
+	%s -o ... input1.bgl input2.bgl input3.bgl
 	
 
 Description:
@@ -147,10 +147,8 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		for inputFname in self.inputFnameLs:
 			beagleFile = BeagleGenotypeFile(inputFname=inputFname)
 			beagleFile.readInAllHaplotypes()
-			for individualID, firstHaplotypeIndex in beagleFile.snpData.col_id2col_index.iteritems():
-				haplotypeList = []
-				for j in xrange(firstHaplotypeIndex, firstHaplotypeIndex+self.ploidy):
-					haplotypeList.append(beagleFile.snpData.data_matrix[:,j]) 
+			for individualID in beagleFile.sampleIDList:
+				haplotypeList = beagleFile.getHaplotypeListOfOneSample(individualID)
 				individualID2HaplotypeData[individualID] = PassingData(haplotypeList=haplotypeList,
 																	locusIDList=beagleFile.locusIDList)
 			# get all haplotypes , etc.
