@@ -20,6 +20,9 @@ if test $# -lt 3; then
 	echo "	# replace old value TimeToLive with 178000 and overwrite original file"
 	echo "	$0 work/BaseQualityRecalibration/LocalRealignmentBQSR_AlnID2828_2847_vsMethod87.2013.Apr.17T230821/ merge_pegasus-addOrReplaceReadGroupsJava 178000 1"
 	echo
+	echo "# replace old MaxPermSize in java jobs"
+	echo "	$0 work/BaseQualityRecalibration/LocalRealignmentBQSR_AlnID2828_2847_vsMethod87.2013.Apr.17T230821/ merge_pegasus-addOrReplaceReadGroupsJava 4000 1 MaxPermSize"
+	echo
 	echo
 	exit 1
 fi
