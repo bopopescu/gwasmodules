@@ -390,9 +390,9 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				else:
 					mpileupInterval = intervalData.interval
 					bcftoolsInterval = intervalData.interval
-				intervalFnameSignature = intervalData.intervalFnameSignature
+				intervalFileBasenameSignature = intervalData.intervalFileBasenameSignature
 				overlapInterval = intervalData.overlapInterval
-				overlapFilenameSignature = intervalData.overlapIntervalFnameSignature
+				overlapFileBasenameSignature = intervalData.overlapIntervalFileBasenameSignature
 				
 				mapEachIntervalData = self.mapEachInterval(workflow=workflow, alignmentData=alignmentData, intervalData=intervalData,\
 									chromosome=chromosome,\
@@ -459,14 +459,12 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		refFastaFList = registerReferenceData.refFastaFList
 		refFastaF = refFastaFList[0]
 
-		topOutputDir = "%sMap"%(outputDirPrefix)
-		topOutputDirJob = self.addMkDirJob(outputDir=topOutputDir)
+		topOutputDirJob = self.addMkDirJob(outputDir="%sMap"%(outputDirPrefix))
+		self.mapDirJob = topOutputDirJob
 		
-		plotOutputDir = "%sPlot"%(outputDirPrefix)
-		plotOutputDirJob = self.addMkDirJob(outputDir=plotOutputDir)
+		plotOutputDirJob = self.addMkDirJob(outputDir="%sPlot"%(outputDirPrefix))
 		
-		reduceOutputDir = "%sReduce"%(outputDirPrefix)
-		reduceOutputDirJob = self.addMkDirJob(outputDir=reduceOutputDir)
+		reduceOutputDirJob = self.addMkDirJob(outputDir="%sReduce"%(outputDirPrefix))
 		
 		if needFastaDictJob or registerReferenceData.needPicardFastaDictJob:
 			fastaDictJob = self.addRefFastaDictJob(CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
@@ -544,7 +542,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		no_of_alignments_worked_on= 0
 		for alignmentData in passingData.alignmentDataLs:
 			alignment = alignmentData.alignment
-			parentJobLs = alignmentData.jobLs
+			parentJobLs = alignmentData.jobLs + [fastaDictJob, fastaIndexJob]
 			bamF = alignmentData.bamF
 			baiF = alignmentData.baiF
 			

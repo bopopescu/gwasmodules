@@ -968,7 +968,7 @@ class AbstractWorkflow(ADAG):
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, \
 					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-					key2ObjectForJob=None, objectWithDBArguments=None, **keywords):
+					key2ObjectForJob=None, objectWithDBArguments=None, walltime=None, **keywords):
 		"""
 		2013.3.25 bugfix. moved most post-addGenericDBJob code into addGenericDBJob()
 		2012.10.6
@@ -989,7 +989,7 @@ class AbstractWorkflow(ADAG):
 						extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
 						transferOutput=transferOutput, extraArguments=extraArguments, extraArgumentList=extraArgumentList,\
 						job_max_memory=job_max_memory, sshDBTunnel=sshDBTunnel, key2ObjectForJob=key2ObjectForJob,\
-						objectWithDBArguments=objectWithDBArguments, \
+						objectWithDBArguments=objectWithDBArguments, walltime=walltime,\
 						**keywords)
 		
 		#2012.10.6 set the job.input
@@ -1074,9 +1074,12 @@ class AbstractWorkflow(ADAG):
 		
 	def addGenericJob(self, workflow=None, executable=None, inputFile=None, inputArgumentOption="-i", \
 					outputFile=None, outputArgumentOption="-o", inputFileList=None, argumentForEachFileInInputFileList=None, \
-					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
-					frontArgumentList=None, extraArguments=None, extraArgumentList=None, job_max_memory=2000,  sshDBTunnel=None, \
-					key2ObjectForJob=None, objectWithDBArguments=None, no_of_cpus=None, walltime=180, max_walltime=None, **keywords):
+					parentJob=None, parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, \
+					frontArgumentList=None, extraArguments=None, extraArgumentList=None, \
+					transferOutput=False, sshDBTunnel=None, \
+					key2ObjectForJob=None, objectWithDBArguments=None, \
+					no_of_cpus=None, job_max_memory=2000, walltime=180, \
+					max_walltime=None, **keywords):
 		"""
 		order in commandline:
 			executable [frontArgumentList] [DBArguments] [inputArgumentOption] [inputFile] [outputArgumentOption] [outputFile]

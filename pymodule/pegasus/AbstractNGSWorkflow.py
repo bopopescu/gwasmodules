@@ -168,6 +168,9 @@ class AbstractNGSWorkflow(parentClass):
 		"""
 		parentClass.registerJars(self)
 		
+		#2013.06.13
+		self.registerOneJar(name="BeagleJar", path=os.path.expanduser('~/bin/Beagle/beagle.jar'))
+		
 		#add the MergeSamFiles.jar file into workflow
 		self.registerOneJar(name="MergeSamFilesJar", path=os.path.join(self.picard_path, 'MergeSamFiles.jar'))
 		self.registerOneJar(name="BuildBamIndexJar", path=os.path.join(self.picard_path, 'BuildBamIndex.jar'))
@@ -328,15 +331,6 @@ class AbstractNGSWorkflow(parentClass):
 		concatSamtools.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcf_concat.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((concatSamtools, 1))
 		
-		#vcftoolsPath is first argument to vcftoolsWrapper
-		vcftoolsWrapper = Executable(namespace=namespace, name="vcftoolsWrapper", version=version, \
-										os=operatingSystem, arch=architecture, installed=True)
-		vcftoolsWrapper.addPFN(PFN("file://" + os.path.join(self.vervetSrcPath, "shell/vcftoolsWrapper.sh"), site_handler))
-		vcftoolsWrapper.vcftoolsPath = self.vcftoolsPath
-		executableClusterSizeMultiplierList.append((vcftoolsWrapper, 1))
-		#vcftoolsWrapper.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
-		#self.addExecutable(vcftoolsWrapper)
-		#self.vcftoolsWrapper = vcftoolsWrapper
 		
 		tabix = Executable(namespace=namespace, name="tabix", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
@@ -360,13 +354,6 @@ class AbstractNGSWorkflow(parentClass):
 							version=version, os=operatingSystem, arch=architecture, installed=True)
 		MergeFiles.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "shell/MergeFiles.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((MergeFiles, 0 ))
-		
-		#2012.7.25
-		MergeVCFReplicateHaplotypesJava= Executable(namespace=namespace, name="MergeVCFReplicateHaplotypesJava", \
-											version=version, os=operatingSystem,\
-											arch=architecture, installed=True)
-		MergeVCFReplicateHaplotypesJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((MergeVCFReplicateHaplotypesJava, 0.5))
 		
 		#2012.7.29, moved from CheckTwoVCFOverlapPipeline.py
 		CheckTwoVCFOverlap = Executable(namespace=namespace, name="CheckTwoVCFOverlap", version=version, \
@@ -396,10 +383,21 @@ class AbstractNGSWorkflow(parentClass):
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='GATKJava', clusterSizeMultipler=0.2)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.samtools_path, name='samtools', clusterSizeMultipler=0.2)
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='genotyperJava', clusterSizeMultipler=0.2)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='genotyperJava', clusterSizeMultipler=0.1)
 		
 		#clustering is controlled by a separate parameter
 		#genotyperJava.addProfile(Profile(Namespace.PEGASUS, key="clusters.size", value="%s"%clusters_size))
+		
+		#2012.7.25
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='MergeVCFReplicateHaplotypesJava', \
+											clusterSizeMultipler=0.5)
+		
+		#2013.06.13
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='BeagleJava', clusterSizeMultipler=0.3)
+		#2013.06.12 use this simple function to register vcftoolsWrapper
+		#vcftoolsPath is first argument to vcftoolsWrapper
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.vervetSrcPath, "shell/vcftoolsWrapper.sh"), \
+													name='vcftoolsWrapper', clusterSizeMultipler=1)
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='SortSamFilesJava', clusterSizeMultipler=1)
 		#2013.06.06
@@ -560,25 +558,45 @@ class AbstractNGSWorkflow(parentClass):
 		if fastaIndexJob or fastaDictJob:
 			self.addJobUse(job=job, file=refFastaF, transfer=True, register=True, link=Link.INPUT)
 	
-	def addVCFFormatConvertJob(self, workflow=None, vcf_convert=None, parentJob=None, inputF=None, outputF=None, \
-							namespace=None, version=None, transferOutput=False):
+	def addVCFFormatConvertJob(self, workflow=None, vcf_convert=None, inputF=None, outputF=None, \
+							parentJob=None, parentJobLs=None, \
+							extraDependentInputLs=None, transferOutput=False, job_max_memory=None,\
+							walltime=None, **keywords):
 		"""
+		2013.06.14
+			use addGenericJob()
 		2011-11-4
 		"""
-		vcf_convert_job = Job(namespace=getattr(self, 'namespace', namespace), name=vcf_convert.name, \
-							version=getattr(self, 'version', version))
-		vcf_convert_job.addArguments(inputF, outputF)
-		vcf_convert_job.uses(inputF, transfer=False, register=True, link=Link.INPUT)
-		vcf_convert_job.uses(outputF, transfer=transferOutput, register=True, link=Link.OUTPUT)
-		self.addJob(vcf_convert_job)
-		self.depends(parent=parentJob, child=vcf_convert_job)
-		return vcf_convert_job
+		if workflow is None:
+			workflow = self
+		if vcf_convert is None:
+			vcf_convert = self.vcf_convert
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		extraArgumentList = []
+		extraOutputLs = []
+		key2ObjectForJob = {}
+		
+		job = self.addGenericJob(executable=vcf_convert, inputFile=inputF, inputArgumentOption="", \
+					outputFile=outputF, outputArgumentOption="", \
+					parentJob=parentJob, \
+					parentJobLs=parentJobLs, \
+					extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
+					transferOutput=transferOutput, \
+					extraArguments=None, extraArgumentList=extraArgumentList, \
+					sshDBTunnel=None, \
+					key2ObjectForJob=key2ObjectForJob, \
+					job_max_memory=job_max_memory, walltime=walltime,\
+					**keywords)
+		return job
 	
 	def addBGZIP_tabix_Job(self, workflow=None, bgzip_tabix=None, parentJob=None, inputF=None, outputF=None, \
 							transferOutput=False, parentJobLs=None, tabixArguments=None,\
-							extraDependentInputLs=None, **keywords):
+							extraDependentInputLs=None, job_max_memory=2000, **keywords):
 		"""
+		Doc:
 			access the tbi file via job.tbi_F
+		2013.06.14 added argument job_max_memory
 		2012.8.17 if transferOutput is None, do not register output files as OUTPUT with transfer flag
 			use addGenericJob()
 		2011.12.20
@@ -611,7 +629,8 @@ class AbstractNGSWorkflow(parentClass):
 					outputFile=outputF, outputArgumentOption="", \
 					parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, extraOutputLs=extraOutputLs, \
 					transferOutput=transferOutput, \
-					extraArguments=tabixArguments, extraArgumentList=extraArgumentList, job_max_memory=2000,  sshDBTunnel=None, \
+					extraArguments=tabixArguments, extraArgumentList=extraArgumentList, \
+					job_max_memory=job_max_memory,  sshDBTunnel=None, \
 					key2ObjectForJob=key2ObjectForJob, **keywords)
 		return job
 	
@@ -1939,11 +1958,11 @@ Contig966       3160    50
 						startLineNumber=blockStartLineNumber, stopLineNumber=blockStopLineNumber, \
 						parentJobLs=parentJobLs, extraDependentInputLs=None, \
 						transferOutput=False, job_max_memory=500)
-				intervalFnameSignature = '%s_%s_%s'%(chr, blockStartLineNumber, blockStopLineNumber)
+				intervalFileBasenameSignature = '%s_%s_%s'%(chr, blockStartLineNumber, blockStopLineNumber)
 				if chr not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chr] = []
 				span = blockStopLineNumber - blockStartLineNumber + 1	#how many loci, rather than the region size
-				intervalData = PassingData(file=blockIntervalFile, intervalFnameSignature=intervalFnameSignature, interval=interval,\
+				intervalData = PassingData(file=blockIntervalFile, intervalFileBasenameSignature=intervalFileBasenameSignature, interval=interval,\
 										overlapInterval=interval, span=span, chromosomeSize=chr2MaxStopPosition.get(chr), \
 										chr=chr, jobLs=[blockIntervalJob], job=blockIntervalJob)
 				chr2IntervalDataLs[chr].append(intervalData)
@@ -1974,14 +1993,14 @@ Contig966       3160    50
 				stopPos = min(refSize, originalStopPos+intervalOverlapSize)
 				
 				interval = "%s:%s-%s"%(chr, originalStartPos, originalStopPos)
-				intervalFnameSignature = '%s_%s_%s'%(chr, originalStartPos, originalStopPos)
+				intervalFileBasenameSignature = '%s_%s_%s'%(chr, originalStartPos, originalStopPos)
 				overlapInterval = "%s:%s-%s"%(chr, startPos, stopPos)
-				overlapIntervalFnameSignature = '%s_%s_%s'%(chr, startPos, stopPos)
+				overlapIntervalFileBasenameSignature = '%s_%s_%s'%(chr, startPos, stopPos)
 				if chr not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chr] = []
 				span = stopPos-startPos+1
-				intervalData = PassingData(overlapInterval=overlapInterval, overlapIntervalFnameSignature=overlapIntervalFnameSignature,\
-							interval=interval, intervalFnameSignature=intervalFnameSignature, \
+				intervalData = PassingData(overlapInterval=overlapInterval, overlapIntervalFileBasenameSignature=overlapIntervalFileBasenameSignature,\
+							interval=interval, intervalFileBasenameSignature=intervalFileBasenameSignature, \
 							file=None,\
 							chr=chr, chromosomeSize=refSize,\
 							start=originalStartPos, stop=originalStopPos, \
@@ -2203,7 +2222,7 @@ Contig966       3160    50
 						inputF=None, outputF=None, replicateIndividualTag=None, \
 						debugHaplotypeDistanceFile=None, \
 						debugMajoritySupportFile=None,\
-						refFastaFList=[], parentJobLs=[], extraDependentInputLs=None, transferOutput=False, \
+						refFastaFList=None, parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 						extraArguments=None, job_max_memory=2000, analysis_type='MergeVCFReplicateHaplotypes',\
 						**keywords):
 		"""

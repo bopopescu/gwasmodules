@@ -321,8 +321,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 								
 		fastqF = firstFileObject.fastqF
 		relativePath = fastqF.name
-		fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
-		outputSamFile = File('%s.sam'%(os.path.join(outputDir, fname_prefix)))
+		fileBasenamePrefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
+		outputSamFile = File('%s.sam'%(os.path.join(outputDir, fileBasenamePrefix)))
 		
 		alignmentJob = Job(namespace=workflow.namespace, name=stampy.name, version=workflow.version)
 		# make sure to use ', rather than ", to wrap the bwaoptions. double-quote(") would disappear during xml translation.
@@ -335,7 +335,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 			alignmentJob.addArguments("--solexa")
 		alignmentJob.uses(outputSamFile, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		alignmentJob.output = outputSamFile
-		alignmentJob.fname_prefix = fname_prefix
+		alignmentJob.fileBasenamePrefix = fileBasenamePrefix
 		
 		for refFastaFile in refFastaFList:
 			alignmentJob.uses(refFastaFile, transfer=True, register=True, link=Link.INPUT)
@@ -492,8 +492,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 			if alignment_method.command.find('aln')>=0 and sequencer.short_name!='454' and \
 						(sequence_type and sequence_type.read_length_mean is not None \
 						and sequence_type.read_length_mean<150):	#short single-end read
-				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
-				outputFname = os.path.join(outputDir, '%s.sai'%fname_prefix)
+				fileBasenamePrefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
+				outputFname = os.path.join(outputDir, '%s.sai'%fileBasenamePrefix)
 				saiOutput = File(outputFname)
 				alignmentJob = self.addBWAAlignmentJob(workflow=workflow, executable=bwa, bwaCommand=alignment_method.command, \
 									fileObject=fileObject, outputFile=saiOutput,\
@@ -505,7 +505,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 					extraArguments=None, extraArgumentList=None, job_max_memory=aln_job_max_memory, \
 					key2ObjectForJob=None, walltime=aln_job_walltime)
 				
-				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
+				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fileBasenamePrefix)))
 				sai2samJob = Job(namespace=namespace, name=ShortSEAlignmentByBWA.name, version=version)
 				sai2samJob.addArguments(refFastaFList[0], saiOutput, fastqF, alignmentSamF)
 				for refFastaFile in refFastaFList:
@@ -521,8 +521,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 			elif alignment_method.command.find('bwasw')>=0 or sequencer.short_name=='454' or \
 						(sequence_type and sequence_type.read_length_mean is not None \
 						and sequence_type.read_length_mean>150):	#long single-end read
-				fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
-				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
+				fileBasenamePrefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
+				alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fileBasenamePrefix)))
 				alignmentJob = Job(namespace=namespace, name=LongSEAlignmentByBWA.name, version=version)
 				
 				alignmentJob.addArguments(refFastaFList[0], fastqF, alignmentSamF, repr(no_of_aln_threads))
@@ -549,11 +549,11 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 								
 			#fastqF1, format, sequence_type = fileObjectLs[0][:3]
 			#fastqF2, format, sequence_type = fileObjectLs[1][:3]
-			fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
-			#fname_prefix = fname_prefix[:-2]	#2013.3.18 stop discarding the last two characters of filename prefix
+			fileBasenamePrefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
+			#fileBasenamePrefix = fileBasenamePrefix[:-2]	#2013.3.18 stop discarding the last two characters of filename prefix
 			# full filename for pair-1 fastq is 13135_3628_20_gerald_81LWDABXX_5_ATCACG_1_3.fastq.gz. the last 3 is split order.
 			# the last 1 means pair-1. Doesn't affect filename uniqueness in either way. since the file id (13135) is unique.
-			alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
+			alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fileBasenamePrefix)))
 			sai2samJob = Job(namespace=namespace, name=PEAlignmentByBWA.name, version=version)
 			sai2samJob.addArguments(refFastaFList[0])
 			yh_pegasus.setJobProperRequirement(sai2samJob, job_max_memory=sampe_job_max_memory)
@@ -602,7 +602,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		sai2samJob.uses(alignmentSamF, transfer=transferOutput, register=True, link=Link.OUTPUT)
 		sai2samJob.output = alignmentSamF
 		sai2samJob.outputLs = [alignmentSamF]
-		sai2samJob.fname_prefix = fname_prefix
+		sai2samJob.fileBasenamePrefix = fileBasenamePrefix
 		if refIndexJob:
 			self.addRefIndexJobAndItsOutputAsParent(workflow, refIndexJob, childJob=sai2samJob)
 		if parentJobLs:
@@ -660,8 +660,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 									baseInputVolume=4000000, baseJobPropertyValue=baseAlnJobWalltime, \
 									minJobPropertyValue=baseAlnJobWalltime*2/3, maxJobPropertyValue=baseAlnJobWalltime*5).value
 									
-			fname_prefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
-			alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fname_prefix)))
+			fileBasenamePrefix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(os.path.basename(relativePath))[0]
+			alignmentSamF = File('%s.sam.gz'%(os.path.join(outputDir, fileBasenamePrefix)))
 			
 			fastqFileList = [fileObject.fastqF for fileObject in fileObjectLs]
 			extraArgumentList.extend(["-a -M", refFastaFile] + fastqFileList)
@@ -681,7 +681,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 			raise
 		
 		
-		alignmentJob.fname_prefix = fname_prefix
+		alignmentJob.fileBasenamePrefix = fileBasenamePrefix
 		if refIndexJob:
 			self.addRefIndexJobAndItsOutputAsParent(workflow, refIndexJob, childJob=alignmentJob)
 		return alignmentJob
@@ -784,10 +784,10 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		else:
 			sys.stderr.write("Alignment method %s is not supported.\n"%(alignment_method.short_name))
 			sys.exit(3)
-		fname_prefix = alignmentJob.fname_prefix
+		fileBasenamePrefix = alignmentJob.fileBasenamePrefix
 		
 		## convert sam into bam	
-		bamOutputF = File(os.path.join(outputDir, "%s.bam"%(fname_prefix)))
+		bamOutputF = File(os.path.join(outputDir, "%s.bam"%(fileBasenamePrefix)))
 		#2013.3.18
 		sam_convert_job = self.addSAM2BAMJob(inputFile=alignmentJob.output, outputFile=bamOutputF,\
 					executable=self.SAM2BAMJava, SamFormatConverterJar=self.SamFormatConverterJar,\
@@ -805,7 +805,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		"""
 		if individual_alignment:	#if not given then , no read-group addition job
 			#2012.9.19 add a AddReadGroup job
-			outputRGBAM = File(os.path.join(outputDir, "%s.RG.bam"%(fname_prefix)))
+			outputRGBAM = File(os.path.join(outputDir, "%s.RG.bam"%(fileBasenamePrefix)))
 			addRGJob = self.addReadGroupInsertionJob(workflow=workflow, individual_alignment=individual_alignment, \
 								inputBamFile=sam_convert_job.output, \
 								outputBamFile=outputRGBAM,\
@@ -822,7 +822,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		# 2010-2-4
 			sort it so that it could be used for merge
 		"""
-		bam_output_fname_prefix = '%s.sorted'%(os.path.join(outputDir, fname_prefix))
+		bam_output_fname_prefix = '%s.sorted'%(os.path.join(outputDir, fileBasenamePrefix))
 		sortBamF = File('%s.bam'%(bam_output_fname_prefix))
 		sortAlignmentJob = self.addSortAlignmentJob(workflow=workflow, inputBamFile=sortAlnParentJob.output, \
 					outputBamFile=sortBamF,\

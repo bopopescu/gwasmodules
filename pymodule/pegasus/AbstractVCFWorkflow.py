@@ -440,10 +440,10 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 						startLineNumber=blockStartLineNumber, stopLineNumber=blockStopLineNumber, \
 						parentJobLs=parentJobLs, extraDependentInputLs=None, \
 						transferOutput=False, job_max_memory=500)
-				intervalFnameSignature = '%s_%s_%s'%(chromosome, blockStartLineNumber, blockStopLineNumber)
+				intervalFileBasenameSignature = '%s_%s_%s'%(chromosome, blockStartLineNumber, blockStopLineNumber)
 				if chromosome not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chromosome] = []
-				intervalData = PassingData(file=blockIntervalFile, intervalFnameSignature=intervalFnameSignature, interval=interval,\
+				intervalData = PassingData(file=blockIntervalFile, intervalFileBasenameSignature=intervalFileBasenameSignature, interval=interval,\
 										chr=chromosome, chromosome=chromosome, jobLs=[blockIntervalJob], job=blockIntervalJob)
 				chr2IntervalDataLs[chromosome].append(intervalData)
 				counter += 1
@@ -461,21 +461,27 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	
 	def preReduce(self, workflow=None, outputDirPrefix="", passingData=None, transferOutput=True, **keywords):
 		"""
+		2013.06.14
+			move topOutputDirJob from addAllJobs to here. 
 		2012.9.17
 		"""
 		returnData = PassingData(no_of_jobs = 0)
 		returnData.jobDataLs = []
 		
+		self.topOutputDirJob = self.addMkDirJob(outputDir="%sRun"%(outputDirPrefix))
+		passingData.topOutputDirJob = self.topOutputDirJob
+		
 		mapDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, \
 										outputDir="%sMap"%(outputDirPrefix))
 		passingData.mapDirJob = mapDirJob
 		returnData.mapDirJob = mapDirJob
+		self.mapDirJob = mapDirJob
 		
 		reduceOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, \
 												outputDir="%sReduce"%(outputDirPrefix))
 		passingData.reduceOutputDirJob = reduceOutputDirJob
-		
 		returnData.reduceOutputDirJob = reduceOutputDirJob
+		self.reduceOutputDirJob = reduceOutputDirJob
 		
 		return returnData
 	
@@ -508,14 +514,14 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		
 		topOutputDirJob = passingData.topOutputDirJob
-		fnamePrefix = passingData.fnamePrefix
+		fileBasenamePrefix = passingData.fileBasenamePrefix
 		VCFJobData = passingData.VCFJobData
 		VCFFile = VCFJobData.file	#2013.04.08
 		jobData = passingData.jobData
 		intervalOverlapSize = passingData.intervalOverlapSize
 		intervalSize = passingData.intervalSize
 		
-		outputFnamePrefix = os.path.join(topOutputDirJob.output, '%s_splitVCF'%fnamePrefix)
+		outputFnamePrefix = os.path.join(topOutputDirJob.output, '%s_splitVCF'%fileBasenamePrefix)
 		
 		splitVCFJob = self.addSplitVCFFileJob(executable=self.SplitVCFFile, inputFile=VCFFile, \
 											outputFnamePrefix=outputFnamePrefix, \
@@ -581,13 +587,13 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				outputDirPrefix="", passingData=None, \
 				transferOutput=True, job_max_memory=2000, **keywords):
 		"""
+		2013.06.14 bugfix regarding noOfUnits, which was all inferred from one file
 		2012.7.26
 			architect of the whole map-reduce framework
 		"""
 		chr2jobDataLs = {}
 		for jobData in inputVCFData.jobDataLs:
-			inputF = jobData.file
-			chromosome = self.getChrFromFname(os.path.basename(inputF.name))
+			chromosome = self.getChrFromFname(os.path.basename(jobData.file.name))
 			if chromosome not in chr2jobDataLs:
 				chr2jobDataLs[chromosome] = []
 			chr2jobDataLs[chromosome].append(jobData)
@@ -601,9 +607,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			refFastaF = refFastaFList[0]
 		else:
 			refFastaF = None
-		
-		topOutputDir = "%sMap"%(outputDirPrefix)
-		topOutputDirJob = yh_pegasus.addMkDirJob(workflow, mkdir=workflow.mkdirWrap, outputDir=topOutputDir)
 		
 		if needFastaDictJob or getattr(registerReferenceData, 'needPicardFastaDictJob', None):
 			fastaDictJob = self.addRefFastaDictJob(workflow, CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
@@ -625,13 +628,15 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		
 		#2012.9.22 
 		# 	mapEachAlignmentDataLs is never reset.
-		#	mapEachChromosomeDataLs is reset right after a new alignment is chosen.
-		#	mapEachIntervalDataLs is reset right after each chromosome is chosen.
-		#	all reduce dataLs never gets reset.
-		passingData = PassingData(fnamePrefix=None, \
+		#	mapEachChromosomeDataLs is reset upon new alignment
+		#	mapEachIntervalDataLs is reset upon each new chromosome
+		#	all reduce lists never get reset.
+		#	fileBasenamePrefix is the prefix of input file's basename, to be used for temporary output files in reduceEachVCF()
+		#		but not for output files in mapEachInterval()
+		passingData = PassingData(\
+					fileBasenamePrefix=None, \
 					chromosome=None, \
 					
-					topOutputDirJob=topOutputDirJob, \
 					outputDirPrefix=outputDirPrefix, \
 					intervalFnamePrefix=None,\
 					
@@ -705,13 +710,13 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			for i in xrange(len(jobDataLs)):
 				jobData = jobDataLs[i]
 				passingData.jobData = jobData
+				passingData.VCFJobData = jobData
 				
 				VCFFile = jobData.vcfFile
 				inputFBaseName = os.path.basename(VCFFile.name)
 				commonPrefix = inputFBaseName.split('.')[0]
 				
-				passingData.fnamePrefix = commonPrefix
-				passingData.VCFJobData = jobData
+				passingData.fileBasenamePrefix = commonPrefix
 				
 				mapEachVCFData = self.mapEachVCF(workflow=workflow,\
 												VCFJobData=jobData, passingData=passingData, \
@@ -722,7 +727,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				passingData.mapEachIntervalDataLsLs.append([])
 				passingData.mapEachIntervalDataLs = passingData.mapEachIntervalDataLsLs[-1]
 				
-				noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=inputF.noOfLoci, s=intervalSize, o=intervalOverlapSize)-1)
+				noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=jobData.file.noOfLoci, s=intervalSize, o=intervalOverlapSize)-1)
+				jobData.file.noOfUnits = noOfUnits	#2013.06.14
 				for unitNumber in xrange(1, noOfUnits+1):
 					splitVCFJob = mapEachVCFData.splitVCFJob
 					splitVCFFile = getattr(splitVCFJob, 'unit%sFile'%(unitNumber), None)
@@ -822,6 +828,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 											minNoOfLoci=getattr(self, 'minNoOfLoci', 10))
 			firstVCFJobData = inputData.jobDataLs[0]
 			#job=None, jobLs=[], vcfFile=inputF, tbi_F=tbi_F, file=inputF, fileLs=[inputF, tbi_F]
+			firstVCFFile = firstVCFJobData.file
+			sys.stderr.write("\t VCF file %s is chosen as an example VCF for any job that needs a random VCF file.\n"%(firstVCFFile))
 		
 		registerReferenceData = self.getReferenceSequence()
 		
@@ -829,6 +837,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		self.chr2IntervalDataLs = chr2IntervalDataLs
 		self.registerReferenceData = registerReferenceData
 		self.firstVCFJobData = firstVCFJobData
+		#self.firstVCFFile = firstVCFFile
 		return self
 	
 	def run(self):
