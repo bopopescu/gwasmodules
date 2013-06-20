@@ -717,10 +717,12 @@ class AbstractNGSWorkflow(parentClass):
 	def addGATKJob(self, workflow=None, executable=None, GenomeAnalysisTKJar=None, GATKAnalysisType=None,\
 					inputFile=None, inputArgumentOption=None, refFastaFList=None, inputFileList=None,\
 					argumentForEachFileInInputFileList=None,\
-					interval=None, outputFile=None, \
-					parentJobLs=None, transferOutput=True, job_max_memory=2000,\
+					interval=None, outputFile=None, outputArgumentOption="--out", \
 					frontArgumentList=None, extraArguments=None, extraArgumentList=None, extraOutputLs=None, \
-					extraDependentInputLs=None, no_of_cpus=None, walltime=120, key2ObjectForJob=None, **keywords):
+					extraDependentInputLs=None, \
+					parentJobLs=None, transferOutput=True, \
+					no_of_cpus=None, job_max_memory=2000, walltime=120, \
+					key2ObjectForJob=None, **keywords):
 		"""
 		i.e.
 			indelUnionOutputF = File(os.path.join(gatkIndelDirJob.folder, '%s.indel.vcf'%chromosome))
@@ -787,7 +789,7 @@ class AbstractNGSWorkflow(parentClass):
 		job = self.addGenericJob(workflow=workflow, executable=executable, inputFile=inputFile, \
 					inputArgumentOption=inputArgumentOption,  inputFileList=inputFileList,\
 					argumentForEachFileInInputFileList=argumentForEachFileInInputFileList,\
-					outputFile=outputFile, outputArgumentOption="--out", \
+					outputFile=outputFile, outputArgumentOption=outputArgumentOption, \
 					parentJob=None, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 					extraOutputLs=extraOutputLs, \
 					transferOutput=transferOutput, \
@@ -898,7 +900,43 @@ class AbstractNGSWorkflow(parentClass):
 					job_max_memory=job_max_memory, sshDBTunnel=None, \
 					key2ObjectForJob=None, **keywords)
 		return job
-
+	
+	def addVCFBeforeAfterFilterStatJob(self, executable=None, chromosome=None, outputF=None, vcf1=None, vcf2=None,\
+									lastVCFJob=None, currentVCFJob=None,\
+									statMergeJob=None, parentJobLs=None):
+		"""
+		2013.06.19 moved from vervet/src/qc/FilterVCFPipeline.py
+		2013.06.11 renamed old arguments to lastVCFJob, currentVCFJob
+		2012.7.30
+			examples:
+			
+			self.addVCFBeforeAfterFilterStatJob(chromosome=chromosome, outputF=outputF, \
+									currentVCFJob=currentVCFJob, lastVCFJob=lastVCFJob,\
+									statMergeJob=filterByMaxSNPMissingRateMergeJob)
+		"""
+		if vcf1 is None and lastVCFJob:
+			vcf1 = lastVCFJob.output
+		if vcf2 is None and currentVCFJob:
+			vcf2 = currentVCFJob.output
+		if parentJobLs is None:
+			parentJobLs = []
+		if lastVCFJob:
+			parentJobLs.append(lastVCFJob)
+		if currentVCFJob:
+			parentJobLs.append(currentVCFJob)
+		if executable is None:
+			executable = self.CheckTwoVCFOverlap
+		vcfFilterStatJob = self.addCheckTwoVCFOverlapJob(executable=executable, \
+					vcf1=vcf1, vcf2=vcf2, \
+					chromosome=chromosome, chrLength=None, \
+					outputF=outputF, parentJobLs=parentJobLs, \
+					extraDependentInputLs=None, transferOutput=False, extraArguments=None, job_max_memory=1000, \
+					perSampleMismatchFraction=False)
+		self.addInputToStatMergeJob(statMergeJob=statMergeJob, \
+							inputF=vcfFilterStatJob.output , \
+							parentJobLs=[vcfFilterStatJob])
+		return vcfFilterStatJob
+	
 	def addVCF2MatrixJob(self, workflow=None, executable=None, inputVCF=None, outputFile=None, \
 						refFastaF=None, run_type=3, numberOfReadGroups=10, seqCoverageF=None, \
 						outputDelimiter=None, minDepth=0, \
@@ -997,9 +1035,10 @@ class AbstractNGSWorkflow(parentClass):
 			vcf1Name = defaultName
 		return vcf1Name
 	
-	def addSelectVariantsJob(self, workflow=None, SelectVariantsJava=None, GenomeAnalysisTKJar=None, inputF=None, outputF=None, \
-					refFastaFList=None, sampleIDKeepFile=None, snpIDKeepFile=None, sampleIDExcludeFile=None, \
+	def addSelectVariantsJob(self, workflow=None, SelectVariantsJava=None, GenomeAnalysisTKJar=None, \
+					inputF=None, outputF=None, \
 					interval=None,\
+					refFastaFList=None, sampleIDKeepFile=None, snpIDKeepFile=None, sampleIDExcludeFile=None, \
 					parentJobLs=None, extraDependentInputLs=None, transferOutput=True, \
 					extraArguments=None, extraArgumentList=None, job_max_memory=2000, walltime=None,\
 					**keywords):

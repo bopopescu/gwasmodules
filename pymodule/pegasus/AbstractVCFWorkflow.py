@@ -155,10 +155,10 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		if workflow is None:
 			workflow = self
 		returnData = PassingData(jobDataLs = [])
+		counter = 0
+		real_counter = 0
 		if inputDir and os.path.isdir(inputDir):	#2013.04.07
 			fnameLs = os.listdir(inputDir)
-			counter = 0
-			real_counter = 0
 			previous_reported_real_counter = ''
 			for fname in fnameLs:
 				counter += 1
@@ -350,6 +350,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
 				sshDBTunnel=sshDBTunnel, **keywords)
 		job.noOfSitesPerUnit = noOfSitesPerUnit	#2013.05.21 add this
+		job.noOfUnits  = noOfUnits	#2013.06.19 added this for easy access
 		return job
 	
 	def getChr2IntervalDataLsBySelectVCFFile(self, vcfFname=None, noOfSitesPerUnit=5000, noOfOverlappingSites=1000, \
@@ -443,7 +444,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				intervalFileBasenameSignature = '%s_%s_%s'%(chromosome, blockStartLineNumber, blockStopLineNumber)
 				if chromosome not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chromosome] = []
-				intervalData = PassingData(file=blockIntervalFile, intervalFileBasenameSignature=intervalFileBasenameSignature, interval=interval,\
+				intervalData = PassingData(file=blockIntervalFile, intervalFileBasenameSignature=intervalFileBasenameSignature, \
+										interval=interval,\
 										chr=chromosome, chromosome=chromosome, jobLs=[blockIntervalJob], job=blockIntervalJob)
 				chr2IntervalDataLs[chromosome].append(intervalData)
 				counter += 1
@@ -494,13 +496,24 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		return returnData
 	
-	def mapEachInterval(self, **keywords):
+	def mapEachInterval(self, passingData=None, **keywords):
 		"""
 		2012.9.22
 		"""
 		
 		returnData = PassingData(no_of_jobs = 0)
 		returnData.jobDataLs = []
+		passingData.intervalFileBasenamePrefix
+		passingData.splitVCFFile
+		passingData.unitNumber
+		"""
+		## 2013.06.19 structures available from passingData, specific to the interval
+		passingData.splitVCFFile = splitVCFFile
+		passingData.unitNumber = unitNumber
+		passingData.intervalFileBasenamePrefix = '%s_%s_splitVCF_u%s'%(chromosome, commonPrefix, unitNumber)
+		passingData.noOfIndividuals = jobData.file.noOfIndividuals
+		passingData.span = self.intervalSize + self.intervalOverlapSize*2 	#2013.06.19 for memory/walltime gauging
+		"""
 		return returnData
 	
 	def mapEachVCF(self, workflow=None, chromosome=None,VCFJobData=None, passingData=None, transferOutput=False, **keywords):
@@ -638,7 +651,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					chromosome=None, \
 					
 					outputDirPrefix=outputDirPrefix, \
-					intervalFnamePrefix=None,\
+					intervalFileBasenamePrefix=None,\
 					
 					refFastaFList=refFastaFList, \
 					registerReferenceData=registerReferenceData, \
@@ -727,16 +740,18 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				passingData.mapEachIntervalDataLsLs.append([])
 				passingData.mapEachIntervalDataLs = passingData.mapEachIntervalDataLsLs[-1]
 				
-				noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=jobData.file.noOfLoci, s=intervalSize, o=intervalOverlapSize)-1)
+				splitVCFJob = mapEachVCFData.splitVCFJob
+				#noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=jobData.file.noOfLoci, s=intervalSize, o=intervalOverlapSize)-1)
+				noOfUnits = splitVCFJob.noOfUnits
 				jobData.file.noOfUnits = noOfUnits	#2013.06.14
 				for unitNumber in xrange(1, noOfUnits+1):
-					splitVCFJob = mapEachVCFData.splitVCFJob
 					splitVCFFile = getattr(splitVCFJob, 'unit%sFile'%(unitNumber), None)
 					if splitVCFFile is not None:
 						passingData.splitVCFFile = splitVCFFile
 						passingData.unitNumber = unitNumber
-						passingData.intervalFnamePrefix = '%s_%s_splitVCF_u%s'%(chromosome, commonPrefix, unitNumber)
-						
+						passingData.intervalFileBasenamePrefix = '%s_%s_splitVCF_u%s'%(chromosome, commonPrefix, unitNumber)
+						passingData.noOfIndividuals = jobData.file.noOfIndividuals
+						passingData.span = self.intervalSize + self.intervalOverlapSize*2 	#2013.06.19 for memory/walltime gauging
 						mapEachIntervalData = self.mapEachInterval(workflow=workflow, \
 												VCFJobData=PassingData(file=splitVCFFile, vcfFile=splitVCFFile, fileLs=[splitVCFFile], \
 																	job=splitVCFJob, jobLs=[splitVCFJob], tbi_F=None), \
@@ -818,7 +833,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		inputData = None
 		firstVCFJobData = None
 		if getattr(self, 'inputDir', None):	#2013.05.20 bugfix
-			inputData = self.registerAllInputFiles(workflow, self.inputDir, input_site_handler=self.input_site_handler, \
+			inputData = self.registerAllInputFiles(inputDir=self.inputDir, input_site_handler=self.input_site_handler, \
 											checkEmptyVCFByReading=self.checkEmptyVCFByReading,\
 											pegasusFolderName=self.pegasusFolderName,\
 											maxContigID=self.maxContigID, \
@@ -857,11 +872,13 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, \
 					chr2IntervalDataLs=None, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
-				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
+				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, \
+				CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
 				BuildBamIndexFilesJava=workflow.BuildBamIndexFilesJava, BuildBamIndexJar=workflow.BuildBamIndexJar,\
 				mv=workflow.mv, \
 				registerReferenceData=pdata.registerReferenceData,\
-				needFastaIndexJob=getattr(self, 'needFastaIndexJob',False), needFastaDictJob=getattr(self, 'needFastaDictJob', False), \
+				needFastaIndexJob=getattr(self, 'needFastaIndexJob',False), \
+				needFastaDictJob=getattr(self, 'needFastaDictJob', False), \
 				data_dir=self.data_dir, no_of_gatk_threads = 1,\
 				intervalSize=self.intervalSize, intervalOverlapSize=self.intervalOverlapSize, \
 				outputDirPrefix=self.pegasusFolderName, transferOutput=True,)

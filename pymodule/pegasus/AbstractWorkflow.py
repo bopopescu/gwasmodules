@@ -53,7 +53,7 @@ class AbstractWorkflow(ADAG):
 						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, etc., default is /tmp/ but sometimes it is too small'],\
 						('max_walltime', 1, int):[4320, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
 	used in addGenericJob().'],\
-						('jvmVirtualByPhysicalMemoryRatio', 1, float):[1.2, '', 1, "if a job's virtual memory (usually 1.2X of memory request) exceeds request, it will abort on hoffman2. "],\
+						('jvmVirtualByPhysicalMemoryRatio', 1, float):[1.5, '', 1, "if a job's virtual memory (usually 1.2X of JVM resident memory) exceeds request, it will be killed on hoffman2. Hence this argument"],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('needSSHDBTunnel', 0, int):[0, 'H', 0, 'DB-interacting jobs need a ssh tunnel (running on cluster behind firewall).'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
