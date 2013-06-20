@@ -9,7 +9,7 @@ if test $# -lt 3; then
 	echo ""
 	echo "Note:"
 	echo "	#. This program modifies pegasus job scripts (jobFilenamePrefix*.sub) in the working folder." 
-	echo "	#. Right now it is only suited for modifying numerical attributes (re pattern: [0-9]*), like changing 82800 in 'TimeToLive>=82800' to 178000. '>=' could any combination of <>=."
+	echo "	#. Right now it is only suited for modifying numerical attributes (re pattern: [0-9]*), like changing 82800 in 'TimeToLive>=82800' to 178000. '>=' could any combination of <>= (at least one) and could have optional space in the front or end, i.e. 'TimeToLive = 82800' or 'TimeToLive=   82800'."
 	echo " 	#. Default attributeName is $attributeNameDefault"
 	echo "  #. If runType is 0, this program leaves the new content in jobFilename.tmp but do not overwrite the original one."
 	echo "  #. If runType is 1, this program overwrites (by mv command) the original FILEPATH with FILEPATH.tmp (and FILEPATH.tmp will be gone)."
@@ -48,7 +48,7 @@ echo attributeNewValue is $attributeNewValue
 echo runType is $runType
 
 for f in `ls $pegasusWorkFolder/$jobFilenamePrefix*.sub`; do
-	sed 's/'$attributeName'\([<>=]*\)[0-9]*/'$attributeName'\1'$attributeNewValue'/' $f >$f.tmp;
+	sed 's/'$attributeName'\([ ]*[<>=][<>=]*[ ]*\)[0-9]*/'$attributeName'\1'$attributeNewValue'/' $f >$f.tmp;
 	if test "$runType" = "1"; then
 		mv $f.tmp $f
 	elif test "$runType" = "2"; then
