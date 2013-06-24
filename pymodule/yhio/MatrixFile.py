@@ -57,6 +57,8 @@ class MatrixFile(object):
 		if self.inputFname and self.inputFile is None:
 			self.inputFile = utils.openGzipFile(self.inputFname, openMode=self.openMode)
 		
+		self.filename = self.inputFname	#2013.05.03 for easy access
+		
 		self.csvFile = None
 		self.isRealCSV = False
 		if self.openMode=='r':	#reading mode
@@ -78,15 +80,17 @@ class MatrixFile(object):
 				self.isRealCSV = False
 		self.col_name2index = None
 	
-	def writeHeader(self):
+	def writeHeader(self,header=None):
 		"""
 		2012.11.16
 		"""
-		if self.header:
+		if header is None:
+			header = self.header
+		if header:
 			if self.isRealCSV:
-				self.csvFile.writerow(self.header)
+				self.csvFile.writerow(header)
 			else:
-				self.csvFile.write("%s\n"%(self.delimiter.join(self.header)))
+				self.csvFile.write("%s\n"%(self.delimiter.join(header)))
 	
 	def constructColName2IndexFromHeader(self):
 		"""
@@ -137,6 +141,34 @@ class MatrixFile(object):
 				self.csvFile.writerow(row)
 			else:
 				self.csvFile.write("%s\n"%(self.delimiter.join(row)))
+	
+	def constructDictionary(self, keyColumnIndexList=None, valueColumnIndexList=None):
+		"""
+		2013.05.24
+			
+			i.e.:
+			alignmentCoverageFile = MatrixFile(inputFname=self.individualAlignmentCoverageFname)
+			alignmentCoverageFile.constructColName2IndexFromHeader()
+			alignmentID2coverage = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
+
+		"""
+		sys.stderr.write("Constructing a dictionary, keys are column %s, values are column %s. ..."%\
+						(repr(keyColumnIndexList), repr(valueColumnIndexList)))
+		dc = {}
+		counter = 0
+		for row in self:
+			counter += 1
+			keyList = []
+			for i in keyColumnIndexList:
+				keyList.append(row[i])
+			valueList = []
+			for i in valueColumnIndexList:
+				valueList.append(row[i])
+			keyTuple = tuple(keyList)
+			if keyTuple not in dc:
+				dc[keyTuple] = []
+			dc[keyTuple].append(valueList)
+		sys.stderr.write("%s unique pairs from %s rows.\n"%(len(dc), counter))
 	
 	def run(self):
 		"""
