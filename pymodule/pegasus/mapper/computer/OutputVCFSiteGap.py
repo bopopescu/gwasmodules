@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.yhio.VCFFile import VCFFile
-from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
+from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 
 class OutputVCFSiteGap(AbstractVCFMapper):
 	__doc__ = __doc__
@@ -43,10 +43,8 @@ class OutputVCFSiteGap(AbstractVCFMapper):
 			
 		"""
 		sys.stderr.write("Calculate the distances between sites of %s .\n"%(inputFname))
-		import csv
 		writer = csv.writer(open(outputFname, 'w'), delimiter='\t')
 		writer.writerow(['chromosome', 'position', 'length', "distanceToNextSite"])
-		from pymodule.VCFFile import VCFFile
 		vcfFile = VCFFile(inputFname=inputFname, minDepth=minDepth)
 		
 		no_of_total = 0.
