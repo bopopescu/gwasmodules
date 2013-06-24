@@ -17,7 +17,16 @@ Description:
 		Contig791:4203 C G 1 0 0 1 0 0 0
 
 	Example:
-	
+		beagleFile = BeagleGenotypeFile(inputFname='/tmp/input.bgl.gz')
+		beagleFile.readInAllHaplotypes()
+		
+		for individualID, firstHaplotypeIndex in beagleFile.snpData.col_id2col_index.iteritems():
+			haplotypeList = []
+			for j in xrange(firstHaplotypeIndex, firstHaplotypeIndex+self.ploidy):
+				haplotypeList.append(beagleFile.snpData.data_matrix[:,j]) 
+			# another way
+			#haplotypeList = beagleFile.getHaplotypeListOfOneSample(individualID)
+		
 		reader = MatrixFile(inputFname='/tmp/input.txt', openMode='r')
 		reader = MatrixFile('/tmp/input.txt', openMode='r')
 		reader.constructColName2IndexFromHeader()
@@ -32,11 +41,8 @@ Description:
 		writer.writeHeader(...)
 		writer.writerow(row)
 		writer.close()
-	
-	
 
 """
-
 import sys, os, math
 __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 
@@ -65,10 +71,27 @@ class BeagleGenotypeFile(MatrixFile):
 		self.col_name2index = None	#key is sampleID, value is index of first haplotype
 		
 		self.sampleIDList = []
+		self.sampleID2index = {}	#same as col_name2index
 		self.locusIDList = []
 		self.haplotypeMatrix = []
 		
 		self.snpData = None	#to store everything above . SNPData type
+	
+	def _completeSNPData(self):
+		"""
+		2013.06.05
+		"""
+		if self.snpData is None:
+			if self.openMode=='r':
+				self.readInAllHaplotypes()
+			else:	#writing mode
+				self._consolidateHaplotypeMatrixIntoSNPData()
+	
+	def getSampleIndexGivenSampleID(self, sampleID=None):
+		"""
+		2013.06.05
+		"""
+		return self.getColIndexGivenColHeader(colHeader=sampleID)
 	
 	def constructColName2IndexFromHeader(self):
 		"""
@@ -81,7 +104,8 @@ class BeagleGenotypeFile(MatrixFile):
 		M Contig791:1649 G G G C C G G G
 		
 		"""
-		self.col_name2index = {}
+		self.col_name2index = {}	#col_name2index does not include the first two columns, starting only from samples
+			#same as sampleID2index
 		headerLineData = self.next()
 		if headerLineData.lineIndicator=='I':
 			self.header = headerLineData.genotypeList
@@ -112,6 +136,7 @@ class BeagleGenotypeFile(MatrixFile):
 			return a list of haplotypes for one individual, from self.snpData
 			the number of haplotypes fetched depends on self.ploidy
 		"""
+		self._completeSNPData()
 		haplotypeList = []
 		firstHaplotypeIndex = self.snpData.col_id2col_index.get(sampleID)
 		for j in xrange(firstHaplotypeIndex, firstHaplotypeIndex+self.ploidy):
@@ -119,21 +144,35 @@ class BeagleGenotypeFile(MatrixFile):
 			haplotypeList.append(self.snpData.data_matrix[:,j])
 		return haplotypeList
 	
-	def getGenotypeOfOneSampleOneLocus(self, oneLocus=None, sampleID=None):
+	def getGenotypeOfOneSampleFromOneLocus(self, oneLocus=None, sampleID=None):
 		"""
 		2013.05.06
-			oneLocus is output of next()
+			oneLocus is output of next(), upon iterating through the file
 		"""
 		try:
-			sampleCallLikeStartIndex = self.getColIndexGivenColHeader(sampleID)[0]
+			sampleStartIndex = self.getSampleIndexGivenSampleID(sampleID)
 		except:
 			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 			import traceback
 			traceback.print_exc()
-			sys.stderr.write("  sampleID %s not in beagleLikelihoodFile.\n"%(sampleID))
+			sys.stderr.write("  sampleID %s not in file.\n"%(sampleID))
 			raise
-		genotypeList = oneLocus.genotypeList[sampleCallLikeStartIndex:sampleCallLikeStartIndex+self.ploidy]
+		genotypeList = oneLocus.genotypeList[sampleStartIndex:sampleStartIndex+self.ploidy]
 		return genotypeList
+	
+	def getGenotypeOfOneSampleOneLocus(self, sampleID=None, locusID=None):
+		"""
+		2013.06.05
+			get genotype from self.snpData
+		"""
+		self._completeSNPData()
+		
+		sampleStartIndex = self.getSampleIndexGivenSampleID(sampleID)
+		locusIndex = self.snpData.row_id2row_index.get(locusID)
+		sampleIndexList = []
+		for i in xrange(sampleStartIndex, sampleStartIndex+self.ploidy):
+			sampleIndexList.append(i)
+		return self.snpData.data_matrix[locusIndex, sampleIndexList]
 	
 	def next(self):
 		try:
@@ -167,7 +206,7 @@ class BeagleGenotypeFile(MatrixFile):
 		self.snpData = SNPData(row_id_ls=self.locusIDList, col_id_ls=self.sampleIDList, \
 							data_matrix=dataMatrix, ploidy=self.ploidy, matrix_orientation=2)
 			#matrix_orientation=2, rows are loci, columns are samples
-		
+		self.sampleID2index = self.snpData.col_id2col_index
 		sys.stderr.write("%s samples, %s loci.\n"%(len(self.sampleIDList), len(self.locusIDList)))
 		
 	def addOneIndividual(self, sampleID=None, locusIDList=None, haplotypeList=None):
@@ -197,22 +236,28 @@ class BeagleGenotypeFile(MatrixFile):
 		self.snpData = SNPData(row_id_ls=self.locusIDList, col_id_ls=self.sampleIDList, \
 							data_matrix=dataMatrix, ploidy=self.ploidy, matrix_orientation=2)
 			#matrix_orientation=2, rows are loci, columns are samples
-		
+		self.sampleID2index = self.snpData.col_id2col_index
 		sys.stderr.write("%s samples, %s loci.\n"%(len(self.sampleIDList), len(self.locusIDList)))
 	
 	def writeDataToDisk(self):
 		"""
 		2013.05.30
 		"""
+		sys.stderr.write("Writing data to file %s ..."%(self.inputFname))
 		if self.snpData is None:
-			self._consolidateHaplotypeMatrixIntoSNPData()
+			if self.sampleIDList and self.locusIDList and self.haplotypeMatrix:
+				self._consolidateHaplotypeMatrixIntoSNPData()
+			else:
+				sys.stderr.write("Error: either sampleIDList (%s) or locusIDList (%s) or haplotypeMatrix is None/empty.\n"%\
+								(repr(self.sampleIDList[:3]), repr(self.locusIDList[:3]),  ))
+				raise
 		self.writerow(['I', 'id'] + self.sampleIDList)
 		for i in xrange(len(self.locusIDList)):
 			locusID = self.locusIDList[i]
 			genotypeList = self.haplotypeMatrix[i:]
 			oneRow = ['M', locusID] + genotypeList
 			self.writerow(oneRow)
-	
+		sys.stderr.write(" .\n")
 	
 if __name__ == '__main__':
 	main_class = BeagleGenotypeFile

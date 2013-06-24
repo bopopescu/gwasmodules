@@ -86,14 +86,14 @@ class BeagleLikelihoodFile(parentClass):
 			oneLocus is output of next()
 		"""
 		try:
-			sampleCallLikeStartIndex = self.getColIndexGivenColHeader(sampleID)[0]
+			sampleStartIndex = self.getColIndexGivenColHeader(sampleID)[0]
 		except:
 			sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 			import traceback
 			traceback.print_exc()
 			sys.stderr.write("  sampleID %s not in beagleLikelihoodFile.\n"%(sampleID))
 			raise
-		tripleLikelihood = oneLocus.genotypeLikelihoodList[sampleCallLikeStartIndex:sampleCallLikeStartIndex+3]
+		tripleLikelihood = oneLocus.genotypeLikelihoodList[sampleStartIndex:sampleStartIndex+3]
 		return tripleLikelihood
 	
 	def next(self):
