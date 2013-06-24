@@ -9,8 +9,15 @@ Examples:
 Description:
 	2013.05.03
 		This program splits a VCF file from pedigree members into trios/duos beagle input files.
-			pedigree is based on plinkPedigreeFname.
-			The gatkPrintBeagleFname file (beagle likelihood file) is output of running GATK PrintBeagleInput on VCF.
+			Pedigree is provided by --plinkPedigreeFname and contains individuals from --gatkPrintBeagleFname.
+				If more (a pedigree that encompasses more individuals from --gatkPrintBeagleFname), the extra will be ignored.
+				If less (individuals in --gatkPrintBeagleFname but not in --plinkPedigreeFname), would be ignored.
+				Output is the intersection between the two. 
+			The --gatkPrintBeagleFname file (beagle likelihood file) is output of running GATK PrintBeagleInput on VCF.
+		Output includes
+			1 or 2 or 3 (depends on composition of pedigree) beagle files 'outputFnamePrefix_familySize??.bgl
+				If a pedigree is composed entirely of one type of family (trio/duo/singleton), then only one beagle file.
+				The Beagle file for singletons is in likelihood format.
 			One additional output file is outputFnamePrefix.markers, which contains the markers.
 				Contig791:1086 1086 C A
 	
@@ -23,6 +30,7 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import copy, numpy
+import networkx as nx
 from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.yhio.VCFFile import VCFFile
 from pymodule.yhio.MatrixFile import MatrixFile
@@ -39,9 +47,9 @@ class SplitPedigreeVCFIntoBeagleTriosDuosFiles(AbstractVCFMapper):
 	#option_default_dict.pop(('outputFnamePrefix', 0, ))
 	option_default_dict.update({
 						
-						('gatkPrintBeagleFname', 0, ): [None, '', 1, '(beagle likelihood file) is output of running GATK PrintBeagleInput on the same VCF (inputFname).', ],\
+						('gatkPrintBeagleFname', 0, ): [None, '', 1, 'beagle likelihood file, output of running GATK PrintBeagleInput on the VCF (inputFname).', ],\
 						('plinkPedigreeFname', 0, ): [None, '', 1, 'pedigree filename in plink format. tab or space delimiter is fine', ],\
-						('minProbForValidCall', 0, float): [0.7, '', 1, 'minimum probability for the most likely genotype (among 3) to be valid,\n\
+						('minProbForValidCall', 0, float): [0.7, '', 1, 'minimum probability (from gatkPrintBeagleFname) for the most likely genotype (among 3) to be valid,\n\
 	not marked as missing ?', ],\
 						('dummyIndividualNamePrefix', 1, ): ['dummy', '', 1, 'the prefix to name a dummy parent (TrioCaller format). The suffix is its order among all dummies.'],\
 						#('noOfTotalSites', 1, int): [None, 'n', 1, 'The total number of sites in input VCF', ],\
@@ -73,11 +81,14 @@ class SplitPedigreeVCFIntoBeagleTriosDuosFiles(AbstractVCFMapper):
 		
 		beagleLikelihoodFile = BeagleLikelihoodFile(inputFname=gatkPrintBeagleFname)
 		sampleID2ColIndexList = beagleLikelihoodFile.constructColName2IndexFromHeader()
-		#read in the pedigree, make sure samples exist in gatkPrintBeagleFname
+		#read in the pedigree, make sure samples exist in gatkPrintBeagleFname	
 		counter = 0
 		real_counter = 0
 		plinkPedigreeFile = PlinkPedigreeFile(inputFname=plinkPedigreeFname, dummyIndividualNamePrefix=dummyIndividualNamePrefix)
 		pedigreeGraph = plinkPedigreeFile.getPedigreeGraph().DG
+		# shrink the pedigree to only individuals that exist in beagleLikelihoodFile
+		pedigreeGraph = nx.subgraph(pedigreeGraph, sampleID2ColIndexList.keys())
+		
 		familySize2SampleIDList = {}
 		#use pedigreeGraph above to figure out
 		for node in pedigreeGraph:
@@ -100,8 +111,6 @@ class SplitPedigreeVCFIntoBeagleTriosDuosFiles(AbstractVCFMapper):
 						familySize2SampleIDList[familySize] = []
 					
 					familySize2SampleIDList[familySize].extend(memberList)
-				
-		
 		
 		sys.stderr.write("\tFamilySize\tNoOfIndividuals\n")
 		for familySize, sampleIDList in familySize2SampleIDList.iteritems():
@@ -170,8 +179,7 @@ class SplitPedigreeVCFIntoBeagleTriosDuosFiles(AbstractVCFMapper):
 			return False
 		else:
 			return True
-		
-
+	
 	def splitVCFIntoBeagleInputs(self, inputFname=None, beagleLikelihoodFile=None, \
 						familySize2BeagleFileHandler=None, pedigreeFamilyData=None, \
 						minProbForValidCall=0.9, markersFile=None):
@@ -207,7 +215,7 @@ class SplitPedigreeVCFIntoBeagleTriosDuosFiles(AbstractVCFMapper):
 				for sampleID in sampleIDList:
 					totalNoOfCalls += 1
 					vcfGenotypeCallData = vcfRecord.getGenotypeCallForOneSample(sampleID)
-					tripleLikelihood = beagleLikelihoodFile.getLikelihoodListForOneSample(oneLocus=oneLocus, sampleID=sampleID)
+					tripleLikelihood = beagleLikelihoodFile.getLikelihoodListOfOneGenotypeOneSample(oneLocus=oneLocus, sampleID=sampleID)
 					if familySize==1:
 						no_of_singletons += 1
 						familySize2CallList[familySize].extend(tripleLikelihood)
