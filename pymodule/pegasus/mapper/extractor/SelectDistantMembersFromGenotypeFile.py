@@ -7,9 +7,16 @@ Examples:
 	
 
 Description:
-	2013.06.05 select distant members from 
-		input Beagle phased files should be added to the end of commandline, as many as you want.
-			Whether it is Singleton/Trio/Duo beagle files, it does not matter. Pedigree is extracted from plinkIBDCheckOutputFname.
+	2013.06.05 select haplotypes of distant pedigree members. IBD distance of all pairs must be < --maxIBDSharing. 
+		Input Beagle phased files could be passed through "-i" and/or appended to the end of commandline.
+			Unlimited number of them.
+			It does not matter whether it is Singleton/Trio/Duo beagle files.
+			Pedigree is extracted from --pedigreeFname to figure out the relationship among all samples/columns.
+			Pedigree could include more samples (identical ID system) than those in input Beagle files.
+				The extra will be removed from the graph before proceeding. 
+		Sample IDs in input Beagle and --pedigreeFname files should be in replicate form, containing --replicateIndividualTag.
+		Sample IDs in --plinkIBDCheckOutputFname are individual.code.
+		Sample IDs in outputFname are in original form (alignment.read_group, no replicate tag)
 """
 
 import sys, os, math
@@ -41,15 +48,15 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 	option_default_dict = AbstractMatrixFileWalker.option_default_dict
 	option_default_dict.update({
 			('sampleSize', 0, int): [40, '', 1, 'max number of individuals to be selected into output file.\n\
-	It could be low this number because maxPairwiseKinship is another threshold that is required.'],\
+	The final number could be lower because maxPairwiseKinship is another threshold to meet.'],\
 			('maxPairwiseKinship', 0, float): [0.2, '', 1, 'maximum pairwise kinship allowed among selected individuals.'],\
 			('plinkIBDCheckOutputFname', 1, ): [None, '', 1, 'file that contains IBD check result, PI_HAT=relatedness.\n\
 	at least 3-columns with header: IID1, IID2, PI_HAT. IID1 and IID2 should match the whichColumn (whichColumnHeader) of inputFname.\n\
 	The sampling will try to avoid sampling close pairs, PI_HAT(i,j)<=maxIBDSharing'],\
 			('replicateIndividualTag', 0, ): ['copy', '', 1, 'the tag that separates the true ID and its replicate count'],\
 			('individualAlignmentCoverageFname', 1, ): ['', '', 1, 'file contains two columns, individual-alignment-ID, coverage.'],\
-			('pedigreeFname', 1, ): ['', '', 1, 'pedigree file that covers IDs in all beagle input files, but not more, in plink format.\n\
-	This is used to figure out the family context for different replicates of the same individual => used to select one final replicate to represent the whole'],\
+			('pedigreeFname', 1, ): ['', '', 1, 'pedigree (trios/duos/singletons) file that covers IDs in all beagle input files, but not more, in plink format.\n\
+	This is used to figure out the family context of different replicates of the same individual => select one to represent all replicates'],\
 			
 			})
 	
@@ -101,13 +108,28 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		alignmentIDTuple2coverageLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
 		alignmentCoverageFile.close()
 		
+		sys.stderr.write("Reading in all haplotypes from %s Beagle input files ... \n"%(len(self.inputFnameLs)))
+		# read all the Beagle files
+		individualID2HaplotypeData = {}
+		for inputFname in self.inputFnameLs:
+			beagleFile = BeagleGenotypeFile(inputFname=inputFname)
+			beagleFile.readInAllHaplotypes()
+			for individualID in beagleFile.sampleIDList:
+				haplotypeList = beagleFile.getHaplotypeListOfOneSample(individualID)
+				individualID2HaplotypeData[individualID] = PassingData(haplotypeList=haplotypeList,
+																	locusIDList=beagleFile.locusIDList)
+			# get all haplotypes , etc.
+			# get all sample IDs
+		sys.stderr.write("%s individuals total.\n"%(len(individualID2HaplotypeData)))
 		
 		#. read in the pedigree or deduce it from Beagle Trio/Duo genotype file (columns)
 		#. construct individualID2pedigreeContext, context: familySize=1/2/3, familyPosition=1/2 (parent/child)
-		plinkPedigreeFile = PlinkPedigreeFile(inputFname=self.pedigreeFname)
-		pGraphStructure = plinkPedigreeFile.getPedigreeGraph()
 		sys.stderr.write("Constructing individualID2pedigreeContext ...")
-		pGraph = pGraphStructure.DG
+		plinkPedigreeFile = PlinkPedigreeFile(inputFname=self.pedigreeFname)
+		pGraph = plinkPedigreeFile.getPedigreeGraph().DG
+		#shrink the graph to only individuals with haplotype
+		pGraph = nx.subgraph(pGraph, individualID2HaplotypeData.keys())
+		
 		cc_subgraph_list = nx.connected_component_subgraphs(pGraph)
 		individualID2familyContext = {}
 		familySizeContainer = NumberContainer(minValue=0)
@@ -142,19 +164,6 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		plinkPedigreeFile.close()
 		sys.stderr.write("%s individuals.\n"%(len(individualID2familyContext)))
 		
-		# read all the Beagle files
-		individualID2HaplotypeData = {}
-		for inputFname in self.inputFnameLs:
-			beagleFile = BeagleGenotypeFile(inputFname=inputFname)
-			beagleFile.readInAllHaplotypes()
-			for individualID in beagleFile.sampleIDList:
-				haplotypeList = beagleFile.getHaplotypeListOfOneSample(individualID)
-				individualID2HaplotypeData[individualID] = PassingData(haplotypeList=haplotypeList,
-																	locusIDList=beagleFile.locusIDList)
-			# get all haplotypes , etc.
-			# get all sample IDs
-		
-		
 		sys.stderr.write("Getting originalIndividualID2individualIDList ...")
 		originalIndividualID2individualIDList = {}
 		for individualID in individualID2HaplotypeData:
@@ -163,7 +172,7 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 				originalIndividualID2individualIDList[originalIndividualID] = []
 			originalIndividualID2individualIDList[originalIndividualID].append(individualID)
 		
-		sys.stderr.write("%s original IDs from %s individuals.\n"%(len(originalIndividualID2individualIDList),\
+		sys.stderr.write("  %s original IDs from %s individuals.\n"%(len(originalIndividualID2individualIDList),\
 																len(individualID2HaplotypeData)))
 		
 		sys.stderr.write("Selecting representative individual for each replicate group, Weighing each individual , assigning probability mass  ...")
@@ -187,9 +196,9 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 					representativeImportanceScore = importanceScore
 					representativeID = individualID
 			originalIndividualID2representativeData[originalIndividualID] = PassingData(\
-																representativeImportanceScore=representativeImportanceScore,\
-																representativeID=representativeID)
-		sys.stderr.write(" \n")
+											representativeImportanceScore=representativeImportanceScore,\
+											representativeID=representativeID)
+		sys.stderr.write(" %s original IDs with representative data.\n"%(len(originalIndividualID2representativeData)))
 		
 		self.originalIndividualID2representativeData = originalIndividualID2representativeData
 		self.individualID2HaplotypeData = individualID2HaplotypeData
@@ -245,6 +254,26 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 			else:
 				return 1
 	
+	def mapSampleIDToIDInIBDFile(self, genotypeSampleIDList=None, ibdFileSampleIDList=None):
+		"""
+		2013.06.20
+			sample IDs are alignment read_group, with or without replicateIndividualTag,
+			ID in IBD file are individual.code (or maybe ucla_id)
+			do pairwise matching , not relying on DB
+		"""
+		sys.stderr.write("Finding a map between %s genotype sample IDs and %s IBD sample IDs ...\n"%\
+						(len(genotypeSampleIDList), len(ibdFileSampleIDList)))
+		genotypeSampleID2IBDSampleID = {}
+		for genotypeSampleID in genotypeSampleIDList:
+			for ibdSampleID in ibdFileSampleIDList:
+				if genotypeSampleID.find(ibdSampleID)>=0:
+					if genotypeSampleID in genotypeSampleID2IBDSampleID:
+						sys.stderr.write("Warning: %s already in genotypeSampleID2IBDSampleID with value=%s, overwritten with ibdSampleID=%s.\n"%\
+										(genotypeSampleID, genotypeSampleID2IBDSampleID.get(genotypeSampleID), ibdSampleID))
+					genotypeSampleID2IBDSampleID[genotypeSampleID] = ibdSampleID
+		sys.stderr.write("\t %s pairs.\n"%(len(genotypeSampleID2IBDSampleID)))
+		return genotypeSampleID2IBDSampleID
+	
 	def reduce(self, **keywords):
 		"""
 		2012.10.15
@@ -256,6 +285,8 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		self.originalIndividualID2individualIDList.keys()
 		
 		noOfTotalRows = len(self.originalIndividualID2representativeData)
+		genotypeSampleID2IBDSampleID = self.mapSampleIDToIDInIBDFile(genotypeSampleIDList=self.originalIndividualID2representativeData.keys(), \
+															ibdFileSampleIDList=self.ibdData.row_id_ls)
 		real_counter = 0
 		if self.sampleSize<noOfTotalRows:
 			if self.ibdData:
@@ -272,7 +303,8 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 						includeInTheSampling = True
 						for alreadySampledIndividualID in sampledIndividualIDSet:	#not too close to anyone previously sampled
 							#getting the relatedness
-							relatedness = self.ibdData.getCellDataGivenRowColID(sampledIndividualID, alreadySampledIndividualID)
+							relatedness = self.ibdData.getCellDataGivenRowColID(genotypeSampleID2IBDSampleID.get(sampledIndividualID), \
+																			genotypeSampleID2IBDSampleID.get(alreadySampledIndividualID))
 							if relatedness>=self.maxIBDSharing:
 								includeInTheSampling = False
 						if includeInTheSampling:
