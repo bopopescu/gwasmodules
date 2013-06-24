@@ -20,8 +20,14 @@ if test $# -lt 3; then
 	echo "	# replace old value TimeToLive with 178000 and overwrite original file"
 	echo "	$0 work/BaseQualityRecalibration/LocalRealignmentBQSR_AlnID2828_2847_vsMethod87.2013.Apr.17T230821/ merge_pegasus-addOrReplaceReadGroupsJava 178000 1"
 	echo
-	echo "# replace old MaxPermSize in java jobs"
-	echo "	$0 work/BaseQualityRecalibration/LocalRealignmentBQSR_AlnID2828_2847_vsMethod87.2013.Apr.17T230821/ merge_pegasus-addOrReplaceReadGroupsJava 4000 1 MaxPermSize"
+	echo "  # dry-run: replace old MaxPermSize in java jobs (original files not affected)"
+	echo "	$0 work/BaseQualityRecalibration/LocalRealignmentBQSR_AlnID2828_2847_vsMethod87.2013.Apr.17T230821/ merge_pegasus-addOrReplaceReadGroupsJava 4000 0 MaxPermSize"
+	echo
+	echo "	# dry-run, change request_memory"
+	echo "  $0 work/InspectAlignment/InspectPopulationMonkeyAlignment_RefSeq3488_AlnMethod6_GATKDOC.2013.Jun.21T105136/  DOCWalkerJava_ID00 9040 0 request_memory"
+	echo
+	echo "  # dry-run, change memory"
+	echo ' 	$0 work/InspectAlignment/InspectPopulationMonkeyAlignment_RefSeq3488_AlnMethod6_GATKDOC.2013.Jun.21T105136/  DOCWalkerJava_ID00 9040 0 "(memory"'
 	echo
 	echo
 	exit 1
@@ -46,6 +52,19 @@ fi
 echo attributeName is $attributeName
 echo attributeNewValue is $attributeNewValue
 echo runType is $runType
+
+if test "$runType" = "1"; then
+	echo "These files have matches: \n$affectedFiles"
+	echo "File overwriting option is on."
+	echo -n "Continue? (y/n): "
+	read answer
+	if [ -z $answer ]; then
+		exit 1
+	fi
+	if [ $answer != 'y' ]; then
+		exit 1
+	fi
+fi
 
 for f in `ls $pegasusWorkFolder/$jobFilenamePrefix*.sub`; do
 	sed 's/'$attributeName'\([ ]*[<>=][<>=]*[ ]*\)[0-9]*/'$attributeName'\1'$attributeNewValue'/' $f >$f.tmp;
