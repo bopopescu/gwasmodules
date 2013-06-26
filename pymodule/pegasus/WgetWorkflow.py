@@ -43,7 +43,7 @@ class WgetWorkflow(AbstractWorkflow):
 		"""
 		AbstractWorkflow.__init__(self, **keywords)
 	
-	def addWgetJob(self, executable=None, url=None, filename=None, username=None, password=None,\
+	def addWgetJob(self, executable=None, url=None, relativePath=None, username=None, password=None,\
 				targetFolder=None, logFile=None, cut_dir_number=1, parentJobLs=[], extraDependentInputLs=[], transferOutput=False, \
 				extraArguments=None, job_max_memory=2000, **keywords):
 		"""
@@ -51,7 +51,7 @@ class WgetWorkflow(AbstractWorkflow):
 		"""
 		extraArgumentList = ['--user=%s'%(username), '--password=%s'%(password), '--recursive', '--no-parent',\
 					'--continue', "--reject='index.html*'", "-nc -nH --cut-dirs=%s"%(cut_dir_number), "-P %s"%(targetFolder), \
-					"%s/%s"%(url, filename)]
+					"%s/%s"%(url, relativePath)]
 		
 		"""
 		# unlike -nd, --cut-dirs does not lose with subdirectories---for instance, with
@@ -97,12 +97,17 @@ class WgetWorkflow(AbstractWorkflow):
 		url_path_list = urlparse.urlparse(url).path.split('/')[1:]	#[0] is empty because the path starts with '/' 
 		subPath = '/'.join(url_path_list[cut_dir_number:])
 		
-		outputFile = File(os.path.join(targetFolder, os.path.join(subPath, filename)))
+		if relativePath.find('/')>=0:	#2013.06.26 it's a folder itself. so no straight output.
+			sys.stderr.write("\n\t Warning: item %s is a folder, will not be staged out. You have to manually copy them out of scratch folder.\n"%\
+							(relativePath))
+			extraOutputLs = None
+		else:
+			extraOutputLs = [File(os.path.join(targetFolder, os.path.join(subPath, relativePath)))]
 		#2012.6.27 don't pass the downloaded outputFile to argument outputFile of addGenericJob()
 		# because it will add "-o" in front of it. "-o" of wget is reserved for logFile.
 		return self.addGenericJob(executable=executable, inputFile=None, outputFile=logFile, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
-						extraOutputLs=[outputFile],\
+						extraOutputLs=extraOutputLs,\
 						transferOutput=transferOutput, \
 						extraArgumentList=extraArgumentList, job_max_memory=job_max_memory)
 	
@@ -144,7 +149,7 @@ class WgetWorkflow(AbstractWorkflow):
 			startTagList = []
 			endTagList = []
 			hrefValueList = []
-			filenameList = []
+			relativePathList = []
 			def __init(self):
 				"""
 				2012.6.27 example http page source. lots of hrefs that are irrelevant.
@@ -187,22 +192,22 @@ class WgetWorkflow(AbstractWorkflow):
 					then this data is one of the files to be downloaded.
 				"""
 				if len(self.startTagList)>0 and self.startTagList[-1]=='a' and self.hrefValueList[-1]==data:
-					self.filenameList.append(data)
+					self.relativePathList.append(data)
 				#print "Encountered some data  :", data
 		parser = MyHTMLParser()
 		parser.feed(url_content)
 		
-		sys.stderr.write(' found %s files.\n'%(len(parser.filenameList)))
-		return parser.filenameList
+		sys.stderr.write(' found %s files/folders.\n'%(len(parser.relativePathList)))
+		return parser.relativePathList
 		
 	
-	def addJobs(self, inputURL=None, filenameList =[], outputDir="", username=None, password=None, \
+	def addJobs(self, inputURL=None, relativePathList =[], outputDir="", username=None, password=None, \
 			transferOutput=True):
 		"""
 		2012.6.27
 		"""
 		
-		sys.stderr.write("Adding wget jobs for %s input ... "%(len(filenameList)))
+		sys.stderr.write("Adding wget jobs for %s input ... "%(len(relativePathList)))
 		no_of_jobs= 0
 		
 		topOutputDir = outputDir
@@ -211,9 +216,11 @@ class WgetWorkflow(AbstractWorkflow):
 		returnData = PassingData()
 		returnData.jobDataLs = []
 		
-		for filename in filenameList:
-			logFile = File('%s.log'%(filename))
-			wgetJob = self.addWgetJob(executable=self.wget, url=inputURL, filename=filename, \
+		for relativePath in relativePathList:
+			#2013.06.26 remove all "/" from  relativePath in case it's a folder
+			relativePathNoFolder = relativePath.replace('/', '_')
+			logFile = File('%s.log'%(relativePathNoFolder))
+			wgetJob = self.addWgetJob(executable=self.wget, url=inputURL, relativePath=relativePath, \
 						username=username, password=password,\
 						targetFolder=outputDir, logFile=logFile, cut_dir_number=self.cut_dir_number, parentJobLs=[topOutputDirJob], extraDependentInputLs=[], \
 						transferOutput=transferOutput, \
@@ -261,12 +268,12 @@ class WgetWorkflow(AbstractWorkflow):
 		self.registerExecutables()
 		self.registerCustomExecutables()
 		
-		filenameList = self.getFilenamesToBeDownloaded(url=self.inputURL, username=self.username, password=self.password)
+		relativePathList = self.getFilenamesToBeDownloaded(url=self.inputURL, username=self.username, password=self.password)
 		#one file needs to registered so that replica catalog is not empty
 		#but this file doesn't need to be actually used by any job.
 		wgetFile = self.registerOneInputFile(inputFname=self.pathToWget)
 		
-		self.addJobs(inputURL=self.inputURL, filenameList=filenameList, outputDir=self.pegasusFolderName, username=self.username, \
+		self.addJobs(inputURL=self.inputURL, relativePathList=relativePathList, outputDir=self.pegasusFolderName, username=self.username, \
 					password=self.password, \
 					transferOutput=True)
 		outf = open(self.outputFname, 'w')
