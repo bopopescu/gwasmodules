@@ -27,7 +27,6 @@ class ReduceMatrixByChosenColumn(ReduceMatrixByMergeColumnsWithSameKey):
 	__doc__ = __doc__
 	option_default_dict = ReduceMatrixByMergeColumnsWithSameKey.option_default_dict.copy()
 	option_default_dict.update({
-						('valueColumnLs', 1, ):["1", 'v', 1, 'comma/tab-separated list, specifying columns from which to aggregate total value by key'],\
 						})
 
 	def __init__(self, inputFnameLs, **keywords):

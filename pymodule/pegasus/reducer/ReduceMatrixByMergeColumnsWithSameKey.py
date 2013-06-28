@@ -31,6 +31,7 @@ class ReduceMatrixByMergeColumnsWithSameKey(AbstractReducer):
 	option_default_dict.update({
 						("keyColumnLs", 1, ): [0, 'k', 1, 'index(es) of the key in each input file. must be same. comma/dash-separated. i.e. 0-2,4 '],\
 						("keyHeaderLs", 0, ): [0, '', 1, 'header(s) of the key. comma-separated'],\
+						('valueColumnLs', 1, ):["1", 'v', 1, 'comma/tab-separated list, specifying columns from which to aggregate total value by key'],\
 						})
 
 	def __init__(self, inputFnameLs=None, **keywords):
