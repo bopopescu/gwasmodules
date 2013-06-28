@@ -53,8 +53,15 @@ echo attributeName is $attributeName
 echo attributeNewValue is $attributeNewValue
 echo runType is $runType
 
+
+affectedFiles=`ls $pegasusWorkFolder/$jobFilenamePrefix*.sub`
+
+echo "These files have matches: "
+echo  $affectedFiles
+
+counter=0
+
 if test "$runType" = "1"; then
-	echo "These files have matches: \n$affectedFiles"
 	echo "File overwriting option is on."
 	echo -n "Continue? (y/n): "
 	read answer
@@ -68,9 +75,12 @@ fi
 
 for f in `ls $pegasusWorkFolder/$jobFilenamePrefix*.sub`; do
 	sed 's/'$attributeName'\([ ]*[<>=][<>=]*[ ]*\)[0-9]*/'$attributeName'\1'$attributeNewValue'/' $f >$f.tmp;
+	counter=`echo $counter+1|bc`
 	if test "$runType" = "1"; then
 		mv $f.tmp $f
 	elif test "$runType" = "2"; then
 		rm $f.tmp
 	fi
 done
+
+echo "Modified $counter files."
