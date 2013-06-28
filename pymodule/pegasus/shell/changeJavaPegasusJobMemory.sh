@@ -45,6 +45,7 @@ echo runType is $runType
 
 if test $XmxNewValue -gt 0; then
 	~/script/shell/processFile/substitutePatternInAllMatchedFiles.sh $pegasusWorkFolder "$jobFilenamePrefix*.sub"  Xmx$XmxOldValue\m Xmx$XmxNewValue\m 1 $runType 
+	~/script/shell/processFile/substitutePatternInAllMatchedFiles.sh $pegasusWorkFolder "$jobFilenamePrefix*.in"  Xmx$XmxOldValue\m Xmx$XmxNewValue\m 1 $runType 
 fi
 
 if test $MaxPermSizeNewValue -gt 0; then
