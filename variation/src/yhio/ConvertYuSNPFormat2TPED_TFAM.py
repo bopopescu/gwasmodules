@@ -58,13 +58,12 @@ Description:
 		Phenotype
 """
 import sys, os, math
+import csv, numpy
 bit_number = math.log(sys.maxint)/math.log(2)
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script/')))
-from pymodule import process_function_arguments, write_data_matrix, figureOutDelimiter, read_data
-from pymodule.SNP import transposeSNPData, number2nt, SNPData
-import csv, numpy
-from Association import Association
+from pymodule.yhio.SNP import transposeSNPData, number2nt
+from variation.src.association.Association import Association
 
 class ConvertYuSNPFormat2TPED_TFAM(object):
 	__doc__ = __doc__
@@ -135,8 +134,8 @@ class ConvertYuSNPFormat2TPED_TFAM(object):
 		no_of_cols = len(newSnpData.data_matrix[0])
 		for i in range(no_of_rows):
 			snp_id = newSnpData.row_id_ls[i]
-			chr, pos = snp_id.split('_')
-			row = [chr, snp_id, 0, pos,]
+			chromosome, pos = snp_id.split('_')[:2]
+			row = [chromosome, snp_id, 0, pos,]
 			for j in range(no_of_cols):
 				allele = newSnpData.data_matrix[i][j]
 				if not self.recode12:	# it's in my nucleotide number format.
