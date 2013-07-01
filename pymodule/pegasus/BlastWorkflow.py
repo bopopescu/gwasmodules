@@ -2,15 +2,23 @@
 """
 Examples:
 
-	%s -d /Network/Data/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta 
-		-i ~/script/vervet/data/OphoffMethylation/DMR330K_ProbeSeq.fasta  -a 2 -l condorpool -j condorpool 
+	%s --databaseFname /Network/Data/vervet/db/individual_sequence/524_superContigsMinSize2000.fasta 
+		--inputFname ~/script/vervet/data/OphoffMethylation/DMR330K_ProbeSeq.fasta --maxNoOfMismatches 2
+		-l condorpool -j condorpool --blockSize 500
 		-C 1 -o workflow/BlastDMR330K_ProbeSeqAgainst524.xml
+	
+	%s --databaseFname ~/NetworkData/vervet/db/individual_sequence/3280_vervet_ref_6.0.3.fasta
+		-i ~/script/vervet/data/194SNPData/allSNPFlanks_refAllele.fa
+		--maxNoOfMismatches 5 -l hcondor -j hcondor -C 1
+		-o dags/Blast/Blast194SNPFlankAgainst3280_5Mismatches.xml
+		--blockSize 10 --formatdbPath ~/bin/blast/bin/formatdb
+		--blastallPath ~/bin/blast/bin/blastall
 
 2011-11-22
 	a common class for pegasus workflows that work on NGS (next-gen sequencing) data
 """
 import sys, os, math
-__doc__ = __doc__%(sys.argv[0],)
+__doc__ = __doc__%(sys.argv[0], sys.argv[0])
 
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
@@ -67,8 +75,8 @@ class BlastWorkflow(AbstractWorkflow):
 		noOfSplitFiles = int(math.ceil(noOfTotalSequences/float(noOfSequencesPerSplitFile)))
 		suffixLength = len(repr(noOfSplitFiles))
 		
-		job.addArguments("-i", inputFile, "-l %s"%(noOfSequencesPerSplitFile), \
-						"-O", outputFnamePrefix, '-f %s'%(filenameSuffix), '-a %s'%(suffixLength))
+		job.addArguments("-i", inputFile, "--noOfSequences %s"%(noOfSequencesPerSplitFile), \
+						"--outputFnamePrefix", outputFnamePrefix, '--filenameSuffix %s'%(filenameSuffix), '--suffixLength %s'%(suffixLength))
 		if extraArguments:
 			job.addArguments(extraArguments)
 		job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
