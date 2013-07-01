@@ -240,7 +240,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		mapDirJob = passingData.mapDirJob
 		reduceOutputDirJob = passingData.reduceOutputDirJob
 		
-		intervalFnamePrefix = passingData.intervalFnamePrefix
+		intervalFileBasenamePrefix = passingData.intervalFileBasenamePrefix
 		jobData = passingData.jobData
 		VCFFile = VCFJobData.file	#2013.04.08
 		
@@ -249,7 +249,7 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(AbstractVCFWorkflow, BlastWork
 		
 		# a flanking sequence extraction job
 		
-		outputFnamePrefix = os.path.join(mapDirJob.output, '%s_flankSequence'%(intervalFnamePrefix)) 
+		outputFnamePrefix = os.path.join(mapDirJob.output, '%s_flankSequence'%(intervalFileBasenamePrefix)) 
 		outputFile = File('%s.fasta'%(outputFnamePrefix))
 		oldRefFastaFile = passingData.oldRefFastaFile
 		extraArgumentList = ['--flankingLength %s'%(self.flankingLength), '--refFastaFname', oldRefFastaFile,\
