@@ -25,14 +25,13 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import time, csv, getopt
-import warnings, traceback
 from pymodule import ProcessOptions, read_data, getListOutOfStr
-from variation.src.QualityControl import QualityControl
-import dataParsers, FilterAccessions, FilterSnps, MergeSnpsData
-from common import RawSnpsData_ls2SNPData, transposeSNPData
+from variation.src.qc.QualityControl import QualityControl
+from variation.src.qc import FilterAccessions, FilterSnps
+
+from variation.src.yhio import dataParsers, MergeSnpsData
+from variation.src.common import RawSnpsData_ls2SNPData, transposeSNPData
 from QC_250k import QC_250k, SNPData, TwoSNPData
-from sets import Set
 
 class QC(object):
 	__doc__ = __doc__
@@ -59,7 +58,6 @@ class QC(object):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-		from variation.src.FilterStrainSNPMatrix import FilterStrainSNPMatrix
 		
 		#to check whether two input file are in different orientation
 		file_format2count = {}
@@ -133,7 +131,7 @@ class QC(object):
 			if not self.ecotype_id_ls:
 				sys.stderr.write("Run_type %s: ecotype_id_ls (%s) is not specified.\n"%(self.run_type, self.ecotype_id_ls))
 				sys.exit(3)
-			ecotype_id_set = Set(self.ecotype_id_ls)
+			ecotype_id_set = set(self.ecotype_id_ls)
 			row_id_ls = []	#test against 
 			for row_id in snpData1.row_id_ls:
 				
@@ -156,7 +154,7 @@ class QC(object):
 						twoSNPData.output_col_id2NA_mismatch_rate_InGWRFormat(col_id2NA_mismatch_rate, output_fname)
 		elif self.run_type==2:
 			#2008-10-12	column-wise mismatch of snpData1 vs snpData1 between rows with same ecotype_id but different array_id
-			row_id_pair_set = Set()
+			row_id_pair_set = set()
 			for row_id in snpData1.row_id_ls:
 				
 				if not isinstance(row_id, str) and hasattr(row_id, '__len__'):
