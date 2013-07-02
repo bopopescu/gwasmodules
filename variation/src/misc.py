@@ -25,8 +25,9 @@ class DisplaySNPMatrix(object):
 	2007-06-05
 		set aspect='auto' in imshow(), the default (pylab.image.rcParams['image.aspect'])='equal', which is bad
 	"""
-	def display_snp_matrix(input_fname, output_fname=None, need_sort=0, need_savefig=0, xlabel='', ylabel=''):
-		import csv, Numeric, pylab
+	@classmethod
+	def display_snp_matrix(cls, input_fname, output_fname=None, need_sort=0, need_savefig=0, xlabel='', ylabel=''):
+		import csv, numpy, pylab
 		reader = csv.reader(open(input_fname), delimiter='\t')
 		header = reader.next()
 		data_matrix = []
@@ -38,7 +39,7 @@ class DisplaySNPMatrix(object):
 		data_matrix.reverse()	#2007-03-06 reverse() due to the imshow()'s y axis starting from bottom
 		if need_sort:
 			data_matrix.sort()
-		data_matrix = Numeric.array(data_matrix)
+		data_matrix = numpy.array(data_matrix)
 		
 		pylab.clf()
 		pylab.imshow(data_matrix, aspect='auto', interpolation='nearest')	#2007-06-05
@@ -53,7 +54,8 @@ class DisplaySNPMatrix(object):
 			pylab.savefig('%s.png'%output_fname, dpi=300)
 		pylab.show()
 	
-	def make_snp_matrix_legend(value_ls, label_ls, output_fname=None):
+	@classmethod
+	def make_snp_matrix_legend(cls, value_ls, label_ls, output_fname=None):
 		"""
 		2007-10-25
 			to pair with display_snp_matrix()
@@ -88,7 +90,8 @@ class DB149(object):
 	"""
 	2007-04-09
 	"""
-	def draw_SNP_gap_histogram(curs, snp_locus_table, output_fname, need_savefig=0):
+	@classmethod
+	def draw_SNP_gap_histogram(cls, curs, snp_locus_table, output_fname, need_savefig=0):
 		SNP_gap_ls = []
 		prev_chromosome = None
 		prev_position = None
@@ -176,7 +179,8 @@ class DB149(object):
 	"""
 	2007-04-30
 	"""
-	def fill_snp_locus_table_with_25mer_thaliana_call(curs, snp_locus_table, annot_assembly_table='sequence.annot_assembly', \
+	@classmethod
+	def fill_snp_locus_table_with_25mer_thaliana_call(cls, curs, snp_locus_table, annot_assembly_table='sequence.annot_assembly', \
 		raw_sequence_table='sequence.raw_sequence', need_commit=0):
 		import sys
 		sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
@@ -207,7 +211,8 @@ class DB149(object):
 	2007-03-05
 		add the position info given by Yan Li from Borevitz Lab
 	"""
-	def fill_snp_locus_table_with_position_info(curs, input_fname, output_table, need_commit):
+	@classmethod
+	def fill_snp_locus_table_with_position_info(cls, curs, input_fname, output_table, need_commit):
 		import csv
 		reader = csv.reader(open(input_fname))
 		snp_locus_acc_list = reader.next()[1:]
@@ -230,7 +235,8 @@ class DB149(object):
 	2007-09-21
 		check duplicate calls in the database
 	"""
-	def check_inconsistent_duplicate_calls(curs, ecotype_table, calls_table, debug=0):
+	@classmethod
+	def check_inconsistent_duplicate_calls(cls, curs, ecotype_table, calls_table, debug=0):
 		"""
 		2007-09-22
 			buggy, don't use it. use check_inconsistent_duplicate_calls2()
@@ -282,7 +288,8 @@ class DB149(object):
 		print 'inconsistent ratio: %s/%s=%s'%(no_of_inconsistent, no_of_strain_snp_pairs, float(no_of_inconsistent)/no_of_strain_snp_pairs)
 		return strain_snp_pair_set, inconsistent_dup_strain_snp_pair_set
 	
-	def check_inconsistent_duplicate_calls2(curs, ecotype_table, calls_table, strainname_type=1, debug=0):
+	@classmethod
+	def check_inconsistent_duplicate_calls2(cls, curs, ecotype_table, calls_table, strainname_type=1, debug=0):
 		"""
 		use_ecotypeid_as_strainname controls whether it's nativename or ecotypeid in strain_snp_pair
 		"""
@@ -406,7 +413,8 @@ class DB149(object):
 class Data149_PopulationStructure(object):
 	#2007-06-17 function to calculate the great circle distance of a sphere given latitude and longitude
 	# http://en.wikipedia.org/wiki/Great-circle_distance
-	def cal_great_circle_distance(lat1, lon1, lat2, lon2, earth_radius=6372.795):
+	@classmethod
+	def cal_great_circle_distance(cls, lat1, lon1, lat2, lon2, earth_radius=6372.795):
 		import math
 		lat1_rad = lat1*math.pi/180
 		lon1_rad = lon1*math.pi/180
@@ -421,7 +429,8 @@ class Data149_PopulationStructure(object):
 		return earth_radius*spheric_angular_diff
 	
 	#2007-06-17 draw location of all strains onto a map
-	def test_draw_strain_location(pic_area=[-180,-90,180,90]):
+	@classmethod
+	def test_draw_strain_location(cls, pic_area=[-180,-90,180,90]):
 		import pylab
 		from matplotlib.toolkits.basemap import Basemap
 		pylab.clf()
@@ -451,7 +460,8 @@ class Data149_PopulationStructure(object):
 		pylab.show()
 	
 	#2007-06-17 calculate pairwise distance among strains by calling cal_great_circle_distance()
-	def cal_pairwise_distance_of_strains():
+	@classmethod
+	def cal_pairwise_distance_of_strains(cls, ):
 		import MySQLdb, pylab
 		db = MySQLdb.connect(db="stock",host='natural.uchicago.edu', user='iamhere', passwd='iamhereatusc')
 		c = db.cursor()
@@ -481,7 +491,8 @@ class Data149_PopulationStructure(object):
 	2007-09-13
 	following functions to investigate inter/intra-population identity
 	"""
-	def construct_identity_pair_ls(input_fname):
+	@classmethod
+	def construct_identity_pair_ls(cls, input_fname):
 		"""
 		2007-09-13
 			input_fname is a data frame file with snps coded in integers. 1st row is the ecotype id in table ecotype
@@ -9337,8 +9348,8 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 			if rm.call_method_id:	#call method, snp dataset
 				db_id2chr_pos = db_250k.snp_id2chr_pos
 			elif rm.cnv_method_id:
-				if db_250k._cnv_method_id!=cnv_method_id:
-					db_250k.cnv_id2chr_pos = cnv_method_id
+				if db_250k._cnv_method_id!=rm.cnv_method_id:
+					db_250k.cnv_id2chr_pos = rm.cnv_method_id
 				db_id2chr_pos = db_250k.cnv_id2chr_pos
 			#pdata = PassingData(db_id2chr_pos=db_id2chr_pos)
 			pdata = PassingData(min_MAF=min_MAF, db_id2chr_pos=db_id2chr_pos)
@@ -9371,6 +9382,27 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 		DB250k.convertRMIntoJson(db_250k, call_method_id_ls_str='29,32,43-56', commit=True)
 	
 	"""
+	
+	@classmethod
+	def correctAssociationLocusFileFormat(cls, db_250k=None, data_dir=None):
+		"""
+		2013.1.28 swap the stop and no_of_peaks for the AssociationLocusTable
+		"""
+		from variation.src import Stock_250kDB
+		from pymodule import AssociationLocusTableFile
+		for row in Stock_250kDB.GenomeWideAssociationLocus.query:
+			if row.id==1:	#already changed.
+				continue
+			newAbsPath = db_250k.reScalePathByNewDataDir(filePath=row.path, newDataDir=data_dir)
+			associationLocusTableFile = AssociationLocusTableFile(newAbsPath, openMode='a', autoRead=False)
+			associationLocusTableFile._readInData(bugfixType=1)
+			associationLocusTableFile.close()
+		"""
+		#2013.1.28
+		DB250k.correctAssociationLocusFileFormat(db_250k=db_250k, data_dir=None)
+		sys.exit(0)
+		"""
+		
 	
 	@classmethod
 	def updateResultsMethodNoOfAccessions(cls, db_250k=None, call_method_id_ls_str="", analysis_method_id_ls_str="", \
@@ -9458,12 +9490,12 @@ DB250k.cleanUpTablePhenotype(db_250k, make_replicate_continuous=True)
 		reader = csv.reader(open(filename), delimiter='\t')
 		header = reader.next()
 		array_id_ls = []
-		count = 0
+		counter = 0
 		for row in reader:
 			ecotype_id, array_id = row[:2]
 			array_id = int(array_id)
 			call_info = db_250k.getCallInfo(array_id=array_id, call_method_id=call_method_id)
-			count += 1
+			counter += 1
 		if commit:
 			db_250k.session.flush()
 			db_250k.session.commit()
@@ -21381,7 +21413,7 @@ class DBGenome(object):
 					chromosome=chromosome,\
 					type_of_gene=type_of_gene, description='TE Family %s Super-Family %s'%(Transposon_Family, Transposon_Super_Family), \
 					strand=strand, start=start, stop=stop)
-				gene.genomic_annot_assembly = annot_assembly
+				gene.annot_assembly = annot_assembly
 				gene.entrezgene_type = entrezgene_type
 				session.add(gene)
 				no_of_into_db += 1
@@ -21395,7 +21427,7 @@ class DBGenome(object):
 			if not entrezgene_mapping:
 				entrezgene_mapping = GenomeDB.EntrezgeneMapping(tax_id=tax_id, chromosome=chromosome,\
 												start=start, stop=stop, strand=strand,)
-				entrezgene_mapping.genomic_annot_assembly = annot_assembly
+				entrezgene_mapping.annot_assembly = annot_assembly
 				entrezgene_mapping.gene = gene
 				entrezgene_mapping.entrezgene_type = entrezgene_type
 				
@@ -21485,6 +21517,10 @@ class Main(object):
 						db_passwd=self.db_passwd, hostname=self.hostname, dbname=self.dbname, schema=self.schema)
 		db_250k.setup(create_tables=False)
 		self.db_250k = db_250k
+		
+		#2013.1.28
+		DB250k.correctAssociationLocusFileFormat(db_250k=db_250k, data_dir=None)
+		sys.exit(0)
 		
 		#2013.1.17
 		DB250k.addCallInfoEntriesForOneCallMethod(db_250k=db_250k, call_method_id=75, \
