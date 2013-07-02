@@ -58,7 +58,8 @@ class PlotAssociationLocus(AbstractPlot, AbstractVariationMapper, DrawSNPRegion)
 	input file has to contain start, stop position for 2 & 3. Providing central position in input works only for SNP data.'],\
 						('phenotype_fname', 0, ): [None, 'N', 1, 'phenotype file, if snp_matrix_fname is given, this is needed as well.', ],\
 						("list_type_id_list", 1, ): [None, '', 1, 'comma/dash separated list of Gene list type. must be in table gene_list_type.'],\
-						("gene_annotation_pickleFname", 0, ): [None, '', 1, 'given the option, If the file does not exist yet, store a pickled gene_annotation into it. If the file exists, load gene_annotation out of it.'],\
+						("gene_annotation_pickleFname", 0, ): [None, '', 1, 'If the file does not exist, store a pickled gene_annotation into it.\n\
+	If the file exists, load gene_annotation out of it.'],\
 						
 						})
 	
