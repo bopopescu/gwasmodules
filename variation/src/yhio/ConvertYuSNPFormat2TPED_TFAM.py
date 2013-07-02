@@ -135,7 +135,7 @@ class ConvertYuSNPFormat2TPED_TFAM(object):
 		for i in range(no_of_rows):
 			snp_id = newSnpData.row_id_ls[i]
 			chromosome, pos = snp_id.split('_')[:2]
-			row = [chromosome, snp_id, 0, pos,]
+			row = [chromosome, "%s_%s"%(chromosome, pos), 0, pos,]
 			for j in range(no_of_cols):
 				allele = newSnpData.data_matrix[i][j]
 				if not self.recode12:	# it's in my nucleotide number format.
