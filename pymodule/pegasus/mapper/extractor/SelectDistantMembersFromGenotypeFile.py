@@ -1,22 +1,36 @@
 #!/usr/bin/env python
 """
 Examples:
-	%s 
+	#2013.06.25
+	m=0.2;
+	%s  -i  folderHighCoveragePanel/Scaffold96_88778_VCF_87875_VCF_Scaffold96_splitVCF_u1.minCoverage8.beagled.vcf.gz 
+		-o  folderHighCoveragePanel/Scaffold96_88778_VCF_87875_VCF_Scaffold96_splitVCF_u1.phasedRefPanel.m$m.tsv
+		--maxPairwiseKinship $m --sampleSize 40
+		--pedigreeKinshipFilePath ../Kinx2Sept2012.txt.gz
+		--replicateIndividualTag copy
+		--individualAlignmentCoverageFname  folderAuxilliary/88179_VCF_86965_VCF_Scaffold99.filterByMaxSNPMissingRate.recode.alignmentDepth.tsv
+		--pedigreeFname  folderAuxilliary/pedigree.88179_VCF_86965_VCF_Scaffold99.filterByMaxSNPMissingRate.recode.format1.txt
 	
-	%s -o ... input1.bgl input2.bgl input3.bgl
+	%s -o ... input1.vcf input2.vcf input3.vcf
 	
 
 Description:
-	2013.06.05 select haplotypes of distant pedigree members. IBD distance of all pairs must be < --maxIBDSharing. 
-		Input Beagle phased files could be passed through "-i" and/or appended to the end of commandline.
+	2013.06.05 select haplotypes of distant pedigree members. IBD distance of all pairs must be < --maxPairwiseKinship. 
+		Input VCF files could be passed through "-i" and/or appended to the end of commandline.
 			Unlimited number of them.
-			It does not matter whether it is Singleton/Trio/Duo beagle files.
-			Pedigree is extracted from --pedigreeFname to figure out the relationship among all samples/columns.
-			Pedigree could include more samples (identical ID system) than those in input Beagle files.
-				The extra will be removed from the graph before proceeding. 
-		Sample IDs in input Beagle and --pedigreeFname files should be in replicate form, containing --replicateIndividualTag.
-		Sample IDs in --plinkIBDCheckOutputFname are individual.code.
-		Sample IDs in outputFname are in original form (alignment.read_group, no replicate tag)
+		--pedigreeFname provides the pedigree linking all samples.
+			Pedigree file could include more samples (identical ID system) than those in input Beagle files.
+				The extra will be removed from the graph before proceeding.
+			The pedigree is better not to be split into trios/duos because an individual's number of offspring affects
+				its probability of being sampled.
+		Sample IDs in input Beagle and --pedigreeFname files could be in replicate form, containing --replicateIndividualTag, or not.
+			first number is sample ID is alignment ID, matching samples in --individualAlignmentCoverageFname.
+		Sample IDs in --pedigreeKinshipFilePath are individual.code.
+		Sample IDs in outputFname would be in the same format as those of input.
+		
+		Two factors (linearly) affect a sample's probability of being chosen.
+			1. sequence coverage
+			2. number of offspring
 """
 
 import sys, os, math
@@ -40,6 +54,7 @@ from pymodule.yhio.BeagleGenotypeFile import BeagleGenotypeFile
 from pymodule.yhio import SNP
 from pymodule.yhio.MatrixFile import MatrixFile
 from pymodule.yhio.PlinkPedigreeFile import PlinkPedigreeFile
+from pymodule.yhio.VCFFile import VCFFile
 from pymodule.statistics import NumberContainer, DiscreteProbabilityMassContainer
 
 class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
@@ -50,15 +65,16 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 			('sampleSize', 0, int): [40, '', 1, 'max number of individuals to be selected into output file.\n\
 	The final number could be lower because maxPairwiseKinship is another threshold to meet.'],\
 			('maxPairwiseKinship', 0, float): [0.2, '', 1, 'maximum pairwise kinship allowed among selected individuals.'],\
-			('plinkIBDCheckOutputFname', 1, ): [None, '', 1, 'file that contains IBD check result, PI_HAT=relatedness.\n\
-	at least 3-columns with header: IID1, IID2, PI_HAT. IID1 and IID2 should match the whichColumn (whichColumnHeader) of inputFname.\n\
-	The sampling will try to avoid sampling close pairs, PI_HAT(i,j)<=maxIBDSharing'],\
+			('pedigreeKinshipFilePath', 1, ): [None, '', 1, 'file that contains pairwise kinship between individuals (ID: ucla_id/code).\n\
+	no header. coma-delimited 3-column file: individual1, individual2, kinsihp\n\
+	The sampling will try to avoid sampling close pairs, kinship(i,j)<=maxPairwiseKinship'],\
 			('replicateIndividualTag', 0, ): ['copy', '', 1, 'the tag that separates the true ID and its replicate count'],\
-			('individualAlignmentCoverageFname', 1, ): ['', '', 1, 'file contains two columns, individual-alignment-ID, coverage.'],\
+			('individualAlignmentCoverageFname', 1, ): ['', '', 1, 'file contains two columns, individual-alignment.read_group, coverage.'],\
 			('pedigreeFname', 1, ): ['', '', 1, 'pedigree (trios/duos/singletons) file that covers IDs in all beagle input files, but not more, in plink format.\n\
 	This is used to figure out the family context of different replicates of the same individual => select one to represent all replicates'],\
 			
 			})
+	option_default_dict[('outputFileFormat', 0, int)][0] = 4	#a no-header matrix
 	
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
@@ -72,52 +88,52 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		originalIndividualID = individualID.split(replicateIndividualTag)[0]
 		return originalIndividualID
 	
-	def getIndividualCoverage(self, individualID=None, alignmentIDTuple2coverageLs=None):
+	def getIndividualCoverage(self, individualID=None, alignmentReadGroupTuple2coverageInTupleLs=None):
 		"""
 		2013.05.24
 		"""
 		alignmentID = individualID.split('_')[0]
-		alignmentIDTuple = (alignmentID, )
-		coverageLs = alignmentIDTuple2coverageLs.get(alignmentIDTuple)
-		if not coverageLs:
-			sys.stderr.write("Error: coverage for %s is %s.\n"%(individualID, repr(coverageLs)))
+		#alignmentIDTuple = (alignmentID, )
+		coverageInTupleLs = alignmentReadGroupTuple2coverageInTupleLs.get((individualID,))
+		if not coverageInTupleLs:
+			sys.stderr.write("Error: coverage for alignmentID=%s, %s is %s.\n"%(alignmentID, individualID, repr(coverageInTupleLs)))
 			sys.exit(3)
-		if len(coverageLs)>1:
+		if len(coverageInTupleLs)>1:
 			sys.stderr.write("Warning: coverage for %s has more than 1 entries %s. Take first one.\n "%\
-							(individualID, repr(coverageLs)))
-		return coverageLs[0]
+							(individualID, repr(coverageInTupleLs)))
+		return coverageInTupleLs[0][0]
 	
 	def setup(self, **keywords):
 		"""
 		2012.10.15
 			run before anything is run
 		"""
-		#2013.05.30 comment out AbstractMatrixFileWalker.setup() to open the output file differently
-		#AbstractMatrixFileWalker.setup(self, **keywords)
-		self.writer = BeagleGenotypeFile(inputFname=self.outputFname, openMode='w')
+		AbstractMatrixFileWalker.setup(self, **keywords)
+		#self.writer = BeagleGenotypeFile(inputFname=self.outputFname, openMode='w')
 		
 		#read in the IBD check result
-		self.ibdData = SNP.readAdjacencyListDataIntoMatrix(inputFname=self.plinkIBDCheckOutputFname, \
-								rowIDHeader="IID1", colIDHeader="IID2", \
-								rowIDIndex=None, colIDIndex=None, \
-								dataHeader="PI_HAT", dataIndex=None, hasHeader=True)
+		self.ibdData = SNP.readAdjacencyListDataIntoMatrix(inputFname=self.pedigreeKinshipFilePath, \
+								rowIDHeader=None, colIDHeader=None, \
+								rowIDIndex=0, colIDIndex=1, \
+								dataHeader=None, dataIndex=2, hasHeader=False)
 		
 		#. read in the alignment coverage data
 		alignmentCoverageFile = MatrixFile(inputFname=self.individualAlignmentCoverageFname)
 		alignmentCoverageFile.constructColName2IndexFromHeader()
-		alignmentIDTuple2coverageLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
+		alignmentReadGroupTuple2coverageInTupleLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
 		alignmentCoverageFile.close()
 		
-		sys.stderr.write("Reading in all haplotypes from %s Beagle input files ... \n"%(len(self.inputFnameLs)))
+		sys.stderr.write("Reading in all samples from %s VCF input files ... \n"%(len(self.inputFnameLs)))
 		# read all the Beagle files
 		individualID2HaplotypeData = {}
 		for inputFname in self.inputFnameLs:
-			beagleFile = BeagleGenotypeFile(inputFname=inputFname)
-			beagleFile.readInAllHaplotypes()
-			for individualID in beagleFile.sampleIDList:
-				haplotypeList = beagleFile.getHaplotypeListOfOneSample(individualID)
-				individualID2HaplotypeData[individualID] = PassingData(haplotypeList=haplotypeList,
-																	locusIDList=beagleFile.locusIDList)
+			vcfFile = VCFFile(inputFname=inputFname)
+			#vcfFile.readInAllHaplotypes()
+			for individualID in vcfFile.getSampleIDList():
+				individualID2HaplotypeData[individualID] = None
+				#haplotypeList = vcfFile.getHaplotypeListOfOneSample(individualID)
+				#individualID2HaplotypeData[individualID] = PassingData(haplotypeList=haplotypeList,
+				#													locusIDList=vcfFile.locusIDList)
 			# get all haplotypes , etc.
 			# get all sample IDs
 		sys.stderr.write("%s individuals total.\n"%(len(individualID2HaplotypeData)))
@@ -127,11 +143,12 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		sys.stderr.write("Constructing individualID2pedigreeContext ...")
 		plinkPedigreeFile = PlinkPedigreeFile(inputFname=self.pedigreeFname)
 		pGraph = plinkPedigreeFile.getPedigreeGraph().DG
-		#shrink the graph to only individuals with haplotype
+		#shrink the graph to only individuals with data
 		pGraph = nx.subgraph(pGraph, individualID2HaplotypeData.keys())
 		
-		cc_subgraph_list = nx.connected_component_subgraphs(pGraph)
+		cc_subgraph_list = nx.connected_component_subgraphs(pGraph.to_undirected())
 		individualID2familyContext = {}
+		outDegreeContainer = NumberContainer(minValue=0)
 		familySizeContainer = NumberContainer(minValue=0)
 		individualCoverageContainer = NumberContainer(minValue=0)
 		familyCoverageContainer = NumberContainer(minValue=0)
@@ -139,18 +156,16 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 			familySize= len(cc_subgraph)
 			familySizeContainer.addOneValue(familySize)
 			
-			familyCoverage = None
+			familyCoverage = 0
 			for n in cc_subgraph:	#assuming each family is a two-generation trio/nuclear family
-				individualCoverage = self.getIndividualCoverage(individualID=n, alignmentIDTuple2coverageLs=alignmentIDTuple2coverageLs)
+				individualCoverage = self.getIndividualCoverage(individualID=n, alignmentReadGroupTuple2coverageInTupleLs=alignmentReadGroupTuple2coverageInTupleLs)
+				individualCoverage = float(individualCoverage)
 				individualCoverageContainer.addOneValue(individualCoverage)
 				familyCoverage += individualCoverage
-				in_degree = cc_subgraph.in_degree(n)
-				out_degree = cc_subgraph.out_degree(n)
-				if in_degree==2:
-					familyPosition = 3
-				elif out_degree==1:
-					familyPosition=1	#parent
-				familyContext = PassingData(familySize=familySize, familyPosition=familyPosition, \
+				in_degree = pGraph.in_degree(n)
+				out_degree = pGraph.out_degree(n)
+				outDegreeContainer.addOneValue(out_degree)
+				familyContext = PassingData(familySize=familySize, in_degree=in_degree, out_degree=out_degree, \
 										individualCoverage=individualCoverage,\
 										familyCoverage=None)
 				if n not in individualID2familyContext:
@@ -164,45 +179,21 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		plinkPedigreeFile.close()
 		sys.stderr.write("%s individuals.\n"%(len(individualID2familyContext)))
 		
-		sys.stderr.write("Getting originalIndividualID2individualIDList ...")
-		originalIndividualID2individualIDList = {}
-		for individualID in individualID2HaplotypeData:
-			originalIndividualID = self.getOriginalIndividualID(individualID, self.replicateIndividualTag)
-			if originalIndividualID not in originalIndividualID2individualIDList:
-				originalIndividualID2individualIDList[originalIndividualID] = []
-			originalIndividualID2individualIDList[originalIndividualID].append(individualID)
 		
-		sys.stderr.write("  %s original IDs from %s individuals.\n"%(len(originalIndividualID2individualIDList),\
-																len(individualID2HaplotypeData)))
+		# weigh each unique individual based on its sequencing coverage + no of offspring => probability mass for each individual
+		sys.stderr.write("Weighing each individual , assigning probability mass  ...")
+		individualID2probabilityMass = {}
+		for individualID, familyContext in individualID2familyContext.iteritems():
+			outDegreeQuotient = outDegreeContainer.normalizeValue(familyContext.familySize)
+			individualCoverageQuotient = individualCoverageContainer.normalizeValue(familyContext.individualCoverage)
+			#familyCoverageQuotient = familyCoverageContainer.normalizeValue(familyContext.familyCoverage)
+			importanceScore = outDegreeQuotient + individualCoverageQuotient
+			representativeImportanceScore = importanceScore
+			individualID2probabilityMass[individualID] = representativeImportanceScore
+		sys.stderr.write(" %s IDs with probability mass assigned.\n"%(len(individualID2probabilityMass)))
 		
-		sys.stderr.write("Selecting representative individual for each replicate group, Weighing each individual , assigning probability mass  ...")
-		# select representative for each replicate group, trio > duo > singleton
-		# Note: if an individual is replicated, it will not show up as singleton at all.
-		#  			so the candidates lie in trios, duos
-		#  importance score = familySize + individual-coverage + coverage of all members
-		#		equal weight
-		# weigh each unique individual based on its sequencing coverage => probability mass for each individual
-		originalIndividualID2representativeData = {}
-		for originalIndividualID, individualIDList in originalIndividualID2individualIDList.iteritems():
-			representativeID = None
-			representativeImportanceScore = None
-			for individualID in individualIDList:
-				familyContext = individualID2familyContext.get(individualID)
-				familySizeQuotient = familySizeContainer.normalizeValue(familyContext.familySize)
-				individualCoverageQuotient = individualCoverageContainer.normalizeValue(familyContext.individualCoverage)
-				familyCoverageQuotient = familyCoverageContainer.normalizeValue(familyContext.familyCoverage)
-				importanceScore = familySizeQuotient + individualCoverageQuotient + familyCoverageQuotient
-				if representativeImportanceScore is None or representativeImportanceScore < importanceScore:
-					representativeImportanceScore = importanceScore
-					representativeID = individualID
-			originalIndividualID2representativeData[originalIndividualID] = PassingData(\
-											representativeImportanceScore=representativeImportanceScore,\
-											representativeID=representativeID)
-		sys.stderr.write(" %s original IDs with representative data.\n"%(len(originalIndividualID2representativeData)))
-		
-		self.originalIndividualID2representativeData = originalIndividualID2representativeData
+		self.individualID2probabilityMass = individualID2probabilityMass
 		self.individualID2HaplotypeData = individualID2HaplotypeData
-		self.originalIndividualID2individualIDList = originalIndividualID2individualIDList
 	
 	def processRow(self, row=None, pdata=None):
 		"""
@@ -280,13 +271,12 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 			run after all files have been walked through
 		"""
 		#sample the data
-		probabilityMassContainer = DiscreteProbabilityMassContainer(object2proabilityMassDict=self.originalIndividualID2representativeData)
-		
-		self.originalIndividualID2individualIDList.keys()
-		
-		noOfTotalRows = len(self.originalIndividualID2representativeData)
-		genotypeSampleID2IBDSampleID = self.mapSampleIDToIDInIBDFile(genotypeSampleIDList=self.originalIndividualID2representativeData.keys(), \
+		probabilityMassContainer = DiscreteProbabilityMassContainer(object2proabilityMassDict=self.individualID2probabilityMass)
+				
+		noOfTotalRows = len(self.individualID2probabilityMass)
+		genotypeSampleID2IBDSampleID = self.mapSampleIDToIDInIBDFile(genotypeSampleIDList=self.individualID2probabilityMass.keys(), \
 															ibdFileSampleIDList=self.ibdData.row_id_ls)
+		counter = 0
 		real_counter = 0
 		if self.sampleSize<noOfTotalRows:
 			if self.ibdData:
@@ -299,13 +289,14 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 				while len(sampledIndividualIDSet)<self.sampleSize and \
 						self.detectSampledSetSizeHistoryChangeInLastRounds(sampledSetSizeHistoryData=sampledSetSizeHistoryData):
 					sampledIndividualID = probabilityMassContainer.sampleObject()
+					counter += 1
 					if sampledIndividualID:
 						includeInTheSampling = True
 						for alreadySampledIndividualID in sampledIndividualIDSet:	#not too close to anyone previously sampled
 							#getting the relatedness
 							relatedness = self.ibdData.getCellDataGivenRowColID(genotypeSampleID2IBDSampleID.get(sampledIndividualID), \
 																			genotypeSampleID2IBDSampleID.get(alreadySampledIndividualID))
-							if relatedness>=self.maxIBDSharing:
+							if relatedness is not None and relatedness>=self.maxPairwiseKinship:
 								includeInTheSampling = False
 						if includeInTheSampling:
 							sampledIndividualIDSet.add(sampledIndividualID)
@@ -313,21 +304,17 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 				#turn into list
 				sampledIndividualIDList = list(sampledIndividualIDSet)
 			else:
-				sampledIndividualIDList = random.sample(self.originalIndividualID2representativeData.keys(), self.sampleSize)
+				sampledIndividualIDList = random.sample(self.individualID2probabilityMass.keys(), self.sampleSize)
 		else:	#take all
-			sampledIndividualIDList = self.originalIndividualID2representativeData.keys()
+			sampledIndividualIDList = self.individualID2probabilityMass.keys()
 		
 		#output the sampled individuals
-		for originalIndividualID in sampledIndividualIDList:
-			representativeData = self.originalIndividualID2representativeData.get(originalIndividualID)
-			haplotypeData = self.individualID2HaplotypeData.get(representativeData.representativeID)
-			self.writer.addOneIndividual(sampleID=originalIndividualID, haplotypeList=haplotypeData.haplotypeList, \
-										locusIDList=haplotypeData.locusIDList)
+		for individualID in sampledIndividualIDList:
+			self.writer.writerow([individualID])
 			real_counter += 1
 		
-		self.writer.writeDataToDisk()	#first write out header (sampleID), then one locus a line
 		fraction = float(real_counter)/float(noOfTotalRows)
-		sys.stderr.write("%s/%s (%.3f) selected.\n"%(real_counter, noOfTotalRows, fraction))
+		sys.stderr.write("%s/%s (%.3f) selected out of %s samplings.\n"%(real_counter, noOfTotalRows, fraction, counter))
 		
 		#close the self.invariantPData.writer and self.writer
 		AbstractMatrixFileWalker.reduce(self, **keywords)
