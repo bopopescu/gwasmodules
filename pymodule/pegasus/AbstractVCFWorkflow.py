@@ -26,12 +26,21 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				only used for TrioCaller, not for SAMtools/GATK', ],\
 						('intervalSize', 1, int): [5000000, 'Z', 1, '#bps/#loci for adjacent intervals from one contig/chromosome (alignment or VCF)', ],\
 						("ligateVcfPerlPath", 1, ): ["%s/bin/umake/scripts/ligateVcf.pl", '', 1, 'path to ligateVcf.pl'],\
+						("notToKnowNoOfLoci", 0, int): [0, '', 0, 'By default, this program infers the number of loci for each VCF file (for splitting, etc.) \n\
+	either using first number of filename as db id or reading through the file. Toggle this to disable it.'],\
+						("notToUseDBToInferVCFNoOfLoci", 0, int): [0, '', 0, 'assuming --notToKnowNoOfLoci is off, \n\
+	toggle this to infer the number of loci by strictly reading through the file'],\
+						('minNoOfLociInVCF', 0, int): [5, '', 1, 'minimum number of loci for an input VCF file to be included.', ],\
 						})
 	def __init__(self,  **keywords):
 		"""
 		2012.1.17
 		"""
 		AbstractNGSWorkflow.__init__(self, **keywords)
+		
+		self.mapReduceType = 1	#2013.06.27 type 1: split VCF with fixed number of sites
+		# type 2: SelectVariants from VCF with fixed-size windows
+		# child classes could change its value in the end of their own __init__()
 	
 	def extra__init__(self):
 		"""
@@ -97,10 +106,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		PlotVCFtoolsStat.addPFN(PFN("file://" +  os.path.join(self.vervetSrcPath, "plot/PlotVCFtoolsStat.py"), site_handler))
 		executableClusterSizeMultiplierList.append((PlotVCFtoolsStat, 0))
 		
-		SplitVCFFile = Executable(namespace=namespace, name="SplitVCFFile", version=version, os=operatingSystem, arch=architecture, installed=True)
-		SplitVCFFile.addPFN(PFN("file://" +  os.path.join(self.pymodulePath, "pegasus/mapper/splitter/SplitVCFFile.py"), site_handler))
-		executableClusterSizeMultiplierList.append((SplitVCFFile, 1))
-		
 		#2012.8.30 moved from vervet/src/AddVCFFolder2DBWorkflow.py
 		AddVCFFile2DB = Executable(namespace=namespace, name="AddVCFFile2DB", \
 											version=version, \
@@ -121,6 +126,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
+		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, "pegasus/mapper/extractor/ExtractInfoFromVCF.py"), \
 											name='ExtractInfoFromVCF', clusterSizeMultipler=1)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(vervetSrcPath, "mapper/ExtractSamplesFromVCF.py"), \
@@ -135,11 +141,11 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	def registerAllInputFiles(self, workflow=None, inputDir=None, input_site_handler=None, \
 					checkEmptyVCFByReading=False, pegasusFolderName='',\
 					maxContigID=None, minContigID=None, db_vervet=None, needToKnowNoOfLoci=False,
-					minNoOfLoci=None, includeIndelVCF=True):
+					minNoOfLociInVCF=None, includeIndelVCF=True):
 		"""
 		2013.3.1 flip includeIndelVCF to true (now indel and SNP vcf files from AlignmentToCall workflows are in separate folders.
 		2012.8.15 add argument db_vervet, needToKnowNoOfLoci, to get no_of_loci by parsing inputFname and find db-entry...
-			argument minNoOfLoci, only used when it's not None and needToKnowNoOfLoci is True
+			argument minNoOfLociInVCF, only used when it's not None and needToKnowNoOfLoci is True
 		2012.8.10 add maxContigID and minContigID to restrict input
 		2012.7.27 add attribute file to each object in returnData.jobDataLs
 		2012.5.9
@@ -151,7 +157,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		2011-9-29
 			vcf files only
 		"""
-		sys.stderr.write("Registering input files from %s ..."%(inputDir))
+		sys.stderr.write("Registering input files from %s, maxContigID=%s, minContigID=%s, needToKnowNoOfLoci=%s, minNoOfLociInVCF=%s, includeIndelVCF=%s, notToUseDBToInferVCFNoOfLoci=%s ..."%\
+						(inputDir, maxContigID, minContigID, needToKnowNoOfLoci, minNoOfLociInVCF, includeIndelVCF, self.notToUseDBToInferVCFNoOfLoci))
 		if workflow is None:
 			workflow = self
 		returnData = PassingData(jobDataLs = [])
@@ -185,7 +192,9 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					no_of_loci = None
 					no_of_individuals = None
 					if needToKnowNoOfLoci:
-						if db_vervet:
+						if self.notToUseDBToInferVCFNoOfLoci:	#2013.06.21 do not use db to infer no of loci
+							pass
+						elif db_vervet:
 							genotype_file = db_vervet.parseGenotypeFileGivenDBAffiliatedFilename(filename=inputFname)
 							if genotype_file and inputFname.find(genotype_file.path)>=0:	#2012.9.6 make sure same file
 								no_of_loci = genotype_file.no_of_loci
@@ -202,7 +211,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					inputF.no_of_individuals = no_of_individuals
 					inputF.noOfIndividuals = no_of_individuals
 					
-					if minNoOfLoci is None or inputF.no_of_loci is None or (minNoOfLoci and inputF.no_of_loci and  inputF.no_of_loci >=minNoOfLoci):
+					if minNoOfLociInVCF is None or inputF.no_of_loci is None or (minNoOfLociInVCF and inputF.no_of_loci and  inputF.no_of_loci >=minNoOfLociInVCF):
 						workflow.addFile(inputF)
 						
 						tbi_F_absPath = "%s.tbi"%inputFname
@@ -496,9 +505,13 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		return returnData
 	
-	def mapEachInterval(self, passingData=None, **keywords):
+	def mapEachInterval(self, workflow=None, VCFJobData=None, chromosome=None,intervalData=None,\
+					mapEachChromosomeData=None, passingData=None, transferOutput=False, \
+					**keywords):
 		"""
 		2012.9.22
+			argument VCFJobData looks like PassingData(file=splitVCFFile, vcfFile=splitVCFFile, fileLs=[splitVCFFile], \
+																		job=splitVCFJob, jobLs=[splitVCFJob], tbi_F=None)
 		"""
 		
 		returnData = PassingData(no_of_jobs = 0)
@@ -518,6 +531,8 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 	
 	def mapEachVCF(self, workflow=None, chromosome=None,VCFJobData=None, passingData=None, transferOutput=False, **keywords):
 		"""
+		2013.06.20 new data structure available used to split/select VCF
+			intervalDataLs = passingData.intervalDataLs
 		2013.04.07 use VCFJobData
 		2012.9.22
 			default is to split each VCF into intervals
@@ -534,6 +549,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		intervalOverlapSize = passingData.intervalOverlapSize
 		intervalSize = passingData.intervalSize
 		
+		#intervalDataLs = passingData.intervalDataLs	#2013.06.20 new data structure available used to split/select VCF
 		outputFnamePrefix = os.path.join(topOutputDirJob.output, '%s_splitVCF'%fileBasenamePrefix)
 		
 		splitVCFJob = self.addSplitVCFFileJob(executable=self.SplitVCFFile, inputFile=VCFFile, \
@@ -566,7 +582,51 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData.mapEachVCFDataLs = mapEachVCFDataLs
 		returnData.reduceEachVCFDataLs = reduceEachVCFDataLs
 		return returnData
-
+	
+	def concatenateOverlapIntervalsIntoOneVCFSubWorkflow(self, chromosome=None, passingData=None, intervalJobLs=None,\
+					outputDirJob=None,
+					transferOutput=True, job_max_memory=None, walltime=None, **keywords):
+		"""
+		2013.06.14
+			#. concatenate overlapping (share some loci) VCFs into one, used in reduceEachVCF
+		"""
+		
+		#ligate vcf job (different segments of a chromosome into one chromosome) for replicate VCFs
+		concatTrioCallerOutputFname = os.path.join(outputDirJob.folder, '%s.vcf'%(passingData.fileBasenamePrefix))
+		concatTrioCallerOutputF = File(concatTrioCallerOutputFname)
+		concatJob = self.addLigateVcfJob(executable=self.ligateVcf, \
+									ligateVcfExecutableFile=self.ligateVcfExecutableFile, \
+									outputFile=concatTrioCallerOutputF, \
+									parentJobLs=[outputDirJob], \
+									extraDependentInputLs=None, transferOutput=False, \
+									extraArguments=None, job_max_memory=job_max_memory, walltime=walltime/2)
+		
+		for intervalJob in intervalJobLs:
+			#add this output to the union job
+			# 2012.6.1 done it through addInputToStatMergeJob()
+			self.addInputToStatMergeJob(statMergeJob=concatJob, inputF=intervalJob.output, \
+							parentJobLs=[intervalJob], extraDependentInputLs=intervalJob.outputLs[1:])
+		
+		
+		#convert to vcf4 so that other vcftools software could be used.
+		vcf4Filename = os.path.join(outputDirJob.folder, '%s.v4.vcf'%passingData.fileBasenamePrefix)
+		vcf4File = File(vcf4Filename)
+		vcf_convert_job = self.addVCFFormatConvertJob(vcf_convert=self.vcf_convert_in_reduce, \
+					parentJob=concatJob, inputF=concatJob.output, \
+					outputF=vcf4File, transferOutput=False, job_max_memory=job_max_memory, walltime=walltime/2)
+		
+		
+		#bgzip and tabix the trio caller output
+		trioGzipOutputF = File("%s.gz"%vcf4Filename)
+		bgzip_tabix_job = self.addBGZIP_tabix_Job(bgzip_tabix=self.bgzip_tabix_in_reduce, \
+								parentJob=vcf_convert_job, \
+								inputF=vcf4File, outputF=trioGzipOutputF, transferOutput=True,\
+								job_max_memory=job_max_memory/4, walltime=walltime/4)
+		
+		return PassingData(file=bgzip_tabix_job.output, vcfFile=bgzip_tabix_job.output, \
+				fileLs=[bgzip_tabix_job.output, bgzip_tabix_job.tbi_F], \
+				job=bgzip_tabix_job, jobLs=[bgzip_tabix_job], tbi_F=bgzip_tabix_job.tbi_F)
+	
 	def reduceEachVCF(self, workflow=None, chromosome=None, passingData=None, mapEachIntervalDataLs=None,\
 					transferOutput=True, **keywords):
 		"""
@@ -574,6 +634,23 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData = PassingData(no_of_jobs = 0)
 		returnData.jobDataLs = []
 		returnData.mapEachIntervalDataLs = mapEachIntervalDataLs
+		"""
+		realInputVolume = passingData.jobData.file.noOfIndividuals * passingData.jobData.file.noOfLoci
+		baseInputVolume = 200*2000000
+		#base is 4X coverage in 20Mb region => 120 minutes
+		walltime = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=realInputVolume, \
+							baseInputVolume=baseInputVolume, baseJobPropertyValue=60, \
+							minJobPropertyValue=60, maxJobPropertyValue=500).value
+		#base is 4X, => 5000M
+		job_max_memory = self.scaleJobWalltimeOrMemoryBasedOnInput(realInputVolume=realInputVolume, \
+							baseInputVolume=baseInputVolume, baseJobPropertyValue=2000, \
+							minJobPropertyValue=2000, maxJobPropertyValue=8000).value
+		concatenateIntoOneVCFJob = self.concatenateOverlapIntervalsIntoOneVCFSubWorkflow(chromosome=chromosome, passingData=passingData, \
+						intervalJobLs=[pdata.lastVCFJob for pdata in mapEachIntervalDataLs],\
+						outputDirJob=self.reduceOutputDirJob, \
+						transferOutput=True, job_max_memory=job_max_memory, walltime=walltime,\
+						**keywords)
+		"""
 		return returnData
 	
 	def reduce(self, workflow=None, reduceEachChromosomeDataLs=None, \
@@ -611,7 +688,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				chr2jobDataLs[chromosome] = []
 			chr2jobDataLs[chromosome].append(jobData)
 		
-		sys.stderr.write("Adding jobs for %s chromosomes/contigs of %s VCF files..."%(len(chr2jobDataLs), len(inputVCFData.jobDataLs)))
+		sys.stderr.write("Adding jobs for %s chromosomes/contigs of %s VCF files... \n"%(len(chr2jobDataLs), len(inputVCFData.jobDataLs)))
 		if getattr(registerReferenceData, 'refFastaFList', None):
 			refFastaFList = registerReferenceData.refFastaFList
 		else:
@@ -666,6 +743,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 					jobData=None,\
 					VCFJobData=None,\
 					splitVCFFile=None,\
+					intervalDataLs=None,\
 					preReduceReturnData=None,\
 					
 					mapEachIntervalData=None,\
@@ -705,6 +783,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		gzipReduceEachChromosomeFolderJob = None
 		gzipReduceFolderJob = None
 		gzipPreReduceFolderJob = None
+		no_of_vcf_files = 0
 		for chromosome, jobDataLs in chr2jobDataLs.iteritems():
 			passingData.chromosome = chromosome
 			mapEachChromosomeData = self.mapEachChromosome(workflow=workflow, chromosome=chromosome, \
@@ -720,6 +799,11 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			passingData.reduceEachVCFDataLsLs.append([])
 			passingData.reduceEachVCFDataLs = passingData.reduceEachVCFDataLsLs[-1]
 			
+			#2013.06.20
+			if chr2IntervalDataLs:
+				passingData.intervalDataLs = chr2IntervalDataLs.get(chromosome)
+			else:
+				pass
 			for i in xrange(len(jobDataLs)):
 				jobData = jobDataLs[i]
 				passingData.jobData = jobData
@@ -731,34 +815,61 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 				
 				passingData.fileBasenamePrefix = commonPrefix
 				
-				mapEachVCFData = self.mapEachVCF(workflow=workflow,\
-												VCFJobData=jobData, passingData=passingData, \
-												transferOutput=False, **keywords)
-				passingData.mapEachVCFData = mapEachVCFData
-				passingData.mapEachVCFDataLs.append(mapEachVCFData)
-				
-				passingData.mapEachIntervalDataLsLs.append([])
-				passingData.mapEachIntervalDataLs = passingData.mapEachIntervalDataLsLs[-1]
-				
-				splitVCFJob = mapEachVCFData.splitVCFJob
-				#noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=jobData.file.noOfLoci, s=intervalSize, o=intervalOverlapSize)-1)
-				noOfUnits = splitVCFJob.noOfUnits
-				jobData.file.noOfUnits = noOfUnits	#2013.06.14
-				for unitNumber in xrange(1, noOfUnits+1):
-					splitVCFFile = getattr(splitVCFJob, 'unit%sFile'%(unitNumber), None)
-					if splitVCFFile is not None:
-						passingData.splitVCFFile = splitVCFFile
-						passingData.unitNumber = unitNumber
-						passingData.intervalFileBasenamePrefix = '%s_%s_splitVCF_u%s'%(chromosome, commonPrefix, unitNumber)
-						passingData.noOfIndividuals = jobData.file.noOfIndividuals
-						passingData.span = self.intervalSize + self.intervalOverlapSize*2 	#2013.06.19 for memory/walltime gauging
-						mapEachIntervalData = self.mapEachInterval(workflow=workflow, \
-												VCFJobData=PassingData(file=splitVCFFile, vcfFile=splitVCFFile, fileLs=[splitVCFFile], \
-																	job=splitVCFJob, jobLs=[splitVCFJob], tbi_F=None), \
-												chromosome=chromosome,intervalData=None,\
-												mapEachChromosomeData=mapEachChromosomeData, \
-												passingData=passingData, transferOutput=False, \
+				no_of_vcf_files += 1
+				if no_of_vcf_files%100==0:
+					sys.stderr.write("%s\t%s VCFs."%('\x08'*40, no_of_vcf_files))
+				if self.mapReduceType==1:
+					mapEachVCFData = self.mapEachVCF(workflow=workflow,\
+													VCFJobData=jobData, passingData=passingData, \
+													transferOutput=False, **keywords)
+					passingData.mapEachVCFData = mapEachVCFData
+					passingData.mapEachVCFDataLs.append(mapEachVCFData)
+					
+					passingData.mapEachIntervalDataLsLs.append([])
+					passingData.mapEachIntervalDataLs = passingData.mapEachIntervalDataLsLs[-1]
+					
+					splitVCFJob = mapEachVCFData.splitVCFJob
+					#noOfUnits = max(1, utils.getNoOfUnitsNeededToCoverN(N=jobData.file.noOfLoci, s=intervalSize, o=intervalOverlapSize)-1)
+					noOfUnits = splitVCFJob.noOfUnits
+					jobData.file.noOfUnits = noOfUnits	#2013.06.14
+					for unitNumber in xrange(1, noOfUnits+1):
+						splitVCFFile = getattr(splitVCFJob, 'unit%sFile'%(unitNumber), None)
+						if splitVCFFile is not None:
+							passingData.splitVCFFile = splitVCFFile
+							passingData.unitNumber = unitNumber
+							passingData.intervalFileBasenamePrefix = '%s_%s_splitVCF_u%s'%(chromosome, commonPrefix, unitNumber)
+							passingData.noOfIndividuals = jobData.file.noOfIndividuals
+							passingData.span = self.intervalSize + self.intervalOverlapSize*2 	#2013.06.19 for memory/walltime gauging
+							mapEachIntervalData = self.mapEachInterval(workflow=workflow, \
+													VCFJobData=PassingData(file=splitVCFFile, vcfFile=splitVCFFile, fileLs=[splitVCFFile], \
+																		job=splitVCFJob, jobLs=[splitVCFJob], tbi_F=None), \
+													chromosome=chromosome,intervalData=None,\
+													mapEachChromosomeData=mapEachChromosomeData, \
+													passingData=passingData, transferOutput=False, \
+													**keywords)
+							passingData.mapEachIntervalData = mapEachIntervalData
+							passingData.mapEachIntervalDataLs.append(mapEachIntervalData)
+							
+							linkMapToReduceData = self.linkMapToReduce(workflow=workflow, mapEachIntervalData=mapEachIntervalData, \
+												preReduceReturnData=preReduceReturnData, \
+												passingData=passingData, \
 												**keywords)
+				else:
+					if not chr2IntervalDataLs:
+						sys.stderr.write("Error: mapReduceType=%s, but chr2IntervalDataLs (%s) is nothing.\n"%\
+										(self.mapReduceType, repr(chr2IntervalDataLs)))
+						sys.exit(2)
+					if not chr2IntervalDataLs.get(chromosome):
+						sys.stderr.write("Error: chromosome %s is not in chr2IntervalDataLs (mapReduceType=%s) while VCFFile %s is from this chromosome.\n"%\
+										(chromosome, self.mapReduceType, jobData.file.name))
+						sys.exit(3)
+					for intervalData in chr2IntervalDataLs.get(chromosome):
+						mapEachIntervalData = self.mapEachInterval(workflow=workflow, \
+														VCFJobData=jobData, \
+														chromosome=chromosome,intervalData=intervalData,\
+														mapEachChromosomeData=mapEachChromosomeData, \
+														passingData=passingData, transferOutput=False, \
+														**keywords)
 						passingData.mapEachIntervalData = mapEachIntervalData
 						passingData.mapEachIntervalDataLs.append(mapEachIntervalData)
 						
@@ -766,7 +877,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 											preReduceReturnData=preReduceReturnData, \
 											passingData=passingData, \
 											**keywords)
-				
 				reduceEachVCFData = self.reduceEachVCF(workflow=workflow, chromosome=chromosome, passingData=passingData, \
 								mapEachIntervalDataLs=passingData.mapEachIntervalDataLs,\
 								transferOutput=False, data_dir=data_dir, \
@@ -809,6 +919,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 						outputDirPrefix="%sReduce"%(outputDirPrefix), \
 						topOutputDirJob=gzipReduceFolderJob, report=False)
 		gzipReduceFolderJob = gzipReduceReturnData.topOutputDirJob
+		sys.stderr.write("\n %s%s VCF files.\n"%('\x08'*40, no_of_vcf_files))
 		sys.stderr.write("%s jobs.\n"%(self.no_of_jobs))
 		return reduceReturnData
 	
@@ -825,11 +936,12 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		#self.chr2size = {}
 		#self.chr2size = set(['Contig149'])	#temporary when testing Contig149
 		#self.chr2size = set(['1MbBAC'])	#temporary when testing the 1Mb-BAC (formerly vervet_path2)
-		chrLs = self.chr2size.keys()
-		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
+		if self.needSplitChrIntervalData:	#2013.06.21 defined in AbstractNGSWorkflow.__init__()
+			chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
 													intervalSize=self.intervalSize, \
 													intervalOverlapSize=self.intervalOverlapSize)
-		
+		else:
+			chr2IntervalDataLs = None
 		inputData = None
 		firstVCFJobData = None
 		if getattr(self, 'inputDir', None):	#2013.05.20 bugfix
@@ -840,7 +952,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 											minContigID=self.minContigID,\
 											db_vervet=getattr(self, 'db_vervet', None), \
 											needToKnowNoOfLoci=True,\
-											minNoOfLoci=getattr(self, 'minNoOfLoci', 10))
+											minNoOfLociInVCF=getattr(self, 'minNoOfLociInVCF', 10))
 			firstVCFJobData = inputData.jobDataLs[0]
 			#job=None, jobLs=[], vcfFile=inputF, tbi_F=tbi_F, file=inputF, fileLs=[inputF, tbi_F]
 			firstVCFFile = firstVCFJobData.file
@@ -870,7 +982,7 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 			sys.exit(0)
 				
 		self.addAllJobs(workflow=workflow, inputVCFData=inputData, \
-					chr2IntervalDataLs=None, samtools=workflow.samtools, \
+				chr2IntervalDataLs=self.chr2IntervalDataLs, samtools=workflow.samtools, \
 				GenomeAnalysisTKJar=workflow.GenomeAnalysisTKJar, \
 				CreateSequenceDictionaryJava=workflow.CreateSequenceDictionaryJava, \
 				CreateSequenceDictionaryJar=workflow.CreateSequenceDictionaryJar, \
