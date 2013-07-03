@@ -26,57 +26,70 @@ import snpsdata
 missing_val = 'N'
 #Standard nt decoding, is using the IUPAC alphabet
 nt_decoder = {'A':'A',
-	      'C':'C',
-	      'G':'G',
-	      'T':'T',
-	      'AG':'R',
-	      'AC':'M',
-	      'GT':'K',
-	      'CT':'Y',
-	      'AT':'W',
-	      'CG':'S',
-	      'Y':'Y',
-	      'R':'R',
-	      'W':'W',
-	      'S':'S',
-	      'K':'K',
-	      'M':'M',
-	      'D':'D',
-	      'H':'H',
-	      'V':'V',
-	      'B':'B',
-	      'X':'X', #Unknown base(s)
-	      'N':'X', #Unknown base(s)
-	      '-':'-', #Indel 
-	      '|':missing_val}
+		'C':'C',
+		'G':'G',
+		'T':'T',
+		'AA':'A',
+		'CC':'C',
+		'GG':'G',
+		'TT':'T',
+		'AG':'R',
+		'GA':'R',
+		'AC':'M',
+		'CA':'M',
+		'GT':'K',
+		'TG':'K',
+		'CT':'Y',
+		'TC':'Y',
+		'AT':'W',
+		'TA':'W',
+		'CG':'S',
+		'GC':'S',
+		'Y':'Y',
+		'R':'R',
+		'W':'W',
+		'S':'S',
+		'K':'K',
+		'M':'M',
+		'D':'D',
+		'H':'H',
+		'V':'V',
+		'B':'B',
+		'X':'X', #Unknown base(s)
+		'N':'X', #Unknown base(s)
+		'-':'-', #Indel 
+		'|':missing_val}
 
 
 #An int decoder is useful for processing the data efficiently
+from pymodule.yhio.SNP import nt2number
+nt_int_decoder = nt2number
+"""
 nt_int_decoder = {'A':1,
-	      'C':2,
-	      'G':3,
-	      'T':4,
-	      'AG':5,
-	      'AC':6,
-	      'GT':7,
-	      'CT':8,
-	      'AT':9,
-	      'CG':10,
-	      'Y':11,
-	      'R':12,
-	      'W':13,
-	      'S':14,
-	      'K':15,
-	      'M':16,
-	      'D':17,
-	      'H':18,
-	      'V':19,
-	      'B':20,
-	      'X':21, #Unknown base(s)
-	      'N':21, #Unknown base(s)
-	      '-':22, #Indel 
-	      '|':0}
-
+		'C':2,
+		'G':3,
+		'T':4,
+		'AG':5,
+		'AC':6,
+		'GT':7,
+		'CT':8,
+		'AT':9,
+		'CG':10,
+		'Y':11,
+		'R':12,
+		'W':13,
+		'S':14,
+		'K':15,
+		'M':16,
+		'D':17,
+		'H':18,
+		'V':19,
+		'B':20,
+		'X':21, #Unknown base(s)
+		'N':21, #Unknown base(s)
+		'-':22, #Indel 
+		'|':0}
+"""
 
 # A couple of useful dictionaries:
 #accessionName2Id = {'Ms-0': 92, 'Mt-0': 79, 'HR-10': 34, 'Knox-18': 4, 'Spr1-6': 20, 'Knox-10': 3, 'Spr1-2': 19, 'Nok-3': 80, 'Wa-1': 81, 'RRS-10': 2, 'C24': 57, 'Wt-5': 74, 'Ra-0': 69, 'Gu-0': 54, 'Mz-0': 73, 'Tsu-1': 78, 'Fei-0': 82, 'Bur-0': 93, 'Omo2-3': 22, 'Pu2-23': 30, 'Rmx-A180': 6, 'Kondara': 88, 'Tamm-2': 41, 'CS22491': 58, 'Zdr-6': 26, 'Ren-11': 48, 'Zdr-1': 25, 'Ren-1': 47, 'Ler-1': 55, 'Fab-2': 13, 'Yo-0': 61, 'Wei-0': 59, 'Got-7': 45, 'Tamm-27': 42, 'Kas-2': 75, 'Ts-5': 85, 'Ts-1': 84, 'Pu2-7': 29, 'Mr-0': 77, 'Ei-2': 53, 'Mrk-0': 72, 'Lz-0': 52, 'Bil-7': 16, 'Bil-5': 15, 'Sq-8': 38, 'Fab-4': 14, 'Sq-1': 37, 'Omo2-1': 21, 'Var2-1': 17, 'Var2-6': 18, 'Shahdara': 89, 'Uod-7': 50, 'Uod-1': 49, 'Lov-5': 12, 'Lov-1': 11, 'Gy-0': 68, 'Col-0': 62, 'Kin-0': 91, 'NFA-8': 35, 'Nd-1': 56, 'Got-22': 46, 'Br-0': 65, 'HR-5': 33, 'Ull2-3': 24, 'Ull2-5': 23, 'Est-1': 66, 'CIBC-17': 40, 'Ct-1': 76, 'Cvi-0': 51, 'Oy-0': 95, 'LL-0': 87, 'Bor-4': 28, 'Bor-1': 27, 'Pna-10': 8, 'Pna-17': 7, 'Ga-0': 71, 'Bay-0': 70, 'Eden-2': 10, 'Eden-1': 9, 'Pro-0': 86, 'Kz-1': 43, 'RRS-7': 1, 'Kz-9': 44, 'Edi-0': 94, 'An-1': 63, 'CIBC-5': 39, 'Ws-0': 60, 'Ws-2': 96, 'Van-0': 64, 'Rmx-A02': 5, 'Se-0': 83, 'Lp2-2': 31, 'Lp2-6': 32, 'NFA-10': 36, 'Ag-0': 67, 'Sorbo': 90}
@@ -488,7 +501,7 @@ def get2010DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at
 	cursor = conn.cursor ()
 
 	locStr = " and l.offset=0 "
-	if int(dataVersion) == 4:		   #If using version=4, then allow any locus.offset.
+	if int(dataVersion) == 4:			#If using version=4, then allow any locus.offset.
 		locStr = ""
 
 	#Get distinct accessions and their id.
@@ -577,7 +590,7 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 	cursor = conn.cursor ()
 
 	locStr = " and l.offset=0 "
-	if int(dataVersion) == 4:		   #If using version=4, then allow any locus.offset.
+	if int(dataVersion) == 4:			#If using version=4, then allow any locus.offset.
 		locStr = ""
 
 
@@ -1891,8 +1904,8 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 						use_pickle=use_pickle, dtype='int8', data_format=format)
 #		else: #Try nucleotide format
 #			sd = parse_snp_data(data_file , format='nucleotides', delimiter=delimiter,
-#					      missingVal=missingVal, filter=filter, look_for_binary=False,
-#					      filter_accessions=filter_accessions)
+#						missingVal=missingVal, filter=filter, look_for_binary=False,
+#						filter_accessions=filter_accessions)
 #			sd.convert_data_format('binary')
 #			print 'Save a binary snps data file:', sd_binary_file
 #			sd.writeToFile(sd_binary_file, binary_format=True)
