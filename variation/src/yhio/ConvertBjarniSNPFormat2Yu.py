@@ -18,8 +18,9 @@ if bit_number>40:       #64bit
 else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/')))
-import dataParsers
-from common import RawSnpsData_ls2SNPData, transposeSNPData
+
+from variation.src.yhio import dataParsers
+from variation.src.common import RawSnpsData_ls2SNPData, transposeSNPData
 
 class ConvertBjarniSNPFormat2Yu(object):
 	__doc__ = __doc__

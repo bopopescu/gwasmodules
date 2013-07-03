@@ -270,7 +270,7 @@ def snp_kinship_correlation(binary_snps, k, num_perm=0, permutation_snps=None, k
 	num_snps = len(binary_snps)
 	num_lines = len(binary_snps[0])
 	if kinship_type == 'emma.R':
-		import linear_models as lm
+		from variation.src.association import linear_models as lm
 		snps_k = lm.calc_kinship_old(binary_snps)
 		snp_dists = []
 		for i in range(num_lines):

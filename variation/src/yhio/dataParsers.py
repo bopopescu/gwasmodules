@@ -8,14 +8,16 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import time, sys, random
-import os
+import time, random
 import cPickle
-import pdb
 import scipy as sp
-from snpsdata import *
-from variation.src.env import *
+#from variation.src.yhio.snpsdata import *
+from variation.src import env
 from variation.src.db import dbutils
+#2013.07.03 do not use "from variation.src.yhio" below to avoid import loop
+
+import snpsdata
+#dataVersion
 
 # this should be fixed
 
@@ -168,7 +170,7 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="st
 
 	"""
 	rt = time.time()
-	decoder = RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']!!
+	decoder = snpsdata.RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']!!
 
 	conn = dbutils.connect_to_default_lookup()
 	cursor = conn.cursor ()
@@ -364,11 +366,11 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="st
 	snpsds = []
 	if callProb:
 		for i in chromosomes:
-			snpsds.append(RawSnpsData(snpsList[i - 1], positionsList[i - 1], accessions=accessions, arrayIds=arrayIds, callProbabilities=callProbabilityList[i - 1]))
+			snpsds.append(snpsdata.RawSnpsData(snpsList[i - 1], positionsList[i - 1], accessions=accessions, arrayIds=arrayIds, callProbabilities=callProbabilityList[i - 1]))
 			print "callProbabilityList length=", len(callProbabilityList[i - 1])
 	else:
 		for i in chromosomes:
-			snpsds.append(RawSnpsData(snpsList[i - 1], positionsList[i - 1], accessions=accessions, arrayIds=arrayIds))
+			snpsds.append(snpsdata.RawSnpsData(snpsList[i - 1], positionsList[i - 1], accessions=accessions, arrayIds=arrayIds))
 	dif = int(time.time() - rt)
 	print "It took " + str(dif / 60) + " min. and " + str(dif % 60) + " sec. to fetch data."
 	cursor.close ()
@@ -378,14 +380,15 @@ def get250KDataFromDb(host="banyan.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="st
 
 
 
-def get149DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at", only96accessions=False, user=None, passwd=None):
+def get149DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at", only96accessions=False, \
+					user=None, passwd=None, dataVersion='1.0'):
 	import MySQLdb
 	"""
 	Retrieve 149 data from DB.  Returns a list of RawSnpsData objects. 
 
 	"""
 	rt = time.time()
-	decoder = RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']:
+	decoder = snpsdata.RawDecoder()  #Other unused informative letters are ['R','Y','S','M','K','W']:
 
 	print "Connecting to db, host=" + host
 	if not user:
@@ -449,7 +452,7 @@ def get149DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at"
 					newPosition = int(row[0])
 				snps.append(snp)
 
-		snpsd = RawSnpsData(snps, positions, accessions=accessions)
+		snpsd = snpsdata.RawSnpsData(snps, positions, accessions=accessions)
 		snpsds.append(snpsd)
 
 	cursor.close ()
@@ -467,7 +470,7 @@ def get2010DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at
 	Retrieve 2010 data from DB.  Returns a list of RawSnpsData objects. 
 	"""
 	rt = time.time()
-	decoder = RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
+	decoder = snpsdata.RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
 
 	print "Connecting to db, host=" + host
 	if not user:
@@ -537,7 +540,7 @@ def get2010DataFromDb(host="papaya.usc.edu", chromosomes=[1, 2, 3, 4, 5], db="at
 					newPosition = int(row[0])
 				snps.append(snp)
 
-		snpsd = RawSnpsData(snps, positions, accessions=accessions)
+		snpsd = snpsdata.RawSnpsData(snps, positions, accessions=accessions)
 		snpsd.alphabet.append('-')
 		snpsds.append(snpsd)
 
@@ -556,8 +559,8 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 	Returns a list of AlignmentData objects.
 	"""
 	rt = time.time()
-	decoder = RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
-
+	decoder = snpsdata.RawDecoder({'-':'-'})  #Other unused informative letters are ['R','Y','S','M','K','W']:
+	import MySQLdb
 	print "Connecting to db, host=" + host
 	if not user:
 		import sys
@@ -604,10 +607,6 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 		positions = []
 		offsets = []
 		numRows = int(cursor.execute("select distinct l.id, l.position, l.offset, from at.locus l where l.alignment=" + str(a_id) + " order by l.position, l.offset"))
-
-
-
-
 	print "Fetching 2010 data (version " + dataVersion + "):"
 	snpsds = []
 	for chromosome in chromosomes:
@@ -633,7 +632,7 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 					newPosition = int(row[0])
 				snps.append(snp)
 
-		snpsd = RawSnpsData(snps, positions, accessions=accessions)
+		snpsd = snpsdata.RawSnpsData(snps, positions, accessions=accessions)
 		snpsd.alphabet.append('-')
 		snpsds.append(snpsd)
 
@@ -650,7 +649,7 @@ def get_2010_sequences_from_db(host="papaya.usc.edu", user="bvilhjal", passwd="*
 def getPerlgenDataFromDb(host="papaya.usc.edu", db="chip", chromosomes=[1, 2, 3, 4, 5], user=None, passwd=None):
 	import MySQLdb
 	"""
-	Retrieve Perlgen data from DB.  Returns a list of RawSnpsData objects. 
+	Retrieve Perlgen data from DB.  Returns a list of snpsdata.RawSnpsData objects. 
 
 	"""
 
@@ -725,7 +724,7 @@ def getPerlgenDataFromDb(host="papaya.usc.edu", db="chip", chromosomes=[1, 2, 3,
 						break;
 					newPosition = int(row[0])
 				snps.append(snp)
-		snpsd = RawSnpsData(snps, positions, accessions=accessions)
+		snpsd = snpsdata.RawSnpsData(snps, positions, accessions=accessions)
 		snpsds.append(snpsd)
 
 	cursor.close ()
@@ -762,22 +761,25 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 	05/12/08 yh. add argument use_nt2number, to turn nucleotide into numbers. default is not
 	05/12/08 yh. add '-':'-' (deletion) and '|':'NA' (untouched) check nt2number in 'variation.common' to decoder
 	05/12/2008 yh. more correct reporting of snp loading counts
-	05/11/2008 yh. add chromosome. use RawSnpsData directly. ...
+	05/11/2008 yh. add chromosome. use snpsdata.RawSnpsData directly. ...
 	06/25/2008 bjv. withArrayIds is now detected, i.e. the argument doesn't matter.	
 
-	Parses raw CSV SNPs data files into a RawSnpsData.
+	Parses raw CSV SNPs data files into a snpsdata.RawSnpsData.
 
-	format=1: the function return a RawSnpsData object list
+	format=1: the function return a snpsdata.RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
-
 	sys.stderr.write("Loading file: %s ... \n" % datafile)
 	decoder = nt_decoder
 	decoder[missingVal] = missing_val
 	positions = [] #list[chr][position_index]
 	genotypes = [] #list[chr][position_index][acces]
 	accessions = []
-
+	
+	#2013.07.03 forget about deliminator
+	from pymodule import utils
+	deliminator = utils.figureOutDelimiter(input_fname=datafile)
+	
 	#Reading column data
 	f = open(datafile, 'r')
 	lines = f.readlines()
@@ -813,7 +815,7 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 	while i < len(lines):
 		chromosomes.append(newChr)
 		oldChr = newChr
-		rawSnpsData = RawSnpsData(accessions=accessions, arrayIds=arrayIds, id=id)	#05/11/2008 yh. use rawSnpsData
+		rawSnpsData = snpsdata.RawSnpsData(accessions=accessions, arrayIds=arrayIds, id=id)	#05/11/2008 yh. use rawSnpsData
 		rawSnpsData.snps = []
 		rawSnpsData.positions = []
 		rawSnpsData.chromosome = oldChr
@@ -936,7 +938,7 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 	snps_data_list = []
 	chromosomes = sorted(pos_snps_dict.keys())
 	for chrom in chromosomes:
-		snps_data_list.append(RawSnpsData(accessions=accessions, positions=pos_snps_dict[chrom]['positions'], \
+		snps_data_list.append(snpsdata.RawSnpsData(accessions=accessions, positions=pos_snps_dict[chrom]['positions'], \
 				snps=pos_snps_dict[chrom]['snps'], chromosome=chrom, arrayIds=array_ids, id=id))
 
 	if target_format == 'binary':
@@ -956,9 +958,9 @@ def parse_raw_snps_data(datafile, target_format='nucleotides', deliminator=",", 
 
 def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", missingVal='NA', withArrayIds=False):
 	"""
-	Parses raw CSV SNPs data files into a RawSnpsData.
+	Parses raw CSV SNPs data files into a snpsdata.RawSnpsData.
 
-	format=1: the function return a RawSnpsData object list
+	format=1: the function return a snpsdata.RawSnpsData object list
 	format=0: the function return a SnpsData object list
 	"""
 	sys.stderr.write("Loading file: %s ...\n" % datafile)
@@ -1031,7 +1033,7 @@ def parseCSVDataWithCallProb(datafile, callProbFile, format=1, deliminator=",", 
 
 	snpsds = []
 	for i in range(0, len(chromosomes)):
-		snpsds.append(RawSnpsData(snpsList[i], positionsList[i], accessions=accessions, arrayIds=arrayIds, callProbabilities=callProbList[i]))
+		snpsds.append(snpsdata.RawSnpsData(snpsList[i], positionsList[i], accessions=accessions, arrayIds=arrayIds, callProbabilities=callProbList[i]))
 	if format == 0:
 		for i in range(0, len(chromosomes)):
 			snpsds[i] = snpsds[i].getSnpsData()
@@ -1048,7 +1050,7 @@ def parse2010Data(datafile=None):
 	"""
 
 	#Imputed data
-	datadir = homedir + "Projects/data/2010-Zhao_et_al/"
+	datadir = env.homedir + "Projects/data/2010-Zhao_et_al/"
 	if not datafile:
 		datafile = datadir + "SNPs.csv"
 
@@ -1131,7 +1133,7 @@ def parse2010Data(datafile=None):
 
 	chromasomes = []
 	for i in range(0, 5):
-		chromasomes.append(SnpsData(genotypes[i], positions[i], accessions=accessions))
+		chromasomes.append(snpsdata.SnpsData(genotypes[i], positions[i], accessions=accessions))
 
 	#print positions[4]
 	return(chromasomes)
@@ -1140,7 +1142,7 @@ def parse2010Data(datafile=None):
 #def parse250DataRaw(imputed = True):
 #	"""
 #	WARNING: OUTDATED
-#	Returns 250K Data in a list of RawSnpsData objects (one for each chromosome).
+#	Returns 250K Data in a list of snpsdata.RawSnpsData objects (one for each chromosome).
 #
 #	Set imputed to False, if un-imputed data is preferred.
 #
@@ -1207,7 +1209,7 @@ def parse2010Data(datafile=None):
 #
 #	import random
 #	#Converting genotype and filtering.
-#	decoder = RawDecoder()
+#	decoder = snpsdata.RawDecoder()
 #	genotypes = [[],[],[],[],[]]
 #	newpositions = [[],[],[],[],[]]
 #	for i in range(0,len(rawgenotypes)):
@@ -1229,7 +1231,7 @@ def parse2010Data(datafile=None):
 #	
 #	chromasomes = []
 #	for i in range(0,5):
-#		chromasomes.append(RawSnpsData(genotypes[i],positions[i],accessions=accessions))
+#		chromasomes.append(snpsdata.RawSnpsData(genotypes[i],positions[i],accessions=accessions))
 #			
 #	return(chromasomes)
 
@@ -1238,7 +1240,7 @@ def parse2010Data(datafile=None):
 #def parse250KDataFiles(imputed = True):
 #	"""
 #	WARNING: OUTDATED
-#	Returns 250K Data as a list of SnpsData objects (not RawSnpsData).
+#	Returns 250K Data as a list of SnpsData objects (not snpsdata.RawSnpsData).
 #	
 #	Set imputed to False, if un-imputed data is preferred.
 #
@@ -1395,7 +1397,7 @@ def parse2010Data(datafile=None):
 #				newSnps.append(snps[j])
 #				newPositions.append(positions[j])
 #
-#			newSnpsd = SnpsData(newSnps, newPositions)
+#			newSnpsd = snpsdata.SnpsData(newSnps, newPositions)
 #			#print newSnpsd.snps
 #			data.append(newSnpsd)
 #		else:
@@ -1466,7 +1468,7 @@ def parse2010Data(datafile=None):
 #							newSnps.append(snps[j])
 #							newPositions.append(positions[j])
 #
-#			newSnpsd = SnpsData(newSnps, newPositions, baseScale)
+#			newSnpsd = snpsdata.SnpsData(newSnps, newPositions, baseScale)
 #			#print newSnpsd.snps
 #			data.append(newSnpsd)
 #		else:
@@ -1531,7 +1533,7 @@ def parse2010Data(datafile=None):
 #								newSnps.append(snps[j])
 #								newPositions.append(npos)
 #					pos = positions[j]
-#			data.append(SnpsData(newSnps, newPositions, baseScale))
+#			data.append(snpsdata.SnpsData(newSnps, newPositions, baseScale))
 #		else:
 #			i = i + 1
 #	return data
@@ -1613,7 +1615,7 @@ def parse2010Data(datafile=None):
 #								newSnps.append(snps[j])
 #								newPositions.append(npos)
 #					pos = positions[j]
-#				data.append(SnpsData(newSnps, newPositions, baseScale))
+#				data.append(snpsdata.SnpsData(newSnps, newPositions, baseScale))
 #		else:
 #			i = i + 1
 #	return data
@@ -1713,7 +1715,7 @@ def parse2010Data(datafile=None):
 #					print newPositions
 #					print newSnps
 #					print debug2
-#				snpsd = SnpsData(newSnps, newPositions, baseScale)
+#				snpsd = snpsdata.SnpsData(newSnps, newPositions, baseScale)
 #				if len(snpsd.snps) == 0 or len(snpsd.snps[0]) == 0:
 #					print snpsd.positions
 #					print snpsd.snps
@@ -1794,7 +1796,7 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 				line_list = line.split(delimiter)
 				chromosome = int(line_list[0])
 				if chromosome != old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd = snpsdata.SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
 					snpsd_ls.append(snpsd)
 					chromosomes.append(old_chromosome)
 					positions = []
@@ -1812,7 +1814,7 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 				line_list = line.split(delimiter)
 				chromosome = int(line_list[0])
 				if chromosome != old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd = snpsdata.SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
 					snpsd_ls.append(snpsd)
 					chromosomes.append(old_chromosome)
 					positions = []
@@ -1828,7 +1830,7 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 				line_list = line.split(delimiter)
 				chromosome = int(line_list[0])
 				if chromosome != old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd = snpsdata.SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
 					snpsd_ls.append(snpsd)
 					chromosomes.append(old_chromosome)
 					positions = []
@@ -1845,7 +1847,7 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 				line_list = line.split(delimiter)
 				chromosome = int(line_list[0])
 				if chromosome != old_chromosome: #Then save snps_data
-					snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+					snpsd = snpsdata.SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
 					snpsd_ls.append(snpsd)
 					chromosomes.append(old_chromosome)
 					positions = []
@@ -1859,11 +1861,11 @@ def parse_numerical_snp_data(data_file, delimiter=",", missing_val='NA', filter=
 
 
 	f.close()
-	snpsd = SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
+	snpsd = snpsdata.SNPsData(snps, positions, accessions=accessions, chromosome=old_chromosome)
 	snpsd_ls.append(snpsd)
 	chromosomes.append(old_chromosome)
 	sys.stderr.write("Loaded %s SNPs.\n" % i)
-	sd = SNPsDataSet(snpsd_ls, chromosomes, data_format=data_format)
+	sd = snpsdata.SNPsDataSet(snpsd_ls, chromosomes, data_format=data_format)
 	if use_pickle:
 		print 'Saving a pickled version of genotypes.'
 		f = open(pickle_file, 'wb')
@@ -1912,7 +1914,7 @@ def parse_snp_data(data_file, delimiter=",", missingVal='NA', format='nucleotide
 		print 'Looking for nucleotide SNPs'
 		(snpsds, chromosomes) = parse_raw_snps_data(data_file, deliminator=delimiter, missing_val=missingVal,
 					format=1, debug_filter=filter, id=id, return_chromosomes=True)
-		sd = SNPsDataSet(snpsds, chromosomes, data_format=format)
+		sd = snpsdata.SNPsDataSet(snpsds, chromosomes, data_format=format)
 	else:
 		print "Unknown file format!"
 		raise Exception()
@@ -1927,7 +1929,7 @@ def parse_snp_data_region(datafile, chromosome, start_pos, end_pos, delimiter=",
 	Return a region of snpsd.
 	"""
 	snpsds = parseCSVData(datafile, deliminator=delimiter, missingVal=missingVal, format=format, filter=filter, id=id)
-	snpsd = SNPsDataSet(snpsds, [1, 2, 3, 4, 5])
+	snpsd = snpsdata.SNPsDataSet(snpsds, [1, 2, 3, 4, 5])
 	return snpsd.get_region_snpsd(chromosome, start_pos, end_pos)
 
 
@@ -2054,7 +2056,7 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 	if os.path.isfile(ped_pickled_filename):
 		print 'Loading pickled ped file'
 		individ_dict = cPickle.load(open(ped_pickled_filename))
-                print 'Pickled file was loaded.'
+		print 'Pickled file was loaded.'
 	else:
 		individ_dict = {}
 		with open(ped_filename) as f:
@@ -2106,28 +2108,27 @@ def parse_plink_ped_file(file_prefix, only_binary_snps=True, debug=False):
 
 	snp_mat = sp.zeros((len(individ_dict), num_markers), dtype='int8')
 	for i, ind_id in enumerate(individ_dict):
-                snp_mat[i] = individ_dict[ind_id]['snps']
-
-        print 'Finished construcing matrix.'
+		snp_mat[i] = individ_dict[ind_id]['snps']
+	print 'Finished construcing matrix.'
 
 
 	num_weird_snps = 0
 	snps = []
 	for snp_i in range(num_markers):
 		if snp_i % 1000 == 0:
-                        print snp_i, num_weird_snps
-                snp = snp_mat[:, snp_i]
+			print snp_i, num_weird_snps
+		snp = snp_mat[:, snp_i]
 		alleles = sp.unique(snp)
 		if 0 in alleles:
 			if 3 <= len(alleles) <= 4:
 				snps.append(snp)
-                        else:
-                                num_weird_snps += 1
+			else:
+				num_weird_snps += 1
 		else:
 			if 2 <= len(alleles) <= 3:
 				snps.append(snp)
-                        else:
-                                num_weird_snps += 1
+			else:
+				num_weird_snps += 1
 
 	print 'Number of weird SNPs is %d, out of %d' % (num_weird_snps, num_markers)
 	accessions = individ_dict.keys()
@@ -2149,7 +2150,7 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple', return_kinship=
 	if os.path.isfile(tfam_pickled_filename):
 		print 'Loading pickled tfam file'
 		individs, sex_list = cPickle.load(open(tfam_pickled_filename))
-                print 'Pickled tfam file was loaded.'
+		print 'Pickled tfam file was loaded.'
 	else:
 		individs = []
 		sex_list = []
@@ -2166,7 +2167,7 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple', return_kinship=
 	if os.path.isfile(tped_pickled_filename):
 		print 'Loading pickled tped file'
 		chrom_pos_snp_dict = cPickle.load(open(tped_pickled_filename))
-                print 'Pickled tped file was loaded.'
+		print 'Pickled tped file was loaded.'
 	else:
 		chrom_pos_snp_dict = {}
 		with open(tped_filename) as f:
@@ -2215,33 +2216,33 @@ def parse_plink_tped_file(file_prefix, imputation_type='simple', return_kinship=
 				chrom_pos_snp_dict[chrom]['snps'].append(snp)
 		cPickle.dump(chrom_pos_snp_dict, open(tped_pickled_filename, 'wb'), protocol=2)
 
-        chromosomes = sorted(chrom_pos_snp_dict.keys())
-        snpsds = []
-        for chrom in chromosomes:
-                snps = chrom_pos_snp_dict[chrom]['snps']
-                positions = chrom_pos_snp_dict[chrom]['positions']
-                snpsds.append(SNPsData(snps, positions, accessions=individs, chromosome=chrom))
-        sd = SNPsDataSet(snpsds, chromosomes, data_format='diploid_int')
-        print 'SNPsDataSet constructed!'
-
-        if return_kinship:
-	        print 'Loading the kinship matrix'
-	        ibs_filename = file_prefix + '.mibs'
-	        ibs_pickled_filename = ibs_filename + '.pickled'
-	        if os.path.isfile(ibs_pickled_filename):
-	                print 'Loading pickled IBS kinship file'
-	                l = cPickle.load(open(ibs_pickled_filename))
-	                K = l[0]
-	                print 'Pickled IBS kinship was loaded.'
-	        else:
-	                print 'Loading K...'
-	                K = sp.zeros((num_individs, num_individs), dtype='double')
-	                with open(ibs_filename) as f:
-	                        for i, line in enumerate(f):
-	                                K[i] = map(float, line.split())
-	                cPickle.dump([K, individs], open(ibs_pickled_filename, 'wb'), protocol=2)
-	                print 'K was loaded.'
-	        return sd, K
+	chromosomes = sorted(chrom_pos_snp_dict.keys())
+	snpsds = []
+	for chrom in chromosomes:
+		snps = chrom_pos_snp_dict[chrom]['snps']
+		positions = chrom_pos_snp_dict[chrom]['positions']
+		snpsds.append(snpsdata.SNPsData(snps, positions, accessions=individs, chromosome=chrom))
+	sd = snpsdata.SNPsDataSet(snpsds, chromosomes, data_format='diploid_int')
+	print 'SNPsDataSet constructed!'
+	
+	if return_kinship:
+		print 'Loading the kinship matrix'
+		ibs_filename = file_prefix + '.mibs'
+		ibs_pickled_filename = ibs_filename + '.pickled'
+		if os.path.isfile(ibs_pickled_filename):
+			print 'Loading pickled IBS kinship file'
+			l = cPickle.load(open(ibs_pickled_filename))
+			K = l[0]
+			print 'Pickled IBS kinship was loaded.'
+		else:
+			print 'Loading K...'
+			K = sp.zeros((num_individs, num_individs), dtype='double')
+			with open(ibs_filename) as f:
+				for i, line in enumerate(f):
+					K[i] = map(float, line.split())
+			cPickle.dump([K, individs], open(ibs_pickled_filename, 'wb'), protocol=2)
+			print 'K was loaded.'
+		return sd, K
 	return sd
 
 
@@ -2325,7 +2326,7 @@ def _test_full_seq_parser_():
 
 def load_kinship(call_method_id=75, data_format='binary', method='ibs', accessions=None, return_accessions=False,
 		scaled=True, min_mac=0, sd=None, debug_filter=1):
-	import linear_models as lm
+	from variation.src.association import linear_models as lm
 	if call_method_id:
 		file_prefix = '%s%d/kinship_%s_%s' % (env['data_dir'], call_method_id, method, data_format)
 		kinship_file = file_prefix + '_mac%d.pickled' % min_mac
@@ -2383,7 +2384,7 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 		print 'Found data file, loading and then attempting to convert to %s format' % data_format
 		(snpsds, chromosomes) = parse_raw_snps_data(nt_data_file, deliminator=',', missingVal='',
 					format=1, filter=filter, id=id, returnChromosomes=True)
-		sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
+		sd = snpsdata.SNPsDataSet(snpsds, chromosomes, data_format=data_format)
 		sd.convert_data_format(data_format)
 		sd.writeToFile(data_file)
 		return load_snps_call_method(call_method_id=call_method_id, data_format=data_format,
@@ -2398,7 +2399,7 @@ def load_snps_call_method(call_method_id=75, data_format='binary', debug_filter=
 				(snpsds, chromosomes) = parse_raw_snps_data(nt_data_file, deliminator=',',
 									missing_val='N', debug_filter=debug_filter,
 									id=id, return_chromosomes=True)
-				sd = SNPsDataSet(snpsds, chromosomes, data_format='nucleotides')
+				sd = snpsdata.SNPsDataSet(snpsds, chromosomes, data_format='nucleotides')
 				sd.convert_data_format(data_format)
 				data_file = file_prefix + 'chr_%d_%s_mac0.csv' % (chrom, data_format)
 				sd.writeToFile(data_file)
@@ -2455,7 +2456,7 @@ def load_full_sequence_data(file_prefix, data_format='diploid_int', min_mac=5, c
 	t = time.time() - t
 	print 'Loaded % d SNPs.' % num_snps
 	print 'It took % d minutes and % 0.2f seconds to load the SNPs' % (t / 60, t % 60)
-	sd = SNPsDataSet(snpsds, chromosomes, data_format=data_format)
+	sd = snpsdata.SNPsDataSet(snpsds, chromosomes, data_format=data_format)
 	print 'Loaded % d SNPs in total.' % sd.num_snps()
 	return sd
 
@@ -2605,13 +2606,13 @@ def _test_plink_tped_parser_():
 	#plink_prefix = env['home_dir'] + 'Projects/Data/Skin_color/plink'
 	plink_prefix = env['home_dir'] + 'Projects/data/NFBC_20091001/NFBC_20091001'
 	sd = parse_plink_tped_file(plink_prefix)
-        K = sd.get_ibd_kinship_matrix()
-        import linear_models as lm
-        lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibd.pickled', K, sd.accessions)
+	K = sd.get_ibd_kinship_matrix()
+	from variation.src.association import linear_models as lm
+	lm.save_kinship_to_file(plink_prefix + '_kinship_diploid.ibd.pickled', K, sd.accessions)
 
 
 def generate_kinship(call_method_id=76, data_format='binary', method='ibs', min_mac=0, debug_filter=1):
-	import linear_models as lm
+	from variation.src.association import linear_models as lm
 	K, acc_list = load_kinship(call_method_id, data_format, method, min_mac=min_mac, return_accessions=True,
 				debug_filter=debug_filter)
 	file_prefix = '%s%d/kinship_%s_%s' % (env['data_dir'], call_method_id, method, data_format)

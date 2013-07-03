@@ -5,17 +5,16 @@ This python library aims to do two things.
 
 Bjarni Vilhjalmsson, bvilhjal@usc.edu
 """
-import sys, os, math
+import sys, os
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import sys, warnings
-from itertools import *
+import warnings, random
+from itertools import izip
 from bisect import bisect
-import h5py, csv, copy
+import h5py,  copy
 
 import tempfile
-import warnings
 try:
 	import scipy as sp
 	sp.seterr(divide='raise')
@@ -23,11 +22,13 @@ except Exception, err_str:
 	print 'scipy is missing:', err_str
 
 from variation.src import env
-import phenotypeData as pd
+from variation.src.yhio import phenotypeData as pd
 from variation.src.db import dbutils
-import util  #Used to convert val list to stringlist.
-import yu_snp_key as yk
+from variation.src.yhio import util  #Used to convert val list to stringlist.
+from variation.src.yhio import yu_snp_key as yk
+#2013.07.03 do not use "from variation.src.yhio" below to avoid import loop
 import dataParsers as dp
+import dataParsers
 #import ImputeSNPs as imp	#2013.1.19 does not exist anymore
 
 IUPAC_alphabet = ['A', 'C', 'G', 'T', '-', 'Y', 'R', 'W', 'S', 'K', 'M', 'D', 'H', 'V', 'B', 'X', 'N']
@@ -313,6 +314,7 @@ class _SnpsData_(object):
 		snpErrorRate = []
 		newSnps = []
 		newPositions = []
+		new_marker_types = []
 		i = 0
 		j = 0
 		while i <= len(self.positions) and j <= len(snpsd.positions):
@@ -1154,10 +1156,6 @@ class RawSnpsData(_SnpsData_):
 	"""
 	#alphabet = ['A','C','G','T']
 	#alphabet = ['A','C','G','T','-']
-
-
-
-
 	def __init__(self, snps=None, positions=None, baseScale=None, accessions=None, arrayIds=None,
 			chromosome=None, callProbabilities=None, alignment_positions=None, id=None,
 			marker_types=None, missing_val='NA'):
@@ -1166,7 +1164,6 @@ class RawSnpsData(_SnpsData_):
 		self.accessions = accessions
 		#if accessions:
 		#	self._convert_to_tg_ecotypes_()
-
 		self.arrayIds = arrayIds
 		self.callProbabilities = []  #list[position_index][accession_index]
 		if callProbabilities:
@@ -1177,12 +1174,10 @@ class RawSnpsData(_SnpsData_):
 		self.marker_types = marker_types #Where do these markers come frome, what type are they?  Useful for later analysis.
 		self.id = id
 		self.chromosome = chromosome
-
-
+	
 	def writeToFile(self, filename, chromosome, withArrayId=False):
 		"""
 		Writes data to a file.  1 file for each chromosome.
-
 		WARNING OLD, outdated!
 		"""
 		outStr = ""
@@ -1195,9 +1190,7 @@ class RawSnpsData(_SnpsData_):
 		f = open(filename, "w")
 		f.write(outStr)
 		f.close()
-
-
-
+	
 	def impute_data_region(self, reference_snpsd, window_count=100, window_size=None, verbose=False, **kwargs):
 		"""
 		Impute any NA SNPs.
@@ -1229,7 +1222,6 @@ class RawSnpsData(_SnpsData_):
 		tmpFile2 = tempfile.mkstemp()
 		os.close(tmpFile2[0])
 
-		pdb.set_trace()
 		if verbose:
 			print "Preparing data in", tmpFile1[1]
 		imp.writeAsNputeFile(snpsd, tmpFile1[1])
@@ -1269,7 +1261,7 @@ class RawSnpsData(_SnpsData_):
 		os.system(nputeCmd)
 		if verbose:
 			print "Imputation done!"
-		pdb.set_trace()
+		#pdb.set_trace()
 		snpsd = imp.readNputeFile(tmpFile2[1], self.accessions, self.positions)
 		self.snps = snpsd.snps
 		os.remove(tmpFile1[1])
@@ -1340,7 +1332,6 @@ class RawSnpsData(_SnpsData_):
 					accIndices = accessionsIndices[k]
 					snp1 = self.snps[i][accIndices[0]]
 					snp2 = snpsd.snps[j][accIndices[1]]
-
 					if heterozygous2NA:
 						if snp1 in basicAlphabet and snp2 in basicAlphabet:
 							accessionCounts[k] += 1
@@ -1403,8 +1394,6 @@ class RawSnpsData(_SnpsData_):
 		print "Average Accession SNP Error:", sum(accessionErrorRate) / float(len(accessionErrorRate))
 		print "SNP error rates", snpErrorRate
 		print "Average Snp Error:", sum(snpErrorRate) / float(len(snpErrorRate))
-
-
 		naCounts1 = [0] * len(accessionsIndices)
 		for i in range(0, len(self.positions)):
 			for k in range(0, len(accessionsIndices)):
@@ -1412,7 +1401,7 @@ class RawSnpsData(_SnpsData_):
 				snp = self.snps[i][accIndices[0]]
 				if snp == self.missingVal:
 					naCounts1[k] += 1
-
+		
 		naCounts2 = [0] * len(accessionsIndices)
 		for i in range(0, len(snpsd.positions)):
 			for k in range(0, len(accessionsIndices)):
@@ -1420,8 +1409,6 @@ class RawSnpsData(_SnpsData_):
 				snp = snpsd.snps[i][accIndices[1]]
 				if snp == self.missingVal:
 					naCounts2[k] += 1
-
-
 		return [commonSnpsPos, snpErrorRate, commonAccessions, accessionErrorRate, accessionCallRates, arrayIds, accessionCounts, snpCallRate, [naCounts1, naCounts2], [totalCounts, totalFails]]
 
 
@@ -1454,7 +1441,7 @@ class RawSnpsData(_SnpsData_):
 		snps = []
 		positions = []
 		num_lines = len(self.accessions)
-		for snp_i, (snp, pos) in enumerate(izip(self.snps, self.positions)):
+		for snp_i, (snp, pos) in enumerate(zip(self.snps, self.positions)):
 			if verbose and snp_i % 100000 == 0:
 				print 'Converted %d SNPs.' % snp_i
 			unique_nts = sp.unique(snp).tolist()
@@ -1890,12 +1877,12 @@ class SNPsData(_SnpsData_):
 
 
 	def filter_mac(self, min_mac=15, w_missing=False, data_format='binary'):
-       		"""
-       		Filter minor allele count SNPs.
-       		"""
-       		print 'Filtering SNPs with MAC<%d, assuming %s data format' % (min_mac, data_format)
-       		new_snps = []
-       		new_positions = []
+		"""
+		Filter minor allele count SNPs.
+		"""
+		print 'Filtering SNPs with MAC<%d, assuming %s data format' % (min_mac, data_format)
+		new_snps = []
+		new_positions = []
 		if w_missing and self.missingVal in snp:
 			raise NotImplementedError()
 #			for snp, pos in izip(self.snps, self.positions):
@@ -2442,7 +2429,8 @@ class SnpsData(_SnpsData_):
 		f.close()
 		return numPairs
 
-	def estimateRecomb(self, windowSize, maxNumPairs=10000, tempfile1="tmp1", tempfile2="tmp2", meanTract=200, numPoints=50):
+	def estimateRecomb(self, windowSize, maxNumPairs=10000, \
+					tempfile1="tmp1", tempfile2="tmp2", meanTract=200, numPoints=50, homedir=""):
 		num = self._genRecombFile(tempfile1, windowSize, maxNumPairs)
 		if num < 1:
 			return [0, 0, 0]
@@ -2906,7 +2894,7 @@ class snps_data_set:
 		"""
 		chr_pos_l = self.get_chr_pos_list()
 		start_i = bisect(chr_pos_l, (chrom, start_pos))
-		stop_i = bisect(chr_pos_l, (chrom, end_pos))
+		stop_i = bisect(chr_pos_l, (chrom, stop_pos))
 		if self.cached_snps == None:
 			self.cached_snps = self.get_snps()
 		snps = self.cached_snps
@@ -3363,8 +3351,8 @@ class SNPsDataSet:
 			elif self.data_format == 'binary':
 				sm = sp.mat(snps_array * 2.0 - 1.0)
 				k_mat = k_mat + sm * sm.T
-                        else:
-                                raise NotImplementedError
+			else:
+				raise NotImplementedError
 			if num_dots and num_splits >= num_dots and (chunk_i + 1) % int(num_splits / num_dots) == 0: #Print dots
 				sys.stdout.write('.')
 				sys.stdout.flush()
@@ -3656,11 +3644,11 @@ class SNPsDataSet:
 
 	def get_snps(self, random_fraction=None, cache=False):
 		if cache:
-                        try:
-                                return self.snps
-                        except Exception:
-                                pass
-                snplist = []
+			try:
+				return self.snps
+			except Exception:
+				pass
+		snplist = []
 		if random_fraction:
 			import random
 			for snpsd in self.snpsDataList:
@@ -3670,8 +3658,8 @@ class SNPsDataSet:
 		else:
 			for snpsd in self.snpsDataList:
 				snplist.extend(snpsd.snps)
-                if cache:
-                        self.snps = snplist
+		if cache:
+			self.snps = snplist
 		return snplist
 
 
@@ -3694,7 +3682,7 @@ class SNPsDataSet:
 			K = self.get_ibs_kinship_matrix()
 		if kinship_method == 'ibd':
 			K = self.get_ibd_kinship_matrix()
-                plot_tree(K, tree_file, self.accessions, verbose=verbose)
+		plot_tree(K, tree_file, self.accessions, verbose=verbose)
 
 
 	def plot_snp_map(self, chromosome, position, pdf_file=None, png_file=None, map_type='global',
@@ -3721,16 +3709,13 @@ class SNPsDataSet:
 #				r = eid[str(e)]
 #				latitude = float(r[5])
 #				longitude = float(r[6])
-
 			except Exception, err_str:
 				print "Latitude and Longitude, not found?:", err_str
 				print 'Placing them in the Atlantic.'
 				latitude = 40
 				longitude = -20
-
 			lats.append(latitude)
 			lons.append(longitude)
-
 		from mpl_toolkits.basemap import Basemap
 		import numpy as np
 		from pylab import cm
@@ -3743,7 +3728,7 @@ class SNPsDataSet:
 
 			plt.figure(figsize=(16, 4))
 			plt.axes([0.02, 0.02, 0.96, 0.96])
- 			m = Basemap(projection='cyl', llcrnrlat=10, urcrnrlat=80,
+			m = Basemap(projection='cyl', llcrnrlat=10, urcrnrlat=80,
 				    llcrnrlon= -130, urcrnrlon=150, lat_ts=20, resolution='c')
 			m.drawparallels(np.arange(20, 90, 20))
 			m.drawmeridians(np.arange(-180, 180, 30))
@@ -3757,7 +3742,6 @@ class SNPsDataSet:
 			m.drawmeridians(np.arange(-20, 100, 10))
 			#m.bluemarble()
 		elif map_type == 'sweden':
-
 			plt.figure(figsize=(2.4, 4))
 			plt.axes([0.02, 0.02, 0.96, 0.96])
 			m = Basemap(projection='merc', llcrnrlat=55, urcrnrlat=67,
@@ -3803,10 +3787,8 @@ class SNPsDataSet:
 			plt.savefig(png_file, format="png", dpi=400)
 		if not pdf_file and not png_file:
 			plt.show()
-
 		return self.accessions, lats, lons
-
-
+	
 #	def get_snps(self, random_fraction=None, region=None):
 #		snplist = []
 #		if random_fraction:
@@ -3916,7 +3898,7 @@ class SNPsDataSet:
 
 	def get_chr_list(self):
 		chr_list = []
-		for c, snpsd in izip(self.chromosomes, self.snpsDataList):
+		for c, snpsd in zip(self.chromosomes, self.snpsDataList):
 			chr_list.extend([c] * len(snpsd.positions))
 		return chr_list
 
@@ -4106,8 +4088,7 @@ class SNPsDataSet:
 		"""
 		Returns the pc_num'th principal components of the genotype 
 		"""
-		import random
-		import rpy, util
+		import rpy
 
 		if not self.is_binary:
 			print "Converting the snps data to binary format."
@@ -4669,7 +4650,7 @@ def get_AW_common_dataset():
 def write_out_01_dataset():
 	sd_t75 = dataParsers.parse_snp_data(env.env['data_dir'] + '250K_t75.csv', format='binary')
 	file_name = '/Users/bjarnivilhjalmsson/Projects/Data/250k/250K_t75.csv.binary'
-	sd_t54.writeToFile(file_name)
+	sd_t75.writeToFile(file_name)
 
 def get_JB_datasets():
 	pass
@@ -4724,39 +4705,39 @@ def _test_prior_():
 
 
 def plot_tree(K, tree_file, ets, verbose=True, label_values=None):
-        import scipy.cluster.hierarchy as hc
-        import pylab
-        import phenotypeData
-        e_dict = phenotypeData.get_ecotype_id_info_dict()
-        #print e_dict
-        labels = []
-        for et_i, et in enumerate(ets):
-                try:
-                        s1 = unicode(e_dict[int(et)][0], 'iso-8859-1')
-                        if label_values != None:
-                                s2 = unicode(' %s' % str(label_values[et_i]))
-                        else:
-                                s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(et)][2], e_dict[int(et)][3]))
-                        s = s1 + s2
-                except Exception, err_s:
-                        print err_s
-                        s = str(et)
-                labels.append(s)
-        if verbose:
-                print "Plotting tree for SNPs:"
-        Z = hc.average(K)
-        pylab.figure(figsize=(24, 15))
-        pylab.axes([0.03, 0.08, 0.96, 0.91])
-        dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=labels)
-        xmin, xmax = pylab.xlim()
-        xrange = xmax - xmin
-        ymin, ymax = pylab.ylim()
-        yrange = ymax - ymin
-        pylab.axis([xmin - 0.01 * xrange, xmax + 0.01 * xrange, ymin - 0.02 * yrange, ymax + 0.02 * yrange])
-        pylab.savefig(tree_file, format='pdf')
-        pylab.clf()
-        if verbose:
-                print "Done plotting tree, saved in file:", tree_file, "\n"
+	import scipy.cluster.hierarchy as hc
+	import pylab
+	import phenotypeData
+	e_dict = phenotypeData.get_ecotype_id_info_dict()
+	# print e_dict
+	labels = []
+	for et_i, et in enumerate(ets):
+		try:
+			s1 = unicode(e_dict[int(et)][0], 'iso-8859-1')
+			if label_values != None:
+				s2 = unicode(' %s' % str(label_values[et_i]))
+			else:
+				s2 = unicode('(%0.1f,%0.1f)' % (e_dict[int(et)][2], e_dict[int(et)][3]))
+			s = s1 + s2
+		except Exception, err_s:
+			print err_s
+			s = str(et)
+		labels.append(s)
+	if verbose:
+		print "Plotting tree for SNPs:"
+	Z = hc.average(K)
+	pylab.figure(figsize=(24, 15))
+	pylab.axes([0.03, 0.08, 0.96, 0.91])
+	dend_dict = hc.dendrogram(Z, leaf_font_size=7, labels=labels)
+	xmin, xmax = pylab.xlim()
+	xrange = xmax - xmin
+	ymin, ymax = pylab.ylim()
+	yrange = ymax - ymin
+	pylab.axis([xmin - 0.01 * xrange, xmax + 0.01 * xrange, ymin - 0.02 * yrange, ymax + 0.02 * yrange])
+	pylab.savefig(tree_file, format='pdf')
+	pylab.clf()
+	if verbose:
+		print "Done plotting tree, saved in file:", tree_file, "\n"
 
 
 
@@ -4781,9 +4762,9 @@ def _plot_interesting_snps_():
 		for l in f:
 			line = map(str.strip, l.split(','))
 			cps = line[0].split(':')
-                        cp1 = map(int, cps[0].split('_'))
+			cp1 = map(int, cps[0].split('_'))
 			png_file_1 = env.env['results_dir'] + 'weird_snp_geographical_plot_%d_%d.png' % (cp1[0], cp1[1])
-                        cp2 = map(int, cps[1].split('_'))
+			cp2 = map(int, cps[1].split('_'))
 			png_file_2 = env.env['results_dir'] + 'weird_snp_geographical_plot_%d_%d.png' % (cp2[0], cp2[1])
 			try:
 				sd.plot_snp_map(cp1[0], cp1[1], png_file=png_file_1, map_type='sweden')
@@ -4798,28 +4779,28 @@ def _plot_interesting_snps_():
 
 
 if __name__ == "__main__":
-        _plot_interesting_snps_()
+	_plot_interesting_snps_()
 #	sd = dp.load_snps_call_method(78)
-#        sd.plot_tree(env.env['results_dir'] + 'tree_full.pdf')
-#        sd_chr1 = SNPsDataSet(snpsds=[sd.snpsDataList[0]], chromosomes=[1], data_format='binary')
-#        sd_chr1.plot_tree(env.env['results_dir'] + 'tree_chr1.pdf')
-#        sd_0_19 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=0, end_pos=19000000)], chromosomes=[1], data_format='binary')
-#        sd_0_19.plot_tree(env.env['results_dir'] + 'tree_chr1_0_19.pdf')
-#        sd = dp.load_snps_call_method(78)
-#        sd_19_20 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=19000000, end_pos=20000000)], chromosomes=[1], data_format='binary')
-#        sd_19_20.plot_tree(env.env['results_dir'] + 'tree_chr1_19_20.pdf')
-#        sd = dp.load_snps_call_method(78)
-#        sd_20_21 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=20000000, end_pos=21000000)], chromosomes=[1], data_format='binary')
-#        sd_20_21.plot_tree(env.env['results_dir'] + 'tree_chr1_20_21.pdf')
-#        sd = dp.load_snps_call_method(78)
-#        sd_21_22 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=21000000, end_pos=22000000)], chromosomes=[1], data_format='binary')
-#        sd_21_22.plot_tree(env.env['results_dir'] + 'tree_chr1_21_22.pdf')
-#        sd = dp.load_snps_call_method(78)
-#        sd_22_23 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=22000000, end_pos=23000000)], chromosomes=[1], data_format='binary')
-#        sd_22_23.plot_tree(env.env['results_dir'] + 'tree_chr1_22_23.pdf')
-#        sd = dp.load_snps_call_method(78)
-#        sd_21_31 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=21000000, end_pos=31000000)], chromosomes=[1], data_format='binary')
-#        sd_21_31.plot_tree(env.env['results_dir'] + 'tree_chr1_21_31.pdf')
+#	sd.plot_tree(env.env['results_dir'] + 'tree_full.pdf')
+#	sd_chr1 = SNPsDataSet(snpsds=[sd.snpsDataList[0]], chromosomes=[1], data_format='binary')
+#	sd_chr1.plot_tree(env.env['results_dir'] + 'tree_chr1.pdf')
+#	sd_0_19 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=0, end_pos=19000000)], chromosomes=[1], data_format='binary')
+#	sd_0_19.plot_tree(env.env['results_dir'] + 'tree_chr1_0_19.pdf')
+#	sd = dp.load_snps_call_method(78)
+#	sd_19_20 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=19000000, end_pos=20000000)], chromosomes=[1], data_format='binary')
+#	sd_19_20.plot_tree(env.env['results_dir'] + 'tree_chr1_19_20.pdf')
+#	sd = dp.load_snps_call_method(78)
+#	sd_20_21 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=20000000, end_pos=21000000)], chromosomes=[1], data_format='binary')
+#	sd_20_21.plot_tree(env.env['results_dir'] + 'tree_chr1_20_21.pdf')
+#	sd = dp.load_snps_call_method(78)
+#	sd_21_22 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=21000000, end_pos=22000000)], chromosomes=[1], data_format='binary')
+#	sd_21_22.plot_tree(env.env['results_dir'] + 'tree_chr1_21_22.pdf')
+#	sd = dp.load_snps_call_method(78)
+#	sd_22_23 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=22000000, end_pos=23000000)], chromosomes=[1], data_format='binary')
+#	sd_22_23.plot_tree(env.env['results_dir'] + 'tree_chr1_22_23.pdf')
+#	sd = dp.load_snps_call_method(78)
+#	sd_21_31 = SNPsDataSet(snpsds=[sd.get_region_snpsd(1, start_pos=21000000, end_pos=31000000)], chromosomes=[1], data_format='binary')
+#	sd_21_31.plot_tree(env.env['results_dir'] + 'tree_chr1_21_31.pdf')
 
 	#_test_prior_()
 #	import dataParsers
