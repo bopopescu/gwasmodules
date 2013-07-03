@@ -1,0 +1,1 @@
+../pegasus/mapper/extractor/SelectDistantMembersFromGenotypeFile.py
