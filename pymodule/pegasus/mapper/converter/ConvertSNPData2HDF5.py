@@ -50,7 +50,8 @@ class ConvertSNPData2HDF5(AbstractMapper):
 		f = h5py.File(self.outputFname, 'w')
 		import numpy
 		#snpData.data_matrix.dtype = numpy.int16
-		dset = f.create_dataset("data_matrix", data=snpData.data_matrix, maxshape=(None, None))	#numpy.array(snpData.data_matrix, dtype=numpy.int64)
+		dset = f.create_dataset("data_matrix", data=snpData.data_matrix, maxshape=(None, None))
+		#numpy.array(snpData.data_matrix, dtype=numpy.int64)
 		col_id_ls_dset = f.create_dataset('col_id_ls', data=snpData.col_id_ls, maxshape=(None,))
 		row_id_ls_dset = f.create_dataset('row_id_ls', data=snpData.row_id_ls, maxshape=(None,))
 		f.close()
