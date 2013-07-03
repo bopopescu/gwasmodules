@@ -1,0 +1,1 @@
+../../../../variation/src/yhio/ConvertYuSNPFormat2TPED_TFAM.py

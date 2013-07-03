@@ -1,0 +1,1 @@
+../../../../variation/src/yhio/ConvertYuSNPFormat2EigenStrat.py
