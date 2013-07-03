@@ -36,15 +36,18 @@ from QC_250k import QC_250k, SNPData, TwoSNPData
 class QC(object):
 	__doc__ = __doc__
 	option_default_dict = {('input_fname1',1, ): [None, 'i', 1, 'File containing the calls'],\
-							('input_fname2',1, ): [None, 'j', 1, 'File containing the reference calls to be compared with'],\
-							('input_fname1_format',1,int): [1, 'k', 1, 'Format of input_fname1. 1=strain X snp (Yu). 2=snp X strain (Bjarni) without arrayId. 3=snp X strain with arrayId.'],\
-							('input_fname2_format',1,int): [1, 'l', 1, 'Format of input_fname2. 1=strain X snp (Yu). 2=snp X strain (Bjarni) without arrayId'],\
-							('output_fname', 1, ): [None, 'o', 1, '', ],\
-							('ecotype_id_ls', 0, ): [None, '', 1, 'list of ecotypes in input_fname1 that need to get chromosomal SNP mismatch rate. only for run_type 3.', ],\
-							('run_type', 1, int): [1, 'y', 1, \
-							'Running type. 1: compare the row-wise mismatching rate between input_fname1 and input_fname2. 2: column-wise mismatch of input_fname1 vs itself. same ecotype_id (1st column) but different array_id (2nd column). 3: column-wise mismatch between input_fname1 and input_fname2 only for designated ecotype_id_ls from snpData1', ],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+						('input_fname2',1, ): [None, 'j', 1, 'File containing the reference calls to be compared with'],\
+						('input_fname1_format',1,int): [1, 'k', 1, 'Format of input_fname1. 1=strain X snp (Yu). 2=snp X strain (Bjarni) without arrayId. 3=snp X strain with arrayId.'],\
+						('input_fname2_format',1,int): [1, 'l', 1, 'Format of input_fname2. 1=strain X snp (Yu). 2=snp X strain (Bjarni) without arrayId'],\
+						('output_fname', 1, ): [None, 'o', 1, '', ],\
+						('ecotype_id_ls', 0, ): [None, '', 1, 'list of ecotypes in input_fname1 that need to get chromosomal SNP mismatch rate. only for run_type 3.', ],\
+						('run_type', 1, int): [1, 'y', 1, 'Running type. \n\
+1: carry out row-wise and column-wise mismatch rate between input_fname1 and input_fname2.\n\
+2: column-wise mismatch of input_fname1 vs itself. same ecotype_id (1st column) but different array_id (2nd column).\n\
+3: column-wise mismatch between input_fname1 and input_fname2 only for designated ecotype_id_ls from snpData1', ],\
+						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	
 	def __init__(self, **keywords):
 		"""
 		2008-05-11
