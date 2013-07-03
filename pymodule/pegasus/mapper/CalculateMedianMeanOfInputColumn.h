@@ -63,6 +63,7 @@ class CalculateMedianMeanOfInputColumn{
 	int alignmentID;
 	long noOfData;	//watch "long" is needed, big integer, 3 billion or so loci for one genome
 	long noOfSampledData;
+	long sumOfCoverageAtAllLoci;
 	double meanStat;
 	double medianStat;
 	long modeStat;

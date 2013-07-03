@@ -17,6 +17,7 @@ CalculateMedianMeanOfInputColumn::CalculateMedianMeanOfInputColumn(string _input
 {
 	noOfData=0;
 	noOfSampledData=0;
+	sumOfCoverageAtAllLoci = 0;
 	statListExpansionStepSize=100000;
 	int inputFnameLength = inputFname.length();
 	if (inputFname.substr(inputFnameLength-2, 2)=="gz"){
@@ -30,7 +31,7 @@ CalculateMedianMeanOfInputColumn::CalculateMedianMeanOfInputColumn(string _input
 
 	outputFile.open(outputFname.c_str(), std::ios::out);
 	outputFile<<"alignmentID\ttotal_base_count\tsampled_base_count\tmean" + inputStatName + "\tmedian"
-			+ inputStatName + "\tmode"+ inputStatName<<endl;
+			+ inputStatName + "\tmode"+ inputStatName + "\tsumOf" + inputStatName << endl;
 
 }
 
@@ -139,12 +140,15 @@ int CalculateMedianMeanOfInputColumn::readInRawDataFromSAMtoolsDepthFile(){
 	//2013.06.09 compute the mean/median/mode
 	//cout<< statList << endl;
 	if (noOfSampledData>0){
+		sumOfCoverageAtAllLoci = ba::sum(accumulatorSet);
+
 		medianStat = arma::median(statList.col(0));
 		meanStat = arma::mean(statList.col(0));
 
 		// Display the results by boost accumulators ...
 		std::cout << "Mean:   " << ba::mean(accumulatorSet) << std::endl;
 		std::cout << "Median: " << ba::median(accumulatorSet) << std::endl;
+		std::cout << "sumOfCoverageAtAllLoci: " << sumOfCoverageAtAllLoci << std::endl;
 	}
 
 	return 1;
@@ -174,7 +178,6 @@ int CalculateMedianMeanOfInputColumn::readInRawDataFromGATKDOCOutput(){
 	//tokenizerCharType::iterator tokenizer_iter = line_toks.begin();
 	long inputColumnNumber=0;
 	long coverageAtTheseLoci;
-	long sumOfCoverageAtAllLoci = 0;
 	long noOfLociAtModeDepth = -1;
 	long noOfLociAtThisCoverage;
 	for(tokenizerCharType::iterator it = line_toks.begin(), ite = line_toks.end(); it!=ite; ++it){
@@ -239,7 +242,7 @@ void CalculateMedianMeanOfInputColumn::run(){
 
 	//output
 	outputFile<< alignmentID << "\t" << noOfData << "\t" << noOfSampledData << "\t"<< meanStat << "\t"
-			<< medianStat << "\t" << modeStat << endl;
+			<< medianStat << "\t" << modeStat << "\t" << sumOfCoverageAtAllLoci << endl;
 	//cout<< medianStat << endl;
 	//cout<< meanStat << endl;
 	//output it
