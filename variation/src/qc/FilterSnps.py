@@ -33,9 +33,9 @@ Description:
 	Requires MySQLdb to be installed, as well as util.py, rfun.py, snpsdata.py and dataParsers.py.
 """
 
-import sys, getopt, traceback
-import snpsdata
-import dataParsers
+import sys, getopt
+from variation.src.yhio import snpsdata
+from variation.src.yhio import dataParsers
 
 def _run_():
 	if len(sys.argv) == 1:
@@ -49,6 +49,7 @@ def _run_():
 		opts, args = getopt.getopt(sys.argv[1:], "o:d:m:a:brh", long_options_list)
 
 	except:
+		import traceback
 		traceback.print_exc()
 		print sys.exc_info()
 		print __doc__
@@ -263,7 +264,7 @@ def filterMonomorphic(snpsds):
 	return snpsds
 
 def _test1_():
-	import dataParsers
+	from variation.src.yhio import dataParsers
 	snpsds = dataParsers.parseCSVData("2010_v3.csv")
 	#snpsds = dataParsers.parseCSVData("250K_m3.csv",withArrayIds=1)
 	#comparisonSnpsds = dataParsers.parseCSVData("2010_v3.csv")
