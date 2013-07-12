@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """
-Example of embedding matplotlib in an application and interacting with
-a treeview to store data.  Double click on an entry to update plot
-data
+Example of embedding matplotlib in an application and interacting with a treeview to store data.  Double click on an entry to update plot data
+
+2013.07.02 input matrix file should have a header.
+	First two columns should be of string type. Everything else is of float type.
 
 """
 import __init__	#used to know the path to this file itself
@@ -21,9 +22,10 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 
 import yh_gnome, csv, traceback
-from SNP import SNPData, read_data
-from utils import figureOutDelimiter
-from sets import Set
+from pymodule.yhio.SNP import SNPData, read_data
+from pymodule.utils import figureOutDelimiter
+from pymodule import MatrixFile
+from variation.src.qc.FilterStrainSNPMatrix import FilterStrainSNPMatrix
 
 class DataMatrixGuiXYProbe(gtk.Window):
 	"""
@@ -134,15 +136,21 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			if event.inaxes is not None:
 				print 'data coords', event.xdata, event.ydata
 				for row in self.list_2d:
-					x_data = float(row[x_column])
-					y_data = float(row[y_column])
-					if abs(x_data-event.xdata)<x_grain_size and abs(y_data-event.ydata)<y_grain_size:
-						info = row[dot_label_column]
-						if to_label_dot:
-							self.ax.text(event.xdata, event.ydata, info, size=8)
-							self.canvas.draw()
-						sys.stderr.write("%s: %s, %s: %s, xy=(%s, %s), info: %s.\n"%(self.column_header[0], row[0], self.column_header[1], row[1], x_data, y_data, info))
-	
+					if row[x_column] and row[y_column]:	#not empty
+						try:
+							x_data = float(row[x_column])
+							y_data = float(row[y_column])
+							if abs(x_data-event.xdata)<x_grain_size and abs(y_data-event.ydata)<y_grain_size:
+								info = row[dot_label_column]
+								if to_label_dot:
+									self.ax.text(event.xdata, event.ydata, info, size=8)
+									self.canvas.draw()
+								sys.stderr.write("%s: %s, %s: %s, xy=(%s, %s), info: %s.\n"%\
+												(self.column_header[0], row[0], self.column_header[1], row[1], x_data, y_data, info))
+						except:
+							sys.stderr.write("Column %s, %s of row (%s), could not be converted to float. skip.\n"%\
+											(x_column, y_column, repr(row)))
+			
 	def plotXY(self, ax, canvas, liststore, plot_title='', chosen_index_ls=[]):
 		"""
 		2009-3-13
@@ -164,12 +172,13 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		y_ls = []
 		x_chosen_ls = []
 		y_chosen_ls = []
-		from sets import Set
-		chosen_index_set = Set(chosen_index_ls)
+		chosen_index_set = set(chosen_index_ls)
 		for i in range(len(liststore)):
 			row = liststore[i]
 			x = row[x_column]
 			y = row[y_column]
+			if not x or not y:	#2013.07.12 skip if empty cells
+				continue
 			if x<min_x:
 				min_x = x
 			if x>max_x:
@@ -259,7 +268,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		self.treeselection.selected_foreach(yh_gnome.foreach_cb, pathlist_strains1)
 		self.app1_appbar1.push("%s rows selected."%len(pathlist_strains1))
 		if self.header and self.strain_acc_list and self.category_list and self.data_matrix:
-			selected_index_set = Set()
+			selected_index_set = set()
 			for path in pathlist_strains1:
 				row = self.liststore[path[0]]
 				id = row[0]
@@ -271,16 +280,15 @@ class DataMatrixGuiXYProbe(gtk.Window):
 					self.category_list[index_in_data_matrix] = id[1].strip()
 				#else:
 				#	self.header[index_in_data_matrix+2] = id
-			from variation.src.FilterStrainSNPMatrix import FilterStrainSNPMatrix
 			FilterStrainSNPMatrix_instance = FilterStrainSNPMatrix()
 			if self.id_is_strain:
-				rows_to_be_tossed_out = Set(range(len(self.strain_acc_list))) - selected_index_set
+				rows_to_be_tossed_out = set(range(len(self.strain_acc_list))) - selected_index_set
 				FilterStrainSNPMatrix_instance.write_data_matrix(self.data_matrix, output_fname, self.header, self.strain_acc_list, self.category_list,\
-								rows_to_be_tossed_out, cols_to_be_tossed_out=Set(), nt_alphabet=0)
+								rows_to_be_tossed_out, cols_to_be_tossed_out=set(), nt_alphabet=0)
 			else:
-				cols_to_be_tossed_out = Set(range(len(self.header)-2)) - selected_index_set
+				cols_to_be_tossed_out = set(range(len(self.header)-2)) - selected_index_set
 				FilterStrainSNPMatrix_instance.write_data_matrix(self.data_matrix, output_fname, self.header, self.strain_acc_list, self.category_list,\
-								rows_to_be_tossed_out=Set(), cols_to_be_tossed_out=cols_to_be_tossed_out, nt_alphabet=0)
+								rows_to_be_tossed_out=set(), cols_to_be_tossed_out=cols_to_be_tossed_out, nt_alphabet=0)
 	
 	def show_all(self):
 		"""
@@ -324,13 +332,14 @@ class DataMatrixGuiXYProbe(gtk.Window):
 	
 	def readInDataToPlot(self, input_fname):
 		"""
+		2013.07.11 use MatrixFile to read in the file
 		2009-5-20
 			add the column index into the column header for easy picking
 		2009-3-13
 			wrap the float conversion part into try...except to report what goes wrong
 		2009-3-13
 		"""
-		reader = csv.reader(open(input_fname), delimiter=figureOutDelimiter(input_fname))
+		reader = MatrixFile(inputFname=input_fname)
 		self.column_header=reader.next()
 		for i in range(len(self.column_header)):
 			self.column_header[i] = '%s %s'%(i, self.column_header[i])
@@ -347,6 +356,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 				traceback.print_exc()
 			new_row = row[:2]+float_part
 			self.list_2d.append(new_row)
+		reader.close()
 		self.setupColumns(self.treeview_matrix)
 		self.plotXY(self.ax, self.canvas, self.liststore, self.plot_title)
 	
