@@ -297,16 +297,23 @@ def drawHexbin(x_ls, y_ls, C_ls, fig_fname=None, gridsize=100, title=None, xlabe
 
 
 
-def drawScatter(x_ls, y_ls, fig_fname=None, title=None, xlabel=None, ylabel=None,\
-			dpi=300):
+def drawScatter(x_ls=None, y_ls=None, fig_fname=None, title=None, xlabel=None, ylabel=None,\
+			dpi=300, logX=False, logY=False, **keywords):
 	"""
+	2013.07.12 added argument logX, logY
 	2011-10-17
 	"""
 	sys.stderr.write("Drawing scatter of %s points vs %s points to %s ..."%(len(x_ls), len(y_ls), fig_fname))
 	import pylab, numpy
 	import matplotlib.cm as cm
 	pylab.clf()
-	pylab.plot(x_ls, y_ls, '.')
+	fig = pylab.figure(figsize=(10, 10)) # You were missing the =
+	ax = fig.add_subplot(1, 1, 1)
+	if logY:
+		ax.set_yscale('log')
+	if logX:
+		ax.set_xscale('log')
+	pylab.plot(x_ls, y_ls, '.', **keywords)
 	if title is None:
 		title = constructTitleFromTwoDataSummaryStat(x_ls, y_ls)
 	pylab.title(title)
