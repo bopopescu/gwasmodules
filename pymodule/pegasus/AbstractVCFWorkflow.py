@@ -43,7 +43,11 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		self.mapReduceType = 1	#2013.06.27 type 1: split VCF with fixed number of sites
 		# type 2: SelectVariants from VCF with fixed-size windows
 		# child classes could change its value in the end of their own __init__()
-	
+		
+		#2013.07.18 offer child classes option to turn it off
+		self.needGzipPreReduceReturnData = True
+		self.needGzipReduceReturnData = True
+		
 	def extra__init__(self):
 		"""
 		2013.2.14
@@ -1037,16 +1041,18 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 							**keywords)
 		passingData.reduceReturnData = reduceReturnData
 		
-		
-		gzipPreReduceReturnData = self.addGzipSubWorkflow(workflow=workflow, inputData=preReduceReturnData, transferOutput=transferOutput,\
+		if self.needGzipPreReduceReturnData:
+			gzipPreReduceReturnData = self.addGzipSubWorkflow(workflow=workflow, inputData=preReduceReturnData, transferOutput=transferOutput,\
 						outputDirPrefix="%sPreReduce"%(outputDirPrefix), \
 						topOutputDirJob= gzipPreReduceFolderJob, report=False)
-		gzipPreReduceFolderJob = gzipPreReduceReturnData.topOutputDirJob
+			gzipPreReduceFolderJob = gzipPreReduceReturnData.topOutputDirJob
 		
-		gzipReduceReturnData = self.addGzipSubWorkflow(workflow=workflow, inputData=reduceReturnData, transferOutput=transferOutput,\
+		if self.needGzipReduceReturnData:
+			gzipReduceReturnData = self.addGzipSubWorkflow(workflow=workflow, inputData=reduceReturnData, transferOutput=transferOutput,\
 						outputDirPrefix="%sReduce"%(outputDirPrefix), \
 						topOutputDirJob=gzipReduceFolderJob, report=False)
-		gzipReduceFolderJob = gzipReduceReturnData.topOutputDirJob
+			gzipReduceFolderJob = gzipReduceReturnData.topOutputDirJob
+		
 		sys.stderr.write("\n %s%s VCF files.\n"%('\x08'*40, no_of_vcf_files))
 		sys.stderr.write("%s jobs.\n"%(self.no_of_jobs))
 		return reduceReturnData
