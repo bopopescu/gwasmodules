@@ -17,12 +17,10 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from Bio.Seq import Seq
 from pymodule import ProcessOptions, MatrixFile, PassingData
 from pymodule.yhio.VCFFile import VCFFile
 from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 from pymodule import SNP
-from pymodule.yhio.SNP import nt2number
 
 parentClass = AbstractVCFMapper
 class CalculateSameSiteConcordanceInVCF(parentClass):
@@ -36,29 +34,40 @@ class CalculateSameSiteConcordanceInVCF(parentClass):
 		parentClass.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
 	
-	def readInSNPID2GenotypeVectorLs(self, inputFname=None):
+	def readInSNPID2GenotypeVectorLs(self, inputFname=None, returnType=1):
 		"""
+		returnType
+			1: snp_pos2returnData is snp_pos2genotypeVectorLs
+			2: snp_pos2returnData is snp_pos2returnData
+		2013.07.19 bugfix
 		2013.07.11
 		"""
-		sys.stderr.write("Reading in same-SNP genotype data from %s ..."%(inputFname))
+		sys.stderr.write("Finding SNPs that have same positions from %s ..."%(inputFname))
 		
 		reader = VCFFile(inputFname=inputFname)
 		counter = 0
 		real_counter = 0
-		snp_pos2genotypeVectorLs = {}
+		snp_pos2returnData = {}
 		for vcfRecord in reader:
 			key = (vcfRecord.chromosome, vcfRecord.position)
-			if key not in snp_pos2genotypeVectorLs:
-				snp_pos2genotypeVectorLs[key] = []
+			if key not in snp_pos2returnData:
+				if returnType==1:
+					snp_pos2returnData[key] = []
+				else:
+					snp_pos2returnData[key] = 0
 			else:
 				real_counter += 1
-			snp_pos2genotypeVectorLs[key].append(vcfRecord.data_row[1:])	#[0] is reference
+			
+			if returnType==1:
+				snp_pos2returnData[key].append(vcfRecord.data_row[1:])	#[0] is reference
+			else:
+				snp_pos2returnData[key] += 1
 			
 			counter += 1
-		del reader
+		reader.close()
 		sys.stderr.write("%s snp coordinates from %s vcf records. %s entries with same-positions.\n"%\
-						(len(snp_pos2genotypeVectorLs), counter, real_counter))
-		return snp_pos2genotypeVectorLs
+						(len(snp_pos2returnData), counter, real_counter))
+		return PassingData(snp_pos2returnData=snp_pos2returnData)
 	
 	def run(self):
 		if self.debug:
@@ -71,7 +80,7 @@ class CalculateSameSiteConcordanceInVCF(parentClass):
 		if outputDir and not os.path.isdir(outputDir):
 			os.makedirs(outputDir)
 		
-		snp_pos2genotypeVectorLs =self.readInSNPID2GenotypeVectorLs(self.inputFname)
+		snp_pos2genotypeVectorLs =self.readInSNPID2GenotypeVectorLs(self.inputFname).snp_pos2returnData
 		
 		
 		
