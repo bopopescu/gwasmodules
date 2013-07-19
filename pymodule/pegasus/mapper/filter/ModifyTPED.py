@@ -80,7 +80,7 @@ class ModifyTPED(AbstractMapper):
 		"""
 		2013.1.29
 		"""
-		sys.stderr.write("Getting individualID2Index from %s ..."%(tfamFname))
+		sys.stderr.write("Getting individualID2Index from tfam file %s ..."%(tfamFname))
 		individualID2Index = {}
 		reader = MatrixFile(inputFname=tfamFname)
 		index = 0
