@@ -25,9 +25,9 @@ class ModifyTPED(AbstractMapper):
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict.update({
 						('run_type', 1, int): [1, 'y', 1, 'which run type. 1: modify snp_id (2nd-column) = chr_phyiscalPosition,\n\
-		2: snp_id=chr_physicalPosition (original data), set chr = X (chromosome X, for sex check by plink), pos += positionStartBase. \n\
+		2: snp_id=chr_physicalPosition (original data), set chromosome = X (chromosome X, for sex check by plink), pos += positionStartBase. \n\
 			assuming input is on X already,\n\
-		3: snp_id=chr_physicalPosition (original data), chr (1st column) = newChr, pos += positionStartBase,\n\
+		3: snp_id=chr_physicalPosition (original data), chromosome (1st column) = newChr, pos += positionStartBase,\n\
 		4: mark genotype calls involved in mendel inconsistency as missing, requiring mendelErrorFname.\n', ],\
 						('mendelErrorFname', 0, ): ["", '', 1, 'the plink mendel error output file (the full version). looks like\
  FID       KID  CHR                 SNP   CODE                 ERROR\n\
@@ -45,35 +45,35 @@ class ModifyTPED(AbstractMapper):
 		"""
 		2012.8.9
 		"""
-		chr, snp_id, genetic_distace, physical_distance = row[:4]
-		#chr = Genome.getContigIDFromFname(chr)	# 2012.8.16 getting rid of the string part of chromosome ID doesn't help.
+		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
+		#chromosome = Genome.getContigIDFromFname(chromosome)	# 2012.8.16 getting rid of the string part of chromosome ID doesn't help.
 			#   non-human chromosome numbers would still be regarded as 0 by plink.
-		snp_id = '%s_%s'%(chr, physical_distance)
-		new_row = [chr, snp_id, genetic_distace, physical_distance] + row[4:]
+		snp_id = '%s_%s'%(chromosome, physical_distance)
+		new_row = [chromosome, snp_id, genetic_distace, physical_distance] + row[4:]
 		return new_row
 	
 	def processRow_ChangeChromosomeIDToX(self, row):
 		"""
 		2012.8.9
 		"""
-		chr, snp_id, genetic_distace, physical_distance = row[:4]
-		snp_id = '%s_%s'%(chr, physical_distance)	#the snp_id is the original contig & position
-		#chr = self.newChr	#new chromosome, new position
+		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
+		snp_id = '%s_%s'%(chromosome, physical_distance)	#the snp_id is the original contig & position
+		#chromosome = self.newChr	#new chromosome, new position
 		physical_distance = int(physical_distance) + self.positionStartBase
-		chr = "X"
-		new_row = [chr, snp_id, genetic_distace, physical_distance] + row[4:]
+		chromosome = "X"
+		new_row = [chromosome, snp_id, genetic_distace, physical_distance] + row[4:]
 		return new_row
 	
 	def processRow_addPositionStartBase(self, row):
 		"""
 		2012.8.9
 		"""
-		chr, snp_id, genetic_distace, physical_distance = row[:4]
-		snp_id = '%s_%s'%(chr, physical_distance)	#the snp_id is the original contig & position
-		chr = self.newChr	#new chromosome, new position
+		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
+		snp_id = '%s_%s'%(chromosome, physical_distance)	#the snp_id is the original contig & position
+		chromosome = self.newChr	#new chromosome, new position
 		physical_distance = int(physical_distance) + self.positionStartBase
-		#chr = Genome.getContigIDFromFname(chr)
-		new_row = [chr, snp_id, genetic_distace, physical_distance] + row[4:]
+		#chromosome = Genome.getContigIDFromFname(chromosome)
+		new_row = [chromosome, snp_id, genetic_distace, physical_distance] + row[4:]
 		return new_row
 	
 	def getIndividualID2IndexFromTFAMFile(self, tfamFname=None):
@@ -128,7 +128,7 @@ class ModifyTPED(AbstractMapper):
 			Starting from 5th column, data is genotype of individuals (order is recorded in tfam).
 				Each individual's genotype occupies two columns (diploid). 
 		"""
-		chr, snp_id, genetic_distace, physical_distance = row[:4]
+		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
 		individual_index_ls = locus_id2individual_index_ls.get(snp_id)
 		if individual_index_ls:
 			for index in individual_index_ls:
