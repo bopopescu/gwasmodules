@@ -119,12 +119,8 @@ class PlinkPedigreeFile(MatrixFile):
 			noOfParents2FamilyData[noOfParents].childIDSet.add(nodeID)
 		
 		noOfNuclearFamilies = noOfParents2FamilyData.get(2, 0)
-		sys.stderr.write("\tParentSetSize\tNoOfFamilies\tNoOfParents\tNoOfChildren\n")
 		
-		for noOfParents, familyData in noOfParents2FamilyData.iteritems():
-			parentIDSet = familyData.parentIDSet
-			childIDSet = familyData.childIDSet
-			sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(noOfParents, len(familyData.parentTupleSet), len(parentIDSet), len(childIDSet)))
+		self._reportFamilyStructure(noOfParents2FamilyData)
 		return PassingData(noOfParents2FamilyData=noOfParents2FamilyData)
 	
 	def getFamilyStructurePlinkWay(self, ):
@@ -132,26 +128,40 @@ class PlinkPedigreeFile(MatrixFile):
 		2013.07.19
 			Plink ignores individuals that do not have independent entries (only show up as parents of others).
 			
-			Families where both parents have their own independent entries in the file (linkage format) will be inspected for mendel errors by plink.
-				This function calculates the number of them.
-				
-			#founders = number of lines (entries/individuals) where both parents are 0.
+			Plink Mendel (error detection) works only on families where both parents have their own independent entries in the file.
+				This function calculates the number of them (=len(noOfParents2FamilyData[2].parentTupleSet) ).
+			
+			#founders = number of lines (entries/individuals) where both parents are 0 (do not think in graph way).
 			#non-founders = number of lines (entries/individuals), one or both parents are NOT 0.
 				non-founders were classified into two
-					# with 2 parents in ??? nuclear families = both their parents are included in the file with independent entries (AKA genotyped).
-					# without 2 parents in ??? nuclear families = the rest
+					#non-founders with 2 parents in N1 nuclear families = both their parents are included in the file with independent entries (AKA genotyped).
+						= len(noOfParents2FamilyData[2].childIDSet)
+						N1 = len(noOfParents2FamilyData[2].parentTupleSet)
+						
+					#non-founders without 2 parents in N2 nuclear families = the rest
+						= len(noOfParents2FamilyData[1].childIDSet) + len(noOfParents2FamilyData[0].childIDSet)
+						N2 = len(noOfParents2FamilyData[1].parentTupleSet) + len(noOfParents2FamilyData[0].parentTupleSet)
+			
 		"""
 		sys.stderr.write("Getting number of unique parent-set that both parents ")
 		pGraph = self.pedigreeGraph
 		self._resetInput()
 		individualIDSet = set()
+		founderIndividualIDSet = set()
+		nonFounderIndividualIDSet = set()
 		for row in self:
+			if row.paternalID=='0' and row.maternalID=='0':
+				founderIndividualIDSet.add(row.individualID)
+			else:
+				nonFounderIndividualIDSet.add(row.individualID)
+			
 			individualIDSet.add(row.individualID)
 		self._resetInput()
 		
 		noOfParents2FamilyData = {}
 		for nodeID in self.pedigreeGraph:
-			if nodeID in individualIDSet:	#must have an independent entry
+			if nodeID in individualIDSet and nodeID in nonFounderIndividualIDSet:	#must have an independent entry
+					#and exclude founders
 				parents = self.pedigreeGraph.predecessors(nodeID)
 				parents.sort()
 				#calculate no of parents in the plink way, both parents must have independent entries
@@ -164,19 +174,27 @@ class PlinkPedigreeFile(MatrixFile):
 				
 				parentTupleList = []
 				for parentID in parents:
-					if parentID in individualIDSet:
+					if parentID!='0':
 						parentTupleList.append(parentID)
 						noOfParents2FamilyData[noOfParents].parentIDSet.add(parentID)
 				
 				noOfParents2FamilyData[noOfParents].parentTupleSet.add(tuple(parentTupleList))
 				noOfParents2FamilyData[noOfParents].childIDSet.add(nodeID)
-			
+		self._reportFamilyStructure(noOfParents2FamilyData)
+		sys.stderr.write("\t %s founders, %s non-founders.\n"%(len(founderIndividualIDSet), len(nonFounderIndividualIDSet)))
+		return PassingData(noOfParents2FamilyData=noOfParents2FamilyData, founderIndividualIDSet=founderIndividualIDSet,\
+						nonFounderIndividualIDSet=nonFounderIndividualIDSet)
+	
+	def _reportFamilyStructure(self, noOfParents2FamilyData=None):
+		"""
+		2013.07.19
+		"""
+		sys.stderr.write("\t%s\t%s\t%s\t%s\n"%("parentSetSize", "noOfFamilies", "noOfParents", "noOfKids"))
 		for noOfParents, familyData in noOfParents2FamilyData.iteritems():
 			parentIDSet = familyData.parentIDSet
 			childIDSet = familyData.childIDSet
 			sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(noOfParents, len(familyData.parentTupleSet), len(parentIDSet), len(childIDSet)))
 		
-		return PassingData(noOfParents2FamilyData=noOfParents2FamilyData)
 	
 	def next(self):
 		try:
