@@ -142,7 +142,7 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		#. construct individualID2pedigreeContext, context: familySize=1/2/3, familyPosition=1/2 (parent/child)
 		sys.stderr.write("Constructing individualID2pedigreeContext ...")
 		plinkPedigreeFile = PlinkPedigreeFile(inputFname=self.pedigreeFname)
-		pGraph = plinkPedigreeFile.getPedigreeGraph().DG
+		pGraph = plinkPedigreeFile.pedigreeGraph
 		#shrink the graph to only individuals with data
 		pGraph = nx.subgraph(pGraph, individualID2HaplotypeData.keys())
 		
