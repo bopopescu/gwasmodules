@@ -18,20 +18,13 @@ Description:
 	
 	Example:
 	
-		reader = MatrixFile(inputFname='/tmp/input.txt', openMode='r')
-		reader = MatrixFile('/tmp/input.txt', openMode='r')
-		reader.constructColName2IndexFromHeader()
-		for row in reader:
-			row[reader.getColName2IndexFromHeader('KID')]
+		plinkPedigreeFile = PlinkPedigreeFile(inputFname=self.pedigreeFname)
+		familyStructureData = plinkPedigreeFile.getFamilyStructurePlinkWay()
 		
-		inf = utils.openGzipFile(inputFname, openMode='r')
-		reader = MatrixFile(inputFile=inf)
-		
-		#2013.2.1 writing
-		writer = MatrixFile('/tmp/output.txt', openMode='w', delimiter='\t')
-		writer.writeHeader(...)
-		writer.writerow(row)
-		writer.close()
+		plinkPedigreeFile = PlinkPedigreeFile(inputFname=self.pedigreeFname)
+		for nodeID in plinkPedigreeFile.pedigreeGraph:
+			...
+		plinkPedigreeFile.close()
 	
 	
 
@@ -62,6 +55,28 @@ class PlinkPedigreeFile(MatrixFile):
 		
 		self.familyID2MemberList= {}
 		self.familySize2SampleIDList = {}
+		
+		#2013.07.19
+		self._pedigreeGraph = None
+		self._childNodeSet = None
+	
+	@property
+	def pedigreeGraph(self):
+		"""
+		2013.07.19
+		"""
+		if self._pedigreeGraph is None:
+			self.pedigreeGraph = None
+		return self._pedigreeGraph
+	
+	@pedigreeGraph.setter
+	def pedigreeGraph(self, argument_ls=[]):
+		"""
+		2013.07.19
+		"""
+		graphData = self.getPedigreeGraph()
+		self._pedigreeGraph = graphData.DG
+		self._childNodeSet = graphData.childNodeSet
 	
 	def getPedigreeGraph(self,):
 		"""
@@ -69,11 +84,10 @@ class PlinkPedigreeFile(MatrixFile):
 		"""
 		sys.stderr.write("Getting pedigree graph from this file %s ..."%(self.inputFname))
 		
+		self._resetInput()
 		#self.constructColName2IndexFromHeader()	#there is no header.
 		DG = graph.DiGraphWrapper()
-			
 		childNodeSet = set()
-		
 		counter = 0
 		for row in self:
 			DG.add_node(row.individualID)	#in case this guy has no parents, then won't be added via add_edge()
@@ -87,6 +101,82 @@ class PlinkPedigreeFile(MatrixFile):
 							len(childNodeSet), DG.number_of_nodes(), DG.number_of_edges(), \
 							nx.number_connected_components(DG.to_undirected())))
 		return PassingData(DG=DG, childNodeSet=childNodeSet)
+	
+	def getFamilyStructure(self):
+		"""
+		2013.07.19
+		"""
+		sys.stderr.write("Finding unique pairs (singletons or groups) of parents ...\n ")
+		noOfParents2FamilyData = {}
+		for nodeID in self.pedigreeGraph:
+			parents = self.pedigreeGraph.predecessors(nodeID)
+			noOfParents = len(parents)
+			if noOfParents not in noOfParents2FamilyData:
+				noOfParents2FamilyData[noOfParents] = PassingData(parentTupleSet=set(), parentIDSet=set(), childIDSet=set())
+			parents.sort()
+			noOfParents2FamilyData[noOfParents].parentTupleSet.add(tuple(parents))
+			noOfParents2FamilyData[noOfParents].parentIDSet = noOfParents2FamilyData[noOfParents].parentIDSet.union(set(parents))
+			noOfParents2FamilyData[noOfParents].childIDSet.add(nodeID)
+		
+		noOfNuclearFamilies = noOfParents2FamilyData.get(2, 0)
+		sys.stderr.write("\tParentSetSize\tNoOfFamilies\tNoOfParents\tNoOfChildren\n")
+		
+		for noOfParents, familyData in noOfParents2FamilyData.iteritems():
+			parentIDSet = familyData.parentIDSet
+			childIDSet = familyData.childIDSet
+			sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(noOfParents, len(familyData.parentTupleSet), len(parentIDSet), len(childIDSet)))
+		return PassingData(noOfParents2FamilyData=noOfParents2FamilyData)
+	
+	def getFamilyStructurePlinkWay(self, ):
+		"""
+		2013.07.19
+			Plink ignores individuals that do not have independent entries (only show up as parents of others).
+			
+			Families where both parents have their own independent entries in the file (linkage format) will be inspected for mendel errors by plink.
+				This function calculates the number of them.
+				
+			#founders = number of lines (entries/individuals) where both parents are 0.
+			#non-founders = number of lines (entries/individuals), one or both parents are NOT 0.
+				non-founders were classified into two
+					# with 2 parents in ??? nuclear families = both their parents are included in the file with independent entries (AKA genotyped).
+					# without 2 parents in ??? nuclear families = the rest
+		"""
+		sys.stderr.write("Getting number of unique parent-set that both parents ")
+		pGraph = self.pedigreeGraph
+		self._resetInput()
+		individualIDSet = set()
+		for row in self:
+			individualIDSet.add(row.individualID)
+		self._resetInput()
+		
+		noOfParents2FamilyData = {}
+		for nodeID in self.pedigreeGraph:
+			if nodeID in individualIDSet:	#must have an independent entry
+				parents = self.pedigreeGraph.predecessors(nodeID)
+				parents.sort()
+				#calculate no of parents in the plink way, both parents must have independent entries
+				noOfParents = 0
+				for parentID in parents:
+					if parentID in individualIDSet:
+						noOfParents += 1
+				if noOfParents not in noOfParents2FamilyData:
+					noOfParents2FamilyData[noOfParents] = PassingData(parentTupleSet=set(), parentIDSet=set(), childIDSet=set())
+				
+				parentTupleList = []
+				for parentID in parents:
+					if parentID in individualIDSet:
+						parentTupleList.append(parentID)
+						noOfParents2FamilyData[noOfParents].parentIDSet.add(parentID)
+				
+				noOfParents2FamilyData[noOfParents].parentTupleSet.add(tuple(parentTupleList))
+				noOfParents2FamilyData[noOfParents].childIDSet.add(nodeID)
+			
+		for noOfParents, familyData in noOfParents2FamilyData.iteritems():
+			parentIDSet = familyData.parentIDSet
+			childIDSet = familyData.childIDSet
+			sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(noOfParents, len(familyData.parentTupleSet), len(parentIDSet), len(childIDSet)))
+		
+		return PassingData(noOfParents2FamilyData=noOfParents2FamilyData)
 	
 	def next(self):
 		try:
