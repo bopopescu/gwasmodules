@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """
 Examples:
-	%s  -i  folderHighCoveragePanel/Scaffold96_88778_VCF_87875_VCF_Scaffold96_splitVCF_u1.minCoverage8.beagled.vcf.gz 
-		-o  folderHighCoveragePanel/Scaffold96_88778_VCF_87875_VCF_Scaffold96_splitVCF_u1.phasedRefPanel.m$m.tsv
-		--pedigreeFname  folderAuxilliary/pedigree.88179_VCF_86965_VCF_Scaffold99.filterByMaxSNPMissingRate.recode.format1.txt
-	
-	%s -o ... input1.vcf input2.vcf input3.vcf
+	%s  -i mendelRuntype3_s1Gzip/meanMedianModePerLocusMendelError.tsv.gz
+		--pedigreeFname vcf2plinkRuntype3_s1VCF2PlinkMerged/pedigree.tfam
+		-o mendelRuntype3_s1Gzip/meanMendelErrorPerLocusPerFamily.tsv
+		
+	%s
 	
 
 Description:
