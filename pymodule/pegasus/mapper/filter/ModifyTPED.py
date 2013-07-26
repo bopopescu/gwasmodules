@@ -35,6 +35,7 @@ class ModifyTPED(AbstractMapper):
 						('tfamFname', 0, ): ["", '', 1, 'the plink tfam file used to figure out which individual is on which column'],\
 						('newChr', 0, ): ["1", 'n', 1, 'the new chromosome for the TPED file (replace the old one)'],\
 						('positionStartBase', 0, int): [0, 'p', 1, 'the number to be added to position of every SNP'],\
+						('markMissingStatFname', 0, ): ["", '', 1, 'only required for run_type 4, used to store genotypes that have been marked missing'],\
 						})
 	def __init__(self,  **keywords):
 		"""
@@ -78,19 +79,22 @@ class ModifyTPED(AbstractMapper):
 	
 	def getIndividualID2IndexFromTFAMFile(self, tfamFname=None):
 		"""
+		2013.07.24 return individualIDList as well
 		2013.1.29
 		"""
 		sys.stderr.write("Getting individualID2Index from tfam file %s ..."%(tfamFname))
 		individualID2Index = {}
+		individualIDList = []
 		reader = MatrixFile(inputFname=tfamFname)
-		index = 0
+		counter = 0
 		for row in reader:
 			individualID = row[1]
 			individualID2Index[individualID] = len(individualID2Index)
-			index += 1
+			individualIDList.append(individualID)
+			counter += 1
 		del reader
 		sys.stderr.write(" %s individuals.\n"%(len(individualID2Index)))
-		return individualID2Index
+		return PassingData(individualID2Index=individualID2Index, individualIDList=individualIDList)
 	
 	def getMendelErrorIndividualLocusData(self, mendelErrorFname=None, individualID2Index=None):
 		"""
@@ -121,8 +125,10 @@ class ModifyTPED(AbstractMapper):
 						(counter, len(locus_id2individual_index_ls)))
 		return locus_id2individual_index_ls
 	
-	def markGenotypeMissingIfInvolvedInMendelError(self, row=None, locus_id2individual_index_ls=None):
+	def markGenotypeMissingIfInvolvedInMendelError(self, row=None, locus_id2individual_index_ls=None, \
+												individual_index2no_of_genotype_marked_missing=None):
 		"""
+		2013.07.24 bugfix
 		2013.1.29 
 			need to read the tfam file to figure out which column one individual is on.
 			Starting from 5th column, data is genotype of individuals (order is recorded in tfam).
@@ -130,14 +136,36 @@ class ModifyTPED(AbstractMapper):
 		"""
 		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
 		individual_index_ls = locus_id2individual_index_ls.get(snp_id)
+		
 		if individual_index_ls:
 			for index in individual_index_ls:
-				row[index*2] = 0	#mark it missing
-				row[index*2+1] = 0
+				row[4+index*2] = 0	#mark it missing
+				row[4+index*2+1] = 0
+				if individual_index2no_of_genotype_marked_missing is not None:
+					if index not in individual_index2no_of_genotype_marked_missing:
+						individual_index2no_of_genotype_marked_missing[index] = 0
+					individual_index2no_of_genotype_marked_missing[index] += 1
 		return row
+	
+	def outputGenotypeMarkedMissingStat(self, outputFname=None, \
+									individual_index2no_of_genotype_marked_missing=None,\
+									individualIDList=None):
+		"""
+		2013.07.24
+		"""
+		if outputFname and individual_index2no_of_genotype_marked_missing is not None:
+			writer = MatrixFile(inputFname=outputFname, openMode='w', delimiter='\t')
+			header = ["individualID", "noOfGenotypesMarkedMissing"]
+			writer.writeHeader(header)
+			for individual_index, no_of_genotype_marked_missing in individual_index2no_of_genotype_marked_missing.iteritems():
+				individual_id = individualIDList[individual_index]
+				writer.writerow([individual_id, no_of_genotype_marked_missing])
+			writer.close()
+		
 	
 	def run(self):
 		"""
+		2013.07.24
 		"""
 		
 		if self.debug:
@@ -149,12 +177,17 @@ class ModifyTPED(AbstractMapper):
 		writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
 		counter = 0
 		if self.run_type==4:	#2013.2.1
-			individualID2Index = self.getIndividualID2IndexFromTFAMFile(tfamFname=self.tfamFname)
+			tfamIndividualData = self.getIndividualID2IndexFromTFAMFile(tfamFname=self.tfamFname)
+			individualID2Index = tfamIndividualData.individualID2Index
+			individualIDList = tfamIndividualData.individualIDList
 			locus_id2individual_index_ls = self.getMendelErrorIndividualLocusData(mendelErrorFname=self.mendelErrorFname, \
 												individualID2Index=individualID2Index)
+			individual_index2no_of_genotype_marked_missing = {}
 		else:
 			individualID2Index = None
+			individualIDList = None
 			locus_id2individual_index_ls = None
+			individual_index2no_of_genotype_marked_missing = None
 		for row in reader:
 			if self.run_type==2:
 				new_row = self.processRow_ChangeChromosomeIDToX(row)
@@ -162,16 +195,22 @@ class ModifyTPED(AbstractMapper):
 				new_row = self.processRow_addPositionStartBase(row)
 			elif self.run_type==4:
 				new_row = self.markGenotypeMissingIfInvolvedInMendelError(row=row, \
-														locus_id2individual_index_ls=locus_id2individual_index_ls)
+											locus_id2individual_index_ls=locus_id2individual_index_ls,\
+											individual_index2no_of_genotype_marked_missing=individual_index2no_of_genotype_marked_missing)
+				
 			else:
 				new_row = self.processRow(row)
 			writer.writerow(new_row)
 			counter += 1
-			
+		sys.stderr.write("%s lines modified.\n"%(counter))
+		
 		del reader
 		del writer
-		sys.stderr.write("%s lines modified.\n"%(counter))
-
+		self.outputGenotypeMarkedMissingStat(outputFname=self.markMissingStatFname, \
+								individual_index2no_of_genotype_marked_missing=individual_index2no_of_genotype_marked_missing, \
+								individualIDList=individualIDList)
+	
+	
 if __name__ == '__main__':
 	main_class = ModifyTPED
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
