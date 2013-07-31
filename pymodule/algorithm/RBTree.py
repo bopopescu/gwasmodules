@@ -1,5 +1,26 @@
 #!/usr/bin/env python
 """
+Usage:
+	
+	## for genomic or other data with span-like data structures (chromsome, start, stop).
+	# chromosome could be set to same for other non-genomic span data. 
+	from RBTree import RBDict	# 2010-1-26 RBDict is more efficiency than binary_tree.
+	rbDict = RBDict(cmpfn=leftWithinRightAlsoEqualCmp)
+
+	for segment in segment_ls:
+		chromosome, start, stop = segment[:3]
+		segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, span_ls=[start, stop], \
+												min_reciprocal_overlap=min_reciprocal_overlap)
+		rbDict[segmentKey] = segment
+	
+	## keys that are easier to be hashed and compared
+	rbDict = RBDict()
+	key1 = 0.5
+	individual1 = "1978001"
+	rbDict[key1] = individual1
+	
+	
+	
 2010-1-26 downloaded from http://newcenturycomputers.net/projects/rbtree.html
 
 #
