@@ -891,9 +891,9 @@ class RBList(RBTree):
 
 class RBDict(RBTree):
 
-	def __init__(self, dict={}, cmpfn=cmp):
+	def __init__(self, dictionaryStructure={}, cmpfn=cmp):
 		RBTree.__init__(self, cmpfn)
-		for key, value in dict.items():
+		for key, value in dictionaryStructure.items():
 			self[key]=value
 		# changing the comparison function for an existing tree is dangerous!
 		self.__cmp = cmpfn
