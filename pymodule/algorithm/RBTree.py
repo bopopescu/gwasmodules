@@ -28,11 +28,11 @@ Usage:
 # Thomas Niemann's Sorting and Searching Algorithms: A Cookbook
 #
 # From the title page:
-#   Permission to reproduce this document, in whole or in part, is
-#   given provided the original web site listed below is referenced,
-#   and no additional restrictions apply. Source code, when part of
-#   a software project, may be used freely without reference to the
-#   author.
+#	Permission to reproduce this document, in whole or in part, is
+#	given provided the original web site listed below is referenced,
+#	and no additional restrictions apply. Source code, when part of
+#	a software project, may be used freely without reference to the
+#	author.
 #
 # Adapted by Chris Gonnerman <chris.gonnerman@newcenturycomputers.net>
 #		and Graham Breed
@@ -206,11 +206,11 @@ class RBTree(object):
 		self.elements = 0
 		
 		#SF: If self.unique is True, all elements in the tree have 
-	   	#SF  to be unique and an exception is raised for multiple 
-	   	#SF insertions of a node
-	   	#SF If self.unique is set to False, nodes can be added multiple 
-	   	#SF times. There is still only one node, but all insertions are
-	   	#SF counted in the variable node.count
+			#SF  to be unique and an exception is raised for multiple 
+			#SF insertions of a node
+			#SF If self.unique is set to False, nodes can be added multiple 
+			#SF times. There is still only one node, but all insertions are
+			#SF counted in the variable node.count
 		self.unique = unique
 		# changing the comparison function for an existing tree is dangerous!
 		self.__cmp = cmpfn
@@ -316,7 +316,7 @@ class RBTree(object):
 	def insertFixup(self, x):
 		#************************************
 		#  maintain Red-Black tree balance  *
-		#  after inserting node x		   *
+		#  after inserting node x			*
 		#************************************
 
 		# check Red-Black properties
@@ -994,6 +994,14 @@ class RBDict(RBTree):
 	
 	def findNodes(self, key, node_ls=[], current=None, compareIns=None):
 		"""
+		Examples:
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=str(row.chromosome), \
+							span_ls=[row.start, row.stop], \
+							min_reciprocal_overlap=0.0000001, )	#min_reciprocal_overlap doesn't matter here.
+				# it's decided by compareIns.
+			node_ls = []
+			genomeRBDict.findNodes(segmentKey, node_ls=node_ls, compareIns=compareIns)
+		
 		2010-8-17
 			add argument compareIns, an instance of a class which has function cmp().
 			
