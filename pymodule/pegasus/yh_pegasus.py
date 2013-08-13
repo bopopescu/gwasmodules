@@ -46,6 +46,8 @@ def registerRefFastaFile(workflow=None, refFastaFname=None, registerAffiliateFil
 						'stidx', 'sthash'], folderName="reference"):
 	"""
 	suffix here doesn't include ".".
+	
+	2013.08.23 bugfix, check if workflow has a file registered before adding it
 	2013.3.26 added refSAMtoolsFastaIndexF, refPicardFastaDictF into returnData
 	2013.3.20 deduce needBWARefIndexJob, needSAMtoolsFastaIndexJob, needPicardFastaDictJob, needStampyRefIndexJob from missing suffixes
 	2010.10.10 added argument folderName
@@ -72,7 +74,8 @@ def registerRefFastaFile(workflow=None, refFastaFname=None, registerAffiliateFil
 		refFastaF = File(os.path.join(folderName, os.path.basename(refFastaFname)))	#use relative path, otherwise, it'll go to absolute path
 		# Add it into replica only when needed.
 		refFastaF.addPFN(PFN("file://" + refFastaFname, input_site_handler))
-		workflow.addFile(refFastaF)
+		if not workflow.hasFile(refFastaF):	#2013.08.12
+			workflow.addFile(refFastaF)
 		returnData.refFastaFList.append(refFastaF)
 		# If it's not needed, assume the index is done and all relevant files are in absolute path.
 		# and no replica transfer
@@ -102,7 +105,8 @@ def registerRefFastaFile(workflow=None, refFastaFname=None, registerAffiliateFil
 			affiliateF = File(os.path.join(folderName, os.path.basename(pathToFile)))
 			#use relative path, otherwise, it'll go to absolute path
 			affiliateF.addPFN(PFN("file://" + pathToFile, input_site_handler))
-			workflow.addFile(affiliateF)
+			if not workflow.hasFile(affiliateF):	#2013.08.12
+				workflow.addFile(affiliateF)
 			returnData.refFastaFList.append(affiliateF)
 			
 			if suffix=='dict':	#2013.3.26
@@ -125,8 +129,10 @@ def registerRefFastaFile(workflow=None, refFastaFname=None, registerAffiliateFil
 		returnData.needBlastMakeDBJob = True
 	return returnData
 
-def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, walltime=180, sshDBTunnel=0):
+def setJobToProperMemoryRequirement(job=None, job_max_memory=500, no_of_cpus=1, walltime=180, sshDBTunnel=0):
 	"""
+	2013.06.22 if job_max_memory is None, then skip setting memory requirement
+		if job_max_memory is "" or 0 or "0", then assign 500 (mb) to it.
 	2012.8.15
 		increase default walltime to 180
 	2012.4.16
@@ -141,9 +147,13 @@ def setJobToProperMemoryRequirement(job, job_max_memory=500, no_of_cpus=1, wallt
 		job_max_memory is in MB.
 		walltime is in minutes.
 	"""
-	job.addProfile(Profile(Namespace.GLOBUS, key="maxmemory", value="%s"%(job_max_memory)))
-	job.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(job_max_memory)))	#for dynamic slots
-	condorJobRequirementLs = ["(memory>=%s)"%(job_max_memory)]
+	condorJobRequirementLs = []
+	if job_max_memory == "" or job_max_memory == 0 or job_max_memory =="0":
+		job_max_memory = 500
+	if job_max_memory is not None: 
+		job.addProfile(Profile(Namespace.GLOBUS, key="maxmemory", value="%s"%(job_max_memory)))
+		job.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(job_max_memory)))	#for dynamic slots
+		condorJobRequirementLs.append("(memory>=%s)"%(job_max_memory))
 	#2012.4.16
 	if sshDBTunnel==1:
 		condorJobRequirementLs.append("(sshDBTunnel==%s)"%(sshDBTunnel))	#use ==, not =.
