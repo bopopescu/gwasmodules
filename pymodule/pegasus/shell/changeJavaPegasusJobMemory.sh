@@ -7,12 +7,13 @@ if test $# -lt 6; then
 	echo "  $0 pegasusWorkFolder jobFilenamePrefix XmxOldValue XmxNewValue MaxPermSizeNewValue totalMemoryNewValue [runType]"
 	echo ""
 	echo "Note:"
-	echo "	#. This program modifies pegasus job scripts (jobFilenamePrefix*.sub) in a workflow working folder."
+	echo "	#. This program modifies pegasus job scripts (jobFilenamePrefix*.sub, jobFilenamePrefix*.in) in a workflow working folder."
 	echo " 	#. XmxOldValue has to match the original value in order for XmxNewValue to be set."
 	echo "  #. if XmxNewValue is <=0, its modification will not be carried out. Same for MaxPermSize and totalMemoryNewValue."
 	echo "  #. If runType is 0, this program leaves the new content in jobFilename.tmp but do not overwrite the original one."
 	echo "  #. If runType is 1, this program overwrites (by mv command) the original FILEPATH with FILEPATH.tmp (and FILEPATH.tmp will be gone)."
 	echo "  #. If runType is 2, this program deletes FILEPATH.tmp left by runType 0."
+	echo "  #. If runType is 3, same effect as runType 1 but no user-asking, just execute."
 	echo "  #. Default runType is $runTypeDefault."
 	echo
 	echo "Examples:"
@@ -49,12 +50,12 @@ if test $XmxNewValue -gt 0; then
 fi
 
 if test $MaxPermSizeNewValue -gt 0; then
-	./modifyPegasusJobContent.sh $pegasusWorkFolder $jobFilenamePrefix $MaxPermSizeNewValue $runType MaxPermSize
+	~/script/pymodule/pegasus/shell/modifyPegasusJobContent.sh $pegasusWorkFolder $jobFilenamePrefix $MaxPermSizeNewValue $runType MaxPermSize
+	~/script/pymodule/pegasus/shell/modifyPegasusJobContent.sh $pegasusWorkFolder $jobFilenamePrefix $MaxPermSizeNewValue $runType MaxPermSize .in
 fi
 
 if test $totalMemoryNewValue -gt 0; then
-	./modifyPegasusJobContent.sh $pegasusWorkFolder $jobFilenamePrefix $totalMemoryNewValue $runType request_memory
-	
+	~/script/pymodule/pegasus/shell/modifyPegasusJobContent.sh $pegasusWorkFolder $jobFilenamePrefix $totalMemoryNewValue $runType request_memory
 	~/script/pymodule/pegasus/shell/modifyPegasusJobContent.sh $pegasusWorkFolder $jobFilenamePrefix $totalMemoryNewValue $runType "(memory"
 fi
 
