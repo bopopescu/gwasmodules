@@ -35,10 +35,9 @@ else:   #32bit
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv, numpy, traceback, subprocess
 from pymodule import figureOutDelimiter, getListOutOfStr
-import Stock_250kDB
 from CNVNormalize import CNVNormalize
 import cStringIO
-from sets import Set
+from variation.src.db import Stock_250kDB
 
 class RunGADA(CNVNormalize):
 	__doc__ = __doc__
@@ -327,7 +326,7 @@ class RunGADA(CNVNormalize):
 		array_id_ls = header[1:-2]
 		array_id_ls = map(int, array_id_ls)
 		if self.which_array_id_ls:
-			col_index_ls = self.findOutWhichColumn(array_id_ls, Set(self.which_array_id_ls))
+			col_index_ls = self.findOutWhichColumn(array_id_ls, set(self.which_array_id_ls))
 		else:
 			col_index_ls = range(data_matrix.shape[1])
 		
@@ -377,7 +376,7 @@ class RunGADA(CNVNormalize):
 		array_id_ls = header[1:-2]
 		array_id_ls = map(int, array_id_ls)
 		if self.which_array_id_ls:
-			col_index_ls = self.findOutWhichColumn(array_id_ls, Set(self.which_array_id_ls))
+			col_index_ls = self.findOutWhichColumn(array_id_ls, set(self.which_array_id_ls))
 		else:
 			col_index_ls = range(data_matrix.shape[1])
 		
