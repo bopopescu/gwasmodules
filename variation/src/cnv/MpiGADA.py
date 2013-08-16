@@ -22,15 +22,15 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import getopt, csv, math, traceback
-import cPickle, traceback
+import getopt, csv
+import cPickle
 from Scientific import MPI
 from pymodule.MPIwrapper import mpi_synchronize, MPIwrapper
 from pymodule import PassingData, getListOutOfStr, figureOutDelimiter
 from RunGADA import RunGADA
 #import Stock_250kDB
 from sets import Set
-import GADA
+from variation.src import GADA
 
 class MpiGADA(RunGADA, MPIwrapper):
 	__doc__ = __doc__
@@ -62,7 +62,7 @@ class MpiGADA(RunGADA, MPIwrapper):
 		self.communicator = MPI.world.duplicate()
 		MPIwrapper.__init__(self, self.communicator, debug=self.debug, report=self.report)
 		
-	def generate_params(cls, aAlpha_ls, TBackElim_ls, MinSegLen_ls, reader=None, array_id_set=None, \
+	def generate_params(self, aAlpha_ls, TBackElim_ls, MinSegLen_ls, reader=None, array_id_set=None, \
 					param_obj=None, debug=None, chr2start_stop_index=None):
 		"""
 		2010-6-5
@@ -253,8 +253,9 @@ class MpiGADA(RunGADA, MPIwrapper):
 					if not os.path.isdir(tmp_output_dir):
 						os.makedirs(tmp_output_dir)
 				except:
-					 traceback.print_exc()
-					 sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 			computing_parameter_obj = PassingData(tmp_input_fname=self.tmp_input_fname, tmp_output_fname=self.tmp_output_fname)
 			self.computing_node(computing_parameter_obj, self.computing_node_handler)
 		else:
