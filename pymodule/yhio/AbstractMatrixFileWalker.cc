@@ -222,8 +222,10 @@ void AbstractMatrixFileWalker::run(){
 }
 
 
-
-int main(int argc, char* argv[]) {
-	AbstractMatrixFileWalker instance(argc, argv);
-	instance.run();
-}
+#ifndef __MAIN__
+	int main(int argc, char* argv[]) {
+		AbstractMatrixFileWalker instance(argc, argv);
+		instance.run();
+	}
+#define __MAIN__
+#endif
