@@ -3,11 +3,14 @@ HDF5Lib  = -lhdf5_cpp -l hdf5
 .SUFFIXES:	.i .cc .c .so .o _wrap.o .py
 .PHONY:	swig
 
+IncludeDirs = -I ~/script/
+
 cxx_targets	= CalculateColCorBetweenTwoHDF5 FindMaxLDBetweenPeakAndEachLocus
-cxx_flags	= -O2
+cxx_flags	= -O2 $(IncludeDirs)
 cxx_compiler	= g++
+
 c_targets	= 
-c_flags		= -O2
+c_flags		= -O2 $(IncludeDirs)
 c_compiler	= gcc
 
 

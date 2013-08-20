@@ -3,7 +3,7 @@
  *
  */
 
-#include "CalculateColCorBetweenTwoHDF5.h"
+#include "pymodule/include/CalculateColCorBetweenTwoHDF5.h"
 
 
 FindMaxLDBetweenPeakAndEachLocus::FindMaxLDBetweenPeakAndEachLocus(char* _input1Fname, char* _withinPeakLocusIDFname, char* _outputFname, int _i1_start, int _i1_stop)\

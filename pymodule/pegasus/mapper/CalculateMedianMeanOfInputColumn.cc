@@ -6,7 +6,7 @@
  * 	CalculateMedianMeanOfInputColumn -i /tmp/input.tsv.gz -o /tmp/output -f 0.7
  */
 
-#include "CalculateMedianMeanOfInputColumn.h"
+#include "pymodule/include/CalculateMedianMeanOfInputColumn.h"
 
 CalculateMedianMeanOfInputColumn::CalculateMedianMeanOfInputColumn(string _inputFname, string _outputFname, int _alignmentID,
 		float _fractionToSample, int _whichColumn, long _maxNumberOfSamplings,
