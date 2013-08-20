@@ -2,7 +2,7 @@
  * 2013.08.19 a c++ version of AbstractMatrixFileWalker.py
  *
  */
-#include "AbstractMatrixFileWalker.h"
+#include "pymodule/include/AbstractMatrixFileWalker.h"
 
 void AbstractMatrixFileWalker::_constructOptionDescriptionStructure(){
 
