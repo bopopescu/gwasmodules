@@ -1,0 +1,49 @@
+
+.SUFFIXES:	.i .cc .c .so .o _wrap.o .py
+.PHONY:	swig clean_subdirs subdirs $(SUBDIRS)
+
+IncludeDirs = -I ~/script/
+BoostLib  = -lboost_program_options -lboost_iostreams
+HDF5Lib  = -lhdf5_cpp -lhdf5 
+
+## cxx_targets, cxxLinkFlags, c_targets, cLinkFlags, extraTargets will be defined in child Makefiles 
+#cxx_targets	= 
+cxx_flags	= -O2
+cxx_compiler	= g++
+#cxxLinkFlags	= 
+
+#c_targets	= 
+c_flags		= -O2
+c_compiler	= gcc
+#cLinkFlags 	=
+
+#extraTargets
+
+all:	$(cxx_targets) $(c_targets) $(extraTargets) subdirs
+
+
+$(cxx_targets):	%:	%.o
+	-$(cxx_compiler) $< $(cxx_flags) -o $@ $(cxxLinkFlags)
+
+.cc.o:
+	$(cxx_compiler) $< $(cxx_flags) $(IncludeDirs) -c -o $@
+
+$(c_targets):	%:	%.o
+	$(c_compiler) $< $(c_flags) -o $@ $(cLinkFlags)
+
+.c.o:
+	$(c_compiler) $< $(c_flags) $(IncludeDirs) -c -o $@
+
+
+subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir all; \
+	done
+	
+clean_subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+
+clean:	clean_subdirs
+	-rm -f *.o $(cxx_targets) $(c_targets) $(extraTargets)
