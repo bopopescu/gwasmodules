@@ -35,6 +35,7 @@ using namespace boost;
 namespace po = boost::program_options;
 
 class AbstractMatrixFileWalker{
+protected:
 	int minNoOfTotal;
 	int maxNoOfTotal;
 	float fractionToSample;
