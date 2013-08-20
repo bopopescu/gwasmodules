@@ -1,0 +1,229 @@
+/*
+ * 2013.08.19 a c++ version of AbstractMatrixFileWalker.py
+ *
+ */
+#include "AbstractMatrixFileWalker.h"
+
+void AbstractMatrixFileWalker::_constructOptionDescriptionStructure(){
+
+	optionDescription.add_options()("help,h", "produce help message")
+				("minNoOfTotal,m", po::value<int>(&minNoOfTotal)->default_value(0),
+					"minimum no of data from one file for afterFileFunction() to run")
+				("maxNoOfTotal,x", po::value<int>(&maxNoOfTotal)->default_value(-1),
+					"maximum no of data to sample from one file. if not set, no limit.")
+				("fractionToSample,f", po::value<float>(&fractionToSample)->default_value(1.0),
+					"how often you include the data, a probability between 0 and 1.")
+				("whichColumn,w", po::value<int >(&whichColumn)->default_value(1),
+						"which column of inputFname is the target stat, --inputFileFormat=1 only.")
+				("whichColumnHeader,W", po::value<string >(&whichColumnHeader),
+						"column header of the data to be used, substitute whichColumn")
+				("missingDataNotation", po::value<string>(&missingDataNotation),
+						"missing data notation. missing data will be skipped.")
+				("debug,b", "toggle debug mode")
+				("report,r", "toggle report mode")
+				("inputFname,i", po::value<vector<string> >(&inputFnameList),
+						"input filename, space/tab/coma-delimited, gzipped or not. could be specified as options or positional arguments")
+				("inputFileFormat", po::value<int >(&inputFileFormat)->default_value(1),
+						"input file format")
+				("outputFname,o", po::value<string>(&outputFname), "output filename")
+				("outputFileFormat", po::value<int >(&outputFileFormat)->default_value(1),
+						"output file format");
+
+}
+
+AbstractMatrixFileWalker::AbstractMatrixFileWalker(int argc, char* argv[])
+{
+	_constructOptionDescriptionStructure();
+
+	//all positional arguments are input files.
+	positionOptionDescription.add("inputFname", -1);
+
+	po::store(po::command_line_parser(argc, argv).
+	              options(optionDescription).positional(positionOptionDescription).run(), optionVariableMap);
+
+	//po::store(po::parse_command_line(argc, argv, optionDescription), optionVariableMap);
+	po::notify(optionVariableMap);
+	if (optionVariableMap.count("help") || inputFnameList.size()<=0){
+		cout << optionDescription << endl;
+		exit(1);
+	}
+	if (optionVariableMap.count("debug")){
+		debug = 1;
+	}
+	else{
+		debug = 0;
+	}
+	if (optionVariableMap.count("report")){
+		report = 1;
+	}
+	else{
+		report = 0;
+	}
+	if (!outputFname.empty()){
+		if (debug){
+			std::cerr<<"Open file " << outputFname << " for writing " ;
+		}
+		outputFile.open(outputFname.c_str(), std::ios::out);
+		if (debug){
+			std::cerr<< endl ;
+		}
+	}
+}
+
+AbstractMatrixFileWalker::~AbstractMatrixFileWalker()
+{
+	//clearing
+	if (debug){
+		std::cerr<<"Exit." << endl;
+	}
+}
+
+void AbstractMatrixFileWalker::setup(){
+
+}
+
+void AbstractMatrixFileWalker::reduce(){
+
+}
+
+void AbstractMatrixFileWalker::preFileFunction(){
+}
+
+void AbstractMatrixFileWalker::postFileFunction(){
+}
+
+int AbstractMatrixFileWalker::processRow(tokenizerCharType &line_toks){
+	int returnValue = 0;
+	tokenizerCharType::iterator tokenizer_iter = line_toks.begin();
+	for (int i=0;i<whichColumn;i++){
+		/*
+		if (tokenizer_iter==line_toks.end()){
+			//2012.9.15 debug purpose
+			std::cerr<< "end of line has been reached before the whichColumn, abort." << std::endl;
+			std::cerr<< "Exception line no. " << noOfData << " has content: " << line <<std::endl;
+			continue;	//end has been reached before whichColumn, abort.
+		}
+		*/
+		++tokenizer_iter;
+	}
+	_statInStr = *tokenizer_iter;
+	_stat = atol(_statInStr.c_str());	// use atol instead of atoi to make sure no overflow
+	returnValue = 1;
+	return returnValue;
+}
+
+
+void AbstractMatrixFileWalker::fileWalker(string &inputFname){
+	if (debug){
+		std::cerr<<"walking through " << inputFname << "..." << std::endl;
+	}
+	_currentFilename = inputFname;
+
+	int counter = 0;
+	int real_counter = 0;
+	int noOfSampled = 0;
+	preFileFunction();
+	boost::char_separator<char> sep("\t ,");		//blank or '\t' or ',' is the separator
+
+	base_generator_type generator(42);
+	//boost::mt19937 generator;
+	boost::uniform_real<> uni_dist(0,1);
+	boost::variate_generator<base_generator_type&, boost::uniform_real<> > uni(generator, uni_dist);
+	double toss;	//random number
+	std::string line;
+	int rowReturnValue;
+	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
+	try{
+		int inputFnameLength = inputFname.length();
+		if (inputFname.substr(inputFnameLength-2, 2)=="gz"){
+			inputFilterStreamBuffer.push(boost::iostreams::gzip_decompressor());
+			inputFile.open(inputFname.c_str(), std::ios::in | std::ios::binary);
+		}
+		else{
+			inputFile.open(inputFname.c_str(), std::ios::in );
+		}
+		inputFilterStreamBuffer.push(inputFile);
+		std::istream inputStream(&inputFilterStreamBuffer);
+
+		//col_name2index = reader.constructColName2IndexFromHeader()
+		//header = reader.getHeader()
+
+		//#output the header to the output file if necessary
+		//self.processHeader(header=header, pdata=pdata) #2012.8.13
+
+		std::getline(inputStream, line);
+
+		while (!line.empty()){
+			counter++;
+			if (fractionToSample>0 && fractionToSample<1){	//random sampling
+				toss=uni();
+				if (toss>fractionToSample){
+					continue;
+				}
+			}
+			if (maxNoOfTotal>0 && real_counter>maxNoOfTotal){
+				break;
+			}
+
+			tokenizerCharType line_toks(line, sep);
+			rowReturnValue = processRow(line_toks);
+			noOfSampled++;
+			real_counter += rowReturnValue;
+		}
+		std::getline(inputStream, line);
+
+		if (noOfSampled>=minNoOfTotal){
+			postFileFunction();
+		}
+		inputFile.close();
+	}
+	catch (std::exception& e)
+	{
+		cerr << "An exception occurred: " << e.what() << endl;
+		exit(4);
+	}
+	float fraction;
+	if (counter>0){
+		fraction = float(noOfSampled)/float(counter);
+	}
+	else{
+		fraction = 0;
+	}
+	std::cerr<< boost::format("%1% / %2% (%3%) data sampled. real_counter=%4%.") % noOfSampled % counter % fraction % real_counter << endl;
+
+}
+
+
+
+void AbstractMatrixFileWalker::closeFiles(){
+	//
+	if (debug){
+		std::cerr<<"closing files " << "..." ;
+	}
+	if (outputFile){
+		outputFile.close();
+	}
+}
+void AbstractMatrixFileWalker::run(){
+	if (debug){
+		std::cerr<<" debug mode is on." << std::endl;
+	}
+
+	setup();
+
+	for (vector<string>::iterator inputFnameIter = inputFnameList.begin(); inputFnameIter!= inputFnameList.end(); ++inputFnameIter){
+		fileWalker(*inputFnameIter);
+	}
+
+	reduce();
+
+	closeFiles();
+
+}
+
+
+
+int main(int argc, char* argv[]) {
+	AbstractMatrixFileWalker instance(argc, argv);
+	instance.run();
+}
