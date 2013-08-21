@@ -26,11 +26,11 @@ else:   #32bit
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from pymodule import ProcessOptions, read_data, getListOutOfStr
+from pymodule.yhio.SNP import RawSnpsData_ls2SNPData, transposeSNPData
 from variation.src.qc.QualityControl import QualityControl
 from variation.src.qc import FilterAccessions, FilterSnps
 
 from variation.src.yhio import dataParsers, MergeSnpsData
-from variation.src.common import RawSnpsData_ls2SNPData, transposeSNPData
 from QC_250k import QC_250k, SNPData, TwoSNPData
 
 class QC(object):
@@ -79,9 +79,10 @@ class QC(object):
 			use_nt2number = 0
 		
 		if self.input_fname1_format==1:
-			header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname1)
-			snpData1 = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\
-							data_matrix=data_matrix)
+			snpData1 = SNPData(input_fname=self.input_fname1, turn_into_array=1, ignore_2nd_column=1)
+			#header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname1)
+			#snpData1 = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\
+			#				data_matrix=data_matrix)
 		elif self.input_fname1_format==2:
 			snpsd_ls = dataParsers.parseCSVData(self.input_fname1, withArrayIds=False, use_nt2number=use_nt2number)
 			snpData1 = RawSnpsData_ls2SNPData(snpsd_ls, report=self.report, use_nt2number=0)	#already nt in number
@@ -96,9 +97,10 @@ class QC(object):
 		
 		if self.run_type!=2:
 			if self.input_fname2_format==1:
-				header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname2)
-				snpData2 = SNPData(header=header, strain_acc_list=strain_acc_list,\
-								data_matrix=data_matrix)
+				snpData2 = SNPData(input_fname=self.input_fname2, turn_into_array=1, ignore_2nd_column=1)
+				#header, strain_acc_list, category_list, data_matrix = read_data(self.input_fname2)
+				#snpData2 = SNPData(header=header, strain_acc_list=strain_acc_list,\
+				#				data_matrix=data_matrix)
 			elif self.input_fname2_format==2:
 				snpsd_ls = dataParsers.parseCSVData(self.input_fname2, withArrayIds=False, use_nt2number=use_nt2number)
 				snpData2 = RawSnpsData_ls2SNPData(snpsd_ls, report=self.report, use_nt2number=0)

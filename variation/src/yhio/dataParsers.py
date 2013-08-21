@@ -834,16 +834,18 @@ def parseCSVData(datafile, format=1, deliminator=",", missingVal='NA', use_nt2nu
 		rawSnpsData.chromosome = oldChr
 		while i < len(lines) and newChr == oldChr:
 			line = lines[i].split(deliminator)
-			#print i,":",lines[i]
 			oldChr = line[0]
 			rawSnpsData.positions.append(line[1])
 			snp = []
-			if useDecoder:
-				for nt in line[2:]:
-					snp.append(decoder[(nt.strip())])
-			else:
-				for nt in line[2:]:
-					snp.append(nt.strip())
+			#if useDecoder:
+			for nt in line[2:]:
+				nt = nt.strip()
+				if use_nt2number:	#2013.07.03 back to use argument use_nt2number
+					nt = nt2number[nt.strip()]
+				snp.append(nt)
+			#else:
+			#	for nt in line[2:]:
+			#		snp.append(nt.strip())
 			rawSnpsData.snps.append(snp)
 			i += 1
 			if i < len(lines):
