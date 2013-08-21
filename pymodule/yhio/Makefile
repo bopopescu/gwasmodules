@@ -1,7 +1,7 @@
 
-cxx_targets	= AbstractMatrixFileWalker
-cxxLinkFlags 	= $(BoostLib)
-c_targets	= 
-shareLibTargets	= AbstractMatrixFileWalker.so
+CXXTARGETS	= AbstractMatrixFileWalkerCC
+CXXLDFLAGS 	= $(BoostLib)
+CTARGETS	= 
+SharedLibTargets	= AbstractMatrixFileWalkerCC.so
 
 include ../Makefile.common

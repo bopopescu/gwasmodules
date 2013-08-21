@@ -1,12 +1,13 @@
 
-cxx_targets	= 
-cxxLinkFlags	= $(BoostLib)
-c_targets	= 
+CXXTARGETS	= 
+CXXLDFLAGS	= $(BoostLib)
+CTARGETS	= 
 
-extraTargets	= SelectRowsFromMatrix
+ExtraTargets	= SelectRowsFromMatrixCC
+SharedLibTargets	= ~/script/pymodule/yhio/AbstractMatrixFileWalkerCC.so
 
-SelectRowsFromMatrix:	%:	%.o ../../../yhio/AbstractMatrixFileWalker.so
-	-$(cxx_compiler) $< ../../../yhio/AbstractMatrixFileWalker.so $(cxx_flags) $(cxxLinkFlags) -o $@
+SelectRowsFromMatrixCC:	%:	%.o $(SharedLibTargets)
+	-$(CXXCOMPILER) $< $(SharedLibTargets) $(CXXFLAGS) $(CXXLDFLAGS) -o $@
 
 
 include ../../../Makefile.common

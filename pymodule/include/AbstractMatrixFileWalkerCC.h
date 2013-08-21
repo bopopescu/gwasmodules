@@ -34,13 +34,15 @@ using namespace std;
 using namespace boost;
 namespace po = boost::program_options;
 
-class AbstractMatrixFileWalker{
+class AbstractMatrixFileWalkerCC{
 protected:
 	int argc;
 	char** argv;		//2013.08.20 somehow, can't use "char* argv[]" even though they are same.
 	//otherwise "argv=_argv;" will not work for this error: incompatible types in assignment of ‘char**’ to ‘char* [0]’
 
-	string extraDocumentation;
+	string programName;
+	boost::format usageDoc;
+	boost::format examplesDoc;
 
 	int minNoOfTotal;
 	int maxNoOfTotal;
@@ -68,8 +70,8 @@ protected:
 
 
 public:
-	AbstractMatrixFileWalker(int _argc, char** _argv);
-	virtual ~AbstractMatrixFileWalker();
+	AbstractMatrixFileWalkerCC(int _argc, char* _argv[]);
+	virtual ~AbstractMatrixFileWalkerCC();
 	virtual void constructOptionDescriptionStructure();
 	virtual void parseCommandlineOptions();
 	virtual void setup();

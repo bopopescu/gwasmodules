@@ -35,16 +35,16 @@ $(CXXTARGETS):	%:	%.o
 	-$(CXXCOMPILER) $< $(CXXFLAGS) -o $@ $(CXXLDFLAGS)
 
 .cc.o:
-	$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) -c -o $@
+	-$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) -c -o $@
 
 $(CTARGETS):	%:	%.o
-	$(CCOMPILER) $< $(CFLAGS) -o $@ $(CLDFLAGS)
+	-$(CCOMPILER) $< $(CFLAGS) -o $@ $(CLDFLAGS)
 
 .c.o:
-	$(CCOMPILER) $< $(CFLAGS) $(IncludeDirs) -c -o $@
+	-$(CCOMPILER) $< $(CFLAGS) $(IncludeDirs) -c -o $@
 
-%.c: 	$(wildcard ~/script/pymodule/include/*.h)
-%.cc: 	$(wildcard ~/script/pymodule/include/*.h)
+.c:	$(wildcard ~/script/pymodule/include/*.h)
+.cc:	$(wildcard ~/script/pymodule/include/*.h)
 
 subdirs:
 	for dir in $(SUBDIRS); do \
@@ -57,4 +57,4 @@ clean_subdirs:
 	done
 
 clean:	clean_subdirs
-	-rm -f *.o $(CXXTARGETS) $(CTARGETS) $(ExtraTargets) $(SharedLibTargets)
+	-rm -f *.o *.so $(CXXTARGETS) $(CTARGETS) $(ExtraTargets) $(SharedLibTargets)
