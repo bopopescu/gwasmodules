@@ -21,8 +21,9 @@ CCOMPILER	= gcc
 SharedLibFlags	= -shared -fPIC
 
 #ExtraTargets
+#SRCS
 
-all:	$(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(ExtraTargets) subdirs
+all:	depend $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(ExtraTargets) subdirs
 
 
 $(SharedLibTargets):	%.so:	%.o
@@ -43,8 +44,19 @@ $(CTARGETS):	%:	%.o
 .c.o:
 	-$(CCOMPILER) $< $(CFLAGS) $(IncludeDirs) -c -o $@
 
-.c:	$(wildcard ~/script/pymodule/include/*.h)
-.cc:	$(wildcard ~/script/pymodule/include/*.h)
+#.c:	$(wildcard ~/script/pymodule/include/*.h)
+#.cc:	$(wildcard ~/script/pymodule/include/*.h)
+
+### 2013.08.21 generate auto-dependency for each source code file through "gcc -MM". so that change of .h files would trigger re-compilation as well.
+
+depend: .depend
+
+.depend: $(SRCS)
+	rm -f ./.depend
+	-$(CXXCOMPILER) $^ $(CXXFLAGS) $(IncludeDirs) -MM >>./.depend;
+
+include .depend
+
 
 subdirs:
 	for dir in $(SUBDIRS); do \
@@ -57,4 +69,5 @@ clean_subdirs:
 	done
 
 clean:	clean_subdirs
+	rm -f ./.depend
 	-rm -f *.o *.so $(CXXTARGETS) $(CTARGETS) $(ExtraTargets) $(SharedLibTargets)
