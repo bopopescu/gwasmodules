@@ -155,11 +155,15 @@ class AbstractTableWithFilename(TableClass):
 	
 	def constructRelativePath(self, data_dir=None, subFolder=None, sourceFilename=None, **keywords):
 		"""
+		2013.08.16 make sure there's no "/" on the leftmost of outputDirRelativePath
 		2012.11.13
 		"""
 		if not subFolder:
 			subFolder = self.folderName
 		outputDirRelativePath = subFolder
+		#'/' must not be put in front of the relative path.
+		# otherwise, os.path.join(self.data_dir, dst_relative_path) will only take the path of dst_relative_path.
+		outputDirRelativePath = outputDirRelativePath.lstrip('/')
 		if data_dir and outputDirRelativePath:
 			#make sure the final output folder is created. 
 			outputDirAbsPath = os.path.join(data_dir, outputDirRelativePath)
@@ -561,8 +565,10 @@ class ElixirDB(object):
 		db_vervet.session.commit()
 		sys.exit(0)
 	"""
-	def updateDBEntryPathFileSize(self, db_entry=None, data_dir=None, absPath=None):
+	def updateDBEntryPathFileSize(self, db_entry=None, data_dir=None, absPath=None, \
+								file_path_column_name='path', file_size_column_name='file_size'):
 		"""
+		2013.08.08 added argument file_path_column_name, file_size_column_name
 		2012.12.15 moved from VervetDB
 		2012.7.13
 			if absPath is given, take that , rather than construct it from data_dir and db_entry.path
@@ -571,8 +577,9 @@ class ElixirDB(object):
 		if data_dir is None:
 			data_dir = self.data_dir
 		
-		if hasattr(db_entry, 'path') and db_entry.path:
-			db_entry_path = db_entry.path
+		db_entry_path = getattr(db_entry, file_path_column_name, None)
+		if hasattr(db_entry, file_path_column_name) and db_entry_path:
+			pass
 		elif hasattr(db_entry, 'filename') and db_entry.filename:
 			db_entry_path = db_entry.filename
 		else:
@@ -585,24 +592,33 @@ class ElixirDB(object):
 			sys.stderr.write("Warning: file %s doesn't exist.\n"%(absPath))
 			return
 		file_size = utils.getFileOrFolderSize(absPath)
-		if db_entry.file_size is not None and file_size!=db_entry.file_size:
-			sys.stderr.write("Warning: the new file size %s doesn't match the old one %s.\n"%(file_size, db_entry.file_size))
-		db_entry.file_size = file_size
+		db_entry_file_size = getattr(db_entry, file_size_column_name, None)
+		if db_entry_file_size is not None and file_size!=db_entry_file_size:
+			sys.stderr.write("Warning: the new file size %s doesn't match the old one %s.\n"%(file_size, db_entry_file_size))
+		setattr(db_entry, file_size_column_name, file_size)
 		self.session.add(db_entry)
 		self.session.flush()
 	
-	def copyFileWithAnotherFilePrefix(self, inputFname=None, filenameWithPrefix=None, outputDir=None,\
+	def copyFileWithAnotherFilePrefix(self, inputFname=None, filenameWithPrefix=None, \
+									outputDir=None, outputFileRelativePath=None, \
 									logMessage=None, srcFilenameLs=None, dstFilenameLs=None):
 		"""
+		2013.08.08 added argument outputFileRelativePath
 		2013.3.18 bugfix in filename. there was extra . between prefix and suffix.
 			moved from vervet/src/VervetDB.py
 		2012.9.20
 		"""
 		srcFilename = inputFname
-		prefix, suffix = os.path.splitext(os.path.basename(inputFname))
-		newPrefix = os.path.splitext(filenameWithPrefix)[0]
-		dstFilename = os.path.join(outputDir, '%s%s'%(newPrefix, suffix))
-		utils.copyFile(srcFilename=srcFilename, dstFilename=dstFilename)
+		if outputFileRelativePath is None and filenameWithPrefix:
+			prefix, suffix = os.path.splitext(os.path.basename(inputFname))
+			newPrefix = os.path.splitext(filenameWithPrefix)[0]
+			outputFileRelativePath = '%s%s'%(newPrefix, suffix)
+		
+		dstFilename = os.path.join(outputDir, outputFileRelativePath)
+		returnCode = utils.copyFile(srcFilename=srcFilename, dstFilename=dstFilename)
+		if returnCode!=0:
+			sys.stderr.write("ERROR during utils.copyFile. check stderr message just ahead of this.\n")
+			raise
 		if logMessage:
 			logMessage += "file %s has been copied to %s.\n"%(srcFilename, dstFilename)
 		if srcFilenameLs:

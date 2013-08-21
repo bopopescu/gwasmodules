@@ -72,13 +72,21 @@ class MatrixFile(object):
 				self.csvFile = self.inputFile
 				self.isRealCSV = False
 		else:	#writing mode
-			if self.delimiter:
-				self.csvFile = csv.writer(self.inputFile, delimiter=self.delimiter)
-				self.isRealCSV = True
-			else:
-				self.csvFile = self.inputFile
-				self.isRealCSV = False
+			if not self.delimiter:
+				self.delimiter = '\t'
+			self.csvFile = csv.writer(self.inputFile, delimiter=self.delimiter)
+			self.isRealCSV = True
+			#else:
+			#	self.csvFile = self.inputFile
+			#	self.isRealCSV = False
 		self.col_name2index = None
+	
+	def _resetInput(self):
+		"""
+		2013.07.19
+		"""
+		#reset the inf
+		self.inputFile.seek(0)
 	
 	def writeHeader(self,header=None):
 		"""
@@ -145,12 +153,21 @@ class MatrixFile(object):
 	def constructDictionary(self, keyColumnIndexList=None, valueColumnIndexList=None):
 		"""
 		2013.05.24
-			
+			the key is a tuple
+			the value is a list of lists.
+				
 			i.e.:
-			alignmentCoverageFile = MatrixFile(inputFname=self.individualAlignmentCoverageFname)
-			alignmentCoverageFile.constructColName2IndexFromHeader()
-			alignmentID2coverage = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
-
+			
+				alignmentCoverageFile = MatrixFile(inputFname=self.individualAlignmentCoverageFname)
+				alignmentCoverageFile.constructColName2IndexFromHeader()
+				alignmentReadGroupTuple2coverageInTupleLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
+				alignmentCoverageFile.close()
+				
+				coverageInTupleLs = alignmentReadGroupTuple2coverageInTupleLs.get((individualID,))
+				return coverageInTupleLs[0][0]
+				
+			
+				
 		"""
 		sys.stderr.write("Constructing a dictionary, keys are column %s, values are column %s. ..."%\
 						(repr(keyColumnIndexList), repr(valueColumnIndexList)))
@@ -169,6 +186,7 @@ class MatrixFile(object):
 				dc[keyTuple] = []
 			dc[keyTuple].append(valueList)
 		sys.stderr.write("%s unique pairs from %s rows.\n"%(len(dc), counter))
+		return dc
 	
 	def run(self):
 		"""

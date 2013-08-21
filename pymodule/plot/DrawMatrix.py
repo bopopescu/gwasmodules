@@ -335,7 +335,7 @@ def drawMatrix(matrix, matrix_value2color, left_label_ls=[], top_label_ls=[], ri
 2007-11-02 copied from variation.src.common, use pylab
 """
 def display_snp_matrix(input_fname, output_fname=None, need_sort=0, need_savefig=0, xlabel='', ylabel=''):
-	import csv, Numeric, pylab
+	import csv, numpy, pylab
 	reader = csv.reader(open(input_fname), delimiter='\t')
 	header = reader.next()
 	data_matrix = []
@@ -347,7 +347,7 @@ def display_snp_matrix(input_fname, output_fname=None, need_sort=0, need_savefig
 	data_matrix.reverse()	#2007-03-06 reverse() due to the imshow()'s y axis starting from bottom
 	if need_sort:
 		data_matrix.sort()
-	data_matrix = Numeric.array(data_matrix)
+	data_matrix = numpy.array(data_matrix)
 	
 	pylab.clf()
 	pylab.imshow(data_matrix, aspect='auto', interpolation='nearest')	#2007-06-05
@@ -390,7 +390,7 @@ def display_matrix_of_component(input_fname, ecotypeid_ls, ecotypeid2pos, output
 		display the data from that component
 		
 	"""
-	import csv, Numeric, pylab
+	import csv, numpy, pylab
 	cc_ecotypeid_pos = []
 	for ecotypeid in ecotypeid_ls:
 		cc_ecotypeid_pos.append(ecotypeid2pos[ecotypeid])
@@ -417,7 +417,7 @@ def display_matrix_of_component(input_fname, ecotypeid_ls, ecotypeid2pos, output
 	data_matrix.reverse()	#2007-03-06 reverse() due to the imshow()'s y axis starting from bottom
 	if need_sort:
 		data_matrix.sort()
-	data_matrix = Numeric.array(data_matrix)
+	data_matrix = numpy.array(data_matrix)
 	
 	pylab.clf()
 	pylab.imshow(data_matrix, aspect='auto', interpolation='nearest')	#2007-06-05
@@ -591,27 +591,29 @@ def drawMatrixLegend(data_matrix, left_label_ls=[], top_label_ls=[], min_value=N
 
 class DrawMatrix(object):
 	__doc__ = __doc__
-	option_default_dict = {('font_path', 1, ):['/usr/share/fonts/truetype/freefont/FreeSerif.ttf', 'e', 1, 'path of the font used to draw labels'],\
-							('font_size', 1, int):[20, 's', 1, 'size of font, which determines the size of the whole figure.'],\
-							("input_fname", 1, ): [None, 'i', 1, 'Filename that stores data matrix. 1st two columns are labels for rows. \
-			Top row is header.'],\
-							('min_value_non_negative', 0, ):[0, 'm', 0, 'whether minimum value must be >=0 (minus value has special meaning), \
-			force min_value=0 if data_matrix gives negative min_value.'],\
-							("fig_fname", 1, ): [None, 'o', 1, 'File name prefix for the figure. If matrix is split into multiple blocks, \
-			each block will be output into one file with this prefix and block number.'],\
-							("no_of_ticks", 1, int): [5, 't', 1, 'Number of ticks on the legend'],\
-							("split_legend_and_matrix", 0, ): [0, 'p', 0, 'whether to split legend and matrix into 2 different images or not.\
-		Default is to combine them.'],\
-							('super_value_color', 0,): ["red", 'u', 1, 'color for matrix value -2, like "black", or "red" etc.' ],\
-							("blockColUnit", 0, int): [200, 'c', 1, 'If the matrix is too large, it will be split into multiple blocks.\
-			each block is in one output.\
-			this argument controls how many columns per block.'],\
-							("blockRowUnit", 0, int): [3500, 'x', 1, 'If the matrix is too large, it will be split into multiple blocks.\
-			each block is in one output.\
-			this argument controls how many rows per block.'],\
-							("no_grid", 0, ): [0, 'n', 0, 'toggle to remove the grid on top of the whole 2-D structure'],\
-							('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
-							('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']}
+	option_default_dict = {\
+					('font_path', 1, ):['/usr/share/fonts/truetype/freefont/FreeSerif.ttf', 'e', 1, 'path of the font used to draw labels'],\
+					('font_size', 1, int):[20, 's', 1, 'size of font, which determines the size of the whole figure.'],\
+					("input_fname", 1, ): [None, 'i', 1, 'Filename that stores data matrix. 1st two columns are labels for rows. \
+	Top row is header.'],\
+					('min_value_non_negative', 0, ):[0, 'm', 0, 'whether minimum value must be >=0 (minus value has special meaning), \
+	force min_value=0 if data_matrix gives negative min_value.'],\
+					("fig_fname", 1, ): [None, 'o', 1, 'File name prefix for the figure. If matrix is split into multiple blocks, \
+	each block will be output into one file with this prefix and block number.'],\
+					("no_of_ticks", 1, int): [5, 't', 1, 'Number of ticks on the legend'],\
+					("split_legend_and_matrix", 0, ): [0, 'p', 0, 'whether to split legend and matrix into 2 different images or not.\
+Default is to combine them.'],\
+					('super_value_color', 0,): ["red", 'u', 1, 'color for matrix value -2, like "black", or "red" etc.' ],\
+					("blockColUnit", 0, int): [200, 'c', 1, 'If the matrix is too large, it will be split into multiple blocks.\
+	each block is in one output.\
+	this argument controls how many columns per block.'],\
+					("blockRowUnit", 0, int): [3500, 'x', 1, 'If the matrix is too large, it will be split into multiple blocks.\
+	each block is in one output.\
+	this argument controls how many rows per block.'],\
+					("no_grid", 0, ): [0, 'n', 0, 'toggle to remove the grid on top of the whole 2-D structure'],\
+					('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
+					('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.']
+							}
 	
 	def __init__(self,  **keywords):
 		"""
@@ -638,7 +640,7 @@ class DrawMatrix(object):
 		2008-09-10
 			in case chop the whole figure into blocks, swap col_block_index and row_block_index to make row first, column 2nd
 		"""
-		from pymodule.SNP import read_data
+		from pymodule.yhio.SNP import read_data
 		from pymodule.utils import figureOutDelimiter, PassingData
 		delimiter = figureOutDelimiter(self.input_fname)
 		print delimiter

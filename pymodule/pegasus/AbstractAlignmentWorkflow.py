@@ -17,9 +17,6 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	option_default_dict = copy.deepcopy(AbstractNGSWorkflow.option_default_dict)
 	#option_default_dict.pop(('inputDir', 0, ))
 	option_default_dict.update({
-						('intervalOverlapSize', 1, int): [300000, 'U', 1, 'overlap #bps/#loci between adjacent intervals from one contig/chromosome,\
-				only used for TrioCaller, not for SAMtools/GATK', ],\
-						('intervalSize', 1, int): [5000000, 'Z', 1, '#bps/#loci for adjacent intervals from one contig/chromosome (alignment or VCF)', ],\
 						})
 	commonAlignmentWorkflowOptionDict = {
 						('ind_seq_id_ls', 0, ): ['', 'i', 1, 'a comma/dash-separated list of IndividualSequence.id. alignments come from these', ],\
@@ -683,10 +680,12 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		pdata = AbstractNGSWorkflow.setup_run(self)
 		workflow = pdata.workflow
 		
-		chrLs = self.chr2size.keys()
-		chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
+		if self.needSplitChrIntervalData:	#2013.06.21 defined in AbstractNGSWorkflow.__init__()
+			chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
 													intervalSize=self.intervalSize, \
 													intervalOverlapSize=self.intervalOverlapSize)
+		else:
+			chr2IntervalDataLs = None
 		
 		alignmentLs = self.getAlignments()
 		

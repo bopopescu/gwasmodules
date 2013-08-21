@@ -27,7 +27,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 						('noCheckEmptyReadFile', 0, int):[0, '', 0, "toggle to not check whether each read file is empty (if empty, exclude it). \
 							If IndividualSequenceFile.read_count is null, it'll try to count them on the fly and take a lot of time.\
 							however, only toggle it if you know every input individual_sequence_file is not empty. empty read file fails alignment jobs."],\
-						('additionalArguments', 0, ): ["-q 20", '', 1, 'a string of additional arguments passed to aln, not bwasw, add double quote if space'],\
+						('additionalArguments', 0, ): ["", '', 1, 'a string of additional arguments passed to aln, not bwasw, add double quote if empty space. i.e. "-q 20"'],\
 						("bwa_path", 1, ): ["%s/bin/bwa", '', 1, 'bwa binary'],\
 						("stampy_path", 1, ): ["%s/bin/stampy.py", '', 1, 'path to stampy.py'],\
 						("alignment_method_name", 1, ): ["bwaShortRead", '', 1, 'alignment_method.short_name from db.\
@@ -426,7 +426,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 					refFastaFList=None, bwa=None, additionalArguments=None, \
 					samtools=None, \
 					refIndexJob=None, parentJobLs=None,\
-					alignment_method=None, outputDir=None, namespace='workflow', version='1.0',\
+					alignment_method=None, outputDir=None, namespace=None, version=None,\
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
 					java=None, SortSamFilesJava=None, SortSamJar=None,\
 					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
@@ -615,13 +615,14 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 					refFastaFList=None, bwa=None, additionalArguments=None, \
 					samtools=None, \
 					refIndexJob=None, parentJobLs=None,\
-					alignment_method=None, outputDir=None, namespace='workflow', version='1.0',\
+					alignment_method=None, outputDir=None, namespace=None, version=None,\
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
 					java=None, SortSamFilesJava=None, SortSamJar=None,\
 					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
 					no_of_aln_threads=3, maxMissingAlignmentFraction=None, maxNoOfGaps=None, \
 					extraArgumentList=None, transferOutput=False, **keywords):
 		"""
+		additionalArguments = additionalArguments.strip()	#2013.06.20 strip all the spaces around it.
 		2013.04.04
 			new alignment method from Heng Li
 			raw bwa command:
@@ -639,6 +640,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 		if extraArgumentList is None:
 			extraArgumentList = []
 		extraArgumentList.append(alignment_method.command)	#add mem first
+		additionalArguments = additionalArguments.strip()	#2013.06.20 strip all the spaces around it.
 		if additionalArguments:
 			extraArgumentList.append(additionalArguments)
 		if no_of_aln_threads:
@@ -689,7 +691,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 	def addAlignmentJob(self, workflow=None, fileObjectLs=None, individual_alignment=None, \
 					refFastaFList=None, bwa=None, additionalArguments=None, \
 					samtools=None, refIndexJob=None, parentJobLs=None, \
-					alignment_method=None, outputDir=None, namespace='workflow', version='1.0',\
+					alignment_method=None, outputDir=None, namespace=None, version=None,\
 					PEAlignmentByBWA=None, ShortSEAlignmentByBWA=None, LongSEAlignmentByBWA=None, \
 					java=None, SortSamFilesJava=None, SortSamJar=None,\
 					addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None,\
@@ -767,7 +769,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 						LongSEAlignmentByBWA=LongSEAlignmentByBWA,\
 						java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
 						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
-						no_of_aln_threads=no_of_aln_threads, transferOutput=transferOutput)
+						no_of_aln_threads=no_of_aln_threads, maxMissingAlignmentFraction=maxMissingAlignmentFraction, maxNoOfGaps=maxNoOfGaps,\
+						transferOutput=transferOutput)
 		elif alignment_method.short_name.find('bwa')==0:
 			alignmentJob = self.addBWAAlignmentWrapJob(workflow=workflow, fileObjectLs=fileObjectLs, \
 						refFastaFList=refFastaFList, bwa=bwa, \
@@ -779,8 +782,8 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 						LongSEAlignmentByBWA=LongSEAlignmentByBWA,\
 						java=java, SortSamFilesJava=SortSamFilesJava, SortSamJar=SortSamJar,\
 						addOrReplaceReadGroupsJava=addOrReplaceReadGroupsJava, AddOrReplaceReadGroupsJar=AddOrReplaceReadGroupsJar,\
-						no_of_aln_threads=no_of_aln_threads, transferOutput=transferOutput)
-		
+						no_of_aln_threads=no_of_aln_threads,  maxMissingAlignmentFraction=maxMissingAlignmentFraction, maxNoOfGaps=maxNoOfGaps, \
+						transferOutput=transferOutput)
 		else:
 			sys.stderr.write("Alignment method %s is not supported.\n"%(alignment_method.short_name))
 			sys.exit(3)
@@ -907,7 +910,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 	def addMarkDupJob(self, workflow, parentJobLs=[], inputBamF=None, inputBaiF=None, outputBamFile=None,\
 					MarkDuplicatesJava=None, MarkDuplicatesJar=None, tmpDir="/Network/Data/vervet/vervetPipeline/tmp/",\
 					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
-					namespace='workflow', version='1.0', transferOutput=True, \
+					namespace=None, version=None, transferOutput=True, \
 					job_max_memory=4000, walltime=600, no_of_cpus=1):
 		"""
 		2012.3.21
@@ -958,7 +961,7 @@ class ShortRead2AlignmentWorkflow(AbstractNGSWorkflow, AlignmentReadBaseQualityR
 					refFastaFList=None, outputBamF=None, \
 					parentJob=None, \
 					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
-					namespace='workflow', version='1.0', transferOutput=True,\
+					namespace=None, version=None, transferOutput=True,\
 					**keywords):
 		"""
 		2011-11-20

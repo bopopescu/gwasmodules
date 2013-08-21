@@ -58,6 +58,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 						('plotRight', 0, float): [0.9, '', 1, 'the right side of the subplots of the figure'], \
 						('plotBottom', 0, float): [0.1, '', 1, ' the bottom of the subplots of the figure'], \
 						('plotTop', 0, float): [0.9, '', 1, ' the top of the subplots of the figure'], \
+						('legendType', 0, int): [0, '', 1, '0: no legend; 1: legend'], \
 						
 						})
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -77,9 +78,13 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		self.plotObjectLs = []
 		self.plotObjectLegendLs = []
 		
-		yh_matplotlib.setFontAndLabelSize(self.defaultFontLabelSize)
-		yh_matplotlib.setDefaultFigureSize((self.defaultFigureWidth, self.defaultFigureHeight))
-		yh_matplotlib.setPlotDimension(left=self.plotLeft, right=self.plotRight, bottom=self.plotBottom, top=self.plotTop)
+		#2013.07.01 set these attributes if the class or its descendants have valid values
+		if getattr(self, 'defaultFontLabelSize', None):
+			yh_matplotlib.setFontAndLabelSize(self.defaultFontLabelSize)
+		if getattr(self, "defaultFigureWidth", None) and  getattr(self, "defaultFigureHeight", None):
+			yh_matplotlib.setDefaultFigureSize((self.defaultFigureWidth, self.defaultFigureHeight))
+		if getattr(self, "plotLeft", None) and  getattr(self, "plotBottom", None):
+			yh_matplotlib.setPlotDimension(left=self.plotLeft, right=self.plotRight, bottom=self.plotBottom, top=self.plotTop)
 
 	def addPlotLegend(self, plotObject=None, legend=None, pdata=None, **keywords):
 		"""
@@ -121,7 +126,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 			
 			xValue = row[x_index]
 			yValue = row[whichColumn]
-			if yValue not in self.missingDataNotation and xValue not in self.missingDataNotation:
+			if xValue and yValue and yValue not in self.missingDataNotation and xValue not in self.missingDataNotation:
 				xValue = self.processValue(xValue, processType=self.logX, valueForNonPositiveValue=self.valueForNonPositiveYValue)
 				yValue = self.processValue(yValue, processType=self.logY, \
 							valueForNonPositiveValue=self.valueForNonPositiveYValue)
@@ -259,6 +264,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		
 	def saveFigure(self, invariantPData=None, **keywords):
 		"""
+		2013.07.16 add legend or not , depending on self.legendType
 		2012.11.24
 		2012.10.7
 		"""
@@ -268,7 +274,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		#2012.12.4 change margin
 		self.setMargins()
 		
-		if self.plotObjectLegendLs and self.plotObjectLs:
+		if self.legendType!=0 and self.plotObjectLegendLs and self.plotObjectLs:
 			#add the legend
 			pylab.legend(self.plotObjectLs, self.plotObjectLegendLs, shadow = True)
 		

@@ -68,11 +68,13 @@ class CalculateMendelErrorRateGivenPlinkOutput(parentClass):
 			noOfFamilies = len(familyData.parentTupleSet)
 			noOfParents = len(familyData.parentIDSet)
 			noOfKids = len(familyData.childIDSet)
+			noOfIndividuals = len(familyData.individualIDSet)
 		else:
 			noOfFamilies = 0
 			noOfParents = 0
 			noOfKids = 0
-		return PassingData(noOfFamilies=noOfFamilies, noOfParents=noOfParents, noOfKids=noOfKids)
+			noOfIndividuals = 0
+		return PassingData(noOfFamilies=noOfFamilies, noOfParents=noOfParents, noOfKids=noOfKids, noOfIndividuals=noOfIndividuals)
 
 	def run(self):
 		"""
@@ -100,22 +102,33 @@ class CalculateMendelErrorRateGivenPlinkOutput(parentClass):
 																		parentSetSize=0)
 		
 		writer = MatrixFile(self.outputFname, openMode='w', delimiter='\t')
-		header = ["ID", "noOfTotalLoci", "noOfTwoParentFamilies", "noOfParentsInTwoParentFamilies", "noOfKidsInTwoParentFamilies", \
-				"noOfSingleParentFamilies", "noOfParentsInSingleParentFamilies", "noOfKidsInSingleParentFamilies", \
-				"noOfZeroParentFamilies", "noOfParentsInZeroParentFamilies", "noOfKidsInZeroParentFamilies", \
+		header = ["ID", "noOfTotalLoci", \
+				"noOfTwoParentFamilies", "noOfParentsInTwoParentFamilies", "noOfKidsInTwoParentFamilies", "noOfIndividualsInTwoParentFamilies", \
+				"noOfSingleParentFamilies", "noOfParentsInSingleParentFamilies", "noOfKidsInSingleParentFamilies",  "noOfIndividualsInSingleParentFamilies", \
+				"noOfZeroParentFamilies", "noOfParentsInZeroParentFamilies", "noOfKidsInZeroParentFamilies", "noOfIndividualsInZeroParentFamilies", \
 				"noOfTotalMendelErrors", \
-				"mendelErrorRatePerLocusPerNuclearFamily", "mendelErrorRatePerNuclearFamily"]
+				"noOfMendelErrorsPerLocusPerNuclearFamily", "noOfMendelErrorsPerNuclearFamily"]
 		writer.writeHeader(header)
 		for row in reader:
 			meanMendelError = float(row[meanMendelErrorIndex])
 			noOfLoci = int(row[noOfLociIndex])
 			sumOfMendelError = int(row[sumOfMendelErrorIndex])
 			noOfNuclearFamilies = twoParentFamilyCountData.noOfFamilies
-			data_row = [row[0], noOfLoci, noOfNuclearFamilies, twoParentFamilyCountData.noOfParents, twoParentFamilyCountData.noOfKids, \
+			if noOfNuclearFamilies>0:
+				noOfMendelErrorsPerLocusPerNuclearFamily = meanMendelError/float(noOfNuclearFamilies)
+				noOfMendelErrorsPerNuclearFamily = sumOfMendelError/float(noOfNuclearFamilies)
+			else:
+				noOfMendelErrorsPerLocusPerNuclearFamily = -1
+				noOfMendelErrorsPerNuclearFamily = -1
+			data_row = [row[0], noOfLoci, \
+					noOfNuclearFamilies, twoParentFamilyCountData.noOfParents, twoParentFamilyCountData.noOfKids, \
+						twoParentFamilyCountData.noOfIndividuals,\
 					singleParentFamilyCountData.noOfFamilies,  singleParentFamilyCountData.noOfParents,  singleParentFamilyCountData.noOfKids,\
+						singleParentFamilyCountData.noOfIndividuals,\
 					zeroParentFamilyCountData.noOfFamilies, zeroParentFamilyCountData.noOfParents,  zeroParentFamilyCountData.noOfKids,\
+						zeroParentFamilyCountData.noOfIndividuals,\
 					sumOfMendelError, \
-					meanMendelError/float(noOfNuclearFamilies), sumOfMendelError/float(noOfNuclearFamilies)]
+					noOfMendelErrorsPerLocusPerNuclearFamily,noOfMendelErrorsPerNuclearFamily ]
 			writer.writerow(data_row)
 		
 		plinkPedigreeFile.close()

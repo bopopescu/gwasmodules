@@ -4,7 +4,7 @@ Examples:
 	%s 
 	
 	%s --newSNPDataOutputFname ~/script/vervet/data/194SNPData/isq524CoordinateSNPData_max15Mismatch.tsv
-		--originalSNPDataFname ~/script/vervet/data/194SNPData/AllSNPData.txt
+		--querySNPDataFname ~/script/vervet/data/194SNPData/AllSNPData.txt
 		--SNPFlankSequenceFname ~/script/vervet/data/194SNPData/AllSNPFlankWithSNPMark.txt
 		-i Blast/Blast194SNPFlankAgainst524_15Mismatches.2012.8.17T2334/folderBlast/blast.tsv
 		-o ~/script/vervet/data/194SNPData/originalSNPID2ISQ524Coordinate_max15Mismatch.tsv
@@ -13,10 +13,9 @@ Examples:
 		
 
 Description:
-	2012.10
-		inputFname is FindNewRefCoordinatesGivenVCFFolderWorkflow.py's bwa-alignment output and others.
-		outputFname is the map between old and new coordinates.
-			originalSNPID, newChr, newRefStart, newRefStop, strand, targetAlignmentSpan.
+	2012.10 child of FindSNPPositionOnNewRefFromFlankingBlastOutput.
+		its input is FindNewRefCoordinatesGivenVCFFolderWorkflow.py's bwa-alignment output and others.
+		
 		
 """
 
@@ -49,10 +48,11 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 	
 	
 	def findSNPPositionOnNewRef(self, SNPFlankSequenceFname=None, blastHitResultFname=None, bwaOutputFname=None, \
-							originalSNPDataFname=None,\
-							originalSNPID2NewRefCoordinateOutputFname=None, newSNPDataOutputFname=None, \
+							querySNPDataFname=None,\
+							querySNPID2NewRefCoordinateOutputFname=None, newSNPDataOutputFname=None, \
 							minAlignmentSpan=10, **keywords):
 		"""
+		2013.07.05 add queryChromosome, queryStart, queryStop, newRefBase to output
 		#2013.05.21 bugfix, read.qend is occasionally not available
 		2012.10.14 
 		2012.10.8
@@ -64,9 +64,9 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 			bwaOutputFname = blastHitResultFname
 		
 		if SNPFlankSequenceFname:
-			originalSNPID2positionInFlank = self.getOriginalSNPID2positionInFlank(SNPFlankSequenceFname=SNPFlankSequenceFname)
+			querySNPID2attributes = self.getQuerySNPID2attributes(SNPFlankSequenceFname=SNPFlankSequenceFname)
 		else:
-			originalSNPID2positionInFlank = None
+			querySNPID2attributes = None
 		
 		sys.stderr.write("Finding new reference coordinates for SNPs from bwa alignment output %s ... \n"%(bwaOutputFname))
 		samfile = pysam.Samfile(bwaOutputFname, "rb" )
@@ -74,7 +74,7 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 		counter = 0
 		real_counter = 0
 		queryIDSet= set()
-		originalSNPID2BlastRefCoordinateLs = {}
+		querySNPID2NewReferenceCoordinateLs = {}
 		no_of_reads_mapped = samfile.mapped	#: not good, segmentation fault because bai file is missing
 		no_of_hits_with_exception = 0
 		for read in samfile:	#.fetch():
@@ -87,11 +87,11 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 				yhRead = YHAlignedRead(read)
 				queryID = read.qname
 				queryStart = read.qstart + 1	#qstart is 0-based
-				queryEnd = read.qend	#qend is 0-based but exclusive. same as 1-based but inclusive.
+				queryEnd = read.qend	#qend is exclusive 0-based. same value as inclusive 1-based
 				
 				targetChr = samfile.getrname(read.tid)
-				targetStart = read.pos + 1	#pos is 0-based
-				targetStop = read.aend	#aend is 0-based but exclusive. same as 1-based but inclusive.
+				targetStart = read.pos + 1	#pos is 0-based leftmost coordinate
+				targetStop = read.aend	#aend is 0-based, points to one past the last aligned residue. Returns None if not available.
 				
 				
 				queryAlignmentSpan = read.qlen
@@ -105,8 +105,9 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 			
 			queryIDSet.add(queryID)
 			if read.is_reverse:
-				strand = -1
+				queryStrand = "-"
 				#reverse the query coordinates (pysam stores the two coordinates in ascending order regardless of strand).
+				#reverse them for code below
 				tmp = queryStart
 				queryStart = queryEnd
 				queryEnd = tmp
@@ -118,7 +119,7 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 					sys.exit(3)
 				"""
 			else:
-				strand = +1
+				queryStrand = "+"
 				if targetStart > targetStop:
 					sys.stderr.write("Error: aligned to the negative strand, but targetStart (%s) > targetStop (%s).\n"%\
 									(targetStart, targetStop))
@@ -130,13 +131,13 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 					(self.maxNoOfMismatches is None or yhRead.getNoOfMismatches()<=self.maxNoOfMismatches) and\
 					(self.minIdentityFraction is None or yhRead.getMatchFraction()>=self.minIdentityFraction) and\
 					targetAlignmentSpan>=minAlignmentSpan and queryAlignmentSpan>=minAlignmentSpan:
-				if originalSNPID2positionInFlank and queryID in originalSNPID2positionInFlank:
-					parseData = originalSNPID2positionInFlank.get(queryID)
+				if querySNPID2attributes and queryID in querySNPID2attributes:
+					parseData = querySNPID2attributes.get(queryID)
 					locusSpan = parseData.locusSpan	#locusSpan is the length of the locus itself, excluding the flanks
 					#SNP's locusSpan is regarded as 0.
 				else:
-					parseData = self.parseOriginalLocusID(queryID)
-					chr = parseData.chr
+					parseData = self.parseQueryLocusID(queryID)
+					chromosome = parseData.chromosome
 					start = parseData.start
 					stop = parseData.stop
 					if start is not None and stop is not None:
@@ -146,45 +147,58 @@ class FindSNPPositionOnNewRefFromFlankingBWAOutput(FindSNPPositionOnNewRefFromFl
 					else:
 						locusSpan = None
 				positionInFlank = parseData.positionInFlank
-				originalRefBase = parseData.refBase
-				originalAltBase = parseData.altBase
+				queryRefBase = parseData.refBase
+				queryAltBase = parseData.altBase
 				if positionInFlank is not None and locusSpan is not None:
 					positionInFlank = int(positionInFlank)
-					if queryStart >queryEnd and positionInFlank<queryStart and positionInFlank>queryEnd:
-						#could happen. on the opposite strand. targetStart is always bigger than targetstop
-						#locus must be in the middle of queryStart and queryEnd.
-						newRefStart=  targetStop - (positionInFlank-queryEnd)
-						newRefStop =  targetStart + (queryStart - positionInFlank-locusSpan)
-						strand = -1
-					elif queryStart <queryEnd and positionInFlank>queryStart and positionInFlank<queryEnd:
+					if queryStart <queryEnd and positionInFlank>queryStart and positionInFlank<queryEnd:
 						#locus must be in the middle of queryStart and queryEnd.
 						newRefStart =  targetStart + (positionInFlank - queryStart)
 						newRefStop =  targetStop - (queryEnd - positionInFlank-locusSpan)
-						strand = + 1
+						queryStrand = "+"
+						#query alignment start/stop are always in ascending order, regardless of strand
+						queryAlignmentStart = max(1, parseData.start - (positionInFlank-1) + (queryStart-1))
+						queryAlignmentStop = queryAlignmentStart + targetAlignmentSpan-1
+						
+					elif queryStart >queryEnd and positionInFlank<queryStart and positionInFlank>queryEnd:
+						#could happen. on the opposite strand. targetStart is always bigger than targetStop
+						#locus must be in the middle of queryStart and queryEnd.
+						newRefStart=  targetStop - (positionInFlank-queryEnd)
+						newRefStop =  targetStart + (queryStart - positionInFlank-locusSpan)
+						queryStrand = "-"
+						#query alignment start/stop are always in ascending order, regardless of strand
+						queryAlignmentStart = max(1, parseData.start - (positionInFlank-1) + (queryEnd-1))
+						queryAlignmentStop = queryAlignmentStart + targetAlignmentSpan-1
+					
 					else:
 						newRefStart = None
 						newRefStop = None
 					if newRefStart is not None and newRefStop is not None:
-						if queryID not in originalSNPID2BlastRefCoordinateLs:
-							originalSNPID2BlastRefCoordinateLs[queryID] = []
+						if queryID not in querySNPID2NewReferenceCoordinateLs:
+							querySNPID2NewReferenceCoordinateLs[queryID] = []
+						#all coordinates are 1-based, inclusive.
 						newRefCoordinate = PassingData(newChr=targetChr, newRefStart=newRefStart, newRefStop=newRefStop, \
-													strand=strand, targetAlignmentSpan=targetAlignmentSpan,\
-													queryAlignmentSpan=queryAlignmentSpan,\
-													originalRefBase=originalRefBase, originalAltBase=originalAltBase )
-						originalSNPID2BlastRefCoordinateLs[queryID].append(newRefCoordinate)
+												newRefBase=yhRead.read.seq[positionInFlank-1], \
+												targetAlignmentSpan=targetAlignmentSpan,\
+												targetAlignmentStart=targetStart,\
+												targetAlignmentStop=targetStop,\
+												queryStrand=queryStrand, \
+												queryAlignmentSpan=queryAlignmentSpan,\
+												queryAlignmentStart=queryAlignmentStart,\
+												queryAlignmentStop=queryAlignmentStop,\
+												queryChromosome=parseData.chromosome, \
+												queryStart=parseData.start, queryStop=parseData.stop,\
+												queryRefBase=queryRefBase, queryAltBase=queryAltBase )
+						querySNPID2NewReferenceCoordinateLs[queryID].append(newRefCoordinate)
 						real_counter += 1
 						
 		sys.stderr.write(" from %s reads, no_of_hits_with_exception=%s, no_of_reads_mapped=%s, %s/%s SNPs found new-reference coordinates.\n"%\
 						(counter, no_of_hits_with_exception, no_of_reads_mapped, real_counter, len(queryIDSet)))
 		
-		#output the mapping
-		if originalSNPID2NewRefCoordinateOutputFname:
-			self.outputOriginalSNPID2NewCoordinateMap(originalSNPID2BlastRefCoordinateLs=originalSNPID2BlastRefCoordinateLs, \
-						originalSNPID2NewRefCoordinateOutputFname=originalSNPID2NewRefCoordinateOutputFname)
-		
-		if originalSNPDataFname and newSNPDataOutputFname:
-			self.outputSNPDataInNewCoordinate(originalSNPDataFname=originalSNPDataFname, \
-									originalSNPID2BlastRefCoordinateLs=originalSNPID2BlastRefCoordinateLs, newSNPDataOutputFname=newSNPDataOutputFname)
+		if querySNPDataFname and newSNPDataOutputFname:
+			self.outputSNPDataInNewCoordinate(querySNPDataFname=querySNPDataFname, \
+									querySNPID2NewReferenceCoordinateLs=querySNPID2NewReferenceCoordinateLs, newSNPDataOutputFname=newSNPDataOutputFname)
+		return querySNPID2NewReferenceCoordinateLs
 	
 
 if __name__ == '__main__':

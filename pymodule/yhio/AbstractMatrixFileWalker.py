@@ -37,12 +37,12 @@ class AbstractMatrixFileWalker(AbstractMapper):
 						('samplingRate', 1, float): [1, 's', 1, 'how often you include the data, a probability between 0 and 1.'],\
 						('whichColumn', 0, int): [None, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
 						('whichColumnHeader', 0, ): [None, 'W', 1, 'column header for the data to be plotted as y-axis value, substitute whichColumn'],\
-						('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: log(), 2: -log(). replacing self.logWhichColumn.'],\
+						('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: log(); 2: -log(); 3: ln(X); 4: -ln(X). replacing self.logWhichColumn.'],\
 						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'default value when log-transformation fails (when value is negative)'],\
 						('missingDataNotation', 0, ): ['NA', '', 1, 'coma-separated list of notations for missing data.\n\
 	missing data will be skipped.'],\
 						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; '],\
-						('outputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile.'],\
+						('outputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; 4: csv-like matrix, without header'],\
 						})
 	
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -113,12 +113,10 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		return self.processValue(value=yValue, processType=processType, \
 						valueForNonPositiveValue=valueForNonPositiveValue, **keywords)
 	
-	def processHeader(self, header=None, pdata=None, rowDefinition=None):
+	def _writeHeader(self, header=None, pdata=None, rowDefinition=None):
 		"""
-		2013.3 only open self.outputFname for write when self.writer and self.invariantPData.writer is not available
-		2012.11.22
-		2012.8.13
-			called right after the header of an input file is derived in fileWalker()
+		2013.07.31
+			called by processHeader() and others (in GenomeMovingAverageStatistics.py)
 		"""
 		if not self.invariantPData.headerOutputted:
 			if self.outputFileFormat==1:
@@ -146,6 +144,15 @@ class AbstractMatrixFileWalker(AbstractMapper):
 								(getattr(self, 'writer', None), getattr(self.invariantPData, 'writer', None)))
 				sys.stderr.write("\t no writer created in processHeader().\n")
 		self.invariantPData.headerOutputted = True
+	
+	def processHeader(self, header=None, pdata=None, rowDefinition=None):
+		"""
+		2013.3 only open self.outputFname for write when self.writer and self.invariantPData.writer is not available
+		2012.11.22
+		2012.8.13
+			called right after the header of an input file is derived in fileWalker()
+		"""
+		self._writeHeader(header=header, pdata=pdata, rowDefinition=rowDefinition)
 	
 	
 	def processRow(self, row=None, pdata=None):
@@ -260,15 +267,17 @@ class AbstractMatrixFileWalker(AbstractMapper):
 			run before anything is run
 		"""
 		writer = None
-		if self.outputFileFormat==1:
+		if self.outputFileFormat in [1,4]:
 			suffix = os.path.splitext(self.outputFname)[1]
 			if self.outputFname and suffix!='.png':
-				writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
+				writer = MatrixFile(self.outputFname, openMode='w', delimiter='\t')
+				#writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
 		else:	#HDF5MatrixFile
 			#can't generate HDF5MatrixFile, because it needs dtypeList
 			pass
 		#pass it to the invariantPData
 		self.invariantPData.writer = writer
+		self.writer = writer
 	
 	def closeFiles(self, **keywords):
 		"""

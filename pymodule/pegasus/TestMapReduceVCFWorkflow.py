@@ -104,7 +104,7 @@ class TestMapReduceVCFWorkflow(parentClass):
 							baseInputVolume=baseInputVolume, baseJobPropertyValue=4000, \
 							minJobPropertyValue=4000, maxJobPropertyValue=8000).value
 		
-		outputFnamePrefix = os.path.join(mapDirJob.output, '%s.sameSite.concordance'%(intervalFileBasenamePrefix)) 
+		outputFnamePrefix = os.path.join(mapDirJob.output, '%s.sameSite.concordance'%(intervalFileBasenamePrefix))
 		outputFile = File('%s.tsv'%(outputFnamePrefix))
 		
 		returnData.mapJob = self.addAbstractMapperLikeJob(executable=self.CalculateSameSiteConcordanceInVCF, \

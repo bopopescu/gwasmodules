@@ -131,9 +131,10 @@ class LargeFastaFileTraverse:
 			sys.stderr.write("\n")
 
 import re
-chr_pattern = re.compile(r'([a-zA-Z]+\d+)[._\-:]*')	#the last - has special meaning in [] when it's not the last character. 
+chr_pattern = re.compile(r'([a-zA-Z]+[\dXY]+)[._\-:]*')	#the last - has special meaning in [] when it's not the last character. 
 #contig_id_pattern = re.compile(r'Contig(\d+)[._\-:]*')	#2013.3.19
-contig_id_pattern = re.compile(r'Scaffold(\d+)[._\-:]*')	#2013.3.19 new vervet ref is scaffold-based.
+#contig_id_pattern = re.compile(r'Scaffold(\d+)[._\-:]*')	#2013.3.19 new vervet ref is scaffold-based.
+contig_id_pattern = re.compile(r'[CcS][a-zA-Z]+([\dXY]+)[._\-:]*')	#2013.07.16 new chromosome (Chlorocebus aethiops) vervet ref, add X, Y
 
 def getContigIDFromFname(filename):
 	"""
@@ -163,7 +164,7 @@ def getChrFromFname(filename):
 	"""
 	chr_pattern_sr = chr_pattern.search(filename)
 	if chr_pattern_sr:
-		chr = chr_pattern_sr.group(1)
+		chromosome = chr_pattern_sr.group(1)
 	else:
-		chr = os.path.splitext(os.path.split(filename)[1])[0]
-	return chr
+		chromosome = os.path.splitext(os.path.split(filename)[1])[0]
+	return chromosome

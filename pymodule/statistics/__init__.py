@@ -27,9 +27,9 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
+import numpy, random
 from pymodule import getListOutOfStr, PassingData, getColName2IndexFromHeader, figureOutDelimiter
 from pymodule import yh_matplotlib
-import numpy, random
 
 def calculateChiSqStatOfDeltaVector(dataVector=None, mean=None, std=None):
 	"""
@@ -116,11 +116,10 @@ def getZScorePvalue(zscore=None, twoSided=False):
 def reOrderListOfListByFirstMember(listOfList=None):
 	"""
 	2012.10.29
-		this function reorders every list in listOfList in ascending order using the values of 1st list of listOfList.
+		this function reorders every list in listOfList in ascending order using values in the 1st list of listOfList.
 		And every member of listOfList will be turned into numpy.float array.
 	2012.10.25
 	"""
-	import numpy
 	firstList = listOfList[0]
 	x_ar = numpy.array(firstList, numpy.float)
 	#sort x_ar and y_ar must be in the order of x_ar
@@ -159,7 +158,6 @@ def splineFit(x_ls=None, y_ls=None, no_of_steps=100, needReorderData=True):
 			If 0, spline will interpolate through all data points.
 
 	"""
-	import numpy
 	import scipy.interpolate
 	if needReorderData:
 		sortData = reOrderListOfListByFirstMember(listOfList=[x_ls, y_ls])
@@ -185,7 +183,6 @@ def movingAverage(listOfList=None, no_of_steps=100, needReorderData=True, reduce
 			3: fraction that is >=minValueForFraction, only applied to lists after the first one, numpy.median for X
 	2012.10.26
 	"""
-	import numpy
 	if needReorderData:
 		sortData = reOrderListOfListByFirstMember(listOfList=listOfList)
 		listOfList = sortData.listOfList
@@ -242,7 +239,6 @@ def calculate7NumberSummaryForOneList(ls, returnObj=None):
 		calculate a 7-number summary stats for a given list
 	"""
 	from scipy import stats	# for scoreatpercentile/percentileatscore to get quartiles
-	import numpy
 	if returnObj is None:
 		returnObj = PassingData()
 	returnObj.minimum = numpy.min(ls)
@@ -253,3 +249,85 @@ def calculate7NumberSummaryForOneList(ls, returnObj=None):
 	returnObj.last_decile = stats.scoreatpercentile(ls, 90)
 	returnObj.maximum = numpy.max(ls)
 	return returnObj
+
+class NumberContainer(object):
+	"""
+	#2013.05.24 a structure to scale/normalize any range/series of numbers
+		to make them [0,1]
+	"""
+	def __init__(self, minValue=None, maxValue=None):
+		self.minValue = minValue
+		self.maxValue = maxValue
+		self.valueList = []
+	
+	def addOneValue(self, value=None):
+		if value is not None:
+			self.valueList.append(value)
+			if self.minValue is None or self.minValue > value:
+				self.minValue = value
+			if self.maxValue is None or self.maxValue < value:
+				self.maxValue = value
+	
+	def normalizeValue(self, value=None):
+		"""
+		2013.05.24
+		"""
+		if self.minValue is not None and self.maxValue is not None:
+			return (value-self.minValue)/float(self.maxValue-self.minValue)
+		else:
+			raise
+
+class DiscreteProbabilityMassContainer(object):
+	"""
+	Examples:
+		probabilityMassContainer = DiscreteProbabilityMassContainer(object2proabilityMassDict=self.originalIndividualID2representativeData)
+		sampledIndividualID = probabilityMassContainer.sampleObject()
+	
+	2013.05.26
+		function to do sampling
+	"""
+	def __init__(self, object2proabilityMassDict=None):
+		"""
+		2013.05.26
+		"""
+		from pymodule.algorithm.RBTree import RBDict
+		self.rbDict = RBDict()
+		self.totalProbabilityMass = 1	#default
+		if object2proabilityMassDict is not None:
+			self._constructFromDiscreteProbabilityMassDict(dc=object2proabilityMassDict)
+	
+	def _constructFromDiscreteProbabilityMassDict(self, dc=None):
+		"""
+		2013.05.28
+			dc is a structure with object name as key, and object probability mass (normalized or not) as value. i.e.
+				{"1978001":0.5, "1980001":1.5}
+				
+			argument probabilityNormalized: whether the sum of all values in dc adds up to 1.
+		"""
+		from pymodule.yhio.CNV import CNVSegmentBinarySearchTreeKey
+		startProbMass = 0.0
+		for discreteVariable, probabilityMass in dc.iteritems():
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome="1", span_ls=[startProbMass, startProbMass+probabilityMass], \
+												min_reciprocal_overlap=0.001, isDataDiscrete=False)
+						#min_reciprocal_overlap=1: must be complete overlap in order for two objects occupying same key
+			self.rbDict[segmentKey] = discreteVariable
+			startProbMass += probabilityMass
+		self.totalProbabilityMass = startProbMass
+		sys.stderr.write("%s\n"%(repr(self.rbDict)))
+	
+	def sampleObject(self):
+		"""
+		"""
+		from pymodule.yhio.CNV import CNVSegmentBinarySearchTreeKey
+		u = random.random()*self.totalProbabilityMass
+		key = CNVSegmentBinarySearchTreeKey(chromosome="1", span_ls=[u], \
+												min_reciprocal_overlap=0.0000001)
+		#randint.(0,noOfTotalRows-1)
+		
+		node = self.rbDict.findNode(key)
+		if node:
+			return node.value
+		else:
+			return None
+	
+		

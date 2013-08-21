@@ -40,7 +40,7 @@ VCF_PERL5LIB=script/vcftools/perl
 
 UCLA_CLUSTER_HOSTNAME="grid4.hoffman2.idre.ucla.edu"
 UCLA_CLUSTER_SCHEDULER="sge"
-UCLA_CLUSTER_HOME="/u/home/eeskin/polyacti"
+UCLA_CLUSTER_HOME="/u/home/p/polyacti/"
 UCLA_CLUSTER_PEGASUS_HOME="$UCLA_CLUSTER_HOME/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"

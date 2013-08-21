@@ -24,7 +24,7 @@ class AbstractVCFMapper(AbstractMapper):
 						('inputFname', 0, ): ['', 'i', 1, 'VCF input file. either plain vcf or gzipped is ok. could be unsorted.', ],\
 						("chromosome", 0, ): [None, 'c', 1, 'chromosome name for these two VCF.'],\
 						("chrLength", 1, int): [1, 'l', 1, 'length of the reference used for the input VCF file.'],\
-						('minDepth', 1, float): [0, 'm', 1, 'minimum depth for a call to regarded as non-missing', ],\
+						('minDepth', 0, float): [0, 'm', 1, 'minimum depth for a call to regarded as non-missing', ],\
 						})
 
 	def __init__(self,  inputFnameLs=None, **keywords):

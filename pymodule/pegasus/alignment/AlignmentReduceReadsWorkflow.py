@@ -91,9 +91,9 @@ class AlignmentReduceReadsWorkflow(parentClass):
 		else:
 			mpileupInterval = intervalData.interval
 			bcftoolsInterval = intervalData.interval
-		intervalFnameSignature = intervalData.intervalFnameSignature
+		intervalFileBasenameSignature = intervalData.intervalFileBasenameSignature
 		overlapInterval = intervalData.overlapInterval
-		overlapFilenameSignature = intervalData.overlapIntervalFnameSignature
+		overlapFileBasenameSignature = intervalData.overlapIntervalFileBasenameSignature
 		span = intervalData.span
 		
 		if chromosome is None:
@@ -112,9 +112,14 @@ class AlignmentReduceReadsWorkflow(parentClass):
 							minJobPropertyValue=4000, maxJobPropertyValue=8000).value
 							
 		reduceReadsBamFile = File(os.path.join(topOutputDirJob.output, '%s_%s.reduceReads.bam'%\
-											(bamFnamePrefix, overlapFilenameSignature)))
+											(bamFnamePrefix, overlapFileBasenameSignature)))
 		#Default downsampling setting is 40 in GATK 2.4.9
-		extraArgumentList= ["--downsample_to_coverage 60", "--downsampling_type BY_SAMPLE"]
+		# this downsampling happens at the ReadWalker level,
+		#extraArgumentList= ["--downsample_to_coverage 250", "--downsampling_type BY_SAMPLE"]
+		
+		extraArgumentList=["--downsample_coverage 250"]	#this is for 
+		#This level of downsampling only happens after the region has been evaluated, therefore it can be combined with the engine level downsampling.
+		 
 		reduceReadsJob = self.addGATKJob(executable=self.ReduceReadsJava, GenomeAnalysisTKJar=self.GenomeAnalysisTK2Jar, \
 					GATKAnalysisType='ReduceReads',\
 					inputFile=bamF, inputArgumentOption="-I", refFastaFList=passingData.refFastaFList, inputFileList=None,\
@@ -161,8 +166,8 @@ class AlignmentReduceReadsWorkflow(parentClass):
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
 				#2012.9.19 add a AddReadGroup job
 				alignmentJob, indexAlignmentJob = AlignmentJobAndOutput.parentJobLs
-				fname_prefix = os.path.splitext(alignmentJob.output.name)[0]
-				outputRGBAM = File("%s.isq_RG.bam"%(fname_prefix))
+				fileBasenamePrefix = os.path.splitext(alignmentJob.output.name)[0]
+				outputRGBAM = File("%s.isq_RG.bam"%(fileBasenamePrefix))
 				addRGJob = self.addReadGroupInsertionJob(workflow=workflow, individual_alignment=new_individual_alignment, \
 									inputBamFile=alignmentJob.output, \
 									outputBamFile=outputRGBAM,\

@@ -4,7 +4,23 @@
  */
 #include "pymodule/include/AbstractMatrixFileWalker.h"
 
-void AbstractMatrixFileWalker::_constructOptionDescriptionStructure(){
+AbstractMatrixFileWalker::AbstractMatrixFileWalker(int _argc, char** _argv): argc(_argc), argv(_argv)
+{
+	debug=0;
+	report=0;
+	extraDocumentation ="Examples:\n  \n";
+}
+
+AbstractMatrixFileWalker::~AbstractMatrixFileWalker()
+{
+	//clearing
+	if (debug){
+		std::cerr<<"Deconstructing from AbstractMatrixFileWalker." << endl;
+	}
+}
+
+
+void AbstractMatrixFileWalker::constructOptionDescriptionStructure(){
 
 	optionDescription.add_options()("help,h", "produce help message")
 				("minNoOfTotal,m", po::value<int>(&minNoOfTotal)->default_value(0),
@@ -13,7 +29,7 @@ void AbstractMatrixFileWalker::_constructOptionDescriptionStructure(){
 					"maximum no of data to sample from one file. if not set, no limit.")
 				("fractionToSample,f", po::value<float>(&fractionToSample)->default_value(1.0),
 					"how often you include the data, a probability between 0 and 1.")
-				("whichColumn,w", po::value<int >(&whichColumn)->default_value(1),
+				("whichColumn,w", po::value<int >(&whichColumn)->default_value(0),
 						"which column of inputFname is the target stat, --inputFileFormat=1 only.")
 				("whichColumnHeader,W", po::value<string >(&whichColumnHeader),
 						"column header of the data to be used, substitute whichColumn")
@@ -31,20 +47,19 @@ void AbstractMatrixFileWalker::_constructOptionDescriptionStructure(){
 
 }
 
-AbstractMatrixFileWalker::AbstractMatrixFileWalker(int argc, char* argv[])
-{
-	_constructOptionDescriptionStructure();
 
+void AbstractMatrixFileWalker::parseCommandlineOptions(){
 	//all positional arguments are input files.
 	positionOptionDescription.add("inputFname", -1);
 
 	po::store(po::command_line_parser(argc, argv).
-	              options(optionDescription).positional(positionOptionDescription).run(), optionVariableMap);
+				  options(optionDescription).positional(positionOptionDescription).run(), optionVariableMap);
 
 	//po::store(po::parse_command_line(argc, argv, optionDescription), optionVariableMap);
 	po::notify(optionVariableMap);
 	if (optionVariableMap.count("help") || inputFnameList.size()<=0){
-		cout << optionDescription << endl;
+		cout << optionDescription << endl << endl;
+		cout << extraDocumentation << endl;
 		exit(1);
 	}
 	if (optionVariableMap.count("debug")){
@@ -70,18 +85,9 @@ AbstractMatrixFileWalker::AbstractMatrixFileWalker(int argc, char* argv[])
 	}
 }
 
-AbstractMatrixFileWalker::~AbstractMatrixFileWalker()
-{
-	//clearing
-	if (debug){
-		std::cerr<<"Exit." << endl;
-	}
-}
-
 void AbstractMatrixFileWalker::setup(){
 
 }
-
 void AbstractMatrixFileWalker::reduce(){
 
 }
@@ -112,6 +118,30 @@ int AbstractMatrixFileWalker::processRow(tokenizerCharType &line_toks){
 	return returnValue;
 }
 
+int AbstractMatrixFileWalker::outputRow(tokenizerCharType &line_toks){
+	int returnValue = 0;
+	tokenizerCharType::iterator tokenizer_iter = line_toks.begin();
+	for (;tokenizer_iter!=line_toks.end();tokenizer_iter++){
+			/*
+			if (tokenizer_iter==line_toks.end()){
+				//2012.9.15 debug purpose
+				std::cerr<< "end of line has been reached before the whichColumn, abort." << std::endl;
+				std::cerr<< "Exception line no. " << noOfData << " has content: " << line <<std::endl;
+				continue;	//end has been reached before whichColumn, abort.
+			}
+			*/
+		if (tokenizer_iter==line_toks.begin()){
+			outputFile << *tokenizer_iter ;
+		}
+		else{
+			outputFile << "\t" << *tokenizer_iter ;
+		}
+
+	}
+	outputFile << endl;
+	returnValue = 1;
+	return returnValue;
+}
 
 void AbstractMatrixFileWalker::fileWalker(string &inputFname){
 	if (debug){
@@ -169,8 +199,8 @@ void AbstractMatrixFileWalker::fileWalker(string &inputFname){
 			rowReturnValue = processRow(line_toks);
 			noOfSampled++;
 			real_counter += rowReturnValue;
+			std::getline(inputStream, line);
 		}
-		std::getline(inputStream, line);
 
 		if (noOfSampled>=minNoOfTotal){
 			postFileFunction();
@@ -205,8 +235,11 @@ void AbstractMatrixFileWalker::closeFiles(){
 	}
 }
 void AbstractMatrixFileWalker::run(){
+	constructOptionDescriptionStructure();
+	parseCommandlineOptions();
+
 	if (debug){
-		std::cerr<<" debug mode is on." << std::endl;
+		std::cerr<<"Entering AbstractMatrixFileWalker.run()..." << std::endl;
 	}
 
 	setup();
@@ -218,7 +251,9 @@ void AbstractMatrixFileWalker::run(){
 	reduce();
 
 	closeFiles();
-
+	if (debug){
+		std::cerr<<"Exit AbstractMatrixFileWalker.run()." << std::endl;
+	}
 }
 
 

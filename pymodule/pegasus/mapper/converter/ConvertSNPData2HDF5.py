@@ -7,6 +7,7 @@ Examples:
 
 Description:
 	2012.3.1
+		assuming row and column ids are of type integer.
 
 """
 

@@ -147,6 +147,23 @@ number2nt = {-2: '|',	#2008-01-07 not even tried. 'N'/'NA' is tried but produces
 	10:'GT'
 	}
 
+#2013.07.03 for diploids
+number2di_nt = {-2: '|',	#2008-01-07 not even tried. 'N'/'NA' is tried but produces inconclusive result.
+	-1: '-',
+	0: 'NA',
+	num.nan: 'NA',	#2008-12-03	data_matrix might contain num.nan as NA
+	1:'AA',
+	2:'CC',
+	3:'GG',
+	4:'TT',
+	5:'AC',
+	6:'AG',
+	7:'AT',
+	8:'CG',
+	9:'CT',
+	10:'GT'
+	}
+
 #2009-6-5 dictionary used in output FASTA format which doesn't recognize two-letter heterozygous representation
 number2single_char_nt = {-2: '|',	#2008-01-07 not even tried. 'N'/'NA' is tried but produces inconclusive result.
 	-1: '-',
@@ -230,8 +247,11 @@ def get_nt_number2diff_matrix_index(number2nt):
 	sys.stderr.write("Done.\n")
 	return nt_number2diff_matrix_index
 
-def RawSnpsData_ls2SNPData(rawSnpsData_ls, report=0, use_nt2number=0):
+def RawSnpsData_ls2SNPData(rawSnpsData_ls, report=0, use_nt2number=0, snpIDAsString=True):
 	"""
+	2013.07.03 added argument snpIDAsString
+		True: row_id = 'chr_pos'
+		False: row_id = (chr, pos)
 	2012.8.20 bugfix
 		generate snpData in the end.
 	2008-05-19
@@ -264,7 +284,11 @@ def RawSnpsData_ls2SNPData(rawSnpsData_ls, report=0, use_nt2number=0):
 			else:
 				data_row = rawSnpsData.snps[j]
 			data_matrix.append(data_row)
-			row_id_ls.append((chromosome, rawSnpsData.positions[j]))
+			if snpIDAsString:
+				snpID = "%s_%s"%(chromosome, rawSnpsData.positions[j])
+			else:
+				snpID = (chromosome, rawSnpsData.positions[j])
+			row_id_ls.append(snpID)
 	if report:
 		sys.stderr.write("Done.\n")
 	snpData = SNPData(row_id_ls = row_id_ls, col_id_ls=col_id_ls, data_matrix=data_matrix)
@@ -652,6 +676,19 @@ def readAdjacencyListDataIntoMatrix(inputFname=None, rowIDHeader=None, colIDHead
 									dataHeader='Geno', dataIndex=None, hasHeader=True, defaultValue=0, \
 									dataConvertDictionary=SNP.nt2number, matrixDefaultDataType=numpy.int, asymmetric=True)
 			snpData.tofile(outputFname)
+			
+			#read in the IBD check result
+			self.ibdData = SNP.readAdjacencyListDataIntoMatrix(inputFname=self.plinkIBDCheckOutputFname, \
+								rowIDHeader="IID1", colIDHeader="IID2", \
+								rowIDIndex=None, colIDIndex=None, \
+								dataHeader="PI_HAT", dataIndex=None, hasHeader=True)
+			
+			#read in kinship
+			self.ibdData = SNP.readAdjacencyListDataIntoMatrix(inputFname=self.pedigreeKinshipFilePath, \
+								rowIDHeader=None, colIDHeader=None, \
+								rowIDIndex=0, colIDIndex=1, \
+								dataHeader=None, dataIndex=2, hasHeader=False)
+		
 	"""
 	sys.stderr.write("Reading a matrix out of an adjacency-list based file %s ..."%(inputFname))
 	from pymodule import MatrixFile
@@ -776,7 +813,6 @@ def getKey2ValueFromMatrixLikeFile(inputFname=None, keyHeaderLs=None, valueHeade
 
 class SNPData(object):
 	"""
-	2009-10-30
 		example usages:
 		
 			snpData1 = SNPData(input_fname=self.input_fname1, turn_into_array=1, ignore_2nd_column=1)
@@ -789,7 +825,12 @@ class SNPData(object):
 			snpData = SNPData(header=header, strain_acc_list=strain_acc_list, category_list=category_list,\
 							data_matrix=data_matrix)
 			
-			covariateData = SNPData(row_id_ls=row_id_ls, col_id_ls=new_col_id_ls, data_matrix=data_matrix)
+			covariateData = SNPData(row_id_ls=row_id_ls, col_id_ls=new_col_id_ls, data_matrix=data_matrix, ploidy=1)
+			
+			#2013.05.31 beagle format is different orientation and in nucleotides,
+			# turn_into_integer=0 or 1 (default) is up to user
+			beagleData = SNPData(row_id_ls=locusIDList, col_id_ls=sampleIDList, data_matrix=data_matrix, ploidy=2,\
+				matrix_orientation=2, turn_into_integer=0)
 			
 			# 2010-3-22 read in the kinship matrix
 			kinshipData = SNPData(input_fname=kinship_output_fname, ignore_2nd_column=1, matrix_data_type=float)
@@ -799,6 +840,11 @@ class SNPData(object):
 			def row_id_hash_func(row_id):
 				return int(row_id[0])
 			snpData = SNPData(input_fname=inputFname, turn_into_array=1, row_id_key_set=ecotype_id_set, row_id_hash_func=row_id_hash_func)
+	2013.05.31
+		added argument ploidy, which affects self.row_id2index or self.col_id2index , depending on another new argument
+			matrix_orientation
+		Multi-ploidy (ploidy>1) assumes haplotypes of same individual are adjacent to each other.
+		Row/Column index for each sample records only index of the 1st haplotype of each individual. 
 	2009-5-20
 		add argument ignore_het which is passed to read_data() when data_matrix is not given to ignore heterozygous calls.
 		It'll only be functional when data_matrix is not given upon SNPData initialization.
@@ -821,17 +867,16 @@ class SNPData(object):
 							('input_alphabet',0, int): 0,\
 							('turn_into_integer', 0, int): 1,\
 							('double_header', 0, int):0, \
-							
 							('ignore_2nd_column', 0, int): [0, '', 0, 'Ignore category_list, the 2nd column.'],\
-							
 							('turn_into_array', 0 ,): [0, '', 0, 'Turn the data_matrix into array'],\
-							
+							('ploidy', 1, int): [1, '', 1, 'ploidy of the organism described here. ploidy=#genotype-columns for one individual'],\
 							('min_probability', 0, float): -1,\
 							('call_method_id', 0, int): -1,\
 							('col_id2id', 0, ):None,\
 							('max_call_info_mismatch_rate', 0, float): 1,\
 							('snps_table', 0, ): None,\
 							('matrix_data_type', 0, ): int,\
+							('matrix_orientation', 1, int): [1, '', 1, '1: rows are samples, columns are loci, Yu-format; 2: rows are loci, columns are samples'],\
 							('ignore_het', 0, int): [0, '', 0, 'Ignore the heterozygous genotypes'],\
 							('data_starting_col', 0, int): [2, '', 0, 'which column the data starts from'],\
 							('debug', 0, int): [0, '', 0, 'turn on the debug flag']}
@@ -842,7 +887,7 @@ class SNPData(object):
 		2009-12-11
 			add 2 arguments (col_id_key_set and col_id_hash_func) to be passed to read_data()
 		2010-3-22
-			argument turn_into_integer is not just turn data into integer. It's about whether to cast data to type matrix_data_type.
+			argument turn_into_integer does not just turn data into integer. It's about whether to cast data to type matrix_data_type.
 			argument matrix_data_type is only used in read_data().
 		2009-12-11
 			add 2 arguments (row_id_key_set and row_id_hash_func) to be passed to read_data()
@@ -942,7 +987,11 @@ class SNPData(object):
 		if self.row_id_ls:	#2008-12-03
 			for i in range(len(self.row_id_ls)):
 				row_id = self.row_id_ls[i]
-				self.row_id2row_index[row_id] = i
+				if self.matrix_orientation==1:	#2013.05.31
+					row_index = i*self.ploidy
+				else:
+					row_index = i
+				self.row_id2row_index[row_id] = row_index
 		
 		if self.col_id_ls is None and self.header is not None:
 			self.col_id_ls = []
@@ -954,7 +1003,11 @@ class SNPData(object):
 		if self.col_id_ls:	#2008-12-03
 			for i in range(len(self.col_id_ls)):
 				col_id = self.col_id_ls[i]
-				self.col_id2col_index[col_id] = i
+				if self.matrix_orientation==2:	#2013.05.31
+					col_index = i*self.ploidy
+				else:
+					col_index = i
+				self.col_id2col_index[col_id] = col_index
 	
 	def fromfile(self, input_fname, **keywords):
 		"""
@@ -1326,9 +1379,10 @@ class SNPData(object):
 	
 	
 	@classmethod
-	def _remove_rows_with_too_many_NAs(cls, data_matrix, row_cutoff, cols_with_too_many_NAs_set=None, NA_set=set([0, -2]), \
+	def _remove_rows_with_too_many_NAs(cls, data_matrix, row_cutoff=0, cols_with_too_many_NAs_set=None, NA_set=set([0, -2]), \
 									debug=0, is_cutoff_max=0):
 		"""
+		2013.07.03 rename row_index2no_of_NAs to row_index2missing_fraction
 		2013.1.16 moved from variation/src/qc/FilterStrainSNPMatrix
 		2008-05-19
 			if is_cutoff_max=1, anything > row_cutoff is deemed as having too many NAs
@@ -1348,7 +1402,7 @@ class SNPData(object):
 			cols_to_be_checked = total_cols_set - cols_with_too_many_NAs_set
 		else:
 			cols_to_be_checked = total_cols_set
-		row_index2no_of_NAs = {}
+		row_index2missing_fraction = {}
 		for i in range(no_of_rows):
 			no_of_NAs = 0.0
 			for j in cols_to_be_checked:
@@ -1358,7 +1412,7 @@ class SNPData(object):
 				NA_ratio = no_of_NAs/no_of_cols
 			else:
 				NA_ratio = 0.0
-			row_index2no_of_NAs[i] = NA_ratio
+			row_index2missing_fraction[i] = NA_ratio
 			if is_cutoff_max:
 				if NA_ratio > row_cutoff:
 					rows_with_too_many_NAs_set.add(i)
@@ -1369,15 +1423,16 @@ class SNPData(object):
 			print
 			print 'rows_with_too_many_NAs_set'
 			print rows_with_too_many_NAs_set
-		passingdata = PassingData(rows_with_too_many_NAs_set=rows_with_too_many_NAs_set)
-		passingdata.row_index2no_of_NAs = row_index2no_of_NAs
+		passingdata = PassingData(rows_with_too_many_NAs_set=rows_with_too_many_NAs_set, row_index2missing_fraction=row_index2missing_fraction)
 		sys.stderr.write("%s strains removed, done.\n"%len(rows_with_too_many_NAs_set))
 		return passingdata
 	
 	@classmethod
-	def _remove_cols_with_too_many_NAs(cls, data_matrix, col_cutoff, rows_with_too_many_NAs_set=None, NA_set=set([0, -2]), \
+	def _remove_cols_with_too_many_NAs(cls, data_matrix, col_cutoff=0, rows_with_too_many_NAs_set=None, NA_set=set([0, -2]), \
 									debug=0, is_cutoff_max=0):
 		"""
+			argument rows_with_too_many_NAs_set is used to exclude rows in calculating NA rate for each column
+		2013.07.03 rename col_index2no_of_NAs to col_index2missing_fraction
 		2013.1.16 moved from variation/src/qc/FilterStrainSNPMatrix
 		2008-05-19
 			if is_cutoff_max=1, anything > row_cutoff is deemed as having too many NAs
@@ -1396,7 +1451,7 @@ class SNPData(object):
 		else:
 			rows_to_be_checked = total_rows_set
 		
-		col_index2no_of_NAs = {}
+		col_index2missing_fraction = {}
 		
 		for j in range(no_of_cols):
 			no_of_NAs = 0.0
@@ -1407,7 +1462,7 @@ class SNPData(object):
 				NA_ratio = no_of_NAs/no_of_rows
 			else:
 				NA_ratio = 0.0
-			col_index2no_of_NAs[j] = NA_ratio
+			col_index2missing_fraction[j] = NA_ratio
 			if is_cutoff_max:
 				if NA_ratio > col_cutoff:
 					cols_with_too_many_NAs_set.add(j)
@@ -1418,7 +1473,7 @@ class SNPData(object):
 			print
 			print 'cols_with_too_many_NAs_set'
 			print cols_with_too_many_NAs_set
-		passingdata = PassingData(cols_with_too_many_NAs_set=cols_with_too_many_NAs_set, col_index2no_of_NAs=col_index2no_of_NAs)
+		passingdata = PassingData(cols_with_too_many_NAs_set=cols_with_too_many_NAs_set, col_index2missing_fraction=col_index2missing_fraction)
 		sys.stderr.write("%s cols removed, done.\n"%(len(cols_with_too_many_NAs_set)))
 		return passingdata
 	

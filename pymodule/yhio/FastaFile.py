@@ -27,6 +27,7 @@ class FastaFile(object):
 		self.inf = None
 		self._initializeInput(inputFname=self.inputFname)
 		self._seqTitle2sequence = None
+		self._seqTitleList = None	#2013.07.08
 		
 		self.outf = None
 	
@@ -63,6 +64,29 @@ class FastaFile(object):
 			raise StopIteration
 	
 	@property
+	def seqTitleList(self):
+		"""
+		2013.07.08
+		"""
+		if self._seqTitleList is None:
+			self.seqTitleList = ()
+		return self._seqTitleList
+	
+	@seqTitleList.setter
+	def seqTitleList(self, argument_ls=[]):
+		"""
+		2013.07.08
+		"""
+		sys.stderr.write("Getting seqTitleList from %s ..."%(self.inputFname))
+		if self.inf.tell()!=0:
+			self.inf.seek(0)
+		self._seqTitleList = []
+		for record in SeqIO.parse(self.inf, "fasta"):
+			seqTitle = record.id
+			self._seqTitleList.append(seqTitle)
+		sys.stderr.write("%s sequences.\n"%(len(self._seqTitleList)))
+		
+	@property
 	def seqTitle2sequence(self):
 		"""
 		2012.10.8
@@ -77,6 +101,8 @@ class FastaFile(object):
 		2012.10.8
 		"""
 		sys.stderr.write("Getting seqTitle2sequence from %s ..."%(self.inputFname))
+		if self.inf.tell()!=0:
+			self.inf.seek(0)
 		self._seqTitle2sequence = {}
 		for record in SeqIO.parse(self.inf, "fasta"):
 			seqTitle = record.id

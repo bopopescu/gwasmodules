@@ -36,6 +36,12 @@ namespace po = boost::program_options;
 
 class AbstractMatrixFileWalker{
 protected:
+	int argc;
+	char** argv;		//2013.08.20 somehow, can't use "char* argv[]" even though they are same.
+	//otherwise "argv=_argv;" will not work for this error: incompatible types in assignment of ‘char**’ to ‘char* [0]’
+
+	string extraDocumentation;
+
 	int minNoOfTotal;
 	int maxNoOfTotal;
 	float fractionToSample;
@@ -59,18 +65,20 @@ protected:
 	po::options_description optionDescription;	//("Allowed options")
 	po::positional_options_description positionOptionDescription;
 	po::variables_map optionVariableMap;
-	void _constructOptionDescriptionStructure();
 
 
 public:
-	AbstractMatrixFileWalker(int argc, char* argv[]);
-	~AbstractMatrixFileWalker();
-	void setup();
-	void reduce();
-	void closeFiles();
-	void preFileFunction();
-	void postFileFunction();
-	void fileWalker(string &inputFname);
-	int processRow(tokenizerCharType &line_toks);
-	void run();
+	AbstractMatrixFileWalker(int _argc, char** _argv);
+	virtual ~AbstractMatrixFileWalker();
+	virtual void constructOptionDescriptionStructure();
+	virtual void parseCommandlineOptions();
+	virtual void setup();
+	virtual void reduce();
+	virtual void closeFiles();
+	virtual void preFileFunction();
+	virtual void postFileFunction();
+	virtual void fileWalker(string &inputFname);
+	virtual int processRow(tokenizerCharType &line_toks);
+	virtual int outputRow(tokenizerCharType &line_toks);
+	virtual void run();
 };

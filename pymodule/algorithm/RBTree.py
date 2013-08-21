@@ -890,7 +890,10 @@ class RBList(RBTree):
 
 
 class RBDict(RBTree):
-
+	"""
+	Examples:
+		
+	"""
 	def __init__(self, dictionaryStructure={}, cmpfn=cmp):
 		RBTree.__init__(self, cmpfn)
 		for key, value in dictionaryStructure.items():

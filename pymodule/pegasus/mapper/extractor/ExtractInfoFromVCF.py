@@ -30,12 +30,11 @@ class ExtractInfoFromVCF(AbstractMapper):
 						}
 						)
 
-	def __init__(self,  **keywords):
+	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		2011-7-12
 		"""
-		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
-														class_to_have_attr=self)
+		AbstractMapper.__init__(self, inputFnameLs=inputFnameLs, **keywords)
 	
 	
 	def extract(self, inputFname=None, outputFname=None, infoKey='HaplotypeScore', **keywords):

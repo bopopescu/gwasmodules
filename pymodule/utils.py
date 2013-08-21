@@ -1,6 +1,6 @@
 import os, sys, csv, re, numpy
 
-def dict_map(dict, ls, type=1):
+def dict_map(dictionaryStructure=None, ls=None, type=1):
 	"""
 	2008-04-03 copied from annot.codense.common
 	10-13-05
@@ -13,13 +13,13 @@ def dict_map(dict, ls, type=1):
 	if type==3:
 		new_list = {}	#it's a dictionary
 		for item in ls:
-			value = dict.get(item)
+			value = dictionaryStructure.get(item)
 			if value is not None:
 				new_list[item] = value
 	else:
 		new_list = []
 		for item in ls:
-			value = dict.get(item)
+			value = dictionaryStructure.get(item)
 			if value is not None:
 				new_list.append(value)
 			elif type==2:
@@ -453,6 +453,7 @@ def getListOutOfStr(list_in_str=None, data_type=int, separator1=',', separator2=
 	"""
 	Examples:
 		self.chromosomeList = utils.getListOutOfStr(self.chromosomeList, data_type=str, separator2=None)
+	2013.04.09 strip the strings as much as u can
 	2012.10.25
 		if separator2 is None or nothing or 0, it wont' be used.
 	2009-10-28
@@ -467,12 +468,14 @@ def getListOutOfStr(list_in_str=None, data_type=int, separator1=',', separator2=
 		
 	"""
 	list_to_return = []
+	list_in_str = list_in_str.strip()	#2013.04.09
 	if list_in_str=='' or list_in_str is None:
 		return list_to_return
 	if type(list_in_str)==int:	#just one integer, put it in and return immediately
 		return [list_in_str]
 	index_anchor_ls = list_in_str.split(separator1)
 	for index_anchor in index_anchor_ls:
+		index_anchor = index_anchor.strip()	#2013.04.09
 		if len(index_anchor)==0:	#nothing there, skip
 			continue
 		if separator2:
@@ -777,6 +780,28 @@ def getPhredScoreOutOfSolexaScore(solexaChar):
 	import math
 	return 10*math.log10(1 + math.pow(10, (ord(solexaChar) - 64) / 10.0))
 
+def getFileBasenamePrefixFromPath(path=None, fakeSuffixSet = ['.gz']):
+	"""
+	2013.06.21 convenient function
+		i.e. 
+			path= 'folderHighCoveragePanel/Scaffold97_88626_VCF_87970_VCF_Scaffold97_splitVCF_u1.unphased_familySize3.bgl'
+		
+			getFileBasenamePrefixFromPath(path) == "Scaffold97_88626_VCF_87970_VCF_Scaffold97_splitVCF_u1.unphased_familySize3"
+		
+		it will also get rid of suffix that are in the fakeSuffixSet.
+			path = "folder/input.vcf.gz"
+			
+			getFileBasenamePrefixFromPath(path) == "input"
+			
+	"""
+	fileBasename = os.path.basename(path)
+	fname_prefix, fname_suffix =  os.path.splitext(fileBasename)
+	while fname_suffix in fakeSuffixSet:
+		fname_prefix, fname_suffix =  os.path.splitext(fname_prefix)
+	return fname_prefix
+	
+	
+
 def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname, fakeSuffix='.gz'):
 	"""
 	"." is included in the fname_suffix
@@ -893,7 +918,6 @@ def findFilesWithOneSuffixRecursively(inputDir='./', suffix='.bam'):
 		if suffix is empty string, it'll get all files.
 	"""
 	import fnmatch
-	import os
 	
 	matches = []
 	for root, dirnames, filenames in os.walk(inputDir):
@@ -906,7 +930,6 @@ def getFolderSize(inputDir = '.'):
 	"""
 	2012.7.13
 	"""
-	import os
 	total_size = 0
 	for dirpath, dirnames, filenames in os.walk(inputDir):
 		for f in filenames:
@@ -1040,6 +1063,46 @@ def addObjectListAttributeToSet(objectVariable=None, attributeName=None, setVari
 			#attributeValueList = attributeValue
 		setVariable |= set(list(attributeValueList))
 	return setVariable
+
+def pauseForUserInput(message="", continueAnswerSet=set(['Y', 'y', '', 'yes', 'Yes']), exitType=1):
+	"""
+	Examples:
+		#exit pending user answer
+		message = "Error: plink merge file %s already exists. Overwrite it? (if its associated workflows do not use it anymore.) [Y/n]:"%\
+							(outputFname)
+		utils.pauseForUserInput(message=message, continueAnswerSet=set(['Y', 'y', '', 'yes', 'Yes']), exitType=1)
+	
+		#exit regardless
+		message = "ERRROR in AbstractVCFWorkflow.concatenateIntervalsIntoOneVCFSubWorkflow(): %s is None."%\
+							(fileBasenamePrefix)
+		utils.pauseForUserInput(message=message, continueAnswerSet=None, exitType=1)
+	
+	
+	2013.07.17
+		exitType
+			1: exit non-zero
+			2: raise
+			3: pass (ignore)
+	"""
+	userAnswer = raw_input("\n\t %s"%(message))
+	if continueAnswerSet is not None and userAnswer in continueAnswerSet:
+		pass
+	elif continueAnswerSet is None:
+		sys.stderr.write("continueAnswerSet is None. Exit regardless of user input (%s).\n"%(userAnswer))
+		if exitType==2:
+			raise
+		elif exitType==1:
+			sys.exit(3)
+		else:
+			pass
+	else:
+		sys.stderr.write("user answered %s, interpreted as no.\n"%(userAnswer))
+		if exitType==2:
+			raise
+		elif exitType==1:
+			sys.exit(2)
+		else:
+			pass
 
 
 #2012.10.5 copied from VervetDB.py

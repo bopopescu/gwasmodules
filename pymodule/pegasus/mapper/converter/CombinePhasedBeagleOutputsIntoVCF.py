@@ -59,7 +59,7 @@ class CombinePhasedBeagleOutputsIntoVCF(AbstractMatrixFileWalker):
 		"""
 		#2013.05.30 comment out AbstractMatrixFileWalker.setup() to open the output file differently
 		#AbstractMatrixFileWalker.setup(self, **keywords)
-		self.writer = VCFFile(inputFname=self.outputFname, openMode='w')
+		self.writer = VCFFile(outputFname=self.outputFname, openMode='w')
 		self.reader = VCFFile(inputFname=self.originalVCFFname, openMode='r')
 		self.writer.metaInfoLs = self.reader.metaInfoLs
 		self.writer.header = self.reader.header

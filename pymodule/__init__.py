@@ -24,6 +24,9 @@ from algorithm.BinarySearchTree import binary_tree
 from yhio import SNP
 from yhio import NextGenSeq, getAssociationLandscapeDataFromHDF5File
 from yhio.MatrixFile import MatrixFile
+from yhio.BeagleLikelihoodFile import BeagleLikelihoodFile
+from yhio.PlinkPedigreeFile import PlinkPedigreeFile
+
 from yhio.SNP import write_data_matrix, read_data, SNPData, GenomeWideResults, GenomeWideResult, DataObject, \
 	getGenomeWideResultFromFile,\
 	nt2number, number2nt, number2complement, SNPInfo, number2single_char_nt, getGenomeWideResultFromHDF5MatrixFile,\

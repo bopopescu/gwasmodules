@@ -35,9 +35,10 @@ class AbstractMapper(object):
 					('genome_schema', 0, ): ['genome', '', 1, 'genome database schema name', ],\
 					('genome_db_user', 1, ): ['yh', '', 1, 'genome database username', ],\
 					('genome_db_passwd', 1, ): [None, '', 1, 'genome database password', ],\
+					('genome_port', 0, ):[None, '', 1, 'genome database port number'],\
 							}
 	option_default_dict = {
-						('inputFname', 0, ): ['', 'i', 1, 'input file.', ],\
+						('inputFname', 0, ): [None, 'i', 1, 'input file.', ],\
 						("home_path", 1, ): [os.path.expanduser("~"), 'e', 1, 'path to the home directory on the working nodes'],\
 						('outputFname', 0, ): [None, 'o', 1, 'output file'],\
 						('outputFnamePrefix', 0, ): [None, 'O', 1, 'output filename prefix (optional).'],\
@@ -60,6 +61,11 @@ class AbstractMapper(object):
 		
 		if getattr(self, 'inputFname', None):
 			self.inputFnameLs.insert(0, self.inputFname)
+		
+		#2013.08.14 setup self.inputFname if self.inputFnameLs is not None
+		if self.inputFnameLs and not self.inputFname:
+			self.inputFname = self.inputFnameLs[0]
+		
 		self.connectDB()
 		#2012.8.14 an expression that searches any character in a string
 		self.p_char = re.compile(r'[a-df-zA-DF-Z\-]$')	#no 'e' or 'E', used in scientific number, add '-' and append '$'

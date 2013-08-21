@@ -24,7 +24,6 @@ class AbstractAlignmentAndVCFWorkflow(parentClass, AbstractVCFWorkflow):
 						('intervalOverlapSize', 1, int): [300000, 'U', 1, 'overlap #bps/#loci between adjacent intervals from one contig/chromosome,\
 				only used for TrioCaller, not for SAMtools/GATK', ],\
 						('intervalSize', 1, int): [5000000, 'Z', 1, '#bps/#loci for adjacent intervals from one contig/chromosome (alignment or VCF)', ],\
-						("ligateVcfPerlPath", 1, ): ["%s/bin/umake/scripts/ligateVcf.pl", '', 1, 'path to ligateVcf.pl'],\
 						})
 	def __init__(self,  **keywords):
 		"""
@@ -33,7 +32,7 @@ class AbstractAlignmentAndVCFWorkflow(parentClass, AbstractVCFWorkflow):
 		parentClass.__init__(self, **keywords)
 	
 	registerAllInputFiles = AbstractVCFWorkflow.registerAllInputFiles
-
+	
 	def setup(self, inputVCFData=None, chr2IntervalDataLs=None, **keywords):
 		"""
 		2013.04.01 derive chr2VCFJobData only when inputVCFData is available

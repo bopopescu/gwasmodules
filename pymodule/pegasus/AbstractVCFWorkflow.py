@@ -108,10 +108,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		
 		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		
-		PlotVCFtoolsStat = Executable(namespace=namespace, name="PlotVCFtoolsStat", version=version, os=operatingSystem, arch=architecture, installed=True)
-		PlotVCFtoolsStat.addPFN(PFN("file://" +  os.path.join(self.vervetSrcPath, "plot/PlotVCFtoolsStat.py"), site_handler))
-		executableClusterSizeMultiplierList.append((PlotVCFtoolsStat, 0))
-		
 		#2012.8.30 moved from vervet/src/AddVCFFolder2DBWorkflow.py
 		AddVCFFile2DB = Executable(namespace=namespace, name="AddVCFFile2DB", \
 											version=version, \
@@ -198,9 +194,10 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 						if (minContigID is not None and minContigID!=0) and contigID<minContigID:
 							continue
 					except:
-						sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+						sys.stderr.write('Except type in handling file %s: %s\n'%(inputFname, repr(sys.exc_info())))
 						import traceback
 						traceback.print_exc()
+						continue	#2013.08.12 ignore VCFs that contig/chromosome IDs could not be derived. 
 				if NextGenSeq.isFileNameVCF(fname, includeIndelVCF=includeIndelVCF) and \
 						not NextGenSeq.isVCFFileEmpty(inputFname, checkContent=checkEmptyVCFByReading):
 					inputBaseFname = os.path.basename(inputFname)
@@ -250,86 +247,6 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		sys.stderr.write("  %s non-empty VCF out of %s files, real_counter=%s.\n"%(len(returnData.jobDataLs), \
 																				counter, real_counter))
 		return returnData
-
-	def addPlotVCFtoolsStatJob(self, workflow=None, executable=None, inputFileList=None, outputFnamePrefix=None, \
-							whichColumn=None, whichColumnHeader=None, whichColumnPlotLabel=None, need_svg=False, \
-							logY=0, valueForNonPositiveYValue=-1, \
-							xColumnPlotLabel=None, xColumnHeader=None, chrLengthColumnHeader=None, chrColumnHeader=None, \
-							minChrLength=1000000, minNoOfTotal=100,\
-							figureDPI=300, ylim_type=2, samplingRate=0.0001, logCount=False,\
-							parentJobLs=None, \
-							extraDependentInputLs=None, \
-							extraArguments=None, transferOutput=True, job_max_memory=2000, sshDBTunnel=False, **keywords):
-		"""
-		2013.05.27 remove argument positiveLog, rename logWhichColumn to logY
-		2012.10.6 use addGenericDBJob() instead of addGenericJob()
-		2012.8.31 add argument positiveLog and valueForNonPositiveYValue
-		# whichColumnPlotLabel and xColumnPlotLabel should not contain spaces or ( or ). because they will disrupt shell commandline
-		
-		2012.8.2 moved from vervet/src/CalculateVCFStatPipeline.py
-		2012.8.1
-			
-			('whichColumn', 0, int): [3, 'w', 1, 'data from this column (index starting from 0) is plotted as y-axis value'],\
-			('whichColumnHeader', 0, ): ["", 'W', 1, 'column label (in the header) for the data to be plotted as y-axis value, substitute whichColumn'],\
-			('logY', 0, int): [0, '', 1, 'value 0: nothing; 1: log(), 2: -log(). replacing self.logWhichColumn.'],\
-			('need_svg', 0, ): [0, 'n', 0, 'whether need svg output', ],\
-			('whichColumnPlotLabel', 1, ): ['#SNPs in 100kb window', 'D', 1, 'plot label for data of the whichColumn', ],\
-			('xColumnPlotLabel', 1, ): ['position', 'x', 1, 'x-axis label (posColumn) in manhattan plot', ],\
-			('chrLengthColumnHeader', 1, ): ['chrLength', 'c', 1, 'label of the chromosome length column', ],\
-			('chrColumnHeader', 1, ): ['CHR', 'C', 1, 'label of the chromosome column', ],\
-			('minChrLength', 1, int): [1000000, 'm', 1, 'minimum chromosome length for one chromosome to be included', ],\
-			('xColumnHeader', 1, ): ['BIN_START', 'l', 1, 'label of the position column, BIN_START for binned vcftools output. POS for others.', ],\
-			('outputFnamePrefix', 0, ): [None, 'O', 1, 'output filename prefix (optional).'],\
-			
-				('minNoOfTotal', 1, int): [100, 'i', 1, 'minimum no of total variants (denominator of inconsistent rate)'],\
-				('title', 1, ): [None, 't', 1, 'title for the figure.'],\
-				('figureDPI', 1, int): [200, 'f', 1, 'dpi for the output figures (png)'],\
-				('formatString', 1, ): ['-', '', 1, 'formatString passed to matplotlib plot'],\
-				('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: 0 to max. 2: min to max'],\
-				('samplingRate', 1, float): [0.001, 's', 1, 'how often you include the data'],\
-		"""
-		if extraDependentInputLs is None:
-			extraDependentInputLs = []
-		if inputFileList:
-			extraDependentInputLs.extend(inputFileList)
-		extraArgumentList = ["--outputFnamePrefix %s"%outputFnamePrefix, '--minNoOfTotal %s'%(minNoOfTotal), \
-							'--figureDPI %s'%(figureDPI), '--ylim_type %s'%(ylim_type), '--samplingRate %s'%(samplingRate), \
-							'--xColumnHeader %s'%(xColumnHeader)]
-		extraOutputLs = [File('%s.png'%(outputFnamePrefix)), File('%s_hist.png'%(outputFnamePrefix))]
-		if need_svg:
-			extraOutputLs.append(File('%s.svg'%(outputFnamePrefix)))
-		key2ObjectForJob = {}
-		if minChrLength is not None:
-			extraArgumentList.append('--minChrLength %s'%(minChrLength))
-		if whichColumnHeader:
-			extraArgumentList.append("--whichColumnHeader %s"%(whichColumnHeader))
-		if whichColumn:
-			extraArgumentList.append("--whichColumn %s"%(whichColumn))
-		if logY is not None:
-			extraArgumentList.append('--logY %s'%(logY))
-		if whichColumnPlotLabel:
-			extraArgumentList.append("--whichColumnPlotLabel %s"%(whichColumnPlotLabel))
-		if xColumnPlotLabel:
-			extraArgumentList.append("--xColumnPlotLabel %s"%(xColumnPlotLabel))
-		if chrLengthColumnHeader:
-			extraArgumentList.append("--chrLengthColumnHeader %s"%(chrLengthColumnHeader))
-		if chrColumnHeader:
-			extraArgumentList.append("--chrColumnHeader %s"%(chrColumnHeader))
-		if logCount:
-			extraArgumentList.append("--logCount")
-		if valueForNonPositiveYValue:
-			extraArgumentList.append("--valueForNonPositiveYValue %s"%(valueForNonPositiveYValue))
-		if extraArguments:
-			extraArgumentList.append(extraArguments)
-		job= self.addGenericDBJob(executable=executable, inputFile=None, outputFile=None, \
-				inputFileList=inputFileList, \
-				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
-				extraOutputLs=extraOutputLs,\
-				transferOutput=transferOutput, \
-				extraArgumentList=extraArgumentList, key2ObjectForJob=key2ObjectForJob, job_max_memory=job_max_memory, \
-				sshDBTunnel=sshDBTunnel, objectWithDBArguments=self, **keywords)
-		return job
-	
 	
 	def addSplitVCFFileJob(self, workflow=None, executable=None, inputFile=None, outputFnamePrefix=None, \
 					noOfOverlappingSites=1000, noOfSitesPerUnit=5000, noOfTotalSites=10000, \
@@ -790,11 +707,14 @@ class AbstractVCFWorkflow(AbstractNGSWorkflow):
 		returnData.jobDataLs = []
 		returnData.mapEachChromosomeDataLs = mapEachChromosomeDataLs
 		returnData.reduceEachChromosomeDataLs = reduceEachChromosomeDataLs
+		"""
+		#2013.07.18 example to return each processed-VCF job data so that followup workflows could carry out map-reduce
 		for reduceEachVCFDataLs in passingData.reduceEachVCFDataLsLs:
 			if reduceEachVCFDataLs:
 				for reduceEachVCFData in reduceEachVCFDataLs:
 					if reduceEachVCFData:
-						returnData.jobDataLs.append(reduceEachVCFData.concatenateIntoOneVCFJobData)
+						returnData.jobDataLs.append(reduceEachVCFData.WHATEVERJobData)
+		"""
 		return returnData
 	
 	def addAllJobs(self, workflow=None, inputVCFData=None, chr2IntervalDataLs=None, \

@@ -80,6 +80,7 @@ class RawSequence(Entity):
 
 class AnnotAssembly(Entity):
 	"""
+	2013.07.26 added argument genome_order
 	2013.3.15 added argument outdated_index
 	2013.3.14 added accession & version & chromosome_type_id into the unique key
 	2013.2.17 added column genome_annotation_list
@@ -100,6 +101,7 @@ class AnnotAssembly(Entity):
 	chromosome = Field(String(128))
 	start = Field(Integer)
 	stop = Field(Integer)
+	genome_order = Field(Integer)
 	orientation = Field(String(1))
 	sequence = Field(String(10000))
 	raw_sequence_start_id = Field(Integer)
@@ -765,6 +767,11 @@ def getEntrezgeneAnnotatedAnchor(db, tax_id):
 
 class OneGenomeData(PassingData):
 	"""
+	chrOrder (order of chromosomes)
+		1: order by column genome_order, ascendingly
+		2: order by size, descendingly
+		3: order by column genome_order, ascendingly
+	
 	2011-11-28 add two arguments
 		self.chrOrder = None	#2011-11-21
 		self.sequence_type_id = None	#2011-11-21
@@ -799,13 +806,52 @@ class OneGenomeData(PassingData):
 		self.maxPseudoChrSize = maxPseudoChrSize	#2012.8.13
 		
 		self.chr_gap = None
-		self.chr_id_ls = None
+		self._chr_id_ls = None	#2013.07.29 changed from chr_id_ls to _chr_id_ls 
 		
 		self.chrOrder = None	#2011-11-21
 		self.sequence_type_id = None	#2011-11-21
 		self._cumuSpan2ChrRBDict = None
 		
 		PassingData.__init__(self, **keywords)	#keywords could contain chr_gap, chrOrder
+	
+	@property
+	def chr_id_ls(self):
+		"""
+		2013.07.29 return or construct a list of chromosome IDs according to user's chrOrder
+		"""
+		if self._chr_id_ls is None:
+			self.chr_id_ls = (self.tax_id, self.chrOrder, )
+		return self._chr_id_ls
+	
+	@chr_id_ls.setter
+	def chr_id_ls(self, argument_ls=[]):
+		"""
+		2013.07.29
+		"""
+		if argument_ls and len(argument_ls)>0:
+			tax_id = argument_ls[0]
+			if len(argument_ls)>1:
+				chrOrder = argument_ls[1]
+			else:
+				chrOrder = self.chrOrder
+		else:
+			tax_id = self.tax_id
+			chrOrder = self.chrOrder
+		sys.stderr.write("Getting chr_id_ls with tax_id=%s, chrOrder=%s ..."%(tax_id, chrOrder))
+		
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
+		if self.chrOrder==2:
+			query = query.order_by(AnnotAssembly.stop)
+		else:	#1 or 3
+			query = query.order_by(AnnotAssembly.genome_order)
+		if self.sequence_type_id:
+			query = query.filter_by(sequence_type_id=self.sequence_type_id)
+		
+		self._chr_id_ls = []
+		
+		for row in query:
+			self._chr_id_ls.append(row.chromosome)
+		sys.stderr.write("%s chromosomes.\n"%(len(self._chr_id_ls)))
 	
 	@property
 	def chr_id2size(self):
@@ -851,6 +897,8 @@ class OneGenomeData(PassingData):
 		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
 		if self.chrOrder==2:
 			query = query.order_by(AnnotAssembly.stop)
+		else:	#1 or 3
+			query = query.order_by(AnnotAssembly.genome_order)
 		if self.sequence_type_id:
 			query = query.filter_by(sequence_type_id=self.sequence_type_id)
 		
@@ -881,7 +929,7 @@ class OneGenomeData(PassingData):
 			modified from get_chr_id2cumu_size() of variation/src/common.py
 			cumu_size of one chr = sum of length of (all prior chromosomes + current chromosome) + all gaps between them
 		2008-02-04
-			add chr_id_ls
+			add _chr_id_ls
 			turn chr_id all into 'str' form
 		2008-02-01
 			add chr_gap, copied from variation.src.misc
@@ -890,24 +938,26 @@ class OneGenomeData(PassingData):
 		tax_id, chr_gap = argument_list[:2]
 		sys.stderr.write("Getting chr_id2cumu_size for %s ..."%tax_id)
 		if self._chr_id2size is None:
-			self.chr_id2size = (tax_id)
+			self.chr_id2size = (tax_id,)
 		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
 		if chr_gap==None:
 			chr_size_ls = self.chr_id2size.values()
 			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
 		
-		chr_id_ls = self.chr_id2size.keys()
-		chr_id_ls.sort()
+		if self._chr_id_ls is None:
+			self.chr_id_ls = (tax_id, self.chrOrder, )
+		
+		#_chr_id_ls = self.chr_id2size.keys()
+		#_chr_id_ls.sort()
 		#no more chromosome 0
-		first_chr = chr_id_ls[0] 
+		first_chr = self.chr_id_ls[0] 
 		#chr_id_ls might not be continuous integers. so dictionary is better
 		self._chr_id2cumu_size = {first_chr:self.chr_id2size[first_chr]}
-		for i in range(1,len(chr_id_ls)):
-			chr_id = chr_id_ls[i]
-			prev_chr_id = chr_id_ls[i-1]
+		for i in range(1,len(self.chr_id_ls)):
+			chr_id = self.chr_id_ls[i]
+			prev_chr_id = self.chr_id_ls[i-1]
 			self._chr_id2cumu_size[chr_id] = self._chr_id2cumu_size[prev_chr_id] + chr_gap + self.chr_id2size[chr_id]
-		self.chr_id_ls = chr_id_ls
-		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_size)))
+		sys.stderr.write("%s chromosomes.\n"%(len(self._chr_id2cumu_size)))
 	
 	@property
 	def chr_id2cumu_start(self):
@@ -921,6 +971,10 @@ class OneGenomeData(PassingData):
 	@chr_id2cumu_start.setter
 	def chr_id2cumu_start(self, argument_list):
 		"""
+		chrOrder
+			=1: alphabetical order
+			=2: by size , descendingly
+		
 		2011-11-21
 			deal with chrOrder
 				=1: alphabetical order
@@ -947,7 +1001,11 @@ class OneGenomeData(PassingData):
 			chr_size_ls = self.chr_id2size.values()
 			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
 		
-		chr_id_ls = self.chr_id2size.keys()
+		if self._chr_id_ls is None:
+			self.chr_id_ls = (tax_id, self.chrOrder, )
+		
+		#chr_id_ls = self.chr_id2size.keys()
+		"""
 		if self.chrOrder==2:
 			size_chr_id_ls = [(value, key) for key, value in self.chr_id2size.iteritems()]
 			size_chr_id_ls.sort()
@@ -955,15 +1013,15 @@ class OneGenomeData(PassingData):
 			chr_id_ls = [row[1] for row in size_chr_id_ls]
 		else:
 			chr_id_ls.sort()
-		first_chr = chr_id_ls[0] 
+		"""
+		first_chr = self.chr_id_ls[0] 
 		self._chr_id2cumu_start = {first_chr:0}	#chr_id_ls might not be continuous integers. so dictionary is better
 			#start from 0.
-		for i in range(1, len(chr_id_ls)):
-			chr_id = chr_id_ls[i]
-			prev_chr_id = chr_id_ls[i-1]
+		for i in range(1, len(self.chr_id_ls)):
+			chr_id = self.chr_id_ls[i]
+			prev_chr_id = self.chr_id_ls[i-1]
 			self._chr_id2cumu_start[chr_id] = self._chr_id2cumu_start[prev_chr_id] + chr_gap + self.chr_id2size[prev_chr_id]
-		self.chr_id_ls = chr_id_ls
-		sys.stderr.write("%s chromosomes. Done.\n"%(len(self._chr_id2cumu_start)))
+		sys.stderr.write("%s chromosomes.\n"%(len(self._chr_id2cumu_start)))
 	
 	@property
 	def chr_id2cumu_chr_start(self):
@@ -988,12 +1046,15 @@ class OneGenomeData(PassingData):
 		sys.stderr.write("Getting chr_id2cumu_chr_start for tax-id=%s, chr-gap=%s, maxPseudoChrSize=%s ..."%\
 						(tax_id, chr_gap, maxPseudoChrSize))
 		if self._chr_id2size is None:
-			self.chr_id2size = (tax_id)
+			self.chr_id2size = (tax_id, )
 		#if chr_gap not specified, take the 1/5th of the average chromosome size as its value
 		if chr_gap==None:
 			chr_size_ls = self.chr_id2size.values()
 			chr_gap = int(sum(chr_size_ls)/(5.0*len(chr_size_ls)))
 		
+		if self._chr_id_ls is None:
+			self.chr_id_ls = (tax_id, self.chrOrder, )
+		"""
 		chr_id_ls = self.chr_id2size.keys()
 		if self.chrOrder==2:
 			size_chr_id_ls = [(value, key) for key, value in self.chr_id2size.iteritems()]
@@ -1002,13 +1063,14 @@ class OneGenomeData(PassingData):
 			chr_id_ls = [row[1] for row in size_chr_id_ls]
 		else:
 			chr_id_ls.sort()
-		first_chr = chr_id_ls[0]
+		"""
+		first_chr = self.chr_id_ls[0]
 		newChrID = 1
 		self._chr_id2cumu_chr_start = {first_chr:(newChrID, 0)}	#chr_id_ls might not be continuous integers. so dictionary is better
 			#start from 0.
-		for i in range(1, len(chr_id_ls)):
-			chr_id = chr_id_ls[i]
-			prev_chr_id = chr_id_ls[i-1]
+		for i in range(1, len(self.chr_id_ls)):
+			chr_id = self.chr_id_ls[i]
+			prev_chr_id = self.chr_id_ls[i-1]
 			prev_new_chr, prev_cumu_start = self._chr_id2cumu_chr_start[prev_chr_id]
 			new_cumu_start = prev_cumu_start + chr_gap + self.chr_id2size[prev_chr_id]
 			if new_cumu_start>=self.maxPseudoChrSize:
@@ -1017,8 +1079,7 @@ class OneGenomeData(PassingData):
 			else:
 				newChrID = prev_new_chr
 			self._chr_id2cumu_chr_start[chr_id] = (newChrID, new_cumu_start)
-		self.chr_id_ls = chr_id_ls
-		sys.stderr.write("%s chromosomes, last newChrID=%s Done.\n"%(len(self._chr_id2cumu_chr_start), newChrID))
+		sys.stderr.write("%s chromosomes, last newChrID=%s.\n"%(len(self._chr_id2cumu_chr_start), newChrID))
 	
 	@property
 	def chr_id2centromere(self):
@@ -1093,7 +1154,7 @@ class OneGenomeData(PassingData):
 				self._cumuSpan2ChrRBDict[segmentKey] = [chr_id, 1, chr_size]
 			else:
 				sys.stderr.write("Error: %s of chr %s is already in cumuSpan2ChrRBDict.\n"%(segmentKey, chr_id))
-		sys.stderr.write("%s chromosomes Done.\n"%(len(self._cumuSpan2ChrRBDict)))
+		sys.stderr.write("%s chromosomes.\n"%(len(self._cumuSpan2ChrRBDict)))
 
 class GenomeDatabase(ElixirDB):
 	__doc__ = __doc__
@@ -1342,6 +1403,11 @@ class GenomeDatabase(ElixirDB):
 	def getOneGenomeData(self, tax_id=3702, chr_gap=0, chrOrder=1, sequence_type_id=None, \
 						maxPseudoChrSize=3000000000, **keywords):
 		"""
+		chrOrder (order of chromosomes)
+			1: order by column genome_order, ascendingly
+			2: order by size, descendingly
+			3: order by column genome_order, ascendingly
+		
 		2012.8.13
 			add argument maxPseudoChrSize, keywords
 		2011-11-21
@@ -1417,8 +1483,9 @@ class GenomeDatabase(ElixirDB):
 		return db_entry
 	
 	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
-							version=None, chromosome_type_id=0, chromosome=None):
+							version=None, chromosome_type_id=0, chromosome=None, outdated_index=0):
 		"""
+		2013.3.19 added argument outdated_index
 		2013.3.14 added argument version, chromosome
 		2013.2.15 added argument chromosome_type_id
 		chromosome_type_id: what type of chromosomes to be included, same as table genome.chromosome_type.
@@ -1444,6 +1511,8 @@ class GenomeDatabase(ElixirDB):
 			query = query.filter_by(version=version)
 		if chromosome:	#2013.3.14
 			query = query.filter_by(chromosome=chromosome)
+		if outdated_index is not None:	#2013.3.19
+			query = query.filter_by(outdated_index=outdated_index)
 		#order by size from big to small
 		query = query.order_by(desc(AnnotAssembly.stop))
 		counter = 0
@@ -1539,6 +1608,94 @@ class GenomeDatabase(ElixirDB):
 						sequence_type_id = sequence_type_id, chromosome_type_id=chromosome_type_id,\
 						outdated_index=outdated_index,\
 						comment = comment)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
+	
+	def checkGenomeAnnotation(self, id=None, strand=None, start=None, stop =None, \
+						annot_assembly_id=None, \
+						genome_annotation_type_id=None, description=None, comment=None):
+		"""
+		2013.08.01
+		"""
+		if id is not None:
+			db_entry = self.checkIfEntryInTable(TableClass=GenomeAnnotation, id=id)
+			if db_entry:
+				return db_entry
+		
+		query = GenomeAnnotation.query
+		if strand:
+			query = query.filter_by(strand=strand)
+		if start:
+			query = query.filter_by(start=start)
+		if stop:
+			query = query.filter_by(stop=stop)
+		if annot_assembly_id:
+			query = query.filter_by(annot_assembly_id=annot_assembly_id)
+		if genome_annotation_type_id:
+			query = query.filter_by(genome_annotation_type_id=genome_annotation_type_id)
+		db_entry = query.first()
+		return db_entry
+	
+	def getGenomeAnnotation(self, id=None, strand=None, start=None, stop =None, \
+						annot_assembly_id=None, \
+						tax_id=None, chromosome=None, version=None, sequence_type_name=None, sequence_type_id=None, \
+						genome_annotation_type_id=None, genome_annotation_type_name=None,\
+						description=None, comment=None, **keywords):
+		"""
+		2013.8.1
+		"""
+		if not annot_assembly_id:
+			if tax_id and chromosome:
+				annot_assembly = self.getAnnotAssembly(id=None, gi=None, acc_ver=None, accession=None, version=version, \
+													tax_id=tax_id, chromosome=chromosome, start=None, stop=None, \
+													orientation=None, sequence=None, raw_sequence_start_id=None, \
+													original_path=None, sequence_type_id=sequence_type_id, \
+													sequence_type_name=sequence_type_name, chromosome_type_id=None, \
+													chromosome_type_name=None, outdated_index=None, comment=None)
+				annot_assembly_id = annot_assembly.id
+		if not genome_annotation_type_id:
+			if genome_annotation_type_name:
+				genome_annotation_type = self.getGenomeAnnotationType(short_name=genome_annotation_type_name, description=None, comment=None)
+				genome_annotation_type_id = genome_annotation_type.id
+		db_entry=self.checkGenomeAnnotation(id=id, strand=strand, start=start, stop=stop, \
+									annot_assembly_id=annot_assembly_id, \
+									genome_annotation_type_id=genome_annotation_type_id, \
+									description=description, comment=comment)
+		if not db_entry:
+			db_entry = GenomeAnnotation(strand = strand, start = start,\
+						stop =stop, annot_assembly_id=annot_assembly_id, \
+						genome_annotation_type_id = genome_annotation_type_id, \
+						description=description, comment = comment)
+			self.session.add(db_entry)
+			self.session.flush()
+		return db_entry
+	
+	def checkGenomeAnnotationType(self, id=None, short_name=None):
+		"""
+		2013.08.01
+		"""
+		if id is not None:
+			db_entry = self.checkIfEntryInTable(TableClass=GenomeAnnotationType, id=id)
+			if db_entry:
+				return db_entry
+		
+		query = GenomeAnnotationType.query
+		if short_name:
+			query = query.filter_by(short_name=short_name)
+		db_entry = query.first()
+		return db_entry
+	
+	def getGenomeAnnotationType(self, id=None, short_name=None, description=None, comment=None, **keywords):
+		"""
+		2013.8.1
+		"""
+		db_entry=self.checkGenomeAnnotationType(id=id, short_name=short_name)
+		if not db_entry:
+			db_entry = GenomeAnnotationType(short_name = short_name, \
+						description=description, comment = comment)
+			self.session.add(db_entry)
+			self.session.flush()
 		return db_entry
 	
 	def getGeneCommentary(self, gene_id=None, start=None, stop=None, gene_commentary_type_id=None, gene_commentary_id=None,\

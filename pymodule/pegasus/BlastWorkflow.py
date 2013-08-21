@@ -222,6 +222,8 @@ class BlastWorkflow(AbstractWorkflow):
 		for suffix in ['.nin', '.nhr', '.nsq']:	#start from 0
 			dbIndexFile = File('%s%s'%(inputFile.name, suffix))
 			extraOutputLs.append(dbIndexFile)
+		# 2013.07.09
+		extraOutputLs.append(File("formatdb.log"))
 		
 		extraArgumentList = ["-p F"]
 		job = self.addGenericJob(executable=executable, inputFile=inputFile, outputFile=None, \

@@ -112,11 +112,15 @@ class PlinkPedigreeFile(MatrixFile):
 			parents = self.pedigreeGraph.predecessors(nodeID)
 			noOfParents = len(parents)
 			if noOfParents not in noOfParents2FamilyData:
-				noOfParents2FamilyData[noOfParents] = PassingData(parentTupleSet=set(), parentIDSet=set(), childIDSet=set())
+				noOfParents2FamilyData[noOfParents] = PassingData(parentTupleSet=set(), parentIDSet=set(), childIDSet=set(),\
+																individualIDSet=set())
 			parents.sort()
 			noOfParents2FamilyData[noOfParents].parentTupleSet.add(tuple(parents))
-			noOfParents2FamilyData[noOfParents].parentIDSet = noOfParents2FamilyData[noOfParents].parentIDSet.union(set(parents))
+			for parentID in parents:
+				noOfParents2FamilyData[noOfParents].parentIDSet.add(parentID)
+				noOfParents2FamilyData[noOfParents].individualIDSet.add(parentID)
 			noOfParents2FamilyData[noOfParents].childIDSet.add(nodeID)
+			noOfParents2FamilyData[noOfParents].individualIDSet.add(nodeID)
 		
 		noOfNuclearFamilies = noOfParents2FamilyData.get(2, 0)
 		
@@ -146,7 +150,7 @@ class PlinkPedigreeFile(MatrixFile):
 		sys.stderr.write("Getting number of unique parent-set that both parents ")
 		pGraph = self.pedigreeGraph
 		self._resetInput()
-		individualIDSet = set()
+		tfamEntryIndividualIDSet = set()
 		founderIndividualIDSet = set()
 		nonFounderIndividualIDSet = set()
 		for row in self:
@@ -155,33 +159,36 @@ class PlinkPedigreeFile(MatrixFile):
 			else:
 				nonFounderIndividualIDSet.add(row.individualID)
 			
-			individualIDSet.add(row.individualID)
+			tfamEntryIndividualIDSet.add(row.individualID)
 		self._resetInput()
 		
 		noOfParents2FamilyData = {}
 		for nodeID in self.pedigreeGraph:
-			if nodeID in individualIDSet and nodeID in nonFounderIndividualIDSet:	#must have an independent entry
+			if nodeID in tfamEntryIndividualIDSet and nodeID in nonFounderIndividualIDSet:	#must have an independent entry
 					#and exclude founders
 				parents = self.pedigreeGraph.predecessors(nodeID)
 				parents.sort()
 				#calculate no of parents in the plink way, both parents must have independent entries
 				noOfParents = 0
 				for parentID in parents:
-					if parentID in individualIDSet:
+					if parentID in tfamEntryIndividualIDSet:
 						noOfParents += 1
 				if noOfParents not in noOfParents2FamilyData:
-					noOfParents2FamilyData[noOfParents] = PassingData(parentTupleSet=set(), parentIDSet=set(), childIDSet=set())
+					noOfParents2FamilyData[noOfParents] = PassingData(parentTupleSet=set(), parentIDSet=set(), childIDSet=set(), \
+																	individualIDSet=set())
 				
 				parentTupleList = []
 				for parentID in parents:
 					if parentID!='0':
 						parentTupleList.append(parentID)
 						noOfParents2FamilyData[noOfParents].parentIDSet.add(parentID)
+						noOfParents2FamilyData[noOfParents].individualIDSet.add(parentID)
 				
 				noOfParents2FamilyData[noOfParents].parentTupleSet.add(tuple(parentTupleList))
 				noOfParents2FamilyData[noOfParents].childIDSet.add(nodeID)
+				noOfParents2FamilyData[noOfParents].individualIDSet.add(nodeID)
+		
 		self._reportFamilyStructure(noOfParents2FamilyData)
-		sys.stderr.write("\t %s founders, %s non-founders.\n"%(len(founderIndividualIDSet), len(nonFounderIndividualIDSet)))
 		return PassingData(noOfParents2FamilyData=noOfParents2FamilyData, founderIndividualIDSet=founderIndividualIDSet,\
 						nonFounderIndividualIDSet=nonFounderIndividualIDSet)
 	
@@ -189,11 +196,13 @@ class PlinkPedigreeFile(MatrixFile):
 		"""
 		2013.07.19
 		"""
-		sys.stderr.write("\t%s\t%s\t%s\t%s\n"%("parentSetSize", "noOfFamilies", "noOfParents", "noOfKids"))
+		sys.stderr.write("\t%s\t%s\t%s\t%s\t%s\n"%("parentSetSize", "noOfFamilies", "noOfParents", "noOfKids", "noOfUniqueIndividuals"))
 		for noOfParents, familyData in noOfParents2FamilyData.iteritems():
 			parentIDSet = familyData.parentIDSet
 			childIDSet = familyData.childIDSet
-			sys.stderr.write("\t%s\t%s\t%s\t%s\n"%(noOfParents, len(familyData.parentTupleSet), len(parentIDSet), len(childIDSet)))
+			individualIDSet = familyData.individualIDSet
+			sys.stderr.write("\t%s\t%s\t%s\t%s\t%s\n"%(noOfParents, len(familyData.parentTupleSet), len(parentIDSet), \
+													len(childIDSet), len(individualIDSet)))
 		
 	
 	def next(self):

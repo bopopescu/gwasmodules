@@ -1,14 +1,14 @@
+SUBDIRS 	= extractor
+CXXTARGETS	= CalculateColCorBetweenTwoHDF5 FindMaxLDBetweenPeakAndEachLocus
+CXXLDFLAGS 	= $(HDF5Lib)
+CTARGETS	= 
 
-cxx_targets	= CalculateColCorBetweenTwoHDF5 FindMaxLDBetweenPeakAndEachLocus
-cxxLinkFlags 	= $(HDF5Lib)
-c_targets	= 
-
-extraTargets	= CalculateMedianMeanOfInputColumn
+ExtraTargets	= CalculateMedianMeanOfInputColumn
 
 CalculateMedianMeanOfInputColumn:	%:	%.o
-	-$(cxx_compiler) $< $(cxx_flags) -lboost_program_options -lboost_iostreams -larmadillo -o $@
+	-$(CXXCOMPILER) $< $(CXXFLAGS) -lboost_program_options -lboost_iostreams -larmadillo -o $@
 
 
 
 include ../../Makefile.common
-#all:	$(cxx_targets) $(c_targets) CalculateColCorBetweenTwoHDF5
+#all:	$(CXXTARGETS) $(CTARGETS) CalculateColCorBetweenTwoHDF5

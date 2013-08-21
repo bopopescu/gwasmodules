@@ -51,7 +51,8 @@ class AppendExtraPedigreeIndividualsToTPED(parentClass):
 		
 		writer = csv.writer(open(self.outputFname, 'w'), delimiter='\t')
 		counter = 0
-		individualID2Index = self.getIndividualID2IndexFromTFAMFile(tfamFname=self.tfamFname)
+		tfamIndividualData = self.getIndividualID2IndexFromTFAMFile(tfamFname=self.tfamFname)
+		individualID2Index = tfamIndividualData.individualID2Index
 		noOfIndividuals = len(individualID2Index)
 		
 		noOfExtraIndividuals = None
