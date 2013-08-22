@@ -17,6 +17,8 @@
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/filter/bzip2.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_real.hpp>
 #include <boost/random/variate_generator.hpp>
@@ -32,6 +34,19 @@ typedef boost::tokenizer<boost::char_separator<char> > tokenizerCharType;	//to b
 using namespace std;
 using namespace boost;
 namespace po = boost::program_options;
+
+/*
+ * 2013.08.21 convenient function from http://stackoverflow.com/questions/6097927/is-there-a-way-to-implement-analog-of-pythons-separator-join-in-c
+ */
+template<typename Iter>
+std::string joinIteratorToString(Iter begin, Iter end, std::string const& separator) {
+	std::ostringstream result;
+	if (begin != end)
+		result << *begin++;
+	while (begin != end)
+		result << separator << *begin++;
+	return result.str();
+}
 
 class AbstractMatrixFileWalkerCC{
 protected:
@@ -59,6 +74,8 @@ protected:
 	std::ifstream inputFile;
 
 	std::ofstream outputFile;
+	boost::iostreams::filtering_streambuf<boost::iostreams::output> outputFilterStreamBuffer;
+
 	string _currentFilename;
 	string _statInStr;
 	long _stat;
@@ -76,6 +93,7 @@ public:
 	virtual void setup();
 	virtual void reduce();
 	virtual void closeFiles();
+	virtual void openOutputFile();
 	virtual void preFileFunction();
 	virtual void postFileFunction();
 	virtual void fileWalker(string &inputFname);

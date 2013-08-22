@@ -14,7 +14,7 @@ AbstractMatrixFileWalkerCC::AbstractMatrixFileWalkerCC(int _argc, char* _argv[])
 	cerr << "program name is " << programName << "." <<endl;
 
 	usageDoc = boost::format("%1% -i INPUTFNAME -o OUTPUTFNAME [OPTIONS]\n")% programName;
-	examplesDoc = boost::format("%1% -i /tmp/input.tsv.gz -o /tmp/output -w 0 \n")% programName;
+	examplesDoc = boost::format("%1% -i /tmp/input.tsv.gz -o /tmp/output.gz -w 0 \n")% programName;
 }
 
 AbstractMatrixFileWalkerCC::~AbstractMatrixFileWalkerCC()
@@ -82,14 +82,37 @@ void AbstractMatrixFileWalkerCC::parseCommandlineOptions(){
 	else{
 		report = 0;
 	}
+
+}
+
+void AbstractMatrixFileWalkerCC::openOutputFile(){
 	if (!outputFname.empty()){
-		if (debug){
-			std::cerr<<"Open file " << outputFname << " for writing " ;
+			if (debug){
+				std::cerr<<"Open file " << outputFname << " for writing " ;
+			}
+			int outputFnameLength = outputFname.length();
+			if (outputFname.substr(outputFnameLength-3, 3)==".gz"){
+				//boost::iostreams::gzip_compressor gzipCompressor;
+				outputFilterStreamBuffer.push(boost::iostreams::gzip_compressor());
+				//outputFilterStreamBuffer.push(boost::iostreams::base64_encoder());
+				//outputFile.open(outputFname.c_str(), std::ios::out | std::ios::binary);
+				outputFile.open(outputFname.c_str(), std::ios::out | std::ios::binary);
+			}
+			else{
+				outputFile.open(outputFname.c_str(), std::ios::out);
+			}
+			outputFilterStreamBuffer.push(outputFile);
+			//outputStream.rdbuf(&outputFilterStreamBuffer);
+			//(&outputFilterStreamBuffer);
+			if (debug){
+				std::cerr<< endl ;
+			}
 		}
-		outputFile.open(outputFname.c_str(), std::ios::out);
+	else{
 		if (debug){
-			std::cerr<< endl ;
+			std::cerr << "Warning: Output file, " << outputFname << ", is an empty string." << endl;
 		}
+
 	}
 }
 
@@ -127,26 +150,25 @@ int AbstractMatrixFileWalkerCC::processRow(tokenizerCharType &line_toks){
 }
 
 int AbstractMatrixFileWalkerCC::outputRow(tokenizerCharType &line_toks){
+	std::ostream outputStream(&outputFilterStreamBuffer);
 	int returnValue = 0;
 	tokenizerCharType::iterator tokenizer_iter = line_toks.begin();
+	string combinedString = joinIteratorToString(line_toks.begin(), line_toks.end(), "\t");
+	outputStream << combinedString + "\n";
+	/*
 	for (;tokenizer_iter!=line_toks.end();tokenizer_iter++){
-			/*
-			if (tokenizer_iter==line_toks.end()){
-				//2012.9.15 debug purpose
-				std::cerr<< "end of line has been reached before the whichColumn, abort." << std::endl;
-				std::cerr<< "Exception line no. " << noOfData << " has content: " << line <<std::endl;
-				continue;	//end has been reached before whichColumn, abort.
-			}
-			*/
 		if (tokenizer_iter==line_toks.begin()){
-			outputFile << *tokenizer_iter ;
+			outputStream << *tokenizer_iter ;
 		}
 		else{
-			outputFile << "\t" << *tokenizer_iter ;
+			outputStream << "\t" << *tokenizer_iter ;
 		}
 
 	}
-	outputFile << endl;
+	outputStream << endl;
+	*/
+	outputStream.flush();
+	//outputStream.clear();	#this clears the string just added. => no output.
 	returnValue = 1;
 	return returnValue;
 }
@@ -173,7 +195,7 @@ void AbstractMatrixFileWalkerCC::fileWalker(string &inputFname){
 	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
 	try{
 		int inputFnameLength = inputFname.length();
-		if (inputFname.substr(inputFnameLength-2, 2)=="gz"){
+		if (inputFname.substr(inputFnameLength-3, 3)==".gz"){
 			inputFilterStreamBuffer.push(boost::iostreams::gzip_decompressor());
 			inputFile.open(inputFname.c_str(), std::ios::in | std::ios::binary);
 		}
@@ -213,6 +235,9 @@ void AbstractMatrixFileWalkerCC::fileWalker(string &inputFname){
 		if (noOfSampled>=minNoOfTotal){
 			postFileFunction();
 		}
+
+		//delete inputFilterStreamBuffer;
+		//inputStream.clear();
 		inputFile.close();
 	}
 	catch (std::exception& e)
@@ -235,16 +260,22 @@ void AbstractMatrixFileWalkerCC::fileWalker(string &inputFname){
 
 void AbstractMatrixFileWalkerCC::closeFiles(){
 	//
-	if (debug){
-		std::cerr<<"closing files " << "..." ;
+
+	if (outputFile!=NULL){
+		if (debug){
+			std::cerr<<"closing files " << "..." ;
+		}
+		//delete outputFilterStreamBuffer;
+		outputFile.flush();
+		//outputFile.close();	//2013.08.21 if output is a .gz, closing it here would result a truncated .gz file. don't know why.
+		//maybe because the buffer or the gzip compressor filter needs to be closed beforehand.
 	}
-	if (outputFile){
-		outputFile.close();
-	}
+
 }
 void AbstractMatrixFileWalkerCC::run(){
 	constructOptionDescriptionStructure();
 	parseCommandlineOptions();
+	openOutputFile();
 
 	if (debug){
 		std::cerr<<"Entering AbstractMatrixFileWalkerCC.run()..." << std::endl;
