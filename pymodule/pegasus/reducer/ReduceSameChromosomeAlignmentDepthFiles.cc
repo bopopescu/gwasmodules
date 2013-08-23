@@ -10,8 +10,8 @@
 ReduceSameChromosomeAlignmentDepthFiles::ReduceSameChromosomeAlignmentDepthFiles(int _argc, char* _argv[]): AbstractMatrixFileWalkerCC(_argc, _argv) {
 
 	//overwrite these doc variables
-	usageDoc = boost::format("%1% -i INPUTFNAME -o OUTPUTFNAME --chromosomeSize CHROMOSOMESIZE [OPTIONS]\n")% programName;
-	examplesDoc = boost::format("%1% -i data/ReduceSameChromosomeAlignmentDepthFiles_input1.txt.gz "
+	usageDoc = boost::format("%S -i INPUTFNAME -o OUTPUTFNAME --chromosomeSize CHROMOSOMESIZE [OPTIONS]\n")% programName;
+	examplesDoc = boost::format("%S -i data/ReduceSameChromosomeAlignmentDepthFiles_input1.txt.gz "
 			"-i data/ReduceSameChromosomeAlignmentDepthFiles_input2.txt.gz -o data/ReduceSameChromosomeAlignmentDepthFiles_output.txt.gz -w 2 --chromosomePositionColumnIndex 1 --chromosomeSize 15 \n")% programName;
 }
 
@@ -68,8 +68,8 @@ void ReduceSameChromosomeAlignmentDepthFiles::fileWalker(vector<string> &inputFn
 				}
 				else{	//should not happen
 					sumValue += 0;
-					std::cerr<< boost::format("ERROR: currentPositionInFile (%1%), %2%, (currentLineNumber=%3%) is less than current position across files, %4%.") %
-							_inputFileDSPtr->inputFname % currentPositionInFile % _inputFileDSPtr->getCurrentLineNumber() % i
+					std::cerr<< boost::format("ERROR: currentPositionInFile %1%, (file, %2%, currentLineNumber=%3%) is less than current position across files, %4%.") %
+							currentPositionInFile % _inputFileDSPtr->inputFname % _inputFileDSPtr->getCurrentLineNumber() % i
 							<< endl;
 					//outputStream.flush();
 					//outputFile.flush();
