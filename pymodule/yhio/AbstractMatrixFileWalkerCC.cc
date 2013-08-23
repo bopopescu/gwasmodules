@@ -172,8 +172,20 @@ int AbstractMatrixFileWalkerCC::outputRow(tokenizerCharType &line_toks){
 	returnValue = 1;
 	return returnValue;
 }
+void  AbstractMatrixFileWalkerCC::openOneInputFile(string &inputFname, boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer){
 
-void AbstractMatrixFileWalkerCC::fileWalker(string &inputFname){
+	int inputFnameLength = inputFname.length();
+	if (inputFname.substr(inputFnameLength-3, 3)==".gz"){
+		inputFilterStreamBuffer.push(boost::iostreams::gzip_decompressor());
+		inputFile.open(inputFname.c_str(), std::ios::in | std::ios::binary);
+	}
+	else{
+		inputFile.open(inputFname.c_str(), std::ios::in );
+	}
+	inputFilterStreamBuffer.push(inputFile);
+}
+
+void AbstractMatrixFileWalkerCC::handleOneFile(string &inputFname){
 	if (debug){
 		std::cerr<<"walking through " << inputFname << "..." << std::endl;
 	}
@@ -192,17 +204,10 @@ void AbstractMatrixFileWalkerCC::fileWalker(string &inputFname){
 	double toss;	//random number
 	std::string line;
 	int rowReturnValue;
-	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
 	try{
-		int inputFnameLength = inputFname.length();
-		if (inputFname.substr(inputFnameLength-3, 3)==".gz"){
-			inputFilterStreamBuffer.push(boost::iostreams::gzip_decompressor());
-			inputFile.open(inputFname.c_str(), std::ios::in | std::ios::binary);
-		}
-		else{
-			inputFile.open(inputFname.c_str(), std::ios::in );
-		}
-		inputFilterStreamBuffer.push(inputFile);
+
+		boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
+		openOneInputFile(inputFname, inputFilterStreamBuffer);
 		std::istream inputStream(&inputFilterStreamBuffer);
 
 		//col_name2index = reader.constructColName2IndexFromHeader()
@@ -272,6 +277,14 @@ void AbstractMatrixFileWalkerCC::closeFiles(){
 	}
 
 }
+
+void AbstractMatrixFileWalkerCC::fileWalker(vector<string> &inputFnameList){
+	for (vector<string>::iterator inputFnameIter = inputFnameList.begin(); inputFnameIter!= inputFnameList.end(); ++inputFnameIter){
+		handleOneFile(*inputFnameIter);
+	}
+}
+
+
 void AbstractMatrixFileWalkerCC::run(){
 	constructOptionDescriptionStructure();
 	parseCommandlineOptions();
@@ -282,11 +295,7 @@ void AbstractMatrixFileWalkerCC::run(){
 	}
 
 	setup();
-
-	for (vector<string>::iterator inputFnameIter = inputFnameList.begin(); inputFnameIter!= inputFnameList.end(); ++inputFnameIter){
-		fileWalker(*inputFnameIter);
-	}
-
+	fileWalker(inputFnameList);
 	reduce();
 
 	closeFiles();
