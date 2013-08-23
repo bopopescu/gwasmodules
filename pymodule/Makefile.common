@@ -8,7 +8,7 @@ HDF5Lib  = -lhdf5_cpp -lhdf5
 
 ## CXXTARGETS, CXXLDFLAGS, CTARGETS, CLDFLAGS, ExtraTargets will be defined in child Makefiles 
 #CXXTARGETS	= 
-CXXFLAGS	= -fPIC -O2
+CXXFLAGS	= -fPIC -O2 
 CXXCOMPILER	= g++
 #CXXLDFLAGS	= 
 
