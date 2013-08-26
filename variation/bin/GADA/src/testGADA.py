@@ -23,10 +23,8 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import GADA
-ins = GADA.GADA()
-segment_ls = ins.run([1,1,1,1,0.99,0.99,1,1,0.1,0.1,0.1,0.15], 0.2, 4, 2)
-print segment_ls
+
+from pymodule import MatrixFile
 
 class testGADA(object):
 	__doc__ = __doc__
@@ -54,19 +52,26 @@ class testGADA(object):
 		
 		import sys, csv
 		#input_fname = "/tmp/GADA_ATL8C17938_ATL7C28313_1_5_ATL8C17938_ATL7C28313_1_input"
-		inf = open(self.input_fname)
+		inf = MatrixFile(inputFname=self.input_fname)
 		intensity_ls = []
-		for line in inf:
-			intensity_ls.append(float(line.strip()))
+		for row in inf:
+			intensity_ls.append(float(row[0]))
+		inf.close()
 		sys.stderr.write("%s probes read in.\n"%len(intensity_ls))
 		
 		segment_ls = ins.run(intensity_ls, self.aAlpha, self.TBackElim, self.MinSegLen)
-		writer = csv.writer(open(self.output_fname, 'w'), delimiter='\t')
+		writer = MatrixFile(inputFname=self.output_fname, openMode='w', delimiter='\t')
 		for segment in segment_ls:
 			writer.writerow(segment)
 		del writer
 
 if __name__ == '__main__':
+	#test GADA
+	import GADA
+	ins = GADA.GADA()
+	segment_ls = ins.run([1,1,1,1,0.99,0.99,1,1,0.1,0.1,0.1,0.15], 0.2, 4, 2)
+	print segment_ls
+
 	from pymodule import ProcessOptions
 	main_class = testGADA
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
