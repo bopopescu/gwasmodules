@@ -203,10 +203,10 @@ class PlotGenomeWideData(parentClass, AbstractGenomeFileWalker):
 					self.xtick_locs.append(j)
 				for j in range(0, chr_size, self.xtickInterval):
 					#label only at 5 X xtickInterval
-					if j % (5*self.xtickInterval) == 0 and j < (chr_size - 1.5*self.xtickInterval):
-						self.xtick_labels.append(j / self.xtickInterval)
-					else:
-						self.xtick_labels.append("")
+					#if j % (5*self.xtickInterval) == 0 and j < (chr_size - 1.5*self.xtickInterval):
+					#	self.xtick_labels.append(j / self.xtickInterval)
+					#else:
+					self.xtick_labels.append("")
 		
 		parentClass.setup(self, **keywords)
 	
