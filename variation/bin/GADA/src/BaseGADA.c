@@ -51,25 +51,25 @@ SegLen  Segment longitudes lenght K+1 and should sum up to M?
 
 
 void IextToSegLen(
-	int *Iext, // Enters Iext
-	int *SegLen,		// Outputs SegLen.. can be the same as Iext?
-	int K			// Length Iext - 1
+	long *Iext, // Enters Iext
+	long *SegLen,		// Outputs SegLen.. can be the same as Iext?
+	long K			// Length Iext - 1
 	)
 {
-	int k;
+	long k;
 	for(k=1;k<=K+1;k++)
 		SegLen[k-1]=Iext[k]-Iext[k-1];
 }
 
 
 void IextWextToSegAmp(
-	int *Iext,
+	long *Iext,
 	double *Wext,
 	double *SegAmp,
-	int K
+	long K
 	)
 {
-	int k;
+	long k;
 	double M,TotalMean,AuxMean;
 	M=Iext[K+1];
 
@@ -91,11 +91,11 @@ void IextWextToSegAmp(
 // Implements: Reconstruct.m -- Recontructs x from w with zero mean
 void reconstruct (
     double *wr,
-    int M,
+    long M,
     double *aux_vec
     )
 {
-    int i=0;
+    long i=0;
     double aux_double=0;
 
     for (i=0;i<M;i++){
@@ -127,12 +127,12 @@ void reconstruct (
 
 /* Bubble Sort */
 void BubbleSort (
-    int *I,
-    int L
+    long *I,
+    long L
     )
 {
-    int i=0;
-    int aux=0;
+    long i=0;
+    long aux=0;
 
     for (i=0;i<L-1;i++) {
         if (I[i]>I[i+1]){
@@ -145,13 +145,13 @@ void BubbleSort (
 }
 void doubleBubbleSort (
     double *D,
-	int *I,
-    int L
+	long *I,
+    long L
     )
 {
-    int i=0;
+    long i=0;
     double Daux=0;
-	int Iaux=0;
+	long Iaux=0;
 
     for (i=0;i<L-1;i++) {
         if (D[i]>D[i+1]){
@@ -181,11 +181,11 @@ TrisolveREG(
     double *tl,
     double *coef,
     double *sol,
-    int sizeh0
+    long sizeh0
     )
 {
     double m=0;
-    int i=0;
+    long i=0;
 
     for (i=0;i<sizeh0-1;i++){
         //forward elimination
@@ -210,10 +210,10 @@ DiagOfTriXTri(
     double *r0, // r0 Central diagonal
     double *ru, // ru Upper diagonal
     double *d,  // d=DiagOfTriXTri(ll,l0,lu,rl,r0,ru)
-    int N  //Number of variables or length of l0,
+    long N  //Number of variables or length of l0,
     )
 {
-    register int i;
+    register long i;
 
     d[0]=l0[0]*r0[0]+lu[0]*rl[0];
     for (i=1;i<N-1;i++){
@@ -235,12 +235,12 @@ tridiagofinverse(
     double *it0,
     double *itu,
 
-    int N,  //Number of variables
+    long N,  //Number of variables
     double *d, //Array cointaining the upper diagonal of pseudo-inverse
     double *e //Array cointaining the lower diagonal of pseudo-inverse
     )
 {
-    int i;
+    long i;
     it0[0]=1/(t0[0]*(1-e[0]*d[0]));
 
     for(i=1;i<(N-1);i++)
@@ -263,10 +263,10 @@ ForwardElimination(
     //Input variables:
     double *A, //2D Array containing the [tu';t0';tl';b']
                // Retuns [d';t0';tl';z']
-    int N  //Number of variables
+    long N  //Number of variables
     )
 {
-    register int i=0;
+    register long i=0;
     register double *d,*tl,*t0,*z,*b;
     register double m,m2;
 
@@ -311,10 +311,10 @@ BackSubstitution(
     double *A, //2D Array containing the [d';!t0';!tl';z'] from Forward Elimination
                // Retuns [d';t0';tl';x']
 
-    int N  //Number of variables
+    long N  //Number of variables
     )
 {
-    register int i=0;
+    register long i=0;
     register double *d,*z,*x;
 
     // +4 jumps pointer to the element in next column of A
@@ -335,10 +335,10 @@ BackwardElimination(
     //Input variables:
     double *A, //2D Array containing the [tu';t0';tl';!b']
                // Retuns [tu';t0';e';b']
-    int N  //Number of variables
+    long N  //Number of variables
     )
 {
-    register int i=0;
+    register long i=0;
     double *e,*tu;
     register double *t0;
     e=&A[4*N-6];
@@ -357,9 +357,9 @@ BackwardElimination(
 
 
 void
-TriSolveINV(double *AA,int M /*rows*/, int N/*columns*/, double *x,double *d,double *e)
+TriSolveINV(double *AA,long M /*rows*/, long N/*columns*/, double *x,double *d,double *e)
 {
-    int i;
+    long i;
 
     double aux;
 
@@ -400,11 +400,11 @@ TriSolveINV(double *AA,int M /*rows*/, int N/*columns*/, double *x,double *d,dou
 void
 ComputeFdualXb(
     //imput variables:
-    int M,
+    long M,
     double *b
     )
 {
-    int i=0;
+    long i=0;
     double a=0;
 
     /* diff */
@@ -422,13 +422,13 @@ ComputeFdualXb(
 void CompZ(// computes z=F'y for entire possilbe breakpoint positions (normalized PWC)
 	double *y,
 	double *z,
-	int M
+	long M
 	)
 {
 	double LeftSum;
 	double RightSum;
 	double *aux;
-	int m;
+	long m;
 
 	aux=(double* )myCalloc(M-1,sizeof(double));
 
@@ -444,7 +444,7 @@ void CompZ(// computes z=F'y for entire possilbe breakpoint positions (normalize
 		RightSum=RightSum+y[m];
 		z[m-1]=aux[m-1]+sqrt( (double)m / ((double)(M-m)*(double)(M)) )*RightSum;
 	}
-//	myPrintf("\n CHECKING: Rsum=%g,Lsum=%g,M=%d\n",RightSum,LeftSum,M);
+//	myPrintf("\n CHECKING: Rsum=%g,Lsum=%g,M=%ld\n",RightSum,LeftSum,M);
 //	myPrintf("\n z CHECKING: z[0]=%g,z[1]=%g,z[2]=%g,z[M-3]=%g,z[M-2]=%g\n",z[0],z[1],z[2],z[M-3],z[M-2]);
 //	myPrintf("\n z CHECKING: z[0]=%g,z[1]=%g,z[2]=%g,z[M-1]=%g,z[M]=%g\n",aux[0],aux[1],aux[2],aux[M-1],aux[M]);
 
@@ -459,10 +459,10 @@ ComputeH(
     //Input variables:
     double *h0,
     double *h1,
-    int M  //Number of variables
+    long M  //Number of variables
     )
 {
-    int i;
+    long i;
 
     for (i=0;i<M-1;i++){
         h0[i]=((double)(M-1-i)*(double)(i+1))/(double)M;
@@ -480,14 +480,14 @@ ComputeH(
 void
 ComputeHs(
     //input variables:
-    int *s,     // Indices of selection,
-    int M,      // Length of the chormosome,
-    int K,     // Length of the indices,
+    long *s,     // Indices of selection,
+    long M,      // Length of the chormosome,
+    long K,     // Length of the indices,
     double *h0, // Returning diagonal of H,
     double *h1  // Returning upper diagonal of H
     )
 {
-    int i;
+    long i;
     double iC,iL,iR;
     //double M;
     //M=(double)MM;
@@ -523,13 +523,13 @@ ComputeHs(
 void
 ComputeHsIext(
     //input variables:
-    int *Iext,     // Indices of selection,
-    int K,     // Length of the indices,
+    long *Iext,     // Indices of selection,
+    long K,     // Length of the indices,
     double *h0, // Returning diagonal of H,
     double *h1  // Returning upper diagonal of H
     )
 {
-    int i,M;
+    long i,M;
     double iC,iL,iR;
     //double M;
     //M=(double)MM;
@@ -555,12 +555,12 @@ TriSymGaxpy(
     double *t0,
     double *t1,
     double *x,
-    int M,
+    long M,
     double *y
 
     )
 {
-    int i;
+    long i;
 
     if (M==1){
         y[0]=t0[0]*x[0];
@@ -579,7 +579,7 @@ void
 ComputeT(
     double *h0,
     double *h1,
-    int M,
+    long M,
     double *alfa,
     double sigma, /*pass 1 if scale not available*/
     double *t0,
@@ -588,7 +588,7 @@ ComputeT(
     /* in theory there is a parameter called 'scale' but we don't use it */
     )
 {
-    int i=0;
+    long i=0;
 
     for (i=0;i<M;i++){
         t0[i]=(h0[i]*alfa[i]*sigma)+1;
@@ -599,16 +599,16 @@ ComputeT(
     }
 }
 
-int
+long
 findminus(/*allocates all those lower-than-maxalpha alpha's INDEXES in sel vector  */
     //Input variables:
     double *alpha,
-    int K,
+    long K,
     double maxalpha,
-    int *sel //index vector
+    long *sel //index vector
     )
 {
-    int i,j=0;
+    long i,j=0;
     for (i=0;i<K;i++){
         if (alpha[i]<maxalpha){
             sel[j]=i;
@@ -622,19 +622,19 @@ findminus(/*allocates all those lower-than-maxalpha alpha's INDEXES in sel vecto
 /* simpletresholding
  * Applies a simple tresholding algorithm to find the discontinuities
  */
-int   //Returns the number of discontinuities
+long   //Returns the number of discontinuities
 simpletresholding(
     //Input variables:
     double *inputvector, //1D Array containing the input vector
-    int N,  //Vector length
+    long N,  //Vector length
     double thres, //Treshold value
     //Output variables:
     double *disc //1D empty array, with memory already allocated for finding up to N discontinuities positions
     )
 {
-    int i=0;
-    int numdisc=0; //Number of discontinuities
-    int state=0; //To keep up the state 0(<tresh),1(>tresh)
+    long i=0;
+    long numdisc=0; //Number of discontinuities
+    long state=0; //To keep up the state 0(<tresh),1(>tresh)
 
     //First step: Find discontinuities
     if(inputvector[0]>=thres) state=1;
@@ -646,7 +646,7 @@ simpletresholding(
                 disc[numdisc]=(double)(i+1); //Matlab uses 1..N indices instead of 0..(N-1)
                 numdisc++;
                 state=1;
-//                myPrintf("i%d numdisc%d State change state%d.\n",i,numdisc,state);
+//                myPrintf("i%ld numdisc%ld State change state%ld.\n",i,numdisc,state);
             }
         }
         else
@@ -656,7 +656,7 @@ simpletresholding(
                 disc[numdisc]=(double)(i+1); //Matlab uses 1..N indices instead of 0..(N-1)
                 numdisc++;
                 state=0;
-  //              myPrintf("i%d numdisc%d State change state%d.\n",i,numdisc,state);
+  //              myPrintf("i%ld numdisc%ld State change state%ld.\n",i,numdisc,state);
             }
         }
     }
@@ -672,23 +672,23 @@ void
 computesegmentmeans(
     //Input variables:
     double *inputvector, //1D Array containing the input vector
-    int N,  //Vector length
+    long N,  //Vector length
     double *disc, //1D empty array, with memory already allocated for finding up to N discontinuities positions
-    int numdisc, //Length of the discontinuity vector
+    long numdisc, //Length of the discontinuity vector
     //Output variables:
     double *amp  //1D empty array, containing the amplitudes of the segments between discotinuities,
     )
 {
-    int i,j;
-    int prevdisc=0;
+    long i,j;
+    long prevdisc=0;
 
     for(i=0;i<numdisc;i++)
     {
         amp[i]=0;
-        for(j=prevdisc;j<(int)(disc[i]-1);j++)
+        for(j=prevdisc;j<(long)(disc[i]-1);j++)
             amp[i]+=inputvector[j];
         amp[i]=amp[i]/((double)(disc[i]-1-prevdisc));
-        prevdisc=(int)(disc[i]-1);
+        prevdisc=(long)(disc[i]-1);
     }
     amp[i]=0;
     for(j=prevdisc;j<N;j++)
@@ -705,18 +705,18 @@ reconstructoutput(
     //Output variables:
     double *rec, //1D Array returning the reconstructed vector
     //Input variable:
-    int N,  //Vector length
+    long N,  //Vector length
     double *disc, //1D empty array, with memory already allocated for finding up to N discontinuities positions
-    int numdisc, //Length of the discontinuity vector
+    long numdisc, //Length of the discontinuity vector
     //Output variables:
     double *amp  //1D empty array, containing the amplitudes of the segments between discotinuities,
     )
 {
-    int i,j;
+    long i,j;
 
     j=0;
     for(i=0;i<numdisc;i++)
-        for(;j<(int)(disc[i]-1);j++)
+        for(;j<(long)(disc[i]-1);j++)
             rec[j]=amp[i];
     //If no discontinuities or from the last to the end
     for(;j<N;j++)
@@ -728,26 +728,26 @@ reconstructoutput(
 /* SBL function
  * returns number of EM iterations
  */
-int SBL(
+long SBL(
     double *y, //I -- 1D array with the input signal
-    int *I, //IO -- 1D array with the initial (final) candidate breakpoints
+    long *I, //IO -- 1D array with the initial (final) candidate breakpoints
     double *alpha, //I -- 1D array with the initial (final) hyperparameter inv. varainces.
     double *w, //O -- 1D array containing the breakpoint weigths or posterior mean.
     double *sigw, //O -- Posterior variances, I would not really need them since they can be computed from alpha and H
-    int M, //Initial size of the array in y
-    int *pK, //Size of the I alpha w
+    long M, //Initial size of the array in y
+    long *pK, //Size of the I alpha w
 
     //Algorithm parameters:
     double sigma2, //Noise estimated
     double a,      //
     double b,
     double maxalpha,  //Basis reduction parameter
-    int    maxit,     //Max number of iterations
+    long    maxit,     //Max number of iterations
     double tol,       //Tolerance for convergence
-    int debug         //verbosity... set equal to 1 to see messages  0 to not see them
+    long debug         //verbosity... set equal to 1 to see messages  0 to not see them
     ){
-    int n,i,K;
-    int M0,sizesel;
+    long n,i,K;
+    long M0,sizesel;
     double *w0;
     double mynorm,myaux;
 
@@ -762,7 +762,7 @@ int SBL(
     double *wpred;
     double *d;
     double *e;
-    int *sel;
+    long *sel;
     double *AA;
     double *yy;
 
@@ -791,7 +791,7 @@ int SBL(
     h0=(double* )myCalloc(M0,sizeof(double));
     h1=(double* )myCalloc(M0-1,sizeof(double));
     wpred=(double* )myCalloc(K,sizeof(double));
-    sel=(int* )myCalloc(K,sizeof(int));
+    sel=(long* )myCalloc(K,sizeof(long));
     z=(double* )myCalloc(M0,sizeof(double));
     xx=(double* )myCalloc(K,sizeof(double));//myDoubleMAlloc(K);
 
@@ -804,25 +804,25 @@ int SBL(
    // myPrintf("\nCOMPUTE H\n");
 
     ComputeH(h0,h1,M);
-    //myPrintf("H0\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%d]:%g\n",h0[0],h0[1],h0[2],h0[3],M0-1,h0[M0-1]);
-    //myPrintf("H1\n\nh1[0]:%g\nh1[1]:%g\nh1[2]:%g\nh1[3]:%g\nh1[%d]:%g\n",h1[0],h1[1],h1[2],h1[3],M0-2,h1[M0-2]);
+    //myPrintf("H0\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%ld]:%g\n",h0[0],h0[1],h0[2],h0[3],M0-1,h0[M0-1]);
+    //myPrintf("H1\n\nh1[0]:%g\nh1[1]:%g\nh1[2]:%g\nh1[3]:%g\nh1[%ld]:%g\n",h1[0],h1[1],h1[2],h1[3],M0-2,h1[M0-2]);
     //myPrintf("\nCOMPUTE F DUAL\n");
 
     ComputeFdualXb(M,yy);//checked
 
     w0=yy;//w0 now has M-1 dimmension
-    //myPrintf("W0\n\nw0[0]:%g\nw0[1]:%g\nw0[2]:%g\nw0[3]:%g\nw0[%d]:%g\n",w0[0],w0[1],w0[2],w0[3],M0-1,w0[M0-1]);
+    //myPrintf("W0\n\nw0[0]:%g\nw0[1]:%g\nw0[2]:%g\nw0[3]:%g\nw0[%ld]:%g\n",w0[0],w0[1],w0[2],w0[3],M0-1,w0[M0-1]);
     for (i=0;i<K;i++){
         xx[i]=w0[i];
         t0[i]=h0[i];
     }
 
-    //myPrintf("H0\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%d]:%g\n",t0[0],t0[1],t0[2],t0[3],M0-1,t0[M0-1]);
+    //myPrintf("H0\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%ld]:%g\n",t0[0],t0[1],t0[2],t0[3],M0-1,t0[M0-1]);
 
     //myPrintf("\nTRISOLVE REGULAR\n");
     TrisolveREG(t0,h1,h1,xx,z,M0); //checked
-    //myPrintf("Z\n\nz[0]:%g\nz[1]:%g\nz[2]:%g\nz[3]:%g\nz[%d]:%g\n",z[0],z[1],z[2],z[3],M0-1,z[M0-1]);
-    //myPrintf("Z\n\nz[0]:%g\nz[1]:%g\nz[2]:%g\nz[3]:%g\nz[%d]:%g\n",xx[0],xx[1],xx[2],xx[M0-2],M0-1,xx[M0-1]);
+    //myPrintf("Z\n\nz[0]:%g\nz[1]:%g\nz[2]:%g\nz[3]:%g\nz[%ld]:%g\n",z[0],z[1],z[2],z[3],M0-1,z[M0-1]);
+    //myPrintf("Z\n\nz[0]:%g\nz[1]:%g\nz[2]:%g\nz[3]:%g\nz[%ld]:%g\n",xx[0],xx[1],xx[2],xx[M0-2],M0-1,xx[M0-1]);
 
     //myPrintf("\n\nSUBSELECTION STARTS\n");
     /* initialize if subselection */
@@ -830,10 +830,10 @@ int SBL(
         //myPrintf("\nCOMPUTE HS SUBSELECTION\n");
         ComputeHs(I,M,K,h0,h1);//checked
 
-        //myPrintf("h0s\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%d]:%g\n",h0[0],h0[1],h0[2],h0[3],K-1,h0[K-1]);
-        //myPrintf("h1s\n\nh1[0]:%g\nh1[1]:%g\nh1[2]:%g\nh1[3]:%g\nh1[%d]:%g\n",h1[0],h1[1],h1[2],h1[3],K-2,h1[K-2]);
+        //myPrintf("h0s\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%ld]:%g\n",h0[0],h0[1],h0[2],h0[3],K-1,h0[K-1]);
+        //myPrintf("h1s\n\nh1[0]:%g\nh1[1]:%g\nh1[2]:%g\nh1[3]:%g\nh1[%ld]:%g\n",h1[0],h1[1],h1[2],h1[3],K-2,h1[K-2]);
         //z(I)
-        //myPrintf("I[0]:%d\n",I[0]);
+        //myPrintf("I[0]:%ld\n",I[0]);
 
         for (i=0;i<K;i++)
             t0[i]=z[I[i]];
@@ -844,7 +844,7 @@ int SBL(
         //myPrintf("\nTRISYMGAXPY SUBSELECTION\n");
         TriSymGaxpy(h0,h1,t0,K,xx);//checked
         w0=xx; // error??? nono I think it's perfecly fine!!!
-        //myPrintf("W0 TRISYMGAXPY\n\nw0[0]:%g\nw0[1]:%g\nw0[2]:%g\nw0[3]:%g\nd[%d]:%g\n",w0[0],w0[1],w0[2],w0[3],K-1,w0[K-1]);
+        //myPrintf("W0 TRISYMGAXPY\n\nw0[0]:%g\nw0[1]:%g\nw0[2]:%g\nw0[3]:%g\nd[%ld]:%g\n",w0[0],w0[1],w0[2],w0[3],K-1,w0[K-1]);
     }
     //myPrintf("\n\n*****************\nITERATION STARTS\n*****************\n\n");
 
@@ -861,9 +861,9 @@ int SBL(
        ComputeT(h0,h1,K,alpha,sigma2,t0,tl,tu);//checked
 //        if (n==0){
 //        //myPrintf("COMPUTE T FIRST ITERATION:\n");
-//        //myPrintf("T0\n\nt0[0]:%g\nt0[1]:%g\nt0[2]:%g\nt0[3]:%g\nt0[%d]:%g\n",t0[0],t0[1],t0[2],t0[3],K-1,t0[K-1]);
-//        //myPrintf("TL\n\ntl[0]:%g\ntl[1]:%g\ntl[2]:%g\ntl[3]:%g\ntl[%d]:%g\n",tl[0],tl[1],tl[2],tl[3],K-2,tl[K-2]);
-//        //myPrintf("TU\n\ntu[0]:%g\ntu[1]:%g\ntu[2]:%g\ntu[3]:%g\ntu[%d]:%g\n",tu[0],tu[1],tu[2],tu[3],K-2,tu[K-2]);
+//        //myPrintf("T0\n\nt0[0]:%g\nt0[1]:%g\nt0[2]:%g\nt0[3]:%g\nt0[%ld]:%g\n",t0[0],t0[1],t0[2],t0[3],K-1,t0[K-1]);
+//        //myPrintf("TL\n\ntl[0]:%g\ntl[1]:%g\ntl[2]:%g\ntl[3]:%g\ntl[%ld]:%g\n",tl[0],tl[1],tl[2],tl[3],K-2,tl[K-2]);
+//        //myPrintf("TU\n\ntu[0]:%g\ntu[1]:%g\ntu[2]:%g\ntu[3]:%g\ntu[%ld]:%g\n",tu[0],tu[1],tu[2],tu[3],K-2,tu[K-2]);
 //        }
 
        if (K==1){
@@ -882,9 +882,9 @@ int SBL(
            TriSolveINV(AA,4,K,w,d,e);//checked
 //            if (n==0){
 //            myPrintf("TRISOLVE INVERSE FIRST ITERATION:\n");
-//            myPrintf("W TRISOLVE\n\nw[0]:%g\nw[1]:%g\nw[2]:%g\nw[3]:%g\nw[%d]:%g\n",w[0],w[1],w[2],w[3],K-1,w[K-1]);
-//            myPrintf("D TRISOLVE\n\nd[0]:%g\nd[1]:%g\nd[2]:%g\nd[3]:%g\nd[%d]:%g\n",d[0],d[1],d[2],d[3],K-2,d[K-2]);
-//            myPrintf("E TRISOLVE\n\ne[0]:%g\ne[1]:%g\ne[2]:%g\ne[3]:%g\ne[%d]:%g\n",e[0],e[1],e[2],e[3],K-2,e[K-2]);
+//            myPrintf("W TRISOLVE\n\nw[0]:%g\nw[1]:%g\nw[2]:%g\nw[3]:%g\nw[%ld]:%g\n",w[0],w[1],w[2],w[3],K-1,w[K-1]);
+//            myPrintf("D TRISOLVE\n\nd[0]:%g\nd[1]:%g\nd[2]:%g\nd[3]:%g\nd[%ld]:%g\n",d[0],d[1],d[2],d[3],K-2,d[K-2]);
+//            myPrintf("E TRISOLVE\n\ne[0]:%g\ne[1]:%g\ne[2]:%g\ne[3]:%g\ne[%ld]:%g\n",e[0],e[1],e[2],e[3],K-2,e[K-2]);
 //            }
 
 
@@ -893,17 +893,17 @@ int SBL(
            // now itl itu it0 cointain the tridiagonal of the inverse....
 //            if (n==0){
 //            myPrintf("TRISOLVE FIRST ITERATION:\n");
-//            myPrintf("IT0\n\nit0[0]:%g\nit0[1]:%g\nit0[2]:%g\nit0[3]:%g\nit0[%d]:%g\n",it0[0],it0[1],it0[2],it0[3],K-1,it0[K-1]);
-//            myPrintf("ITL\n\nitl[0]:%g\nitl[1]:%g\nitl[2]:%g\nitl[3]:%g\nitl[%d]:%g\n",itl[0],itl[1],itl[2],itl[3],K-2,itl[K-2]);
-//            myPrintf("ITU\n\nitu[0]:%g\nitu[1]:%g\nitu[2]:%g\nitu[3]:%g\nitu[%d]:%g\n",itu[0],itu[1],itu[2],itu[3],K-2,itu[K-2]);
+//            myPrintf("IT0\n\nit0[0]:%g\nit0[1]:%g\nit0[2]:%g\nit0[3]:%g\nit0[%ld]:%g\n",it0[0],it0[1],it0[2],it0[3],K-1,it0[K-1]);
+//            myPrintf("ITL\n\nitl[0]:%g\nitl[1]:%g\nitl[2]:%g\nitl[3]:%g\nitl[%ld]:%g\n",itl[0],itl[1],itl[2],itl[3],K-2,itl[K-2]);
+//            myPrintf("ITU\n\nitu[0]:%g\nitu[1]:%g\nitu[2]:%g\nitu[3]:%g\nitu[%ld]:%g\n",itu[0],itu[1],itu[2],itu[3],K-2,itu[K-2]);
 //            }
 
 
            DiagOfTriXTri(tl,t0,tu,h1,h0,h1,sigw,K);//checked
 //            if (n==0){
 //            myPrintf("TRIDIAGOFINVERSE FIRST ITERATION:\n");
-//            myPrintf("DIAG\n\ndiag[0]:%g\ndiag[1]:%g\ndiag[2]:%g\ndiag[3]:%g\ndiag[%d]:%g\n",diag[0],diag[1],diag[2],diag[3],K-1,diag[K-1]);
-//            myPrintf("DIAGOFTRIXTRI ITERATION:%d\n",n);
+//            myPrintf("DIAG\n\ndiag[0]:%g\ndiag[1]:%g\ndiag[2]:%g\ndiag[3]:%g\ndiag[%ld]:%g\n",diag[0],diag[1],diag[2],diag[3],K-1,diag[K-1]);
+//            myPrintf("DIAGOFTRIXTRI ITERATION:%ld\n",n);
 //            }
 
            for(i=0;i<K;i++){
@@ -917,9 +917,9 @@ int SBL(
 
 //        if (n==0){
 //            myPrintf("ALPHA & DIAGSIGMA FIRST ITERATION:\n");
-//            myPrintf("\n\nMS:%d\n\n",K);
-//            myPrintf("ALPHA\n\nalpha[0]:%g\nalpha[1]:%g\nalpha[2]:%g\nalpha[3]:%g\nalpha[%d]:%g\n",alpha[0],alpha[1],alpha[2],alpha[3],K-1,alpha[K-1]);
-//            myPrintf("DIAGSIGMA\n\nd[0]:%g\ndiagsigma[1]:%g\ndiagdigma[2]:%g\ndiagsigma[3]:%g\ndiagsigma[%d]:%g\n",sigw[0],sigw[1],sigw[2],sigw[3],K-1,sigw[K-1]);
+//            myPrintf("\n\nMS:%ld\n\n",K);
+//            myPrintf("ALPHA\n\nalpha[0]:%g\nalpha[1]:%g\nalpha[2]:%g\nalpha[3]:%g\nalpha[%ld]:%g\n",alpha[0],alpha[1],alpha[2],alpha[3],K-1,alpha[K-1]);
+//            myPrintf("DIAGSIGMA\n\nd[0]:%g\ndiagsigma[1]:%g\ndiagdigma[2]:%g\ndiagsigma[3]:%g\ndiagsigma[%ld]:%g\n",sigw[0],sigw[1],sigw[2],sigw[3],K-1,sigw[K-1]);
 //        }
 
        //euclidean norm of wpred-w  CRITERIUM of CONVERGENCE
@@ -946,7 +946,7 @@ int SBL(
 //        }
        if (mynorm<tol){
            if (debug>0){
-			   myPrintf("#      SBL: Converged after %d iterations within tolerance %g, M=%d \n",n,tol,K);
+			   myPrintf("#      SBL: Converged after %ld iterations within tolerance %g, M=%ld \n",n,tol,K);
            }
            break;
        }
@@ -954,7 +954,7 @@ int SBL(
        sizesel=findminus(alpha,K,maxalpha,sel);
 //        if (n==0){
 //            myPrintf("\n\nSIZESEL FIRST ITERATION:\n");
-//            myPrintf("SEL\n\nsel[0]:%d\nsel[1]:%d\nsel[2]:%d\nsel[3]:%d\nsel[%d]:%d\n",sel[0],sel[1],sel[2],sel[3],K-1,sel[K-1]);
+//            myPrintf("SEL\n\nsel[0]:%ld\nsel[1]:%ld\nsel[2]:%ld\nsel[3]:%ld\nsel[%ld]:%ld\n",sel[0],sel[1],sel[2],sel[3],K-1,sel[K-1]);
 //        }
        if (sizesel==0){
            K=0;
@@ -962,7 +962,7 @@ int SBL(
            I[0]=-1;
            sigw[0]=-1;
            alpha[0]=-1;
-		   myPrintf("#      SBL: After %d iterations, No disconinuities found M=%d \n",n,K);
+		   myPrintf("#      SBL: After %ld iterations, No disconinuities found M=%ld \n",n,K);
            break;
        }
        if (sizesel<K){
@@ -971,21 +971,21 @@ int SBL(
            //I(sel)
            for (i=0;i<sizesel;i++)
                I[i]=I[sel[i]];
-               //myPrintf("I[%d]=%d\n",i,I[i]);
+               //myPrintf("I[%ld]=%ld\n",i,I[i]);
 
            ComputeHs(I,M,K,h0,h1);
 
 //            if (k==0){
 //            myPrintf("\n\nCOMPUTE Hs FIRST TIME REDUCTION:\n");
-//            myPrintf("h0s sizesel<K\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%d]:%g\n",h0[0],h0[1],h0[2],h0[3],K-1,h0[K-1]);
-//            myPrintf("h1s sizesel<K\n\nh1[0]:%g\nh1[1]:%g\nh1[2]:%g\nh1[3]:%g\nh1[%d]:%g\n",h1[0],h1[1],h1[2],h1[3],K-2,h1[K-2]);
+//            myPrintf("h0s sizesel<K\n\nh0[0]:%g\nh0[1]:%g\nh0[2]:%g\nh0[3]:%g\nh0[%ld]:%g\n",h0[0],h0[1],h0[2],h0[3],K-1,h0[K-1]);
+//            myPrintf("h1s sizesel<K\n\nh1[0]:%g\nh1[1]:%g\nh1[2]:%g\nh1[3]:%g\nh1[%ld]:%g\n",h1[0],h1[1],h1[2],h1[3],K-2,h1[K-2]);
 //            }
 
            //alpha(sel)
            for (i=0;i<K;i++)
                alpha[i]=alpha[sel[i]];
 
-          //myPrintf("I[0]:%d\n",I[0]);
+          //myPrintf("I[0]:%ld\n",I[0]);
            for (i=0;i<K;i++)
                 t0[i]=z[I[i]];
 
@@ -996,19 +996,19 @@ int SBL(
            w0=xx;
 //            if (k==0){
 //                myPrintf("\n\nTRISYMGAXPY FIRST TIME REDUCTION:\n");
-//                myPrintf("W0 trisymgaxpy\n\nw0[0]:%g\nw0[1]:%g\nw0[2]:%g\nw0[3]:%g\nw0[%d]:%g\n",w0[0],w0[1],w0[2],w0[3],K-1,w0[K-1]);
+//                myPrintf("W0 trisymgaxpy\n\nw0[0]:%g\nw0[1]:%g\nw0[2]:%g\nw0[3]:%g\nw0[%ld]:%g\n",w0[0],w0[1],w0[2],w0[3],K-1,w0[K-1]);
 //            }
 
 //            if (k==0){
-//                myPrintf("W FIRSt TIME REDUCTION\n\nw[0]:%g\nw[1]:%g\nw[2]:%g\nw[3]:%g\nw[%d]:%g\n",w[0],w[1],w[2],w[3],K-1,w[K-1]);
-//                myPrintf("SEL FIRSt TIME REDUCTION\n\nsel[0]:%d\nsel[1]:%d\nsel[2]:%d\nsel[3]:%d\nsel[%d]:%d\n",sel[0],sel[1],sel[2],sel[3],K-1,sel[K-1]);
+//                myPrintf("W FIRSt TIME REDUCTION\n\nw[0]:%g\nw[1]:%g\nw[2]:%g\nw[3]:%g\nw[%ld]:%g\n",w[0],w[1],w[2],w[3],K-1,w[K-1]);
+//                myPrintf("SEL FIRSt TIME REDUCTION\n\nsel[0]:%ld\nsel[1]:%ld\nsel[2]:%ld\nsel[3]:%ld\nsel[%ld]:%ld\n",sel[0],sel[1],sel[2],sel[3],K-1,sel[K-1]);
 //            }
            for (i=0;i<K;i++){
                w[i]=w[sel[i]];
                wpred[i]=wpred[sel[i]];
            }
 //             if (k==0){
-//                myPrintf("W FIRST TIME REDUCTION AFTER W[SEL]\n\nw[0]:%g\nw[1]:%g\nw[2]:%g\nw[3]:%g\nw[%d]:%g\n",w[0],w[1],w[2],w[3],K-1,w[K-1]);
+//                myPrintf("W FIRST TIME REDUCTION AFTER W[SEL]\n\nw[0]:%g\nw[1]:%g\nw[2]:%g\nw[3]:%g\nw[%ld]:%g\n",w[0],w[1],w[2],w[3],K-1,w[K-1]);
 //                k=1;
 //             }
 
@@ -1018,18 +1018,18 @@ int SBL(
 
        if (debug>0){
            if (i>=maxit){
-			   myPrintf("#      SBL: Converged??? Stopped after %d iterations with change %g, M=%d\n",n,mynorm,K);
+			   myPrintf("#      SBL: Converged??? Stopped after %ld iterations with change %g, M=%ld\n",n,mynorm,K);
            }
        }
 
        #ifdef _DEBUG_SBL_
-            myPrintf("_SBL_ Reffiting K=%d\n",K);
+            myPrintf("_SBL_ Reffiting K=%ld\n",K);
        #endif
 
        // Projection onto Breakpoint set... (REFITTING)
        if (K!=0){
 
-           //myPrintf("I[0]:%d\n",I[0]);
+           //myPrintf("I[0]:%ld\n",I[0]);
           for (i=0;i<K;i++)
               t0[i]=z[I[i]];
 
@@ -1073,35 +1073,35 @@ int SBL(
     hand, if it is greater than zero, it will work as a regular threshold
     algorithm i.e.,it will remove all those break-point who don't reach the
     selected value TAU.*/
-int BEthresh(
+long BEthresh(
     double *Scores,
-    int Nscores,
+    long Nscores,
     double *wr,
-    int *indsel,
-    int *pointNumRem,
+    long *indsel,
+    long *pointNumRem,
     double *pointTau
     )
 {
-    int M=Nscores+1; //genome length
+    long M=Nscores+1; //genome length
     double vmin=-1e100; //Forces to enter at least once for tau<0
-    int imin=-1;
-    int inrem=-1;
-    int i=0;
-    int aux=0;
-    int iC=0;
-    int iR=0;
-    int iL=0;
+    long imin=-1;
+    long inrem=-1;
+    long i=0;
+    long aux=0;
+    long iC=0;
+    long iR=0;
+    long iL=0;
     double h0R=0;
     double h0L=0;
     double Tau=*pointTau;
-    int NumRem=*pointNumRem;
+    long NumRem=*pointNumRem;
 
     #ifdef _DEBUG_
         //checked-> inputs are OK
-        int n=0;
-        myPrintf("INPUT CHECKING:\n\nNscores=%d\n\nSCORES[indsel[0]]=%g\nSCORES[indsel[1]]=%g\nSCORES[indsel[2]]=%g\nSCORES[indsel[%d]]=%g\n",Nscores,Scores[indsel[0]],Scores[indsel[1]],Scores[indsel[2]],NumRem-1,Scores[indsel[NumRem-1]]);
-        myPrintf("\nwr[indsel[0]]=%g\nwr[indsel[1]]=%g\nwr[indsel[2]]=%g\nwr[indsel[%d]]=%g\n\nindsel[0]=%d\nindsel[1]=%d\nindsel[2]=%d\nindsel[%d]=%d\n",wr[indsel[0]],wr[indsel[1]],wr[indsel[2]],NumRem,wr[indsel[NumRem-1]],indsel[0],indsel[1],indsel[2],NumRem-1,indsel[NumRem-1]);
-        myPrintf("\nNumRem=%d\n\nTau=%g\n\nNscores=%d\n\n",NumRem,Tau,Nscores);
+        long n=0;
+        myPrintf("INPUT CHECKING:\n\nNscores=%ld\n\nSCORES[indsel[0]]=%g\nSCORES[indsel[1]]=%g\nSCORES[indsel[2]]=%g\nSCORES[indsel[%ld]]=%g\n",Nscores,Scores[indsel[0]],Scores[indsel[1]],Scores[indsel[2]],NumRem-1,Scores[indsel[NumRem-1]]);
+        myPrintf("\nwr[indsel[0]]=%g\nwr[indsel[1]]=%g\nwr[indsel[2]]=%g\nwr[indsel[%ld]]=%g\n\nindsel[0]=%ld\nindsel[1]=%ld\nindsel[2]=%ld\nindsel[%ld]=%ld\n",wr[indsel[0]],wr[indsel[1]],wr[indsel[2]],NumRem,wr[indsel[NumRem-1]],indsel[0],indsel[1],indsel[2],NumRem-1,indsel[NumRem-1]);
+        myPrintf("\nNumRem=%ld\n\nTau=%g\n\nNscores=%ld\n\n",NumRem,Tau,Nscores);
 
     #endif
 
@@ -1111,7 +1111,7 @@ int BEthresh(
     {
         #ifdef _DEBUG_
             n++;
-            myPrintf("ITERATION NUMBER:\n\nn=%d\n\n",n);
+            myPrintf("ITERATION NUMBER:\n\nn=%ld\n\n",n);
         #endif
 
         //search for the minimum score>0
@@ -1129,7 +1129,7 @@ int BEthresh(
         inrem=indsel[imin]; // Returns the absolute position of the disc to remove.
 
         #ifdef _DEBUG_
-            myPrintf("NEXT COMPONENT OUT:\n\nimin=%d\nvmin=%g\n\n",imin,vmin);
+            myPrintf("NEXT COMPONENT OUT:\n\nimin=%ld\nvmin=%g\n\n",imin,vmin);
         #endif
 
         if ((vmin>Tau)&&(Tau>=0)) //if the lowest score is greater than TAU, we don't do anything
@@ -1159,7 +1159,7 @@ int BEthresh(
         iC=indsel[imin];
 
         #ifdef _DEBUG_
-            myPrintf("IC Component out:\n\niC=%d\n\n",iC);
+            myPrintf("IC Component out:\n\niC=%ld\n\n",iC);
         #endif
 
         //only one left
@@ -1171,7 +1171,7 @@ int BEthresh(
             NumRem=0;
 
             #ifdef _DEBUG_
-                myPrintf("There is one left to extract:\n\nindsel[imin]=%d\n\n",aux);
+                myPrintf("There is one left to extract:\n\nindsel[imin]=%ld\n\n",aux);
             #endif
 
             break;
@@ -1193,7 +1193,7 @@ int BEthresh(
             wr[iC]=0;
 
             #ifdef _DEBUG_
-                myPrintf("wr[iR]=%g:\niR=%d\n",wr[iR],iR);
+                myPrintf("wr[iR]=%g:\niR=%ld\n",wr[iR],iR);
             #endif
 
             //I don't modify wr[iL] coz there is no left breakpoint
@@ -1219,7 +1219,7 @@ int BEthresh(
             }
 
             #ifdef _DEBUG_
-                myPrintf("h0R=%g\niC=%d\nScores[iC]=%g\n\n",h0R,iC,Scores[iC]);
+                myPrintf("h0R=%g\niC=%ld\nScores[iC]=%g\n\n",h0R,iC,Scores[iC]);
             #endif
 
         }
@@ -1235,7 +1235,7 @@ int BEthresh(
             wr[iL]=wr[iL]+sqrt((double)(M-iL-1)/(M-iC-1)*(double)(iL+1)/(iC+1))*(double)(iR-iC-1)/(iR-iL-1)*wr[iC];
             wr[iC]=0;
             #ifdef _DEBUG_
-                myPrintf("wr[iL]=%g:\niL=%d\n",wr[iL],iL);
+                myPrintf("wr[iL]=%g:\niL=%ld\n",wr[iL],iL);
             #endif
 
             //Scores
@@ -1259,7 +1259,7 @@ int BEthresh(
                 Scores[iC]=(double)(-wr[iC]/sqrt(h0L));
             }
             #ifdef _DEBUG_
-                myPrintf("h0L=%g\niC=%d\nScores[iC]=%g\n\n",h0L,iC,Scores[iC]);
+                myPrintf("h0L=%g\niC=%ld\nScores[iC]=%g\n\n",h0L,iC,Scores[iC]);
             #endif
         }else
         {
@@ -1273,8 +1273,8 @@ int BEthresh(
             wr[iL]=wr[iL]+sqrt((double)(M-iL-1)/(M-iC-1)*(double)(iL+1)/(iC+1))*(double)(iR-iC)/(iR-iL)*wr[iC];
             wr[iC]=0;
             #ifdef _DEBUG_
-                myPrintf("M-iR-1=%d:\nM-iC-1=%d\niR+1/iC+1=%g:\nsqrt(all)=%g\n",M-iR-1,M-iC-1,(iR+1)/(iC+1),sqrt(((M-iR-1)/(M-iC-1))*((iR+1)/(iC+1))));
-                myPrintf("wr[iL]=%g:\niL=%d\nwr[iR]=%g:\niR=%d\n",wr[iL],iL,wr[iR],iR);
+                myPrintf("M-iR-1=%ld:\nM-iC-1=%ld\niR+1/iC+1=%g:\nsqrt(all)=%g\n",M-iR-1,M-iC-1,(iR+1)/(iC+1),sqrt(((M-iR-1)/(M-iC-1))*((iR+1)/(iC+1))));
+                myPrintf("wr[iL]=%g:\niL=%ld\nwr[iR]=%g:\niR=%ld\n",wr[iL],iL,wr[iR],iR);
             #endif
 
             //Scores
@@ -1297,7 +1297,7 @@ int BEthresh(
                 Scores[iC]=(double)(-wr[iC]/sqrt(h0R));
             }
             #ifdef _DEBUG_
-                myPrintf("h0R=%g\niCfirst=%d\nScores[iC]=%g\n\n",h0R,iC,Scores[iC]);
+                myPrintf("h0R=%g\niCfirst=%ld\nScores[iC]=%g\n\n",h0R,iC,Scores[iC]);
             #endif
             //scores
             if (imin-1==0)//iC is now the most left point
@@ -1319,7 +1319,7 @@ int BEthresh(
                 Scores[iC]=(double)(-wr[iC]/sqrt(h0L));
             }
             #ifdef _DEBUG_
-                myPrintf("h0L=%g\niCsecond=%d\nScores[iC]=%g\n\n",h0L,iC,Scores[iC]);
+                myPrintf("h0L=%g\niCsecond=%ld\nScores[iC]=%g\n\n",h0L,iC,Scores[iC]);
             #endif
         }
         NumRem=NumRem-1;
@@ -1329,7 +1329,7 @@ int BEthresh(
 
         }
         #ifdef _DEBUG_
-                myPrintf("INDSEL RECOMPUTE:\n\nindsel[0]=%d\nindsel[1]=%d\nindsel[2]=%d\nindsel[%d]=%d\n\n",indsel[0],indsel[1],indsel[2],NumRem-1,indsel[NumRem-1]);
+                myPrintf("INDSEL RECOMPUTE:\n\nindsel[0]=%ld\nindsel[1]=%ld\nindsel[2]=%ld\nindsel[%ld]=%ld\n\n",indsel[0],indsel[1],indsel[2],NumRem-1,indsel[NumRem-1]);
         #endif
         if (Tau<0)
         {
@@ -1341,7 +1341,7 @@ int BEthresh(
     }
 
     #ifdef _DEBUG_
-        myPrintf("OUTPUT Parameters:\n\nvmin=%g\nNumRem=%d\nimin=%d",vmin,NumRem,imin);
+        myPrintf("OUTPUT Parameters:\n\nvmin=%g\nNumRem=%ld\nimin=%ld",vmin,NumRem,imin);
     #endif
 
     *pointTau=vmin;
@@ -1358,14 +1358,14 @@ int BEthresh(
 void
 CollapseAmpTtest(//Uses a T test to decide which segments collapse to neutral
 	double *SegAmp, //Segment Amplitudes (input output)
-	const int *SegLen, //Segment Lengths
-	int L, //Number of segments.
+	const long *SegLen, //Segment Lengths
+	long L, //Number of segments.
 	double BaseAmp, //Reference amplitude to compare
 	double sigma2,  //Reference noise
 	double T		//Critical value that decides when to colapse
 	)
 {
-	int k;
+	long k;
 
 //	if(L==1)
 //	{
@@ -1413,16 +1413,16 @@ CollapseAmpTtest(//Uses a T test to decide which segments collapse to neutral
 void
 ClassifySegments(
 	double *SegAmp,
-	int *SegLen,
+	long *SegLen,
 	double *SegState,
-	int K,
+	long K,
 	double BaseAmp,
 	double ploidy,
     double sigma2,  //Reference noise
 	double T		//Critical value that decides when to colapse
 	)
 {
-	int k;
+	long k;
 	double c;
 	double aux;
 
@@ -1475,19 +1475,19 @@ ClassifySegments(
 
 double // Returns BaseAmp corresponding to the base level.
 CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline level.
-	const int *SegLen,    //Lengths corresponding to the amplitudes
+	const long *SegLen,    //Lengths corresponding to the amplitudes
 	const double *SegAmp, //Amplitudes !!! assumed already ordered...
-	int K
+	long K
 	)
 {
-	int M,k,RunLen;
+	long M,k,RunLen;
 	double BaseAmp=0;
 
 	//If they need to be sorted use the following...
 	double *D;
-	int *I;
+	long *I;
 	D=(double* ) myCalloc(K+1,sizeof(double));
-	I=(int* ) myCalloc(K+1,sizeof(int));
+	I=(long* ) myCalloc(K+1,sizeof(long));
 	for(k=0;k<K+1;k++)
 	{
 		D[k]=SegAmp[k];
@@ -1501,14 +1501,14 @@ CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline 
 	for(k=0;k<=K;k++)
 		M=M+SegLen[k];
 #ifdef _DebugCompBaseAmpMedianMethod_
-	myPrintf("_DebugCompBaseAmpMedianMethod_: M%d K%d M/2%d\n",M,K,M/2);
+	myPrintf("_DebugCompBaseAmpMedianMethod_: M%ld K%ld M/2%ld\n",M,K,M/2);
 #endif
 
 	RunLen=0;
 	k=0;
 	while(RunLen<M/2)RunLen=RunLen+SegLen[k++];
 #ifdef _DebugCompBaseAmpMedianMethod_
-	myPrintf("_DebugCompBaseAmpMedianMethod_: k%d RunLen=%d SegAmp[k-1]%g SegAmp[k]%g\n",k,RunLen,SegAmp[k-1],SegAmp[k]);
+	myPrintf("_DebugCompBaseAmpMedianMethod_: k%ld RunLen=%ld SegAmp[k-1]%g SegAmp[k]%g\n",k,RunLen,SegAmp[k-1],SegAmp[k]);
 #endif
 
    BaseAmp=SegAmp[k-1];
@@ -1526,28 +1526,28 @@ CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline 
 
 
 /**************************************************************************************************************************/
-int SBLandBE( //Returns breakpoint list lenght.
+long SBLandBE( //Returns breakpoint list lenght.
     double *y,
-    int M,  //length of the noisy signal tn
+    long M,  //length of the noisy signal tn
     double *Psigma2,	//If sigma2 < 0, compute sigma2
     double a,		// SBL parameter
     double T,		// Threshold to prune
-    int MinSegLen,	//Minimum length of the segment.
-    int **pIext,	//Returns breakpoint positions
+    long MinSegLen,	//Minimum length of the segment.
+    long **pIext,	//Returns breakpoint positions
     double **pWext,	//Returns breakpoint weights.
-    int debug		//verbosity... set equal to 1 to see messages  0 to not see them
-    //int *pK
+    long debug		//verbosity... set equal to 1 to see messages  0 to not see them
+    //long *pK
 )
 {
-    int i,K;
+    long i,K;
     double myaux;
 	double sigma2;
     double ymean;
     double tol,maxalpha,b;
     double *alpha,*Wext,*tn,*aux;
-    int *Iext;
-    int maxit;
-    int NumEMsteps;
+    long *Iext;
+    long maxit;
+    long NumEMsteps;
 
 	sigma2=*Psigma2;
 
@@ -1585,7 +1585,7 @@ int SBLandBE( //Returns breakpoint list lenght.
     #endif
 
     K=M-1;
-    Iext=(int* )myCalloc(M,sizeof(int)); //R
+    Iext=(long* )myCalloc(M,sizeof(long)); //R
     Wext=(double* )myCalloc(M,sizeof(double)); //R
     alpha=(double* )myCalloc(M,sizeof(double));
     aux=(double* )myCalloc(M,sizeof(double));
@@ -1614,7 +1614,7 @@ int SBLandBE( //Returns breakpoint list lenght.
 
 
 	//Convert Iext and Wext to the extended notation.
-	Iext=(int* )realloc(Iext,(K+2)*sizeof(int));
+	Iext=(long* )realloc(Iext,(K+2)*sizeof(long));
 	for(i=(K+1);i>0;i--)
 		Iext[i]=Iext[i-1]+1;
 	Iext[0]=0;
@@ -1626,15 +1626,15 @@ int SBLandBE( //Returns breakpoint list lenght.
 	Wext[0]=ymean;
 
     #ifdef _DEBUG_SBLBE_
-	myPrintf("_SBLBE_ Backward Elimination T=%g MinLen=%d\n",T,MinSegLen);
+	myPrintf("_SBLBE_ Backward Elimination T=%g MinLen=%ld\n",T,MinSegLen);
     #endif
 	BEwTandMinLen(Wext,Iext,&K,sigma2,T,MinSegLen);
 
-	Iext=(int* )realloc(Iext,(K+2)*sizeof(int));
+	Iext=(long* )realloc(Iext,(K+2)*sizeof(long));
 	Wext=(double *)realloc(Wext,(K+1)*sizeof(double));
 
 	#ifdef _DEBUG_SBLBE_
-        myPrintf("_SBLBE_ After BE K=%d \n",K);
+        myPrintf("_SBLBE_ After BE K=%ld \n",K);
     #endif
 
 
@@ -1647,21 +1647,21 @@ int SBLandBE( //Returns breakpoint list lenght.
 
 
 /**************************************************************************************************************************/
-int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
+long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
     double *Wext,  //IO Breakpoint weights extended notation...
-	int *Iext,     //IO Breakpoint positions in extended notation...
-    int *pK,       //IO Number breakpoint positions remaining.
+	long *Iext,     //IO Breakpoint positions in extended notation...
+    long *pK,       //IO Number breakpoint positions remaining.
 	double sigma2, //IP If sigma2
     double T,      //IP  Threshold to prune,  T=T*sqrt(sigma2);
-    int MinSegLen  //IP Minimum length of the segment.
+    long MinSegLen  //IP Minimum length of the segment.
 )
 {
-    int i,K,imin,M;
+    long i,K,imin,M;
 //    double myaux;
     double vmin;
     double *tscore; //Statistical Scores,
-    int *L; //Vector with the smallest of the two neighboring segments of each breakpoint.
-    int smallinside; //Variable that indicates that there are still small segments to eliminate.
+    long *L; //Vector with the smallest of the two neighboring segments of each breakpoint.
+    long smallinside; //Variable that indicates that there are still small segments to eliminate.
 
 	K=*pK;       //Number of breakpoints
 	M=Iext[K+1]; //Total length
@@ -1672,7 +1672,7 @@ int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
     else
         smallinside=0;
 
-    L=(int* )myCalloc(K+1,sizeof(int)); //Bring from outside?
+    L=(long* )myCalloc(K+1,sizeof(long)); //Bring from outside?
     tscore=(double* )myCalloc(K+1,sizeof(double)); //
 
 	//Computing scores
@@ -1685,23 +1685,23 @@ int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
     ComputeTScores(Wext,Iext,tscore,K,1,K);
 
 	#ifdef _DEBUG_BEwTandMinLen_
-       	myPrintf("\n_BEwTandMinLen_:K%d w[0]=%g,w[1]=%g,w[2]=%g,w[K-1]=%g,w[K]=%g\n",K,Wext[0],Wext[1],Wext[2],Wext[K-1],Wext[K]);
-       	myPrintf("\n_BEwTandMinLen_:K%d t[0]=%g,t[1]=%g,t[2]=%g,t[K-1]=%g,t[K]=%g\n",K,tscore[0],tscore[1],tscore[2],tscore[K-1],tscore[K]);
+       	myPrintf("\n_BEwTandMinLen_:K%ld w[0]=%g,w[1]=%g,w[2]=%g,w[K-1]=%g,w[K]=%g\n",K,Wext[0],Wext[1],Wext[2],Wext[K-1],Wext[K]);
+       	myPrintf("\n_BEwTandMinLen_:K%ld t[0]=%g,t[1]=%g,t[2]=%g,t[K-1]=%g,t[K]=%g\n",K,tscore[0],tscore[1],tscore[2],tscore[K-1],tscore[K]);
     #endif
     #ifdef _DEBUG_BEwTandMinLen_
-        myPrintf("_BEwTandMinLen_ Backward Elimination sigma2=%g T=%g MinSegLen %d\n",sigma2,T,MinSegLen);
+        myPrintf("_BEwTandMinLen_ Backward Elimination sigma2=%g T=%g MinSegLen %ld\n",sigma2,T,MinSegLen);
     #endif
 
 	BEwTscore(Wext,Iext,tscore,&K,T);
 
 	#ifdef _DEBUG_BEwTandMinLen_
-       	myPrintf("\n_BEwTandMinLen_:K%d w[0]=%g,w[1]=%g,w[2]=%g,w[K-1]=%g,w[K]=%g\n",K,Wext[0],Wext[1],Wext[2],Wext[K-1],Wext[K]);
-       	myPrintf("\n_BEwTandMinLen_:K%d t[0]=%g,t[1]=%g,t[2]=%g,t[K-1]=%g,t[K]=%g\n",K,tscore[0],tscore[1],tscore[2],tscore[K-1],tscore[K]);
+       	myPrintf("\n_BEwTandMinLen_:K%ld w[0]=%g,w[1]=%g,w[2]=%g,w[K-1]=%g,w[K]=%g\n",K,Wext[0],Wext[1],Wext[2],Wext[K-1],Wext[K]);
+       	myPrintf("\n_BEwTandMinLen_:K%ld t[0]=%g,t[1]=%g,t[2]=%g,t[K-1]=%g,t[K]=%g\n",K,tscore[0],tscore[1],tscore[2],tscore[K-1],tscore[K]);
     #endif
 
 
     #ifdef _DEBUG_BEwTandMinLen_
-        myPrintf("_BEwTandMinLen_ Small segment prunning ML=%d SI=%d \n",MinSegLen,smallinside);
+        myPrintf("_BEwTandMinLen_ Small segment prunning ML=%ld SI=%ld \n",MinSegLen,smallinside);
     #endif
     while(smallinside)
     {
@@ -1723,20 +1723,20 @@ int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
         else
         {
 			#ifdef _DEBUG_BEwTandMinLen_
-				myPrintf("_BEwTandMinLen_ Removing %d %d %g Numrem(old)=%d",Iext[imin],imin,vmin,K);
+				myPrintf("_BEwTandMinLen_ Removing %ld %ld %g Numrem(old)=%ld",Iext[imin],imin,vmin,K);
 			#endif
 			tscore[imin]=-1;
 			BEwTscore(Wext,Iext,tscore,&K,T);
 
 			#ifdef _DEBUG_BEwTandMinLen_
-				myPrintf("_BEwTandMinLen_ K = %d \n",K);
+				myPrintf("_BEwTandMinLen_ K = %ld \n",K);
 			#endif
         }
         if(K<1)smallinside=0;
     }
     #ifdef _DEBUG_BEwTandMinLen_
-        myPrintf("T=%g K=%d\n",T,K);
-        myPrintf("_BEwTandMinLen_ Small segment prunning ends imin=%d vmin=%g\n",imin,vmin);
+        myPrintf("T=%g K=%ld\n",T,K);
+        myPrintf("_BEwTandMinLen_ Small segment prunning ends imin=%ld vmin=%g\n",imin,vmin);
     #endif
 
   // for (i=1;i<K;i++)
@@ -1745,7 +1745,7 @@ int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
   //     Wext[i]=w2[Iext[i]];
 
     #ifdef _DEBUG_BEwTandMinLen_
-        myPrintf("_BEwTandMinLen_ After BE K=%d \n",K);
+        myPrintf("_BEwTandMinLen_ After BE K=%ld \n",K);
     #endif
 
     //Freeing memory
@@ -1758,22 +1758,22 @@ int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
 
 /******************************************************/
     //BEwTscore(Iext,Wext,h0,h1,tscore,&K,T);  //Need to update BEthres to operate on the Iext Wext notation...
-int BEwTscore(
+long BEwTscore(
     double *Wext,  //IO Breakpoint weights extended notation...
-	int *Iext,     //IO Breakpoint positions in extended notation...
+	long *Iext,     //IO Breakpoint positions in extended notation...
 	double *tscore,
-    int *pK,       //IO Number breakpoint positions remaining.
+    long *pK,       //IO Number breakpoint positions remaining.
     double T      //IP  Threshold to prune
 	)
 {
-	int i,K,jmin,M;
+	long i,K,jmin,M;
     double vmin;
 
 	K=*pK;       //Number of breakpoints
 	M=Iext[K+1]; //Total length
 
 #ifdef _DebugBEwTscore_
-	myPrintf("_DebugBEwTscore_ BE starts K=%d M=%d T=%g\n",K,M,T);
+	myPrintf("_DebugBEwTscore_ BE starts K=%ld M=%ld T=%g\n",K,M,T);
 #endif
 
 
@@ -1789,22 +1789,22 @@ int BEwTscore(
                 jmin=i;
             }
 	    #ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ Smallest breakpoint imin=%d vmin=%g T=%g\n",jmin,vmin,T);
+			myPrintf("_DebugBEwTscore_ Smallest breakpoint imin=%ld vmin=%g T=%g\n",jmin,vmin,T);
 		#endif
 		if(vmin<T) //Remove breakpoint at imin
 		{
 #ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ Removing imin=%d vmin=%g T=%g\n",jmin,vmin,T);
+			myPrintf("_DebugBEwTscore_ Removing imin=%ld vmin=%g T=%g\n",jmin,vmin,T);
 #endif
 
 #ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ Removing imin=%d vmin=%g T=%g\n",jmin,vmin,T);
+			myPrintf("_DebugBEwTscore_ Removing imin=%ld vmin=%g T=%g\n",jmin,vmin,T);
 #endif
 
 #ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ %d, W[jmin-2]=%g W[jmin-1]=%g W[jmin]=%g W[jmin+1]=%g W[jmin+2]=%g T=%g\n",jmin,Wext[jmin-2],Wext[jmin-1],Wext[jmin],Wext[jmin+1],Wext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %d, I[jmin-2]=%d I[jmin-1]=%d I[jmin]=%d I[jmin+1]=%d I[jmin+2]=%d T=%g\n",jmin,Iext[jmin-2],Iext[jmin-1],Iext[jmin],Iext[jmin+1],Iext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %d, t[jmin-2]=%g t[jmin-1]=%g t[jmin]=%g I[jmin+1]=%g t[jmin+2]=%g T=%g\n",jmin,tscore[jmin-2],tscore[jmin-1],tscore[jmin],tscore[jmin+1],tscore[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, W[jmin-2]=%g W[jmin-1]=%g W[jmin]=%g W[jmin+1]=%g W[jmin+2]=%g T=%g\n",jmin,Wext[jmin-2],Wext[jmin-1],Wext[jmin],Wext[jmin+1],Wext[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, I[jmin-2]=%ld I[jmin-1]=%ld I[jmin]=%ld I[jmin+1]=%ld I[jmin+2]=%ld T=%g\n",jmin,Iext[jmin-2],Iext[jmin-1],Iext[jmin],Iext[jmin+1],Iext[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, t[jmin-2]=%g t[jmin-1]=%g t[jmin]=%g I[jmin+1]=%g t[jmin+2]=%g T=%g\n",jmin,tscore[jmin-2],tscore[jmin-1],tscore[jmin],tscore[jmin+1],tscore[jmin+2],T);
 #endif
 			for(i=jmin;i<K;i++)
 				tscore[i]=tscore[i+1];
@@ -1812,30 +1812,30 @@ int BEwTscore(
 	        ComputeTScores(Wext,Iext,tscore,K,jmin-1,jmin);
 
 #ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ %d, W[jmin-2]=%g W[jmin-1]=%g W[jmin]=%g W[jmin+1]=%g W[jmin+2]=%g T=%g\n",jmin,Wext[jmin-2],Wext[jmin-1],Wext[jmin],Wext[jmin+1],Wext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %d, I[jmin-2]=%d I[jmin-1]=%d I[jmin]=%d I[jmin+1]=%d I[jmin+2]=%d T=%g\n",jmin,Iext[jmin-2],Iext[jmin-1],Iext[jmin],Iext[jmin+1],Iext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %d, t[jmin-2]=%g t[jmin-1]=%g t[jmin]=%g I[jmin+1]=%g t[jmin+2]=%g T=%g\n",jmin,tscore[jmin-2],tscore[jmin-1],tscore[jmin],tscore[jmin+1],tscore[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, W[jmin-2]=%g W[jmin-1]=%g W[jmin]=%g W[jmin+1]=%g W[jmin+2]=%g T=%g\n",jmin,Wext[jmin-2],Wext[jmin-1],Wext[jmin],Wext[jmin+1],Wext[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, I[jmin-2]=%ld I[jmin-1]=%ld I[jmin]=%ld I[jmin+1]=%ld I[jmin+2]=%ld T=%g\n",jmin,Iext[jmin-2],Iext[jmin-1],Iext[jmin],Iext[jmin+1],Iext[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, t[jmin-2]=%g t[jmin-1]=%g t[jmin]=%g I[jmin+1]=%g t[jmin+2]=%g T=%g\n",jmin,tscore[jmin-2],tscore[jmin-1],tscore[jmin],tscore[jmin+1],tscore[jmin+2],T);
 #endif
 
 		}
 	}
 	#ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ BE ends imin=%d vmin=%g T=%g K=%d\n",jmin,vmin,T,K);
+			myPrintf("_DebugBEwTscore_ BE ends imin=%ld vmin=%g T=%g K=%ld\n",jmin,vmin,T,K);
 	#endif
 
 	*pK=K;
 	return K;
 }
 
-int
+long
 RemoveBreakpoint(
 	double *Wext,
-	int *Iext,
-	int K,
-	int jrem
+	long *Iext,
+	long K,
+	long jrem
 	)
 {
-	int j;
+	long j;
 	double iC,iL,iR,M;
 
 	M=(double)Iext[K+1];
@@ -1861,14 +1861,14 @@ RemoveBreakpoint(
 void
 ComputeTScores(
 	const double *Wext,
-	const int *Iext,
+	const long *Iext,
 	double *Scores,
-	int K,
-	int start,
-	int end
+	long K,
+	long start,
+	long end
 	)
 {
-	int j;
+	long j;
 	double h0,M;
 
 	M=(double)Iext[K+1];
@@ -1883,9 +1883,9 @@ ComputeTScores(
 
 void Project (
     double *y,
-    int M,
-    int *I,
-    int L,
+    long M,
+    long *I,
+    long L,
     double *xI,
     double *wI
     )
@@ -1893,7 +1893,7 @@ void Project (
     // Intern variables declaration
     double aux_double=0;
     double ymean=0;
-    int i=0;
+    long i=0;
     double *h0;
     double *h1;
     double *w0;
@@ -1932,7 +1932,7 @@ void Project (
     #ifdef _DEBUG_
         //checked-> inputs are OK
         myPrintf("MEAN CHECKING:\n\nymean=%g\n",ymean);
-        myPrintf("\ny[0]=%g\ny[1]=%g\ny[2]=%g\ny[3]=%g\ny[%d]=%g\nM=%d\n",y[0],y[1],y[2],y[3],M-1,y[M-1],M);
+        myPrintf("\ny[0]=%g\ny[1]=%g\ny[2]=%g\ny[3]=%g\ny[%ld]=%g\nM=%ld\n",y[0],y[1],y[2],y[3],M-1,y[M-1],M);
 
     #endif
 
@@ -1945,15 +1945,15 @@ void Project (
         #ifdef _DEBUG_
         //checked-> inputs are OK
         myPrintf("BubbleSort CHECKING:\n");
-        myPrintf("\nI[0]=%d\nI[1]=%d\nI[2]=%d\nI[3]=%d\nI[%d]=%d\nL=%d\n",I[0],I[1],I[2],I[3],L-1,I[L-1],L);
+        myPrintf("\nI[0]=%ld\nI[1]=%ld\nI[2]=%ld\nI[3]=%ld\nI[%ld]=%ld\nL=%ld\n",I[0],I[1],I[2],I[3],L-1,I[L-1],L);
 		#endif
         //
 
         ComputeH(h0,h1,M);
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("COMPUTE H CHECKING:\n\nh0[0]=%g\nh0[1]=%g\nh0[2]=%g\nh0[3]=%g\nh0[%d]=%g\nsizeh0=%d\n",h0[0],h0[1],h0[2],h0[3],M-2,h0[M-2],M-1);
-        myPrintf("\nh1[0]=%g\nh1[1]=%g\nh1[2]=%g\nh1[3]=%g\nh1[%d]=%g\nsizeh0-1=%d\n",h1[0],h1[1],h1[2],h1[3],M-3,h1[M-3],M-2);
+        myPrintf("COMPUTE H CHECKING:\n\nh0[0]=%g\nh0[1]=%g\nh0[2]=%g\nh0[3]=%g\nh0[%ld]=%g\nsizeh0=%ld\n",h0[0],h0[1],h0[2],h0[3],M-2,h0[M-2],M-1);
+        myPrintf("\nh1[0]=%g\nh1[1]=%g\nh1[2]=%g\nh1[3]=%g\nh1[%ld]=%g\nsizeh0-1=%ld\n",h1[0],h1[1],h1[2],h1[3],M-3,h1[M-3],M-2);
 
         #endif
 
@@ -1961,7 +1961,7 @@ void Project (
         w0=y;  //careful I just erased y's value
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("Compute F dual CHECKING:\n\nw0[0]=%g\nw0[1]=%g\nw0[2]=%g\nw0[3]=%g\nw0[%d]=%g\nM=%d\n",w0[0],w0[1],w0[2],w0[3],M-1,w0[M-2],M-1);
+        myPrintf("Compute F dual CHECKING:\n\nw0[0]=%g\nw0[1]=%g\nw0[2]=%g\nw0[3]=%g\nw0[%ld]=%g\nM=%ld\n",w0[0],w0[1],w0[2],w0[3],M-1,w0[M-2],M-1);
 
         #endif
 
@@ -1969,14 +1969,14 @@ void Project (
 
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("Trisolve Checking:\n\nz[0]=%g\nz[1]=%g\nz[2]=%g\nz[3]=%g\nz[%d]=%g\nM=%d\n",z[0],z[1],z[2],z[3],M-1,z[M-2],M-1);
+        myPrintf("Trisolve Checking:\n\nz[0]=%g\nz[1]=%g\nz[2]=%g\nz[3]=%g\nz[%ld]=%g\nM=%ld\n",z[0],z[1],z[2],z[3],M-1,z[M-2],M-1);
 
         #endif
         ComputeHs(I,M,L,h0,h1);
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("Compute Hs2 CHECKING:\n\nh0[0]=%g\nh0[1]=%g\nh0[2]=%g\nh0[3]=%g\nh0[%d]=%g\nL=%d\n",h0[0],h0[1],h0[2],h0[3],L-1,h0[L-1],L);
-        myPrintf("\nh1[0]=%g\nh1[1]=%g\nh1[2]=%g\nh1[3]=%g\nh1[%d]=%g\nL-1=%d\n",h1[0],h1[1],h1[2],h1[3],L-2,h1[L-2],L-1);
+        myPrintf("Compute Hs2 CHECKING:\n\nh0[0]=%g\nh0[1]=%g\nh0[2]=%g\nh0[3]=%g\nh0[%ld]=%g\nL=%ld\n",h0[0],h0[1],h0[2],h0[3],L-1,h0[L-1],L);
+        myPrintf("\nh1[0]=%g\nh1[1]=%g\nh1[2]=%g\nh1[3]=%g\nh1[%ld]=%g\nL-1=%ld\n",h1[0],h1[1],h1[2],h1[3],L-2,h1[L-2],L-1);
 
         #endif
         for (i=0;i<L;i++){
@@ -1988,32 +1988,32 @@ void Project (
         }
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("Z(I) CHECKING:\n\ntemp[0]=%g\ntemp[1]=%g\ntemp[2]=%g\ntemp[3]=%g\ntemp[%d]=%g\nL=%d\n",temp[0],temp[1],temp[2],temp[3],L-1,temp[L-1],L);
+        myPrintf("Z(I) CHECKING:\n\ntemp[0]=%g\ntemp[1]=%g\ntemp[2]=%g\ntemp[3]=%g\ntemp[%ld]=%g\nL=%ld\n",temp[0],temp[1],temp[2],temp[3],L-1,temp[L-1],L);
 
         #endif
         TriSymGaxpy(h0,h1,temp,L,wI);
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("TriSymGaxpy CHECKING:\n\nwI[0]=%g\nwI[1]=%g\nwI[2]=%g\nwI[3]=%g\nwI[%d]=%g\nL=%d\n",wI[0],wI[1],wI[2],wI[3],L-1,wI[L-1],L);
+        myPrintf("TriSymGaxpy CHECKING:\n\nwI[0]=%g\nwI[1]=%g\nwI[2]=%g\nwI[3]=%g\nwI[%ld]=%g\nL=%ld\n",wI[0],wI[1],wI[2],wI[3],L-1,wI[L-1],L);
 
         #endif
         for (i=0;i<L;i++){
             wr[I[i]]=wI[i];
             #ifdef _DEBUG_
             //checked-> inputs are OK
-            myPrintf("wr CHECKING:\n\nwr[I[%d]]=%g\nI[i]=%d\n",i,wr[I[i]],I[i]);
+            myPrintf("wr CHECKING:\n\nwr[I[%ld]]=%g\nI[i]=%ld\n",i,wr[I[i]],I[i]);
 
             #endif
         }
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("wr CHECKING:\n\nwr[I[0]]=%g\nwr[I[1]]=%g\nwr[%d]=%g\nM=%d\n",wr[I[0]],wr[I[1]],I[L-1],wr[I[L-1]],M);
+        myPrintf("wr CHECKING:\n\nwr[I[0]]=%g\nwr[I[1]]=%g\nwr[%ld]=%g\nM=%ld\n",wr[I[0]],wr[I[1]],I[L-1],wr[I[L-1]],M);
         #endif
 
         reconstruct(wr,M,aux_vec);
         #ifdef _DEBUG_
         //checked-> inputs are OK
-        myPrintf("RECONSTRUCT CHECKING:\n\nwr[0]=%g\nwr[1]=%g\nwr[2]=%g\nwr[3]=%g\nwr[%d]=%g\nM=%d\naux_double=%g\nymean=%g\n",wr[0],wr[1],wr[2],wr[3],M-1,wr[M-1],M,aux_double,ymean);
+        myPrintf("RECONSTRUCT CHECKING:\n\nwr[0]=%g\nwr[1]=%g\nwr[2]=%g\nwr[3]=%g\nwr[%ld]=%g\nM=%ld\naux_double=%g\nymean=%g\n",wr[0],wr[1],wr[2],wr[3],M-1,wr[M-1],M,aux_double,ymean);
 
         #endif
         for (i=0;i<M;i++)
@@ -2041,15 +2041,15 @@ void Project (
 
 void ProjectCoeff ( //IextYobs2Wext
     double *y,
-    int M,
-    int *Iext,
-    int K,
+    long M,
+    long *Iext,
+    long K,
     double *Wext
 	)
 {
     // Intern variables declaration
     double ymean=0;
-    int i=0;
+    long i=0;
     double *h0;
     double *h1;
     double *z;
@@ -2075,7 +2075,7 @@ void ProjectCoeff ( //IextYobs2Wext
         // BubbleSort(Iext,K+2);
 
 		CompZ(y,z,M);
-//		myPrintf("\n CHECKING: ymean=%g,M=%d,K=%d\n",ymean,M,K);//
+//		myPrintf("\n CHECKING: ymean=%g,M=%ld,K=%ld\n",ymean,M,K);//
 //		myPrintf("\n z CHECKING: z[0]=%g,z[1]=%g,z[2]=%g,z[M-3]=%g,z[M-2]=%g\n",z[0],z[1],z[2],z[M-3],z[M-2]);
 
 		for (i=1;i<=K;i++)

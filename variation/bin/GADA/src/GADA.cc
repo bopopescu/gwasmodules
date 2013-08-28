@@ -31,9 +31,9 @@ double BaseAmp=0.0;  //Base-level
 double a=0.2; //SBL hyperprior parameter
 double sigma2=-1; //Variance observed, if negative value, it will be estimated by the mean of the differences
 			  // I would recommend to be estimated on all the chromosomes and as a trimmed mean.
-int MinLen=0; //Lenght in number of probes for a CNA segment to be called significan.
-int SelectClassifySegments=0; //Classify segment into altered state (1), otherwise 0
-int SelectEstimateBaseAmp=1; //Estimate Neutral hybridization amplitude.
+long MinLen=0; //Lenght in number of probes for a CNA segment to be called significan.
+long SelectClassifySegments=0; //Classify segment into altered state (1), otherwise 0
+long SelectEstimateBaseAmp=1; //Estimate Neutral hybridization amplitude.
 char *InputFile;
 char *OutputFile;
 
@@ -42,27 +42,27 @@ char *OutputFile;
 class GADA
 {
 	public:
-		int M;
-		int i;
-		int *Iext;
-		int K;
+		long M;
+		long i;
+		long *Iext;
+		long K;
 		double *tn;
-		int *SegLen;
+		long *SegLen;
 		double *SegAmp;
 		double *SegState;
 		double *Wext;
 
 		FILE *fin,*fout;
-		int debug;		//verbosity... set equal to 1 to see messages of SBLandBE(). 0 to not see them
+		long debug;		//verbosity... set equal to 1 to see messages of SBLandBE(). 0 to not see them
 		double T; //Backward elimination threshold
 		//double T2=5.0; //Segment collapse to base Non-Alteration level threshold
 		double BaseAmp;  //Base-level
 		double a; //SBL hyperprior parameter
 		double sigma2; //Variance observed, if negative value, it will be estimated by the mean of the differences
 					  // I would recommend to be estimated on all the chromosomes and as a trimmed mean.
-		int MinLen; //Lenght in number of probes for a CNA segment to be called significan.
-		int SelectClassifySegments; //Classify segment into altered state (1), otherwise 0
-		int SelectEstimateBaseAmp; //Estimate Neutral hybridization amplitude.
+		long MinLen; //Lenght in number of probes for a CNA segment to be called significan.
+		long SelectClassifySegments; //Classify segment into altered state (1), otherwise 0
+		long SelectEstimateBaseAmp; //Estimate Neutral hybridization amplitude.
 		char *InputFile;
 		char *OutputFile;
 
@@ -70,12 +70,12 @@ class GADA
 		string output_fname;
 
 		GADA();
-		GADA(int _debug);
+		GADA(long _debug);
 		~GADA();
 
 		void initParameters();
 		void readInIntensity(boost::python::list intensity_list);
-		boost::python::list run(boost::python::list intensity_list, double aAlpha, double TBackElim, int MinSegLen);
+		boost::python::list run(boost::python::list intensity_list, double aAlpha, double TBackElim, long MinSegLen);
 		void cleanupMemory();
 };
 
@@ -86,7 +86,7 @@ GADA::GADA()
 	initParameters();
 }
 
-GADA::GADA(int _debug)
+GADA::GADA(long _debug)
 	:debug(_debug)
 {
 	initParameters();
@@ -118,11 +118,11 @@ void GADA::readInIntensity(boost::python::list intensity_list)
 #if defined(DEBUG)
 	cerr<< boost::format("# Start reading ... \n") ;
 #endif
-	int no_of_probes = boost::python::extract<int>(intensity_list.attr("__len__")());
+	long no_of_probes = boost::python::extract<long>(intensity_list.attr("__len__")());
 	M = no_of_probes;
 	tn= (double *) calloc(no_of_probes, sizeof(double));
 
-	for(int i=0; i<no_of_probes;i++)
+	for(long i=0; i<no_of_probes;i++)
 	{
 		tn[i] = boost::python::extract<double>(intensity_list[i]);
 	}
@@ -142,7 +142,7 @@ void GADA::cleanupMemory()
 	//free(Wext);
 }
 
-boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha, double TBackElim, int MinSegLen)
+boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha, double TBackElim, long MinSegLen)
 {
 	readInIntensity(intensity_list);
 	// 2010-6-8 sigma2 has to be set here. sigma2 set in GADA::initParameters() refers to the GADA::sigma2;
@@ -164,7 +164,7 @@ boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
     cerr<< boost::format("# Kept %1% breakpoints after BE\n")%K;
 #endif
 
-	SegLen= (int*) calloc(K+1,sizeof(int));
+	SegLen= (long*) calloc(K+1,sizeof(long));
 	SegAmp= (double *) calloc(K+1,sizeof(double));
 	IextToSegLen(Iext,SegLen,K);
 	IextWextToSegAmp(Iext,Wext,SegAmp,K);
@@ -195,7 +195,7 @@ BOOST_PYTHON_MODULE(GADA)
 {
 	using namespace boost::python;
 	class_<GADA>("GADA")
-		.def(init<int>())
+		.def(init<long>())
 		.def("run", &GADA::run)
 	;
 
@@ -219,7 +219,7 @@ void help_message(FILE *fd)
 	fprintf(fd,"# \t\t i.e. the minimum difference between the segment means divided\n");
 	fprintf(fd,"# \t\t by sigma. The default value for T is %g\n",T);
 	fprintf(fd,"# \t -M\t is the minimum size in number of probes for a segment to be \n");
-	fprintf(fd,"# \t\t deemed significant. Default value is %d.\n",MinLen);
+	fprintf(fd,"# \t\t deemed significant. Default value is %ld.\n",MinLen);
 	fprintf(fd,"# \t -s\t The variance estimate for the noise. If not provided or \n");
 	fprintf(fd,"# \t\t negative it will be estimated from the provided data. \n");
 	fprintf(fd,"# \t\t We recomend to estimate this on the entire data and not \n");
@@ -249,7 +249,7 @@ void Configure(int ac, char *av[], string &input_fname, string &output_fname)
 #if defined(DEBUG)
     cerr<< boost::format("# Getting commandline arguments ...");
 #endif
-    int CLcount,i;
+    long CLcount,i;
 	FILE *fd;
 
 	// Parse the command line
@@ -320,9 +320,9 @@ void Configure(int ac, char *av[], string &input_fname, string &output_fname)
 		else if (0 == strncmp (av[CLcount], "-M", 2)) //! MinLen parameter
 		{
 			if(0 == strncmp (av[CLcount+1], "-", 1))help_and_exit(stderr,1);
-			sscanf (av[CLcount+1], "%d", &MinLen);
+			sscanf (av[CLcount+1], "%ld", &MinLen);
 			CLcount += 2;
-			fprintf(fd,"# MinLen= %d \n",MinLen);
+			fprintf(fd,"# MinLen= %ld \n",MinLen);
 		}
 		else if (0 == strncmp (av[CLcount], "-b", 2)) //! BaseAmp parameter
 		{
@@ -354,16 +354,16 @@ int main(int argc, char *argv[])
 #if defined(DEBUG)
 	cerr<< boost::format("# Starting ....\n");
 #endif
-	int M=1000;
-	int i;
-	int *Iext;
-	int K;
+	long M=1000;
+	long i;
+	long *Iext;
+	long K;
 	double *tn;
-	int *SegLen;
+	long *SegLen;
 	double *SegAmp;
 	double *SegState;
 	double *Wext;
-	int debug=0;
+	long debug=0;
 
 	FILE *fin,*fout;
 
@@ -389,7 +389,7 @@ int main(int argc, char *argv[])
 
 
 	// cout << boost::format("# Parameter setting: a=%1%,T=%2%,MinLen=%3%,sigma2=%4%,BaseAmp=%5%.") % a % T % MinLen % sigma2 % BaseAmp << std::endl;
-	fprintf(fout,"# Parameter setting: a=%g,T=%g,MinLen=%d,sigma2=%g,BaseAmp=%g\n",a,T,MinLen,sigma2,BaseAmp);
+	fprintf(fout,"# Parameter setting: a=%g,T=%g,MinLen=%ld,sigma2=%g,BaseAmp=%g\n",a,T,MinLen,sigma2,BaseAmp);
 
 	/*
 	#if defined(DEBUG)
@@ -413,19 +413,19 @@ int main(int argc, char *argv[])
 	M=i-1;
 	tn= (double*) realloc(tn,M*sizeof(double));
 
-	fprintf(fout,"# Reading M=%d probes in input file\n",M);
+	fprintf(fout,"# Reading M=%ld probes in input file\n",M);
 
 	K = SBLandBE(tn,M,&sigma2,a,0,0,&Iext,&Wext, debug);
 
 	fprintf(fout,"# Overall mean %g\n",Wext[0]);
 	fprintf(fout,"# Sigma^2=%g\n",sigma2);
-	fprintf(fout,"# Found %d breakpoints after SBL\n",K);
+	fprintf(fout,"# Found %ld breakpoints after SBL\n",K);
 
 
 	BEwTandMinLen(Wext,Iext,&K,sigma2,T,MinLen);
-    fprintf(fout,"# Kept %d breakpoints after BE\n",K);
+    fprintf(fout,"# Kept %ld breakpoints after BE\n",K);
 
-	SegLen= (int*) calloc(K+1,sizeof(int));
+	SegLen= (long*) calloc(K+1,sizeof(long));
 	SegAmp= (double *) calloc(K+1,sizeof(double));
 	IextToSegLen(Iext,SegLen,K);
 	IextWextToSegAmp(Iext,Wext,SegAmp,K);
@@ -453,14 +453,14 @@ int main(int argc, char *argv[])
 	{
     	fprintf(fout,"Start\tStop\tLength\tAmpl\n");
 		for(i=0;i<K+1;i++)
-			fprintf(fout,"%d\t%d\t%d\t%g\n",Iext[i]+1,Iext[i+1],SegLen[i],SegAmp[i]);
+			fprintf(fout,"%ld\t%ld\t%ld\t%g\n",Iext[i]+1,Iext[i+1],SegLen[i],SegAmp[i]);
 	}
 	else if(SelectClassifySegments==1)
 	{
 	   	fprintf(fout,"Start\tStop\tLenght\tAmpl\tState\n");
 		for(i=0;i<K+1;i++)
 		{
-			fprintf(fout,"%d\t%d\t%d\t%g\t",Iext[i]+1,Iext[i+1],SegLen[i],SegAmp[i]);
+			fprintf(fout,"%ld\t%ld\t%ld\t%g\t",Iext[i]+1,Iext[i+1],SegLen[i],SegAmp[i]);
 			if(SegState[i]>BaseAmp)
 				fprintf(fout,"G");
 			else if(SegState[i]<BaseAmp)

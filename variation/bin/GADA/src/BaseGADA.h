@@ -46,128 +46,128 @@
 using namespace std;
 
 
-void reconstruct (double *wr,int M,double *aux_vec);
-void BubbleSort (int *I,int L);
-void doubleBubbleSort (double *D,int *I,int L);
-void TrisolveREG(double *t0,double *tu,double *tl,double *coef,double *sol,int sizeh0);
-void DiagOfTriXTri(double *ll,double *l0,double *lu,double *rl,double *r0,double *ru,double *d,int N);
-void tridiagofinverse(double *t0,double *tl,double *itl,double *it0,double *itu,int N,double *d,double *e);
-void ForwardElimination(double *A,int N);
-void BackSubstitution(double *A,int N);
-void BackwardElimination(double *A,int N);
-void TriSolveINV(double *AA,int M, int N, double *x,double *d,double *e);
-void ComputeH(double *h0, double *h1, int M);
-void ComputeFdualXb(int M, double *b);
-// 20080119 REMOVED void ComputeHs(int *s,double *a,int M,int Ms,double *h0,double *h1);
-void ComputeHs(int *s,int M,int Ms,double *h0,double *h1);
-void TriSymGaxpy(double *t0, double *t1, double *x, int M, double *y);
-void ComputeT(double *h0,double *h1,int M,double *alfa,double sigma,double *t0,double *tl,double *tu);
-int findminus(double *alpha,int Ms,double maxalpha,int *sel);
-int simpletresholding(double *inputvector,int N,double thres,double *disc);
-void computesegmentmeans(double *inputvector,int N,double *disc,int numdisc,double *amp);
-void reconstructoutput(double *rec,int N,double *disc,int numdisc,double *amp);
-int SBL(
+void reconstruct (double *wr,long M,double *aux_vec);
+void BubbleSort (long *I,long L);
+void doubleBubbleSort (double *D,long *I,long L);
+void TrisolveREG(double *t0,double *tu,double *tl,double *coef,double *sol,long sizeh0);
+void DiagOfTriXTri(double *ll,double *l0,double *lu,double *rl,double *r0,double *ru,double *d,long N);
+void tridiagofinverse(double *t0,double *tl,double *itl,double *it0,double *itu,long N,double *d,double *e);
+void ForwardElimination(double *A,long N);
+void BackSubstitution(double *A,long N);
+void BackwardElimination(double *A,long N);
+void TriSolveINV(double *AA,long M, long N, double *x,double *d,double *e);
+void ComputeH(double *h0, double *h1, long M);
+void ComputeFdualXb(long M, double *b);
+// 20080119 REMOVED void ComputeHs(long *s,double *a,long M,long Ms,double *h0,double *h1);
+void ComputeHs(long *s,long M,long Ms,double *h0,double *h1);
+void TriSymGaxpy(double *t0, double *t1, double *x, long M, double *y);
+void ComputeT(double *h0,double *h1,long M,double *alfa,double sigma,double *t0,double *tl,double *tu);
+long findminus(double *alpha,long Ms,double maxalpha,long *sel);
+long simpletresholding(double *inputvector,long N,double thres,double *disc);
+void computesegmentmeans(double *inputvector,long N,double *disc,long numdisc,double *amp);
+void reconstructoutput(double *rec,long N,double *disc,long numdisc,double *amp);
+long SBL(
     double *y, //I -- 1D array with the input signal
-    int *I, //IO -- 1D array with the initial (final) candidate breakpoints
+    long *I, //IO -- 1D array with the initial (final) candidate breakpoints
     double *alpha, //I -- 1D array with the initial (final) hyperparameter inv. varainces.
     double *w, //O -- 1D array containing the breakpoint weigths or posterior mean.
     double *sigw, //O -- Posterior variances, I would not really need them since they can be computed from alpha and H
-    int M, //Initial size of the array in y
-    int *K, //Size of the I alpha w
+    long M, //Initial size of the array in y
+    long *K, //Size of the I alpha w
 
     //Algorithm parameters:
     double sigma2, //Noise estimated
     double a,      //
     double b,
     double maxalpha,  //Basis reduction parameter
-    int    maxit,     //Max number of iterations
+    long    maxit,     //Max number of iterations
     double tol,       //Tolerance for convergence
-    int debug       //verbosity... set equal to 1 to see messages  0 to not see them
+    long debug       //verbosity... set equal to 1 to see messages  0 to not see them
     );
 
-int BEthresh( //To eliminate...
+long BEthresh( //To eliminate...
     double *Scores,
-    int Nscores,
+    long Nscores,
     double *wr,
-    int *indsel,
-    int *pointNumRem,
+    long *indsel,
+    long *pointNumRem,
     double *pointTau
     );
 
-int SBLandBE( //Returns breakpoint list lenght.
+long SBLandBE( //Returns breakpoint list lenght.
     double *tn,
-    int M,  //length of the noisy signal tn
+    long M,  //length of the noisy signal tn
     double *sigma2, //If sigma2 < 0, compute sigma2 (Input/Output)
     double a,      // SBL parameter
     double T,      // Threshold to prune
-    int MinSegLen,	//Minimum length of the segment.
-    int **pI,		//Returns breakpoint positions
+    long MinSegLen,	//Minimum length of the segment.
+    long **pI,		//Returns breakpoint positions
     double **pw,	//Returns breakpoint weights.
-    int debug		//verbosity... set equal to 1 to see messages  0 to not see them
-    //int *pK
+    long debug		//verbosity... set equal to 1 to see messages  0 to not see them
+    //long *pK
     );
 
 
 void Project(
     double *y,
-    int M,
-    int *I,
-    int L,
+    long M,
+    long *I,
+    long L,
     double *xI,
     double *wI
     );
 void IextToSegLen(
-	int *Iext, // Enters Iext
-	int *SegLen,		// Outputs SegLen.. can be the same as Iext?
-	int K			// Length Iext - 1
+	long *Iext, // Enters Iext
+	long *SegLen,		// Outputs SegLen.. can be the same as Iext?
+	long K			// Length Iext - 1
 	);
 void IextWextToSegAmp(
-	int *Iext,
+	long *Iext,
 	double *Wext,
 	double *SegAmp,
-	int K
+	long K
 	);
 void CompZ(// computes z=F'y for entire possilbe breakpoint positions (normalized PWC)
 	double *y,
 	double *z,
-	int M
+	long M
 	);
 void ComputeHsIext(
     //input variables:
-    int *Iext,     // Indices of selection,
-    int K,     // Length of the indices,
+    long *Iext,     // Indices of selection,
+    long K,     // Length of the indices,
     double *h0, // Returning diagonal of H,
     double *h1  // Returning upper diagonal of H
     );
 void ProjectCoeff ( //IextYobs2Wext
     double *y,
-    int M,
-    int *Iext,
-    int K,
+    long M,
+    long *Iext,
+    long K,
     double *Wext
 	);
 void
 CollapseAmpTtest(//Uses a T test to decide which segments collapse to neutral
 	double *SegAmp, //Segment Amplitudes (input output)
-	const int *SegLen, //Segment Lengths
-	int K, //Number of segments.
+	const long *SegLen, //Segment Lengths
+	long K, //Number of segments.
 	double BaseAmp, //Reference amplitude to compare
 	double sigma2,  //Reference noise
 	double T		//Critical value that decides when to colapse
 	);
 double // Returns BaseAmp corresponding to the base level.
 CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline level.
-	const int *SegLen,    //Lengths corresponding to the amplitudes
+	const long *SegLen,    //Lengths corresponding to the amplitudes
 	const double *SegAmp, //Amplitudes !!! assumed already ordered...
-	int K
+	long K
 	);
 
 void
 ClassifySegments(
 	double *SegAmp,
-	int *SegLen,
+	long *SegLen,
 	double *SegState,
-	int K,
+	long K,
 	double BaseAmp,
 	double ploidy,
     double sigma2,  //Reference noise
@@ -177,35 +177,35 @@ ClassifySegments(
 void
 ComputeTScores(
 	const double *Wext,
-	const int *Iext,
+	const long *Iext,
 	double *Scores,
-	int K,
-	int start,
-	int end
+	long K,
+	long start,
+	long end
 	);
 
-int BEwTscore(
+long BEwTscore(
     double *Wext,  //IO Breakpoint weights extended notation...
-	int *Iext,     //IO Breakpoint positions in extended notation...
+	long *Iext,     //IO Breakpoint positions in extended notation...
 	double *tscore,
-    int *pK,       //IO Number breakpoint positions remaining.
+    long *pK,       //IO Number breakpoint positions remaining.
     double T      //IP  Threshold to prune
 	);
 
-int BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
+long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
     double *Wext,  //IO Breakpoint weights extended notation...
-	int *Iext,     //IO Breakpoint positions in extended notation...
-    int *pK,       //IO Number breakpoint positions remaining.
+	long *Iext,     //IO Breakpoint positions in extended notation...
+    long *pK,       //IO Number breakpoint positions remaining.
 	double sigma2, //IP If sigma2
     double T,      //IP  Threshold to prune,  T=T*sqrt(sigma2);
-    int MinSegLen  //IP Minimum length of the segment.
+    long MinSegLen  //IP Minimum length of the segment.
 );
-int
+long
 RemoveBreakpoint(
 	double *Wext,
-	int *Iext,
-	int K,
-	int jrem
+	long *Iext,
+	long K,
+	long jrem
 	);
 
 
