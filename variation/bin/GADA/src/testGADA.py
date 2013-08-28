@@ -61,6 +61,9 @@ class testGADA(object):
 		
 		segment_ls = ins.run(intensity_ls, self.aAlpha, self.TBackElim, self.MinSegLen)
 		writer = MatrixFile(inputFname=self.output_fname, openMode='w', delimiter='\t')
+		writer.writerow(["# Parameter setting: a=%s,T=%s,MinSegLen=%s"%(self.aAlpha, self.TBackElim, self.MinSegLen)])
+		header = ['Start', 'Stop', 'Length','Ampl']
+		writer.writeHeader(header)
 		for segment in segment_ls:
 			writer.writerow(segment)
 		del writer
