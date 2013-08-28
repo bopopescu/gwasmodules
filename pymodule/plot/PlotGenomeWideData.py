@@ -168,7 +168,7 @@ class PlotGenomeWideData(parentClass, AbstractGenomeFileWalker):
 			self.setGlobalMaxVariable(extremeVariableName='yMax', givenExtremeValue=max(y_ls))
 			
 			if x_ls and y_ls:
-				ax.plot(x_ls, y_ls, '.', markeredgewidth=0, alpha=0.6)	#markersize=5, 
+				ax.plot(x_ls, y_ls, self.formatString, markersize=self.markerSize, markeredgewidth=0, alpha=0.6)	#
 		
 		"""
 		if drawBonferroni:

@@ -37,7 +37,8 @@ class AbstractPlot(AbstractMatrixFileWalker):
 	option_default_dict.update({
 						('title', 0, ): [None, 't', 1, 'title for the figure.'],\
 						('figureDPI', 1, int): [200, 'f', 1, 'dpi, dots per inch, for the output figures (png)'],\
-						('formatString', 1, ): ['.', 'm', 1, 'formatString passed to matplotlib plot'],\
+						('formatString', 1, ): ['.', '', 1, 'formatString passed to matplotlib plot'],\
+						('markerSize', 1, int): [10, '', 1, 'size of plotting marker (dot size, usually), matplotlib default is 5'],\
 						('ylim_type', 1, int): [1, 'y', 1, 'y-axis limit type, 1: whatever matplotlib decides. 2: min to max'],\
 						('whichColumnPlotLabel', 0, ): ['', 'D', 1, 'plot label for data of the whichColumn', ],\
 						('xColumnHeader', 1, ): ['', 'l', 1, 'header of the x-axis data column, ' ],\
@@ -98,7 +99,7 @@ class AbstractPlot(AbstractMatrixFileWalker):
 		2011-9-30
 			get called by the end of fileWalker() for each inputFname.
 		"""
-		plotObject = pylab.plot(x_ls, y_ls, self.formatString)[0]
+		plotObject = pylab.plot(x_ls, y_ls, self.formatString, markersize=self.markerSize, )[0]
 		self.addPlotLegend(plotObject=plotObject, legend=os.path.basename(pdata.filename), pdata=pdata)
 		
 		self.setGlobalMinVariable(extremeVariableName='xMin', givenExtremeValue=min(x_ls))
