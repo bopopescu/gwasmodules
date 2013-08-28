@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from ProcessOptions import ProcessOptions
 import utils
+from utils import PassingData
 from pegasus.mapper.AbstractMapper import AbstractMapper
 
 class AbstractDBInteractingClass(AbstractMapper):
@@ -42,6 +43,14 @@ class AbstractDBInteractingClass(AbstractMapper):
 			self.logF = open(self.logFilename, 'w')
 		else:
 			self.logF = None
+	
+	def parseInputFile(self, inputFname=None, **keywords):
+		"""
+		2013.08.23
+			if a program is adding a file to db-affiliated storage, this is used for parsing.
+		"""
+		pass
+		return PassingData()
 	
 	def connectDB(self):
 		"""
