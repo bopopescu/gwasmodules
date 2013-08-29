@@ -98,7 +98,7 @@ public:
 	virtual void preFileFunction();
 	virtual void postFileFunction();
 	virtual void fileWalker(vector<string> &inputFnameList);
-	virtual void  openOneInputFile(string &inputFname,  boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer);
+	virtual void openOneInputFile(string &inputFname,  boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer);
 	virtual void handleOneFile(string &inputFname);
 	virtual int processRow(tokenizerCharType &line_toks);
 	virtual int outputRow(tokenizerCharType &line_toks);
