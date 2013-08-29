@@ -286,13 +286,14 @@ void AbstractMatrixFileWalkerCC::fileWalker(vector<string> &inputFnameList){
 
 
 void AbstractMatrixFileWalkerCC::run(){
+	if (debug){
+		std::cerr<<"Entering AbstractMatrixFileWalkerCC.run()..." << std::endl;
+	}
 	constructOptionDescriptionStructure();
 	parseCommandlineOptions();
 	openOutputFile();
 
-	if (debug){
-		std::cerr<<"Entering AbstractMatrixFileWalkerCC.run()..." << std::endl;
-	}
+
 
 	setup();
 	fileWalker(inputFnameList);
