@@ -63,7 +63,7 @@ class AbstractMapper(object):
 			self.inputFnameLs.insert(0, self.inputFname)
 		
 		#2013.08.14 setup self.inputFname if self.inputFnameLs is not None
-		if self.inputFnameLs and not self.inputFname:
+		if self.inputFnameLs and not getattr(self, 'inputFname', None):
 			self.inputFname = self.inputFnameLs[0]
 		
 		self.connectDB()

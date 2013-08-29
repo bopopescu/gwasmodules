@@ -506,6 +506,50 @@ class ElixirDB(object):
 		else:
 			return None
 	
+	def isPathInDBAffiliatedStorage(self, db_entry=None, relativePath=None, inputFileBasename=None, data_dir=None, \
+								constructRelativePathFunction=None):
+		"""
+		2012.8.29
+			check whether one relative path already exists in db-affliated storage.
+				return -1 if db_entry.path is different from relativePath and could not be updated in db.
+				return 1 if relativePath exists in db already
+				return 0 if not.
+			Example:
+				# simplest
+				db_vervet.isPathInDBAffiliatedStorage(relativePath=relativePath, data_dir=self.data_dir)
+				# this will check if db_entry.path == relativePath, if not, update it in db with relativePath.
+				db_vervet.isPathInDBAffiliatedStorage(db_entry=db_entry, relativePath=relativePath)
+				# 
+				db_vervet.isPathInDBAffiliatedStorage(db_entry=db_entry, inputFileBasename=inputFileBasename, data_dir=None, \
+								constructRelativePathFunction=genotypeFile.constructRelativePath)
+		"""
+		if data_dir is None:
+			data_dir = self.data_dir
+		
+		exitCode = 0
+		if db_entry and (relativePath is None) and constructRelativePathFunction and inputFileBasename:
+			relativePath = constructRelativePathFunction(db_entry=db_entry, sourceFilename=inputFileBasename)
+		
+		if db_entry and relativePath:
+			if db_entry.path != relativePath:
+				db_entry.path = relativePath
+				try:
+					self.session.add(db_entry)
+					self.session.flush()
+				except:
+					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+					exitCode = -1
+					return exitCode
+		
+		dstFilename = os.path.join(data_dir, relativePath)
+		if os.path.isfile(dstFilename):
+			exitCode = 1
+		else:
+			exitCode = 0
+		return exitCode
+	
 	def getProperTableName(self, tableClass=None):
 		"""
 		2012.12.31 helper function to add schema in front of tablename.
@@ -734,7 +778,7 @@ class ElixirDB(object):
 				srcFilenameLs.append(srcFilename)
 			if dstFilenameLs is not None:
 				dstFilenameLs.append(dstFilename)
-			if hasattr(db_entry, 'md5sum') and getattr(db_entry, 'md5sum', None) is None:	#2012.7.14 has this attribute but it's None
+			if hasattr(db_entry, 'md5sum'):# and getattr(db_entry, 'md5sum', None) is None:	#2012.7.14 has this attribute but it's None
 				try:
 					self.updateDBEntryMD5SUM(db_entry=db_entry, absPath=dstFilename)
 				except:
@@ -752,7 +796,7 @@ class ElixirDB(object):
 				self.session.flush()
 				exitCode = 3
 				return exitCode
-			if hasattr(db_entry, 'file_size') and db_entry.file_size is None:
+			if hasattr(db_entry, 'file_size'):# and db_entry.file_size is None:
 				try:
 					self.updateDBEntryPathFileSize(db_entry=db_entry, absPath=dstFilename)
 				except:

@@ -36,8 +36,9 @@ class GenomeMovingAverageStatistics(parentClass):
 					('windowOverlapSize', 0, int): [0, '', 1, 'size of the overlap between adjacent windows'], \
 					
 					('run_type', 0, int): [1, '', 1, '1: median within each window; 2: mean within each window; \
-	3: fraction above minimum value'], \
+	3: fraction above minimum value, 4: mean value per base'], \
 					('minValueForFraction', 0, float): [None, '', 1, 'the minimum value for run_type 3'],\
+					('outputAverageColumnHeader', 0, ): ['score', '', 1, 'header for the output column that contains the averaged value'],\
 					
 					})
 	def __init__(self, inputFnameLs=None, **keywords):
@@ -47,7 +48,8 @@ class GenomeMovingAverageStatistics(parentClass):
 		
 		#2013.07.31
 		fractionFunction = lambda ls: sum([a>=self.minValueForFraction for a in ls])/float(len(ls))
-		reduceType2Function = {1: numpy.median, 2: numpy.mean, 3: fractionFunction}
+		meanPerBaseFunction = lambda ls: sum(ls)/float(self.windowSize+self.windowOverlapSize)	#2013.08.28 , the denominator is off by half windowOverlapSize for the first and last window
+		reduceType2Function = {1: numpy.median, 2: numpy.mean, 3: fractionFunction, 4: meanPerBaseFunction}
 		self.reduceFunction = reduceType2Function.get(self.run_type, numpy.median)
 	
 	def setup(self, **keywords):
@@ -134,7 +136,7 @@ class GenomeMovingAverageStatistics(parentClass):
 		2013.07.31
 			override this to output custom header
 		"""
-		header = ["chromosome", "start", "end", "noOfEntries", "score"]
+		header = ["chromosome", "start", "end", "noOfEntries", self.outputAverageColumnHeader]
 		self._writeHeader(header=header, pdata=pdata, rowDefinition=rowDefinition)
 		
 	

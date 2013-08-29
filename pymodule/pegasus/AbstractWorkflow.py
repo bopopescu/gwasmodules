@@ -377,15 +377,28 @@ class AbstractWorkflow(ADAG):
 		site_handler = self.site_handler
 		vervetSrcPath = self.vervetSrcPath
 		
+		
+		#2013.08.28
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'Genome/OutputGenomeAnnotation.py'), \
+										name='OutputGenomeAnnotation', clusterSizeMultipler=0.01)
 		#2013.07.31
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'statistics/GenomeMovingAverageStatistics.py'), \
 										name='GenomeMovingAverageStatistics', clusterSizeMultipler=0.1)
+		#2013.08.23
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/reducer/ReduceSameChromosomeAlignmentDepthFiles'), \
+										name='ReduceSameChromosomeAlignmentDepthFiles', clusterSizeMultipler=0.5)
+		#2013.08.23 c++ version of SelectRowsFromMatrix.py
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/extractor/SelectRowsFromMatrixCC'), \
+										name='SelectRowsFromMatrixCC', clusterSizeMultipler=1)
+		#2012.08.13 SelectRowsFromMatrix is a derivative of AbstractMatrixFileWalker, so use addAbstractMatrixFileWalkerJob()
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/extractor/SelectRowsFromMatrix.py'), \
+										name='SelectRowsFromMatrix', clusterSizeMultipler=1)
+		
 		
 		
 		#executableList = []
 		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		#noClusteringExecutableSet = set()	#2012.8.2 you don't want to cluster for some jobs.
-		
 		
 		#mkdirWrap is better than mkdir that it doesn't report error when the directory is already there.
 		mkdirWrap = Executable(namespace=namespace, name="mkdirWrap", version=version, os=operatingSystem, \
@@ -432,11 +445,6 @@ class AbstractWorkflow(ADAG):
 		DrawHistogram.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "plot/DrawHistogram.py"), site_handler))
 		executableClusterSizeMultiplierList.append((DrawHistogram, 0))
 		
-		#2012.8.13 SelectRowsFromMatrix is a derivative of AbstractMatrixFileWalker, so use addAbstractMatrixFileWalkerJob()
-		SelectRowsFromMatrix = Executable(namespace=namespace, name="SelectRowsFromMatrix", \
-							version=version, os=operatingSystem, arch=architecture, installed=True)
-		SelectRowsFromMatrix.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "pegasus/mapper/extractor/SelectRowsFromMatrix.py"), site_handler))
-		executableClusterSizeMultiplierList.append((SelectRowsFromMatrix, 1))
 		
 		#2012.8.15 ancestor of SelectRowsFromMatrix, 
 		AbstractMatrixFileWalker  = Executable(namespace=namespace, name="AbstractMatrixFileWalker", \
@@ -1863,7 +1871,8 @@ class AbstractWorkflow(ADAG):
 					missingDataNotation='NA',\
 					xColumnHeader=None, xColumnPlotLabel=None, title=None, \
 					minNoOfTotal=100, maxNoOfTotal=None,\
-					figureDPI=300, formatString='.', ylim_type=2, samplingRate=0.001, legendType=None,\
+					figureDPI=300, formatString='.', markerSize=None, \
+					ylim_type=2, samplingRate=0.001, legendType=None,\
 					need_svg=False, \
 					inputFileFormat=None, outputFileFormat=None,\
 					parentJob=None, parentJobLs=None, \
@@ -1872,6 +1881,7 @@ class AbstractWorkflow(ADAG):
 					sshDBTunnel=False, \
 					objectWithDBArguments=None, **keywords):
 		"""
+		2013.08.28 added argument markerSize
 		2013.07.16 added argument legendType
 		2012.12.3 added argument title, logX, logY
 		2012.10.16 added argument sshDBTunnel, objectWithDBArguments
@@ -1924,6 +1934,8 @@ class AbstractWorkflow(ADAG):
 			extraArgumentList.append('--figureDPI %s'%(figureDPI))
 		if formatString:
 			extraArgumentList.append('--formatString %s'%(formatString))
+		if markerSize:
+			extraArgumentList.append("--markerSize %s"%(markerSize))
 		if ylim_type:
 			extraArgumentList.append('--ylim_type %s'%(ylim_type))
 		if samplingRate is not None:

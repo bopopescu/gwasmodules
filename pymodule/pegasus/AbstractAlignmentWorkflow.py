@@ -460,8 +460,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		self.mapDirJob = topOutputDirJob
 		
 		plotOutputDirJob = self.addMkDirJob(outputDir="%sPlot"%(outputDirPrefix))
+		self.plotOutputDirJob = plotOutputDirJob
 		
 		reduceOutputDirJob = self.addMkDirJob(outputDir="%sReduce"%(outputDirPrefix))
+		self.reduceOutputDirJob = reduceOutputDirJob
 		
 		if needFastaDictJob or registerReferenceData.needPicardFastaDictJob:
 			fastaDictJob = self.addRefFastaDictJob(CreateSequenceDictionaryJava=CreateSequenceDictionaryJava, \
