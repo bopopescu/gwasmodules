@@ -2,12 +2,17 @@
 BoostPythonTarget	= GADA.so
 BoostPythonLib  = -lboost_python
 # 2010-6-8 "-L ~/lib64/boost/lib" removed from BoostPythonLib. "-lboost_python-mt" changed to "-lboost_python"
+
+SharedLibFlags	= -shared -fPIC
+IncludeDirs	= `python-config --includes`
+# 2010-6-8 "-I ~/lib64/boost/include/" removed from IncludeDirs
+
+BoostLib	= -lboost_program_options -lboost_iostreams
+
 CFLAGS	= -O3 
 CXXFLAGS	= -fPIC $(CFLAGS)
-SharedLibFlags	= -shared -fPIC
-IncludeDirs = `python-config --includes`
-# 2010-6-8 "-I ~/lib64/boost/include/" removed from IncludeDirs
-CXXCOMPILER = g++
+CXXCOMPILER	= g++
+CXXLDFLAGS	= $(BoostLib)
 
 all:	GADA $(BoostPythonTarget)
 
@@ -23,7 +28,7 @@ $(BoostPythonTarget):	%.so:	%.o BaseGADA.o
 	-$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) $(SharedLibFlags) -c -o $@
 
 GADA:	GADA.cc BaseGADA.c BaseGADA.h consoledefines.h
-	-$(CXXCOMPILER) GADA.cc BaseGADA.c $(CXXFLAGS) $(IncludeDirs) -DGADABIN -o GADA -lm
+	-$(CXXCOMPILER) GADA.cc BaseGADA.c $(CXXFLAGS) $(IncludeDirs) -DGADABIN -o GADA -lm $(CXXLDFLAGS)
 	# `python-config --libs` and $(BoostPythonLib) would be needed if boost.python is used. However, -DGADABIN renders those code off. 
 
 clean:

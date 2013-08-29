@@ -44,8 +44,8 @@ M		= number of probes in chromosome / unit of analysis (can be a chr arm)
 I Ir Ired	Breakpoint set, double array I[0] contains first breakpoint I[K-1] contains Kth breakpoint length 0 if no breakpoints
 Ie Iext		Breakpoint set, extended notation I[0] contains 0 I[K] contains Kth breakpoint I[K+1]=M
 We		Aligned with Ie We[0] contains the overall mean and We[K+1] nothing
-SegAmp  Segment amplitudes lenght K+1
-SegLen  Segment longitudes lenght K+1 and should sum up to M?
+SegAmp  Segment amplitudes length K+1
+SegLen  Segment longitudes length K+1 and should sum up to M?
 */
 
 
@@ -1526,7 +1526,7 @@ CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline 
 
 
 /**************************************************************************************************************************/
-long SBLandBE( //Returns breakpoint list lenght.
+long SBLandBE( //Returns breakpoint list length.
     double *y,
     long M,  //length of the noisy signal tn
     double *Psigma2,	//If sigma2 < 0, compute sigma2
@@ -1551,6 +1551,9 @@ long SBLandBE( //Returns breakpoint list lenght.
 
 	sigma2=*Psigma2;
 
+	#ifdef _DEBUG_SBLBE_
+		myPrintf("allocating memory for tn ...\n");
+	#endif
 	tn=(double* )myCalloc(M,sizeof(double));
 	for(i=0;i<M;i++)
 		tn[i]=y[i];
@@ -1647,7 +1650,7 @@ long SBLandBE( //Returns breakpoint list lenght.
 
 
 /**************************************************************************************************************************/
-long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
+long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
     double *Wext,  //IO Breakpoint weights extended notation...
 	long *Iext,     //IO Breakpoint positions in extended notation...
     long *pK,       //IO Number breakpoint positions remaining.
