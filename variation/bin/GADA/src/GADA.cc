@@ -342,11 +342,6 @@ public:
 	boost::format usageDoc;
 	boost::format examplesDoc;
 
-	po::options_description optionDescription;	//("Allowed options")
-	po::positional_options_description positionOptionDescription;
-	po::variables_map optionVariableMap;
-
-
 	long M;
 	long i;
 	long *Iext;
@@ -372,11 +367,17 @@ public:
 	string inputFname;
 	string outputFname;
 
-	std::ifstream inputFile;
-	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
-	std::ofstream outputFile;
-	boost::iostreams::filtering_streambuf<boost::iostreams::output> outputFilterStreamBuffer;
 
+#ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
+	po::options_description optionDescription;	//("Allowed options")
+	po::positional_options_description positionOptionDescription;
+	po::variables_map optionVariableMap;
+
+	std::ifstream inputFile;
+	std::ofstream outputFile;
+	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
+	boost::iostreams::filtering_streambuf<boost::iostreams::output> outputFilterStreamBuffer;
+#endif
 
 	GADA(int _argc, char* _argv[]);	//2013.08.28 commandline version
 	GADA();
@@ -384,18 +385,20 @@ public:
 	virtual ~GADA();
 
 	void initParameters();
+#ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
 	virtual void constructOptionDescriptionStructure();
 	virtual void parseCommandlineOptions();
 	virtual void openOutputFile();
 	virtual void openOneInputFile(string &inputFname,  boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer);
 	virtual void closeFiles();
+	void commandlineRun();
+#endif
 
 #ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
 	void readInIntensity(boost::python::list intensity_list);
 	boost::python::list run(boost::python::list intensity_list, double aAlpha,
 			double TBackElim, long MinSegLen);
 #endif
-	void commandlineRun();
 	void cleanupMemory();
 };
 
@@ -438,6 +441,7 @@ void GADA::initParameters() {
 	SelectEstimateBaseAmp = 1; //Estimate Neutral hybridization amplitude.
 }
 
+#ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
 
 void GADA::constructOptionDescriptionStructure(){
 	optionDescription.add_options()("help,h", "produce help message")
@@ -502,6 +506,7 @@ void GADA::parseCommandlineOptions(){
 
 }
 
+
 void  GADA::openOneInputFile(string &inputFname, boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer){
 
 	int inputFnameLength = inputFname.length();
@@ -546,14 +551,7 @@ void GADA::openOutputFile(){
 
 	}
 }
-void GADA::cleanupMemory() {
-	free(tn);
-	//free(Iext);
-	free(SegLen);
-	free(SegAmp);
-	//free(SegState);
-	//free(Wext);
-}
+
 
 void GADA::closeFiles(){
 	//
@@ -676,6 +674,18 @@ void GADA::commandlineRun(){
 }
 
 
+#endif
+
+void GADA::cleanupMemory() {
+	free(tn);
+	//free(Iext);
+	free(SegLen);
+	free(SegAmp);
+	//free(SegState);
+	//free(Wext);
+}
+
+
 #ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
 
 void GADA::readInIntensity(boost::python::list intensity_list)
@@ -758,10 +768,9 @@ BOOST_PYTHON_MODULE(GADA)
 #endif	// 2009-11-21 end of the whole boost python module code
 
 
-#ifndef __MAIN__
+#ifdef GADABIN
 	int main(int argc, char* argv[]) {
 		GADA instance(argc, argv);
 		instance.commandlineRun();
 	}
-#define __MAIN__
 #endif
