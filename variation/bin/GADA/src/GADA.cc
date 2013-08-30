@@ -646,7 +646,8 @@ void GADA::commandlineRun(){
 	if (debug){
 		std::cerr<< "Outputting final result ... ";
 	}
-	openOutputFile();
+	openOutputFile();	//2013.08.30 open this file here. Do not open it way before the main writing starts.
+	//it will leave a long period of zero-writing-activity (due to computation), which could hang the program sometimes on panfs system
 
 	std::ostream outputStream(&outputFilterStreamBuffer);
 	outputStream << "# GADA v1.0 Genome Alteration Detection Algorithm\n";
