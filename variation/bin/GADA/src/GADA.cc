@@ -422,7 +422,7 @@ GADA::GADA(int _argc, char* _argv[]) : argc(_argc), argv(_argv)
 	cerr << "program name is " << programName << "." <<endl;
 
 	usageDoc = boost::format("%1% -i INPUTFNAME -o OUTPUTFNAME [OPTIONS]\n")% programName;
-	examplesDoc = boost::format("%1% -i /tmp/input.tsv.gz -o /tmp/output.gz -M 1000 \n")% programName;
+	examplesDoc = boost::format("%1% -i /tmp/input.tsv.gz -o /tmp/output.gz -M 1000 --convergenceDelta 0.01 \n")% programName;
 }
 
 GADA::GADA(long _debug) :
