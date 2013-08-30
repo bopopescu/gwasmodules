@@ -25,13 +25,14 @@ else:   #32bit
 
 
 from pymodule import MatrixFile
+import GADA
 
 class testGADA(object):
 	__doc__ = __doc__
 	option_default_dict = {('input_fname', 1, ): ['', 'i', 1, 'CNV intensity matrix, probe X arrays. 1st column is probe id. 2nd last col is chr. last col is pos.', ],\
 						('output_fname', 1, ): ['', 'o', 1, 'self-explanatory', ],\
 						('aAlpha', 1, float): [0.5, 'A', 1, 'a in Gamma(a;b) the function that controls the prior for the number of breakpoints', ],\
-						('TBackElim', 1, float): [4, 'T', 1, '(amp1-amp2)/stddev in GADA', ],\
+						('TBackElim', 1, int): [4, 'T', 1, '(amp1-amp2)/stddev in GADA', ],\
 						('MinSegLen', 1, int): [5, 'M', 1, 'minimum no of probes to comprise a segment in GADA', ],\
 						('debug', 0, int):[0, 'b', 0, 'toggle debug mode'],\
 						('report', 0, int):[0, 'r', 0, 'toggle report, more verbose stdout/stderr.'],\
@@ -59,7 +60,9 @@ class testGADA(object):
 		inf.close()
 		sys.stderr.write("%s probes read in.\n"%len(intensity_ls))
 		
+		ins = GADA.GADA()
 		segment_ls = ins.run(intensity_ls, self.aAlpha, self.TBackElim, self.MinSegLen)
+		del ins
 		writer = MatrixFile(inputFname=self.output_fname, openMode='w', delimiter='\t')
 		writer.writerow(["# Parameter setting: a=%s,T=%s,MinSegLen=%s"%(self.aAlpha, self.TBackElim, self.MinSegLen)])
 		header = ['Start', 'Stop', 'Length','Ampl']
@@ -70,10 +73,10 @@ class testGADA(object):
 
 if __name__ == '__main__':
 	#test GADA
-	import GADA
 	ins = GADA.GADA()
 	segment_ls = ins.run([1,1,1,1,0.99,0.99,1,1,0.1,0.1,0.1,0.15], 0.2, 4, 2)
 	print segment_ls
+	del ins
 
 	from pymodule import ProcessOptions
 	main_class = testGADA

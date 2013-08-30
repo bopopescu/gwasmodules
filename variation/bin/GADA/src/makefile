@@ -27,8 +27,8 @@ $(BoostPythonTarget):	%.so:	%.o BaseGADA.o
 .c.o:
 	-$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) $(SharedLibFlags) -c -o $@
 
-GADA:	GADA.cc BaseGADA.c BaseGADA.h consoledefines.h
-	-$(CXXCOMPILER) GADA.cc BaseGADA.c $(CXXFLAGS) $(IncludeDirs) -DGADABIN -o GADA -lm $(CXXLDFLAGS)
+GADA:	GADA.cc BaseGADA.cc BaseGADA.h consoledefines.h
+	-$(CXXCOMPILER) GADA.cc BaseGADA.cc $(CXXFLAGS) $(IncludeDirs) -DGADABIN -o GADA -lm $(CXXLDFLAGS)
 	# `python-config --libs` and $(BoostPythonLib) would be needed if boost.python is used. However, -DGADABIN renders those code off. 
 
 clean:

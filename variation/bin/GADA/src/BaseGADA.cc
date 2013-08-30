@@ -837,8 +837,8 @@ long SBL(double *y, //I -- 1D array with the input signal
 //        }
 		if (mynorm < tol) {
 			if (debug > 0) {
-				std::cerr<< boost::format("# \t SBL: Converged after %1% iterations within tolerance %2%, M=%3% \n") %
-						n % tol % K;
+				std::cerr<< boost::format("# \t SBL: Converged after %1% iterations, delta=%4%, within tolerance %2%, M=%3% \n") %
+						n % tol % K % mynorm;
 			}
 			break;
 		}
@@ -911,7 +911,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 
 	if (debug > 0) {
 		if (i >= maxit) {
-			std::cerr << boost::format("# \t SBL: Converged??? Stopped after %1% iterations with change %2%, M=%3%, tol=%4% \n") %
+			std::cerr << boost::format("# \t SBL: Converged??? Stopped after %1% iterations with delta=%2%, M=%3%, tol=%4% \n") %
 					n % mynorm % K % tol;
 		}
 	}
@@ -1385,6 +1385,7 @@ CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline 
 }
 
 /**************************************************************************************************************************/
+/*
 long SBLandBE( //Returns breakpoint list length.
 		double *y, long M, //length of the noisy signal tn
 		double *Psigma2, //If sigma2 < 0, compute sigma2
@@ -1395,16 +1396,42 @@ long SBLandBE( //Returns breakpoint list length.
 		double **pWext, //Returns breakpoint weights.
 		long debug //verbosity... set equal to 1 to see messages  0 to not see them
 		//long *pK
+		){
+	//2013.08.30 call the full-parameter SBLandBE
+	return SBLandBE(y, M, Psigma2, a, T, MinSegLen, pIext, pWext, debug, 1E-10, 50000, 1E8, 1E-20);
+}
+*/
+
+
+long SBLandBE( //Returns breakpoint list length.
+		double *y, long M, //length of the noisy signal tn
+		double *Psigma2, //If sigma2 < 0, compute sigma2
+		double a, // SBL parameter
+		double T, // Threshold to prune
+		long MinSegLen, //Minimum length of the segment.
+		long **pIext, //Returns breakpoint positions
+		double **pWext, //Returns breakpoint weights.
+		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
+		double tol,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
+		long maxit, //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+		double maxalpha , //Maximum number of iterations to reach convergence...
+		double b
+		//long *pK
 		) {
 	long i, K;
 	double myaux;
 	double sigma2;
 	double ymean;
-	double tol, maxalpha, b;
+	//double tol, maxalpha, b;
+	//long maxit;
 	double *alpha, *Wext, *tn, *aux;
 	long *Iext;
-	long maxit;
 	long NumEMsteps;
+	// SBL optimization parameters
+	//tol = 1E-10; //1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
+	//maxalpha = 1E8; //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+	//maxit = 100000; //Maximum number of iterations to reach convergence...
+	//b = 1E-20; //
 
 	sigma2 = *Psigma2;
 
@@ -1436,11 +1463,7 @@ long SBLandBE( //Returns breakpoint list length.
 	for (i = 0; i < M; ++i)
 		tn[i] = tn[i] - ymean;
 
-	// SBL optimization parameters
-	tol = 1E-10; //1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
-	maxalpha = 1E8; //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
-	maxit = 10000; //Maximum number of iterations to reach convergence...
-	b = 1E-20; //
+
 
 	//Call to SBL
 	if (debug){
@@ -1472,7 +1495,7 @@ long SBLandBE( //Returns breakpoint list length.
 
 	//Freeing memory
 	myFree(alpha);
-	myFree(tn);
+	//myFree(tn);	#2013.08.30
 	myFree(aux);
 
 	//Convert Iext and Wext to the extended notation.

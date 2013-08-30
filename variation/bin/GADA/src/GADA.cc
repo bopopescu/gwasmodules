@@ -278,7 +278,7 @@ public:
 
 		fprintf(fout, "# Reading M=%ld probes in input file\n", M);
 
-		K = SBLandBE(tn, M, &sigma2, a, 0, 0, &Iext, &Wext, debug);
+		K = SBLandBE(tn, M, &sigma2, a, 0.0, 0, &Iext, &Wext, debug, 1E-10, 50000, 1E8,1E-20);
 
 		fprintf(fout, "# Overall mean %g\n", Wext[0]);
 		fprintf(fout, "# Sigma^2=%g\n", sigma2);
@@ -363,6 +363,11 @@ public:
 	long MinLen; //Lenght in number of probes for a CNA segment to be called significan.
 	long SelectClassifySegments; //Classify segment into altered state (1), otherwise 0
 	long SelectEstimateBaseAmp; //Estimate Neutral hybridization amplitude.
+	double convergenceDelta;	//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
+			//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+	long maxNoOfIterations;	//=50000, //10000 is enough usually
+	double convergenceMaxAlpha;	// 1E8 Maximum number of iterations to reach convergence...
+	double convergenceB;	// a number related to convergence = 1E-20
 
 	string inputFname;
 	string outputFname;
@@ -426,7 +431,7 @@ GADA::GADA(long _debug) :
 }
 
 GADA::~GADA() {
-
+	//cleanupMemory();	//comment it out to avoid repetitive free, in python module cleanupMemory is called by the end of run().
 }
 
 void GADA::initParameters() {
@@ -439,6 +444,12 @@ void GADA::initParameters() {
 	MinLen = 0; //Lenght in number of probes for a CNA segment to be called significan.
 	SelectClassifySegments = 0; //Classify segment into altered state (1), otherwise 0
 	SelectEstimateBaseAmp = 1; //Estimate Neutral hybridization amplitude.
+
+	convergenceDelta=1E-8;	// or 1E-8 seems to work well for this parameter. -- => ++ conv time
+				//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+	maxNoOfIterations=50000; //10000 is enough usually
+	convergenceMaxAlpha=1E8; // 1E8 Maximum number of iterations to reach convergence...
+	convergenceB=1E-20;	// a number related to convergence = 1E-20
 }
 
 #ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
@@ -466,6 +477,14 @@ void GADA::constructOptionDescriptionStructure(){
 						"Classify segment into altered state (1), otherwise 0")
 				("SelectEstimateBaseAmp", po::value<long>(&SelectEstimateBaseAmp)->default_value(1),
 						"missing data notation. missing data will be skipped.")
+				("convergenceDelta", po::value<double>(&convergenceDelta)->default_value(1E-8),
+							"a delta number controlling convergence")
+				("maxNoOfIterations", po::value<long>(&maxNoOfIterations)->default_value(50000),
+							"maximum number of iterations for EM convergence algorithm to run before being stopped")
+				("convergenceMaxAlpha", po::value<double>(&convergenceMaxAlpha)->default_value(1E8),
+							"one convergence related number, not sure what it does.")
+				("convergenceB", po::value<double>(&convergenceB)->default_value(1E-20),
+							"one convergence related number, not sure what it does")
 				("debug,b", "toggle debug mode")
 				("report,r", "toggle report mode")
 				("inputFname,i", po::value<string >(&inputFname),
@@ -575,15 +594,6 @@ void GADA::commandlineRun(){
 
 	constructOptionDescriptionStructure();
 	parseCommandlineOptions();
-	openOutputFile();
-
-	std::ostream outputStream(&outputFilterStreamBuffer);
-	outputStream << "# GADA v1.0 Genome Alteration Detection Algorithm\n";
-	outputStream << "# Copyright (C) 2008  Childrens Hospital of Los Angeles\n";
-	outputStream << "# author: Roger Pique-Regi piquereg@usc.edu, Yu Huang polyactis@gmail.com\n";
-	outputStream << boost::format("# Parameter setting: a=%1%,T=%2%,MinLen=%3%,sigma2=%4%,BaseAmp=%5%.") % a % T % MinLen % sigma2 % BaseAmp << std::endl;
-
-
 
 	if (debug){
 		std::cerr<<"Reading data from " << inputFname << " ... ";
@@ -610,31 +620,50 @@ void GADA::commandlineRun(){
 		std::cerr<< M << " data points." << endl;
 	}
 
-	outputStream<< boost::format("# Reading M=%1% probes in input file\n")% M;
-
 	if (debug){
-			std::cerr<< "Running SBLandBE ... ";
+			std::cerr<< "Running SBLandBE ... " << endl;
 	}
-	K = SBLandBE(tn, M, &sigma2, a, 0, 0, &Iext, &Wext, debug);
+	K = SBLandBE(tn, M, &sigma2, a, 0, 0, &Iext, &Wext, debug , convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
+	long noOfBreakpointsAfterSBL = K;
 	if (debug){
-		std::cerr<< endl;
+		std::cerr<< " SBLandBE() finished."<< endl;
 	}
-
-	outputStream<< boost::format("# Overall mean %1%\n")%Wext[0];
-	outputStream<< boost::format("# Sigma^2=%1%\n")%sigma2;
-	outputStream<< boost::format("# Found %1% breakpoints after SBL\n")% K;
+	if (debug){
+		std::cerr<< boost::format("Backward elimination (T=%2%) and remove segments that are shorter than %1% ... ") % MinLen % T;
+	}
 
 	BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinLen);
-	outputStream<< boost::format("# Kept %1% breakpoints after BE\n")%K;
 
 	SegLen = (long*) calloc(K + 1, sizeof(long));
 	SegAmp = (double *) calloc(K + 1, sizeof(double));
 	IextToSegLen(Iext, SegLen, K);
 	IextWextToSegAmp(Iext, Wext, SegAmp, K);
-	outputStream<< boost::format("# Making segments\n");
+
+	if (debug){
+		std::cerr<< " BEwTandMinLen() & IextToSegLen() & IextWextToSegAmp() done." << endl;
+	}
+
+	if (debug){
+		std::cerr<< "Outputting final result ... ";
+	}
+	openOutputFile();
+
+	std::ostream outputStream(&outputFilterStreamBuffer);
+	outputStream << "# GADA v1.0 Genome Alteration Detection Algorithm\n";
+	outputStream << "# Copyright (C) 2008  Childrens Hospital of Los Angeles\n";
+	outputStream << "# author: Roger Pique-Regi piquereg@usc.edu, Yu Huang polyactis@gmail.com\n";
+	outputStream << boost::format("# Parameter setting: a=%1%,T=%2%,MinLen=%3%,sigma2=%4%,BaseAmp=%5%.") % a % T % MinLen % sigma2 % BaseAmp << std::endl;
+	outputStream << boost::format("# Reading M=%1% probes in input file\n")% M;
+	outputStream << boost::format("# Overall mean %1%\n")%Wext[0];
+	outputStream << boost::format("# Sigma^2=%1%\n")%sigma2;
+	outputStream << boost::format("# Found %1% breakpoints after SBL\n")% noOfBreakpointsAfterSBL;
+	outputStream<< boost::format("# Kept %1% breakpoints after BE\n")%K;
 
 	//Collapse Segments
 	if (SelectClassifySegments == 1) {
+		if (debug){
+			std::cerr<<" Select and Classify Segments ...";
+		}
 		if (SelectEstimateBaseAmp == 1) {
 			outputStream<< boost::format("# Estimating BaseAmp\n");
 			BaseAmp = CompBaseAmpMedianMethod(SegLen, SegAmp, K);
@@ -646,6 +675,9 @@ void GADA::commandlineRun(){
 		for (i = 0; i <= K; i++)
 			SegState[i] = SegAmp[i];
 		CollapseAmpTtest(SegState, SegLen, K, BaseAmp, sigma2, T);
+		if (debug){
+			std::cerr<<" SelectClassifySegments done.\n";
+		}
 	}
 
 	if (SelectClassifySegments == 0) {
@@ -666,7 +698,9 @@ void GADA::commandlineRun(){
 		}
 
 	}
-
+	if (debug){
+		std::cerr<< " output done." << endl;
+	}
 	closeFiles();
 	if (debug){
 		std::cerr<<"Exit GADA.commandlineRun()." << std::endl;
@@ -678,11 +712,11 @@ void GADA::commandlineRun(){
 
 void GADA::cleanupMemory() {
 	free(tn);
-	//free(Iext);
+	free(Iext);
 	free(SegLen);
 	free(SegAmp);
-	//free(SegState);
-	//free(Wext);
+	free(Wext);
+	//free(SegState);	//2013.08.30 SegState is not always allocated with extra memory
 }
 
 
@@ -718,7 +752,7 @@ boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
 	// It used to be fine without it.
 	sigma2 = -1; //Variance observed, if negative value, it will be estimated by the mean of the differences
 
-	K = SBLandBE(tn, M, &sigma2, aAlpha, 0, 0, &Iext, &Wext, debug);
+	K = SBLandBE(tn, M, &sigma2, aAlpha, 0, 0, &Iext, &Wext, debug, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
 
 #if defined(DEBUG)
 	cerr<< boost::format("# Overall mean %1%.\n")%Wext[0];
@@ -752,8 +786,7 @@ boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
 		//cerr<< boost::format("%1% \t %2% \t %3% %4% \n")%Iext[i] % Iext[i+1] % SegLen[i] % SegAmp[i];
 		return_ls.append(d_row);
 	}
-
-	cleanupMemory();
+	cleanupMemory();	//release tn, SegLen, SegAmp, and others
 	return return_ls;
 
 }

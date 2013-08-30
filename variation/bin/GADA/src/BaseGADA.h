@@ -101,8 +101,12 @@ long SBLandBE( //Returns breakpoint list lenght.
 		long MinSegLen, //Minimum length of the segment.
 		long **pI, //Returns breakpoint positions
 		double **pw, //Returns breakpoint weights.
-		long debug //verbosity... set equal to 1 to see messages  0 to not see them
-		//long *pK
+		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
+		double tol=1E-10,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
+		//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+		long maxit=50000, //10000 is enough usually
+		double maxalpha=1E8,//, 1E8 Maximum number of iterations to reach convergence...
+		double b= 1E-20
 		);
 
 void Project(double *y, long M, long *I, long L, double *xI, double *wI);
