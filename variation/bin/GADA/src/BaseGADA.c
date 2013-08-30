@@ -837,9 +837,8 @@ long SBL(double *y, //I -- 1D array with the input signal
 //        }
 		if (mynorm < tol) {
 			if (debug > 0) {
-				myPrintf(
-						"#      SBL: Converged after %ld iterations within tolerance %g, M=%ld \n",
-						n, tol, K);
+				std::cerr<< boost::format("# \t SBL: Converged after %1% iterations within tolerance %2%, M=%3% \n") %
+						n % tol % K;
 			}
 			break;
 		}
@@ -855,9 +854,8 @@ long SBL(double *y, //I -- 1D array with the input signal
 			I[0] = -1;
 			sigw[0] = -1;
 			alpha[0] = -1;
-			myPrintf(
-					"#      SBL: After %ld iterations, No disconinuities found M=%ld \n",
-					n, K);
+			std::cerr << boost::format("#      SBL: After %1% iterations, No disconinuities found M=%2% \n") %
+					n % K;
 			break;
 		}
 		if (sizesel < K) {
@@ -913,15 +911,14 @@ long SBL(double *y, //I -- 1D array with the input signal
 
 	if (debug > 0) {
 		if (i >= maxit) {
-			myPrintf(
-					"#      SBL: Converged??? Stopped after %ld iterations with change %g, M=%ld\n",
-					n, mynorm, K);
+			std::cerr << boost::format("# \t SBL: Converged??? Stopped after %1% iterations with change %2%, M=%3%, tol=%4% \n") %
+					n % mynorm % K % tol;
 		}
 	}
 
-#ifdef _DEBUG_SBL_
-	myPrintf("_SBL_ Reffiting K=%ld\n",K);
-#endif
+	if (debug){
+		std::cerr <<  boost::format("_SBL_ Reffiting K=%1%\n")%K;
+	}
 
 	// Projection onto Breakpoint set... (REFITTING)
 	if (K != 0) {
@@ -1413,13 +1410,13 @@ long SBLandBE( //Returns breakpoint list length.
 
 	tn = y;
 	/*//2013.08.28 no more copying of input data. to reduce memory usage.
-	 #ifdef _DEBUG_SBLBE_
-	 myPrintf("allocating memory for tn ...\n");
-	 #endif
-	 tn=(double* )myCalloc(M,sizeof(double));
-	 for(i=0;i<M;i++)
-	 tn[i]=y[i];
-	 */
+	if (debug){
+		std::cerr << boost::format("allocating memory for tn ...\n");
+	}
+	tn=(double* )myCalloc(M,sizeof(double));
+	for(i=0;i<M;i++)
+	tn[i]=y[i];
+	*/
 
 	//If sigma2 < 0, compute sigma2
 	if (sigma2 < 0) {
@@ -1446,9 +1443,9 @@ long SBLandBE( //Returns breakpoint list length.
 	b = 1E-20; //
 
 	//Call to SBL
-#ifdef _DEBUG_SBLBE_
-	myPrintf("_SBLBE_ Memory initialization\n");
-#endif
+	if (debug){
+		std::cerr << "_SBLBE_ Memory initialization\n";
+	}
 
 	K = M - 1;
 	Iext = (long*) myCalloc(M,sizeof(long)); //R
@@ -1456,9 +1453,9 @@ long SBLandBE( //Returns breakpoint list length.
 	alpha = (double*) myCalloc(M,sizeof(double));
 	aux = (double*) myCalloc(M,sizeof(double));
 
-#ifdef _DEBUG_SBLBE_
-	myPrintf("_SBLBE_ Breakpoint Initialization\n");
-#endif
+	if (debug){
+		std::cerr << "_SBLBE_ Breakpoint Initialization\n";
+	}
 	//Initialize breakpoints
 	for (i = 0; i < M; i++)
 		alpha[i] = 0.0;
@@ -1467,9 +1464,9 @@ long SBLandBE( //Returns breakpoint list length.
 	for (i = 0; i < M; i++)
 		Iext[i] = i;
 
-#ifdef _DEBUG_SBLBE_
-	myPrintf("_SBLBE_ SBL starts\n");
-#endif
+	if (debug){
+		std::cerr << "_SBLBE_ SBL starts\n";
+	}
 	NumEMsteps = SBL(tn, Iext, alpha, Wext + 1, aux, M, &K, sigma2, a, b,
 			maxalpha, maxit, tol, debug);
 
@@ -1490,17 +1487,17 @@ long SBLandBE( //Returns breakpoint list length.
 	//	Wext[i]=Wext[i-1];
 	Wext[0] = ymean;
 
-#ifdef _DEBUG_SBLBE_
-	myPrintf("_SBLBE_ Backward Elimination T=%g MinLen=%ld\n",T,MinSegLen);
-#endif
+	if (debug){
+		std::cerr << "_SBLBE_ Backward Elimination T=" << T << " MinLen=" << MinSegLen << std::endl;
+	}
 	BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinSegLen);
 
 	Iext = (long*) realloc(Iext, (K + 2) * sizeof(long));
 	Wext = (double *) realloc(Wext, (K + 1) * sizeof(double));
 
-#ifdef _DEBUG_SBLBE_
-	myPrintf("_SBLBE_ After BE K=%ld \n",K);
-#endif
+	if (debug){
+		std::cerr << "_SBLBE_ After BE K=" <<K << endl;
+	}
 
 	*pIext = Iext;
 	*pWext = Wext;
