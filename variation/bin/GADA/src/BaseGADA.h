@@ -85,6 +85,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 		double b, double maxalpha, //Basis reduction parameter
 		long maxit, //Max number of iterations
 		double tol, //Tolerance for convergence
+		double &delta,	//delta convergence
 		long debug //verbosity... set equal to 1 to see messages  0 to not see them
 		);
 
@@ -102,6 +103,8 @@ long SBLandBE( //Returns breakpoint list lenght.
 		long **pI, //Returns breakpoint positions
 		double **pw, //Returns breakpoint weights.
 		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
+		double &delta,	//delta convergence
+		long &numEMsteps,	//how many iterations it goes through
 		double tol=1E-10,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
 		//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
 		long maxit=50000, //10000 is enough usually

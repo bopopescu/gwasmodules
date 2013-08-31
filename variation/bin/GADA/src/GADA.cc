@@ -278,7 +278,9 @@ public:
 
 		fprintf(fout, "# Reading M=%ld probes in input file\n", M);
 
-		K = SBLandBE(tn, M, &sigma2, a, 0.0, 0, &Iext, &Wext, debug, 1E-10, 50000, 1E8,1E-20);
+		double delta;
+		long numEMsteps;
+		K = SBLandBE(tn, M, &sigma2, a, 0.0, 0, &Iext, &Wext, debug, delta, numEMsteps, 1E-10, 50000, 1E8,1E-20);
 
 		fprintf(fout, "# Overall mean %g\n", Wext[0]);
 		fprintf(fout, "# Sigma^2=%g\n", sigma2);
@@ -351,6 +353,8 @@ public:
 	double *SegAmp;
 	double *SegState;
 	double *Wext;
+	double delta;
+	long numEMsteps;
 
 	int report;
 	long debug; //verbosity... set equal to 1 to see messages of SBLandBE(). 0 to not see them
@@ -372,8 +376,20 @@ public:
 	string inputFname;
 	string outputFname;
 
+	GADA(int _argc, char* _argv[]);	//2013.08.28 commandline version
+	GADA();
+	GADA(long _debug);
+	virtual ~GADA();
 
-#ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
+	void initParameters();
+//#ifdef GADABIN
+
+#ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
+	void readInIntensity(boost::python::list intensity_list);
+	boost::python::list run(boost::python::list intensity_list, double aAlpha,
+			double TBackElim, long MinSegLen);
+#else
+	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
 	po::options_description optionDescription;	//("Allowed options")
 	po::positional_options_description positionOptionDescription;
 	po::variables_map optionVariableMap;
@@ -382,27 +398,14 @@ public:
 	std::ofstream outputFile;
 	boost::iostreams::filtering_streambuf<boost::iostreams::input> inputFilterStreamBuffer;
 	boost::iostreams::filtering_streambuf<boost::iostreams::output> outputFilterStreamBuffer;
-#endif
 
-	GADA(int _argc, char* _argv[]);	//2013.08.28 commandline version
-	GADA();
-	GADA(long _debug);
-	virtual ~GADA();
-
-	void initParameters();
-#ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
+	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
 	virtual void constructOptionDescriptionStructure();
 	virtual void parseCommandlineOptions();
 	virtual void openOutputFile();
 	virtual void openOneInputFile(string &inputFname,  boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer);
 	virtual void closeFiles();
 	void commandlineRun();
-#endif
-
-#ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
-	void readInIntensity(boost::python::list intensity_list);
-	boost::python::list run(boost::python::list intensity_list, double aAlpha,
-			double TBackElim, long MinSegLen);
 #endif
 	void cleanupMemory();
 };
@@ -452,7 +455,90 @@ void GADA::initParameters() {
 	convergenceB=1E-20;	// a number related to convergence = 1E-20
 }
 
-#ifdef GADABIN	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
+
+
+
+
+
+#ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
+
+void GADA::readInIntensity(boost::python::list intensity_list)
+/*
+ * 2010-6-8 fix a bug in moving intensity from intensity_list to tn: the last intensity was forgotten.
+ */
+{
+	#if defined(DEBUG)
+		cerr<< boost::format("# Start reading ... \n");
+	#endif
+	long no_of_probes = boost::python::extract<long>(
+			intensity_list.attr("__len__")());
+	M = no_of_probes;
+	tn = (double *) calloc(no_of_probes, sizeof(double));
+
+	for (long i = 0; i < no_of_probes; i++) {
+		tn[i] = boost::python::extract<double>(intensity_list[i]);
+	}
+
+	#if defined(DEBUG)
+		cerr<< boost::format("# M=%1% probes in input file\n") % M;
+	#endif
+}
+
+boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
+		double TBackElim, long MinSegLen) {
+	readInIntensity(intensity_list);
+	// 2010-6-8 sigma2 has to be set here. sigma2 set in GADA::initParameters() refers to the GADA::sigma2;
+	// here i suspect is the global one. Without the sentence below, the results seem to be weird.
+	// It used to be fine without it.
+	sigma2 = -1; //Variance observed, if negative value, it will be estimated by the mean of the differences
+
+	K = SBLandBE(tn, M, &sigma2, aAlpha, 0, 0, &Iext, &Wext, debug, delta, numEMsteps, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
+
+#if defined(DEBUG)
+	cerr<< boost::format("# Overall mean %1%.\n")%Wext[0];
+	cerr<< boost::format("# Sigma^2=%1%.\n")%sigma2;
+	cerr<< boost::format("# Found %1% breakpoints after SBL\n")%K;
+#endif
+
+	BEwTandMinLen(Wext, Iext, &K, sigma2, TBackElim, MinSegLen);
+
+#if defined(DEBUG)
+	cerr<< boost::format("# Kept %1% breakpoints after BE\n")%K;
+#endif
+
+	SegLen = (long*) calloc(K + 1, sizeof(long));
+	SegAmp = (double *) calloc(K + 1, sizeof(double));
+	IextToSegLen(Iext, SegLen, K);
+	IextWextToSegAmp(Iext, Wext, SegAmp, K);
+#if defined(DEBUG)
+	cerr<< boost::format("# Making segments\n");
+#endif
+
+	boost::python::list return_ls;
+
+	//fprintf(fout,"Start\tStop\tLength\tAmpl\n");
+	for (i = 0; i < K + 1; i++) {
+		boost::python::list d_row;
+		d_row.append(Iext[i] + 1);
+		d_row.append(Iext[i + 1]);
+		d_row.append(SegLen[i]);
+		d_row.append(SegAmp[i]);
+		//cerr<< boost::format("%1% \t %2% \t %3% %4% \n")%Iext[i] % Iext[i+1] % SegLen[i] % SegAmp[i];
+		return_ls.append(d_row);
+	}
+	cleanupMemory();	//release tn, SegLen, SegAmp, and others
+	return return_ls;
+
+}
+
+BOOST_PYTHON_MODULE(GADA)
+{
+	using namespace boost::python;
+	class_<GADA>("GADA").def(init<long>()).def("run", &GADA::run);
+
+}
+#else
+// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
 
 void GADA::constructOptionDescriptionStructure(){
 	optionDescription.add_options()("help,h", "produce help message")
@@ -623,7 +709,7 @@ void GADA::commandlineRun(){
 	if (debug){
 			std::cerr<< "Running SBLandBE ... " << endl;
 	}
-	K = SBLandBE(tn, M, &sigma2, a, 0, 0, &Iext, &Wext, debug , convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
+	K = SBLandBE(tn, M, &sigma2, a, 0, 0, &Iext, &Wext, debug , delta, numEMsteps, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
 	long noOfBreakpointsAfterSBL = K;
 	if (debug){
 		std::cerr<< " SBLandBE() finished."<< endl;
@@ -653,10 +739,12 @@ void GADA::commandlineRun(){
 	outputStream << "# GADA v1.0 Genome Alteration Detection Algorithm\n";
 	outputStream << "# Copyright (C) 2008  Childrens Hospital of Los Angeles\n";
 	outputStream << "# author: Roger Pique-Regi piquereg@usc.edu, Yu Huang polyactis@gmail.com\n";
-	outputStream << boost::format("# Parameter setting: a=%1%,T=%2%,MinLen=%3%,sigma2=%4%,BaseAmp=%5%.") % a % T % MinLen % sigma2 % BaseAmp << std::endl;
+	outputStream << boost::format("# Parameters: a=%1%,T=%2%,MinLen=%3%,sigma2=%4%,BaseAmp=%5%, convergenceDelta=%6%, maxNoOfIterations=%7%, convergenceMaxAlpha=%8%, convergenceB=%9%.")%
+			a % T % MinLen % sigma2 % BaseAmp % convergenceDelta % maxNoOfIterations % convergenceMaxAlpha % convergenceB << std::endl;
 	outputStream << boost::format("# Reading M=%1% probes in input file\n")% M;
 	outputStream << boost::format("# Overall mean %1%\n")%Wext[0];
 	outputStream << boost::format("# Sigma^2=%1%\n")%sigma2;
+	outputStream << boost::format("# Convergence: delta=%1% after %2% EM iterations.\n")% delta % numEMsteps;
 	outputStream << boost::format("# Found %1% breakpoints after SBL\n")% noOfBreakpointsAfterSBL;
 	outputStream<< boost::format("# Kept %1% breakpoints after BE\n")%K;
 
@@ -707,9 +795,7 @@ void GADA::commandlineRun(){
 		std::cerr<<"Exit GADA.commandlineRun()." << std::endl;
 	}
 }
-
-
-#endif
+#endif	// 2009-11-21 end of the whole boost python module code
 
 void GADA::cleanupMemory() {
 	free(tn);
@@ -720,86 +806,6 @@ void GADA::cleanupMemory() {
 	//free(SegState);	//2013.08.30 SegState is not always allocated with extra memory
 }
 
-
-#ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
-
-void GADA::readInIntensity(boost::python::list intensity_list)
-/*
- * 2010-6-8 fix a bug in moving intensity from intensity_list to tn: the last intensity was forgotten.
- */
-{
-	#if defined(DEBUG)
-		cerr<< boost::format("# Start reading ... \n");
-	#endif
-	long no_of_probes = boost::python::extract<long>(
-			intensity_list.attr("__len__")());
-	M = no_of_probes;
-	tn = (double *) calloc(no_of_probes, sizeof(double));
-
-	for (long i = 0; i < no_of_probes; i++) {
-		tn[i] = boost::python::extract<double>(intensity_list[i]);
-	}
-
-	#if defined(DEBUG)
-		cerr<< boost::format("# M=%1% probes in input file\n") % M;
-	#endif
-}
-
-boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
-		double TBackElim, long MinSegLen) {
-	readInIntensity(intensity_list);
-	// 2010-6-8 sigma2 has to be set here. sigma2 set in GADA::initParameters() refers to the GADA::sigma2;
-	// here i suspect is the global one. Without the sentence below, the results seem to be weird.
-	// It used to be fine without it.
-	sigma2 = -1; //Variance observed, if negative value, it will be estimated by the mean of the differences
-
-	K = SBLandBE(tn, M, &sigma2, aAlpha, 0, 0, &Iext, &Wext, debug, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
-
-#if defined(DEBUG)
-	cerr<< boost::format("# Overall mean %1%.\n")%Wext[0];
-	cerr<< boost::format("# Sigma^2=%1%.\n")%sigma2;
-	cerr<< boost::format("# Found %1% breakpoints after SBL\n")%K;
-#endif
-
-	BEwTandMinLen(Wext, Iext, &K, sigma2, TBackElim, MinSegLen);
-
-#if defined(DEBUG)
-	cerr<< boost::format("# Kept %1% breakpoints after BE\n")%K;
-#endif
-
-	SegLen = (long*) calloc(K + 1, sizeof(long));
-	SegAmp = (double *) calloc(K + 1, sizeof(double));
-	IextToSegLen(Iext, SegLen, K);
-	IextWextToSegAmp(Iext, Wext, SegAmp, K);
-#if defined(DEBUG)
-	cerr<< boost::format("# Making segments\n");
-#endif
-
-	boost::python::list return_ls;
-
-	//fprintf(fout,"Start\tStop\tLength\tAmpl\n");
-	for (i = 0; i < K + 1; i++) {
-		boost::python::list d_row;
-		d_row.append(Iext[i] + 1);
-		d_row.append(Iext[i + 1]);
-		d_row.append(SegLen[i]);
-		d_row.append(SegAmp[i]);
-		//cerr<< boost::format("%1% \t %2% \t %3% %4% \n")%Iext[i] % Iext[i+1] % SegLen[i] % SegAmp[i];
-		return_ls.append(d_row);
-	}
-	cleanupMemory();	//release tn, SegLen, SegAmp, and others
-	return return_ls;
-
-}
-
-BOOST_PYTHON_MODULE(GADA)
-{
-	using namespace boost::python;
-	class_<GADA>("GADA").def(init<long>()).def("run", &GADA::run);
-
-}
-
-#endif	// 2009-11-21 end of the whole boost python module code
 
 
 #ifdef GADABIN

@@ -637,12 +637,13 @@ long SBL(double *y, //I -- 1D array with the input signal
 		double b, double maxalpha, //Basis reduction parameter
 		long maxit, //Max number of iterations
 		double tol, //Tolerance for convergence
+		double &delta,	//delta convergence
 		long debug //verbosity... set equal to 1 to see messages  0 to not see them
 		) {
 	long n, i, K;
 	long M0, sizesel;
 	double *w0;
-	double mynorm, myaux;
+	double myaux;
 
 	//Extra memory necessary to store variables during the algorithm.... (require memory initialization)
 	double *h0;
@@ -813,32 +814,32 @@ long SBL(double *y, //I -- 1D array with the input signal
 
 		//euclidean norm of wpred-w  CRITERIUM of CONVERGENCE
 		/*
-		 mynorm=0;
-		 for (i=0;i<K;i++){
-		 mynorm=mynorm+(wpred[i]-w[i])*(wpred[i]-w[i]);
-		 }
-		 mynorm=sqrt(mynorm);
-		 */
+		delta=0;
+		for (i=0;i<K;i++){
+		delta=delta+(wpred[i]-w[i])*(wpred[i]-w[i]);
+		}
+		delta=sqrt(delta);
+		*/
 
 		//max diff of wpred-w  CRITERIUM of CONVERGENCE
-		mynorm = 0;
+		delta = 0;
 		for (i = 0; i < K; i++) {
 			//myaux=abs(wpred[i]-w[i]);
 			myaux = (wpred[i] - w[i]);
 			if (myaux < 0)
 				myaux = -myaux;
-			if (myaux > mynorm)
-				mynorm = myaux;
+			if (myaux > delta)
+				delta = myaux;
 		}
 
 //        if (n==0){
 //            myPrintf("EUCLIDEAN NORM FIRST ITERATION:\n");
-//            myPrintf("\n\neuclidean_norm:%g\n\n",mynorm);
+//            myPrintf("\n\neuclidean_norm:%g\n\n",delta);
 //        }
-		if (mynorm < tol) {
+		if (delta < tol) {
 			if (debug > 0) {
 				std::cerr<< boost::format("# \t SBL: Converged after %1% iterations, delta=%4%, within tolerance %2%, M=%3% \n") %
-						n % tol % K % mynorm;
+						n % tol % K % delta;
 			}
 			break;
 		}
@@ -912,7 +913,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 	if (debug > 0) {
 		if (i >= maxit) {
 			std::cerr << boost::format("# \t SBL: Converged??? Stopped after %1% iterations with delta=%2%, M=%3%, tol=%4% \n") %
-					n % mynorm % K % tol;
+					n % delta % K % tol;
 		}
 	}
 
@@ -1412,6 +1413,8 @@ long SBLandBE( //Returns breakpoint list length.
 		long **pIext, //Returns breakpoint positions
 		double **pWext, //Returns breakpoint weights.
 		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
+		double &delta,	//delta convergence
+		long &numEMsteps,	//how many iterations it goes through
 		double tol,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
 		long maxit, //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
 		double maxalpha , //Maximum number of iterations to reach convergence...
@@ -1426,7 +1429,6 @@ long SBLandBE( //Returns breakpoint list length.
 	//long maxit;
 	double *alpha, *Wext, *tn, *aux;
 	long *Iext;
-	long NumEMsteps;
 	// SBL optimization parameters
 	//tol = 1E-10; //1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
 	//maxalpha = 1E8; //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
@@ -1490,8 +1492,8 @@ long SBLandBE( //Returns breakpoint list length.
 	if (debug){
 		std::cerr << "_SBLBE_ SBL starts\n";
 	}
-	NumEMsteps = SBL(tn, Iext, alpha, Wext + 1, aux, M, &K, sigma2, a, b,
-			maxalpha, maxit, tol, debug);
+	numEMsteps = SBL(tn, Iext, alpha, Wext + 1, aux, M, &K, sigma2, a, b,
+			maxalpha, maxit, tol, delta, debug);
 
 	//Freeing memory
 	myFree(alpha);
