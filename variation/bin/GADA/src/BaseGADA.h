@@ -105,6 +105,7 @@ long SBLandBE( //Returns breakpoint list lenght.
 		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
 		double &delta,	//delta convergence
 		long &numEMsteps,	//how many iterations it goes through
+		long &noOfBreakpointsAfterSBL,	//
 		double tol=1E-10,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
 		//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
 		long maxit=50000, //10000 is enough usually
@@ -129,8 +130,7 @@ void ComputeHsIext(
 		);
 void ProjectCoeff( //IextYobs2Wext
 		double *y, long M, long *Iext, long K, double *Wext);
-void
-CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
+void CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
 		double *SegAmp, //Segment Amplitudes (input output)
 		const long *SegLen, //Segment Lengths
 		long K, //Number of segments.
@@ -138,26 +138,27 @@ CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
 		double sigma2, //Reference noise
 		double T //Critical value that decides when to colapse
 		);
+
 double // Returns BaseAmp corresponding to the base level.
 CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline level.
 		const long *SegLen, //Lengths corresponding to the amplitudes
 		const double *SegAmp, //Amplitudes !!! assumed already ordered...
 		long K);
 
-void
-ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
+void ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
 		double BaseAmp, double ploidy, double sigma2, //Reference noise
 		double T //Critical value that decides when to colapse
 		);
 
-void
-ComputeTScores(const double *Wext, const long *Iext, double *Scores, long K,
+void ComputeTScores(const double *Wext, const long *Iext, double *Scores, long K,
 		long start, long end);
 
 long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		long *Iext, //IO Breakpoint positions in extended notation...
 		double *tscore, long *pK, //IO Number breakpoint positions remaining.
-		double T //IP  Threshold to prune
+		double T, //IP  Threshold to prune
+		long MinSegLen=0,	//minimum segment length
+		long debug=0
 		);
 
 long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
@@ -166,9 +167,9 @@ long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
 		long *pK, //IO Number breakpoint positions remaining.
 		double sigma2, //IP If sigma2
 		double T, //IP  Threshold to prune,  T=T*sqrt(sigma2);
-		long MinSegLen //IP Minimum length of the segment.
+		long MinSegLen, //IP Minimum length of the segment.
+		long debug
 		);
-long
-RemoveBreakpoint(double *Wext, long *Iext, long K, long jrem);
+long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long indexOfSegmentToRemove);
 
 #endif //_BaseGADA_H_

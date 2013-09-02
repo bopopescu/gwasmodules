@@ -280,13 +280,14 @@ public:
 
 		double delta;
 		long numEMsteps;
-		K = SBLandBE(tn, M, &sigma2, a, 0.0, 0, &Iext, &Wext, debug, delta, numEMsteps, 1E-10, 50000, 1E8,1E-20);
+		long noOfBreakpointsAfterSBL;
+		K = SBLandBE(tn, M, &sigma2, a, 0.0, 0, &Iext, &Wext, debug, delta, numEMsteps, noOfBreakpointsAfterSBL, 1E-10, 50000, 1E8,1E-20);
 
 		fprintf(fout, "# Overall mean %g\n", Wext[0]);
 		fprintf(fout, "# Sigma^2=%g\n", sigma2);
 		fprintf(fout, "# Found %ld breakpoints after SBL\n", K);
 
-		BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinLen);
+		BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinLen, 0);
 		fprintf(fout, "# Kept %ld breakpoints after BE\n", K);
 
 		SegLen = (long*) calloc(K + 1, sizeof(long));
@@ -355,6 +356,7 @@ public:
 	double *Wext;
 	double delta;
 	long numEMsteps;
+	long noOfBreakpointsAfterSBL;
 
 	int report;
 	long debug; //verbosity... set equal to 1 to see messages of SBLandBE(). 0 to not see them
@@ -491,16 +493,15 @@ boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
 	// here i suspect is the global one. Without the sentence below, the results seem to be weird.
 	// It used to be fine without it.
 	sigma2 = -1; //Variance observed, if negative value, it will be estimated by the mean of the differences
-
-	K = SBLandBE(tn, M, &sigma2, aAlpha, 0, 0, &Iext, &Wext, debug, delta, numEMsteps, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
+	K = SBLandBE(tn, M, &sigma2, aAlpha, TBackElim, MinSegLen, &Iext, &Wext, debug, delta, numEMsteps, noOfBreakpointsAfterSBL, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
 
 #if defined(DEBUG)
 	cerr<< boost::format("# Overall mean %1%.\n")%Wext[0];
 	cerr<< boost::format("# Sigma^2=%1%.\n")%sigma2;
-	cerr<< boost::format("# Found %1% breakpoints after SBL\n")%K;
+	cerr<< boost::format("# Found %1% breakpoints after SBL\n")%noOfBreakpointsAfterSBL;
 #endif
 
-	BEwTandMinLen(Wext, Iext, &K, sigma2, TBackElim, MinSegLen);
+	//BEwTandMinLen(Wext, Iext, &K, sigma2, TBackElim, MinSegLen, debug);
 
 #if defined(DEBUG)
 	cerr<< boost::format("# Kept %1% breakpoints after BE\n")%K;
@@ -709,16 +710,16 @@ void GADA::commandlineRun(){
 	if (debug){
 			std::cerr<< "Running SBLandBE ... " << endl;
 	}
-	K = SBLandBE(tn, M, &sigma2, a, 0, 0, &Iext, &Wext, debug , delta, numEMsteps, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
-	long noOfBreakpointsAfterSBL = K;
+	K = SBLandBE(tn, M, &sigma2, a, T, MinLen, &Iext, &Wext, debug , delta, numEMsteps, noOfBreakpointsAfterSBL, convergenceDelta, maxNoOfIterations, convergenceMaxAlpha, convergenceB);
 	if (debug){
-		std::cerr<< " SBLandBE() finished."<< endl;
+		std::cerr<< boost::format(" %1% breakpoints after SBL, %2% breakpoints after BE.\n")%noOfBreakpointsAfterSBL % K;
 	}
 	if (debug){
-		std::cerr<< boost::format("Backward elimination (T=%2%) and remove segments that are shorter than %1% ... ") % MinLen % T;
+		//std::cerr<< boost::format("Backward elimination (T=%2%) and remove segments that are shorter than %1% ... ") % MinLen % T;
+		std::cerr<< boost::format("Starting IextToSegLen() & IextWextToSegAmp() ... ");
 	}
 
-	BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinLen);
+	//BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinLen, debug);
 
 	SegLen = (long*) calloc(K + 1, sizeof(long));
 	SegAmp = (double *) calloc(K + 1, sizeof(double));
@@ -726,7 +727,7 @@ void GADA::commandlineRun(){
 	IextWextToSegAmp(Iext, Wext, SegAmp, K);
 
 	if (debug){
-		std::cerr<< " BEwTandMinLen() & IextToSegLen() & IextWextToSegAmp() done." << endl;
+		std::cerr<< " IextToSegLen() & IextWextToSegAmp() done." << endl;
 	}
 
 	if (debug){

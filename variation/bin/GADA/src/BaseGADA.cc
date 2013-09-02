@@ -729,11 +729,12 @@ long SBL(double *y, //I -- 1D array with the input signal
 		//z(I)
 		//myPrintf("I[0]:%ld\n",I[0]);
 
-		for (i = 0; i < K; i++)
+		for (i = 0; i < K; i++){
 			t0[i] = z[I[i]];
-
-		for (i = 0; i < K; i++)
 			xx[i] = 0;
+		}
+
+		//for (i = 0; i < K; i++)
 
 		//myPrintf("\nTRISYMGAXPY SUBSELECTION\n");
 		TriSymGaxpy(h0, h1, t0, K, xx); //checked
@@ -801,9 +802,10 @@ long SBL(double *y, //I -- 1D array with the input signal
 			}
 
 		}
-		for (i = 0; i < K; i++) {
-			alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * b);
-		}
+		// 2013.09.01 merged to below
+		//for (i = 0; i < K; i++) {
+		//	alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * b);
+		//}
 
 //        if (n==0){
 //            myPrintf("ALPHA & DIAGSIGMA FIRST ITERATION:\n");
@@ -824,6 +826,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 		//max diff of wpred-w  CRITERIUM of CONVERGENCE
 		delta = 0;
 		for (i = 0; i < K; i++) {
+			alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * b);
 			//myaux=abs(wpred[i]-w[i]);
 			myaux = (wpred[i] - w[i]);
 			if (myaux < 0)
@@ -863,8 +866,9 @@ long SBL(double *y, //I -- 1D array with the input signal
 			K = sizesel;
 
 			//I(sel)
-			for (i = 0; i < sizesel; i++)
+			for (i = 0; i < sizesel; i++){
 				I[i] = I[sel[i]];
+			}
 			//myPrintf("I[%ld]=%ld\n",i,I[i]);
 
 			ComputeHs(I, M, K, h0, h1);
@@ -876,15 +880,20 @@ long SBL(double *y, //I -- 1D array with the input signal
 //            }
 
 			//alpha(sel)
-			for (i = 0; i < K; i++)
-				alpha[i] = alpha[sel[i]];
+			// 2013.09.01 merged to below
+			//for (i = 0; i < K; i++)
+			//	alpha[i] = alpha[sel[i]];
 
 			//myPrintf("I[0]:%ld\n",I[0]);
-			for (i = 0; i < K; i++)
+			for (i = 0; i < K; i++){
+				alpha[i] = alpha[sel[i]];
 				t0[i] = z[I[i]];
-
-			for (i = 0; i < K; i++)
 				xx[i] = 0;
+			}
+
+			// 2013.09.01 merged to above
+			//for (i = 0; i < K; i++)
+			//	xx[i] = 0;
 
 			TriSymGaxpy(h0, h1, t0, K, xx); //checked until here
 			w0 = xx;
@@ -925,15 +934,20 @@ long SBL(double *y, //I -- 1D array with the input signal
 	if (K != 0) {
 
 		//myPrintf("I[0]:%ld\n",I[0]);
-		for (i = 0; i < K; i++)
+		for (i = 0; i < K; i++){
 			t0[i] = z[I[i]];
+			sigw[i] = h0[i];
+			w[i] = 0;
+		}
 
+		// 2013.09.01 merged to above
+		/*
 		for (i = 0; i < K; i++)
 			sigw[i] = h0[i];
 
 		for (i = 0; i < K; i++)
 			w[i] = 0;
-
+		 */
 		TriSymGaxpy(h0, h1, t0, K, w);
 	} else {
 		h0[0] = -1;
@@ -1415,6 +1429,7 @@ long SBLandBE( //Returns breakpoint list length.
 		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
 		double &delta,	//delta convergence
 		long &numEMsteps,	//how many iterations it goes through
+		long &noOfBreakpointsAfterSBL,	//
 		double tol,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
 		long maxit, //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
 		double maxalpha , //Maximum number of iterations to reach convergence...
@@ -1494,7 +1509,7 @@ long SBLandBE( //Returns breakpoint list length.
 	}
 	numEMsteps = SBL(tn, Iext, alpha, Wext + 1, aux, M, &K, sigma2, a, b,
 			maxalpha, maxit, tol, delta, debug);
-
+	noOfBreakpointsAfterSBL = K;	//2013.08.31 K would be changed later on.
 	//Freeing memory
 	myFree(alpha);
 	//myFree(tn);	#2013.08.30
@@ -1515,7 +1530,7 @@ long SBLandBE( //Returns breakpoint list length.
 	if (debug){
 		std::cerr << "_SBLBE_ Backward Elimination T=" << T << " MinLen=" << MinSegLen << std::endl;
 	}
-	BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinSegLen);
+	BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinSegLen, debug);
 
 	Iext = (long*) realloc(Iext, (K + 2) * sizeof(long));
 	Wext = (double *) realloc(Wext, (K + 1) * sizeof(double));
@@ -1538,13 +1553,14 @@ long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 		long *pK, //IO Number breakpoint positions remaining.
 		double sigma2, //IP If sigma2
 		double T, //IP  Threshold to prune,  T=T*sqrt(sigma2);
-		long MinSegLen //IP Minimum length of the segment.
+		long MinSegLen, //IP Minimum length of the segment.
+		long debug
 		) {
 	long i, K, imin, M;
 //    double myaux;
 	double vmin;
 	double *tscore; //Statistical Scores,
-	long *L; //Vector with the smallest of the two neighboring segments of each breakpoint.
+	//long *L; //Vector with the smallest of the two neighboring segments of each breakpoint.
 	long smallinside; //Variable that indicates that there are still small segments to eliminate.
 
 	K = *pK; //Number of breakpoints
@@ -1556,36 +1572,31 @@ long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 	else
 		smallinside = 0;
 
-	L = (long*) myCalloc(K+1,sizeof(long)); //Bring from outside?
+	//L = (long*) myCalloc(K+1,sizeof(long)); //Bring from outside?
 	tscore = (double*) myCalloc(K+1,sizeof(double)); //
 
 	//Computing scores
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("_BEwTandMinLen_ Computing scores\n");
-#endif
+	if (debug){
+			std::cerr << boost::format("_BEwTandMinLen_() Computing scores\n");
+	}
 	for (i = 0; i < K + 1; i++)
 		tscore[i] = 0;
 
 	ComputeTScores(Wext, Iext, tscore, K, 1, K);
 
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("\n_BEwTandMinLen_:K%ld w[0]=%g,w[1]=%g,w[2]=%g,w[K-1]=%g,w[K]=%g\n",K,Wext[0],Wext[1],Wext[2],Wext[K-1],Wext[K]);
-	myPrintf("\n_BEwTandMinLen_:K%ld t[0]=%g,t[1]=%g,t[2]=%g,t[K-1]=%g,t[K]=%g\n",K,tscore[0],tscore[1],tscore[2],tscore[K-1],tscore[K]);
-#endif
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("_BEwTandMinLen_ Backward Elimination sigma2=%g T=%g MinSegLen %ld\n",sigma2,T,MinSegLen);
-#endif
+	if (debug){
+		std::cerr << boost::format("_BEwTandMinLen_:K%1% w[0]=%2%,w[1]=%3%,w[2]=%4%,w[K-1]=%5%,w[K]=%6%\n") % K % Wext[0] % Wext[1] % Wext[2] % Wext[K-1] % Wext[K];
+		std::cerr << boost::format("_BEwTandMinLen_:K%1% t[0]=%2%,t[1]=%3%,t[2]=%4%,t[K-1]=%5%,t[K]=%6%\n") % K % tscore[0] % tscore[1] % tscore[2] % tscore[K-1] % tscore[K];
+		std::cerr << boost::format("_BEwTandMinLen_() Starting Backward Elimination: sigma2=%1% T=%2% MinSegLen %3% ... \n") % sigma2 % T % MinSegLen;
+	}
 
-	BEwTscore(Wext, Iext, tscore, &K, T);
-
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("\n_BEwTandMinLen_:K%ld w[0]=%g,w[1]=%g,w[2]=%g,w[K-1]=%g,w[K]=%g\n",K,Wext[0],Wext[1],Wext[2],Wext[K-1],Wext[K]);
-	myPrintf("\n_BEwTandMinLen_:K%ld t[0]=%g,t[1]=%g,t[2]=%g,t[K-1]=%g,t[K]=%g\n",K,tscore[0],tscore[1],tscore[2],tscore[K-1],tscore[K]);
-#endif
-
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("_BEwTandMinLen_ Small segment prunning ML=%ld SI=%ld \n",MinSegLen,smallinside);
-#endif
+	BEwTscore(Wext, Iext, tscore, &K, T, MinSegLen, debug);
+	if (debug){
+		std::cerr << boost::format("_BEwTandMinLen_:K%1% w[0]=%2%,w[1]=%3%,w[2]=%4%,w[K-1]=%5%,w[K]=%6%\n") % K % Wext[0] % Wext[1]%Wext[2]%Wext[K-1]%Wext[K];
+		std::cerr << boost::format("_BEwTandMinLen_:K%1% t[0]=%2%,t[1]=%3%,t[2]=%4%,t[K-1]=%5%,t[K]=%6%\n") % K%tscore[0]%tscore[1]%tscore[2]%tscore[K-1]%tscore[K];
+		//std::cerr << boost::format("_BEwTandMinLen_() Starting small segment prunning: ML=%1% smallinside=%2% ... \n") % MinSegLen % smallinside;
+	}
+	/*
 	while (smallinside) {
 		//Compute segment lengths of flanking breakpoints
 		for (i = 1; i < K + 1; i++)
@@ -1603,36 +1614,36 @@ long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 		if (imin < 0)
 			smallinside = 0;
 		else {
-#ifdef _DEBUG_BEwTandMinLen_
-			myPrintf("_BEwTandMinLen_ Removing %ld %ld %g Numrem(old)=%ld",Iext[imin],imin,vmin,K);
-#endif
+			if (debug>0){
+				std::cerr << boost::format("_BEwTandMinLen_ Removing %1% %2% %3% Numrem(old)=%4%") % Iext[imin] % imin % vmin % K;
+			}
 			tscore[imin] = -1;
-			BEwTscore(Wext, Iext, tscore, &K, T);
-
-#ifdef _DEBUG_BEwTandMinLen_
-			myPrintf("_BEwTandMinLen_ K = %ld \n",K);
-#endif
+			BEwTscore(Wext, Iext, tscore, &K, T, MinSegLen);
+			if (debug>0){
+				std::cerr << boost::format(" _BEwTandMinLen_ K = %1% \n")%K;
+			}
 		}
 		if (K < 1)
 			smallinside = 0;
 	}
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("T=%g K=%ld\n",T,K);
-	myPrintf("_BEwTandMinLen_ Small segment prunning ends imin=%ld vmin=%g\n",imin,vmin);
-#endif
+
+	if (debug>0){
+		std::cerr << boost::format("T=%1% K=%2%\n") % T % K;
+		std::cerr << boost::format("_BEwTandMinLen_ Small segment prunning ends imin=%1% vmin=%2%\n") % imin % vmin;
+	}
+	*/
 
 	// for (i=1;i<K;i++)
 	//     Wext[i]=0.0;
 	// for (i=1;i<K;i++)
 	//     Wext[i]=w2[Iext[i]];
 
-#ifdef _DEBUG_BEwTandMinLen_
-	myPrintf("_BEwTandMinLen_ After BE K=%ld \n",K);
-#endif
-
+	if (debug>0){
+		std::cerr << boost::format("_BEwTandMinLen_() finished. number of breakpoints=%1% \n") % K;
+	}
 	//Freeing memory
 	myFree(tscore);
-	myFree(L);
+	//myFree(L);
 
 	*pK = K;
 	return K;
@@ -1643,92 +1654,132 @@ long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		long *Iext, //IO Breakpoint positions in extended notation...
 		double *tscore, long *pK, //IO Number breakpoint positions remaining.
-		double T //IP  Threshold to prune
+		double T, //IP  Threshold to prune
+		long MinSegLen,	//minimum segment length
+		long debug
 		) {
-	long i, K, jmin, M;
+	long i, K, indexOfSegmentToRemove, M;
 	double vmin;
+	long *L; //Vector with the smallest of the two neighboring segments of each breakpoint.
 
 	K = *pK; //Number of breakpoints
 	M = Iext[K + 1]; //Total length
+	L = (long*) myCalloc(K+1,sizeof(long)); //array to store segment length
 
-#ifdef _DebugBEwTscore_
-	myPrintf("_DebugBEwTscore_ BE starts K=%ld M=%ld T=%g\n",K,M,T);
-#endif
+	if (debug>0){
+		std::cerr << boost::format("BEwTscore(): BE starts K=%1% M=%2% T=%3% ... \n")% K%M%T;
+	}
 
 	vmin = 0;
-	while ((vmin < T) && (K > 0)) {
-		//Find breakpoint with lowest score to remove
-		jmin = -1;
+	double shortestSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
+	long previousRoundShortestSegmentLength = -1;
+	double previousRoundMinScore=-1;
+	long counter = 0;
+	while ((vmin < T || shortestSegmentLength<MinSegLen) && (K > 0)) {
+		shortestSegmentLength=1E100;
+		indexOfSegmentToRemove = -1;
 		vmin = 1E100;
-		for (i = 1; i < K + 1; i++)
-			if (tscore[i] < vmin) {
-				vmin = tscore[i];
-				jmin = i;
+		if (indexOfSegmentToRemove==-1 && previousRoundMinScore<T){
+			//Find breakpoint with lowest score to remove
+			for (i = 1; i < K + 1; i++){
+				if (tscore[i] < vmin) {
+					vmin = tscore[i];
+					if (vmin<T){
+						indexOfSegmentToRemove = i;
+					}
+					if (fabs(vmin-previousRoundMinScore)<1E-8){
+						//break if this score is very close to previous lowest score
+						break;
+					}
+				}
 			}
-#ifdef _DebugBEwTscore_
-		myPrintf("_DebugBEwTscore_ Smallest breakpoint imin=%ld vmin=%g T=%g\n",jmin,vmin,T);
-#endif
-		if (vmin < T) //Remove breakpoint at imin
-				{
-#ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ Removing imin=%ld vmin=%g T=%g\n",jmin,vmin,T);
-#endif
+			previousRoundMinScore = vmin;
+		}
+
+		if (indexOfSegmentToRemove==-1 && MinSegLen>0 && previousRoundShortestSegmentLength<MinSegLen){
+			//didn't find a segment with low enough score. now check segment length
+			//Compute segment lengths of flanking breakpoints
+			for (i = 1; i < K + 1; i++){
+				L[i] = min(Iext[i]-Iext[i-1],Iext[i+1]-Iext[i]);
+				if (L[i]<shortestSegmentLength){
+					shortestSegmentLength=L[i];
+					if (shortestSegmentLength<MinSegLen){
+						indexOfSegmentToRemove =i;
+					}
+					if (shortestSegmentLength==previousRoundShortestSegmentLength){
+						//break if current segment is already smallest.
+						break;
+					}
+				}
+			}
+			previousRoundShortestSegmentLength = shortestSegmentLength;
+		}
+		if (debug>0 && counter%100000==0){
+			std::cerr << boost::format("BEwTscore(): no=%5%, Smallest breakpoint indexOfSegmentToRemove=%1% vmin=%2% T=%3% shortestSegmentLength=%4% numberOfSegments=%6% \n") %
+						indexOfSegmentToRemove % vmin % T % shortestSegmentLength % counter % K;
+		}
+		counter ++;
+		if (indexOfSegmentToRemove!=-1){ //Remove breakpoint at indexOfSegmentToRemove
+			//if (debug>0){
+			//	std::cerr << boost::format("_DebugBEwTscore_ Removing indexOfSegmentToRemove=%1% vmin=%2% T=%3% \n")% indexOfSegmentToRemove % vmin % T;
+				//std::cerr << boost::format("_DebugBEwTscore_ %ld, W[indexOfSegmentToRemove-2]=%g W[indexOfSegmentToRemove-1]=%g W[indexOfSegmentToRemove]=%g W[indexOfSegmentToRemove+1]=%g W[indexOfSegmentToRemove+2]=%g T=%g\n") %indexOfSegmentToRemove,Wext[indexOfSegmentToRemove-2],Wext[indexOfSegmentToRemove-1],Wext[indexOfSegmentToRemove],Wext[indexOfSegmentToRemove+1],Wext[indexOfSegmentToRemove+2] %T;
+				//myPrintf("_DebugBEwTscore_ %ld, I[indexOfSegmentToRemove-2]=%ld I[indexOfSegmentToRemove-1]=%ld I[indexOfSegmentToRemove]=%ld I[indexOfSegmentToRemove+1]=%ld I[indexOfSegmentToRemove+2]=%ld T=%g\n",indexOfSegmentToRemove,Iext[indexOfSegmentToRemove-2],Iext[indexOfSegmentToRemove-1],Iext[indexOfSegmentToRemove],Iext[indexOfSegmentToRemove+1],Iext[indexOfSegmentToRemove+2],T);
+				//myPrintf("_DebugBEwTscore_ %ld, t[indexOfSegmentToRemove-2]=%g t[indexOfSegmentToRemove-1]=%g t[indexOfSegmentToRemove]=%g I[indexOfSegmentToRemove+1]=%g t[indexOfSegmentToRemove+2]=%g T=%g\n",indexOfSegmentToRemove,tscore[indexOfSegmentToRemove-2],tscore[indexOfSegmentToRemove-1],tscore[indexOfSegmentToRemove],tscore[indexOfSegmentToRemove+1],tscore[indexOfSegmentToRemove+2],T);
+			//}
+			K = RemoveBreakpoint(Wext, Iext, tscore, K, indexOfSegmentToRemove);
+			ComputeTScores(Wext, Iext, tscore, K, indexOfSegmentToRemove - 1, indexOfSegmentToRemove);
 
 #ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ Removing imin=%ld vmin=%g T=%g\n",jmin,vmin,T);
-#endif
-
-#ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ %ld, W[jmin-2]=%g W[jmin-1]=%g W[jmin]=%g W[jmin+1]=%g W[jmin+2]=%g T=%g\n",jmin,Wext[jmin-2],Wext[jmin-1],Wext[jmin],Wext[jmin+1],Wext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %ld, I[jmin-2]=%ld I[jmin-1]=%ld I[jmin]=%ld I[jmin+1]=%ld I[jmin+2]=%ld T=%g\n",jmin,Iext[jmin-2],Iext[jmin-1],Iext[jmin],Iext[jmin+1],Iext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %ld, t[jmin-2]=%g t[jmin-1]=%g t[jmin]=%g I[jmin+1]=%g t[jmin+2]=%g T=%g\n",jmin,tscore[jmin-2],tscore[jmin-1],tscore[jmin],tscore[jmin+1],tscore[jmin+2],T);
-#endif
-			for (i = jmin; i < K; i++)
-				tscore[i] = tscore[i + 1];
-			K = RemoveBreakpoint(Wext, Iext, K, jmin);
-			ComputeTScores(Wext, Iext, tscore, K, jmin - 1, jmin);
-
-#ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ %ld, W[jmin-2]=%g W[jmin-1]=%g W[jmin]=%g W[jmin+1]=%g W[jmin+2]=%g T=%g\n",jmin,Wext[jmin-2],Wext[jmin-1],Wext[jmin],Wext[jmin+1],Wext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %ld, I[jmin-2]=%ld I[jmin-1]=%ld I[jmin]=%ld I[jmin+1]=%ld I[jmin+2]=%ld T=%g\n",jmin,Iext[jmin-2],Iext[jmin-1],Iext[jmin],Iext[jmin+1],Iext[jmin+2],T);
-			myPrintf("_DebugBEwTscore_ %ld, t[jmin-2]=%g t[jmin-1]=%g t[jmin]=%g I[jmin+1]=%g t[jmin+2]=%g T=%g\n",jmin,tscore[jmin-2],tscore[jmin-1],tscore[jmin],tscore[jmin+1],tscore[jmin+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, W[indexOfSegmentToRemove-2]=%g W[indexOfSegmentToRemove-1]=%g W[indexOfSegmentToRemove]=%g W[indexOfSegmentToRemove+1]=%g W[indexOfSegmentToRemove+2]=%g T=%g\n",indexOfSegmentToRemove,Wext[indexOfSegmentToRemove-2],Wext[indexOfSegmentToRemove-1],Wext[indexOfSegmentToRemove],Wext[indexOfSegmentToRemove+1],Wext[indexOfSegmentToRemove+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, I[indexOfSegmentToRemove-2]=%ld I[indexOfSegmentToRemove-1]=%ld I[indexOfSegmentToRemove]=%ld I[indexOfSegmentToRemove+1]=%ld I[indexOfSegmentToRemove+2]=%ld T=%g\n",indexOfSegmentToRemove,Iext[indexOfSegmentToRemove-2],Iext[indexOfSegmentToRemove-1],Iext[indexOfSegmentToRemove],Iext[indexOfSegmentToRemove+1],Iext[indexOfSegmentToRemove+2],T);
+			myPrintf("_DebugBEwTscore_ %ld, t[indexOfSegmentToRemove-2]=%g t[indexOfSegmentToRemove-1]=%g t[indexOfSegmentToRemove]=%g I[indexOfSegmentToRemove+1]=%g t[indexOfSegmentToRemove+2]=%g T=%g\n",indexOfSegmentToRemove,tscore[indexOfSegmentToRemove-2],tscore[indexOfSegmentToRemove-1],tscore[indexOfSegmentToRemove],tscore[indexOfSegmentToRemove+1],tscore[indexOfSegmentToRemove+2],T);
 #endif
 
 		}
 	}
-#ifdef _DebugBEwTscore_
-	myPrintf("_DebugBEwTscore_ BE ends imin=%ld vmin=%g T=%g K=%ld\n",jmin,vmin,T,K);
-#endif
+	if (debug>0){
+		std::cerr << boost::format("BEwTscore(): no=%5%, Smallest breakpoint indexOfSegmentToRemove=%1% vmin=%2% T=%3% shortestSegmentLength=%4% numberOfSegments=%6% \n") %
+								indexOfSegmentToRemove % vmin % T % shortestSegmentLength % counter % K;
+		std::cerr << boost::format("BEwTscore(): BE ends indexOfSegmentToRemove=%1% vmin=%2% T=%3% numberOfSegments=%4% \n") % indexOfSegmentToRemove%vmin%T%K;
+	}
 
 	*pK = K;
 	return K;
 }
 
-long RemoveBreakpoint(double *Wext, long *Iext, long K, long jrem) {
+long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long indexOfSegmentToRemove) {
 	long j;
 	double iC, iL, iR, M;
 
 	M = (double) Iext[K + 1];
-	iL = (double) Iext[jrem - 1];
-	iC = (double) Iext[jrem];
-	iR = (double) Iext[jrem + 1];
+	iL = (double) Iext[indexOfSegmentToRemove - 1];
+	iC = (double) Iext[indexOfSegmentToRemove];
+	iR = (double) Iext[indexOfSegmentToRemove + 1];
 
 	//Change coefficients
-	if (jrem > 1)
-		Wext[jrem - 1] = Wext[jrem - 1]
+	if (indexOfSegmentToRemove > 1){
+		Wext[indexOfSegmentToRemove - 1] = Wext[indexOfSegmentToRemove - 1]
 				+ sqrt((M - iL) / (M - iC) * iL / iC) * (iR - iC) / (iR - iL)
-						* Wext[jrem];
-	if (jrem < K)
-		Wext[jrem + 1] = Wext[jrem + 1]
+						* Wext[indexOfSegmentToRemove];
+	}
+	if (indexOfSegmentToRemove < K){
+		Wext[indexOfSegmentToRemove + 1] = Wext[indexOfSegmentToRemove + 1]
 				+ sqrt((M - iR) / (M - iC) * iR / iC) * (iC - iL) / (iR - iL)
-						* Wext[jrem];
-	Wext[jrem] = 0; //
-
+						* Wext[indexOfSegmentToRemove];
+	}
+	Wext[indexOfSegmentToRemove] = 0; //
 	//Shorten list
-	for (j = jrem; j < K; j++)
+	for (j = indexOfSegmentToRemove; j < K; j++){
+		tscore[j] = tscore[j + 1];
 		Wext[j] = Wext[j + 1];
-	for (j = jrem; j < K + 1; j++)
 		Iext[j] = Iext[j + 1];
+	}
+	//2013.09.01 last one for Iext
+	if (indexOfSegmentToRemove<=K){
+		Iext[K] = Iext[K + 1];
+	}
+	//for (j = indexOfSegmentToRemove; j < K + 1; j++)
+	//	Iext[j] = Iext[j + 1];
 	return K - 1;
 }
 
