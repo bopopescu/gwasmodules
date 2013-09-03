@@ -1471,7 +1471,9 @@ long SBLandBE( //Returns breakpoint list length.
 		}
 		sigma2 = sigma2 / (M - 1);
 	}
-
+	if (debug){
+		std::cerr << boost::format("sigma^2 (of difference of adjacent values) = %1% .\n")% sigma2;
+	}
 	//Mean removal
 	ymean = 0;
 	for (i = 0; i < M; ++i)
@@ -1667,18 +1669,22 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 	L = (long*) myCalloc(K+1,sizeof(long)); //array to store segment length
 
 	if (debug>0){
-		std::cerr << boost::format("BEwTscore(): BE starts K=%1% M=%2% T=%3% ... \n")% K%M%T;
+		std::cerr << boost::format("BEwTscore(): BE starts K=%1% M=%2% T=%3% MinSegLen=%4% ... \n")% K % M % T % MinSegLen;
 	}
 
 	vmin = 0;
-	double shortestSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
-	long previousRoundShortestSegmentLength = -1;
+	long toRemoveSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
+	long previousToRemoveSegmentLength = -1;
 	double previousRoundMinScore=-1;
 	long counter = 0;
-	while ((vmin < T || shortestSegmentLength<MinSegLen) && (K > 0)) {
-		shortestSegmentLength=1E100;
+	while ((vmin < T || toRemoveSegmentLength<MinSegLen) && (K > 0)) {
+		toRemoveSegmentLength=1000000000000;	//1 trillion ,very large
 		indexOfSegmentToRemove = -1;
 		vmin = 1E100;
+		if (debug>0 && counter%100000==0){
+			std::cerr << boost::format("BEwTscore(): iteration no=%5%, T=%3% indexOfSegmentToRemove=%1% vmin=%2% tscore[i]=%7% previousRoundMinScore=%8% previousToRemoveSegmentLength=%9% toRemoveSegmentLength=%4% nOOfSegments=%6% \n") %
+						indexOfSegmentToRemove % vmin % T % toRemoveSegmentLength % counter % K % tscore[indexOfSegmentToRemove] % previousRoundMinScore % previousToRemoveSegmentLength;
+		}
 		if (indexOfSegmentToRemove==-1 && previousRoundMinScore<T){
 			//Find breakpoint with lowest score to remove
 			for (i = 1; i < K + 1; i++){
@@ -1696,27 +1702,28 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 			previousRoundMinScore = vmin;
 		}
 
-		if (indexOfSegmentToRemove==-1 && MinSegLen>0 && previousRoundShortestSegmentLength<MinSegLen){
+		if (indexOfSegmentToRemove==-1 && MinSegLen>0 && previousToRemoveSegmentLength<MinSegLen){
+			vmin=1E100;	//reset this value
 			//didn't find a segment with low enough score. now check segment length
 			//Compute segment lengths of flanking breakpoints
 			for (i = 1; i < K + 1; i++){
 				L[i] = min(Iext[i]-Iext[i-1],Iext[i+1]-Iext[i]);
-				if (L[i]<shortestSegmentLength){
-					shortestSegmentLength=L[i];
-					if (shortestSegmentLength<MinSegLen){
-						indexOfSegmentToRemove =i;
-					}
-					if (shortestSegmentLength==previousRoundShortestSegmentLength){
+				if (L[i]<MinSegLen && tscore[i]<=vmin){	//lowest score among all short segments, not shortest
+					toRemoveSegmentLength=L[i];
+					vmin = tscore[i];
+					indexOfSegmentToRemove =i;
+					//if (toRemoveSegmentLength==previousToRemoveSegmentLength){
 						//break if current segment is already smallest.
-						break;
-					}
+						//break;
+					//}
 				}
 			}
-			previousRoundShortestSegmentLength = shortestSegmentLength;
+			previousToRemoveSegmentLength = toRemoveSegmentLength;
+			previousRoundMinScore = vmin;
 		}
 		if (debug>0 && counter%100000==0){
-			std::cerr << boost::format("BEwTscore(): no=%5%, Smallest breakpoint indexOfSegmentToRemove=%1% vmin=%2% T=%3% shortestSegmentLength=%4% numberOfSegments=%6% \n") %
-						indexOfSegmentToRemove % vmin % T % shortestSegmentLength % counter % K;
+			std::cerr << boost::format("BEwTscore(): iteration no=%5%, T=%3% indexOfSegmentToRemove=%1% vmin=%2% tscore[i]=%7% previousRoundMinScore=%8% previousToRemoveSegmentLength=%9% toRemoveSegmentLength=%4% nOOfSegments=%6% \n") %
+						indexOfSegmentToRemove % vmin % T % toRemoveSegmentLength % counter % K % tscore[indexOfSegmentToRemove] % previousRoundMinScore % previousToRemoveSegmentLength;
 		}
 		counter ++;
 		if (indexOfSegmentToRemove!=-1){ //Remove breakpoint at indexOfSegmentToRemove
@@ -1738,9 +1745,8 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		}
 	}
 	if (debug>0){
-		std::cerr << boost::format("BEwTscore(): no=%5%, Smallest breakpoint indexOfSegmentToRemove=%1% vmin=%2% T=%3% shortestSegmentLength=%4% numberOfSegments=%6% \n") %
-								indexOfSegmentToRemove % vmin % T % shortestSegmentLength % counter % K;
-		std::cerr << boost::format("BEwTscore(): BE ends indexOfSegmentToRemove=%1% vmin=%2% T=%3% numberOfSegments=%4% \n") % indexOfSegmentToRemove%vmin%T%K;
+		std::cerr << boost::format("BEwTscore(): Last iteration no=%5%, T=%3% indexOfSegmentToRemove=%1% vmin=%2% tscore[i]=%7% previousRoundMinScore=%8% previousToRemoveSegmentLength=%9% toRemoveSegmentLength=%4% nOOfSegments=%6% \n") %
+								indexOfSegmentToRemove % vmin % T % toRemoveSegmentLength % counter % K % tscore[indexOfSegmentToRemove] % previousRoundMinScore % previousToRemoveSegmentLength;
 	}
 
 	*pK = K;

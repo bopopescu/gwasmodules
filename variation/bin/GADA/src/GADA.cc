@@ -75,11 +75,11 @@ public:
 				"# \t\t shape parameter of the Gamma distribution. Default value %g.\n",
 				a);
 		fprintf(fd,
-				"# \t\t Higher (lower) value more (less) breakpoints expected a priori\n");
+				"# \t\t Higher (lower) value less (more) breakpoints expected a priori\n");
 		fprintf(fd,
 				"# \t -T\t is the backward elimination critical value for a breakpoint. \n");
 		fprintf(fd,
-				"# \t\t i.e. the minimum difference between the segment means divided\n");
+				"# \t\t i.e. the minimum difference between the (mean1-mean2)/segment divided\n");
 		fprintf(fd, "# \t\t by sigma. The default value for T is %g\n", T);
 		fprintf(fd,
 				"# \t -M\t is the minimum size in number of probes for a segment to be \n");
@@ -544,9 +544,9 @@ BOOST_PYTHON_MODULE(GADA)
 void GADA::constructOptionDescriptionStructure(){
 	optionDescription.add_options()("help,h", "produce help message")
 				("TBackElim,T", po::value<double>(&T)->default_value(5.0),
-					" is the backward elimination critical value for a breakpoint. i.e. the minimum difference between the segment means divided by sigma.")
-				("aAlpha,a", po::value<double>(&a)->default_value(0.2),
-					"is the SBL hyper prior parameter for a breakpoint. It is the  shape parameter of the Gamma distribution. Higher (lower) value more (less) breakpoints expected a priori.")
+					" is the backward elimination critical value for a breakpoint. i.e. minimum (mean1-mean2)/stddev difference between two adjacent segments.")
+				("aAlpha,a", po::value<double>(&a)->default_value(0.5),
+					"is the SBL hyper prior parameter for a breakpoint. It is the  shape parameter of the Gamma distribution. Higher (lower) value means less (more) breakpoints expected a priori.")
 				("MinSegLen,M", po::value<long>(&MinLen)->default_value(0),
 					"is the minimum size in number of probes for a segment to be deemed significant.")
 				("BaseAmp", po::value<double>(&BaseAmp)->default_value(0.0),
