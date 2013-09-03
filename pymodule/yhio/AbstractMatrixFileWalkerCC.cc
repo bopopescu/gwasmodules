@@ -9,6 +9,7 @@ AbstractMatrixFileWalkerCC::AbstractMatrixFileWalkerCC(int _argc, char* _argv[])
 	debug=0;
 	report=0;
 	programName = _argv[0];
+	noOfOutput=0;	//recording how many times output has happened.
 	//strcpy(_argv[0], programName.c_str());	//2013.08.20 does no work
 
 	cerr << "program name is " << programName << "." <<endl;
@@ -36,7 +37,9 @@ void AbstractMatrixFileWalkerCC::constructOptionDescriptionStructure(){
 				("fractionToSample,f", po::value<float>(&fractionToSample)->default_value(1.0),
 					"how often you include the data, a probability between 0 and 1.")
 				("whichColumn,w", po::value<int >(&whichColumn)->default_value(0),
-						"which column of inputFname is the target stat, --inputFileFormat=1 only.")
+					"which column of inputFname is the target stat, --inputFileFormat=1 only.")
+				("inputFileSortMode", po::value<int >(&inputFileSortMode)->default_value(0),
+						"sorting mode of input file(s) 0: not sorted, 1: sorted.")
 				("whichColumnHeader,W", po::value<string >(&whichColumnHeader),
 						"column header of the data to be used, substitute whichColumn")
 				("missingDataNotation", po::value<string>(&missingDataNotation),
@@ -130,6 +133,9 @@ void AbstractMatrixFileWalkerCC::postFileFunction(){
 }
 
 int AbstractMatrixFileWalkerCC::processRow(tokenizerCharType &line_toks){
+	/*
+	 * if returnValue==-1, it signals parent function to break the for-loop of file reading
+	 */
 	int returnValue = 0;
 	tokenizerCharType::iterator tokenizer_iter = line_toks.begin();
 	for (int i=0;i<whichColumn;i++){
@@ -170,6 +176,7 @@ int AbstractMatrixFileWalkerCC::outputRow(tokenizerCharType &line_toks){
 	outputStream.flush();
 	//outputStream.clear();	#this clears the string just added. => no output.
 	returnValue = 1;
+	noOfOutput++;
 	return returnValue;
 }
 void  AbstractMatrixFileWalkerCC::openOneInputFile(string &inputFname, boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer){
@@ -233,6 +240,9 @@ void AbstractMatrixFileWalkerCC::handleOneFile(string &inputFname){
 			tokenizerCharType line_toks(line, sep);
 			rowReturnValue = processRow(line_toks);
 			noOfSampled++;
+			if (rowReturnValue==-1){	//2013.09.03 break signal
+				break;
+			}
 			real_counter += rowReturnValue;
 			std::getline(inputStream, line);
 		}

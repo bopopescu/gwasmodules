@@ -62,6 +62,7 @@ protected:
 	int minNoOfTotal;
 	int maxNoOfTotal;
 	float fractionToSample;
+	int inputFileSortMode;	//2013.09.03
 	int whichColumn;
 	string whichColumnHeader;
 	vector<string> inputFnameList;
@@ -76,6 +77,7 @@ protected:
 
 	std::ofstream outputFile;
 	boost::iostreams::filtering_streambuf<boost::iostreams::output> outputFilterStreamBuffer;
+	long noOfOutput;	//2013.09.03 recording how many times output has happened.
 
 	string _currentFilename;
 	string _statInStr;

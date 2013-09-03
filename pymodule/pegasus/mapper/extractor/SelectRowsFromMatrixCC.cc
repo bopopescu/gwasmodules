@@ -36,6 +36,9 @@ int SelectRowsFromMatrixCC::processRow(tokenizerCharType &line_toks){
 		this->outputRow(line_toks);
 		returnValue = 1;
 	}
+	else if (inputFileSortMode>0 && noOfOutput>0){	//file is sorted and has passed the section to be selected, early exit.
+		returnValue = -1;
+	}
 	return returnValue;
 }
 
