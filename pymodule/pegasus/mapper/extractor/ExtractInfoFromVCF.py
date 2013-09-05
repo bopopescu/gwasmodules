@@ -16,7 +16,7 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-import cStringIO, re, csv
+import csv
 from pymodule import ProcessOptions, figureOutDelimiter
 from pymodule.utils import sortCMPBySecondTupleValue
 from pymodule.yhio.VCFFile import VCFFile
