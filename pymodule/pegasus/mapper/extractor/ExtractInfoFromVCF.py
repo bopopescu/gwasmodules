@@ -70,9 +70,6 @@ class ExtractInfoFromVCF(AbstractMapper):
 		if self.debug:
 			import pdb
 			pdb.set_trace()
-			debug = True
-		else:
-			debug =False
 		
 		
 		
