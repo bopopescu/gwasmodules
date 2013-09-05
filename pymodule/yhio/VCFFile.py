@@ -630,6 +630,20 @@ class VCFFile(object):
 			else:	#leave everything for parseFile or parseIter
 				break
 	
+	def constructColName2IndexFromHeader(self):
+		"""
+		2013.09.05
+			to be compatible with MatrixFile
+		"""
+		return self.col_name2index
+	
+	def getHeader(self):
+		"""
+		2013.09.05
+			to be compatible with MatrixFile
+		"""
+		return self.header
+	
 	def parseIter(self):
 		"""
 		2011-11-2
