@@ -20,11 +20,12 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 import csv, random
-from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils, getColName2IndexFromHeader, figureOutDelimiter
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.pegasus.mapper.AbstractMapper import AbstractMapper
 from pymodule.yhio.MatrixFile import MatrixFile
 from pymodule.yhio.HDF5MatrixFile import HDF5MatrixFile
 from pymodule.yhio.YHPyTables import YHFile
+from pymodule.yhio.VCFFile import VCFFile
 
 class AbstractMatrixFileWalker(AbstractMapper):
 	__doc__ = __doc__
@@ -41,7 +42,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 						('valueForNonPositiveYValue', 1, float): [-1, 'v', 1, 'default value when log-transformation fails (when value is negative)'],\
 						('missingDataNotation', 0, ): ['NA', '', 1, 'coma-separated list of notations for missing data.\n\
 	missing data will be skipped.'],\
-						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; '],\
+						('inputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; 4: VCFFile'],\
 						('outputFileFormat', 0, int): [1, '', 1, '1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; 4: csv-like matrix, without header'],\
 						})
 	
@@ -196,6 +197,19 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		if hasattr(self, 'plot'):
 			return self.plot(**keywords)
 	
+	def openOneInputFile(self, inputFname=None):
+		"""
+		2013.09.05 split out of fileWalker() , added VCFFile
+		"""
+		if self.inputFileFormat==2:	#2012.12.20
+			reader = YHFile(inputFname, openMode='r', tableName=self.h5TableName)
+		elif self.inputFileFormat==3:	#2012.11.22
+			reader = HDF5MatrixFile(inputFname, openMode='r')
+		elif self.inputFileFormat==4:
+			reader = VCFFile(inputFname=inputFname)
+		else:
+			reader = MatrixFile(inputFname)
+		return reader
 	
 	def fileWalker(self, inputFname=None, preFileFunction=None, afterFileFunction=None, processRowFunction=None , run_type=1):
 		"""
@@ -215,13 +229,7 @@ class AbstractMatrixFileWalker(AbstractMapper):
 		if afterFileFunction is None:
 			afterFileFunction = self.afterFileFunction
 		try:
-			if self.inputFileFormat==1:	#2012.11.22 support HDF5MatrixFile
-				reader = MatrixFile(inputFname)
-			elif self.inputFileFormat==2:	#2012.12.20
-				reader = YHFile(inputFname, openMode='r', tableName=self.h5TableName)
-			else:	#2012.11.22
-				reader = HDF5MatrixFile(inputFname, openMode='r')
-			
+			reader = self.openOneInputFile(inputFname)
 			col_name2index = reader.constructColName2IndexFromHeader()
 			header = reader.getHeader()
 			
