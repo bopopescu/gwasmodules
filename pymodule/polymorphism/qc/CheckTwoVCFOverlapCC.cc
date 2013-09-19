@@ -130,7 +130,7 @@ void CheckTwoVCFOverlapCC::findOverlapSamples(VariantCallFile& vcfFile1, Variant
 	*/
 	sort(overlapping_sample_id_list.begin(), overlapping_sample_id_list.end());
 	if (debug){
-		cerr<<boost::format(" %1% overlap samples ") % overlapping_sample_id_list.size() ;
+		cerr<<boost::format(" %1% overlap samples.\n") % overlapping_sample_id_list.size() ;
 	}
 }
 
