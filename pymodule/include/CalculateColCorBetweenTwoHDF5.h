@@ -5,13 +5,13 @@
  * */
 #include <iostream>
 #include <string>
+#include <map>
 #include <fstream>
 #include <cmath>	//sqrt
 #include <getopt.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ext/hash_map>	//for hash_map
 
 #ifndef H5_NO_NAMESPACE
 #ifndef H5_NO_STD
@@ -39,7 +39,7 @@ typedef struct s1_t {
 	int a;
 	int b;
 	float c;
-} s1_t;
+} outputStruct;
 
 class CalculateColCorBetweenTwoHDF5
 {
@@ -74,7 +74,7 @@ class CalculateColCorBetweenTwoHDF5
 	int outputDatasetMaxLength;
 	int outputDatasetLength;
 	int outputDatasetRank;
-	s1_t* outputDataInMemory;
+	outputStruct* outputDataInMemory;
 
 	public:
 		CalculateColCorBetweenTwoHDF5(char* _input1Fname, char* _input2Fname, char* outf_name, int _i1_start, int _i1_stop,
@@ -86,7 +86,7 @@ class CalculateColCorBetweenTwoHDF5
 		double cor(int* &data_matrix1, int* &data_matrix2, int matrix1_col_index, int matrix2_col_index, int &no_of_rows);
 		void cleanupMemory();
 		void run();
-		int output(s1_t* &dataInMemory, H5std_string &outputFname);
+		int output(outputStruct* &dataInMemory, H5std_string &outputFname);
 
 };
 
@@ -105,17 +105,17 @@ class FindMaxLDBetweenPeakAndEachLocus
 	DataSpace dataspace1;
 
 	H5std_string withinPeakLocusIDFname;
-	s1_t *inputCorrelationInMemory;
+	outputStruct *inputCorrelationInMemory;
 
-	__gnu_cxx::hash_map <int, s1_t> fstLocusId2CorStruc;
-	__gnu_cxx::hash_map <int, int> sndLocusIdMap;
+	map <int, outputStruct> fstLocusId2CorStruc;
+	map <int, int> sndLocusIdMap;
 
 	H5std_string outputFname;
 	H5File out;
 	int outputDatasetMaxLength;
 	int outputDatasetLength;
 	int outputDatasetRank;
-	s1_t* outputDataInMemory;
+	outputStruct* outputDataInMemory;
 
 	public:
 		FindMaxLDBetweenPeakAndEachLocus(char* _input1Fname, char* _withinPeakLocusIDFname, char* _outputFname, int _i1_start, int _i1_stop);

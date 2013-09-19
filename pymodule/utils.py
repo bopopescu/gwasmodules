@@ -780,7 +780,7 @@ def getPhredScoreOutOfSolexaScore(solexaChar):
 	import math
 	return 10*math.log10(1 + math.pow(10, (ord(solexaChar) - 64) / 10.0))
 
-def getFileBasenamePrefixFromPath(path=None, fakeSuffixSet = ['.gz']):
+def getFileBasenamePrefixFromPath(path=None, fakeSuffixSet = set(['.gz', '.zip', '.bz2', '.bz'])):
 	"""
 	2013.06.21 convenient function
 		i.e. 

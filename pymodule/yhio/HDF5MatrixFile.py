@@ -60,7 +60,7 @@ sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 import csv
 import h5py
 import numpy
-from pymodule.utils import PassingData, PassingDataList
+from pymodule.utils import PassingData, PassingDataList,getListOutOfStr 
 from pymodule.ProcessOptions import  ProcessOptions
 from pymodule.yhio.MatrixFile import MatrixFile
 varLenStrType = h5py.new_vlen(str)
@@ -363,8 +363,9 @@ class YHTableInHDF5Group(object):
 			setVariable.add(attributeValue)
 		return setVariable
 	
-	def addObjectListAttributeToSet(self, attributeName=None, setVariable=None):
+	def addObjectListAttributeToSet(self, attributeName=None, setVariable=None, data_type=None):
 		"""
+		2013.09.10 bugfix, added argument data_type
 		2012.12.3
 		2012.12.2 bugfix
 		2012.11.23

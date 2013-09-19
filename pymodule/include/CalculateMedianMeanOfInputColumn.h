@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ext/hash_map>	//for hash_map
+#include <map>	//for hash_map
 #include <boost/program_options.hpp>	//for program options
 #include <fstream>
 #include <exception>
@@ -55,7 +55,7 @@ class CalculateMedianMeanOfInputColumn{
 	string inputStatName;	//name of the statistics in the input file
 	arma::mat statList;	//armadillo matrix storing all the sampled stats
 	int statListExpansionStepSize;	//each time, statList is expanded, this parameter controls the size of expansion
-	__gnu_cxx::hash_map <long, long> stat2Frequency;	//needed to calculate mode
+	map <long, long> stat2Frequency;	//needed to calculate mode
 	// Define an accumulator set for calculating the mean and the median
 	ba::accumulator_set<double, ba::stats<ba::tag::mean, ba::tag::median > > accumulatorSet;
 

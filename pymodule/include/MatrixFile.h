@@ -10,6 +10,14 @@
  *	outputFile->write(sumValue);
  *	outputFile->write("\n");
  *
+ *	vector<string> header { "sample_id", "no_of_matches", "no_of_non_NA_pairs", "matchFraction" };
+ *	outputFile->writeRow(header);
+ *
+ *	typedef boost::spirit::hold_any anyType;
+ *
+ *	vector< anyType > dataRow {anyType(chromosome), anyType(chrLength)};
+ *	outputFile->writeRow(dataRow);
+ *
  *
  */
 #include <iostream>
@@ -20,10 +28,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <list>
 #include <functional>	//2013.09.11 for customize hash
 #include <boost/functional/hash.hpp>	//2013.09.10 yh: for customize boost::hash
 #include <boost/tokenizer.hpp>
-#include <boost/assign/list_inserter.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/assign/list_inserter.hpp>
 #include <boost/bimap.hpp>
@@ -41,6 +49,8 @@
 #include <boost/random/variate_generator.hpp>
 #include <boost/format.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/any.hpp>
+#include <boost/spirit/home/support/detail/hold_any.hpp>
 //#include <boost/generator_iterator.hpp>
 #include "utils.h"
 
@@ -252,11 +262,17 @@ public:
 		return header;
 	}
 
-	template <class contentType>
+	template <typename contentType>
 	int writeRow(vector<contentType>& contentList){
 		int returnValue = 0;
-		string combinedString = join(contentList, delimiter);
-		outputStream << combinedString << endl;
+		typename std::vector<contentType>::iterator e = contentList.begin();
+		outputStream << *e++;
+		for (; e != contentList.end(); ++e) {
+			outputStream << delimiter << *e;
+		}
+		outputStream << endl;
+		//string combinedString = join(contentList, delimiter);
+		//outputStream << combinedString << endl;
 		returnValue = 1;
 		noOfRows++;
 		return returnValue;
@@ -265,12 +281,34 @@ public:
 	template<typename Iter>
 	int writeRow(Iter begin, Iter end){
 		int returnValue = 0;
-		string combinedString = joinIteratorToString(begin, end, delimiter);
-		outputStream << combinedString << endl;
+		//string combinedString = joinIteratorToString(begin, end, delimiter);
+		//outputStream << combinedString << endl;
+		if (begin != end)
+			outputStream << *begin++;
+		while (begin != end)
+			outputStream << delimiter << *begin++;
+		outputStream << endl;
 		returnValue = 1;
 		noOfRows++;
 		return returnValue;
 	}
+	/*
+	int writeRow(vector<boost::any >& contentList){
+		int returnValue = 0;
+		std::vector<boost::any>::iterator e = contentList.begin();
+		outputStream << boost::any_cast<string>(*e);	// does not work for string (stack variable, rather than pointer)
+		e++;
+		for (; e != contentList.end(); ++e) {
+			outputStream << delimiter << boost::any_cast<string>(*e);
+		}
+		outputStream << endl;
+		//string combinedString = join(contentList, delimiter);
+		//outputStream << combinedString << endl;
+		returnValue = 1;
+		noOfRows++;
+		return returnValue;
+	}
+	*/
 
 	template<typename anyType>
 	int write(anyType anything){

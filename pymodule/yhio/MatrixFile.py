@@ -34,8 +34,8 @@ __doc__ = __doc__%(sys.argv[0], sys.argv[0])
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
+import csv, re
 from pymodule.ProcessOptions import  ProcessOptions
-import csv
 from pymodule import utils, figureOutDelimiter
 
 class MatrixFile(object):
@@ -80,6 +80,11 @@ class MatrixFile(object):
 			#	self.csvFile = self.inputFile
 			#	self.isRealCSV = False
 		self.col_name2index = None
+		
+		self._row = None	#2013.08.30 to store the current row being read
+		self.headerPattern = re.compile(r'^[a-zA-Z]')	#default header pattern, line beginned with letter
+		self.commentPattern = re.compile(r'^#')	#default, beginned with #
+		self.comment_row_list  = []
 	
 	def _resetInput(self):
 		"""
@@ -108,6 +113,31 @@ class MatrixFile(object):
 		self.col_name2index = utils.getColName2IndexFromHeader(self.header)
 		return self.col_name2index
 	
+	def smartReadHeader(self, headerPattern=None, commentPattern=None):
+		"""
+		Note:
+			If an input file does not have a header, this function over-reads by one line (stored in self._row)
+			so need to process the last self._row before further reading
+		2013.08.30 read the header, while ignoring lines fitting the comment pattern
+			and construct col_name2index when a line matching headerPattern is encountered
+		
+		"""
+		if headerPattern is None:
+			headerPattern = self.headerPattern
+		if commentPattern is None:
+			commentPattern = self.commentPattern
+		row = self.next()
+		while commentPattern.search(row[0]):	#passing all comments
+			self.comment_row_list.append(row)
+			row = self.next()
+		if headerPattern.search(row[0]):
+			self.header = row
+			self.col_name2index = utils.getColName2IndexFromHeader(self.header)
+		else:
+			self.col_name2index = None
+		return self.col_name2index
+	
+	
 	def getHeader(self):
 		"""
 		2012.11.22
@@ -134,6 +164,7 @@ class MatrixFile(object):
 			raise StopIteration
 		if not self.isRealCSV:
 			row = row.strip().split()
+		self._row = row
 		return row
 	
 	def close(self):

@@ -40,6 +40,7 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 						('flankingLength', 1, int): [24, '', 1, 'number of flanking bases on either side of the locus.\n\
 	length of flanking = 2*flankingLength+locusLength', ],\
 						('outputFormatType', 1, int): [1, '', 1, 'output format type. 1: fasta, 2: fastq (standard quality=H (72-33) format)'],\
+						('alleleLength', 1, int): [1, '', 1, 'restrict reference and alternative allele length. used to get rid of multi-nucleotide alleles. 0 means no restriction.'],\
 					})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
@@ -50,20 +51,27 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 	sequenceTitlePattern = 	re.compile(r'^([a-zA-Z0-9]+)_(\d+)_(\d+)_([a-zA-Z\-]*)_([a-zA-Z\-,]*)_positionInFlank(\d+)$')
 
 	def extractFlankingSequence(self, inputFname=None, refFastaFname=None, outputFname=None, flankingLength=24,\
-							outputFormatType=1):
+							outputFormatType=1, alleleLength=1):
 		"""
+		2013.09.03 added argument alleleLength
 		2012.10.10
 			added argument outputFormatType. 1: fasta, 2: fastq
 		2012.10.8
 		"""
-		sys.stderr.write("Extracting flanking sequences of loci from %s, based on ref-sequence of %s ...\n"%\
-						(inputFname, refFastaFname))
+		sys.stderr.write("Extracting flanking sequences of loci from %s, based on ref-sequence of %s, alleleLength=%s, outputFormatType=%s ...\n"%\
+						(inputFname, refFastaFname, alleleLength, outputFormatType))
 		vcfFile = VCFFile(inputFname=inputFname)
 		outf = open(outputFname, 'w')
 		refFastaFile = FastaFile(inputFname=refFastaFname)
 		
 		counter = 0
+		real_counter = 0
 		for vcfRecord in vcfFile:
+			counter += 1
+			if alleleLength and (len(vcfRecord.refBase)!=alleleLength or len(vcfRecord.altBase)!=alleleLength):
+				continue
+			
+			real_counter += 1
 			refBase = vcfRecord.refBase
 			stopPos = vcfRecord.pos + len(refBase) -1
 			
@@ -81,14 +89,13 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 					outf.write('%s\n'%(flankingSequence))
 					outf.write("+\n")
 					outf.write("%s\n"%('H'*len(flankingSequence)))
-					
-			
-			counter += 1
+						
+				
 		
 		del outf
 		vcfFile.close()
 		refFastaFile.close()
-		sys.stderr.write("%s loci.\n"%(counter))
+		sys.stderr.write("%s loci (%s total) written out.\n"%(real_counter, counter))
 	
 	def run(self):
 		"""
@@ -101,7 +108,7 @@ class ExtractFlankingSequenceForVCFLoci(AbstractVCFMapper):
 		
 		self.extractFlankingSequence(inputFname=self.inputFname, refFastaFname=self.refFastaFname, \
 									outputFname=self.outputFname, flankingLength=self.flankingLength,\
-									outputFormatType=self.outputFormatType)
+									outputFormatType=self.outputFormatType, alleleLength=self.alleleLength)
 		
 
 if __name__ == '__main__':

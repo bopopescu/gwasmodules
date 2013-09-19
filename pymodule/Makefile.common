@@ -2,13 +2,13 @@
 .SUFFIXES:	.i .cc .c .so .o _wrap.o .py
 .PHONY:	swig clean_subdirs subdirs $(SUBDIRS)
 
-IncludeDirs = -I ~/script/
+IncludeDirs = -I ~/script/ -I ~/script/vcflib/
 BoostLib  = -lboost_program_options -lboost_iostreams
 HDF5Lib  = -lhdf5_cpp -lhdf5 
 
 ## CXXTARGETS, CXXLDFLAGS, CTARGETS, CLDFLAGS, ExtraTargets will be defined in child Makefiles 
 #CXXTARGETS	= 
-CXXFLAGS	= -fPIC -O2 
+CXXFLAGS	= -fPIC -O3 -std=c++0x 
 CXXCOMPILER	= g++
 #CXXLDFLAGS	= 
 
@@ -20,11 +20,16 @@ CCOMPILER	= gcc
 #SharedLibTargets	=
 SharedLibFlags	= -shared -fPIC
 
+#StaticLibTargets	=
+
 #ExtraTargets
 #SRCS
 
-all:	depend $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(ExtraTargets) subdirs
+all:	depend $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(StaticLibTargets) $(ExtraTargets) subdirs
 
+
+$(StaticLibTargets):	%.a:	%.o
+	-ar crfvs $@ $<
 
 $(SharedLibTargets):	%.so:	%.o
 	-$(CXXCOMPILER) $< $(SharedLibFlags) -o $@ $(CXXLDFLAGS)

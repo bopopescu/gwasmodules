@@ -47,8 +47,6 @@ void ReduceSameChromosomeAlignmentDepthFiles::fileWalker(vector<string> &inputFn
 		inputFileDataStructureList.push_back(inputFileDSPtr);
 	}
 
-	std::ostream outputStream(&outputFilterStreamBuffer);
-
 	InputFileDataStructureIterator iter;
 	InputFileDataStructurePtr _inputFileDSPtr;
 	for (long i=1;i<=chromosomeSize; i++){
@@ -77,7 +75,8 @@ void ReduceSameChromosomeAlignmentDepthFiles::fileWalker(vector<string> &inputFn
 				}
 			}
 		}
-		outputStream << sumValue << endl;
+		outputFile->write(sumValue);
+		outputFile->write("\n");
 	}
 	//close all input files
 /*

@@ -8,15 +8,21 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from Pegasus.DAX3 import *
+from Pegasus.DAX3 import Executable, File, PFN, Link, Job
 from pymodule import Genome, utils
 from pymodule import ProcessOptions
+from pymodule.Genome import IntervalData
 from pymodule.yhio import NextGenSeq
 from pymodule.pegasus import yh_pegasus
 from pymodule.utils import PassingData
 from pymodule.yhio.VCFFile import VCFFile
 from pymodule.yhio.MatrixFile import MatrixFile
+from pymodule.yhio.AlignmentDepthIntervalFile import AlignmentDepthIntervalFile
+from pymodule.yhio.CNV import CNVCompare, CNVSegmentBinarySearchTreeKey
+from pymodule.algorithm.RBTree import RBDict
 from AbstractWorkflow import AbstractWorkflow
+
+
 
 parentClass = AbstractWorkflow
 class AbstractNGSWorkflow(parentClass):
@@ -76,6 +82,11 @@ class AbstractNGSWorkflow(parentClass):
 						("sequence_max_coverage", 0, float): [None, '', 1, 'max IndividualSequence.coverage. Empty for no filtering'],\
 						("sequence_min_coverage", 0, float): [None, '', 1, 'min IndividualSequence.coverage. Empty for no filtering'],\
 						
+						('alignmentDepthIntervalMethodShortName', 0, ): [None, '', 1, 'fetch intervals from AlignmentDepthIntervalFile table', ],\
+						('minAlignmentDepthIntervalLength', 0, int): [1000, '', 1, 'minimum length for a alignment depth interval to be included', ],\
+						('alignmentDepthMaxFold', 0, float): [2, '', 1, 'depth of an alignment depth interval have to be within a range of [1/foldChange, foldChange]*medianDepth', ],\
+						('alignmentDepthMinFold', 0, float): [0.1, '', 1, 'depth of an alignment depth interval have to be within a range of [1/foldChange, foldChange]*medianDepth', ],\
+							
 						('intervalOverlapSize', 1, int): [300000, 'U', 1, 'overlap #bps/#loci between adjacent intervals from one contig/chromosome,\
 				only used for TrioCaller, not for SAMtools/GATK', ],\
 						('intervalSize', 1, int): [5000000, 'Z', 1, '#bps/#loci for adjacent intervals from one contig/chromosome (alignment or VCF)', ],\
@@ -209,22 +220,12 @@ class AbstractNGSWorkflow(parentClass):
 		"""
 		parentClass.registerCustomJars(self, workflow=workflow)
 
-	def registerCommonExecutables(self, workflow=None):
-		"""
-		2012.7.30
-			become a link to registerExecutables()
-		2012.7.25
-			add noDefaultClustersSizeExecutableList
-		2011-11-22
-		"""
-		self.registerExecutables(workflow=workflow)
-	
 	def registerExecutables(self, workflow=None):
 		"""
 		2012.8.7 remove noDefaultClustersSizeExecutableList, use executableClusterSizeMultiplierList instead
 		2012.1.9 a symlink to registerCommonExecutables()
 		"""
-		parentClass.registerExecutables(self)
+		parentClass.registerExecutables(self, workflow=workflow)
 		
 		namespace = self.namespace
 		version = self.version
@@ -236,6 +237,9 @@ class AbstractNGSWorkflow(parentClass):
 		
 		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)
 		
+		#2013.09.17 updated 
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, "polymorphism/qc/CheckTwoVCFOverlapCC"), \
+											name='CheckTwoVCFOverlapCC', clusterSizeMultipler=1)
 		
 		selectAndSplit = Executable(namespace=namespace, name="SelectAndSplitAlignment", version=version, \
 								os=operatingSystem, arch=architecture, installed=True)
@@ -289,10 +293,11 @@ class AbstractNGSWorkflow(parentClass):
 		SelectVariantsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
 		executableClusterSizeMultiplierList.append((SelectVariantsJava, 0.5))
 		
-		CombineVariantsJava = Executable(namespace=namespace, name="CombineVariantsJava", version=version, os=operatingSystem,\
-											arch=architecture, installed=True)
-		CombineVariantsJava.addPFN(PFN("file://" + self.javaPath, site_handler))
-		executableClusterSizeMultiplierList.append((CombineVariantsJava, 0.3))
+		#2013.09.04
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='CombineVariantsJava', clusterSizeMultipler=0.3)
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='CombineVariantsJavaInReduce', \
+															clusterSizeMultipler=0.001)
+		
 		
 		CallVariantBySamtools = Executable(namespace=namespace, name="CallVariantBySamtools", version=version, \
 										os=operatingSystem, arch=architecture, installed=True)
@@ -368,11 +373,9 @@ class AbstractNGSWorkflow(parentClass):
 		MergeFiles.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "shell/MergeFiles.sh"), site_handler))
 		executableClusterSizeMultiplierList.append((MergeFiles, 0 ))
 		
-		#2012.7.29, moved from CheckTwoVCFOverlapPipeline.py
-		CheckTwoVCFOverlap = Executable(namespace=namespace, name="CheckTwoVCFOverlap", version=version, \
-										os=operatingSystem, arch=architecture, installed=True)
-		CheckTwoVCFOverlap.addPFN(PFN("file://" + os.path.join(vervetSrcPath, "mapper/CheckTwoVCFOverlap.py"), site_handler))
-		executableClusterSizeMultiplierList.append((CheckTwoVCFOverlap, 1))
+		#2013.09.17 updated 
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.vervetSrcPath, "mapper/CheckTwoVCFOverlap.py"), \
+											name='CheckTwoVCFOverlap', clusterSizeMultipler=1)
 		
 		#2012.9.6
 		AppendInfo2SmartPCAOutput = Executable(namespace=namespace, name="AppendInfo2SmartPCAOutput", version=version, \
@@ -584,8 +587,8 @@ class AbstractNGSWorkflow(parentClass):
 	
 	def addVCFFormatConvertJob(self, workflow=None, vcf_convert=None, inputF=None, outputF=None, \
 							parentJob=None, parentJobLs=None, \
-							extraDependentInputLs=None, transferOutput=False, job_max_memory=None,\
-							walltime=None, **keywords):
+							extraDependentInputLs=None, transferOutput=False, job_max_memory=1000,\
+							walltime=120, **keywords):
 		"""
 		2013.06.14
 			use addGenericJob()
@@ -1273,7 +1276,8 @@ class AbstractNGSWorkflow(parentClass):
 		return job
 	
 	def addSelectAlignmentJob(self, executable=None, inputFile=None, \
-							outputFile=None, region=None, parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
+							outputFile=None, region=None, \
+							parentJobLs=None, extraDependentInputLs=None, transferOutput=False, \
 							extraArguments=None, job_max_memory=2000, needBAMIndexJob=True, **keywords):
 		"""
 		2012.9.17 copied from vervet/src/AlignmentReadBaseQualityRecalibrationWorkflow.py
@@ -1287,6 +1291,8 @@ class AbstractNGSWorkflow(parentClass):
 			extraDependentInputLs=[inputFile]
 		else:
 			extraDependentInputLs.append(inputFile)
+		if executable is None:
+			executable = self.samtools
 		job= self.addGenericJob(executable=executable, inputFile=None, outputFile=None, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 						extraOutputLs=[outputFile],\
@@ -1324,6 +1330,27 @@ class AbstractNGSWorkflow(parentClass):
 		sys.stderr.write("  found %s files.\n"%(len(vcfFileID2object)))
 		return vcfFileID2object
 	
+	def constructGenomeFileRBTreeByFilenameInterval(self, jobDataStructure=None, chr2size=None):
+		"""
+		2013.09.18
+		"""
+		sys.stderr.write("Constructing genome file RBtree from %s genome file data ... "%(len(jobDataStructure.jobDataLs)))
+		genomeFileRBDict = RBDict()
+		for jobData in jobDataStructure.jobDataLs:
+			filenameParseData = Genome.parseChrStartStopFromFilename(filename=jobData.file.name, chr2size=chr2size)
+			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=filenameParseData.chromosome, \
+							span_ls=[filenameParseData.start, filenameParseData.stop], \
+							min_reciprocal_overlap=0.000000000000001,)	#any overlap is an overlap
+			if genomeFileRBDict.has_key(segmentKey):
+				sys.stderr.write("\n \t Error: current jobData file %s overlaps node taken by previous jobData file %s.\n"%\
+								(jobData.file.name, genomeFileRBDict[segmentKey].file.name))
+				raise
+			genomeFileRBDict[segmentKey] = jobData
+		sys.stderr.write(" %s nodes in the tree. "%(len(genomeFileRBDict)))
+		
+		return genomeFileRBDict
+	
+	
 	def extractVCFSitesIntoBEDFile(self, inputVCFFolder=None, outputFname=None):
 		"""
 		2013.05.29
@@ -1352,20 +1379,19 @@ class AbstractNGSWorkflow(parentClass):
 	
 	
 	def addCheckTwoVCFOverlapJob(self, workflow=None, executable=None, vcf1=None, vcf2=None, chromosome=None, chrLength=None, \
-					outputF=None, outputFnamePrefix=None, parentJobLs=None, \
+					outputFile=None, perSampleConcordanceOutputFile=None, overlapSiteOutputFile=None, parentJobLs=None, \
 					extraDependentInputLs=None, transferOutput=False, extraArguments=None, job_max_memory=1000, \
-					perSampleMatchFraction=False, **keywords):
+					**keywords):
 		"""
+		2013.09.17 deal with CheckTwoVCFOverlapCC
+		2013.09.10 three output files have explicit arguments now.
 		2013.05.20 bugfix
 		2012.8.16
 			now perSampleMatchFraction output is in a separate output file.
 		2011.12.9
 		"""
-		if outputF is None and outputFnamePrefix:
-			outputF = File('%s.tsv'%(outputFnamePrefix))
-		if outputF and outputFnamePrefix is None:	#2013.04.09 to register _overlapSitePos.tsv file
-			outputFnamePrefix = os.path.splitext(outputF.name)[0]	#2013.05.20 bugfix
-		
+		if workflow is None:
+			workflow = self
 		extraOutputLs = []
 		extraArgumentList = []
 		key2ObjectForJob = {}
@@ -1376,24 +1402,31 @@ class AbstractNGSWorkflow(parentClass):
 			extraDependentInputLs = []
 		
 		if vcf2:
-			extraArgumentList.extend(["-j", vcf2])
+			if executable==workflow.CheckTwoVCFOverlapCC:
+				extraArgumentList.extend(["-i", vcf2])
+			else:	#the python version CheckTwoVCFOverlap.py
+				extraArgumentList.extend(["-j", vcf2])
 			extraDependentInputLs.append(vcf2)
 		if chromosome:
-			extraArgumentList.extend(["-c", chromosome])
+			extraArgumentList.extend(["--chromosome", chromosome])
 		if chrLength:
-			extraArgumentList.append("-l %s"%(chrLength))
-		if perSampleMatchFraction and outputFnamePrefix:
-			extraArgumentList.append("-p")
-			suffixAndNameTupleList.append(['_perSample.tsv','perSample'])
-		if outputFnamePrefix:
-			extraArgumentList.extend(['-O', outputFnamePrefix])
-			suffixAndNameTupleList.append(['_overlapSitePos.tsv','overlapSitePos'])
+			extraArgumentList.append("--chrLength %s"%(chrLength))
+		if perSampleConcordanceOutputFile:
+			extraArgumentList.extend(["--perSampleConcordanceOutputFname", perSampleConcordanceOutputFile])
+			#suffixAndNameTupleList.append(['_perSample.tsv','perSample'])
+			key2ObjectForJob['perSampleFile'] = perSampleConcordanceOutputFile
+			extraOutputLs.append(perSampleConcordanceOutputFile)
+		if overlapSiteOutputFile:
+			extraArgumentList.extend(["--overlappingSitesOutputFname", overlapSiteOutputFile])
+			#suffixAndNameTupleList.append(['_overlapSitePos.tsv','overlapSitePos'])
+			key2ObjectForJob['overlapSitePosFile'] = overlapSiteOutputFile
+			extraOutputLs.append(overlapSiteOutputFile)
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
 
-		self.setupMoreOutputAccordingToSuffixAndNameTupleList(outputFnamePrefix=outputFnamePrefix, suffixAndNameTupleList=suffixAndNameTupleList, \
-													extraOutputLs=extraOutputLs, key2ObjectForJob=key2ObjectForJob)
-		job= self.addGenericJob(executable=executable, inputFile=vcf1, outputFile=outputF, \
+		#self.setupMoreOutputAccordingToSuffixAndNameTupleList(outputFnamePrefix=outputFnamePrefix, suffixAndNameTupleList=suffixAndNameTupleList, \
+		#											extraOutputLs=extraOutputLs, key2ObjectForJob=key2ObjectForJob)
+		job= self.addGenericJob(executable=executable, inputFile=vcf1, outputFile=outputFile, \
 						parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
 						extraOutputLs=extraOutputLs,\
 						transferOutput=transferOutput, \
@@ -1951,6 +1984,7 @@ Contig966       3160    50
 					if included:
 						new_dc[contig] = data
 				except:
+					sys.stderr.write("Error in handling contig %s.\n"%(contig))
 					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
 					import traceback
 					traceback.print_exc()
@@ -1979,7 +2013,7 @@ Contig966       3160    50
 				add the split job
 				 
 		"""
-		sys.stderr.write("Splitting %s into blocks of %s lines ... "%(intervalFname, noOfLinesPerUnit))
+		sys.stderr.write("Splitting %s into blocks, each block with %s lines ... "%(intervalFname, noOfLinesPerUnit))
 		#from pymodule import utils
 		#noOfLines = utils.getNoOfLinesInOneFileByWC(intervalFname)
 		chr2StartStopDataLs = {}
@@ -2089,22 +2123,97 @@ Contig966       3160    50
 				#to render adjacent intervals overlapping because trioCaller uses LD
 				stopPos = min(chromosomeSize, originalStopPos+intervalOverlapSize)
 				
-				interval = "%s:%s-%s"%(chromosome, originalStartPos, originalStopPos)
-				intervalFileBasenameSignature = '%s_%s_%s'%(chromosome, originalStartPos, originalStopPos)
-				overlapInterval = "%s:%s-%s"%(chromosome, startPos, stopPos)
-				overlapIntervalFileBasenameSignature = '%s_%s_%s'%(chromosome, startPos, stopPos)
 				if chromosome not in chr2IntervalDataLs:
 					chr2IntervalDataLs[chromosome] = []
-				span = stopPos-startPos+1
-				intervalData = PassingData(overlapInterval=overlapInterval, overlapIntervalFileBasenameSignature=overlapIntervalFileBasenameSignature,\
-							interval=interval, intervalFileBasenameSignature=intervalFileBasenameSignature, \
-							file=None,\
-							chr=chromosome, chromosome=chromosome, chromosomeSize=chromosomeSize,\
-							start=originalStartPos, stop=originalStopPos, \
-							overlapStart=startPos, overlapStop=stopPos, span=span, \
-							jobLs=[])
+				intervalData = IntervalData(chromosome=chromosome, chromosomeSize=chromosomeSize,\
+								start=originalStartPos, stop=originalStopPos,\
+								overlapStart=startPos, overlapStop=stopPos)
 				chr2IntervalDataLs[chromosome].append(intervalData)
 				counter += 1
+		sys.stderr.write("%s intervals.\n"%(counter))
+		return chr2IntervalDataLs
+	
+	def getChr2IntervalDataLsFromDBAlignmentDepthInterval(self, db=None, intervalSize=None, intervalOverlapSize=None,\
+									alignmentDepthIntervalMethodShortName=None, alignmentDepthMinFold=0.1, alignmentDepthMaxFold=2, \
+									minAlignmentDepthIntervalLength=1000, maxContigID=None, minContigID=None):
+		"""
+		2013.08.29
+		"""
+		method = db.getAlignmentDepthIntervalMethod(short_name =alignmentDepthIntervalMethodShortName)
+		minDepth = method.sum_median_depth*float(alignmentDepthMinFold)
+		maxDepth = method.sum_median_depth*alignmentDepthMaxFold
+		sys.stderr.write("Getting alignment depth intervals (depth %sX median - %sX median depth)=(%s-%s) from db, maxContigID=%s, minContigID=%s  ... \n "%\
+					(alignmentDepthMinFold, alignmentDepthMaxFold, minDepth, maxDepth, maxContigID, minContigID))
+		counter =0
+		
+		noOfRawIntervals = 0
+		chr2alignmentDepthIntervalData = {}
+		for alignment_depth_interval_file in method.alignment_depth_interval_file_ls:
+			chromosome = alignment_depth_interval_file.chromosome
+			included = True
+			if (maxContigID is not None and maxContigID!=0) and (minContigID is not None and minContigID!=0):
+				try:
+					contigID = int(self.getContigIDFromFname(chromosome))
+					if (maxContigID is not None and maxContigID!=0) and contigID>maxContigID:
+						included = False
+					if (minContigID is not None and minContigID!=0) and contigID<minContigID:
+						included = False
+				except:
+					sys.stderr.write('Except type: %s\n'%repr(sys.exc_info()))
+					import traceback
+					traceback.print_exc()
+					included = False
+			if not included:	#skip this chromosome
+				continue
+			chromosomeSize = alignment_depth_interval_file.chromosome_size
+			inputFname = os.path.join(self.data_dir, alignment_depth_interval_file.path)
+			sys.stderr.write("\t %s ..."%(inputFname))
+			if os.path.isfile(inputFname):
+				reader = AlignmentDepthIntervalFile(inputFname)
+				intervalLs = reader.getAllIntervalWithinDepthRange(minDepth=minDepth, maxDepth=maxDepth)
+				reader.close()
+				noOfRawIntervals += len(intervalLs)
+				if chromosome not in chr2alignmentDepthIntervalData:
+					chr2alignmentDepthIntervalData[chromosome] = PassingData(chromosomeSize=chromosomeSize, intervalLs=intervalLs)
+				else:
+					sys.stderr.write("\t Warning: chromosome %s sees new alignment depth interval data from %s.\n"%(chromosome, inputFname))
+					chr2alignmentDepthIntervalData[chromosome].intervalLs.extend(intervalLs)
+			else:
+				sys.stderr.write("\t Warning: interval file %s of chromosome %s does not exist. Ignore.\n"%(inputFname, chromosome))
+			sys.stderr.write(" noOfRawIntervals=%s.\n"%(noOfRawIntervals))
+		sys.stderr.write(" %s alignment depth intervals covering %s chromosomes.\n"%(noOfRawIntervals, len(chr2alignmentDepthIntervalData)))
+		
+		sys.stderr.write("Splitting alignment depth intervals (depth %sX median - %sX median depth), minAlignmentDepthIntervalLength=%s) into size=%s intervals, overlap=%s,  ... "%\
+					(alignmentDepthMinFold, alignmentDepthMaxFold, minAlignmentDepthIntervalLength, intervalSize, intervalOverlapSize))
+		chr2IntervalDataLs = {}
+		for chromosome, alignmentDepthIntervalData in chr2alignmentDepthIntervalData.iteritems():
+			intervalLs = alignmentDepthIntervalData.intervalLs
+			chromosomeSize = alignmentDepthIntervalData.chromosomeSize
+			for interval  in intervalLs:
+				if interval.length<minAlignmentDepthIntervalLength:	#skip short intervals
+					continue
+				if intervalSize is None:
+					no_of_intervals = 1
+				else:
+					no_of_intervals = max(1, int(math.ceil(interval.length/float(intervalSize)))-1)
+				for i in range(no_of_intervals):
+					originalStartPos = interval.start + i*intervalSize 
+					#to render adjacent intervals overlapping because trioCaller uses LD
+					startPos = max(interval.start, originalStartPos-intervalOverlapSize)
+					if i<no_of_intervals-1:
+						originalStopPos = min(interval.start + (i+1)*intervalSize-1, interval.stop)
+					else:	#last chunk, include bp till the end
+						originalStopPos = interval.stop
+					#to render adjacent intervals overlapping because trioCaller uses LD
+					stopPos = min(interval.stop, originalStopPos+intervalOverlapSize)
+					#2013.09.09 overlap is not considered because considering overlap would go into those highly repetitive inter-interval regions.
+					
+					if chromosome not in chr2IntervalDataLs:
+						chr2IntervalDataLs[chromosome] = []
+					intervalData = IntervalData(chromosome=chromosome, chromosomeSize=chromosomeSize,\
+								start=originalStartPos, stop=originalStopPos)
+					chr2IntervalDataLs[chromosome].append(intervalData)
+					counter += 1
 		sys.stderr.write("%s intervals.\n"%(counter))
 		return chr2IntervalDataLs
 	
@@ -2241,10 +2350,10 @@ Contig966       3160    50
 					job.addArguments(inputFile)
 		return job
 	
-	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=None, outputBamFile=None,samtools=None,\
-					java=None, MergeSamFilesJava=None, MergeSamFilesJar=None, \
-					BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
-					mv=None, parentJobLs=None, namespace='workflow', version='1.0', transferOutput=False,\
+	def addAlignmentMergeJob(self, workflow=None, AlignmentJobAndOutputLs=None, outputBamFile=None,\
+					MergeSamFilesJava=None, \
+					BuildBamIndexFilesJava=None, \
+					mv=None, parentJobLs=None, namespace=None, version=None, transferOutput=False,\
 					job_max_memory=7000, walltime=680, **keywords):
 		"""
 		not certain, but it looks like MergeSamFilesJar does not require the .bai (bam index) file.
@@ -2265,24 +2374,33 @@ Contig966       3160    50
 		"""
 		if workflow is None:
 			workflow = self
+		if MergeSamFilesJava is None:
+			MergeSamFilesJava = workflow.MergeSamFilesJava
+		if BuildBamIndexFilesJava is None:
+			BuildBamIndexFilesJava = workflow.BuildBamIndexFilesJava
+		if mv is None:
+			mv = workflow.mv
+		
+		namespace = getattr(workflow, 'namespace', namespace)
+		version = getattr(workflow, 'version', version)
+		
 		memRequirementObject = self.getJVMMemRequirment(job_max_memory=job_max_memory, minMemory=2000)
 		job_max_memory = memRequirementObject.memRequirement
 		javaMemRequirement = memRequirementObject.memRequirementInStr
-		namespace = getattr(workflow, 'namespace', namespace)
-		version = getattr(workflow, 'version', version)
+		
 		
 		if len(AlignmentJobAndOutputLs)>1:
 			# 'USE_THREADING=true', threading might be causing process hanging forever (sleep).
 			alignmentJobLs = []
 			alignmentOutputLs = []
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
-				if AlignmentJobAndOutput.parentJobLs:
-					alignmentJobLs.extend(AlignmentJobAndOutput.parentJobLs)
+				if AlignmentJobAndOutput.jobLs:
+					alignmentJobLs.extend(AlignmentJobAndOutput.jobLs)
 				alignmentOutput = AlignmentJobAndOutput.file
 				if alignmentOutput:
 					alignmentOutputLs.append(alignmentOutput)
 						#2013.04.01
-			merge_sam_job = self.addGenericJavaJob(executable=MergeSamFilesJava, jarFile=MergeSamFilesJar, \
+			merge_sam_job = self.addGenericJavaJob(executable=MergeSamFilesJava, jarFile=workflow.MergeSamFilesJar, \
 					inputFile=None, inputArgumentOption=None, \
 					inputFileList=alignmentOutputLs, argumentForEachFileInInputFileList="INPUT=",\
 					outputFile=outputBamFile, outputArgumentOption="OUTPUT=",\
@@ -2292,7 +2410,7 @@ Contig966       3160    50
 					extraDependentInputLs=None, no_of_cpus=None, walltime=walltime, sshDBTunnel=None, **keywords)
 		elif len(AlignmentJobAndOutputLs)==1:	#one input file, no samtools merge. use "mv" to rename it instead. should use "cp", then the input would be cleaned by cleaning job.
 			AlignmentJobAndOutput = AlignmentJobAndOutputLs[0]
-			alignmentJobLs = AlignmentJobAndOutput.parentJobLs
+			alignmentJobLs = AlignmentJobAndOutput.jobLs
 			alignmentOutput = AlignmentJobAndOutput.file
 			#2012.7.4
 			sys.stderr.write(" copy (instead of merging small alignment files) due to only one alignment file, from %s to %s.\n"%\
@@ -2317,10 +2435,12 @@ Contig966       3160    50
 				workflow.depends(parent=parentJob, child=merge_sam_job)
 						
 		# add the index job on the merged bam file
-		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, BuildBamIndexJar=BuildBamIndexJar, \
+		bamIndexJob = self.addBAMIndexJob(BuildBamIndexFilesJava=BuildBamIndexFilesJava, \
+					BuildBamIndexJar=workflow.BuildBamIndexJar, \
 					inputBamF=outputBamFile,\
 					parentJobLs=[merge_sam_job], namespace=namespace, version=version,\
 					transferOutput=transferOutput, job_max_memory=3000, walltime=max(180, int(walltime/3)))
+		merge_sam_job.bamIndexJob = bamIndexJob
 		return merge_sam_job, bamIndexJob
 	
 	

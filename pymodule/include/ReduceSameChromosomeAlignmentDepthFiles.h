@@ -109,7 +109,6 @@ public:
 				currentValue = atof(_statInStr.c_str());
 			}
 			i++;
-
 		}
 	}
 

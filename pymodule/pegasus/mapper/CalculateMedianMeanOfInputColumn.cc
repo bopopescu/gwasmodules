@@ -72,8 +72,8 @@ int CalculateMedianMeanOfInputColumn::readInRawDataFromSAMtoolsDepthFile(){
 	boost::uniform_real<> uni_dist(0,1);
 	boost::variate_generator<base_generator_type&, boost::uniform_real<> > uni(generator, uni_dist);
 	//boost::uniform_01<> uni();
-	__gnu_cxx::hash_map<long, long >::iterator stat2FrequencyIter = stat2Frequency.begin();
-	__gnu_cxx::hash_map<long, long >::iterator modeStatIter = stat2Frequency.begin();
+	map<long, long >::iterator stat2FrequencyIter = stat2Frequency.begin();
+	map<long, long >::iterator modeStatIter = stat2Frequency.begin();
 
 	double toss;	//random number
 	string statInStr;

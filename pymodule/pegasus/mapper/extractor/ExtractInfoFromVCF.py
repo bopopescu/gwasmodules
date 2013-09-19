@@ -51,6 +51,7 @@ class ExtractInfoFromVCF(parentClass):
 			data_row = [vcfRecord.chr, vcfRecord.pos, value]
 			self.invariantPData.writer.writerow(data_row)
 			real_counter += 1
+		return real_counter
 	
 	def processHeader(self, header=None, pdata=None, rowDefinition=None):
 		"""

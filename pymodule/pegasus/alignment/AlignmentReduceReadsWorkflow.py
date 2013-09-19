@@ -138,8 +138,8 @@ class AlignmentReduceReadsWorkflow(parentClass):
 					parentJobLs=[reduceReadsJob], \
 					transferOutput=False, job_max_memory=3000, \
 					walltime=max(120, int(reduceReadsJobWalltime/3)))
-		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=[reduceReadsJob, indexBamJob], \
-															file=reduceReadsJob.output))
+		passingData.AlignmentJobAndOutputLs.append(PassingData(jobLs=[reduceReadsJob, indexBamJob], \
+															file=reduceReadsJob.output, fileLs=[reduceReadsJob.output]))
 		return returnData
 	
 	def reduceAfterEachAlignment(self, workflow=None, passingData=None, transferOutput=False, data_dir=None, **keywords):
@@ -165,7 +165,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 			NewAlignmentJobAndOutputLs = []
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
 				#2012.9.19 add a AddReadGroup job
-				alignmentJob, indexAlignmentJob = AlignmentJobAndOutput.parentJobLs
+				alignmentJob, indexAlignmentJob = AlignmentJobAndOutput.jobLs[:2]
 				fileBasenamePrefix = os.path.splitext(alignmentJob.output.name)[0]
 				outputRGBAM = File("%s.isq_RG.bam"%(fileBasenamePrefix))
 				addRGJob = self.addReadGroupInsertionJob(workflow=workflow, individual_alignment=new_individual_alignment, \
@@ -176,7 +176,7 @@ class AlignmentReduceReadsWorkflow(parentClass):
 									parentJobLs=[alignmentJob, indexAlignmentJob], extraDependentInputLs=None, \
 									extraArguments=None, job_max_memory = 2500, transferOutput=False)
 				
-				NewAlignmentJobAndOutputLs.append(PassingData(parentJobLs=[addRGJob], file=addRGJob.output))
+				NewAlignmentJobAndOutputLs.append(PassingData(jobLs=[addRGJob], file=addRGJob.output))
 			#
 			mergedBamFile = File(os.path.join(reduceOutputDirJob.output, '%s.merged.bam'%(bamFnamePrefix)))
 			alignmentMergeJob, bamIndexJob = self.addAlignmentMergeJob(workflow, AlignmentJobAndOutputLs=NewAlignmentJobAndOutputLs, \

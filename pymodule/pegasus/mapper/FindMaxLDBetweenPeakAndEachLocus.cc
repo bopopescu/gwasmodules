@@ -121,6 +121,7 @@ int FindMaxLDBetweenPeakAndEachLocus::readLocusIDLs(){
 
 	for (int i=0; i<no_of_loci; i++){
 		sndLocusIdMap[locusIDLs[i]] = i;
+		//sndLocusIdMap.insert(std::make_pair(5,"Hello"));
 
 	}
 	delete [] locusIDLs;
@@ -137,10 +138,10 @@ int FindMaxLDBetweenPeakAndEachLocus::readDataIntoMemory(DataSet &dataset, DataS
 	/*
 	 * Create a datatype
 	 */
-	CompType mtype1(sizeof(s1_t));
-	mtype1.insertMember(outputTypeMember1, HOFFSET(s1_t, a), PredType::NATIVE_INT);
-	mtype1.insertMember(outputTypeMember2, HOFFSET(s1_t, b), PredType::NATIVE_INT);
-	mtype1.insertMember(outputTypeMember3, HOFFSET(s1_t, c), PredType::NATIVE_FLOAT);
+	CompType mtype1(sizeof(outputStruct));
+	mtype1.insertMember(outputTypeMember1, HOFFSET(outputStruct, a), PredType::NATIVE_INT);
+	mtype1.insertMember(outputTypeMember2, HOFFSET(outputStruct, b), PredType::NATIVE_INT);
+	mtype1.insertMember(outputTypeMember3, HOFFSET(outputStruct, c), PredType::NATIVE_FLOAT);
 
 
 	/*
@@ -174,7 +175,7 @@ int FindMaxLDBetweenPeakAndEachLocus::readDataIntoMemory(DataSet &dataset, DataS
 	 * Read two fields c and a from s1 dataset. Fields in the file
 	 * are found by their names "c_name" and "a_name".
 	 */
-	inputCorrelationInMemory = new s1_t[noOfSelectedEntries];
+	inputCorrelationInMemory = new outputStruct[noOfSelectedEntries];
 	dataset.read(inputCorrelationInMemory, mtype1, memspace, dataspace);
 	cerr << noOfSelectedEntries << " entries into memory."<< endl;
 
@@ -182,9 +183,9 @@ int FindMaxLDBetweenPeakAndEachLocus::readDataIntoMemory(DataSet &dataset, DataS
 	readLocusIDLs();
 
 	cerr << "Finding 2nd locus with max abs(cor) to 1st locus ...";
-	s1_t oneCorrelationStruc;
-	__gnu_cxx::hash_map<int, s1_t >::iterator fstLocusIter = fstLocusId2CorStruc.begin();
-	__gnu_cxx::hash_map<int, int >::iterator sndLocusIter = sndLocusIdMap.begin();
+	outputStruct oneCorrelationStruc;
+	map<int, outputStruct >::iterator fstLocusIter = fstLocusId2CorStruc.begin();
+	map<int, int >::iterator sndLocusIter = sndLocusIdMap.begin();
 	bool replaceExistingData = false;
 
 	for (int i =0; i<noOfSelectedEntries; i++){
@@ -235,10 +236,10 @@ int FindMaxLDBetweenPeakAndEachLocus::output(H5std_string &outputFname){
 	/*
 	 * Create the memory datatype.
 	 */
-	CompType mtype1(sizeof(s1_t));
-	mtype1.insertMember(outputTypeMember1, HOFFSET(s1_t, a), PredType::NATIVE_INT);
-	mtype1.insertMember(outputTypeMember2, HOFFSET(s1_t, b), PredType::NATIVE_INT);
-	mtype1.insertMember(outputTypeMember3, HOFFSET(s1_t, c), PredType::NATIVE_FLOAT);
+	CompType mtype1(sizeof(outputStruct));
+	mtype1.insertMember(outputTypeMember1, HOFFSET(outputStruct, a), PredType::NATIVE_INT);
+	mtype1.insertMember(outputTypeMember2, HOFFSET(outputStruct, b), PredType::NATIVE_INT);
+	mtype1.insertMember(outputTypeMember3, HOFFSET(outputStruct, c), PredType::NATIVE_FLOAT);
 
 	/*
 	 * add chunks and compression to the output data
@@ -253,8 +254,8 @@ int FindMaxLDBetweenPeakAndEachLocus::output(H5std_string &outputFname){
 	DataSet* dataset;
 	dataset = new DataSet(out.createDataSet(outputDatasetName, mtype1, space, propList));
 
-	outputDataInMemory = new s1_t[outputDatasetLength];
-	__gnu_cxx::hash_map<int, s1_t >::iterator fstLocusIter = fstLocusId2CorStruc.begin();
+	outputDataInMemory = new outputStruct[outputDatasetLength];
+	map<int, outputStruct >::iterator fstLocusIter = fstLocusId2CorStruc.begin();
 	int i =0;
 	for (;fstLocusIter!=fstLocusId2CorStruc.end();fstLocusIter++){
 		outputDataInMemory[i].a = fstLocusIter->first;

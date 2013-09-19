@@ -2,7 +2,11 @@
 2008-10-01
 	module related to Genome
 """
+
 import os,sys
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+from pymodule.utils import PassingData
 
 class GeneModel(object):
 	def __init__(self, **keywords):
@@ -135,6 +139,7 @@ chr_pattern = re.compile(r'([a-zA-Z]+[\dXY]+)[._\-:]*')	#the last - has special 
 #contig_id_pattern = re.compile(r'Contig(\d+)[._\-:]*')	#2013.3.19
 #contig_id_pattern = re.compile(r'Scaffold(\d+)[._\-:]*')	#2013.3.19 new vervet ref is scaffold-based.
 contig_id_pattern = re.compile(r'[CcS][a-zA-Z]+([\dXY]+)[._\-:]*')	#2013.07.16 new chromosome (Chlorocebus aethiops) vervet ref, add X, Y
+chr_start_stop_pattern = re.compile(r'([a-zA-Z]+[\dXY]+)_(\d+)_(\d+)[._\-:]*')	#the last - has special meaning in [] when it's not the last character. 
 
 def getContigIDFromFname(filename):
 	"""
@@ -162,9 +167,97 @@ def getChrFromFname(filename):
 			If you want just "0", use getContigIDFromFname().
 		If search fails, it returns the prefix in the basename of filename.
 	"""
-	chr_pattern_sr = chr_pattern.search(filename)
-	if chr_pattern_sr:
-		chromosome = chr_pattern_sr.group(1)
+	searchResult = chr_pattern.search(filename)
+	if searchResult:
+		chromosome = searchResult.group(1)
 	else:
 		chromosome = os.path.splitext(os.path.split(filename)[1])[0]
 	return chromosome
+
+def parseChrStartStopFromFilename(filename=None, chr2size=None, defaultChromosomeSize=10000000000):
+	"""
+	2013.09.18
+		#10000000000 is used when filename contains data from a whole chromosome and chr2size is not available or not containing chromosome
+		make it very big so that it could be intersected with any interval from any chromosome.
+	"""
+	searchResult = chr_start_stop_pattern.search(filename)
+	if searchResult:
+		chromosome = searchResult.group(1)
+		start = int(searchResult.group(2))
+		stop = int(searchResult.group(3))
+	else:	#try
+		chromosome = getChrFromFname(filename=filename)
+		start =1
+		if chr2size is not None:
+			stop = chr2size.get(chromosome, defaultChromosomeSize)
+		else:
+			stop = defaultChromosomeSize
+	return PassingData(chromosome=chromosome, start=start, stop=stop)
+
+class IntervalData(PassingData):
+	"""
+	2013.09.05 a more dynamic way to store intervals
+		required keywords: chr, chromosome, chromosomeSize, start, stop
+		overlapStart and overlapStop are optional.
+	"""
+	def __init__(self, chr=None, chromosome=None, chromosomeSize=None, start=None, stop=None, 
+				overlapStart=None, overlapStop=None, **keywords):
+		PassingData.__init__(self, chr=chr, chromosome=chromosome, chromosomeSize=chromosomeSize, \
+							start=start, stop=stop, 
+				overlapStart=overlapStart, overlapStop=overlapStop, **keywords)
+		if not hasattr(self, 'file'):
+			self.file = None
+		if not hasattr(self, 'jobLs'):
+			self.jobLs = []
+		if self.chr is None and self.chromosome:
+			self.chr = self.chromosome
+		elif self.chr and self.chromosome is None:
+			self.chromosome = self.chr
+		
+		if self.overlapStart is None:
+			self.overlapStart = self.start
+		
+		if self.overlapStop is None:
+			self.overlapStop = self.stop
+		
+		self.subIntervalLs = []
+		self.subIntervalLs.append((self.overlapStart, self.overlapStop))
+	
+	def unionOneIntervalData(self, otherIntervalData=None):
+		"""
+		"""
+		if self.chromosome!=otherIntervalData.chromosome:
+			sys.stderr.write("Error: this interval %s is trying to union an interval from a different chromosome %s.\n"%\
+							(self.interval, otherIntervalData.interval))
+			raise
+		self.subIntervalLs.append((otherIntervalData.overlapStart, otherIntervalData.overlapStop))
+		self.subIntervalLs.sort()
+		self.start = min(self.start, otherIntervalData.start)
+		self.stop = max(self.stop, otherIntervalData.stop)
+		self.overlapStart = min(self.overlapStart, otherIntervalData.overlapStart)
+		self.overlapStop = max(self.overlapStop, otherIntervalData.overlapStop)
+		
+		
+	@property
+	def span(self):
+		deltaLs = [a[1]-a[0]+1 for a in self.subIntervalLs]
+		return sum(deltaLs)
+	
+	@property
+	def overlapIntervalFileBasenameSignature(self):
+		return '%s_%s_%s'%(self.chromosome, self.overlapStart, self.overlapStop)
+	
+	@property
+	def intervalFileBasenameSignature(self):
+		return '%s_%s_%s'%(self.chromosome, self.start, self.stop)
+		
+		
+	@property
+	def overlapInterval(self):
+		return "%s:%s-%s"%(self.chromosome, self.overlapStart, self.overlapStop)
+	@property
+	def interval(self):
+		return "%s:%s-%s"%(self.chromosome, self.start, self.stop)
+	@property
+	def parentInterval(self):
+		return self.interval

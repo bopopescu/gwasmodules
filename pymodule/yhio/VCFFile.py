@@ -170,7 +170,8 @@ def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2
 					info_tag2value=info_tag2value, \
 					refBase=refBase, altBase=altBase, \
 					alleleLs=alleleLs, alleleNumber2Base=alleleNumber2Base, genotypeCall2Count=genotypeCall2Count, data_row=data_row,\
-					info=info, format=format, filter=filter, vcf_locus_id=vcf_locus_id, format_column_name2index=format_column_name2index)
+					info=info, format=format, filter=filter, vcf_locus_id=vcf_locus_id, \
+					format_column_name2index=format_column_name2index, format_column_ls=format_column_ls)
 
 class VCFRecord(object):
 	"""
@@ -199,6 +200,7 @@ class VCFRecord(object):
 		self.alleleLs = []	#index 0 is refBase, 1 is first altBase, 2 is 2nd altBase .. 
 		self.alleleNumber2Base = {}	#map string type of allele 0,1,2 to the actual base
 		self.format_column_name2index = None
+		self.format_column_ls = None
 		
 		self._parse(row)
 		#
@@ -229,6 +231,7 @@ class VCFRecord(object):
 		self.info = returnData.info
 		self.format = returnData.format
 		self.format_column_name2index = returnData.format_column_name2index
+		self.format_column_ls = returnData.format_column_ls	#2013.09.15
 	
 	def getAAF(self, useMax=True, defaultValue=0):
 		"""

@@ -22,6 +22,20 @@ std::string joinIteratorToString(Iter begin, Iter end, std::string const& separa
 		result << separator << *begin++;
 	return result.str();
 }
+
+double sumOfReciprocals(int n){
+	/*
+	 * 2011-10-21
+		for normalized nucleotide diversity
+		\pi = no-of-polymorphic-loci/sumOfReciprocals
+	 */
+	double sum = 0.0;
+	for (int i=0; i<n-1; i++){
+		sum = sum + 1/(i+1.0);
+	}
+	return sum;
+}
+
 #endif
 
 

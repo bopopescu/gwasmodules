@@ -378,7 +378,8 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 															fileLs=[downsampleBamJob.output, downsampleBamJob.bamIndexJob.baiFile]))
 		else:
 		"""
-		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=[printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob], \
+		jobLs=[printRecalibratedReadsJob, printRecalibratedReadsBamIndexJob]
+		passingData.AlignmentJobAndOutputLs.append(PassingData(parentJobLs=jobLs, jobLs=jobLs,\
 															file=printRecalibratedReadsJob.output, \
 															fileLs=[printRecalibratedReadsJob.output, printRecalibratedReadsBamIndexJob.baiFile]))
 		return returnData
@@ -420,7 +421,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 			NewAlignmentJobAndOutputLs = []
 			for AlignmentJobAndOutput in AlignmentJobAndOutputLs:
 				#2012.9.19 add a AddReadGroup job
-				alignmentJob, indexAlignmentJob = AlignmentJobAndOutput.parentJobLs
+				alignmentJob, indexAlignmentJob = AlignmentJobAndOutput.jobLs[:2]
 				fileBasenamePrefix = os.path.splitext(alignmentJob.output.name)[0]
 				outputRGBAM = File("%s.isq_RG.bam"%(fileBasenamePrefix))
 				addRGJob = self.addReadGroupInsertionJob(workflow=workflow, individual_alignment=new_individual_alignment, \
@@ -432,7 +433,7 @@ class AlignmentReadBaseQualityRecalibrationWorkflow(parentClass):
 									extraArguments=None, job_max_memory = 2500, transferOutput=False,\
 									walltime=max(180, mergeAlignmentWalltime/20))
 				
-				NewAlignmentJobAndOutputLs.append(PassingData(parentJobLs=[addRGJob], file=addRGJob.output))
+				NewAlignmentJobAndOutputLs.append(PassingData(jobLs=[addRGJob], file=addRGJob.output))
 			#
 			
 			

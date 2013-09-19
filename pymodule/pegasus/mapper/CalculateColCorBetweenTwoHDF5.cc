@@ -177,7 +177,7 @@ void CalculateColCorBetweenTwoHDF5::run()
 		readDataIntoMemory(dataset1, dataspace1, dataMatrix1InMemory, i1_start, input1_no_of_cols);
 		readDataIntoMemory(dataset2, dataspace2, dataMatrix2InMemory, i2_start, input2_no_of_cols);
 		std::cerr<<"Calculating correlation " << input1_no_of_cols <<  " X " << input2_no_of_cols << " ...";
-		outputDataInMemory = new s1_t[outputDatasetMaxLength];	//over-allocate memory. because some pairs have correlation below min_cor.
+		outputDataInMemory = new outputStruct[outputDatasetMaxLength];	//over-allocate memory. because some pairs have correlation below min_cor.
 		int i,j;
 		int counter=0;
 		int real_counter =0;
@@ -212,6 +212,7 @@ void CalculateColCorBetweenTwoHDF5::run()
 
 int CalculateColCorBetweenTwoHDF5::input()
 {
+	return 0;
 }
 
 int CalculateColCorBetweenTwoHDF5::readDataIntoMemory(DataSet &dataset, DataSpace &dataspace, int* &dataMatrixInMemory, int &col_start, int &no_of_cols)
@@ -324,7 +325,7 @@ int CalculateColCorBetweenTwoHDF5::readColIDIntoMemory(H5File &h5file, int* &col
 }
 
 
-int CalculateColCorBetweenTwoHDF5::output(s1_t* &dataInMemory, H5std_string &outputFname)
+int CalculateColCorBetweenTwoHDF5::output(outputStruct* &dataInMemory, H5std_string &outputFname)
 {
 	out = H5File(outputFname, H5F_ACC_TRUNC);
 	/*
@@ -337,10 +338,10 @@ int CalculateColCorBetweenTwoHDF5::output(s1_t* &dataInMemory, H5std_string &out
 	/*
 	 * Create the memory datatype.
 	 */
-	CompType mtype1(sizeof(s1_t));
-	mtype1.insertMember(outputTypeMember1, HOFFSET(s1_t, a), PredType::NATIVE_INT);
-	mtype1.insertMember(outputTypeMember2, HOFFSET(s1_t, b), PredType::NATIVE_INT);
-	mtype1.insertMember(outputTypeMember3, HOFFSET(s1_t, c), PredType::NATIVE_FLOAT);
+	CompType mtype1(sizeof(outputStruct));
+	mtype1.insertMember(outputTypeMember1, HOFFSET(outputStruct, a), PredType::NATIVE_INT);
+	mtype1.insertMember(outputTypeMember2, HOFFSET(outputStruct, b), PredType::NATIVE_INT);
+	mtype1.insertMember(outputTypeMember3, HOFFSET(outputStruct, c), PredType::NATIVE_FLOAT);
 
 	/*
 	 * add chunks and compression to the output data

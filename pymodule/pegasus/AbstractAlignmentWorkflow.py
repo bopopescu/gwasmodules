@@ -118,7 +118,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	def addAddRG2BamJobsAsNeeded(self, workflow=None, alignmentDataLs=None, site_handler=None, input_site_handler=None, \
 							addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None, \
 							BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
-							mv=None, namespace="workflow", version="1.0", \
+							mv=None, \
 							data_dir=None, tmpDir="/tmp"):
 		"""
 		2012.4.5
@@ -166,7 +166,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				
 				# the add-read-group job
 				#addRGJob = Job(namespace=namespace, name=addRGExecutable.name, version=version)
-				addRGJob = Job(namespace=namespace, name=addOrReplaceReadGroupsJava.name, version=version)
+				addRGJob = Job(namespace=workflow.namespace, name=addOrReplaceReadGroupsJava.name, version=workflow.version)
 				outputRGSAM = File(os.path.join(addRG2BamDir, os.path.basename(alignment.path)))
 				
 				addRGJob.addArguments(javaMemRequirement, '-jar', AddOrReplaceReadGroupsJar, \
@@ -349,7 +349,10 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		preReduceReturnData = passingData.preReduceReturnData
 		
 		for chromosomeSize, chromosome in chrSizeIDList:
-			intervalDataLs = chr2IntervalDataLs.get(chromosome)
+			if chr2IntervalDataLs:
+				intervalDataLs = chr2IntervalDataLs.get(chromosome, None)
+			else:
+				intervalDataLs = None
 			if chr2VCFJobData:
 				VCFJobData = chr2VCFJobData.get(chromosome)
 			else:
@@ -380,31 +383,32 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 			mapEachIntervalDataLs = passingData.mapEachIntervalDataLs
 			mapEachIntervalDataLs = []
 			
-			for intervalData in intervalDataLs:
-				if intervalData.file:
-					mpileupInterval = intervalData.interval
-					bcftoolsInterval = intervalData.file
-				else:
-					mpileupInterval = intervalData.interval
-					bcftoolsInterval = intervalData.interval
-				intervalFileBasenameSignature = intervalData.intervalFileBasenameSignature
-				overlapInterval = intervalData.overlapInterval
-				overlapFileBasenameSignature = intervalData.overlapIntervalFileBasenameSignature
-				
-				mapEachIntervalData = self.mapEachInterval(workflow=workflow, alignmentData=alignmentData, intervalData=intervalData,\
-									chromosome=chromosome,\
-									VCFJobData=VCFJobData, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
-									mapEachAlignmentData=mapEachAlignmentData,\
-									mapEachChromosomeData=mapEachChromosomeData, transferOutput=False, **keywords)
-				passingData.mapEachIntervalData = mapEachIntervalData
-				mapEachIntervalDataLs.append(mapEachIntervalData)
-				
-				linkMapToReduceData = self.linkMapToReduce(workflow=workflow, mapEachIntervalData=mapEachIntervalData, \
-									preReduceReturnData=preReduceReturnData, \
-									reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
-									mapEachAlignmentData=mapEachAlignmentData,\
-									passingData=passingData, \
-									**keywords)
+			if intervalDataLs:
+				for intervalData in intervalDataLs:
+					if intervalData.file:
+						mpileupInterval = intervalData.interval
+						bcftoolsInterval = intervalData.file
+					else:
+						mpileupInterval = intervalData.interval
+						bcftoolsInterval = intervalData.interval
+					intervalFileBasenameSignature = intervalData.intervalFileBasenameSignature
+					overlapInterval = intervalData.overlapInterval
+					overlapFileBasenameSignature = intervalData.overlapIntervalFileBasenameSignature
+					
+					mapEachIntervalData = self.mapEachInterval(workflow=workflow, alignmentData=alignmentData, intervalData=intervalData,\
+										chromosome=chromosome,\
+										VCFJobData=VCFJobData, passingData=passingData, reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
+										mapEachAlignmentData=mapEachAlignmentData,\
+										mapEachChromosomeData=mapEachChromosomeData, transferOutput=False, **keywords)
+					passingData.mapEachIntervalData = mapEachIntervalData
+					mapEachIntervalDataLs.append(mapEachIntervalData)
+					
+					linkMapToReduceData = self.linkMapToReduce(workflow=workflow, mapEachIntervalData=mapEachIntervalData, \
+										preReduceReturnData=preReduceReturnData, \
+										reduceBeforeEachAlignmentData=reduceBeforeEachAlignmentData,\
+										mapEachAlignmentData=mapEachAlignmentData,\
+										passingData=passingData, \
+										**keywords)
 			
 			reduceAfterEachChromosomeData = self.reduceAfterEachChromosome(workflow=workflow, chromosome=chromosome, \
 								passingData=passingData, \
@@ -423,11 +427,12 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 	
 	def setup(self, chr2IntervalDataLs=None, **keywords):
 		"""
+		2013.09.02 use self.chr2size to derive chrIDSet, chr2IntervalDataLs is not used
 		2013.04.09 added chrSizeIDList in return
 		2013.1.25
 			chr2VCFJobData is None.
 		"""
-		chrIDSet = set(chr2IntervalDataLs.keys())
+		chrIDSet = set(self.chr2size.keys())
 		chrSizeIDList = [(chromosomeSize, chromosome) for chromosome, chromosomeSize in self.chr2size.iteritems()]
 		chrSizeIDList.sort()
 		chrSizeIDList.reverse()	#from big to small
@@ -632,7 +637,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		returnData = []
 		for alignment in alignmentLs:
 			inputFname = os.path.join(data_dir, alignment.path)
-			input = File(alignment.path)	#relative path, induces symlinking or stage-in
+			inputFile = File(alignment.path)	#relative path, induces symlinking or stage-in
 			baiFilepath = '%s.bai'%(inputFname)
 			if checkFileExistence and (not os.path.isfile(inputFname) or not os.path.isfile(baiFilepath)):
 				if not os.path.isfile(inputFname):
@@ -640,12 +645,12 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 				if not os.path.isfile(baiFilepath):
 					sys.stderr.write("registerAlignmentAndItsIndexFile() Warning: %s does not exist. skip entire alignment.\n"%(baiFilepath))
 				continue
-			input.addPFN(PFN("file://" + inputFname, workflow.input_site_handler))
-			workflow.addFile(input)
+			inputFile.addPFN(PFN("file://" + inputFname, workflow.input_site_handler))
+			workflow.addFile(inputFile)
 			baiF = File('%s.bai'%alignment.path)
 			baiF.addPFN(PFN("file://" + baiFilepath, workflow.input_site_handler))
 			workflow.addFile(baiF)
-			alignmentData = PassingData(alignment=alignment, jobLs = [], bamF=input, baiF=baiF)
+			alignmentData = PassingData(alignment=alignment, jobLs = [], bamF=inputFile, baiF=baiF)
 			returnData.append(alignmentData)
 		sys.stderr.write("Done.\n")
 		return returnData
@@ -683,9 +688,22 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		workflow = pdata.workflow
 		
 		if self.needSplitChrIntervalData:	#2013.06.21 defined in AbstractNGSWorkflow.__init__()
-			chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
+			if self.alignmentDepthIntervalMethodShortName and self.db and self.db.checkAlignmentDepthIntervalMethod(short_name=self.alignmentDepthIntervalMethodShortName):
+				#2013.09.01 fetch intervals from db
+				#make sure it exists in db first
+				chr2IntervalDataLs = self.getChr2IntervalDataLsFromDBAlignmentDepthInterval(db=self.db, \
+									intervalSize=self.intervalSize, intervalOverlapSize=self.intervalOverlapSize,\
+									alignmentDepthIntervalMethodShortName=self.alignmentDepthIntervalMethodShortName, \
+									alignmentDepthMinFold=self.alignmentDepthMinFold, alignmentDepthMaxFold=self.alignmentDepthMaxFold, \
+									minAlignmentDepthIntervalLength=self.minAlignmentDepthIntervalLength,\
+									maxContigID=self.maxContigID, minContigID=self.minContigID)
+			else: #split evenly using chromosome size
+				chr2IntervalDataLs = self.getChr2IntervalDataLsBySplitChrSize(chr2size=self.chr2size, \
 													intervalSize=self.intervalSize, \
 													intervalOverlapSize=self.intervalOverlapSize)
+			# 2012.8.2 if maxContigID/minContigID is not well defined. restrictContigDictionry won't do anything.
+			chr2IntervalDataLs = self.restrictContigDictionry(dc=chr2IntervalDataLs, \
+												maxContigID=self.maxContigID, minContigID=self.minContigID)
 		else:
 			chr2IntervalDataLs = None
 		

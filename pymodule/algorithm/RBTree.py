@@ -4,9 +4,9 @@ Usage:
 	
 	## for genomic or other data with span-like data structures (chromsome, start, stop).
 	# chromosome could be set to same for other non-genomic span data. 
+	
 	from RBTree import RBDict	# 2010-1-26 RBDict is more efficiency than binary_tree.
 	rbDict = RBDict(cmpfn=leftWithinRightAlsoEqualCmp)
-
 	for segment in segment_ls:
 		chromosome, start, stop = segment[:3]
 		segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=chromosome, span_ls=[start, stop], \
@@ -19,6 +19,10 @@ Usage:
 	individual1 = "1978001"
 	rbDict[key1] = individual1
 	
+	for rbNode in rbDict:
+		print rbNode.key
+		print rbNode.value
+		
 	
 	
 2010-1-26 downloaded from http://newcenturycomputers.net/projects/rbtree.html
@@ -995,7 +999,7 @@ class RBDict(RBTree):
 		self[key] = value
 		return value
 	
-	def findNodes(self, key, node_ls=[], current=None, compareIns=None):
+	def findNodes(self, key=None, node_ls=[], current=None, compareIns=None):
 		"""
 		Examples:
 			segmentKey = CNVSegmentBinarySearchTreeKey(chromosome=str(row.chromosome), \

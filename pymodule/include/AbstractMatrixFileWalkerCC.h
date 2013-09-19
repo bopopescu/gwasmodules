@@ -8,12 +8,13 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ext/hash_map>	//for hash_map
+#include <map>	//for hash_map
 #include <boost/program_options.hpp>	//for program options
 #include <fstream>
+#include <list>
 #include <exception>
+#include <algorithm>    // std::set_intersection, std::sort
 #include <boost/tokenizer.hpp>
-
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
@@ -24,30 +25,33 @@
 #include <boost/random/variate_generator.hpp>
 #include <boost/format.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/assign/std/vector.hpp>
+#include <boost/assign/list_of.hpp>
+#include <boost/assign/list_inserter.hpp>
+#include <boost/any.hpp>
+#include <boost/variant.hpp>
+#include <boost/spirit/home/support/detail/hold_any.hpp>	//hold_any is said to be better than any, AND it can be streamed.
 //#include <boost/generator_iterator.hpp>
-
+#include "utils.h"
+#include "MatrixFile.h"
 
 // This is a typedef for a random number generator.
 // Try boost::mt19937 or boost::ecuyer1988 instead of boost::minstd_rand
 typedef boost::mt19937 base_generator_type;
 typedef boost::tokenizer<boost::char_separator<char> > tokenizerCharType;	//to break a line into list by some delimiter
 
+typedef boost::variant<long, std::string> boostLongStringVariant;
+//do not mix int, long, or float into the type, i.e. variant<int, double, float, long, string>.
+// Since one component can be constructed from another component, it'll cause this error :
+//  "variant.hpp  error:call of overloaded ‘initialize(void*, const long int&)’ is ambiguous.."
+typedef boost::variant<double, std::string> boostDoubleStringVariant;
+typedef boost::spirit::hold_any anyType;	//anyType is streamable (outf << anyTypeObject;), while boost::any is not.
+
+
 using namespace std;
 using namespace boost;
 namespace po = boost::program_options;
 
-/*
- * 2013.08.21 convenient function from http://stackoverflow.com/questions/6097927/is-there-a-way-to-implement-analog-of-pythons-separator-join-in-c
- */
-template<typename Iter>
-std::string joinIteratorToString(Iter begin, Iter end, std::string const& separator) {
-	std::ostringstream result;
-	if (begin != end)
-		result << *begin++;
-	while (begin != end)
-		result << separator << *begin++;
-	return result.str();
-}
 
 class AbstractMatrixFileWalkerCC{
 protected:
@@ -74,8 +78,8 @@ protected:
 	int report;
 
 	std::ifstream inputFile;
-
-	std::ofstream outputFile;
+	//MatrixFile<int> outputFile;
+	MatrixFilePtr outputFile;
 	boost::iostreams::filtering_streambuf<boost::iostreams::output> outputFilterStreamBuffer;
 	long noOfOutput;	//2013.09.03 recording how many times output has happened.
 
@@ -96,13 +100,16 @@ public:
 	virtual void setup();
 	virtual void reduce();
 	virtual void closeFiles();
+	virtual void openOneOutputFile(string &outputFname, \
+			boost::iostreams::filtering_streambuf<boost::iostreams::output> &outputFilterStreamBuffer,\
+			std::ofstream &outputFile);
 	virtual void openOutputFile();
 	virtual void preFileFunction();
-	virtual void postFileFunction();
 	virtual void fileWalker(vector<string> &inputFnameList);
 	virtual void openOneInputFile(string &inputFname,  boost::iostreams::filtering_streambuf<boost::iostreams::input> &inputFilterStreamBuffer);
 	virtual void handleOneFile(string &inputFname);
 	virtual int processRow(tokenizerCharType &line_toks);
 	virtual int outputRow(tokenizerCharType &line_toks);
+	virtual void postFileFunction();
 	virtual void run();
 };

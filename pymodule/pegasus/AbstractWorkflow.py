@@ -237,9 +237,17 @@ class AbstractWorkflow(ADAG):
 	
 	def constructJobDataFromJob(self, job=None):
 		"""
+		2013.09.05 added vcfFile and tbi_F in structure
 		2013.07.18
 		"""
-		return PassingData(job=job, jobLs=[job], file=job.output, fileLs=job.outputLs)
+		if hasattr(job, 'output') and job.output.name.find('.vcf')>=0:
+			vcfFile = job.output
+			tbi_F = getattr(job, 'tbi_F', None)
+		else:
+			vcfFile = None
+			tbi_F = None
+		return PassingData(job=job, jobLs=[job], file=job.output, fileLs=job.outputLs, vcfFile=vcfFile,\
+						tbi_F=tbi_F)
 	
 	def constructOneExecutableObject(self, path=None, name=None, checkPathExecutable=True, version=None, namespace=None,\
 									noVersion=False):
@@ -353,13 +361,6 @@ class AbstractWorkflow(ADAG):
 		"""
 		pass
 	
-	def registerCommonExecutables(self, workflow=None):
-		"""
-		2012.7.25
-			add noDefaultClustersSizeExecutableList
-		2011-11-22
-		"""
-		self.registerExecutables(workflow=workflow)
 
 	def registerExecutables(self, workflow=None):
 		"""
@@ -394,6 +395,8 @@ class AbstractWorkflow(ADAG):
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/extractor/SelectRowsFromMatrix.py'), \
 										name='SelectRowsFromMatrix', clusterSizeMultipler=1)
 		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/mkdirWrap.sh'), \
+										name='mkdirWrap', clusterSizeMultipler=1)
 		
 		
 		#executableList = []
@@ -401,10 +404,6 @@ class AbstractWorkflow(ADAG):
 		#noClusteringExecutableSet = set()	#2012.8.2 you don't want to cluster for some jobs.
 		
 		#mkdirWrap is better than mkdir that it doesn't report error when the directory is already there.
-		mkdirWrap = Executable(namespace=namespace, name="mkdirWrap", version=version, os=operatingSystem, \
-							arch=architecture, installed=True)
-		mkdirWrap.addPFN(PFN("file://" + os.path.join(self.pymodulePath, "shell/mkdirWrap.sh"), site_handler))
-		executableClusterSizeMultiplierList.append((mkdirWrap, 1))
 		
 		#mv to rename files and move them
 		mv = Executable(namespace=namespace, name="mv", version=version, os=operatingSystem, arch=architecture, installed=True)
@@ -655,6 +654,8 @@ class AbstractWorkflow(ADAG):
 				transferExecutable.removeProfile(condorUniverseProfile)
 			transferExecutable.addProfile(condorUniverseProfile)
 		"""
+	
+	registerCommonExecutables = registerExecutables
 	
 	def addExecutableAndAssignProperClusterSize(self, executableClusterSizeMultiplierList=[], defaultClustersSize=None):
 		"""
@@ -1574,6 +1575,9 @@ class AbstractWorkflow(ADAG):
 		PermSize=MaxPermSize*3/4
 		mxMemory = max(minMemory, mxMemory_user)
 		msMemory = mxMemory*3/4
+		#-XX:+UseGCOverheadLimit
+			#Use a policy that limits the proportion of the VM's time that is spent in GC before an OutOfMemory error is thrown. (Introduced in 6.)
+		#-XX:-UseGCOverheadLimit would disable the policy.
 		memRequirementInStr = "-Xms%sm -Xmx%sm -XX:PermSize=%sm -XX:MaxPermSize=%sm"%\
 				(msMemory, mxMemory, PermSize, MaxPermSize)
 		
@@ -2402,7 +2406,7 @@ class AbstractWorkflow(ADAG):
 		
 		if getattr(self, 'db', None):
 			session = self.db.session
-			session.begin()
+			session.begin(subtransactions=True)
 		
 			if not self.data_dir:
 				self.data_dir = self.db.data_dir

@@ -27,16 +27,18 @@
 #include <boost/bimap/multiset_of.hpp>
 #include <boost/bimap/list_of.hpp>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/bimap/set_of.hpp>
+#include <boost/bimap/multiset_of.hpp>
 
 using namespace std;
 
-typedef boost::bimap<string, int > nucleotide2integerBiMapType;
+typedef boost::bimap< boost::bimaps::multiset_of<string>, int > nucleotide2integerBiMapType;
 typedef nucleotide2integerBiMapType::value_type nucleotideIntegerTuple;
 
 class GenotypeCoder{
 public:
 	nucleotide2integerBiMapType nucleotide2integerBiMap;
-
+	nucleotide2integerBiMapType::left_const_iterator nucleotide2integerBiMapTypeLeftEndIterator;
 	GenotypeCoder(){
 		initializeNucleotide2integerBiMap();
 	}
@@ -56,6 +58,8 @@ public:
 		*/
 		//nucleotide2integerBiMap = boost::assign::list_of<nucleotide2integerBiMapType ::relation > ("A", 2);
 		boost::assign::insert(nucleotide2integerBiMap.left)("A", 2)("C", 3)("G", 5)("T", 7);
+		boost::assign::insert(nucleotide2integerBiMap.left)("a", 2)("c", 3)("g", 5)("t", 7);	//lower case but same thing
+		nucleotide2integerBiMapTypeLeftEndIterator = nucleotide2integerBiMap.left.end();
 	}
 
 	int encode(string genotype){
@@ -65,14 +69,16 @@ public:
 		 * '/' or '|' within genotype is ignored.
 		 */
 		int genotypeInteger =1;
-		if (genotype=="NA"){
-			genotypeInteger=0;
+		if (genotype=="NA" or genotype=="." or genotype=="./." or genotype=="" or genotype==".|." or genotype=="|"){
+			genotypeInteger=0;	//missing
 		}
-		else{
+		else if (genotype.length()>0){
 			for(string::iterator gIterator=genotype.begin(); gIterator!=genotype.end(); gIterator++){
-				char singleNucleotide = *gIterator;
-				if (singleNucleotide!='/' && singleNucleotide!='|'){
-					genotypeInteger = genotypeInteger*nucleotide2integerBiMap.left.at(string(gIterator, gIterator+1));
+				string singleNucleotide = string(gIterator, gIterator+1);
+				if (nucleotide2integerBiMap.left.find(singleNucleotide)!=nucleotide2integerBiMap.left.end()){
+					genotypeInteger = genotypeInteger*nucleotide2integerBiMap.left.find(singleNucleotide)->second;
+					//gIterator is char*. string(gIterator, gIterator+1) converts it to string.
+					//nucleotide2integerBiMap.left.at(..) does not work when the left key is multiset_of
 				}
 			}
 		}
