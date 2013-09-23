@@ -38,12 +38,304 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
+#include <vector>
+#include <map>	//for hash_map
+#include <set>	//for set
+#include <functional>	//2013.09.11 for customize hash
+#include <boost/functional/hash.hpp>	//2013.09.10 yh: for customize boost::hash
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
+#include "pymodule/algorithm/RedBlackTree.h"	//2013.09.19 red-black tree to store segment breakpoint, score, etc.
+
+
 #ifndef GADABIN
 #include <boost/python.hpp>
 #endif
 using namespace std;
+
+
+class BreakPointKey{
+	/*
+	 * 2013.09.22 class defines the key of a breakpoint in a red-black tree.
+	 * 	content is similar to BreakPoint but different ordering function.
+	 */
+	// for output
+	friend ostream& operator<<(ostream& out, BreakPointKey& bpKey){
+		/*
+		 * 2013.09.22 something wrong here, it can't be streamed to an ostream
+		 */
+		out << boost::format("position=%1%, tscore=%2%, weight=%3%, length=%4%, MinSegLen=%5%, totalLength=%6%")%
+				bpKey.position % bpKey.tscore % bpKey.weight %
+				bpKey.segmentLength % bpKey.MinSegLen % bpKey.totalLength;
+		return out;
+	}
+	// define comparison operator for the RBTree, how to order them
+	// For all break points below MinSegLen, order by tscore
+	// For all break points above MinSegLen, order by tscore
+	// for break points crossing MinSegLen, order by segmentLength
+	friend bool operator<(const BreakPointKey& a, const BreakPointKey& b){
+		/*
+		 * make sure no duplicate (or close keys, for floating values) keys exist in red-black trees.
+		 */
+		//return a.tscore < b.tscore;
+
+		if(a.segmentLength<=a.MinSegLen && b.segmentLength<=b.MinSegLen){	//both below MinSegLen, then order them by score
+			if (a.tscore==b.tscore){
+				return a.segmentLength<b.segmentLength;
+			}
+			else{
+				return a.tscore<b.tscore;
+			}
+		}
+		else if ((a.segmentLength<a.MinSegLen && b.segmentLength>=b.MinSegLen) || (a.segmentLength>=a.MinSegLen && b.segmentLength<b.MinSegLen)){	//one below, one above
+			if (a.segmentLength==b.segmentLength){
+				return a.tscore<b.tscore;
+			}
+			else{
+				//order by segmentLength
+				return a.segmentLength<b.segmentLength;
+			}
+		}
+		else{	//both above MinSegLen, then order them by score, unless they are identical
+			if (a.tscore==b.tscore){
+				return a.segmentLength<b.segmentLength;
+			}
+			else{
+				return a.tscore<b.tscore;
+			}
+		}
+
+	}
+
+	friend bool operator>(const BreakPointKey& a, const BreakPointKey& b){
+		/*
+		 * make sure no duplicate (or close keys, for floating values) keys exist in red-black trees.
+		 */
+		//return a.tscore > b.tscore;
+		if(a.segmentLength<=a.MinSegLen && b.segmentLength<=b.MinSegLen){	//both below MinSegLen, then order them by score
+			if (a.tscore==b.tscore){
+				return a.segmentLength>b.segmentLength;
+			}
+			else{
+				return a.tscore>b.tscore;
+			}
+		}
+		else if ((a.segmentLength<a.MinSegLen && b.segmentLength>=b.MinSegLen) || (a.segmentLength>=a.MinSegLen && b.segmentLength<b.MinSegLen)){	//one below, one above
+			if (a.segmentLength==b.segmentLength){
+				return a.tscore>b.tscore;
+			}
+			else{
+				//order by segmentLength
+				return a.segmentLength>b.segmentLength;
+			}
+		}
+		else{	//both above MinSegLen, then order them by score, unless they are identical
+			if (a.tscore==b.tscore){
+				return a.segmentLength>b.segmentLength;
+			}
+			else{
+				return a.tscore>b.tscore;
+			}
+		}
+	}
+
+	friend bool operator==(const BreakPointKey& a, const BreakPointKey& b) {
+		return a.tscore == b.tscore;
+	}
+
+public:
+	long position;
+	double weight;
+	double tscore;
+	long segmentLength;
+	long MinSegLen;
+	long totalLength;
+	void* nodePtr;
+	BreakPointKey(){
+		position=1;
+		weight=0;
+		tscore=0;
+		segmentLength=0;
+		MinSegLen=0;
+		totalLength=0;
+		nodePtr = NULL;
+	}
+	BreakPointKey(long _position, double _weight, double _tscore, long _segmentLength, long _MinSegLen, long _totalLength):
+		position(_position),weight(_weight), tscore(_tscore), segmentLength(_segmentLength), MinSegLen(_MinSegLen), totalLength(_totalLength){
+		nodePtr = NULL;
+	};
+	~BreakPointKey(){
+	}
+};
+
+
+class BreakPoint{
+	// for output
+	friend ostream& operator<<(ostream& out, BreakPoint& breakPoint){
+		out << boost::format("position=%1%, tscore=%2%, weight=%3%, length=%4%, MinSegLen=%5%, totalLength=%6%")%
+				breakPoint.position % breakPoint.tscore % breakPoint.weight %
+				breakPoint.segmentLength % breakPoint.MinSegLen % breakPoint.totalLength;
+		return out;
+	}
+	friend bool operator<(const BreakPoint& a, const BreakPoint& b){
+		/*
+		 * to be used in std::sort
+		 */
+		return a.position<b.position;
+	}
+
+	friend bool operator==(const BreakPoint& a, const BreakPoint& b) {
+		return a.position==b.position;
+	}
+
+public:
+	long position;
+	double weight;
+	double tscore;
+	long segmentLength;
+	long MinSegLen;
+	long totalLength;
+	BreakPoint* leftBreakPointPtr;
+	BreakPoint* rightBreakPointPtr;
+	void* nodePtr;
+	BreakPoint(){
+		position=1;
+		weight=0;
+		tscore=0;
+		segmentLength=0;
+		MinSegLen=0;
+		totalLength=0;
+		leftBreakPointPtr=NULL;
+		rightBreakPointPtr=NULL;
+		nodePtr = NULL;
+	}
+	BreakPoint(long _position, double _weight, double _tscore, long _segmentLength, long _MinSegLen, long _totalLength):
+		position(_position),weight(_weight), tscore(_tscore), segmentLength(_segmentLength), MinSegLen(_MinSegLen), totalLength(_totalLength){
+		leftBreakPointPtr=NULL;
+		rightBreakPointPtr=NULL;
+		nodePtr = NULL;
+	};
+	~BreakPoint(){};
+	void setLeftBreakPoint(BreakPoint* bpPtr){
+		this->leftBreakPointPtr=bpPtr;
+	}
+	BreakPoint* getLeftBreakPoint(){
+		return this->leftBreakPointPtr;
+	}
+	void setRightBreakPoint(BreakPoint* bpPtr){
+		this->rightBreakPointPtr=bpPtr;
+	}
+	BreakPoint* getRightBreakPoint(){
+		return this->rightBreakPointPtr;
+	}
+	void setRBTreeNodePtr(void* ndPtr){
+		this->nodePtr = ndPtr;
+	}
+	void* getRBTreeNodePtr(){
+		return this->nodePtr;
+	}
+	BreakPointKey* getKeyPointer(){
+		BreakPointKey* bpKeyPtr = new BreakPointKey(position, weight, tscore, segmentLength, MinSegLen, totalLength);
+		return bpKeyPtr;
+	}
+	BreakPointKey getKey(){
+		BreakPointKey bpKey = BreakPointKey(position, weight, tscore, segmentLength, MinSegLen, totalLength);
+		return bpKey;
+	}
+	void removeItself(){
+		/*
+		 * updating left and right breakpoint
+		 */
+		long j;
+		double iC, iL, iR, M;
+		double h0;
+
+		M = (double) totalLength;
+		//initialize
+		BreakPoint* leftLeftBreakPointPtr = NULL;
+		BreakPoint* rightRightBreakPointPtr = NULL;
+
+		if (leftBreakPointPtr!=NULL && rightBreakPointPtr!=NULL){
+			iL = (double) leftBreakPointPtr->position;
+			iC = (double) this->position;
+			iR = (double) rightBreakPointPtr->position;
+
+			leftLeftBreakPointPtr = leftBreakPointPtr->leftBreakPointPtr;
+			rightRightBreakPointPtr = rightBreakPointPtr->rightBreakPointPtr;
+			//update the weights first
+			if (leftLeftBreakPointPtr!=NULL){	//leftBreakPointPtr is NOT the left most.
+				leftBreakPointPtr->weight = leftBreakPointPtr->weight
+						+ sqrt((M - iL) / (M - iC) * iL / iC) * (iR - iC) / (iR - iL) *weight;
+			}
+			if (rightRightBreakPointPtr!=NULL){	//rightBreakPointPtr is NOT the right most break point
+				rightBreakPointPtr->weight = rightBreakPointPtr->weight
+						+ sqrt((M - iR) / (M - iC) * iR / iC) * (iC - iL) / (iR - iL) * weight;
+			}
+			//update the tscoe and segmentLength, which needs the updated weights
+			if (leftLeftBreakPointPtr!=NULL){
+				h0 = (double) (M - leftBreakPointPtr->position) * (double) leftBreakPointPtr->position / M * (double) (rightBreakPointPtr->position - leftLeftBreakPointPtr->position)
+							/ (double) (rightBreakPointPtr->position - leftBreakPointPtr->position) / (double) (leftBreakPointPtr->position - leftLeftBreakPointPtr->position);
+				leftBreakPointPtr->tscore = fabs(leftBreakPointPtr->weight) / sqrt(h0);
+				leftBreakPointPtr->segmentLength = min(leftBreakPointPtr->position-leftLeftBreakPointPtr->position ,
+						rightBreakPointPtr->position-leftBreakPointPtr->position);
+			}
+			if (rightRightBreakPointPtr!=NULL){
+				h0 = (double) (M - rightBreakPointPtr->position) * (double) rightBreakPointPtr->position / M * (double) (rightRightBreakPointPtr->position - leftBreakPointPtr->position)
+							/ (double) (rightRightBreakPointPtr->position - rightBreakPointPtr->position) / (double) (rightBreakPointPtr->position - leftBreakPointPtr->position);
+				rightBreakPointPtr->tscore = fabs(rightBreakPointPtr->weight) / sqrt(h0);
+				rightBreakPointPtr->segmentLength= min(rightRightBreakPointPtr->position-rightBreakPointPtr->position,
+						rightBreakPointPtr->position-leftBreakPointPtr->position);
+			}
+			/*
+			for (j = start; j <= end; j++) {
+				h0 = (double) (M - Iext[j]) * (double) Iext[j] / M * (double) (Iext[j + 1] - Iext[j - 1])
+						/ (double) (Iext[j + 1] - Iext[j]) / (double) (Iext[j] - Iext[j - 1]);
+				Scores[j] = fabs(Wext[j]) / sqrt(h0);
+			}
+			*/
+		}
+		//update the left & right of the left & right
+		if (leftBreakPointPtr!=NULL){
+			leftBreakPointPtr->rightBreakPointPtr = rightBreakPointPtr ;
+		}
+		if (rightBreakPointPtr!=NULL){
+			rightBreakPointPtr->leftBreakPointPtr = leftBreakPointPtr;
+		}
+		//release the memory
+		//delete leftBreakPointPtr;
+		//delete rightBreakPointPtr;
+		//delete nodePtr;
+	}
+	//define methods to compute /update score/length/weight/position based on neighboring breakpoints
+};
+
+
+
+namespace std {
+	template<> struct hash<BreakPoint> {
+		/*
+		 * 2013.09.22 hash function for BreakPoint, this requires g++ flag "-std=c++0x"
+		 */
+		size_t operator()(const BreakPoint& bp) const {
+
+			// Start with a hash value of 0    .
+			size_t seed = 0;
+
+			// Modify 'seed' by XORing and bit-shifting in
+			// one member of 'Key' after the other:
+			boost::hash_combine(seed, boost::hash_value(bp.position));
+			//boost::hash_combine(seed, boost::hash_value(bp.segmentLength));
+			return seed;
+		}
+	};
+
+};
+
+typedef set<BreakPoint*> rbNodeDataType;
+typedef RedBlackTree<BreakPointKey, rbNodeDataType > treeType;
+typedef RedBlackTreeNode<BreakPointKey, rbNodeDataType > rbNodeType;
+
 
 void reconstruct(double *wr, long M, double *aux_vec);
 void BubbleSort(long *I, long L);

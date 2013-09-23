@@ -366,7 +366,7 @@ public:
 	double a; //SBL hyperprior parameter
 	double sigma2; //Variance observed, if negative value, it will be estimated by the mean of the differences
 				   // I would recommend to be estimated on all the chromosomes and as a trimmed mean.
-	long MinLen; //Lenght in number of probes for a CNA segment to be called significan.
+	long MinLen; //Length in number of probes for a CNA segment to be called significan.
 	long SelectClassifySegments; //Classify segment into altered state (1), otherwise 0
 	long SelectEstimateBaseAmp; //Estimate Neutral hybridization amplitude.
 	double convergenceDelta;	//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
@@ -381,7 +381,9 @@ public:
 	GADA(int _argc, char* _argv[]);	//2013.08.28 commandline version
 	GADA();
 	GADA(long _debug);
-	virtual ~GADA();
+	virtual ~GADA(){
+		//cleanupMemory();	//comment it out to avoid repetitive free, in python module cleanupMemory is called by the end of run().
+	}
 
 	void initParameters();
 //#ifdef GADABIN
@@ -409,7 +411,14 @@ public:
 	virtual void closeFiles();
 	void commandlineRun();
 #endif
-	void cleanupMemory();
+	void cleanupMemory(){
+		free(tn);
+		free(Iext);
+		free(SegLen);
+		free(SegAmp);
+		free(Wext);
+		//free(SegState);	//2013.08.30 SegState is not always allocated with extra memory
+	}
 };
 
 GADA::GADA() :
@@ -435,9 +444,6 @@ GADA::GADA(long _debug) :
 	initParameters();
 }
 
-GADA::~GADA() {
-	//cleanupMemory();	//comment it out to avoid repetitive free, in python module cleanupMemory is called by the end of run().
-}
 
 void GADA::initParameters() {
 	T = 5.0; //Backward elimination threshold
@@ -456,10 +462,6 @@ void GADA::initParameters() {
 	convergenceMaxAlpha=1E8; // 1E8 Maximum number of iterations to reach convergence...
 	convergenceB=1E-20;	// a number related to convergence = 1E-20
 }
-
-
-
-
 
 
 #ifndef GADABIN	// 2009-11-21 boost python module code included under if macro GADABIN (GADA standalone) is not defined.
@@ -798,14 +800,6 @@ void GADA::commandlineRun(){
 }
 #endif	// 2009-11-21 end of the whole boost python module code
 
-void GADA::cleanupMemory() {
-	free(tn);
-	free(Iext);
-	free(SegLen);
-	free(SegAmp);
-	free(Wext);
-	//free(SegState);	//2013.08.30 SegState is not always allocated with extra memory
-}
 
 
 

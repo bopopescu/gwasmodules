@@ -1651,6 +1651,11 @@ long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 	return K;
 }
 
+//define how to output rbNodeDataType
+std::ostream &operator<<(std::ostream &stream, const rbNodeDataType &b) {
+    return stream << boost::format("%1%-elements-in-this-set")% b.size();
+}
+
 /******************************************************/
 //BEwTscore(Iext,Wext,h0,h1,tscore,&K,T);  //Need to update BEthres to operate on the Iext Wext notation...
 long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
@@ -1661,93 +1666,198 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		long debug
 		) {
 	long i, K, indexOfSegmentToRemove, M;
-	double vmin;
-	long *L; //Vector with the smallest of the two neighboring segments of each breakpoint.
 
 	K = *pK; //Number of breakpoints
 	M = Iext[K + 1]; //Total length
-	L = (long*) myCalloc(K+1,sizeof(long)); //array to store segment length
 
 	if (debug>0){
 		std::cerr << boost::format("BEwTscore(): BE starts K=%1% M=%2% T=%3% MinSegLen=%4% ... \n")% K % M % T % MinSegLen;
 	}
+	if (debug>0){
+		std::cerr << boost::format("Adding %1% breakpoints into a red-black tree ... ")% K ;
+	}
+	treeType rbTree = treeType();
 
-	vmin = 0;
-	long toRemoveSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
-	long previousToRemoveSegmentLength = -1;
-	double previousRoundMinScore=-1;
-	long counter = 0;
-	while ((vmin < T || toRemoveSegmentLength<MinSegLen) && (K > 0)) {
-		toRemoveSegmentLength=1000000000000;	//1 trillion ,very large
-		indexOfSegmentToRemove = -1;
-		vmin = 1E100;
-		if (debug>0 && counter%100000==0){
-			std::cerr << boost::format("BEwTscore(): iteration no=%5%, T=%3% indexOfSegmentToRemove=%1% vmin=%2% tscore[i]=%7% previousRoundMinScore=%8% previousToRemoveSegmentLength=%9% toRemoveSegmentLength=%4% nOOfSegments=%6% \n") %
-						indexOfSegmentToRemove % vmin % T % toRemoveSegmentLength % counter % K % tscore[indexOfSegmentToRemove] % previousRoundMinScore % previousToRemoveSegmentLength;
+	BreakPoint* leftBreakPointPtr=NULL;
+	BreakPoint* rightBreakPointPtr=NULL;
+
+	rbNodeType* currentNodePtr=rbTree.nil;
+	rbNodeType* genomeLeftNodePtr=rbTree.nil;
+	rbNodeType* genomeRightNodePtr=rbTree.nil;
+	BreakPoint *leftMostBreakPointPtr = new BreakPoint(Iext[0], Wext[0], tscore[0], 0, MinSegLen, Iext[K+1]);
+	leftMostBreakPointPtr->nodePtr = rbTree.nil;
+	BreakPoint *rightMostBreakPointPtr = new BreakPoint(Iext[K+1], 0, 0, 0, MinSegLen, Iext[K+1]);
+	rightMostBreakPointPtr->nodePtr = rbTree.nil;
+
+	for (i = 1; i < K + 1; i++){
+		long segLength = min(Iext[i]-Iext[i-1],Iext[i+1]-Iext[i]);	//shorter of two neighboring segments as length for the breakpoint
+		BreakPoint* bpPtr = new BreakPoint(Iext[i], Wext[i], tscore[i], segLength, MinSegLen, Iext[K+1]);
+		BreakPointKey bpKey = bpPtr->getKey();
+		//cerr<< *bpPtr << endl;
+		//cerr << boost::format("i=%1%, tree size=%2%, tree valid=%3%")% i % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
+		if (i==1){
+			bpPtr->setLeftBreakPoint(leftMostBreakPointPtr);
+			leftMostBreakPointPtr->setRightBreakPoint(bpPtr);
 		}
-		if (indexOfSegmentToRemove==-1 && previousRoundMinScore<T){
-			//Find breakpoint with lowest score to remove
-			for (i = 1; i < K + 1; i++){
-				if (tscore[i] < vmin) {
-					vmin = tscore[i];
-					if (vmin<T){
-						indexOfSegmentToRemove = i;
-					}
-					if (fabs(vmin-previousRoundMinScore)<1E-8){
-						//break if this score is very close to previous lowest score
-						break;
-					}
-				}
+		else if (leftBreakPointPtr!=NULL){
+			bpPtr->setLeftBreakPoint(leftBreakPointPtr);
+			leftBreakPointPtr->setRightBreakPoint(bpPtr);
+			if (i==K){	//last point
+				bpPtr->setRightBreakPoint(rightMostBreakPointPtr);
+				rightMostBreakPointPtr->setLeftBreakPoint(bpPtr);
 			}
-			previousRoundMinScore = vmin;
 		}
-
-		if (indexOfSegmentToRemove==-1 && MinSegLen>0 && previousToRemoveSegmentLength<MinSegLen){
-			vmin=1E100;	//reset this value
-			//didn't find a segment with low enough score. now check segment length
-			//Compute segment lengths of flanking breakpoints
-			for (i = 1; i < K + 1; i++){
-				L[i] = min(Iext[i]-Iext[i-1],Iext[i+1]-Iext[i]);
-				if (L[i]<MinSegLen && tscore[i]<=vmin){	//lowest score among all short segments, not shortest
-					toRemoveSegmentLength=L[i];
-					vmin = tscore[i];
-					indexOfSegmentToRemove =i;
-					//if (toRemoveSegmentLength==previousToRemoveSegmentLength){
-						//break if current segment is already smallest.
-						//break;
-					//}
-				}
-			}
-			previousToRemoveSegmentLength = toRemoveSegmentLength;
-			previousRoundMinScore = vmin;
+		currentNodePtr = rbTree.queryTree(bpKey);
+		if (rbTree.isNULLNode(currentNodePtr)){
+			rbNodeDataType* dataPtr = new rbNodeDataType();
+			currentNodePtr = rbTree.insertNode(bpKey, dataPtr);
 		}
-		if (debug>0 && counter%100000==0){
-			std::cerr << boost::format("BEwTscore(): iteration no=%5%, T=%3% indexOfSegmentToRemove=%1% vmin=%2% tscore[i]=%7% previousRoundMinScore=%8% previousToRemoveSegmentLength=%9% toRemoveSegmentLength=%4% nOOfSegments=%6% \n") %
-						indexOfSegmentToRemove % vmin % T % toRemoveSegmentLength % counter % K % tscore[indexOfSegmentToRemove] % previousRoundMinScore % previousToRemoveSegmentLength;
-		}
-		counter ++;
-		if (indexOfSegmentToRemove!=-1){ //Remove breakpoint at indexOfSegmentToRemove
-			//if (debug>0){
-			//	std::cerr << boost::format("_DebugBEwTscore_ Removing indexOfSegmentToRemove=%1% vmin=%2% T=%3% \n")% indexOfSegmentToRemove % vmin % T;
-				//std::cerr << boost::format("_DebugBEwTscore_ %ld, W[indexOfSegmentToRemove-2]=%g W[indexOfSegmentToRemove-1]=%g W[indexOfSegmentToRemove]=%g W[indexOfSegmentToRemove+1]=%g W[indexOfSegmentToRemove+2]=%g T=%g\n") %indexOfSegmentToRemove,Wext[indexOfSegmentToRemove-2],Wext[indexOfSegmentToRemove-1],Wext[indexOfSegmentToRemove],Wext[indexOfSegmentToRemove+1],Wext[indexOfSegmentToRemove+2] %T;
-				//myPrintf("_DebugBEwTscore_ %ld, I[indexOfSegmentToRemove-2]=%ld I[indexOfSegmentToRemove-1]=%ld I[indexOfSegmentToRemove]=%ld I[indexOfSegmentToRemove+1]=%ld I[indexOfSegmentToRemove+2]=%ld T=%g\n",indexOfSegmentToRemove,Iext[indexOfSegmentToRemove-2],Iext[indexOfSegmentToRemove-1],Iext[indexOfSegmentToRemove],Iext[indexOfSegmentToRemove+1],Iext[indexOfSegmentToRemove+2],T);
-				//myPrintf("_DebugBEwTscore_ %ld, t[indexOfSegmentToRemove-2]=%g t[indexOfSegmentToRemove-1]=%g t[indexOfSegmentToRemove]=%g I[indexOfSegmentToRemove+1]=%g t[indexOfSegmentToRemove+2]=%g T=%g\n",indexOfSegmentToRemove,tscore[indexOfSegmentToRemove-2],tscore[indexOfSegmentToRemove-1],tscore[indexOfSegmentToRemove],tscore[indexOfSegmentToRemove+1],tscore[indexOfSegmentToRemove+2],T);
-			//}
-			K = RemoveBreakpoint(Wext, Iext, tscore, K, indexOfSegmentToRemove);
-			ComputeTScores(Wext, Iext, tscore, K, indexOfSegmentToRemove - 1, indexOfSegmentToRemove);
-
-#ifdef _DebugBEwTscore_
-			myPrintf("_DebugBEwTscore_ %ld, W[indexOfSegmentToRemove-2]=%g W[indexOfSegmentToRemove-1]=%g W[indexOfSegmentToRemove]=%g W[indexOfSegmentToRemove+1]=%g W[indexOfSegmentToRemove+2]=%g T=%g\n",indexOfSegmentToRemove,Wext[indexOfSegmentToRemove-2],Wext[indexOfSegmentToRemove-1],Wext[indexOfSegmentToRemove],Wext[indexOfSegmentToRemove+1],Wext[indexOfSegmentToRemove+2],T);
-			myPrintf("_DebugBEwTscore_ %ld, I[indexOfSegmentToRemove-2]=%ld I[indexOfSegmentToRemove-1]=%ld I[indexOfSegmentToRemove]=%ld I[indexOfSegmentToRemove+1]=%ld I[indexOfSegmentToRemove+2]=%ld T=%g\n",indexOfSegmentToRemove,Iext[indexOfSegmentToRemove-2],Iext[indexOfSegmentToRemove-1],Iext[indexOfSegmentToRemove],Iext[indexOfSegmentToRemove+1],Iext[indexOfSegmentToRemove+2],T);
-			myPrintf("_DebugBEwTscore_ %ld, t[indexOfSegmentToRemove-2]=%g t[indexOfSegmentToRemove-1]=%g t[indexOfSegmentToRemove]=%g I[indexOfSegmentToRemove+1]=%g t[indexOfSegmentToRemove+2]=%g T=%g\n",indexOfSegmentToRemove,tscore[indexOfSegmentToRemove-2],tscore[indexOfSegmentToRemove-1],tscore[indexOfSegmentToRemove],tscore[indexOfSegmentToRemove+1],tscore[indexOfSegmentToRemove+2],T);
-#endif
-
-		}
+		currentNodePtr->getDataPtr()->insert(bpPtr);
+		bpPtr->setRBTreeNodePtr(currentNodePtr);
+		//reset the left break point pointer
+		leftBreakPointPtr = bpPtr;
 	}
 	if (debug>0){
-		std::cerr << boost::format("BEwTscore(): Last iteration no=%5%, T=%3% indexOfSegmentToRemove=%1% vmin=%2% tscore[i]=%7% previousRoundMinScore=%8% previousToRemoveSegmentLength=%9% toRemoveSegmentLength=%4% nOOfSegments=%6% \n") %
-								indexOfSegmentToRemove % vmin % T % toRemoveSegmentLength % counter % K % tscore[indexOfSegmentToRemove] % previousRoundMinScore % previousToRemoveSegmentLength;
+		//rbTree.printTree();
+		std::cerr << boost::format(" tree size=%1%, tree max depth =%2%, tree valid=%3%.\n") %
+				rbTree.size() % rbTree.maxDepth() % rbTree.isValidRedBlackTree();
 	}
+	long toRemoveSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
+	long previousToRemoveSegmentLength = -1;
+	double currentMinScore;
+	double previousRoundMinScore=-1;
+	long counter = 0;
+
+	rbNodeType*  minNodePtr = NULL;
+	minNodePtr = rbTree.getMinimum();
+	BreakPointKey minBPKey=minNodePtr->getKey();
+	rbNodeDataType* setOfBPPtr = minNodePtr->getDataPtr();
+	rbNodeDataType::iterator setOfBPIterator=(*setOfBPPtr).begin();
+	//reset
+	leftBreakPointPtr=NULL;
+	rightBreakPointPtr=NULL;
+	genomeLeftNodePtr=rbTree.nil;
+	genomeRightNodePtr=rbTree.nil;
+
+	currentMinScore = minBPKey.tscore;
+	toRemoveSegmentLength = minBPKey.segmentLength;
+	while (rbTree.size()>0 && (currentMinScore<T || toRemoveSegmentLength<MinSegLen)){
+		minBPKey = minNodePtr->getKey();
+		setOfBPPtr = minNodePtr->getDataPtr();
+		if (debug>0 && counter%100000==0){
+			std::cerr << boost::format("BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% setOfBPPtr.size=%8% \n") %
+					counter % T % MinSegLen % minBPKey %  previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size() % (*setOfBPPtr).size();
+		}
+		for (setOfBPIterator =(*setOfBPPtr).begin(); setOfBPIterator!=(*setOfBPPtr).end(); setOfBPIterator++){
+			//remove all breakpoints in this node's data (they have same tscore and length)
+			BreakPoint* minBPPtr = *setOfBPIterator;	//get address of BreakPoint
+			leftBreakPointPtr = minBPPtr->leftBreakPointPtr;
+			rightBreakPointPtr = minBPPtr->rightBreakPointPtr;
+
+			if ((debug>0) && counter%100000==0){
+				std::cerr << boost::format("BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: break point to be removed: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% \n") %
+						counter % T % MinSegLen % *minBPPtr %  previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size();
+			}
+			//update two neighboring break points.
+			minBPPtr->removeItself();
+
+			//modify genome left & right key, delete their nodes from tree and re-add them with new key and updated break point info
+			if (leftBreakPointPtr!=NULL &&  leftBreakPointPtr->nodePtr!=rbTree.nil && leftBreakPointPtr->nodePtr!=NULL){
+				//delete the outdated left node
+				genomeLeftNodePtr = (rbNodeType*)leftBreakPointPtr->nodePtr;
+				genomeLeftNodePtr->getDataPtr()->erase(leftBreakPointPtr);
+				if (genomeLeftNodePtr->getDataPtr()->size()==0){
+					//delete this node altogether if its vector is empty
+					rbTree.deleteNode(genomeLeftNodePtr);
+				}
+				//new genomeLeftNodePtr that matches the new key
+				genomeLeftNodePtr = rbTree.queryTree(leftBreakPointPtr->getKey());
+				if (rbTree.isNULLNode(genomeLeftNodePtr)){
+					//create an new node
+					genomeLeftNodePtr = rbTree.insertNode(leftBreakPointPtr->getKey(), new rbNodeDataType() );
+				}
+				genomeLeftNodePtr->getDataPtr()->insert(leftBreakPointPtr);
+				leftBreakPointPtr->nodePtr = genomeLeftNodePtr;
+			}
+			if (rightBreakPointPtr!=NULL && !rbTree.isNULLNode((rbNodeType*)rightBreakPointPtr->nodePtr) && rightBreakPointPtr->nodePtr!=NULL){
+				//delete the outdated right node
+				genomeRightNodePtr = (rbNodeType*)rightBreakPointPtr->nodePtr;
+				genomeRightNodePtr->getDataPtr()->erase(rightBreakPointPtr);
+				if (genomeRightNodePtr->getDataPtr()->size()==0){
+					//delete this node altogether if its vector is empty
+					rbTree.deleteNode(genomeRightNodePtr);
+				}
+				//new genomeRightNodePtr that matches the new key
+				genomeRightNodePtr = rbTree.queryTree(rightBreakPointPtr->getKey());
+				if (rbTree.isNULLNode(genomeRightNodePtr)){
+					//create an new node
+					genomeRightNodePtr = rbTree.insertNode(rightBreakPointPtr->getKey(), new rbNodeDataType() );
+				}
+				genomeRightNodePtr->getDataPtr()->insert(rightBreakPointPtr);
+				rightBreakPointPtr->nodePtr = genomeRightNodePtr;
+			}
+		}
+		(*setOfBPPtr).clear();
+		//delete this minimum node after its data is all tossed out
+		rbTree.deleteNode(minNodePtr);
+
+
+		counter ++;
+		previousRoundMinScore = minBPKey.tscore;
+		previousToRemoveSegmentLength = minBPKey.segmentLength;
+		if (rbTree.size()>0){
+			//get a new minimum
+			minNodePtr = rbTree.getMinimum();
+			minBPKey = minNodePtr->getKey();
+			currentMinScore = minBPKey.tscore;
+			toRemoveSegmentLength = minBPKey.segmentLength;
+		}
+		else{
+			break;
+		}
+
+	}
+	if (debug>0){
+		std::cerr << boost::format("BEwTscore(): last iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4%, previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% \n") %
+				counter % T % MinSegLen % minBPKey % previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size();
+	}
+
+	// convert data back to old data structures
+	K = rbTree.size();
+	vector<BreakPoint> breakPointVector;
+	breakPointVector.push_back(*leftMostBreakPointPtr);	//add this first
+	while (rbTree.size()>0){
+		minNodePtr = rbTree.getMinimum();
+		setOfBPPtr = minNodePtr->getDataPtr();
+		for (setOfBPIterator =(*setOfBPPtr).begin(); setOfBPIterator!=(*setOfBPPtr).end(); setOfBPIterator++){
+			breakPointVector.push_back(**setOfBPIterator);
+		}
+		rbTree.deleteNode(minNodePtr);
+	}
+	breakPointVector.push_back(*rightMostBreakPointPtr);	//add the right most.
+	if (debug){
+		cerr << boost::format("breakPointVector size=%1%, tree size=%2%, tree valid=%3%")% breakPointVector.size() % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
+	}
+	free(leftMostBreakPointPtr);
+	free(rightMostBreakPointPtr);
+	//sort all the breakpoints in the tree by chromosomal position, reconstruct Iext, Wext, tscore, pK
+	sort(breakPointVector.begin(),breakPointVector.end());
+		/*
+		 * a c++0x sorting lambda function, not universally accepted
+		 	[](const BreakPoint& a, const BreakPoint& b) -> bool
+			{return a.position < b.position;});
+		 *
+		 */
+	for (i=1; i<K+1; i++){
+		Wext[i]=breakPointVector[i].weight;
+		Iext[i]=breakPointVector[i].position;
+		tscore[i]=breakPointVector[i].tscore;
+	}
+	Iext[K+1] = leftMostBreakPointPtr->totalLength;
+	Iext = (long*) realloc(Iext, (K + 2) * sizeof(long));
+	Wext = (double *) realloc(Wext, (K + 1) * sizeof(double));
+	tscore = (double *) realloc(tscore, (K + 1) * sizeof(double));
+
 
 	*pK = K;
 	return K;
@@ -1765,13 +1875,11 @@ long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long ind
 	//Change coefficients
 	if (indexOfSegmentToRemove > 1){
 		Wext[indexOfSegmentToRemove - 1] = Wext[indexOfSegmentToRemove - 1]
-				+ sqrt((M - iL) / (M - iC) * iL / iC) * (iR - iC) / (iR - iL)
-						* Wext[indexOfSegmentToRemove];
+				+ sqrt((M - iL) / (M - iC) * iL / iC) * (iR - iC) / (iR - iL) * Wext[indexOfSegmentToRemove];
 	}
 	if (indexOfSegmentToRemove < K){
 		Wext[indexOfSegmentToRemove + 1] = Wext[indexOfSegmentToRemove + 1]
-				+ sqrt((M - iR) / (M - iC) * iR / iC) * (iC - iL) / (iR - iL)
-						* Wext[indexOfSegmentToRemove];
+				+ sqrt((M - iR) / (M - iC) * iR / iC) * (iC - iL) / (iR - iL) * Wext[indexOfSegmentToRemove];
 	}
 	Wext[indexOfSegmentToRemove] = 0; //
 	//Shorten list
@@ -1797,10 +1905,8 @@ void ComputeTScores(const double *Wext, const long *Iext, double *Scores,
 	M = (double) Iext[K + 1];
 
 	for (j = start; j <= end; j++) {
-		h0 = (double) (M - Iext[j]) * (double) Iext[j] / M
-				* (double) (Iext[j + 1] - Iext[j - 1])
-				/ (double) (Iext[j + 1] - Iext[j])
-				/ (double) (Iext[j] - Iext[j - 1]);
+		h0 = (double) (M - Iext[j]) * (double) Iext[j] / M * (double) (Iext[j + 1] - Iext[j - 1])
+				/ (double) (Iext[j + 1] - Iext[j]) / (double) (Iext[j] - Iext[j - 1]);
 		Scores[j] = fabs(Wext[j]) / sqrt(h0);
 	}
 }
