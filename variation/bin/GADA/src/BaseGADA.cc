@@ -1688,7 +1688,7 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 	leftMostBreakPointPtr->nodePtr = rbTree.nil;
 	BreakPoint *rightMostBreakPointPtr = new BreakPoint(Iext[K+1], 0, 0, 0, MinSegLen, Iext[K+1]);
 	rightMostBreakPointPtr->nodePtr = rbTree.nil;
-
+	int maxBPSetSize =0;
 	for (i = 1; i < K + 1; i++){
 		long segLength = min(Iext[i]-Iext[i-1],Iext[i+1]-Iext[i]);	//shorter of two neighboring segments as length for the breakpoint
 		BreakPoint* bpPtr = new BreakPoint(Iext[i], Wext[i], tscore[i], segLength, MinSegLen, Iext[K+1]);
@@ -1713,14 +1713,17 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 			currentNodePtr = rbTree.insertNode(bpKey, dataPtr);
 		}
 		currentNodePtr->getDataPtr()->insert(bpPtr);
+		if (currentNodePtr->getDataPtr()->size()>maxBPSetSize){
+			maxBPSetSize = currentNodePtr->getDataPtr()->size();
+		}
 		bpPtr->setRBTreeNodePtr(currentNodePtr);
 		//reset the left break point pointer
 		leftBreakPointPtr = bpPtr;
 	}
 	if (debug>0){
 		//rbTree.printTree();
-		std::cerr << boost::format(" tree size=%1%, tree max depth =%2%, tree valid=%3%.\n") %
-				rbTree.size() % rbTree.maxDepth() % rbTree.isValidRedBlackTree();
+		std::cerr << boost::format(" tree size=%1%, tree max depth =%2%, tree valid=%3%, maxBPSetSize=%4%.\n") %
+				rbTree.size() % rbTree.maxDepth() % rbTree.isValidRedBlackTree() % maxBPSetSize;
 	}
 	long toRemoveSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
 	long previousToRemoveSegmentLength = -1;
