@@ -4,6 +4,25 @@
  *
  * asoliman's version https://code.google.com/p/rbtrees/ is too buggy.
  * so try luck on this version.
+ *
+ * Examples
+ *
+typedef set<BreakPoint*> rbNodeDataType;
+typedef RedBlackTree<BreakPointKey, rbNodeDataType > treeType;
+typedef RedBlackTreeNode<BreakPointKey, rbNodeDataType > rbNodeType;
+
+	treeType rbTree = treeType();
+	BreakPoint* leftBreakPointPtr=NULL;
+	BreakPoint* rightBreakPointPtr=NULL;
+
+	rbNodeType* currentNodePtr=rbTree.nil;
+	...
+	currentNodePtr = rbTree.queryTree(bpKey);
+	if (rbTree.isNULLNode(currentNodePtr)){
+		rbNodeDataType* dataPtr = new rbNodeDataType();
+		currentNodePtr = rbTree.insertNode(bpKey, dataPtr);
+	}
+	currentNodePtr->getDataPtr()->insert(bpPtr);
  */
 
 #ifndef E_REDBLACK_TREE
