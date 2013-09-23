@@ -1,5 +1,6 @@
 /*
  * 2013.09.18 Yu Huang, copyright. a red-black tree template, c++
+ * still contains bugs, use RedBlackTree.h instead.
  *
  * Built on top of asoliman's work which was created on: Feb 1, 2009 https://code.google.com/p/rbtrees/.
  * 	his version contains bugs. i.e. in deleteNode() and sibling_() is not implemented.
@@ -11,77 +12,85 @@
 #include <stdio.h>
 #include <iostream>
 #include <boost/format.hpp>
+#include <ostream>
+using namespace std;
 
 #define COLOR(color) (color == 0) ? "red" : "black"
 
 namespace YHuang {
 
-static const short BLACK_ = 1;
 static const short RED_ = 0;
+static const short BLACK_ = 1;
 static const short LEFT_ = 100;
 static const short RIGHT_ = 200;
 
 template <typename keyType, typename dataType>
 class RBTreeNode {
-private:
-	RBTreeNode<keyType, dataType> *parent_;
-	RBTreeNode<keyType, dataType> *left_;
-	RBTreeNode<keyType, dataType> *right_;
-	keyType* keyPtr;
-	dataType* dataPtr;
-	unsigned short color_;
+	// for output
+	friend ostream& operator<<(ostream& out, RBTreeNode& node){
+			//out << boost::format(" RBTreeNode object key=%1%, dataPtr=%2%, left=%3%, right=%4%, parent=%5%, color=%6% ")%
+			//		node.getKey() % node.getDataPtr() % node.getLeft() %
+			//		node.getRight() % node.getParent() % node.getColor();
+			out << boost::format(" RBTreeNode object");
+			return out;
+		}
 public:
-	RBTreeNode(RBTreeNode<keyType, dataType>* _parent, keyType* _keyPtr, dataType* _dataPtr): parent_(_parent),
-		keyPtr(_keyPtr), dataPtr(_dataPtr){
+	RBTreeNode<keyType, dataType> *parent;
+	RBTreeNode<keyType, dataType> *left;
+	RBTreeNode<keyType, dataType> *right;
+	keyType key;
+	dataType* dataPtr;
+	unsigned short color;
+	RBTreeNode(RBTreeNode<keyType, dataType>* _parent, keyType _key, dataType* _dataPtr): parent(_parent),
+		key(_key), dataPtr(_dataPtr){
 		/*
-		 * key_, data_ are references, have to be initialized in the away above.
 		 */
-		this->left_ = NULL;
-		this->right_ = NULL;
-		this->color_ = RED_;
+		this->left = NULL;
+		this->right = NULL;
+		this->color = RED_;
 	}
 	~RBTreeNode(){
-		delete parent_;
-		delete this->left_;
-		delete this->right_;
+		free(parent);	//if it's NULL, nothing will happen
+		free(this->left);
+		free(this->right);
 	}
 
 	RBTreeNode<keyType, dataType> *getParent(){
-		return this->parent_;
+		return this->parent;
 	}
 	RBTreeNode<keyType, dataType> *getLeft(){
-		return this->left_;
+		return this->left;
 	}
 	RBTreeNode<keyType, dataType> *getRight(){
-		return this->right_;
+		return this->right;
 	}
-	dataType* getData(){
+	dataType* getDataPtr(){
 		return this->dataPtr;
 	}
-	keyType* getKey(){
-		return this->keyPtr;
+	keyType getKey(){
+		return this->key;
 	}
 	short getColor(){
-		return this->color_;
+		return this->color;
 	}
 	void setLeft(RBTreeNode<keyType, dataType> *nodePtr){
-		this->left_ = nodePtr;
+		this->left = nodePtr;
 	}
 	void setRight(RBTreeNode<keyType, dataType> *nodePtr){
-		this->right_ = nodePtr;
+		this->right = nodePtr;
 	}
 	void setParent(RBTreeNode<keyType, dataType> *nodePtr){
-		this->parent_ = nodePtr;
+		this->parent = nodePtr;
 	}
-	void setData(dataType* dataPtr){
+	void setDataPtr(dataType* dataPtr){
 		this->dataPtr = dataPtr;
 	}
-	void setKey(keyType* keyPtr){
-		this->keyPtr = keyPtr;
+	void setKey(keyType key){
+		this->key = key;
 	}
 
 	void setColor(short color){
-		this->color_ = color;
+		this->color = color;
 
 	}
 
@@ -196,7 +205,7 @@ class RBTree {
 			return 0;
 		}
 		short rotateRight_(RBTreeNode<keyType, dataType> *nodePtr){
-			//printf("Rotate Right Of %d\n", nodePtr->keyPtr);
+			//printf("Rotate Right Of %d\n", nodePtr->key);
 			//cool operation...
 			if (nodePtr->getLeft() == NULL)
 				return 1;
@@ -222,7 +231,7 @@ class RBTree {
 			return 0;
 		}
 		short rotateLeft_(RBTreeNode<keyType, dataType> *nodePtr){
-			//printf("Rotate Left Of %d\n", nodePtr->keyPtr);
+			//printf("Rotate Left Of %d\n", nodePtr->key);
 			//cool operation...
 			if (nodePtr->getRight() == NULL)
 				return 1;
@@ -252,35 +261,38 @@ class RBTree {
 			return 0;
 
 		}
-		RBTreeNode<keyType, dataType> *treeInsert_(RBTreeNode<keyType, dataType> *nodePtr, keyType* keyPtr, dataType* dataPtr){
-			RBTreeNode<keyType, dataType> *inserted;
-			if (nodePtr==NULL){	//2013.09.20 YH. first time insert, root_ is NULL
-				//inserted = createNode_(nodePtr, LEFT_, keyPtr, dataPtr);
-				root_ = new RBTreeNode<keyType, dataType>(NULL, keyPtr, dataPtr);
-				inserted = root_;
-				insertFix_(inserted);
+		RBTreeNode<keyType, dataType> *treeInsert_(RBTreeNode<keyType, dataType> *parentNodePtr, keyType key, dataType* dataPtr){
+			RBTreeNode<keyType, dataType> *inserted=NULL;
+			if (parentNodePtr==NULL){	//2013.09.20 YH. first time insert, root_ is NULL
+				inserted = new RBTreeNode<keyType, dataType>(NULL, key, dataPtr);
+				//inserted = createNode_(parentNodePtr, LEFT_, key, dataPtr);
+				//this->root_ = new RBTreeNode<keyType, dataType>(NULL, key, dataPtr);
+				this->root_ = inserted;
+				//this->root_->setColor(BLACK_);
+				//insertFix_(inserted);
+
 			}
-			else if (*keyPtr < *nodePtr->getKey()) {
-				if (nodePtr->getLeft() == NULL) {
-					inserted = createNode_(nodePtr, LEFT_, keyPtr, dataPtr);
+			else if (key < parentNodePtr->getKey()) {
+				if (parentNodePtr->getLeft() == NULL) {
+					inserted = createNode_(parentNodePtr, LEFT_, key, dataPtr);
 					insertFix_(inserted);
 				} else {
-					inserted = treeInsert_(nodePtr->getLeft(), keyPtr, dataPtr);
+					inserted = treeInsert_(parentNodePtr->getLeft(), key, dataPtr);
 				}
 			} else {
-				if (nodePtr->getRight() == NULL) {
-					inserted = createNode_(nodePtr, RIGHT_, keyPtr, dataPtr);
-					//printf("Inserted %d On Right\n", keyPtr);
+				if (parentNodePtr->getRight() == NULL) {
+					inserted = createNode_(parentNodePtr, RIGHT_, key, dataPtr);
+					//printf("Inserted %d On Right\n", key);
 					insertFix_(inserted);
 				} else {
-					inserted = treeInsert_(nodePtr->getRight(), keyPtr, dataPtr);
+					inserted = treeInsert_(parentNodePtr->getRight(), key, dataPtr);
 				}
 			}
 			//FIX Location
 			return inserted;
 		}
-		RBTreeNode<keyType, dataType> *createNode_(RBTreeNode<keyType, dataType> *parent, short loc, keyType* keyPtr, dataType* dataPtr){
-			RBTreeNode<keyType, dataType> *tmp = new RBTreeNode<keyType, dataType>(parent, keyPtr, dataPtr);
+		RBTreeNode<keyType, dataType> *createNode_(RBTreeNode<keyType, dataType> *parent, short loc, keyType key, dataType* dataPtr){
+			RBTreeNode<keyType, dataType> *tmp = new RBTreeNode<keyType, dataType>(parent, key, dataPtr);
 			if (loc == LEFT_)
 				parent->setLeft(tmp);
 			else
@@ -302,7 +314,7 @@ class RBTree {
 							y->setColor(BLACK_);
 							z->getParent()->getParent()->setColor(RED_);
 							z = z->getParent()->getParent();
-							continue;
+							//continue;
 						} else {
 							if (z == z->getParent()->getRight()) {
 								//case 2
@@ -337,9 +349,10 @@ class RBTree {
 							rotateLeft_(z->getParent()->getParent());
 						}
 					}
-				} else {
-					break;
 				}
+				//else {
+				//	break;
+				//}
 			}
 			this->root_->setColor(BLACK_);
 		}
@@ -361,14 +374,14 @@ class RBTree {
 				return rightDepth + 1;
 			}
 		}
-		RBTreeNode<keyType, dataType> *queryTreeRecur_(RBTreeNode<keyType, dataType> *nodePtr, keyType* keyPtr){
+		RBTreeNode<keyType, dataType> *queryTreeRecur_(RBTreeNode<keyType, dataType> *nodePtr, keyType key){
 			if (nodePtr == NULL) {
 				return NULL;
 			}
-			if (*keyPtr < *nodePtr->getKey()) {
-				return queryTreeRecur_(nodePtr->getLeft(), keyPtr);
-			} else if (*keyPtr > *nodePtr->getKey()) {
-				return queryTreeRecur_(nodePtr->getRight(), keyPtr);
+			if (key < nodePtr->key) {
+				return queryTreeRecur_(nodePtr->getLeft(), key);
+			} else if (key > nodePtr->key) {
+				return queryTreeRecur_(nodePtr->getRight(), key);
 			} else {
 				return nodePtr;
 			}
@@ -378,7 +391,7 @@ class RBTree {
 				return;
 			}
 			printTreeRecur_(nodePtr->getLeft());
-			std::cout<<boost::format("%1% ")%  nodePtr->getKey();
+			std::cout<<boost::format("%1% ") % nodePtr->key;
 			printTreeRecur_(nodePtr->getRight());
 		}
 		void printPathsRecur_(RBTreeNode<keyType, dataType> *nodePtr, RBTreeNode<keyType, dataType>** path, int pathLen){
@@ -398,30 +411,130 @@ class RBTree {
 			printPathsRecur_(nodePtr->getRight(), path, pathLen);
 
 		}
+		void deleteFixup_(RBTreeNode<keyType, dataType> *x) {
+			/*************************************
+			 *  maintain Red-Black tree balance  *
+			 *  after
+			 *  1. node x's parent y, has been moved into the deleted node's place
+			 *  2. x has replaced y's place
+			 *  3. y's color is black
+			 *  4. x's color is also black
+			 *  5. x is not root
+			 *************************************/
+			while (x!=NULL && x != root_ && x->getColor() == BLACK_) {
+				if (x == x->getParent()->getLeft()) {
+					RBTreeNode<keyType, dataType> *siblingPtr = x->getParent()->getRight();	//get sibling
+					//sibling must have valid (non-leaf) left and right because both x's parent and x is black, (property 5)
+					if (siblingPtr->getColor() == RED_) {	//case 2
+						siblingPtr->setColor(BLACK_);
+						x->getParent()->setColor(RED_);
+						rotateLeft_(x->getParent());
+						siblingPtr = x->getParent()->getRight();
+					}
+					if (siblingPtr->getLeft()->getColor() == BLACK_ && siblingPtr->getRight()->getColor() == BLACK_) {
+						//meet property 5 to maintain the same number of black nodes from x's parent
+						siblingPtr->setColor(RED_);
+						x = x->getParent();
+					} else {
+						if (siblingPtr->getRight()->getColor() == BLACK_) {
+							siblingPtr->getLeft()->setColor(BLACK_);
+							siblingPtr->setColor(RED_);
+							rotateRight_(siblingPtr);
+							siblingPtr = x->getParent()->getRight();
+						}
+						siblingPtr->setColor(x->getParent()->getColor());
+						x->getParent()->setColor(BLACK_);
+						siblingPtr->getRight()->setColor(BLACK_);
+						rotateLeft_(x->getParent());
+						x = root_;
+					}
+				} else {
+					RBTreeNode<keyType, dataType> *siblingPtr = x->getParent()->getLeft();	//get sibling
+					if (siblingPtr==NULL){
+						std::cerr << boost::format("deleteFixup_() Error: siblingPtr (address=%1%, %2%) of x (addr=%3%, %4%) >> is NULL, but can't happen as x is black.")%
+								siblingPtr % (*siblingPtr) % x % (*x) << std::endl;
+					}
+					if (siblingPtr->getColor() == RED_) {
+						siblingPtr->setColor(BLACK_);
+						x->getParent()->setColor(RED_);
+						rotateRight_(x->getParent());
+						siblingPtr = x->getParent()->getLeft();
+					}
+					if (siblingPtr->getRight()->getColor() == BLACK_ && siblingPtr->getLeft()->getColor() == BLACK_) {
+						siblingPtr->setColor(RED_);
+						x = x->getParent();
+					} else {
+						if (siblingPtr->getLeft()->getColor() == BLACK_) {
+							siblingPtr->getRight()->setColor(BLACK_);
+							siblingPtr->setColor(RED_);
+							rotateLeft_(siblingPtr);
+							siblingPtr = x->getParent()->getLeft();
+						}
+						siblingPtr->setColor(x->getParent()->getColor());
+						x->getParent()->setColor(BLACK_);
+						siblingPtr->getLeft()->setColor(BLACK_);
+						rotateRight_(x->getParent());
+						x = root_;
+					}
+				}
+			}
+			if (x!=NULL){
+				x->setColor(BLACK_);
+			}
+		}
+
 	public:
 		//Basic Functions
 		RBTree(){
 			root_ = NULL;
 
 		}
-		RBTree(keyType* keyPtr, dataType* dataPtr){
-			root_ = new RBTreeNode<keyType, dataType>(NULL, keyPtr, dataPtr);
+		RBTree(keyType key, dataType* dataPtr){
+			root_ = new RBTreeNode<keyType, dataType>(NULL, key, dataPtr);
 		}
 		~RBTree(){
 			delete this->root_;
 		}
-		//rbtreePtr createRBTree(int, dataType );
+		//rbtreePtr createRBTree(int, dataType* );
 		//void destroyRBTree();
-		RBTreeNode<keyType, dataType> *insertNode(keyType* keyPtr, dataType* dataPtr){
-			return treeInsert_(this->root_, keyPtr, dataPtr);
+		RBTreeNode<keyType, dataType> *insertNode(keyType key, dataType* dataPtr){
+			RBTreeNode<keyType, dataType>* inserted = new RBTreeNode<keyType, dataType>(NULL, key, dataPtr);
+			RBTreeNode<keyType, dataType>* y = NULL;
+			RBTreeNode<keyType, dataType>* x = root_;
+			while (x!=NULL){
+				y=x;
+				if (inserted->key < x->key){
+					x = x->getLeft();
+				}
+				else{
+					x = x->getRight();
+				}
+
+			}
+			inserted->setParent(y);
+			if (y==NULL){
+				root_ = inserted;
+			}else if (inserted->getKey() < y->getKey()){
+				y->setLeft(inserted);
+
+			}else{
+				y->setRight(inserted);
+			}
+			inserted->setLeft(NULL);
+			inserted->setRight(NULL);
+			inserted->setColor(RED_);
+			insertFix_(inserted);
+			//return treeInsert_(this->root_, key, dataPtr);
+			return inserted;
 
 		}
-		long deleteNodeByKey(keyType* keyPtr){
-			RBTreeNode<keyType, dataType> *nodePtr = queryTree(keyPtr);
+		long deleteNodeByKey(keyType key){
+			RBTreeNode<keyType, dataType> *nodePtr = queryTree(key);
 			return deleteNode(nodePtr);
 		}
+
 		long deleteNode(RBTreeNode<keyType, dataType> *nodePtr){
-			//RBTreeNode<keyType, dataType> *nodePtr = queryTree(keyPtr);
+			//RBTreeNode<keyType, dataType> *nodePtr = queryTree(key);
 			RBTreeNode<keyType, dataType> *y;
 			RBTreeNode<keyType, dataType> *x;
 			if (nodePtr == NULL)
@@ -431,12 +544,12 @@ class RBTree {
 			} else {
 				y = getSuccessor_(nodePtr);
 			}
-			if (y->getLeft() != NULL) {
+			if (y->getLeft() != NULL) {	//try to get a non-leaf child, but could still be a leaf (NULL) if both are NULL
 				x = y->getLeft();
 			} else {
 				x = y->getRight();
 			}
-			if (x != NULL) {	//remove y from chain
+			if (x != NULL) {	//remove y from chain, replaces it with x
 				x->setParent(y->getParent());
 			}
 			if (y->getParent() == NULL) {
@@ -444,22 +557,32 @@ class RBTree {
 			} else {
 				if (y == y->getParent()->getLeft()) {
 					y->getParent()->setLeft(x);
-				} else {
+				} else if (y==y->getParent()->getRight()) {
 					y->getParent()->setRight(x);
+				} else{
+					std::cerr << boost::format("deleteNode() Error: node y, << address=%1%, %2%>> , is neither left , nor right of its parent << address=%3%, %4% >>.\n") % y % (*y) % y->getParent() % (*y->getParent()) << std::endl;
 				}
 			}
-			if (y != nodePtr) {
+			if (y != nodePtr) {	//put y's key and dataPtr into nodePtr, since y is next in line to succeed nodePtr, no change.
 				nodePtr->setKey(y->getKey());
-				nodePtr->setData(y->getData());
+				nodePtr->setDataPtr(y->getDataPtr());
 			}
-			delete y;
+			if (y->getColor() == BLACK_){	//x (y's child) has replaced y and replacing a black node (y) requires rebalancing
+				deleteFixup_(x);
+			}
+			//gets rid of y
+			y->setParent(NULL);
+			y->setLeft(NULL);
+			y->setRight(NULL);
+			y=NULL;
+			free(y);
 			return 0;
 		}
 		short isValidRedBlackTree(){
 			return isValidRedBlackTreeRecur_(this->root_);
 		}
-		RBTreeNode<keyType, dataType> *queryTree(keyType* keyPtr){
-			return queryTreeRecur_(this->root_, keyPtr);
+		RBTreeNode<keyType, dataType> *queryTree(keyType key){
+			return queryTreeRecur_(this->root_, key);
 		}
 		long size(){
 			return count_(this->root_, 0);
@@ -478,14 +601,17 @@ class RBTree {
 
 		//Visualization Functions
 		void printTree(){
-			printTreeRecur_(this->root_);
+			if (root_!=NULL)
+				printTreeRecur_(this->root_);
 		}
 		void printPaths(){
 			RBTreeNode<keyType, dataType> *path[1000];
 			printPathsRecur_(this->root_, path, 0);
 		}
 
-
+		bool isNULLNode(RBTreeNode<keyType, dataType> * nodePtr){
+			return nodePtr==NULL;
+		}
 };
 
 }
