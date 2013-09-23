@@ -1720,10 +1720,11 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		//reset the left break point pointer
 		leftBreakPointPtr = bpPtr;
 	}
+	long noOfNodesInTree = rbTree.size();	//reduce the number of times calling .size()
 	if (debug>0){
 		//rbTree.printTree();
 		std::cerr << boost::format(" tree size=%1%, tree max depth =%2%, tree valid=%3%, maxBPSetSize=%4%.\n") %
-				rbTree.size() % rbTree.maxDepth() % rbTree.isValidRedBlackTree() % maxBPSetSize;
+				noOfNodesInTree % rbTree.maxDepth() % rbTree.isValidRedBlackTree() % maxBPSetSize;
 	}
 	long toRemoveSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
 	long previousToRemoveSegmentLength = -1;
@@ -1744,12 +1745,12 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 
 	currentMinScore = minBPKey.tscore;
 	toRemoveSegmentLength = minBPKey.segmentLength;
-	while (rbTree.size()>0 && (currentMinScore<T || toRemoveSegmentLength<MinSegLen)){
+	while (noOfNodesInTree>0 && (currentMinScore<T || toRemoveSegmentLength<MinSegLen)){
 		minBPKey = minNodePtr->getKey();
 		setOfBPPtr = minNodePtr->getDataPtr();
 		if (debug>0 && counter%100000==0){
 			std::cerr << boost::format("BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% setOfBPPtr.size=%8% \n") %
-					counter % T % MinSegLen % minBPKey %  previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size() % (*setOfBPPtr).size();
+					counter % T % MinSegLen % minBPKey %  previousRoundMinScore % previousToRemoveSegmentLength % noOfNodesInTree % (*setOfBPPtr).size();
 		}
 		for (setOfBPIterator =(*setOfBPPtr).begin(); setOfBPIterator!=(*setOfBPPtr).end(); setOfBPIterator++){
 			//remove all breakpoints in this node's data (they have same tscore and length)
@@ -1759,7 +1760,7 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 
 			if ((debug>0) && counter%100000==0){
 				std::cerr << boost::format("BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: break point to be removed: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% \n") %
-						counter % T % MinSegLen % *minBPPtr %  previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size();
+						counter % T % MinSegLen % *minBPPtr %  previousRoundMinScore % previousToRemoveSegmentLength % noOfNodesInTree;
 			}
 			//update two neighboring break points.
 			minBPPtr->removeItself();
@@ -1803,12 +1804,12 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		(*setOfBPPtr).clear();
 		//delete this minimum node after its data is all tossed out
 		rbTree.deleteNode(minNodePtr);
-
+		noOfNodesInTree--;
 
 		counter ++;
 		previousRoundMinScore = minBPKey.tscore;
 		previousToRemoveSegmentLength = minBPKey.segmentLength;
-		if (rbTree.size()>0){
+		if (noOfNodesInTree>0){
 			//get a new minimum
 			minNodePtr = rbTree.getMinimum();
 			minBPKey = minNodePtr->getKey();
@@ -1821,25 +1822,28 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 
 	}
 	if (debug>0){
-		std::cerr << boost::format("BEwTscore(): last iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4%, previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% \n") %
-				counter % T % MinSegLen % minBPKey % previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size();
+		std::cerr << boost::format("BEwTscore(): last iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4%, previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% tree size=%7%, noOfNodesInTree=%8% \n") %
+				counter % T % MinSegLen % minBPKey % previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size() % noOfNodesInTree;
 	}
 
 	// convert data back to old data structures
-	K = rbTree.size();
+	K = noOfNodesInTree;	//update the number of break points
 	vector<BreakPoint> breakPointVector;
 	breakPointVector.push_back(*leftMostBreakPointPtr);	//add this first
-	while (rbTree.size()>0){
+	//noOfNodesInTree = rbTree.size();	//reduce the number of times calling .size()
+	while (noOfNodesInTree>0){
 		minNodePtr = rbTree.getMinimum();
 		setOfBPPtr = minNodePtr->getDataPtr();
 		for (setOfBPIterator =(*setOfBPPtr).begin(); setOfBPIterator!=(*setOfBPPtr).end(); setOfBPIterator++){
 			breakPointVector.push_back(**setOfBPIterator);
 		}
 		rbTree.deleteNode(minNodePtr);
+		noOfNodesInTree--;
 	}
 	breakPointVector.push_back(*rightMostBreakPointPtr);	//add the right most.
 	if (debug){
-		cerr << boost::format("breakPointVector size=%1%, tree size=%2%, tree valid=%3%")% breakPointVector.size() % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
+		cerr << boost::format("breakPointVector size=%1%, noOfNodesInTree=%2%, tree size=%3%, tree valid=%4%")%
+				breakPointVector.size() % noOfNodesInTree % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
 	}
 	free(leftMostBreakPointPtr);
 	free(rightMostBreakPointPtr);
