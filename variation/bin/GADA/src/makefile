@@ -19,12 +19,12 @@ all:	depend GADA $(BoostPythonTarget)
 # for boost.python target(shared libraries)
 $(BoostPythonTarget):	%.so:	GADA_shared.o BaseGADA_shared.o
 	#2013.08.16 -l... should be put in the last. If they are put in front of input files, they will be ignored!
-	-$(CXXCOMPILER) $< BaseGADA_shared.o -o $@ $(SharedLibFlags) -lm $(BoostPythonLib)
+	-$(CXXCOMPILER) $< BaseGADA_shared.o -DGADALib -o $@ $(SharedLibFlags) -lm $(BoostPythonLib)
 
 GADA_shared.o:	GADA.cc
-	-$(CXXCOMPILER) $< -c -o $@ $(CXXFLAGS) $(IncludeDirs) $(SharedLibFlags)
+	-$(CXXCOMPILER) $< -c -o $@ $(CXXFLAGS) -DGADALib $(IncludeDirs) $(SharedLibFlags)
 BaseGADA_shared.o:	BaseGADA.cc
-	-$(CXXCOMPILER) $< -c -o $@ $(CXXFLAGS) $(IncludeDirs) $(SharedLibFlags)
+	-$(CXXCOMPILER) $< -c -o $@ $(CXXFLAGS) -DGADALib $(IncludeDirs) $(SharedLibFlags)
 
 .cc.o:
 	-$(CXXCOMPILER) $< -c -o $@ $(CXXFLAGS) $(IncludeDirs) -DGADABIN $(SharedLibFlags)

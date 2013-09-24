@@ -69,8 +69,14 @@ public:
 	string outputFname;
 
 	GADA(int _argc, char* _argv[]);	//2013.08.28 commandline version
-	GADA();
-	GADA(long _debug);
+	GADA() : debug(0) {
+		initParameters();
+	}
+
+	GADA(long _debug) : debug(_debug) {
+		initParameters();
+	}
+
 	virtual ~GADA(){
 		//cleanupMemory();	//comment it out to avoid repetitive free, in python module cleanupMemory is called by the end of run().
 	}
@@ -82,7 +88,8 @@ public:
 	void readInIntensity(boost::python::list intensity_list);
 	boost::python::list run(boost::python::list intensity_list, double aAlpha,
 			double TBackElim, long MinSegLen);
-#else
+#endif
+#ifndef GADALib
 	// 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
 	po::options_description optionDescription;	//("Allowed options")
 	po::positional_options_description positionOptionDescription;
@@ -107,10 +114,6 @@ public:
 	}
 };
 
-GADA::GADA() :
-		debug(0) {
-	initParameters();
-}
 
 GADA::GADA(int _argc, char* _argv[]) : argc(_argc), argv(_argv)
 	{
@@ -125,10 +128,6 @@ GADA::GADA(int _argc, char* _argv[]) : argc(_argc), argv(_argv)
 	examplesDoc = boost::format("%1% -i /tmp/input.tsv.gz -o /tmp/output.gz -M 1000 --convergenceDelta 0.01 \n")% programName;
 }
 
-GADA::GADA(long _debug) :
-		debug(_debug) {
-	initParameters();
-}
 
 
 void GADA::initParameters() {
@@ -211,12 +210,11 @@ boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
 	baseGADA.IextToSegLen();
 	baseGADA.IextWextToSegAmp();
 
-#if defined(DEBUG)
-	cerr<< boost::format("# Making segments\n");
-#endif
+	if(debug){
+		cerr<< boost::format("# Making segments\n");
+	}
 
 	boost::python::list return_ls;
-
 	//fprintf(fout,"Start\tStop\tLength\tAmpl\n");
 	for (i = 0; i < baseGADA.K + 1; i++) {
 		boost::python::list d_row;
@@ -227,7 +225,10 @@ boost::python::list GADA::run(boost::python::list intensity_list, double aAlpha,
 		//cerr<< boost::format("%1% \t %2% \t %3% %4% \n")%Iext[i] % Iext[i+1] % SegLen[i] % SegAmp[i];
 		return_ls.append(d_row);
 	}
-	cleanupMemory();	//release tn, SegLen, SegAmp, and others
+	if(debug){
+		cerr<< boost::format(" return %1% segments to python.\n")% (baseGADA.K+1);
+	}
+	//cleanupMemory();	//release tn, SegLen, SegAmp, and others
 	return return_ls;
 
 }
@@ -238,8 +239,11 @@ BOOST_PYTHON_MODULE(GADA)
 	class_<GADA>("GADA").def(init<long>()).def("run", &GADA::run);
 
 }
-#else
+#endif
+
+#ifndef GADALib
 // 2013.08.28 stream causes error " note: synthesized method ... required here" because stream is noncopyable.
+// boost smart pointer (or cxx11) solves the problem but too much work
 
 void GADA::constructOptionDescriptionStructure(){
 	optionDescription.add_options()("help,h", "produce help message")

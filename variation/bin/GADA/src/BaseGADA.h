@@ -394,10 +394,11 @@ public:
 		noOfBreakpointsAfterSBL = 0;
 	}
 	~BaseGADA(){
+#ifndef GADALib //this causes GADA::run() of GADA.so to crash right before returning segments to python
 		free(SegLen);
 		free(SegAmp);
 		free(SegState);
-
+#endif
 	}
 	void reconstruct(double *wr, long M, double *aux_vec);
 	void BubbleSort(long *I, long L);
