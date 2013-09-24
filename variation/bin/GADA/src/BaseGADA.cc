@@ -37,6 +37,13 @@
 #endif //_MATLAB_
 #define min(x,y) x<y?x:y
 
+
+//define how to output rbNodeDataType
+std::ostream &operator<<(std::ostream &stream, const rbNodeDataType &b) {
+    return stream << boost::format("%1%-elements-in-this-set")% b.size();
+}
+
+
 /* General Notation definition
  K		= number of breakpoints, segments is K+1
  M		= number of probes in chromosome / unit of analysis (can be a chr arm)
@@ -47,16 +54,15 @@
  SegLen  Segment longitudes length K+1 and should sum up to M?
  */
 
-void IextToSegLen(long *Iext, // Enters Iext
-		long *SegLen, // Outputs SegLen.. can be the same as Iext?
-		long K // Length Iext - 1
-		) {
+void BaseGADA::IextToSegLen() {
+	SegLen = (long*) calloc(K + 1, sizeof(long));
+	SegAmp = (double *) calloc(K + 1, sizeof(double));
 	long k;
 	for (k = 1; k <= K + 1; k++)
 		SegLen[k - 1] = Iext[k] - Iext[k - 1];
 }
 
-void IextWextToSegAmp(long *Iext, double *Wext, double *SegAmp, long K) {
+void BaseGADA::IextWextToSegAmp() {
 	long k;
 	double M, TotalMean, AuxMean;
 	M = Iext[K + 1];
@@ -77,7 +83,7 @@ void IextWextToSegAmp(long *Iext, double *Wext, double *SegAmp, long K) {
 }
 
 // Implements: Reconstruct.m -- Recontructs x from w with zero mean
-void reconstruct(double *wr, long M, double *aux_vec) {
+void BaseGADA::reconstruct(double *wr, long M, double *aux_vec) {
 	long i = 0;
 	double aux_double = 0;
 
@@ -107,7 +113,7 @@ void reconstruct(double *wr, long M, double *aux_vec) {
 }
 
 /* Bubble Sort */
-void BubbleSort(long *I, long L) {
+void BaseGADA::BubbleSort(long *I, long L) {
 	long i = 0;
 	long aux = 0;
 
@@ -120,7 +126,7 @@ void BubbleSort(long *I, long L) {
 		}
 	}
 }
-void doubleBubbleSort(double *D, long *I, long L) {
+void BaseGADA::doubleBubbleSort(double *D, long *I, long L) {
 	long i = 0;
 	double Daux = 0;
 	long Iaux = 0;
@@ -143,7 +149,7 @@ void doubleBubbleSort(double *D, long *I, long L) {
 }
 
 /////////////  TRIDIAGONAL MATRIX OPERATION FUNCTIONS ////////////////////
-void TrisolveREG(
+void BaseGADA::TrisolveREG(
 		//input variables:
 		double *t0, double *tu, double *tl, double *coef, double *sol,
 		long sizeh0) {
@@ -165,7 +171,7 @@ void TrisolveREG(
 }
 
 // DiagOfTriXTri  Diagonal of L*R where L,R tridiagonal (MexDiagOfTriXTri)
-void DiagOfTriXTri(
+void BaseGADA::DiagOfTriXTri(
 //Input variables:
 		double *ll, // ll Lower diagonal
 		double *l0, // l0 Central diagonal
@@ -189,7 +195,7 @@ void DiagOfTriXTri(
 /* Tridiagonal de la inversa imput parameters: (tl,t0,d,e)
  *
  */
-void tridiagofinverse(
+void BaseGADA::tridiagofinverse(
 //Input variables:
 		double *t0, double *tl, double *itl, double *it0, double *itu,
 
@@ -212,7 +218,7 @@ void tridiagofinverse(
 }
 
 //////////               MEXTRISOLVE            ////////////////////
-void ForwardElimination(
+void BaseGADA::ForwardElimination(
 //Input variables:
 		double *A, //2D Array containing the [tu';t0';tl';b']
 				   // Retuns [d';t0';tl';z']
@@ -255,7 +261,7 @@ void ForwardElimination(
 	*b = (*b - m * (*z)) / m2;
 }
 
-void BackSubstitution(
+void BaseGADA::BackSubstitution(
 //Input variables:
 		double *A, //2D Array containing the [d';!t0';!tl';z'] from Forward Elimination
 				   // Retuns [d';t0';tl';x']
@@ -277,7 +283,7 @@ void BackSubstitution(
 	}
 
 }
-void BackwardElimination(
+void BaseGADA::BackwardElimination(
 //Input variables:
 		double *A, //2D Array containing the [tu';t0';tl';!b']
 				   // Retuns [tu';t0';e';b']
@@ -299,7 +305,7 @@ void BackwardElimination(
 
 }
 
-void TriSolveINV(double *AA, long M /*rows*/, long N/*columns*/, double *x,
+void BaseGADA::TriSolveINV(double *AA, long M /*rows*/, long N/*columns*/, double *x,
 		double *d, double *e) {
 	long i;
 
@@ -335,7 +341,7 @@ void TriSolveINV(double *AA, long M /*rows*/, long N/*columns*/, double *x,
 
 ////////////////////////////////////////////////////////////////////////
 
-void ComputeFdualXb(
+void BaseGADA::ComputeFdualXb(
 //imput variables:
 		long M, double *b) {
 	long i = 0;
@@ -353,7 +359,7 @@ void ComputeFdualXb(
 	}
 }
 
-void CompZ( // computes z=F'y for entire possilbe breakpoint positions (normalized PWC)
+void BaseGADA::CompZ( // computes z=F'y for entire possilbe breakpoint positions (normalized PWC)
 		double *y, double *z, long M) {
 	double LeftSum;
 	double RightSum;
@@ -383,7 +389,7 @@ void CompZ( // computes z=F'y for entire possilbe breakpoint positions (normaliz
 }
 
 /* Compute H   fuction [h0,h1]=CompH(dim) */
-void ComputeH(
+void BaseGADA::ComputeH(
 //Input variables:
 		double *h0, double *h1, long M //Number of variables
 		) {
@@ -401,7 +407,7 @@ void ComputeH(
 }
 
 // Computes the H at the vector of indices...
-void ComputeHs(
+void BaseGADA::ComputeHs(
 //input variables:
 		long *s, // Indices of selection,
 		long M, // Length of the chormosome,
@@ -447,7 +453,7 @@ void ComputeHs(
 
 }
 
-void ComputeHsIext(
+void BaseGADA::ComputeHsIext(
 //input variables:
 		long *Iext, // Indices of selection,
 		long K, // Length of the indices,
@@ -478,7 +484,7 @@ void ComputeHsIext(
 	h0[i - 1] = ((M - iC) * iC / M) * (iR - iL) / ((iR - iC) * ((iC - iL)));
 }
 
-void TriSymGaxpy(
+void BaseGADA::TriSymGaxpy(
 //input variables:
 		double *t0, double *t1, double *x, long M, double *y
 
@@ -496,7 +502,7 @@ void TriSymGaxpy(
 	}
 }
 
-void ComputeT(double *h0, double *h1, long M, double *alfa, double sigma, /*pass 1 if scale not available*/
+void BaseGADA::ComputeT(double *h0, double *h1, long M, double *alfa, double sigma, /*pass 1 if scale not available*/
 double *t0, double *tl, double *tu
 /* in theory there is a parameter called 'scale' but we don't use it */
 ) {
@@ -511,13 +517,13 @@ double *t0, double *tl, double *tu
 	}
 }
 
-long findminus(/*allocates all those lower-than-maxalpha alpha's INDEXES in sel vector  */
+long BaseGADA::findminus(/*allocates all those lower-than-convergenceMaxAlpha alpha's INDEXES in sel vector  */
 //Input variables:
-		double *alpha, long K, double maxalpha, long *sel //index vector
+		double *alpha, long K, double convergenceMaxAlpha, long *sel //index vector
 		) {
 	long i, j = 0;
 	for (i = 0; i < K; i++) {
-		if (alpha[i] < maxalpha) {
+		if (alpha[i] < convergenceMaxAlpha) {
 			sel[j] = i;
 			j++;
 		}
@@ -529,7 +535,7 @@ long findminus(/*allocates all those lower-than-maxalpha alpha's INDEXES in sel 
  * Applies a simple tresholding algorithm to find the discontinuities
  */
 long //Returns the number of discontinuities
-simpletresholding(
+BaseGADA::simpletresholding(
 //Input variables:
 		double *inputvector, //1D Array containing the input vector
 		long N, //Vector length
@@ -568,7 +574,7 @@ simpletresholding(
 /* computesegmentmeans
  * Computed segment means.
  */
-void computesegmentmeans(
+void BaseGADA::computesegmentmeans(
 //Input variables:
 		double *inputvector, //1D Array containing the input vector
 		long N, //Vector length
@@ -597,7 +603,7 @@ void computesegmentmeans(
  * Reconstruct signal from the discontinuity location, and segment
  * amplitudes
  */
-void reconstructoutput(
+void BaseGADA::reconstructoutput(
 //Output variables:
 		double *rec, //1D Array returning the reconstructed vector
 		//Input variable:
@@ -623,7 +629,7 @@ void reconstructoutput(
 /* SBL function
  * returns number of EM iterations
  */
-long SBL(double *y, //I -- 1D array with the input signal
+long BaseGADA::SBL(double *y, //I -- 1D array with the input signal
 		long *I, //IO -- 1D array with the initial (final) candidate breakpoints
 		double *alpha, //I -- 1D array with the initial (final) hyperparameter inv. varainces.
 		double *w, //O -- 1D array containing the breakpoint weigths or posterior mean.
@@ -634,10 +640,9 @@ long SBL(double *y, //I -- 1D array with the input signal
 		//Algorithm parameters:
 		double sigma2, //Noise estimated
 		double a, //
-		double b, double maxalpha, //Basis reduction parameter
-		long maxit, //Max number of iterations
-		double tol, //Tolerance for convergence
-		double &delta,	//delta convergence
+		double convergenceB, double convergenceMaxAlpha, //Basis reduction parameter
+		long maxNoOfIterations, //Max number of iterations
+		double convergenceDelta, //Tolerance for convergence
 		long debug //verbosity... set equal to 1 to see messages  0 to not see them
 		) {
 	long n, i, K;
@@ -747,7 +752,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 	/******* EM loop         ********/
 	/********************************/
 
-	for (n = 0; n < maxit; n++) {
+	for (n = 0; n < maxNoOfIterations; n++) {
 
 		for (i = 0; i < K; i++) {
 			wpred[i] = w[i];
@@ -804,7 +809,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 		}
 		// 2013.09.01 merged to below
 		//for (i = 0; i < K; i++) {
-		//	alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * b);
+		//	alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * convergenceB);
 		//}
 
 //        if (n==0){
@@ -826,7 +831,7 @@ long SBL(double *y, //I -- 1D array with the input signal
 		//max diff of wpred-w  CRITERIUM of CONVERGENCE
 		delta = 0;
 		for (i = 0; i < K; i++) {
-			alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * b);
+			alpha[i] = (1 + 2 * a) / (w[i] * w[i] + sigw[i] + 2 * convergenceB);
 			//myaux=abs(wpred[i]-w[i]);
 			myaux = (wpred[i] - w[i]);
 			if (myaux < 0)
@@ -839,15 +844,15 @@ long SBL(double *y, //I -- 1D array with the input signal
 //            myPrintf("EUCLIDEAN NORM FIRST ITERATION:\n");
 //            myPrintf("\n\neuclidean_norm:%g\n\n",delta);
 //        }
-		if (delta < tol) {
+		if (delta < convergenceDelta) {
 			if (debug > 0) {
 				std::cerr<< boost::format("# \t SBL: Converged after %1% iterations, delta=%4%, within tolerance %2%, M=%3% \n") %
-						n % tol % K % delta;
+						n % convergenceDelta % K % delta;
 			}
 			break;
 		}
 
-		sizesel = findminus(alpha, K, maxalpha, sel);
+		sizesel = findminus(alpha, K, convergenceMaxAlpha, sel);
 //        if (n==0){
 //            myPrintf("\n\nSIZESEL FIRST ITERATION:\n");
 //            myPrintf("SEL\n\nsel[0]:%ld\nsel[1]:%ld\nsel[2]:%ld\nsel[3]:%ld\nsel[%ld]:%ld\n",sel[0],sel[1],sel[2],sel[3],K-1,sel[K-1]);
@@ -920,9 +925,9 @@ long SBL(double *y, //I -- 1D array with the input signal
 	/*********************/
 
 	if (debug > 0) {
-		if (i >= maxit) {
-			std::cerr << boost::format("# \t SBL: Converged??? Stopped after %1% iterations with delta=%2%, M=%3%, tol=%4% \n") %
-					n % delta % K % tol;
+		if (i >= maxNoOfIterations) {
+			std::cerr << boost::format("# \t SBL: Converged??? Stopped after %1% iterations with delta=%2%, M=%3%, convergenceDelta=%4% \n") %
+					n % delta % K % convergenceDelta;
 		}
 	}
 
@@ -980,7 +985,7 @@ long SBL(double *y, //I -- 1D array with the input signal
  hand, if it is greater than zero, it will work as a regular threshold
  algorithm i.e.,it will remove all those break-point who don't reach the
  selected value TAU.*/
-long BEthresh(double *Scores, long Nscores, double *wr, long *indsel,
+long BaseGADA::BEthresh(double *Scores, long Nscores, double *wr, long *indsel,
 		long *pointNumRem, double *pointTau) {
 	long M = Nscores + 1; //genome length
 	double vmin = -1e100; //Forces to enter at least once for tau<0
@@ -1251,13 +1256,7 @@ long BEthresh(double *Scores, long Nscores, double *wr, long *indsel,
  % [OutAmp,State]=CollapseAmp(SegAmp,SegLen,BaseAmp,sigma2,T);
  */
 
-void CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
-		double *SegAmp, //Segment Amplitudes (input output)
-		const long *SegLen, //Segment Lengths
-		long L, //Number of segments.
-		double BaseAmp, //Reference amplitude to compare
-		double sigma2, //Reference noise
-		double T //Critical value that decides when to colapse
+void BaseGADA::CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
 		) {
 	long k;
 
@@ -1266,24 +1265,27 @@ void CollapseAmpTtest( //Uses a T test to decide which segments collapse to neut
 //		if( fabs(SegAmp[0]-BaseAmp)/sqrt(sigma2/(double)SegLen[0]) < T)
 //			SegAmp[0]=BaseAmp;
 //	}
-	for (k = 0; k < L; k++)
+	SegState = (double *) calloc(K + 1, sizeof(double));
+	for (i = 0; i <= K; i++)
+		SegState[i] = SegAmp[i];
+	for (k = 0; k < K; k++)
 		if (fabs(SegAmp[k] - BaseAmp) / sqrt(sigma2 / (double) SegLen[k]) < T) {
 			//but do it only if one of the neigboring ones have been collapsed
 			if ((k > 0)
 					&& (fabs(SegAmp[k - 1] - BaseAmp)
 							/ sqrt(sigma2 / (double) SegLen[k - 1]) < T))
 				SegAmp[k] = BaseAmp;
-			if ((k < L - 1)
+			if ((k < K - 1)
 					&& (fabs(SegAmp[k + 1] - BaseAmp)
 							/ sqrt(sigma2 / (double) SegLen[k + 1]) < T))
 				SegAmp[k] = BaseAmp;
 			//or it is the initial segment or the final segment of the unit, since we assume that the unseen neighbors where in collapsed state
-			if ((k == 0) || (k == L - 1))
+			if ((k == 0) || (k == K - 1))
 				SegAmp[k] = BaseAmp;
 			//or it has larger size than the neighboring segments
 			if ((k > 0) && (SegLen[k] > SegLen[k - 1]))
 				SegAmp[k] = BaseAmp;
-			if ((k < L - 1) && (SegLen[k] > SegLen[k + 1]))
+			if ((k < K - 1) && (SegLen[k] > SegLen[k + 1]))
 				SegAmp[k] = BaseAmp;
 
 		}
@@ -1307,7 +1309,7 @@ void CollapseAmpTtest( //Uses a T test to decide which segments collapse to neut
  % Gain uses positive numbers log2(3)-log2(2)
  */
 
-void ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
+void BaseGADA::ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
 		double BaseAmp, double ploidy, double sigma2, //Reference noise
 		double T //Critical value that decides when to colapse
 		) {
@@ -1355,12 +1357,10 @@ void ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
  */
 
 double // Returns BaseAmp corresponding to the base level.
-CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline level.
-		const long *SegLen, //Lengths corresponding to the amplitudes
-		const double *SegAmp, //Amplitudes !!! assumed already ordered...
-		long K) {
+BaseGADA::CompBaseAmpMedianMethod() {
+	//Computes the median recontruction level, as baseline level.
 	long M, k, RunLen;
-	double BaseAmp = 0;
+	BaseAmp = 0;
 
 	//If they need to be sorted use the following...
 	double *D;
@@ -1418,41 +1418,20 @@ long SBLandBE( //Returns breakpoint list length.
 */
 
 
-long SBLandBE( //Returns breakpoint list length.
-		double *y, long M, //length of the noisy signal tn
-		double *Psigma2, //If sigma2 < 0, compute sigma2
-		double a, // SBL parameter
-		double T, // Threshold to prune
-		long MinSegLen, //Minimum length of the segment.
-		long **pIext, //Returns breakpoint positions
-		double **pWext, //Returns breakpoint weights.
-		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
-		double &delta,	//delta convergence
-		long &numEMsteps,	//how many iterations it goes through
-		long &noOfBreakpointsAfterSBL,	//
-		double tol,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
-		long maxit, //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
-		double maxalpha , //Maximum number of iterations to reach convergence...
-		double b
-		//long *pK
-		) {
-	long i, K;
+long BaseGADA::SBLandBE() {
+	long i;
 	double myaux;
-	double sigma2;
-	double ymean;
-	//double tol, maxalpha, b;
-	//long maxit;
-	double *alpha, *Wext, *tn, *aux;
-	long *Iext;
+	//double convergenceDelta, convergenceMaxAlpha, convergenceB;
+	//long maxNoOfIterations;
 	// SBL optimization parameters
-	//tol = 1E-10; //1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
-	//maxalpha = 1E8; //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
-	//maxit = 100000; //Maximum number of iterations to reach convergence...
-	//b = 1E-20; //
+	//convergenceDelta = 1E-10; //1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
+	//convergenceMaxAlpha = 1E8; //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+	//maxNoOfIterations = 100000; //Maximum number of iterations to reach convergence...
+	//convergenceB = 1E-20; //
 
-	sigma2 = *Psigma2;
+	//sigma2 = *Psigma2;
 
-	tn = y;
+	tn = inputDataArray;
 	/*//2013.08.28 no more copying of input data. to reduce memory usage.
 	if (debug){
 		std::cerr << boost::format("allocating memory for tn ...\n");
@@ -1509,8 +1488,8 @@ long SBLandBE( //Returns breakpoint list length.
 	if (debug){
 		std::cerr << "_SBLBE_ SBL starts\n";
 	}
-	numEMsteps = SBL(tn, Iext, alpha, Wext + 1, aux, M, &K, sigma2, a, b,
-			maxalpha, maxit, tol, delta, debug);
+	numEMsteps = SBL(tn, Iext, alpha, Wext + 1, aux, M, &K, sigma2, a, convergenceB,
+			convergenceMaxAlpha, maxNoOfIterations, convergenceDelta, debug);
 	noOfBreakpointsAfterSBL = K;	//2013.08.31 K would be changed later on.
 	//Freeing memory
 	myFree(alpha);
@@ -1530,7 +1509,7 @@ long SBLandBE( //Returns breakpoint list length.
 	Wext[0] = ymean;
 
 	if (debug){
-		std::cerr << "_SBLBE_ Backward Elimination T=" << T << " MinLen=" << MinSegLen << std::endl;
+		std::cerr << "_SBLBE_ Backward Elimination T=" << T << " MinSegLen=" << MinSegLen << std::endl;
 	}
 	BEwTandMinLen(Wext, Iext, &K, sigma2, T, MinSegLen, debug);
 
@@ -1541,15 +1520,14 @@ long SBLandBE( //Returns breakpoint list length.
 		std::cerr << "_SBLBE_ After BE K=" <<K << endl;
 	}
 
-	*pIext = Iext;
-	*pWext = Wext;
-	*Psigma2 = sigma2;
-
+	//*pIext = Iext;
+	//*pWext = Wext;
+	//*Psigma2 = sigma2;
 	return K;
 }
 
 /**************************************************************************************************************************/
-long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
+long BaseGADA::BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 		double *Wext, //IO Breakpoint weights extended notation...
 		long *Iext, //IO Breakpoint positions in extended notation...
 		long *pK, //IO Number breakpoint positions remaining.
@@ -1651,14 +1629,9 @@ long BEwTandMinLen( //Returns breakpoint list length. with T and MinSegLen
 	return K;
 }
 
-//define how to output rbNodeDataType
-std::ostream &operator<<(std::ostream &stream, const rbNodeDataType &b) {
-    return stream << boost::format("%1%-elements-in-this-set")% b.size();
-}
-
 /******************************************************/
 //BEwTscore(Iext,Wext,h0,h1,tscore,&K,T);  //Need to update BEthres to operate on the Iext Wext notation...
-long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
+long BaseGADA::BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		long *Iext, //IO Breakpoint positions in extended notation...
 		double *tscore, long *pK, //IO Number breakpoint positions remaining.
 		double T, //IP  Threshold to prune
@@ -1684,14 +1657,14 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 	rbNodeType* currentNodePtr=rbTree.nil;
 	rbNodeType* genomeLeftNodePtr=rbTree.nil;
 	rbNodeType* genomeRightNodePtr=rbTree.nil;
-	BreakPoint *leftMostBreakPointPtr = new BreakPoint(Iext[0], Wext[0], tscore[0], 0, MinSegLen, Iext[K+1]);
+	BreakPoint *leftMostBreakPointPtr = new BreakPoint(Iext[0], Wext[0], tscore[0], 0, MinSegLen, T, Iext[K+1]);
 	leftMostBreakPointPtr->nodePtr = rbTree.nil;
-	BreakPoint *rightMostBreakPointPtr = new BreakPoint(Iext[K+1], 0, 0, 0, MinSegLen, Iext[K+1]);
+	BreakPoint *rightMostBreakPointPtr = new BreakPoint(Iext[K+1], 0, 0, 0, MinSegLen, T, Iext[K+1]);
 	rightMostBreakPointPtr->nodePtr = rbTree.nil;
 	int maxBPSetSize =0;
 	for (i = 1; i < K + 1; i++){
 		long segLength = min(Iext[i]-Iext[i-1],Iext[i+1]-Iext[i]);	//shorter of two neighboring segments as length for the breakpoint
-		BreakPoint* bpPtr = new BreakPoint(Iext[i], Wext[i], tscore[i], segLength, MinSegLen, Iext[K+1]);
+		BreakPoint* bpPtr = new BreakPoint(Iext[i], Wext[i], tscore[i], segLength, MinSegLen, T, Iext[K+1]);
 		BreakPointKey bpKey = bpPtr->getKey();
 		//cerr<< *bpPtr << endl;
 		//cerr << boost::format("i=%1%, tree size=%2%, tree valid=%3%")% i % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
@@ -1720,11 +1693,10 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		//reset the left break point pointer
 		leftBreakPointPtr = bpPtr;
 	}
-	long noOfNodesInTree = rbTree.size();	//reduce the number of times calling .size()
 	if (debug>0){
 		//rbTree.printTree();
-		std::cerr << boost::format(" tree size=%1%, tree max depth =%2%, tree valid=%3%, maxBPSetSize=%4%.\n") %
-				noOfNodesInTree % rbTree.maxDepth() % rbTree.isValidRedBlackTree() % maxBPSetSize;
+		std::cerr << boost::format(" noOfNodesInTree=%1%, tree max depth =%2%, tree valid=%3%, maxBPSetSize=%4%.\n") %
+				rbTree.noOfNodes() % rbTree.maxDepth() % rbTree.isValidRedBlackTree() % maxBPSetSize;
 	}
 	long toRemoveSegmentLength=-1;	//2013.08.31 initial value =-1, so that it is <MinSegLen
 	long previousToRemoveSegmentLength = -1;
@@ -1745,12 +1717,15 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 
 	currentMinScore = minBPKey.tscore;
 	toRemoveSegmentLength = minBPKey.segmentLength;
-	while (noOfNodesInTree>0 && (currentMinScore<T || toRemoveSegmentLength<MinSegLen)){
+	while (rbTree.noOfNodes()>0 && (currentMinScore<T || toRemoveSegmentLength<MinSegLen)){
 		minBPKey = minNodePtr->getKey();
 		setOfBPPtr = minNodePtr->getDataPtr();
-		if (debug>0 && counter%100000==0){
+		if (debug>0 && counter%reportIntervalDuringBE==0){
 			std::cerr << boost::format("BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% setOfBPPtr.size=%8% \n") %
-					counter % T % MinSegLen % minBPKey %  previousRoundMinScore % previousToRemoveSegmentLength % noOfNodesInTree % (*setOfBPPtr).size();
+					counter % T % MinSegLen % minBPKey %  previousRoundMinScore % previousToRemoveSegmentLength %
+					rbTree.noOfNodes() % (*setOfBPPtr).size();
+			cerr << boost::format("\t currentMinScore=%1%, toRemoveSegmentLength=%2% \n")%
+							currentMinScore % toRemoveSegmentLength;
 		}
 		for (setOfBPIterator =(*setOfBPPtr).begin(); setOfBPIterator!=(*setOfBPPtr).end(); setOfBPIterator++){
 			//remove all breakpoints in this node's data (they have same tscore and length)
@@ -1758,9 +1733,9 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 			leftBreakPointPtr = minBPPtr->leftBreakPointPtr;
 			rightBreakPointPtr = minBPPtr->rightBreakPointPtr;
 
-			if ((debug>0) && counter%100000==0){
-				std::cerr << boost::format("BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: break point to be removed: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% \n") %
-						counter % T % MinSegLen % *minBPPtr %  previousRoundMinScore % previousToRemoveSegmentLength % noOfNodesInTree;
+			if ((debug>0) && counter%reportIntervalDuringBE==0){
+				std::cerr << boost::format("\t BEwTscore(): iteration no=%1% T=%2% MinSegLen=%3%: break point to be removed: %4% previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% noOfSegments=%7% \n") %
+						counter % T % MinSegLen % *minBPPtr %  previousRoundMinScore % previousToRemoveSegmentLength % rbTree.noOfNodes();
 			}
 			//update two neighboring break points.
 			minBPPtr->removeItself();
@@ -1804,12 +1779,11 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 		(*setOfBPPtr).clear();
 		//delete this minimum node after its data is all tossed out
 		rbTree.deleteNode(minNodePtr);
-		noOfNodesInTree--;
 
 		counter ++;
 		previousRoundMinScore = minBPKey.tscore;
 		previousToRemoveSegmentLength = minBPKey.segmentLength;
-		if (noOfNodesInTree>0){
+		if (rbTree.noOfNodes()>0){
 			//get a new minimum
 			minNodePtr = rbTree.getMinimum();
 			minBPKey = minNodePtr->getKey();
@@ -1823,27 +1797,28 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 	}
 	if (debug>0){
 		std::cerr << boost::format("BEwTscore(): last iteration no=%1% T=%2% MinSegLen=%3%: minimum break point key: %4%, previousRoundMinScore=%5% previousToRemoveSegmentLength=%6% tree size=%7%, noOfNodesInTree=%8% \n") %
-				counter % T % MinSegLen % minBPKey % previousRoundMinScore % previousToRemoveSegmentLength % rbTree.size() % noOfNodesInTree;
+				counter % T % MinSegLen % minBPKey % previousRoundMinScore %
+				previousToRemoveSegmentLength % rbTree.size() % rbTree.noOfNodes();
+		cerr << boost::format("\t currentMinScore=%1%, toRemoveSegmentLength=%2% \n")%
+				currentMinScore % toRemoveSegmentLength;
 	}
 
 	// convert data back to old data structures
-	K = noOfNodesInTree;	//update the number of break points
+	K = rbTree.noOfNodes();	//update the number of break points
 	vector<BreakPoint> breakPointVector;
 	breakPointVector.push_back(*leftMostBreakPointPtr);	//add this first
-	//noOfNodesInTree = rbTree.size();	//reduce the number of times calling .size()
-	while (noOfNodesInTree>0){
+	while (rbTree.noOfNodes()>0){
 		minNodePtr = rbTree.getMinimum();
 		setOfBPPtr = minNodePtr->getDataPtr();
 		for (setOfBPIterator =(*setOfBPPtr).begin(); setOfBPIterator!=(*setOfBPPtr).end(); setOfBPIterator++){
 			breakPointVector.push_back(**setOfBPIterator);
 		}
 		rbTree.deleteNode(minNodePtr);
-		noOfNodesInTree--;
 	}
 	breakPointVector.push_back(*rightMostBreakPointPtr);	//add the right most.
 	if (debug){
 		cerr << boost::format("breakPointVector size=%1%, noOfNodesInTree=%2%, tree size=%3%, tree valid=%4%")%
-				breakPointVector.size() % noOfNodesInTree % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
+				breakPointVector.size() % rbTree.noOfNodes() % rbTree.size() % rbTree.isValidRedBlackTree() << endl;
 	}
 	free(leftMostBreakPointPtr);
 	free(rightMostBreakPointPtr);
@@ -1851,7 +1826,7 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 	sort(breakPointVector.begin(),breakPointVector.end());
 		/*
 		 * a c++0x sorting lambda function, not universally accepted
-		 	[](const BreakPoint& a, const BreakPoint& b) -> bool
+		 	[](const BreakPoint& a, const BreakPoint& convergenceB) -> bool
 			{return a.position < b.position;});
 		 *
 		 */
@@ -1870,7 +1845,7 @@ long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
 	return K;
 }
 
-long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long indexOfSegmentToRemove) {
+long BaseGADA::RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long indexOfSegmentToRemove) {
 	long j;
 	double iC, iL, iR, M;
 
@@ -1904,7 +1879,7 @@ long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long ind
 	return K - 1;
 }
 
-void ComputeTScores(const double *Wext, const long *Iext, double *Scores,
+void BaseGADA::ComputeTScores(const double *Wext, const long *Iext, double *Scores,
 		long K, long start, long end) {
 	long j;
 	double h0, M;
@@ -1918,7 +1893,7 @@ void ComputeTScores(const double *Wext, const long *Iext, double *Scores,
 	}
 }
 
-void Project(double *y, long M, long *I, long L, double *xI, double *wI) {
+void BaseGADA::Project(double *y, long M, long *I, long L, double *xI, double *wI) {
 	// Intern variables declaration
 	double aux_double = 0;
 	double ymean = 0;
@@ -2061,7 +2036,7 @@ void Project(double *y, long M, long *I, long L, double *xI, double *wI) {
 
 }
 
-void ProjectCoeff( //IextYobs2Wext
+void BaseGADA::ProjectCoeff( //IextYobs2Wext
 		double *y, long M, long *Iext, long K, double *Wext) {
 	// Intern variables declaration
 	double ymean = 0;

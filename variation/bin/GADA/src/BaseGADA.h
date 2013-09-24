@@ -80,7 +80,7 @@ class BreakPointKey{
 		 */
 		//return a.tscore < b.tscore;
 
-		if(a.segmentLength<=a.MinSegLen && b.segmentLength<=b.MinSegLen){	//both below MinSegLen, then order them by score
+		if(a.tscore<a.minTScore && b.tscore<b.minTScore){	//both below minTScore, then order them by score
 			if (a.tscore==b.tscore){
 				return a.segmentLength<b.segmentLength;
 			}
@@ -88,21 +88,21 @@ class BreakPointKey{
 				return a.tscore<b.tscore;
 			}
 		}
-		else if ((a.segmentLength<a.MinSegLen && b.segmentLength>=b.MinSegLen) || (a.segmentLength>=a.MinSegLen && b.segmentLength<b.MinSegLen)){	//one below, one above
+		else if ((a.tscore<a.minTScore && b.tscore>=b.minTScore) || (a.tscore>=a.minTScore && b.tscore<b.minTScore)){	//one below, one above
+			if (a.tscore==b.tscore){
+				return a.segmentLength<b.segmentLength;
+			}
+			else{
+				//order by tscore
+				return a.tscore<b.tscore;
+			}
+		}
+		else{	//both above minTScore (or one equal, one above or both equal), then order them by segment length, unless they are identical
 			if (a.segmentLength==b.segmentLength){
 				return a.tscore<b.tscore;
 			}
 			else{
-				//order by segmentLength
 				return a.segmentLength<b.segmentLength;
-			}
-		}
-		else{	//both above MinSegLen, then order them by score, unless they are identical
-			if (a.tscore==b.tscore){
-				return a.segmentLength<b.segmentLength;
-			}
-			else{
-				return a.tscore<b.tscore;
 			}
 		}
 
@@ -113,7 +113,7 @@ class BreakPointKey{
 		 * make sure no duplicate (or close keys, for floating values) keys exist in red-black trees.
 		 */
 		//return a.tscore > b.tscore;
-		if(a.segmentLength<=a.MinSegLen && b.segmentLength<=b.MinSegLen){	//both below MinSegLen, then order them by score
+		if(a.tscore<a.minTScore && b.tscore<b.minTScore){	//both below minTScore, then order them by score, unless identical
 			if (a.tscore==b.tscore){
 				return a.segmentLength>b.segmentLength;
 			}
@@ -121,21 +121,21 @@ class BreakPointKey{
 				return a.tscore>b.tscore;
 			}
 		}
-		else if ((a.segmentLength<a.MinSegLen && b.segmentLength>=b.MinSegLen) || (a.segmentLength>=a.MinSegLen && b.segmentLength<b.MinSegLen)){	//one below, one above
+		else if ((a.tscore<a.minTScore && b.tscore>=b.minTScore) || (a.tscore>=a.minTScore && b.tscore<b.minTScore)){	//one below, one above
+			if (a.tscore==b.tscore){
+				return a.segmentLength>b.segmentLength;
+			}
+			else{
+				//order by tscore
+				return a.tscore>b.tscore;
+			}
+		}
+		else{	//both above minTScore (or one equal, one above or both equal), then order them by segment length, unless they are identical
 			if (a.segmentLength==b.segmentLength){
 				return a.tscore>b.tscore;
 			}
 			else{
-				//order by segmentLength
 				return a.segmentLength>b.segmentLength;
-			}
-		}
-		else{	//both above MinSegLen, then order them by score, unless they are identical
-			if (a.tscore==b.tscore){
-				return a.segmentLength>b.segmentLength;
-			}
-			else{
-				return a.tscore>b.tscore;
 			}
 		}
 	}
@@ -150,6 +150,7 @@ public:
 	double tscore;
 	long segmentLength;
 	long MinSegLen;
+	double minTScore;
 	long totalLength;
 	void* nodePtr;
 	BreakPointKey(){
@@ -158,11 +159,12 @@ public:
 		tscore=0;
 		segmentLength=0;
 		MinSegLen=0;
+		minTScore = 0;
 		totalLength=0;
 		nodePtr = NULL;
 	}
-	BreakPointKey(long _position, double _weight, double _tscore, long _segmentLength, long _MinSegLen, long _totalLength):
-		position(_position),weight(_weight), tscore(_tscore), segmentLength(_segmentLength), MinSegLen(_MinSegLen), totalLength(_totalLength){
+	BreakPointKey(long _position, double _weight, double _tscore, long _segmentLength, long _MinSegLen, double _minTScore, long _totalLength):
+		position(_position),weight(_weight), tscore(_tscore), segmentLength(_segmentLength), MinSegLen(_MinSegLen), minTScore(_minTScore), totalLength(_totalLength){
 		nodePtr = NULL;
 	};
 	~BreakPointKey(){
@@ -195,6 +197,7 @@ public:
 	double tscore;
 	long segmentLength;
 	long MinSegLen;
+	double minTScore;
 	long totalLength;
 	BreakPoint* leftBreakPointPtr;
 	BreakPoint* rightBreakPointPtr;
@@ -210,8 +213,8 @@ public:
 		rightBreakPointPtr=NULL;
 		nodePtr = NULL;
 	}
-	BreakPoint(long _position, double _weight, double _tscore, long _segmentLength, long _MinSegLen, long _totalLength):
-		position(_position),weight(_weight), tscore(_tscore), segmentLength(_segmentLength), MinSegLen(_MinSegLen), totalLength(_totalLength){
+	BreakPoint(long _position, double _weight, double _tscore, long _segmentLength, long _MinSegLen, double _minTScore, long _totalLength):
+		position(_position),weight(_weight), tscore(_tscore), segmentLength(_segmentLength), MinSegLen(_MinSegLen), minTScore(_minTScore), totalLength(_totalLength){
 		leftBreakPointPtr=NULL;
 		rightBreakPointPtr=NULL;
 		nodePtr = NULL;
@@ -236,11 +239,11 @@ public:
 		return this->nodePtr;
 	}
 	BreakPointKey* getKeyPointer(){
-		BreakPointKey* bpKeyPtr = new BreakPointKey(position, weight, tscore, segmentLength, MinSegLen, totalLength);
+		BreakPointKey* bpKeyPtr = new BreakPointKey(position, weight, tscore, segmentLength, MinSegLen, minTScore, totalLength);
 		return bpKeyPtr;
 	}
 	BreakPointKey getKey(){
-		BreakPointKey bpKey = BreakPointKey(position, weight, tscore, segmentLength, MinSegLen, totalLength);
+		BreakPointKey bpKey = BreakPointKey(position, weight, tscore, segmentLength, MinSegLen, minTScore, totalLength);
 		return bpKey;
 	}
 	void removeItself(){
@@ -336,132 +339,163 @@ typedef set<BreakPoint*> rbNodeDataType;
 typedef RedBlackTree<BreakPointKey, rbNodeDataType > treeType;
 typedef RedBlackTreeNode<BreakPointKey, rbNodeDataType > rbNodeType;
 
+class BaseGADA{
 
-void reconstruct(double *wr, long M, double *aux_vec);
-void BubbleSort(long *I, long L);
-void doubleBubbleSort(double *D, long *I, long L);
-void TrisolveREG(double *t0, double *tu, double *tl, double *coef, double *sol,
-		long sizeh0);
-void DiagOfTriXTri(double *ll, double *l0, double *lu, double *rl, double *r0,
-		double *ru, double *d, long N);
-void tridiagofinverse(double *t0, double *tl, double *itl, double *it0,
-		double *itu, long N, double *d, double *e);
-void ForwardElimination(double *A, long N);
-void BackSubstitution(double *A, long N);
-void BackwardElimination(double *A, long N);
-void TriSolveINV(double *AA, long M, long N, double *x, double *d, double *e);
-void ComputeH(double *h0, double *h1, long M);
-void ComputeFdualXb(long M, double *b);
-// 20080119 REMOVED void ComputeHs(long *s,double *a,long M,long Ms,double *h0,double *h1);
-void ComputeHs(long *s, long M, long Ms, double *h0, double *h1);
-void TriSymGaxpy(double *t0, double *t1, double *x, long M, double *y);
-void ComputeT(double *h0, double *h1, long M, double *alfa, double sigma,
-		double *t0, double *tl, double *tu);
-long findminus(double *alpha, long Ms, double maxalpha, long *sel);
-long simpletresholding(double *inputvector, long N, double thres, double *disc);
-void computesegmentmeans(double *inputvector, long N, double *disc,
-		long numdisc, double *amp);
-void reconstructoutput(double *rec, long N, double *disc, long numdisc,
-		double *amp);
-long SBL(double *y, //I -- 1D array with the input signal
-		long *I, //IO -- 1D array with the initial (final) candidate breakpoints
-		double *alpha, //I -- 1D array with the initial (final) hyperparameter inv. varainces.
-		double *w, //O -- 1D array containing the breakpoint weigths or posterior mean.
-		double *sigw, //O -- Posterior variances, I would not really need them since they can be computed from alpha and H
-		long M, //Initial size of the array in y
-		long *K, //Size of the I alpha w
 
-		//Algorithm parameters:
-		double sigma2, //Noise estimated
-		double a, //
-		double b, double maxalpha, //Basis reduction parameter
-		long maxit, //Max number of iterations
-		double tol, //Tolerance for convergence
-		double &delta,	//delta convergence
-		long debug //verbosity... set equal to 1 to see messages  0 to not see them
-		);
+public:
+	double *Wext; //IO Breakpoint weights extended notation...
+	long *Iext; //IO Breakpoint positions in extended notation...
+	double *tscore;
+	long *pK; //IO Number breakpoint positions remaining.
+	double T; //IP  Threshold to prune
+	long MinSegLen;	//minimum segment length
 
-long BEthresh(
-		//To eliminate...
-		double *Scores, long Nscores, double *wr, long *indsel,
-		long *pointNumRem, double *pointTau);
+	long debug; //verbosity... set equal to 1 to see messages of SBLandBE(). 0 to not see them
+	int report;
+	long M;	// total/max length
 
-long SBLandBE( //Returns breakpoint list lenght.
-		double *tn, long M, //length of the noisy signal tn
-		double *sigma2, //If sigma2 < 0, compute sigma2 (Input/Output)
-		double a, // SBL parameter
-		double T, // Threshold to prune
-		long MinSegLen, //Minimum length of the segment.
-		long **pI, //Returns breakpoint positions
-		double **pw, //Returns breakpoint weights.
-		long debug, //verbosity... set equal to 1 to see messages  0 to not see them
-		double &delta,	//delta convergence
-		long &numEMsteps,	//how many iterations it goes through
-		long &noOfBreakpointsAfterSBL,	//
-		double tol=1E-10,//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
-		//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
-		long maxit=50000, //10000 is enough usually
-		double maxalpha=1E8,//, 1E8 Maximum number of iterations to reach convergence...
-		double b= 1E-20
-		);
+		long i;
+		long K;
+		double *tn;	//would store normalized array of input data (raw-mean)
+		double *inputDataArray;
+		long *SegLen;
+		double *SegAmp;
+		double *SegState;
+		double delta;
+		long numEMsteps;
+		long noOfBreakpointsAfterSBL;
 
-void Project(double *y, long M, long *I, long L, double *xI, double *wI);
-void IextToSegLen(long *Iext, // Enters Iext
-		long *SegLen, // Outputs SegLen.. can be the same as Iext?
-		long K // Length Iext - 1
-		);
-void IextWextToSegAmp(long *Iext, double *Wext, double *SegAmp, long K);
-void CompZ( // computes z=F'y for entire possilbe breakpoint positions (normalized PWC)
-		double *y, double *z, long M);
-void ComputeHsIext(
-//input variables:
-		long *Iext, // Indices of selection,
-		long K, // Length of the indices,
-		double *h0, // Returning diagonal of H,
-		double *h1 // Returning upper diagonal of H
-		);
-void ProjectCoeff( //IextYobs2Wext
-		double *y, long M, long *Iext, long K, double *Wext);
-void CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
-		double *SegAmp, //Segment Amplitudes (input output)
-		const long *SegLen, //Segment Lengths
-		long K, //Number of segments.
-		double BaseAmp, //Reference amplitude to compare
-		double sigma2, //Reference noise
-		double T //Critical value that decides when to colapse
-		);
+		double *alpha, *aux;
 
-double // Returns BaseAmp corresponding to the base level.
-CompBaseAmpMedianMethod( //Computes the median recontruction level, as baseline level.
-		const long *SegLen, //Lengths corresponding to the amplitudes
-		const double *SegAmp, //Amplitudes !!! assumed already ordered...
-		long K);
+		//double T2=5.0; //Segment collapse to base Non-Alteration level threshold
+		double BaseAmp; //Base-level
+		double a; //SBL hyperprior parameter
+		double sigma2; //Variance observed, if negative value, it will be estimated by the mean of the differences
+					   // I would recommend to be estimated on all the chromosomes and as a trimmed mean.
+		long SelectClassifySegments; //Classify segment into altered state (1), otherwise 0
+		long SelectEstimateBaseAmp; //Estimate Neutral hybridization amplitude.
 
-void ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
-		double BaseAmp, double ploidy, double sigma2, //Reference noise
-		double T //Critical value that decides when to colapse
-		);
+		long maxNoOfIterations;	//=50000, //10000 is enough usually
+		double convergenceDelta;	//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
+				//1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
+		double convergenceMaxAlpha;	// 1E8 Maximum number of iterations to reach convergence...
+		double convergenceB;	// a number related to convergence = 1E-20
+		double ymean;	//mean of inputDataArray
+		int reportIntervalDuringBE;	// how often to report progress during backward elimination, default is 100K
 
-void ComputeTScores(const double *Wext, const long *Iext, double *Scores, long K,
-		long start, long end);
+	BaseGADA(double* _inputDataArray, long _M, double _sigma2, double _BaseAmp, double _a, double _T, long _MinSegLen,
+			long _debug , double _convergenceDelta,
+			long _maxNoOfIterations, double _convergenceMaxAlpha, double _convergenceB, int _reportIntervalDuringBE):
+			inputDataArray(_inputDataArray), M(_M),  sigma2(_sigma2), BaseAmp(_BaseAmp), a(_a), T(_T), MinSegLen(_MinSegLen),
+			debug(_debug),
+			convergenceDelta(_convergenceDelta),
+			maxNoOfIterations (_maxNoOfIterations), convergenceMaxAlpha(_convergenceMaxAlpha),
+			convergenceB(_convergenceB), reportIntervalDuringBE(_reportIntervalDuringBE){
+		noOfBreakpointsAfterSBL = 0;
+	}
+	~BaseGADA(){
+		free(SegLen);
+		free(SegAmp);
+		free(SegState);
 
-long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
-		long *Iext, //IO Breakpoint positions in extended notation...
-		double *tscore, long *pK, //IO Number breakpoint positions remaining.
-		double T, //IP  Threshold to prune
-		long MinSegLen=0,	//minimum segment length
-		long debug=0
-		);
+	}
+	void reconstruct(double *wr, long M, double *aux_vec);
+	void BubbleSort(long *I, long L);
+	void doubleBubbleSort(double *D, long *I, long L);
+	void TrisolveREG(double *t0, double *tu, double *tl, double *coef, double *sol,
+			long sizeh0);
+	void DiagOfTriXTri(double *ll, double *l0, double *lu, double *rl, double *r0,
+			double *ru, double *d, long N);
+	void tridiagofinverse(double *t0, double *tl, double *itl, double *it0,
+			double *itu, long N, double *d, double *e);
+	void ForwardElimination(double *A, long N);
+	void BackSubstitution(double *A, long N);
+	void BackwardElimination(double *A, long N);
+	void TriSolveINV(double *AA, long M, long N, double *x, double *d, double *e);
+	void ComputeH(double *h0, double *h1, long M);
+	void ComputeFdualXb(long M, double *convergenceB);
+	// 20080119 REMOVED void ComputeHs(long *s,double *a,long M,long Ms,double *h0,double *h1);
+	void ComputeHs(long *s, long M, long Ms, double *h0, double *h1);
+	void TriSymGaxpy(double *t0, double *t1, double *x, long M, double *y);
+	void ComputeT(double *h0, double *h1, long M, double *alfa, double sigma,
+			double *t0, double *tl, double *tu);
+	long findminus(double *alpha, long Ms, double convergenceMaxAlpha, long *sel);
+	long simpletresholding(double *inputvector, long N, double thres, double *disc);
+	void computesegmentmeans(double *inputvector, long N, double *disc,
+			long numdisc, double *amp);
+	void reconstructoutput(double *rec, long N, double *disc, long numdisc,
+			double *amp);
+	long SBL(double *y, //I -- 1D array with the input signal
+			long *I, //IO -- 1D array with the initial (final) candidate breakpoints
+			double *alpha, //I -- 1D array with the initial (final) hyperparameter inv. varainces.
+			double *w, //O -- 1D array containing the breakpoint weigths or posterior mean.
+			double *sigw, //O -- Posterior variances, I would not really need them since they can be computed from alpha and H
+			long M, //Initial size of the array in y
+			long *K, //Size of the I alpha w
 
-long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
-		double *Wext, //IO Breakpoint weights extended notation...
-		long *Iext, //IO Breakpoint positions in extended notation...
-		long *pK, //IO Number breakpoint positions remaining.
-		double sigma2, //IP If sigma2
-		double T, //IP  Threshold to prune,  T=T*sqrt(sigma2);
-		long MinSegLen, //IP Minimum length of the segment.
-		long debug
-		);
-long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long indexOfSegmentToRemove);
+			//Algorithm parameters:
+			double sigma2, //Noise estimated
+			double a, //
+			double convergenceB, double convergenceMaxAlpha, //Basis reduction parameter
+			long maxNoOfIterations, //Max number of iterations
+			double convergenceDelta, //Tolerance for convergence
+			long debug //verbosity... set equal to 1 to see messages  0 to not see them
+			);
+
+	long BEthresh(
+			//To eliminate...
+			double *Scores, long Nscores, double *wr, long *indsel,
+			long *pointNumRem, double *pointTau);
+	//Returns breakpoint list lenght.
+	long SBLandBE();
+
+	void Project(double *y, long M, long *I, long L, double *xI, double *wI);
+	void IextToSegLen();
+	void IextWextToSegAmp();
+	void CompZ( // computes z=F'y for entire possilbe breakpoint positions (normalized PWC)
+			double *y, double *z, long M);
+	void ComputeHsIext(
+	//input variables:
+			long *Iext, // Indices of selection,
+			long K, // Length of the indices,
+			double *h0, // Returning diagonal of H,
+			double *h1 // Returning upper diagonal of H
+			);
+	void ProjectCoeff( //IextYobs2Wext
+			double *y, long M, long *Iext, long K, double *Wext);
+	void CollapseAmpTtest( //Uses a T test to decide which segments collapse to neutral
+			);
+
+	double // Returns BaseAmp corresponding to the base level.
+	CompBaseAmpMedianMethod();
+
+	void ClassifySegments(double *SegAmp, long *SegLen, double *SegState, long K,
+			double BaseAmp, double ploidy, double sigma2, //Reference noise
+			double T //Critical value that decides when to colapse
+			);
+
+	void ComputeTScores(const double *Wext, const long *Iext, double *Scores, long K,
+			long start, long end);
+
+	long BEwTscore(double *Wext, //IO Breakpoint weights extended notation...
+			long *Iext, //IO Breakpoint positions in extended notation...
+			double *tscore, long *pK, //IO Number breakpoint positions remaining.
+			double T, //IP  Threshold to prune
+			long MinSegLen=0,	//minimum segment length
+			long debug=0
+			);
+
+	long BEwTandMinLen( //Returns breakpoint list lenght. with T and MinSegLen
+			double *Wext, //IO Breakpoint weights extended notation...
+			long *Iext, //IO Breakpoint positions in extended notation...
+			long *pK, //IO Number breakpoint positions remaining.
+			double sigma2, //IP If sigma2
+			double T, //IP  Threshold to prune,  T=T*sqrt(sigma2);
+			long MinSegLen, //IP Minimum length of the segment.
+			long debug
+			);
+	long RemoveBreakpoint(double *Wext, long *Iext, double *tscore, long K, long indexOfSegmentToRemove);
+
+};
 
 #endif //_BaseGADA_H_
