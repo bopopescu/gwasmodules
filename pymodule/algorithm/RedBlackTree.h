@@ -153,7 +153,7 @@ public:
 template<typename keyType, typename dataType>
 class RedBlackTree {
 protected:
-
+	long _noOfNodes;	//size() is expensive, use this to keep track.
 	short isValidRedBlackTreeRecur_(RedBlackTreeNode<keyType, dataType> *nodePtr) {
 		if (nodePtr == nil)
 			return 1;
@@ -451,7 +451,6 @@ public:
 	/*  that the root and nil nodes do not require special cases in the code */
 	RedBlackTreeNode<keyType, dataType> * root;
 	RedBlackTreeNode<keyType, dataType> * nil;
-
 	RedBlackTree() {
 		nil = new RedBlackTreeNode<keyType, dataType>();
 		nil->left = nil->right = nil->parent = nil;
@@ -464,6 +463,7 @@ public:
 		root->color = BLACK_;
 		//root->key = MAX_INT;
 		//root->storedEntry = NULL;
+		_noOfNodes = 0;
 	}
 	~RedBlackTree() {
 		/*
@@ -563,6 +563,7 @@ public:
 			Assert(!nil->color,"nil not black in RedBlackTree::Delete");
 #endif
 		}
+		_noOfNodes--;
 		return 0;
 	}
 	RedBlackTreeNode<keyType, dataType> * insertNode(keyType key,
@@ -646,6 +647,7 @@ public:
 		Assert(!nil->color,"nil not red in RedBlackTree::Insert");
 		Assert(!root->color,"root not red in RedBlackTree::Insert");
 #endif
+		_noOfNodes++;
 		return (newNode);
 	}
 	RedBlackTreeNode<keyType, dataType> * getPredecessor_(
@@ -731,7 +733,13 @@ public:
 		return queryTreeRecur_(root->left, key);
 	}
 	long size() {
+		/*
+		 * 2013.09.23 very expensive operation, use noOfNodes() to check.
+		 */
 		return count_(root->left, 0);
+	}
+	long noOfNodes(){
+		return _noOfNodes;
 	}
 	long maxDepth() {
 		return maxDepthRecur_(root->left);
