@@ -346,21 +346,6 @@ class FindNewRefCoordinatesGivenVCFFolderWorkflow(parentClass, BlastWorkflow, Sh
 		executableClusterSizeMultiplierList = []	#2012.8.7 each cell is a tuple of (executable, clusterSizeMultipler (0 if u do not need clustering)		
 		self.addExecutableAndAssignProperClusterSize(executableClusterSizeMultiplierList, defaultClustersSize=self.clusters_size)
 		
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
-										"polymorphism/qc/CalculateLociAndGenomeCoveredAtEachSwitchFrequencyThreshold.py"), \
-										name='CalculateLociAndGenomeCoveredAtEachSwitchFrequencyThreshold', clusterSizeMultipler=0.01)
-		
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
-														"pegasus/mapper/extractor/ExtractFlankingSequenceForVCFLoci.py"), \
-													name='ExtractFlankingSequenceForVCFLoci', clusterSizeMultipler=2)
-		
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
-														"polymorphism/FindSNPPositionOnNewRefFromFlankingBlastOutput.py"), \
-													name='FindSNPPositionOnNewRefFromFlankingBlastOutput', clusterSizeMultipler=2)
-		
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
-														"polymorphism/FindSNPPositionOnNewRefFromFlankingBWAOutput.py"), \
-													name='FindSNPPositionOnNewRefFromFlankingBWAOutput', clusterSizeMultipler=1)
 		
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='LiftoverVariants', clusterSizeMultipler=0.5)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.javaPath, name='FilterLiftedVariants', clusterSizeMultipler=0.5)
