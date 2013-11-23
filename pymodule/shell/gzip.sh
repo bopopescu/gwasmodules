@@ -20,4 +20,5 @@ outputFname=$2
 
 exitIfFileExists $outputFname
 
-gzip -c $inputFname > $outputFname
+#2013.11.22 use bgzip in case tabix indexing is needed.
+~/bin/bgzip -c $inputFname > $outputFname
