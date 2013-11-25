@@ -72,6 +72,5 @@ class ReduceMatrixBySumSameKeyColsAndThenDivide(ReduceMatrixByChosenColumn):
 if __name__ == '__main__':
 	main_class = ReduceMatrixBySumSameKeyColsAndThenDivide
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
-	import copy
 	instance = main_class(po.arguments, **po.long_option2value)
 	instance.run()
