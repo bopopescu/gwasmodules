@@ -9,7 +9,7 @@ Examples:
 Description:
 	2012.1.9
 		This program first sums values of chosen columns (all input files) with same keys from the keyColumnLs.
-		In the end, it divides values from first two chosen columns and appends it in the output as an extra column.
+		In the end, it divides values from first two chosen columns and appends it to the output as an extra column.
 """
 import sys, os, math
 __doc__ = __doc__%(sys.argv[0], sys.argv[0])
@@ -25,7 +25,7 @@ class ReduceMatrixBySumSameKeyColsAndThenDivide(ReduceMatrixByChosenColumn):
 	__doc__ = __doc__
 	option_default_dict = ReduceMatrixByChosenColumn.option_default_dict.copy()
 	option_default_dict.update({
-						("operatorType", 1, int): [1, 'p', 1, 'For the last column, 1: firstValue/2ndValue. 2: 1stValue-2ndValue.'],\
+						("operatorType", 1, int): [1, 'p', 1, 'For the last column, 1: firstColumnValue/2ndColumnValue. 2: 1stColumnValue - 2ndColumnValue.'],\
 						})
 	def __init__(self, inputFnameLs, **keywords):
 		"""
