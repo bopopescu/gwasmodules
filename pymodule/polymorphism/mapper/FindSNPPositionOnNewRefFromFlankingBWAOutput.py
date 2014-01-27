@@ -6,7 +6,7 @@ Examples:
 	%s --newSNPDataOutputFname ~/script/vervet/data/194SNPData/isq524CoordinateSNPData_max15Mismatch.tsv
 		--querySNPDataFname ~/script/vervet/data/194SNPData/AllSNPData.txt
 		--SNPFlankSequenceFname ~/script/vervet/data/194SNPData/AllSNPFlankWithSNPMark.txt
-		-i Blast/Blast194SNPFlankAgainst524_15Mismatches.2012.8.17T2334/folderBlast/blast.tsv
+		-i bwa194SNPFlankAgainst524_15Mismatches.bam
 		-o ~/script/vervet/data/194SNPData/originalSNPID2ISQ524Coordinate_max15Mismatch.tsv
 		--maxNoOfMismatches 2
 		--minAlignmentSpan 10
@@ -14,7 +14,8 @@ Examples:
 
 Description:
 	2012.10 child of FindSNPPositionOnNewRefFromFlankingBlastOutput.
-		its input is FindNewRefCoordinatesGivenVCFFolderWorkflow.py's bwa-alignment output and others.
+		Its main input is bwa alingment output (.bam file),
+		This program is used as part of workflow inside FindNewRefCoordinatesGivenVCFFolderWorkflow.py.
 		
 		
 """

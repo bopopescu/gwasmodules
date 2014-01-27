@@ -8,8 +8,7 @@ Examples:
 	%s 
 	
 Description:
-	2014.01.04 program that removes loci with low mapPvalue (output of ComputeLiftOverLocusProbability.py) 
-		from a lifted-over VCF (LiftOverVCFBasedOnCoordinateMap.py).
+	2014.01.04 program that filters loci based on stats from statFname. 
 
 """
 import sys, os, math
@@ -23,52 +22,52 @@ from pymodule.yhio.VCFFile import VCFFile
 from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 
 parentClass = AbstractVCFMapper
-class RemoveLocusFromVCFWithLowLiftOverMapPvalue(parentClass):
+class FilterLocusBasedOnLocusStatFile(parentClass):
 	__doc__ = __doc__
 	option_default_dict = parentClass.option_default_dict.copy()
 	option_default_dict.update({
-						('liftOverLocusMapPvalueFname', 1, ): ['', '', 1, ' output of ComputeLiftOverLocusProbability.py', ],\
-						('minLiftOverMapPvalue', 1, float): [0.5, '', 1, 'locus with mapPvalue lower than this would be removed.', ],\
+						('runType', 1, int): ['', '', 1, ' runType 1: locus missing fraction, header is (locusID, occurrence_byFixedValue).', ],\
+						('statFname', 1, ): ['', '', 1, ' locus statistics file, usually one locus per line, depending on runType.', ],\
+						('minValue', 0, float): [None, '', 1, 'if not None, loci whose stat below this would be removed.', ],\
+						('maxValue', 0, float): [None, '', 1, 'if not None, loci whose stat above this would be removed.', ],\
 						})
 	def __init__(self, inputFnameLs=None, **keywords):
 		"""
 		"""
 		parentClass.__init__(self, inputFnameLs=inputFnameLs, **keywords)
+		
+		self.getLocusID2StatFunctionDict = {1: self.getLocusID2MissingFraction,}
 	
-	
-	def getLocusNewID2mapPvalue(self, liftOverLocusMapPvalueFname=None):
+	def getLocusID2MissingFraction(self, inputFname=None):
 		"""
-		2014.01.04
-			oldChromosome, oldStart, oldStop, oldStrand, newChromosome, newStart, newStop, mapPvalue
+		2014.01.08
+			
 		"""
-		sys.stderr.write("Reading in the coordinate map from %s ..."%(liftOverLocusMapPvalueFname))
-		locusNewID2mapPvalue = {}
-		reader = MatrixFile(inputFname=liftOverLocusMapPvalueFname)
+		sys.stderr.write("Reading in the missing statistics from %s ... "%(inputFname))
+		locusID2Stat = {}
+		
+		reader = MatrixFile(inputFname=inputFname)
 		reader.constructColName2IndexFromHeader()
-		strandIndex = reader.getColIndexGivenColHeader("oldStrand")
-		newChromosomeIndex = reader.getColIndexGivenColHeader("newChromosome")
-		newStartIndex = reader.getColIndexGivenColHeader("newStart")
-		newStopIndex = reader.getColIndexGivenColHeader("newStop")
-		mapPvalueIndex = reader.getColIndexGivenColHeader("mapPvalue")
+		locusIDIndex = reader.getColIndexGivenColHeader("locusID")
+		statIndex = reader.getColIndexGivenColHeader("occurrence_byFixedValue")
 		counter = 0
 		for row in reader:
-			strand = row[strandIndex]
-			newChromosome = row[newChromosomeIndex]
-			newStart = int(row[newStartIndex])
-			newStop = int(row[newStopIndex])
-			mapPvalue = float(row[mapPvalueIndex])
+			locusID = row[locusIDIndex]
+			chromosome, start = locusID.split('_')[:2]
+			start = int(start)
+			stat = float(row[statIndex])
 			
-			key = (newChromosome, newStart, newStop)
-			if key in locusNewID2mapPvalue:
-				if mapPvalue < locusNewID2mapPvalue[key]:
+			key = (chromosome, start, start)
+			if key in locusID2Stat:
+				if stat < locusID2Stat[key]:
 					#take lowest value
-					locusNewID2mapPvalue[key] = mapPvalue
+					locusID2Stat[key] = stat
 			else:
-				locusNewID2mapPvalue[key] = mapPvalue
+				locusID2Stat[key] = stat
 			counter += 1
 		del reader
-		sys.stderr.write("%s unique loci with map p-value out of %s total loci.\n"%(len(locusNewID2mapPvalue), counter))
-		return locusNewID2mapPvalue
+		sys.stderr.write(" %s unique loci with missing fraction out of %s total loci.\n"%(len(locusID2Stat), counter))
+		return locusID2Stat
 	
 	def run(self):
 		if self.debug:
@@ -78,10 +77,9 @@ class RemoveLocusFromVCFWithLowLiftOverMapPvalue(parentClass):
 		outputDir = os.path.split(self.outputFname)[0]
 		if outputDir and not os.path.isdir(outputDir):
 			os.makedirs(outputDir)
-		locusNewID2mapPvalue = self.getLocusNewID2mapPvalue(self.liftOverLocusMapPvalueFname)
+		locusID2Stat = self.getLocusID2StatFunctionDict[self.runType](self.statFname)
 		
 		reader = VCFFile(inputFname=self.inputFname)
-		
 		writer = VCFFile(outputFname=self.outputFname, openMode='w')
 		writer.metaInfoLs = reader.metaInfoLs
 		writer.header = reader.header
@@ -93,11 +91,17 @@ class RemoveLocusFromVCFWithLowLiftOverMapPvalue(parentClass):
 		for vcfRecord in reader:	#assuming input VCF is sorted
 			counter += 1
 			key = (vcfRecord.chromosome, vcfRecord.position, vcfRecord.position)
-			mapPvalue = locusNewID2mapPvalue.get(key)
-			if mapPvalue is None:
+			stat = locusID2Stat.get(key)
+			if stat is None:
 				continue
 			
-			if mapPvalue >self.minLiftOverMapPvalue:
+			toKeepLocus = True
+			if self.minValue is not None and stat < self.minValue:
+				toKeepLocus = False
+			if self.maxValue is not None and stat > self.maxValue:
+				toKeepLocus = False
+			
+			if toKeepLocus:
 				real_counter += 1
 				writer.writeVCFRecord(vcfRecord)
 		reader.close()
@@ -110,7 +114,7 @@ class RemoveLocusFromVCFWithLowLiftOverMapPvalue(parentClass):
 												fraction))
 
 if __name__ == '__main__':
-	main_class = RemoveLocusFromVCFWithLowLiftOverMapPvalue
+	main_class = FilterLocusBasedOnLocusStatFile
 	po = ProcessOptions(sys.argv, main_class.option_default_dict, error_doc=main_class.__doc__)
 	instance = main_class(**po.long_option2value)
 	instance.run()
