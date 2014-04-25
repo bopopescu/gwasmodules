@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 from pymodule import ProcessOptions, figureOutDelimiter, utils, PassingData
-import csv
 from pymodule.yhio.MatrixFile import MatrixFile
 from ReduceMatrixByMergeColumnsWithSameKey import ReduceMatrixByMergeColumnsWithSameKey
 
@@ -27,7 +26,7 @@ class ReduceMatrixByChosenColumn(ReduceMatrixByMergeColumnsWithSameKey):
 	__doc__ = __doc__
 	option_default_dict = ReduceMatrixByMergeColumnsWithSameKey.option_default_dict.copy()
 	option_default_dict.update({
-						})
+				})
 
 	def __init__(self, inputFnameLs, **keywords):
 		"""

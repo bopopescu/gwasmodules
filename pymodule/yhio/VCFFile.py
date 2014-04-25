@@ -30,6 +30,7 @@ diploidGenotypePattern = re.compile(r'([\d.])[|/]([\d.])')
 def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2index, minDepth=1,\
 				dataEntryType=1):
 	"""
+	2014.01.08 fix a bug that skips calls and shortens data_row. 
 	2012.9.6 turn pos into integer
 	2012.5.10
 		complete representation of one locus
@@ -92,42 +93,37 @@ def parseOneVCFRow(row, col_name2index, col_index_individual_name_ls, sample_id2
 			genotype_quality_index = format_column_name2index.get('DP')
 		depth_index = format_column_name2index.get("DP")
 		#GL_index = format_column_name2index.get('GL')
-		if genotype_call_index is None:
-			#sys.stderr.write("")
-			continue
-		if len(genotype_data_ls)==0:# or (genotype_call_index is not None and len(genotype_data_ls)<=genotype_call_index):	#<len(format_column_name2index):	#this genotype call is probably empty "./." due to no reads
-			continue
-		#genotype_quality = genotype_data_ls[genotype_quality_index]
-		if genotype_call_index is not None and len(genotype_data_ls)>genotype_call_index:
-			genotype_call = genotype_data_ls[genotype_call_index]
-		else:
-			genotype_call = './.'	#missing
-		callData = {}
-		if genotype_call=='./.' or genotype_call=='.':	#missing data
-			continue
-		if minDepth>0 and depth_index is None:
-			continue
-		elif minDepth>0 and depth_index is not None:
-			if len(genotype_data_ls)>depth_index:
-				depth = genotype_data_ls[depth_index]
-			else:
-				depth = '.'	#missing DP
-			if depth=='.':	#this means depth=0
-				depth = 0
-			else:
-				depth = int(depth)
-			if depth<minDepth:	#no read. samtools would still assign ref/ref to this individual
-				continue
-			#if depth>maxNoOfReads*coverage or depth<minNoOfReads*coverage:	#2011-3-29 skip. coverage too high or too low
-			#	continue
-			callData['DP'] = depth
-		patternSearchResult = diploidGenotypePattern.search(genotype_call)
 		genotypeCallInBase = 'NA'
-		if patternSearchResult:
-			allele1 = alleleNumber2Base[patternSearchResult.group(1)]
-			allele2 = alleleNumber2Base[patternSearchResult.group(2)]
-			if allele1!='N' and allele2!='N':
-				genotypeCallInBase = '%s%s'%(allele1, allele2)
+		if genotype_call_index is not None and len(genotype_data_ls)>0:
+			# or (genotype_call_index is not None and len(genotype_data_ls)<=genotype_call_index):	#<len(format_column_name2index):	#this genotype call is probably empty "./." due to no reads
+			#genotype_quality = genotype_data_ls[genotype_quality_index]
+			if genotype_call_index is not None and len(genotype_data_ls)>genotype_call_index:
+				genotype_call = genotype_data_ls[genotype_call_index]
+			else:
+				genotype_call = './.'	#missing
+			callData = {}
+			if genotype_call!='./.' and genotype_call!='.' and genotype_call!='.|.':	#missing data
+				patternSearchResult = diploidGenotypePattern.search(genotype_call)
+				if patternSearchResult:
+					allele1 = alleleNumber2Base[patternSearchResult.group(1)]
+					allele2 = alleleNumber2Base[patternSearchResult.group(2)]
+					if allele1!='N' and allele2!='N':
+						genotypeCallInBase = '%s%s'%(allele1, allele2)
+				if depth_index is not None:
+					if len(genotype_data_ls)>depth_index:
+						depth = genotype_data_ls[depth_index]
+					else:
+						depth = '.'	#missing DP
+					if depth=='.':	#this means depth=0
+						depth = 0
+					else:
+						depth = int(depth)
+					if minDepth>0 and depth<minDepth:	#no read. samtools would still assign ref/ref to this individual
+						genotypeCallInBase = 'NA'	#set it to missing
+					#if depth>maxNoOfReads*coverage or depth<minNoOfReads*coverage:	#2011-3-29 skip. coverage too high or too low
+					#	continue
+					callData['DP'] = depth
+
 		"""
 		if genotype_call=='0/1' or genotype_call =='1/0':	#heterozygous, the latter notation is never used though.
 			allele = '%s%s'%(refBase, altBase)
@@ -215,8 +211,8 @@ class VCFRecord(object):
 		
 		self.chr = returnData.chromosome
 		self.chromosome = returnData.chromosome
-		self.pos = returnData.pos
-		self.position = returnData.pos
+		self.pos = returnData.pos	#integer
+		self.position = returnData.pos	#INTEGER
 		self.locus_id = returnData.locus_id
 		self.vcf_locus_id = returnData.vcf_locus_id
 		self.info_tag2value = returnData.info_tag2value
@@ -324,26 +320,32 @@ class VCFRecord(object):
 		###FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">
 		if PL_index is None:
 			GL_index = self.format_column_name2index.get('GL')	#from Platypus
-			##FORMAT=<ID=GL,Number=.,Type=Float,Description="Genotype log10-likelihoods for AA,AB and BB genotypes, where A = ref and B = variant. Only applicable for bi-allelic sites">
-			if convertGLToPL:	# so far only  for platypus
-				GL = genotypeFieldDataList[GL_index]
-				GL_list = map(float, GL.split(','))
-				PL_list = map(self.log10Likeli2PhredScaleFunction, GL_list)
-				PL = ','.join(PL_list)
-				
-				if self.format.find('GL')>=0:	#change the field name in format as well
-					self.format = self.format.replace('GL', 'PL')
+			if GL_index is not None:
+				##FORMAT=<ID=GL,Number=.,Type=Float,Description="Genotype log10-likelihoods for AA,AB and BB genotypes, where A = ref and B = variant. Only applicable for bi-allelic sites">
+				if convertGLToPL:	# so far only  for platypus
+					GL = genotypeFieldDataList[GL_index]
+					GL_list = map(float, GL.split(','))
+					PL_list = map(self.log10Likeli2PhredScaleFunction, GL_list)
+					PL = ','.join(PL_list)
+					if self.format.find('GL')>=0:	#change the field name in format as well
+						self.format = self.format.replace('GL', 'PL')
+				else:
+					PL = genotypeFieldDataList[GL_index]	#this is kind of wrong
 			else:
-				PL = genotypeFieldDataList[GL_index]	#this is kind of wrong
+				PL = '.,.,.'
 			PL_index = GL_index
 		else:
+			#if genotype=='./.' or genotype=='.|.':
+			#	PL = '.,.,.'
+			#else:
 			PL = genotypeFieldDataList[PL_index]
 		
 		if PL=='.':	#should be .,.,.
 			PL = '.,.,.'
-		genotypeFieldDataList[PL_index] = PL
+		if PL_index is not None:
+			genotypeFieldDataList[PL_index] = PL
 		genotypeFieldDataList[GT_index] = genotype
-		self.row[sampleGenotypeAndOtherDataIndex] = genotypeFieldDataList
+		self.row[sampleGenotypeAndOtherDataIndex] = ':'.join(genotypeFieldDataList)
 	
 	def getGenotypeCallForAllSamples(self):
 		"""

@@ -60,7 +60,8 @@ class PlotGenomeWideData(parentClass, AbstractGenomeFileWalker):
 	option_default_dict.update(AbstractGenomeFileWalker.genome_option_dict.copy())
 	
 	option_default_dict.update({
-					('xtickInterval', 0, int): [None, '', 1, 'add a tick on the x-axis every interval within each chromosome. Default is 25 ticks throughout the genome.', ],\
+					('xtickInterval', 0, int): [None, '', 1, 'add a tick on the x-axis every interval within each chromosome. Without specifying, it is 25 ticks throughout the genome.\n\
+	Assigning 0 to it disable ticks on x-axis altogether.', ],\
 					('drawCentromere', 0, int): [0, '', 0, 'toggle to plot centromere as semi-transparent band', ],\
 					})
 	# 2013.07.31 no need for this
@@ -187,7 +188,7 @@ class PlotGenomeWideData(parentClass, AbstractGenomeFileWalker):
 		AbstractGenomeFileWalker._loadGenomeStructureFromDB(self, **keywords)
 		
 		if hasattr(self, 'xtickInterval') and self.xtickInterval is None:
-			self.xtickInterval = int(sum(self.oneGenomeData.chr_id2size.values())/25.0)	#25 ticks on average		
+			self.xtickInterval = int(sum(self.oneGenomeData.chr_id2size.values())/25.0)	#25 ticks throughout the genome		
 		
 		#for marking the X-axis
 		self.xtick_locs = []

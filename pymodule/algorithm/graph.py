@@ -89,6 +89,22 @@ class GraphWrapper(Graph):
 		sys.stderr.write(" %s leaves \n"%(len(nodeList)))
 		return nodeList
 	
+	
+	def _recursiveCalculateNodeDistanceToLeaf(self, leafNodes=None, node2distanceToLeaf=None):
+		"""
+		2013.10.16
+		"""
+		newLeafNodeSet = set()
+		for leafNode in leafNodes:
+			if leafNode not in node2distanceToLeaf:
+				node2distanceToLeaf[leafNode] = 0
+			for parent in self.predecessors(leafNode):
+				node2distanceToLeaf[parent] = node2distanceToLeaf[leafNode] + 1
+				newLeafNodeSet.add(parent)
+		if newLeafNodeSet:
+			self._recursiveCalculateNodeDistanceToLeaf(newLeafNodeSet, node2distanceToLeaf)
+		return node2distanceToLeaf
+	
 	def calculateNodeHierarchyLevel(self):
 		"""
 		2013.1.3
@@ -97,12 +113,13 @@ class GraphWrapper(Graph):
 		
 		leafNodes = set(self.findAllLeafNodes())
 		sys.stderr.write("Calculating node hierarchy level ...")
-		node2HierarchyLevel = {}
+		node2distanceToLeaf = {}
 		#leaf nodes' hierarchy level=0
-		
+		self._recursiveCalculateNodeDistanceToLeaf(leafNodes, node2distanceToLeaf)
+		"""
 		for source in self.nodes():
 			if source in leafNodes:
-				node2HierarchyLevel[source] = 0
+				node2distanceToLeaf[source] = 0
 			else:
 				level = None
 				for target in leafNodes:
@@ -115,9 +132,10 @@ class GraphWrapper(Graph):
 					except:
 						#no path between source and target
 						pass
-				node2HierarchyLevel[source] = level
-		sys.stderr.write("%s nodes with hierarchy level.\n"%(len(node2HierarchyLevel)))
-		return node2HierarchyLevel
+				node2distanceToLeaf[source] = level
+		"""
+		sys.stderr.write("%s nodes with hierarchy level.\n"%(len(node2distanceToLeaf)))
+		return node2distanceToLeaf
 	
 	def findAllFounders(self):
 		"""
@@ -146,28 +164,29 @@ class GraphWrapper(Graph):
 			founderSet = set(self.findAllFounders())
 		
 		sys.stderr.write("Ordering members of the pedigree based on distance to founders ...")
-		founderDistance2NodeList = {}
+		nodeID2distanceToFounder = {}
 		#leaf nodes' hierarchy level=0
 		counter = 0
 		for source in self.nodes():
 			if source in founderSet:
-				founderDistance2NodeList[source] = 0
+				nodeID2distanceToFounder[source] = 0
 			else:
 				level = None
-				for target in founderSet:
+				#find the longest path to the founder
+				for founder in founderSet:
 					try:
-						l = nx.astar_path_length(self, source, target)
+						l = nx.astar_path_length(self, founder, source)
 						if level is None:
 							level = l
 						elif l>level:
 							level = l
 					except:
-						#no path between source and target
+						#no path between source and founder
 						pass
-				founderDistance2NodeList[source] = level
+				nodeID2distanceToFounder[source] = level
 			counter += 1
-		sys.stderr.write("%s different hierarchy level.\n"%(len(founderDistance2NodeList)))
-		return founderDistance2NodeList
+		sys.stderr.write("%s different hierarchy level.\n"%(len(nodeID2distanceToFounder)))
+		return nodeID2distanceToFounder
 	
 	
 class DiGraphWrapper(DiGraph, GraphWrapper):
@@ -177,7 +196,39 @@ class DiGraphWrapper(DiGraph, GraphWrapper):
 		2013.1.3
 		"""
 		DiGraph.__init__(self, data=None, **keywords)
-		
+		self._undirectedG = None
+	
+	@property
+	def undirectedGraph(self):
+		"""
+		2013.10.01
+			assuming graph does not change anymore.
+			
+		"""
+		if self._undirectedG is None:
+			self._undirectedG = self.to_undirected()
+		return self._undirectedG
+	
+	def getShortestPathInUndirectedVersion(self, nodeID1=None, nodeID2=None):
+		"""
+		2013.10.01
+			get undirected version of graph, get shortest path between two nodes,
+			then add edge direction to each edge
+			
+		"""
+		shortestPath = nx.astar_path(self.undirectedGraph, source=nodeID1, target=nodeID2)
+		pathWithDirection = []
+		for i in xrange(len(shortestPath)-1):
+			if self.has_edge(shortestPath[i], shortestPath[i+1]):
+				edgeDirection = +1
+			elif self.has_edge(shortestPath[i+1], shortestPath[i]):
+				edgeDirection = -1
+			else:
+				sys.stderr.write("ERROR: Edge %s -> %s exists in undirected graph, but it (or its reverse) does not exist in directed version.\n"%
+								(shortestPath[i], shortestPath[i+1]))
+				raise
+			pathWithDirection.append((shortestPath[i], shortestPath[i+1], edgeDirection))
+		return pathWithDirection
 
 if __name__ == '__main__':
 	import pdb

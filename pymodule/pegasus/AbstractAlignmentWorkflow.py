@@ -119,7 +119,7 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 							addOrReplaceReadGroupsJava=None, AddOrReplaceReadGroupsJar=None, \
 							BuildBamIndexFilesJava=None, BuildBamIndexJar=None, \
 							mv=None, \
-							data_dir=None, tmpDir="/tmp"):
+							data_dir=None, tmpDir="/tmp", **keywords):
 		"""
 		2012.4.5
 			fix some bugs here
@@ -620,39 +620,6 @@ class AbstractAlignmentWorkflow(AbstractNGSWorkflow):
 		passingData.gzipReduceFolderJob = newReturnData.topOutputDirJob
 		
 		sys.stderr.write("%s alignments to be worked on. %s jobs.\n"%(no_of_alignments_worked_on, self.no_of_jobs))
-		return returnData
-	
-	def registerAlignmentAndItsIndexFile(self, workflow=None, alignmentLs=None, data_dir=None, checkFileExistence=True):
-		"""
-		2013.04.03 cosmetic
-		2012.9.18 copied from AlignmentToCallPipeline.py
-		2012.6.12
-			add argument checkFileExistence
-		2012.1.9
-			register the input alignments and return in a data structure usd by several other functions
-		"""
-		if workflow is None:
-			workflow = self
-		sys.stderr.write("Registering %s alignments ..."%(len(alignmentLs)))
-		returnData = []
-		for alignment in alignmentLs:
-			inputFname = os.path.join(data_dir, alignment.path)
-			inputFile = File(alignment.path)	#relative path, induces symlinking or stage-in
-			baiFilepath = '%s.bai'%(inputFname)
-			if checkFileExistence and (not os.path.isfile(inputFname) or not os.path.isfile(baiFilepath)):
-				if not os.path.isfile(inputFname):
-					sys.stderr.write("registerAlignmentAndItsIndexFile() Warning: %s does not exist. skip entire alignment.\n"%(inputFname))
-				if not os.path.isfile(baiFilepath):
-					sys.stderr.write("registerAlignmentAndItsIndexFile() Warning: %s does not exist. skip entire alignment.\n"%(baiFilepath))
-				continue
-			inputFile.addPFN(PFN("file://" + inputFname, workflow.input_site_handler))
-			workflow.addFile(inputFile)
-			baiF = File('%s.bai'%alignment.path)
-			baiF.addPFN(PFN("file://" + baiFilepath, workflow.input_site_handler))
-			workflow.addFile(baiF)
-			alignmentData = PassingData(alignment=alignment, jobLs = [], bamF=inputFile, baiF=baiF)
-			returnData.append(alignmentData)
-		sys.stderr.write("Done.\n")
 		return returnData
 	
 	

@@ -1,5 +1,11 @@
 #!/bin/bash
 
+#2013.01.10 get filename suffix, only for suffix (.gz) length=3
+#outputFilenameLength=`expr length $outputFname`
+#gzSuffixStartPosition=`echo $outputFilenameLength-3+1|bc`
+#gzSuffix=`expr substr $outputFname $gzSuffixStartPosition 3`
+
+
 findValueGivenAnOptionName () {
 	if [ -z "$1" ]
 	then

@@ -6,8 +6,15 @@ Examples:
 	%s -i input.tped.gz -o /tmp/output.tped
 
 Description:
-	2012.7.20
-		all input files could be gzipped or not.
+	2014.01.12, 2012.7.20
+		Its input .tped files are those that are converted from .vcf by "vcftools --plink-tped".
+		All input files could be gzipped or not.
+		
+		Sometime before 2013.11.21, "vcftools --plink-tped" changes it output from 
+			"CAE19	1002674	0	1002674	..." (chromosome, snp_id, genetic_distace, physical_distance)
+			to 
+			"0	CAE19:1002674	0	1002674	..." (chromosome, snp_id, genetic_distace, physical_distance).
+		So all processRow() functions now derive chromosome from "snp_id" column, rather than chromosome.
 """
 
 import sys, os, math
@@ -24,7 +31,8 @@ class ModifyTPED(AbstractMapper):
 	__doc__ = __doc__
 	option_default_dict = AbstractMapper.option_default_dict.copy()
 	option_default_dict.update({
-						('run_type', 1, int): [1, 'y', 1, 'which run type. 1: modify snp_id (2nd-column) = chr_phyiscalPosition,\n\
+						('run_type', 1, int): [1, 'y', 1, 'which run type. \n\
+		1: modify snp_id (2nd-column) = chr_phyiscalPosition,\n\
 		2: snp_id=chr_physicalPosition (original data), set chromosome = X (chromosome X, for sex check by plink), pos += positionStartBase. \n\
 			assuming input is on X already,\n\
 		3: snp_id=chr_physicalPosition (original data), chromosome (1st column) = newChr, pos += positionStartBase,\n\
@@ -44,9 +52,15 @@ class ModifyTPED(AbstractMapper):
 	
 	def processRow(self, row):
 		"""
+		2014.01.12 Sometime before 2013.11.21, "vcftools --plink-tped" changes it output from 
+			"CAE19	1002674	0	1002674	..."
+			to 
+			"0	CAE19:1002674	0	1002674	..."
+		
 		2012.8.9
 		"""
 		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
+		chromosome, physical_distance = snp_id.split(':')[:2]
 		#chromosome = Genome.getContigIDFromFname(chromosome)	# 2012.8.16 getting rid of the string part of chromosome ID doesn't help.
 			#   non-human chromosome numbers would still be regarded as 0 by plink.
 		snp_id = '%s_%s'%(chromosome, physical_distance)
@@ -55,9 +69,15 @@ class ModifyTPED(AbstractMapper):
 	
 	def processRow_ChangeChromosomeIDToX(self, row):
 		"""
+		2014.01.12 Sometime before 2013.11.21, "vcftools --plink-tped" changes it output from 
+			"CAE19	1002674	0	1002674	..."
+			to 
+			"0	CAE19:1002674	0	1002674	..."
+		
 		2012.8.9
 		"""
 		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
+		chromosome, physical_distance = snp_id.split(':')[:2]
 		snp_id = '%s_%s'%(chromosome, physical_distance)	#the snp_id is the original contig & position
 		#chromosome = self.newChr	#new chromosome, new position
 		physical_distance = int(physical_distance) + self.positionStartBase
@@ -67,9 +87,15 @@ class ModifyTPED(AbstractMapper):
 	
 	def processRow_addPositionStartBase(self, row):
 		"""
+		2014.01.12 Sometime before 2013.11.21, "vcftools --plink-tped" changes it output from 
+			"CAE19	1002674	0	1002674	..."
+			to 
+			"0	CAE19:1002674	0	1002674	..."
+		
 		2012.8.9
 		"""
 		chromosome, snp_id, genetic_distace, physical_distance = row[:4]
+		chromosome, physical_distance = snp_id.split(':')[:2]
 		snp_id = '%s_%s'%(chromosome, physical_distance)	#the snp_id is the original contig & position
 		chromosome = self.newChr	#new chromosome, new position
 		physical_distance = int(physical_distance) + self.positionStartBase

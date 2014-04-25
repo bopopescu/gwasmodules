@@ -171,6 +171,12 @@ class MatrixFile(object):
 		del self.csvFile
 		self.inputFile.close()
 	
+	def writeRow(self, row=None):
+		"""
+		2014.03.11 same as writerow(), for API naming consistency.
+		"""
+		self.writerow(row)
+	
 	def writerow(self, row=None):
 		"""
 		mimic csv's writerow()
@@ -181,8 +187,15 @@ class MatrixFile(object):
 			else:
 				self.csvFile.write("%s\n"%(self.delimiter.join(row)))
 	
-	def constructDictionary(self, keyColumnIndexList=None, valueColumnIndexList=None):
+	def constructDictionary(self, keyColumnIndexList=None, valueColumnIndexList=None, keyUniqueInInputFile=False,\
+						keyDataType=None, valueDataType=None):
 		"""
+		2013.10.04 added argument keyDataType, valueDataType
+		2013.10.02 added argument keyUniqueInInputFile
+			True when each key appears once and only once in input file. Exception would be raise if this is not true.
+		2013.09.30
+			If length of keyColumnIndexList is one, then key is not a tuple, simply the key.
+			If length of valueColumnIndexList is one, then value is not a list of tuples, simply a list of values.
 		2013.05.24
 			the key is a tuple
 			the value is a list of lists.
@@ -191,11 +204,11 @@ class MatrixFile(object):
 			
 				alignmentCoverageFile = MatrixFile(inputFname=self.individualAlignmentCoverageFname)
 				alignmentCoverageFile.constructColName2IndexFromHeader()
-				alignmentReadGroupTuple2coverageInTupleLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
+				alignmentReadGroup2coverageLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
 				alignmentCoverageFile.close()
 				
-				coverageInTupleLs = alignmentReadGroupTuple2coverageInTupleLs.get((individualID,))
-				return coverageInTupleLs[0][0]
+				coverageLs = alignmentReadGroup2coverageLs.get((individualID,))
+				return coverageLs[0]
 				
 			
 				
@@ -208,16 +221,40 @@ class MatrixFile(object):
 			counter += 1
 			keyList = []
 			for i in keyColumnIndexList:
-				keyList.append(row[i])
+				keyData = row[i]
+				if keyDataType is not None:
+					keyData = keyDataType(keyData)
+				keyList.append(keyData)
 			valueList = []
 			for i in valueColumnIndexList:
-				valueList.append(row[i])
-			keyTuple = tuple(keyList)
-			if keyTuple not in dc:
-				dc[keyTuple] = []
-			dc[keyTuple].append(valueList)
+				valueData = row[i]
+				if valueDataType is not None:
+					valueData = valueDataType(valueData)
+				valueList.append(valueData)
+			if len(keyColumnIndexList)>1:
+				key = tuple(keyList)
+			else:
+				key = keyList[0]
+			if keyUniqueInInputFile:
+				if key in dc:
+					sys.stderr.write("ERROR: keyUniqueInInputFile=%s but this key (%s) from this row (%s) is already in dictionary with value=%s.\n"%
+									(keyUniqueInInputFile, repr(key), repr(row), repr(dc.get(key)) ))
+					raise
+			else:
+				if key not in dc:
+					dc[key] = []
+			
+			if len(valueColumnIndexList)>1:
+				value = valueList
+			else:
+				value = valueList[0]
+			if keyUniqueInInputFile:
+				dc[key] = value
+			else:
+				dc[key].append(value)
 		sys.stderr.write("%s unique pairs from %s rows.\n"%(len(dc), counter))
 		return dc
+	
 	
 	def run(self):
 		"""

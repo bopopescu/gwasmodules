@@ -66,7 +66,7 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 	The final number could be lower because maxPairwiseKinship is another threshold to meet.'],\
 			('maxPairwiseKinship', 0, float): [0.2, '', 1, 'maximum pairwise kinship allowed among selected individuals.'],\
 			('pedigreeKinshipFilePath', 1, ): [None, '', 1, 'file that contains pairwise kinship between individuals (ID: ucla_id/code).\n\
-	no header. coma-delimited 3-column file: individual1, individual2, kinsihp\n\
+	no header. coma-delimited 3-column file: individual1, individual2, kinship\n\
 	The sampling will try to avoid sampling close pairs, kinship(i,j)<=maxPairwiseKinship'],\
 			('replicateIndividualTag', 0, ): ['copy', '', 1, 'the tag that separates the true ID and its replicate count'],\
 			('individualAlignmentCoverageFname', 1, ): ['', '', 1, 'file contains two columns, individual-alignment.read_group, coverage.'],\
@@ -88,20 +88,20 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		originalIndividualID = individualID.split(replicateIndividualTag)[0]
 		return originalIndividualID
 	
-	def getIndividualCoverage(self, individualID=None, alignmentReadGroupTuple2coverageInTupleLs=None):
+	def getIndividualCoverage(self, individualID=None, alignmentReadGroup2coverageLs=None):
 		"""
 		2013.05.24
 		"""
 		alignmentID = individualID.split('_')[0]
 		#alignmentIDTuple = (alignmentID, )
-		coverageInTupleLs = alignmentReadGroupTuple2coverageInTupleLs.get((individualID,))
-		if not coverageInTupleLs:
-			sys.stderr.write("Error: coverage for alignmentID=%s, %s is %s.\n"%(alignmentID, individualID, repr(coverageInTupleLs)))
+		coverageLs = alignmentReadGroup2coverageLs.get(individualID)
+		if not coverageLs:
+			sys.stderr.write("Error: coverage for alignmentID=%s, %s is %s.\n"%(alignmentID, individualID, repr(coverageLs)))
 			sys.exit(3)
-		if len(coverageInTupleLs)>1:
+		if len(coverageLs)>1:
 			sys.stderr.write("Warning: coverage for %s has more than 1 entries %s. Take first one.\n "%\
-							(individualID, repr(coverageInTupleLs)))
-		return coverageInTupleLs[0][0]
+							(individualID, repr(coverageLs)))
+		return coverageLs[0]
 	
 	def setup(self, **keywords):
 		"""
@@ -120,7 +120,7 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 		#. read in the alignment coverage data
 		alignmentCoverageFile = MatrixFile(inputFname=self.individualAlignmentCoverageFname)
 		alignmentCoverageFile.constructColName2IndexFromHeader()
-		alignmentReadGroupTuple2coverageInTupleLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
+		alignmentReadGroup2coverageLs = alignmentCoverageFile.constructDictionary(keyColumnIndexList=[0], valueColumnIndexList=[1])
 		alignmentCoverageFile.close()
 		
 		sys.stderr.write("Reading in all samples from %s VCF input files ... \n"%(len(self.inputFnameLs)))
@@ -158,7 +158,7 @@ class SelectDistantMembersFromGenotypeFile(AbstractMatrixFileWalker):
 			
 			familyCoverage = 0
 			for n in cc_subgraph:	#assuming each family is a two-generation trio/nuclear family
-				individualCoverage = self.getIndividualCoverage(individualID=n, alignmentReadGroupTuple2coverageInTupleLs=alignmentReadGroupTuple2coverageInTupleLs)
+				individualCoverage = self.getIndividualCoverage(individualID=n, alignmentReadGroup2coverageLs=alignmentReadGroup2coverageLs)
 				individualCoverage = float(individualCoverage)
 				individualCoverageContainer.addOneValue(individualCoverage)
 				familyCoverage += individualCoverage

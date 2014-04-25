@@ -8,11 +8,10 @@ import sys, os, math
 sys.path.insert(0, os.path.expanduser('~/lib/python'))
 sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
-from pymodule import ProcessOptions, getListOutOfStr, PassingData
+from pymodule import ProcessOptions, getListOutOfStr, PassingData, utils
 from pymodule.yhio import NextGenSeq
 from pymodule.pegasus import yh_pegasus
-from Pegasus.DAX3 import *
-from Pegasus import DAX3
+from Pegasus.DAX3 import Executable, File, PFN, Profile, Namespace, Link, ADAG, Use, Job, Dependency
 
 class AbstractWorkflow(ADAG):
 	__doc__ = __doc__
@@ -49,6 +48,8 @@ class AbstractWorkflow(ADAG):
 						('pegasusFolderName', 0, ): ['folder', 'F', 1, 'the folder relative to pegasus workflow root to contain input & output.\
 								It will be created during the pegasus staging process. It is useful to separate multiple workflows.\
 								If empty, everything is in the pegasus root.', ],\
+						('inputSuffixList', 0, ): [None, '', 1, 'coma-separated list of input file suffices. If None, any suffix.\
+		Suffix include the dot, (i.e. .tsv). Typical zip suffices are excluded (.gz, .bz2, .zip, .bz).'],\
 						('outputFname', 1, ): [None, 'o', 1, 'xml workflow output file'],\
 						("tmpDir", 1, ): ["/tmp/", '', 1, 'for MarkDuplicates.jar, etc., default is /tmp/ but sometimes it is too small'],\
 						('max_walltime', 1, int):[4320, '', 1, 'maximum wall time any job could have, in minutes. 20160=2 weeks.\n\
@@ -86,6 +87,9 @@ class AbstractWorkflow(ADAG):
 		from pymodule import ProcessOptions
 		self.ad = ProcessOptions.process_function_arguments(keywords, self.option_default_dict, error_doc=self.__doc__, \
 														class_to_have_attr=self)
+		#2013.11.24
+		self.inputSuffixList = utils.getListOutOfStr(list_in_str=self.inputSuffixList, data_type=str, separator1=',', separator2='-')
+		self.inputSuffixSet = set(self.inputSuffixList)
 		#2013.06.27
 		self.inputArgumentLs = inputArgumentLs
 		if self.inputArgumentLs is None:
@@ -379,6 +383,33 @@ class AbstractWorkflow(ADAG):
 		vervetSrcPath = self.vervetSrcPath
 		
 		
+		#2013.11.22	#2013.06.25 register tabix
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=self.tabixPath, name='tabix', clusterSizeMultipler=5)
+		
+		#2013.11.22 2011.12.21	for OutputVCFSiteStat.py
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.vervetSrcPath, "shell/tabixRetrieve.sh"), name='tabixRetrieve', clusterSizeMultipler=1)
+		
+		#2013.11.22 moved from pymodule/polymorphism/FindNewRefCoordinatesGivenVCFFolderWorkflow.py
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, "polymorphism/mapper/LiftOverVCFBasedOnCoordinateMap.py"), \
+												name='LiftOverVCFBasedOnCoordinateMap', clusterSizeMultipler=1)
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
+										"polymorphism/qc/CalculateLociAndGenomeCoveredAtEachSwitchFrequencyThreshold.py"), \
+										name='CalculateLociAndGenomeCoveredAtEachSwitchFrequencyThreshold', clusterSizeMultipler=0.01)
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
+										"pegasus/mapper/extractor/ExtractFlankingSequenceForVCFLoci.py"), \
+										name='ExtractFlankingSequenceForVCFLoci', clusterSizeMultipler=2)
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
+										"polymorphism/mapper/FindSNPPositionOnNewRefFromFlankingBlastOutput.py"), \
+										name='FindSNPPositionOnNewRefFromFlankingBlastOutput', clusterSizeMultipler=2)
+		
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(workflow.pymodulePath, \
+										"polymorphism/mapper/FindSNPPositionOnNewRefFromFlankingBWAOutput.py"), \
+										name='FindSNPPositionOnNewRefFromFlankingBWAOutput', clusterSizeMultipler=1)
+		
+		
 		#2013.08.28
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'Genome/OutputGenomeAnnotation.py'), \
 										name='OutputGenomeAnnotation', clusterSizeMultipler=0.01)
@@ -593,9 +624,6 @@ class AbstractWorkflow(ADAG):
 		#2013.07.19
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'pegasus/mapper/modifier/AppendExtraPedigreeIndividualsToTPED.py'), \
 										name='AppendExtraPedigreeIndividualsToTPED', clusterSizeMultipler=1)
-		#2013.07.11
-		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, "polymorphism/LiftOverVCFBasedOnCoordinateMap.py"), \
-												name='LiftOverVCFBasedOnCoordinateMap', clusterSizeMultipler=1)
 		
 		#2013.2.7 convert, an image swissknife program, part of imagemagick 
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path="file:///usr/bin/convert", \
@@ -630,6 +658,12 @@ class AbstractWorkflow(ADAG):
 										name='PlotGenomeWideData', clusterSizeMultipler=1)
 		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/pipeCommandOutput2File.sh'), \
 										name='pipeCommandOutput2File', clusterSizeMultipler=1)
+		#2013.01.10
+		self.addOneExecutableFromPathAndAssignProperClusterSize(path=os.path.join(self.pymodulePath, 'shell/sortHeaderAware.sh'), \
+										name='sortHeaderAware', clusterSizeMultipler=1)
+		
+		self.sortExecutableFile = self.registerOneExecutableAsFile(path=os.path.expanduser("~/bin/sort"))
+		self.bgzipExecutableFile = self.registerOneExecutableAsFile(path=os.path.expanduser("~/bin/bgzip"))	#2013.11.22
 		
 		"""
 		# 2013.05.20 DISABLE this
@@ -763,25 +797,60 @@ class AbstractWorkflow(ADAG):
 		sys.stderr.write("%s files out of %s total.\n"%(len(inputFnameLs), counter))
 		#return inputFnameLs
 	
-	def registerAllInputFiles(self, workflow=None, inputFnameLs=[], input_site_handler=None, pegasusFolderName='', **keywords):
+	def registerAllInputFiles(self, workflow=None, inputDir=None,  inputFnameLs=None, input_site_handler=None, \
+						pegasusFolderName='', inputSuffixSet=None, indexFileSuffixSet=set(['.tbi', '.fai']),\
+						**keywords):
 		"""
+		
+		2013.11.24 cosmetic
+			added argument inputSuffixSet, indexFileSuffixSet
+			indexFileSuffixSet is used to attach corresponding index files to a input file.
+				assuming index file name is original filename + indexFileSuffix. 
 		2012.3.9
 			copied from variation.src.LDBetweenTwoSNPDataWorkflow.py
 		2012.3.3
 		"""
-		sys.stderr.write("Registering %s input file ..."%(len(inputFnameLs)))
+		if inputFnameLs is None:
+			inputFnameLs = []
+		if inputDir and os.path.isdir(inputDir):	#2013.04.07
+			fnameLs = os.listdir(inputDir)
+			for fname in fnameLs:
+				inputFname = os.path.realpath(os.path.join(inputDir, fname))
+				inputFnameLs.append(inputFname)
+		
+		if inputSuffixSet is None:
+			inputSuffixSet = self.inputSuffixSet
+		sys.stderr.write("Registering %s input files with %s possible sufficies ..."%(len(inputFnameLs), len(inputSuffixSet)))
 		if workflow is None:
 			workflow = self
 		returnData = PassingData(jobDataLs = [])
 		counter = 0
 		for inputFname in inputFnameLs:
 			counter += 1
-			inputF = File(os.path.join(pegasusFolderName, os.path.basename(inputFname)))
-			inputF.addPFN(PFN("file://" + inputFname, input_site_handler))
-			inputF.abspath = inputFname
-			self.addFile(inputF)
-			returnData.jobDataLs.append(PassingData(output=inputF, jobLs=[]))
-		sys.stderr.write(" %s files registered.\n"%(len(returnData.jobDataLs)))
+			suffix = utils.getRealPrefixSuffixOfFilenameWithVariableSuffix(inputFname)[1]	#default fakeSuffixSet includes .gz
+			if inputSuffixSet is not None and len(inputSuffixSet)>0 and suffix not in inputSuffixSet:
+				#skip input whose suffix is not in inputSuffixSet if inputSuffixSet is a non-empty set.
+				continue
+			if indexFileSuffixSet is not None and len(indexFileSuffixSet)>0 and suffix in indexFileSuffixSet:
+				#skip index files, they are affiliates of real input data files.
+				continue
+			inputFile = File(os.path.join(pegasusFolderName, os.path.basename(inputFname)))
+			inputFile.addPFN(PFN("file://" + inputFname, input_site_handler))
+			inputFile.abspath = inputFname
+			self.addFile(inputFile)
+			jobData = PassingData(output=inputFile, job=None, jobLs=[], \
+								file=inputFile, fileLs=[inputFile], indexFileLs=[])
+			#find all index files.
+			for indexFileSuffix in indexFileSuffixSet:
+				indexFilename = '%s%s'%(inputFname, indexFileSuffix)
+				if os.path.isfile(indexFilename):
+					indexFile = self.registerOneInputFile(workflow=workflow, inputFname=indexFilename, \
+										input_site_handler=input_site_handler, folderName=pegasusFolderName, \
+										useAbsolutePathAsPegasusFileName=False, checkFileExistence=True)
+					jobData.fileLs.append(indexFile)
+					jobData.indexFileLs.append(indexFile)
+			returnData.jobDataLs.append(jobData)
+		sys.stderr.write(" %s out of %s files registered.\n"%(len(returnData.jobDataLs), len(inputFnameLs)))
 		return returnData
 	
 	def registerFilesAsInputToJob(self, job, inputFileList):
@@ -793,7 +862,8 @@ class AbstractWorkflow(ADAG):
 			self.addJobUse(job=job, file=inputFile, transfer=True, register=True, link=Link.INPUT)
 			#job.uses(inputFile, transfer=True, register=True, link=Link.INPUT)
 	
-	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName="", useAbsolutePathAsPegasusFileName=False,\
+	def registerOneInputFile(self, workflow=None, inputFname=None, input_site_handler=None, folderName="", \
+							useAbsolutePathAsPegasusFileName=False,\
 							pegasusFileName=None, checkFileExistence=True):
 		"""
 		Examples:
@@ -906,9 +976,57 @@ class AbstractWorkflow(ADAG):
 						addPicardDictFile=addPicardDictFile, affiliateFilenameSuffixLs=affiliateFilenameSuffixLs, \
 						folderName=folderName)
 	
+	def addSortJob(self, workflow=None, executable=None, executableFile=None, \
+					inputFile=None, outputFile=None, noOfHeaderLines=0, \
+					parentJobLs=None, extraDependentInputLs=None, extraOutputLs=None, transferOutput=False, \
+					extraArguments=None, extraArgumentList=None, sshDBTunnel=None,\
+					job_max_memory=2000, walltime=120, **keywords):
+		"""
+		Examples:
+		
+			sortedSNPID2NewCoordinateFile = File(os.path.join(reduceOutputDirJob.output, 'SNPID2NewCoordinates.sorted.tsv.gz'))
+			sortSNPID2NewCoordinatesJob = self.addSortJob(inputFile=reduceJob.output, \
+						outputFile=sortedSNPID2NewCoordinateFile, noOfHeaderLines=1, \
+						parentJobLs=[reduceJob], \
+						extraOutputLs=None, transferOutput=False, \
+						extraArgumentList=["-k3,3 -k4,4n"], \
+						sshDBTunnel=None,\
+						job_max_memory=4000, walltime=120)
+			# -t$'\t' for sort has to be removed as it won't be passed correctly.
+			# the default sort field separator (non-blank to blank) works if no-blank is part of each cell value.
+		2014.01.10 use sortHeaderAware executable (from pymodule/shell)
+		2013.11.27 use unix sort to sort a file
+		
+		"""
+		if workflow is None:
+			workflow = self
+		if executable is None:
+			executable = self.sortHeaderAware
+		#if executableFile is None:
+		#	executableFile = self.sortExecutableFile
+		if extraDependentInputLs is None:
+			extraDependentInputLs = []
+		if extraArgumentList is None:
+			extraArgumentList = []
+		
+		extraArgumentList.insert(0, "%s"%(noOfHeaderLines))
+		job = self.addGenericJob(executable=executable, \
+					inputFile=inputFile, inputArgumentOption="", \
+					outputFile=outputFile, outputArgumentOption="", 
+					parentJobLs=parentJobLs, \
+					extraDependentInputLs=extraDependentInputLs, \
+					extraOutputLs=extraOutputLs, transferOutput=transferOutput, \
+					extraArguments=extraArguments, \
+					extraArgumentList=extraArgumentList, \
+					sshDBTunnel=sshDBTunnel,\
+					job_max_memory=job_max_memory, walltime=walltime)
+		return job
+	
 	def addStatMergeJob(self, workflow=None, statMergeProgram=None, outputF=None, \
 					parentJobLs=None, extraOutputLs=None,\
-					extraDependentInputLs=None, transferOutput=True, extraArguments=None, \
+					extraDependentInputLs=None, transferOutput=True, \
+					extraArguments=None, extraArgumentList=None,\
+					key2ObjectForJob=None,\
 					namespace=None, version=None, job_max_memory=1000, **keywords):
 		"""
 		2012.8.10
@@ -923,8 +1041,10 @@ class AbstractWorkflow(ADAG):
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
 		
-		extraArgumentList = []
-		key2ObjectForJob = {}
+		if extraArgumentList is None:
+			extraArgumentList = []
+		if key2ObjectForJob is None:
+			key2ObjectForJob = {}
 		
 		if extraArguments:
 			extraArgumentList.append(extraArguments)
@@ -1338,6 +1458,18 @@ class AbstractWorkflow(ADAG):
 					job_max_memory=2000, walltime=120, **keywords):
 		"""
 		Examples:
+			sortedSNPID2NewCoordinateFile = File(os.path.join(reduceOutputDirJob.output, 'SNPID2NewCoordinates.sorted.tsv'))
+			sortSNPID2NewCoordinatesJob = self.addGenericPipeCommandOutput2FileJob(executable=self.pipeCommandOutput2File, \
+					executableFile=self.sortExecutableFile, \
+					outputFile=sortedSNPID2NewCoordinateFile, \
+					parentJobLs=[reduceJob], \
+					extraDependentInputLs=[reduceJob.output], \
+					extraOutputLs=None, transferOutput=False, \
+					extraArguments=None, \
+					extraArgumentList=["-k 3,3 -k4,4n -t$'\t'", reduceJob.output], \
+					sshDBTunnel=None,\
+					job_max_memory=4000, walltime=120)
+		
 			extraArgumentList.append(alignment_method.command)	#add mem first
 			extraArgumentList.extend(["-a -M", refFastaFile] + fastqFileList)
 			alignmentJob = self.addGenericPipeCommandOutput2FileJob(executable=self.BWA_Mem, executableFile=self.bwa, \
@@ -1358,6 +1490,7 @@ class AbstractWorkflow(ADAG):
 					extraArguments=None, extraArgumentList=[self.newRegisterReferenceData.refPicardFastaDictF, selectOneChromosomeVCFJob.output], \
 					job_max_memory=job_max_memory, walltime=walltime)
 		
+		2013.11.22 executableFile could be None
 		2013.03.25 use pipeCommandOutput2File to get output piped into outputF
 			no frontArgumentList exposed because the order of initial arguments are fixed.
 				~/pymodule/shell/pipeCommandOutput2File.sh commandPath outputFname [commandArguments]
@@ -1370,9 +1503,13 @@ class AbstractWorkflow(ADAG):
 			executable = self.pipeCommandOutput2File
 		if extraDependentInputLs is None:
 			extraDependentInputLs = []
-		extraDependentInputLs.append(executableFile)
+		frontArgumentList = []
+		if executableFile:
+			extraDependentInputLs.append(executableFile)
+			frontArgumentList.append(executableFile)
+		
 		job= self.addGenericJob(executable=executable, \
-					frontArgumentList=[executableFile],\
+					frontArgumentList=frontArgumentList,\
 					inputFile=None, inputArgumentOption=None,\
 					outputFile=outputFile, outputArgumentOption=None,\
 				parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
@@ -1558,6 +1695,7 @@ class AbstractWorkflow(ADAG):
 	def getJVMMemRequirment(self, job_max_memory=5000, minMemory=2000, permSizeFraction=0.2,
 						MaxPermSizeUpperBound=35000):
 		"""
+		2013.10.27 handle when job_max_memory is None and minMemory is None.
 		#2013.06.07 if a job's virtual memory (1.2X=self.jvmVirtualByPhysicalMemoryRatio, of memory request) exceeds request, it'll abort.
 			so set memRequirement accordingly.
 		2013.05.01 lower permSizeFraction from 0.4 to 0.2
@@ -1569,6 +1707,10 @@ class AbstractWorkflow(ADAG):
 			job_max_memory could be set by user to lower than minMemory.
 			but minMemory makes sure it's never too low.
 		"""
+		if job_max_memory is None:
+			job_max_memory = 5000
+		if minMemory is None:
+			minMemory = 2000
 		MaxPermSize_user = int(job_max_memory*permSizeFraction)
 		mxMemory_user = int(job_max_memory*(1-permSizeFraction))
 		MaxPermSize= min(MaxPermSizeUpperBound, max(minMemory/2, MaxPermSize_user))
@@ -1880,9 +2022,9 @@ class AbstractWorkflow(ADAG):
 					need_svg=False, \
 					inputFileFormat=None, outputFileFormat=None,\
 					parentJob=None, parentJobLs=None, \
-					extraDependentInputLs=None, \
+					extraDependentInputLs=None, extraOutputLs=None, \
 					extraArgumentList=None, extraArguments=None, transferOutput=True,  job_max_memory=2000, \
-					sshDBTunnel=False, \
+					sshDBTunnel=False, key2ObjectForJob=None, \
 					objectWithDBArguments=None, **keywords):
 		"""
 		2013.08.28 added argument markerSize
@@ -1913,8 +2055,10 @@ class AbstractWorkflow(ADAG):
 			inputFileFormat   1: csv-like plain text file; 2: YHPyTables.YHFile; 3: HDF5MatrixFile; . "1"(default)
 			
 		"""
-		extraOutputLs = []
-		key2ObjectForJob = {}
+		if extraOutputLs is None:
+			extraOutputLs = []
+		if key2ObjectForJob is None:
+			key2ObjectForJob = {}
 		if executable is None:
 			executable = self.AbstractPlot
 		if extraDependentInputLs is None:
@@ -1997,7 +2141,7 @@ class AbstractWorkflow(ADAG):
 					minNoOfTotal=10,\
 					samplingRate=1, \
 					inputFileFormat=None, outputFileFormat=None,\
-					parentJob=None, parentJobLs=None, \
+					parentJob=None, parentJobLs=None, extraOutputLs=None, \
 					extraDependentInputLs=None, extraArgumentList=None, \
 					extraArguments=None, transferOutput=True,  job_max_memory=2000, sshDBTunnel=False, \
 					objectWithDBArguments=None, **keywords):
@@ -2028,7 +2172,8 @@ class AbstractWorkflow(ADAG):
 							xColumnHeader=None, xColumnPlotLabel=None, \
 							minNoOfTotal=minNoOfTotal, \
 							figureDPI=None, formatString=None, ylim_type=None, samplingRate=samplingRate, need_svg=False, \
-							parentJob=parentJob, parentJobLs=parentJobLs, extraDependentInputLs=extraDependentInputLs, \
+							parentJob=parentJob, parentJobLs=parentJobLs, \
+							extraOutputLs=extraOutputLs, extraDependentInputLs=extraDependentInputLs, \
 							extraArgumentList=extraArgumentList,\
 							extraArguments=extraArguments, transferOutput=transferOutput, job_max_memory=job_max_memory, \
 							sshDBTunnel=sshDBTunnel, objectWithDBArguments=objectWithDBArguments, **keywords)

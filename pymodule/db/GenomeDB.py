@@ -826,7 +826,9 @@ class OneGenomeData(PassingData):
 	@chr_id_ls.setter
 	def chr_id_ls(self, argument_ls=[]):
 		"""
+		#2014.01.12 added outdated_index=0 to filter AnnotAssembly
 		2013.07.29
+		2014.01.12 set outdated_index to 0
 		"""
 		if argument_ls and len(argument_ls)>0:
 			tax_id = argument_ls[0]
@@ -839,7 +841,7 @@ class OneGenomeData(PassingData):
 			chrOrder = self.chrOrder
 		sys.stderr.write("Getting chr_id_ls with tax_id=%s, chrOrder=%s ..."%(tax_id, chrOrder))
 		
-		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1).filter_by(outdated_index=0)
 		if self.chrOrder==2:
 			query = query.order_by(AnnotAssembly.stop)
 		else:	#1 or 3
@@ -865,6 +867,7 @@ class OneGenomeData(PassingData):
 	@chr_id2size.setter
 	def chr_id2size(self, argument_ls=[]):
 		"""
+		#2014.01.12 added outdated_index=0 to filter AnnotAssembly
 		#2011-11-21
 			order the chromosomes according to self.chrOrder
 			select sequences based on self.sequence_type_id
@@ -894,7 +897,8 @@ class OneGenomeData(PassingData):
 		query = self.db_genome.metadata.bind.execute("select id, chromosome, stop from genome.%s where tax_id=%s and start=1 %s %s"%\
 						(AnnotAssembly.table.name, tax_id, extraCondition, orderByString))
 		"""
-		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1)
+		#2014.01.12 added outdated_index=0 to filter AnnotAssembly
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(start=1).filter_by(outdated_index=0)
 		if self.chrOrder==2:
 			query = query.order_by(AnnotAssembly.stop)
 		else:	#1 or 3
@@ -1425,6 +1429,7 @@ class GenomeDatabase(ElixirDB):
 	
 	def outputGenomeSequence(self, tax_id=None, sequence_type_id=1, fastaTitlePrefix='chr', outputDir=None, chunkSize=70):
 		"""
+		#2014.01.12 added outdated_index=0 to filter AnnotAssembly
 		2011-7-7
 			at this moment, The output is with symap in mind.
 			
@@ -1434,7 +1439,7 @@ class GenomeDatabase(ElixirDB):
 		"""
 		sys.stderr.write("Outputting genome sequences from tax %s, seq-type %s to %s ...\n"%(tax_id, \
 										sequence_type_id, outputDir))
-		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).order_by(AnnotAssembly.id)
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).filter_by(outdated_index=0).order_by(AnnotAssembly.id)
 		for row in query:
 			fastaTitle = '%s%s'%(fastaTitlePrefix, row.id)
 			outputFname = os.path.join(outputDir, '%s.seq'%(fastaTitle))
@@ -1451,11 +1456,12 @@ class GenomeDatabase(ElixirDB):
 	
 	def getSequenceSegment(self, tax_id=None, chromosome=None, start=None, stop=None, schema='genome'):
 		"""
+		#2014.01.12 added outdated_index=0 to filter AnnotAssembly
 		2011-10-24
 			start and stop are 1-based.
 		"""
 		chromosome = str(chromosome)
-		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(chromosome=chromosome).order_by(AnnotAssembly.id)
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(chromosome=chromosome).filter_by(outdated_index=0).order_by(AnnotAssembly.id)
 		annot_assembly_id_ls = []
 		for row in query:
 			annot_assembly_id_ls.append(row.id)
@@ -1485,6 +1491,7 @@ class GenomeDatabase(ElixirDB):
 	def getTopNumberOfChomosomes(self, contigMaxRankBySize=100, contigMinRankBySize=1, tax_id=60711, sequence_type_id=9,\
 							version=None, chromosome_type_id=0, chromosome=None, outdated_index=0):
 		"""
+		#2014.01.12 added outdated_index=0 to filter AnnotAssembly
 		2013.3.19 added argument outdated_index
 		2013.3.14 added argument version, chromosome
 		2013.2.15 added argument chromosome_type_id
@@ -1504,7 +1511,7 @@ class GenomeDatabase(ElixirDB):
 		sys.stderr.write("Getting %s chromosomes with rank (by size) between %s and %s  ..."%\
 						(no_of_contigs_to_fetch, contigMinRankBySize, contigMaxRankBySize))
 		chr2size = {}
-		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id)
+		query = AnnotAssembly.query.filter_by(tax_id=tax_id).filter_by(sequence_type_id=sequence_type_id).filter_by(outdated_index=0)
 		if chromosome_type_id:
 			query = query.filter_by(chromosome_type_id=chromosome_type_id)
 		if version is not None:	#2013.3.14

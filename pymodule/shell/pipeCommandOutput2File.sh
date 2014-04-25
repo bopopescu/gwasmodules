@@ -14,6 +14,8 @@ then
 exit
 fi
 
+set -vx
+
 commandPath=$1
 outputFname=$2
 shift

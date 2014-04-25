@@ -782,30 +782,31 @@ def getPhredScoreOutOfSolexaScore(solexaChar):
 
 def getFileBasenamePrefixFromPath(path=None, fakeSuffixSet = set(['.gz', '.zip', '.bz2', '.bz'])):
 	"""
+	i.e. 
+		path= 'folderHighCoveragePanel/Scaffold97_88626_VCF_87970_VCF_Scaffold97_splitVCF_u1.unphased_familySize3.bgl'
+	
+		getFileBasenamePrefixFromPath(path) == "Scaffold97_88626_VCF_87970_VCF_Scaffold97_splitVCF_u1.unphased_familySize3"
+	
+	it will also get rid of suffix that are in the fakeSuffixSet.
+		path = "folder/input.vcf.gz"
+		
+		getFileBasenamePrefixFromPath(path) == "input"
+	
+	2013.11.24 call getRealPrefixSuffixOfFilenameWithVariableSuffix() for actual work
 	2013.06.21 convenient function
-		i.e. 
-			path= 'folderHighCoveragePanel/Scaffold97_88626_VCF_87970_VCF_Scaffold97_splitVCF_u1.unphased_familySize3.bgl'
-		
-			getFileBasenamePrefixFromPath(path) == "Scaffold97_88626_VCF_87970_VCF_Scaffold97_splitVCF_u1.unphased_familySize3"
-		
-		it will also get rid of suffix that are in the fakeSuffixSet.
-			path = "folder/input.vcf.gz"
-			
-			getFileBasenamePrefixFromPath(path) == "input"
-			
 	"""
 	fileBasename = os.path.basename(path)
-	fname_prefix, fname_suffix =  os.path.splitext(fileBasename)
-	while fname_suffix in fakeSuffixSet:
-		fname_prefix, fname_suffix =  os.path.splitext(fname_prefix)
-	return fname_prefix
+	return getRealPrefixSuffixOfFilenameWithVariableSuffix(fileBasename, fakeSuffixSet=fakeSuffixSet)[0]
 	
 	
 
-def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname, fakeSuffix='.gz'):
+def getRealPrefixSuffixOfFilenameWithVariableSuffix(path, fakeSuffix='.gz', fakeSuffixSet = set(['.gz', '.zip', '.bz2', '.bz'])):
 	"""
-	"." is included in the fname_suffix
+	"." is included in the fname_suffix (suffix)
 	
+	2013.11.24
+		add argument fakeSuffixSet and fakeSuffix would be added into it if fakeSuffixSet doesn't contain it.
+		borrowed from getFileBasenamePrefixFromPath()
 	2012.4.30
 		make the fakeSuffix an option.
 		if fakeSuffix is None or nothing, the 2nd os.path.splitext() won't run.
@@ -816,11 +817,12 @@ def getRealPrefixSuffixOfFilenameWithVariableSuffix(fname, fakeSuffix='.gz'):
 		fname is either sequence_628BWAAXX_4_1.fastq.gz or sequence_628BWAAXX_4_1.fastq (without gz).
 		Prefix is always sequence_628BWAAXX_4_1
 	"""
-	fname_prefix, fname_suffix = os.path.splitext(fname)
-	if fakeSuffix and fname_suffix==fakeSuffix:	#the input file is gzipped. get the real prefix, suffix
-		fname_prefix, fname_suffix = os.path.splitext(fname_prefix)
+	fname_prefix, fname_suffix =  os.path.splitext(path)
+	if fakeSuffix and fakeSuffix not in fakeSuffixSet:
+		fakeSuffixSet.add(fakeSuffix)
+	while fname_suffix in fakeSuffixSet:
+		fname_prefix, fname_suffix =  os.path.splitext(fname_prefix)
 	return fname_prefix, fname_suffix
-
 
 def getAllFiles(inputDir, inputFiles=[]):
 	"""

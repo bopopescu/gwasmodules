@@ -25,14 +25,15 @@ class ReduceMatrixBySumSameKeyColsAndThenDivide(ReduceMatrixByChosenColumn):
 	__doc__ = __doc__
 	option_default_dict = ReduceMatrixByChosenColumn.option_default_dict.copy()
 	option_default_dict.update({
-						("operatorType", 1, int): [1, 'p', 1, 'For the last column, 1: firstColumnValue/2ndColumnValue. 2: 1stColumnValue - 2ndColumnValue.'],\
-						})
+			("operatorType", 1, int): [1, 'p', 1, 'For the last column, 1: firstColumnValue/2ndColumnValue;\n\
+	2: 1stColumnValue - 2ndColumnValue; 3: divide each column in --valueColumnLs .. with a fixed value (--fixedValueDenominator ..).'],\
+			("fixedValueDenominator", 0, float): [1, '', 1, 'The denominator used in operatorType 3.'],\
+			})
 	def __init__(self, inputFnameLs, **keywords):
 		"""
 		2011-7-12
 		"""
 		ReduceMatrixByChosenColumn.__init__(self, inputFnameLs, **keywords)
-	
 	
 	def divideTwoColumnsInKey2DataLs(self, key2dataLs, no_of_key_columns=1, header=[]):
 		"""
@@ -43,19 +44,37 @@ class ReduceMatrixBySumSameKeyColsAndThenDivide(ReduceMatrixByChosenColumn):
 		sys.stderr.write("Averaging key2dataLs (%s entries ) ..."%(len(key2dataLs)))
 		keyColHeader = header[:no_of_key_columns]
 		valueColHeader = header[no_of_key_columns:]
-		if len(valueColHeader)>1:
-			header.append('%s_by_%s'%(valueColHeader[0], valueColHeader[1]))
+		if self.operatorType==3:
+			for valueSingleColHeader in valueColHeader:
+				header.append("%s_byFixedValue"%(valueSingleColHeader))
+		else:
+			if len(valueColHeader)>1:
+				if self.operatorType==2:
+					header.append("%s_subtract_%s"%(valueColHeader[0], valueColHeader[1]))
+				
+				else:
+					header.append('%s_by_%s'%(valueColHeader[0], valueColHeader[1]))
+					
 		for key, dataLs in key2dataLs.iteritems():
 			no_of_value_columns = len(dataLs)
-			if no_of_value_columns>1:
-				if self.operatorType==2:
-					ratio = float(dataLs[0]) - float(dataLs[1])
-				else:
-					if dataLs[1]!=0:
-						ratio = dataLs[0]/float(dataLs[1])
+			if self.operatorType==3:
+				for i in xrange(no_of_value_columns):	#2014.1.9 do not iterate over dataLs (for data in dataLs) as dataLs is expanding ... 
+					data = dataLs[i]
+					if self.fixedValueDenominator!=0:
+						ratio = float(data)/self.fixedValueDenominator
 					else:
 						ratio = -1
-				key2dataLs[key].append(ratio)
+					key2dataLs[key].append(ratio)
+			else:
+				if no_of_value_columns>1:
+					if self.operatorType==2:
+						ratio = float(dataLs[0]) - float(dataLs[1])
+					else:
+						if dataLs[1]!=0:
+							ratio = dataLs[0]/float(dataLs[1])
+						else:
+							ratio = -1
+					key2dataLs[key].append(ratio)
 		sys.stderr.write("Done.\n")
 		return PassingData(key2dataLs= key2dataLs, header=header)
 	
@@ -66,7 +85,8 @@ class ReduceMatrixBySumSameKeyColsAndThenDivide(ReduceMatrixByChosenColumn):
 			pdb.set_trace()
 		
 		returnData = self.traverse()
-		newReturnData = self.divideTwoColumnsInKey2DataLs(returnData.key2dataLs, no_of_key_columns=len(self.keyColumnLs), header=returnData.header)
+		newReturnData = self.divideTwoColumnsInKey2DataLs(returnData.key2dataLs, no_of_key_columns=len(self.keyColumnLs), \
+														header=returnData.header)
 		self.outputFinalData(self.outputFname, newReturnData.key2dataLs, returnData.delimiter, header=newReturnData.header)
 
 if __name__ == '__main__':

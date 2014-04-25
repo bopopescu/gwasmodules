@@ -196,9 +196,14 @@ def parseChrStartStopFromFilename(filename=None, chr2size=None, defaultChromosom
 
 class IntervalData(PassingData):
 	"""
-	2013.09.05 a more dynamic way to store intervals
-		required keywords: chr, chromosome, chromosomeSize, start, stop
+	Access .overlapInterval for most activities, as it's either equal or bigger than .interval.
+	
+	required keywords: chr or chromosome, chromosomeSize, start, stop
 		overlapStart and overlapStop are optional.
+	
+	2013.09.05 a more dynamic way to store intervals
+		
+		
 	"""
 	def __init__(self, chr=None, chromosome=None, chromosomeSize=None, start=None, stop=None, 
 				overlapStart=None, overlapStop=None, **keywords):
@@ -261,3 +266,4 @@ class IntervalData(PassingData):
 	@property
 	def parentInterval(self):
 		return self.interval
+
