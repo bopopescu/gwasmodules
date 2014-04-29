@@ -92,6 +92,9 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		self.entry_dot_label_column = xml.get_widget('entry_dot_label_column')
 		self.entry_x_column = xml.get_widget('entry_x_column')
 		self.entry_y_column = xml.get_widget('entry_y_column')
+		self.entry_x_error = xml.get_widget("entry_x_error")
+		self.entry_y_error = xml.get_widget("entry_y_error")
+		
 		self.entry_hist_column = xml.get_widget('entry_hist_column')
 		self.entry_no_of_bins = xml.get_widget('entry_no_of_bins')	#2009-5-20
 		self.entry_plot_title = xml.get_widget('entry_plot_title')
@@ -153,6 +156,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			
 	def plotXY(self, ax, canvas, liststore, plot_title='', chosen_index_ls=[]):
 		"""
+		2014.04.29 add error bars
 		2009-3-13
 			rename plot_NA_mismatch_rate to plotXY()
 		2008-02-05
@@ -161,6 +165,15 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		"""
 		x_column = int(self.entry_x_column.get_text())
 		y_column = int(self.entry_y_column.get_text())
+		if self.entry_x_error.get_text():
+			x_error_column_index = int(self.entry_x_error.get_text())
+		else:
+			x_error_column_index = None
+		if self.entry_y_error.get_text():
+			y_error_column_index = int(self.entry_y_error.get_text())
+		else:
+			y_error_column_index = None    
+		
 		plot_title = self.entry_plot_title.get_text()
 		
 		min_x = 1
@@ -169,13 +182,27 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		max_y = 0
 		
 		x_ls = []
+		x_error_ls = []
 		y_ls = []
+		y_error_ls = []
+		
 		x_chosen_ls = []
+		x_chosen_error_ls = []
 		y_chosen_ls = []
+		y_chosen_error_ls = []
+		
 		chosen_index_set = set(chosen_index_ls)
 		for i in range(len(liststore)):
 			row = liststore[i]
 			x = row[x_column]
+			if x_error_column_index is not None:
+				x_error = row[x_error_column_index]
+			else:
+				x_error = 0
+			if y_error_column_index is not None:
+				y_error = row[y_error_column_index]
+			else:
+				y_error = 0
 			y = row[y_column]
 			if not x or not y:	#2013.07.12 skip if empty cells
 				continue
@@ -190,11 +217,21 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			if i in chosen_index_set:
 				x_chosen_ls.append(x)
 				y_chosen_ls.append(y)
+				x_chosen_error_ls.append(x_error)
+				y_chosen_error_ls.append(y_error)
 			else:
 				x_ls.append(x)
 				y_ls.append(y)
+				x_error_ls.append(x_error)
+				y_error_ls.append(y_error)
+		
 		ax.clear()
-		ax.plot(x_ls, y_ls, '.')
+		#ax.plot(x_ls, y_ls, '.')
+		#ax.set_xscale('log')
+		#ax.set_yscale('log')
+		
+		ax.errorbar(x_ls, y_ls, xerr=x_error_ls, yerr=y_error_ls, ecolor='g', fmt='o')
+		
 		
 		"""
 		#diagonal line give a rough feeling about the notion, more NA, worse calling
@@ -204,6 +241,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		"""
 		if x_chosen_ls and y_chosen_ls:	#highlight
 			ax.plot(x_chosen_ls, y_chosen_ls, '.', c='r')
+			ax.errorbar(x_chosen_ls, y_chosen_ls, xerr=x_chosen_error_ls, yerr=y_chosen_error_ls, ecolor='r', color='r', fmt='o')
 		if plot_title:
 			ax.set_title(plot_title)
 		ax.set_xlabel(self.column_header[x_column])
