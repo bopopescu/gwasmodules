@@ -108,7 +108,7 @@ def process_options(argv_list, option_default_dict, error_doc=''):
 	"""
 	import sys
 	if len(argv_list) == 1:
-		print error_doc
+		print(error_doc)
 		sys.exit(6)
 	option_default_dict[('h', 'help', 0, 'Display this documentation', 0, int)] =0
 	
@@ -142,7 +142,7 @@ def process_options(argv_list, option_default_dict, error_doc=''):
 			short_option = opt[1:]
 			long_option = short_option2long_option[short_option]
 		if long_option=='help':
-			print error_doc
+			print(error_doc)
 			sys.exit(2)
 		if long_option2has_argument[long_option]:
 			opts_dict[long_option] = arg
@@ -152,7 +152,7 @@ def process_options(argv_list, option_default_dict, error_doc=''):
 	except:
 		traceback.print_exc()
 		print sys.exc_info()
-		print error_doc
+		print(error_doc)
 		sys.exit(2)
 	"""
 	return opts_dict
@@ -374,7 +374,7 @@ class ProcessOptions(object):
 		
 		import sys
 		if len(self.argv_list) == 1:
-			print error_doc
+			print(error_doc)
 			sys.exit(3)
 		
 		import getopt, traceback
@@ -388,7 +388,7 @@ class ProcessOptions(object):
 				short_option = opt[1:]
 				long_option = self.short_option2long_option[short_option]
 			if long_option=='help':
-				print error_doc
+				print(error_doc)
 				sys.exit(2)
 			if self.long_option2has_argument[long_option]:
 				opts_dict[long_option] = arg
@@ -398,7 +398,7 @@ class ProcessOptions(object):
 		except:
 			traceback.print_exc()
 			print sys.exc_info()
-			print error_doc
+			print(error_doc)
 			sys.exit(2)
 		"""
 		return opts_dict
