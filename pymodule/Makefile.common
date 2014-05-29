@@ -1,0 +1,78 @@
+
+.SUFFIXES:	.i .cc .c .so .o _wrap.o .py
+.PHONY:	swig clean_subdirs subdirs $(SUBDIRS)
+
+IncludeDirs = -I ~/script/ -I ~/script/vcflib/
+BoostLib  = -lboost_program_options -lboost_iostreams
+HDF5Lib  = -lhdf5_cpp -lhdf5 
+
+## CXXTARGETS, CXXLDFLAGS, CTARGETS, CLDFLAGS, ExtraTargets will be defined in child Makefiles 
+#CXXTARGETS	= 
+CXXFLAGS	= -fPIC -O3 -std=c++0x 
+CXXCOMPILER	= g++
+#CXXLDFLAGS	= 
+
+#CTARGETS	= 
+CFLAGS		= -fPIC -O2
+CCOMPILER	= gcc
+#CLDFLAGS	=
+
+#SharedLibTargets	=
+SharedLibFlags	= -shared -fPIC
+
+#StaticLibTargets	=
+
+#ExtraTargets
+#SRCS
+
+all:	depend $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(StaticLibTargets) $(ExtraTargets) subdirs
+
+
+$(StaticLibTargets):	%.a:	%.o
+	-ar crfvs $@ $<
+
+$(SharedLibTargets):	%.so:	%.o
+	-$(CXXCOMPILER) $< $(SharedLibFlags) -o $@ $(CXXLDFLAGS)
+
+#.o.so:
+#	-$(CXXCOMPILER) $< $(SharedLibFlags) -o $@ $(CXXLDFLAGS)
+
+$(CXXTARGETS):	%:	%.o
+	-$(CXXCOMPILER) $< $(CXXFLAGS) -o $@ $(CXXLDFLAGS)
+
+.cc.o:
+	-$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) -c -o $@
+
+$(CTARGETS):	%:	%.o
+	-$(CCOMPILER) $< $(CFLAGS) -o $@ $(CLDFLAGS)
+
+.c.o:
+	-$(CCOMPILER) $< $(CFLAGS) $(IncludeDirs) -c -o $@
+
+#.c:	$(wildcard ~/script/pymodule/include/*.h)
+#.cc:	$(wildcard ~/script/pymodule/include/*.h)
+
+### 2013.08.21 generate auto-dependency for each source code file through "gcc -MM". so that change of .h files would trigger re-compilation as well.
+
+depend: .depend
+
+.depend: $(SRCS)
+	rm -f ./.depend
+	-$(CXXCOMPILER) $^ $(CXXFLAGS) $(IncludeDirs) -MM >>./.depend;
+
+include .depend
+
+
+subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir all; \
+	done
+	
+clean_subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+
+clean:	clean_subdirs
+	rm -f ./.depend
+	-rm -f *.o *.so $(CXXTARGETS) $(CTARGETS) $(ExtraTargets) $(SharedLibTargets)

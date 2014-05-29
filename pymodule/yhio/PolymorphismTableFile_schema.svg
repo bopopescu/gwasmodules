@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="1673.3126"
+   height="838.44934"
+   id="svg3342"
+   version="1.1"
+   inkscape:version="0.48.3.1 r9886"
+   sodipodi:docname="PolymorphismTableFile_schema.svg"
+   inkscape:export-filename="/home/crocea/script/pymodule/yhio/PolymorphismTableFile_schema.png"
+   inkscape:export-xdpi="70.038666"
+   inkscape:export-ydpi="70.038666">
+  <defs
+     id="defs3344" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="0.49497475"
+     inkscape:cx="982.10078"
+     inkscape:cy="119.78067"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:window-width="1197"
+     inkscape:window-height="1057"
+     inkscape:window-x="508"
+     inkscape:window-y="24"
+     inkscape:window-maximized="0"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0" />
+  <metadata
+     id="metadata3347">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(571.41964,166.24791)">
+    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3354"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(-145.71429,-1.142858)"><flowRegion
+         id="flowRegion3356"><rect
+           id="rect3358"
+           width="222.85715"
+           height="208.57143"
+           x="-397.14285"
+           y="-56.209248" /></flowRegion><flowPara
+         id="flowPara3360"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Recombination</flowPara><flowPara
+         id="flowPara3362">  id</flowPara><flowPara
+         id="flowPara3368">  parent_id</flowPara><flowPara
+         id="flowPara3364">  child_id</flowPara><flowPara
+         id="flowPara3366">  position</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3370"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(-82.857143,21.428571)"><flowRegion
+         id="flowRegion3372"><rect
+           id="rect3374"
+           width="265.71426"
+           height="248.57143"
+           x="-488.57144"
+           y="340.93362" /></flowRegion><flowPara
+         id="flowPara3376"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Polymorphism</flowPara><flowPara
+         id="flowPara3378">  id</flowPara><flowPara
+         id="flowPara3382">  individual_id</flowPara><flowPara
+         id="flowPara3386">  locus_id</flowPara><flowPara
+         id="flowPara3388">  chromosome_copy</flowPara><flowPara
+         id="flowPara3390">  allele_sequence</flowPara><flowPara
+         id="flowPara3425">  ...</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3411"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(0,-18)"><flowRegion
+         id="flowRegion3413"><rect
+           id="rect3415"
+           width="158.02898"
+           height="177.02391"
+           x="668.57141"
+           y="203.79076" /></flowRegion><flowPara
+         id="flowPara3417"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Species</flowPara><flowPara
+         id="flowPara3419">  id</flowPara><flowPara
+         id="flowPara3421">  name</flowPara><flowPara
+         id="flowPara3423">  ...</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3427"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(88.571429,-238.28571)"><flowRegion
+         id="flowRegion3429"><rect
+           id="rect3431"
+           width="240"
+           height="254.28572"
+           x="182.85715"
+           y="180.93361" /></flowRegion><flowPara
+         id="flowPara3433"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Population</flowPara><flowPara
+         id="flowPara3435">  id</flowPara><flowPara
+         id="flowPara3437">  name</flowPara><flowPara
+         id="flowPara3441">  species_id</flowPara><flowPara
+         id="flowPara3439">  ...</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3443"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(-161.81582,-111.82158)"><flowRegion
+         id="flowRegion3445"><rect
+           id="rect3447"
+           width="222.85712"
+           height="302.85715"
+           x="-2.8571429"
+           y="-61.923531" /></flowRegion><flowPara
+         id="flowPara3449"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Individual</flowPara><flowPara
+         id="flowPara3453">  id</flowPara><flowPara
+         id="flowPara3455">  population_id</flowPara><flowPara
+         id="flowPara3461">  father_name</flowPara><flowPara
+         id="flowPara3463">  mother_name</flowPara><flowPara
+         id="flowPara3457">  sex</flowPara><flowPara
+         id="flowPara3459">  ...</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3465"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(-5.7142857,-116)"><flowRegion
+         id="flowRegion3467"><rect
+           id="rect3469"
+           width="237.14285"
+           height="257.14285"
+           x="208.57143"
+           y="495.21933" /></flowRegion><flowPara
+         id="flowPara3471"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Chromosome</flowPara><flowPara
+         id="flowPara3473">  id</flowPara><flowPara
+         id="flowPara3477">  name</flowPara><flowPara
+         id="flowPara3479">  length</flowPara><flowPara
+         id="flowPara3475">  species_id</flowPara><flowPara
+         id="flowPara3481">  ...</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot3483"
+       style="font-size:28px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Arial;-inkscape-font-specification:Arial"
+       transform="translate(-80,-140.57143)"><flowRegion
+         id="flowRegion3485"><rect
+           id="rect3487"
+           width="280"
+           height="282.85715"
+           x="-91.428574"
+           y="575.2193" /></flowRegion><flowPara
+         id="flowPara3489"
+         style="font-weight:bold;-inkscape-font-specification:Arial Bold">Locus</flowPara><flowPara
+         id="flowPara3491">  id</flowPara><flowPara
+         id="flowPara3493">  chromosome_id</flowPara><flowPara
+         id="flowPara3495">  start</flowPara><flowPara
+         id="flowPara3497">  stop</flowPara><flowPara
+         id="flowPara3499">  ref_allele</flowPara><flowPara
+         id="flowPara3501">  ...</flowPara></flowRoot>    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="m 864.00321,635.36398 -357.57869,73.1815"
+       id="path3503"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       inkscape:connection-start="#flowRoot3465"
+       inkscape:connection-start-point="d4"
+       transform="translate(-571.41964,-151.28347)"
+       inkscape:connection-end="#flowRoot3483"
+       inkscape:connection-end-point="d4" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="m 126.01367,636.1822 380.41085,72.36328"
+       id="path3505"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       inkscape:connection-end="#flowRoot3483"
+       inkscape:connection-end-point="d4"
+       transform="translate(-571.41964,-151.28347)"
+       inkscape:connection-start="#flowRoot3370"
+       inkscape:connection-start-point="d4" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="M 864.00321,635.36398 1292.2634,406.92648"
+       id="path3509"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       transform="translate(-571.41964,-151.28347)"
+       inkscape:connection-start="#flowRoot3465"
+       inkscape:connection-start-point="d4"
+       inkscape:connection-end="#flowRoot3411"
+       inkscape:connection-end-point="d4" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="M 1292.2634,406.92648 915.78111,181.46792"
+       id="path3511"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       inkscape:connection-end="#flowRoot3427"
+       inkscape:connection-end-point="d4"
+       transform="translate(-571.41964,-151.28347)"
+       inkscape:connection-start="#flowRoot3411"
+       inkscape:connection-start-point="d4" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="M 915.78111,181.46792 500.39874,100.05705"
+       id="path3515"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       transform="translate(-571.41964,-151.28347)"
+       inkscape:connection-end-point="d4"
+       inkscape:connection-end="#flowRoot3443"
+       inkscape:connection-start-point="d4"
+       inkscape:connection-start="#flowRoot3427" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 1575.838,205.53553 0,0"
+       id="path3517"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       transform="translate(-571.41964,-151.28347)" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 500.39874,100.05705 0,0"
+       id="path3519"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       inkscape:connection-start="#flowRoot3443"
+       inkscape:connection-start-point="d4"
+       inkscape:connection-end="#flowRoot3443"
+       inkscape:connection-end-point="d4"
+       transform="translate(-571.41964,-151.28347)" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 1672.8126,334.83506 0,0"
+       id="path3525"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       transform="translate(-571.41964,-151.28347)" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="M 128.77078,184.23674 500.39874,100.05705"
+       id="path3527"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       inkscape:connection-start="#flowRoot3354"
+       inkscape:connection-start-point="d4"
+       transform="translate(-571.41964,-151.28347)"
+       inkscape:connection-end="#flowRoot3443"
+       inkscape:connection-end-point="d4" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;display:inline"
+       d="M 126.01367,651.14664 500.39874,115.02149"
+       id="path3535"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       inkscape:connection-end="#flowRoot3443"
+       inkscape:connection-end-point="d4"
+       transform="translate(-571.41964,-166.24791)"
+       inkscape:connection-start="#flowRoot3370"
+       inkscape:connection-start-point="d4" />
+  </g>
+</svg>

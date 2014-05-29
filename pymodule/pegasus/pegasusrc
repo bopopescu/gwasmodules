@@ -1,0 +1,44 @@
+pegasus.catalog.site=XML3
+pegasus.catalog.site.file=sites.xml
+
+#pegasus.catalog.replica=File
+#pegasus.catalog.replica.file=replica.txt
+
+# 2012.4.3 database as replica catalog
+#pegasus.catalog.replica.db.url=jdbc:postgresql://localhost:5432/pegasus
+#pegasus.catalog.replica.db.user=yh
+#pegasus.catalog.replica.db.password=
+
+#Introduced a Boolean property pegasus.dir.storage.deep . On setting this property to true, the relative submit directory structure is replicated on the output site.
+#Also introduced a property pegasus.dir.useTimestamp . This results in the timestamp being used to created the run number for the relative submit directory.
+
+
+pegasus.dir.useTimestamp=true
+pegasus.dir.storage.deep=false
+pegasus.transfer.links=true
+
+#clusters.size=3
+dagman.retry=3
+
+#pegasus.dir.submit.logs=/var/pegasus_tmp/
+pegasus.condor.logs.symlink=false
+# 2011.11.28 generation of *.arg files to store extra-long job arguments when its length is >=10M
+# 2013.2.16 during conversion from the dag .xml to *.sub (condor sub files). If a single argument's length is >2049, it'll be truncated to 2049. However if you force pegasus to generate *.arg files as supplement to *.sub files. The *.arg files won't have this problem.
+pegasus.gridstart.invoke.length=2000
+
+#2011.11.28 increase the nubmer of stagein and stageout jobs to 10 (default is 4)
+stageout.clusters=10
+stagein.clusters=10
+
+#2011.11.29 -B sz	Resizes the data section size for stdio capture, default is 262144.
+#pegasus.gridstart.arguments -B 400000
+pegasus.gridstart.arguments=-B 50000
+
+#2012.4.9 monitord could blow out the memory on large worklfows. run it later with '--replay' to re-create the jobstate.log file, or re-populate the stats database from scratch.
+#pegasus.monitord.event=false
+#
+#2012.10.16 enable cleanup job clustering. this would reduce the number of jobs on each level to N.
+#pegasus.file.cleanup.clusters.num=50
+
+#2013.03.26 enable cleanup job clustering. This parameter means N cleanup jobs on each level would be clustered as one job.
+pegasus.file.cleanup.clusters.size=15
