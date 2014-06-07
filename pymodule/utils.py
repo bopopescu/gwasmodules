@@ -883,6 +883,7 @@ def getDateStampedFilename(filename):
 
 def openGzipFile(inputFname, openMode='r'):
 	"""
+	2014.05.21 support 'a' mode
 	2013.2.1 support openMode='w'
 	2012.8.21
 		add argument openMode
@@ -896,6 +897,8 @@ def openGzipFile(inputFname, openMode='r'):
 			mode='rb'
 		elif openMode=='w':
 			mode='wb'
+		elif openMode=="a":
+			mode = 'ab'
 		else:
 			mode='rb'
 		inf = gzip.open(inputFname, mode=mode)
