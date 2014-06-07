@@ -228,7 +228,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		ax.clear()
 		#ax.plot(x_ls, y_ls, '.')
 		#ax.set_xscale('log')
-		#ax.set_yscale('log')
+		ax.set_yscale('log')
 		
 		ax.errorbar(x_ls, y_ls, xerr=x_error_ls, yerr=y_error_ls, ecolor='g', fmt='o')
 		
@@ -355,6 +355,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			hist_ls.append(float(self.liststore[i][hist_column]))
 		self.ax.set_title("Histogram of %s %s"%(self.plot_title, self.column_header[hist_column]))
 		no_of_bins = int(self.entry_no_of_bins.get_text())
+		self.ax.set_yscale('log')
 		self.ax.hist(hist_ls, no_of_bins)
 		self.canvas.draw()
 	
