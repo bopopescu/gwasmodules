@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Examples:
-	%s -i  -i ~/NetworkData/vervet/db/genotype_file/method_225/94276_VCF_CAE6.sorted.vcf.gz
+	%s -i ~/NetworkData/vervet/db/genotype_file/method_225/94276_VCF_CAE6.sorted.vcf.gz
 		--missingStatFname ./tmp/94276_VCF_CAE6.sorted_missing_stat.tsv
 		--alignmentFilename ~/NetworkData/vervet/db/individual_alignment/5374_641_1986014_GA_vs_3488_by_method6_realigned0_reduced0.bam
 		--alignmentMedianDepth 34
@@ -34,6 +34,7 @@ from pymodule.yhio.VCFFile import VCFFile
 from pymodule.pegasus.mapper.AbstractVCFMapper import AbstractVCFMapper
 from pymodule import SNP
 import pysam
+import numpy
 
 parentClass = AbstractVCFMapper
 class MarkGenotypeMissingByAlignmentQuality(parentClass):
@@ -43,7 +44,7 @@ class MarkGenotypeMissingByAlignmentQuality(parentClass):
 					('alignmentFilename', 1, ): [None, '', 1, 'alignment file in bam format corresponding to the sample in VCF file', ],\
 					('alignmentMedianDepth', 1, float): [None, '', 1, 'global median coverage of the alignment file', ],\
 					('alignmentDepthFold', 0, float): [2.0, '', 1, 'genotype whose depth is outside the range of [1/foldChange, foldChange]*medianDepth', ],\
-					('minMapQGoodRead', 0, float): [2, '', 1, 'the minimum mapQ for a good-quality aligned read', ],\
+					('minMapQGoodRead', 0, float): [15, '', 1, 'the minimum mapQ for a good-quality aligned read', ],\
 					('minFractionOfGoodRead', 0, float): [0.9, '', 1, 'the minimum fraction of good-quality aligned reads at one locus', ],\
 					('missingStatFname', 1, ): [None, '', 1, 'file to contain the genotype missing stat output', ],\
 					('sampleID', 0, ): [None, '', 1, 'name of the sample from this alignment file, default is alignment file basename', ],\
@@ -60,23 +61,31 @@ class MarkGenotypeMissingByAlignmentQuality(parentClass):
 		"""
 		2013.12.04
 		"""
-		noOfTotalReads = 0
+		totalNoOfReads = 0
 		noOfGoodReads = 0.0
+		medianMapQ=-10
+		mapQList=[]
 		for alignedRead in alignedReadLs:
-			noOfTotalReads +=1
+			totalNoOfReads +=1
+			mapQList.append(alignedRead.mapq)
 			if alignedRead.mapq>=minMapQGoodRead:
 				noOfGoodReads += 1
 			else:
 				pass
-		if noOfTotalReads>0:
-			fractionOfGoodRead = noOfGoodReads/(noOfTotalReads)
+		if totalNoOfReads>0:
+			fractionOfGoodRead = noOfGoodReads/(totalNoOfReads)
+			medianMapQ = numpy.median(mapQList)
 		else:
-			fractionOfGoodRead = 0
+			fractionOfGoodRead = -1
+			medianMapQ = -10
+			
 		if fractionOfGoodRead>=minFractionOfGoodRead:
 			locusLowMapQIndicator = 0
 		else:
 			locusLowMapQIndicator = 2
-		return PassingData(locusLowMapQIndicator=locusLowMapQIndicator, noOfTotalReads=noOfTotalReads, noOfGoodReads=noOfGoodReads)
+		return PassingData(locusLowMapQIndicator=locusLowMapQIndicator, totalNoOfReads=totalNoOfReads, \
+						noOfGoodReads=noOfGoodReads, fractionOfGoodRead=fractionOfGoodRead,\
+						medianMapQ=medianMapQ)
 	
 	
 	def run(self):
@@ -99,7 +108,8 @@ class MarkGenotypeMissingByAlignmentQuality(parentClass):
 		writer.writeMetaAndHeader()
 		
 		statWriter = MatrixFile(self.missingStatFname, openMode='w', delimiter='\t')
-		header = ["sampleID", "locusID", 'chromosome', 'start', 'stop', 'occurrence', 'missingReason']
+		header = ["sampleID", "locusID", 'chromosome', 'start', 'stop', 'occurrence', 'missingReason', \
+				'fractionOfGoodRead', 'medianMapQ', 'totalNoOfReads']
 		statWriter.writeHeader(header)
 		
 		counter = 0
@@ -113,18 +123,19 @@ class MarkGenotypeMissingByAlignmentQuality(parentClass):
 			locusLowMapQData = self.returnLocusLowMapQualityIndicator(alignedReadLs=alignedReadLs,\
 												minMapQGoodRead=self.minMapQGoodRead, minFractionOfGoodRead=self.minFractionOfGoodRead)
 			locusLowMapQIndicator = locusLowMapQData.locusLowMapQIndicator
-			depth = locusLowMapQData.noOfTotalReads
+			depth = locusLowMapQData.totalNoOfReads
 			if depth>=minDepth and depth <=maxDepth:
 				locusOutOfDepthIndicator = 0 	#good
 			else:
 				locusOutOfDepthIndicator = 1
 			
 			locusLowQualityIndicator = locusOutOfDepthIndicator + locusLowMapQIndicator
+			data_row = [self.sampleID, locusID, vcfRecord.chromosome, vcfRecord.position, vcfRecord.position,\
+						1, locusLowQualityIndicator, locusLowMapQData.fractionOfGoodRead, \
+						locusLowMapQData.medianMapQ, locusLowMapQData.totalNoOfReads]
+			statWriter.writerow(data_row)
 			if locusLowQualityIndicator>0:
 				real_counter += 1
-				data_row = [self.sampleID, locusID, vcfRecord.chromosome, vcfRecord.position, vcfRecord.position,\
-						1, locusLowQualityIndicator]
-				statWriter.writerow(data_row)
 				#modify the VCF record
 				#get sample ID column, then set its genotype missing
 				vcfRecord.setGenotypeCallForOneSample(sampleID=self.sampleID, genotype="./.", convertGLToPL=True)
