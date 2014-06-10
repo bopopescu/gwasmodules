@@ -94,6 +94,10 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		self.entry_y_column = xml.get_widget('entry_y_column')
 		self.entry_x_error = xml.get_widget("entry_x_error")
 		self.entry_y_error = xml.get_widget("entry_y_error")
+		self.checkbutton_logX = xml.get_widget('checkbutton_logX')	#2014.06.09
+		self.checkbutton_logY = xml.get_widget('checkbutton_logY')
+		self.checkbutton_histLogX = xml.get_widget('checkbutton_histLogX')	#2014.06.09
+		self.checkbutton_histLogY = xml.get_widget('checkbutton_histLogY')
 		
 		self.entry_hist_column = xml.get_widget('entry_hist_column')
 		self.entry_no_of_bins = xml.get_widget('entry_no_of_bins')	#2009-5-20
@@ -227,8 +231,10 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		
 		ax.clear()
 		#ax.plot(x_ls, y_ls, '.')
-		#ax.set_xscale('log')
-		ax.set_yscale('log')
+		if self.checkbutton_logX.get_active():
+			ax.set_xscale('log')
+		if self.checkbutton_logY.get_active():
+			ax.set_yscale('log')
 		
 		ax.errorbar(x_ls, y_ls, xerr=x_error_ls, yerr=y_error_ls, ecolor='g', fmt='o')
 		
@@ -355,7 +361,11 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			hist_ls.append(float(self.liststore[i][hist_column]))
 		self.ax.set_title("Histogram of %s %s"%(self.plot_title, self.column_header[hist_column]))
 		no_of_bins = int(self.entry_no_of_bins.get_text())
-		self.ax.set_yscale('log')
+		
+		if self.checkbutton_histLogX.get_active():
+			self.ax.set_xscale('log')
+		if self.checkbutton_histLogY.get_active():
+			self.ax.set_yscale('log')
 		self.ax.hist(hist_ls, no_of_bins)
 		self.canvas.draw()
 	
