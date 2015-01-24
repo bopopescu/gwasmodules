@@ -13,7 +13,7 @@ import gtk, gtk.glade, gobject
 from gtk import gdk
 import gnome
 import gnome.ui
-
+import math, random
 import matplotlib
 matplotlib.use('GTKAgg')  # or 'GTK'
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
@@ -26,6 +26,18 @@ from pymodule.yhio.SNP import SNPData, read_data
 from pymodule.utils import figureOutDelimiter
 from pymodule import MatrixFile
 from variation.src.qc.FilterStrainSNPMatrix import FilterStrainSNPMatrix
+
+class ValuePreProcessor(object):
+	"""
+	2014.07.31
+	"""
+	def __init__(self, na=None, scalar=None, addition=None, logScale=None, errorColumnIndex=None):
+		self.na = na
+		self.scalar = scalar
+		self.addition = addition
+		self.logScale = logScale
+		self.errorColumnIndex = errorColumnIndex
+		
 
 class DataMatrixGuiXYProbe(gtk.Window):
 	"""
@@ -90,14 +102,23 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		
 		self.checkbutton_label_dot = xml.get_widget('checkbutton_label_dot')
 		self.entry_dot_label_column = xml.get_widget('entry_dot_label_column')
-		self.entry_x_column = xml.get_widget('entry_x_column')
-		self.entry_y_column = xml.get_widget('entry_y_column')
+		
+		self.entry_x_na = xml.get_widget('entry_x_na')
+		self.entry_y_na = xml.get_widget('entry_y_na')
+		
+		self.entry_multiply_x = xml.get_widget('entry_multiply_x')
+		self.entry_multiply_y = xml.get_widget('entry_multiply_y')
+		self.entry_add_x = xml.get_widget('entry_add_x')
+		self.entry_add_y = xml.get_widget('entry_add_y')
+
 		self.entry_x_error = xml.get_widget("entry_x_error")
 		self.entry_y_error = xml.get_widget("entry_y_error")
 		self.checkbutton_logX = xml.get_widget('checkbutton_logX')	#2014.06.09
 		self.checkbutton_logY = xml.get_widget('checkbutton_logY')
-		self.checkbutton_histLogX = xml.get_widget('checkbutton_histLogX')	#2014.06.09
-		self.checkbutton_histLogY = xml.get_widget('checkbutton_histLogY')
+		self.entry_x_column = xml.get_widget('entry_x_column')
+		self.entry_y_column = xml.get_widget('entry_y_column')
+		#self.checkbutton_histLogX = xml.get_widget('checkbutton_histLogX')	#2014.06.09
+		#self.checkbutton_histLogY = xml.get_widget('checkbutton_histLogY')
 		
 		self.entry_hist_column = xml.get_widget('entry_hist_column')
 		self.entry_no_of_bins = xml.get_widget('entry_no_of_bins')	#2009-5-20
@@ -107,6 +128,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		self.filechooserdialog_save = xml.get_widget("filechooserdialog_save")
 		self.filechooserdialog_save.connect("delete_event", yh_gnome.subwindow_hide)
 		
+		self.entry_sampling_probability = xml.get_widget("entry_sampling_probability")
 		self.filechooserdialog_open = xml.get_widget("filechooserdialog_open")
 		self.filechooserdialog_open.connect("delete_event", yh_gnome.subwindow_hide)
 		
@@ -115,6 +137,14 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		
 		self.treeview_matrix.connect('cursor-changed', self.update_no_of_selected, self.app1_appbar1)
 		self.app1.show_all()
+		
+		self.xValuePreProcessor = None
+		self.yValuePreProcessor = None
+		
+		self.x_error_column_index = None
+		
+
+		self.y_error_column_index = None
 		
 		#self.add_events(gdk.BUTTON_PRESS_MASK|gdk.KEY_PRESS_MASK|gdk.KEY_RELEASE_MASK)
 	
@@ -142,22 +172,82 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		if event.button==1:
 			if event.inaxes is not None:
 				print 'data coords', event.xdata, event.ydata
+				if self.list_2d is None:
+					return
 				for row in self.list_2d:
 					if row[x_column] and row[y_column]:	#not empty
 						try:
 							x_data = float(row[x_column])
 							y_data = float(row[y_column])
-							if abs(x_data-event.xdata)<x_grain_size and abs(y_data-event.ydata)<y_grain_size:
+							x = self.processDataValue(x_data, self.xValuePreProcessor)
+							if x is None:
+								continue
+							y = self.processDataValue(y_data, self.yValuePreProcessor)
+							if y is None:
+								continue
+							if abs(x-event.xdata)<x_grain_size and abs(y-event.ydata)<y_grain_size:
 								info = row[dot_label_column]
 								if to_label_dot:
 									self.ax.text(event.xdata, event.ydata, info, size=8)
 									self.canvas.draw()
-								sys.stderr.write("%s: %s, %s: %s, xy=(%s, %s), info: %s.\n"%\
-												(self.column_header[0], row[0], self.column_header[1], row[1], x_data, y_data, info))
+								sys.stderr.write("%s: %s, %s: %s, raw xy=(%s, %s), scaled xy=(%s,%s), info: %s.\n"%\
+												(self.column_header[0], row[0], self.column_header[1], row[1], row[x_column], row[y_column], x,y, info))
 						except:
 							sys.stderr.write("Column %s, %s of row (%s), could not be converted to float. skip.\n"%\
 											(x_column, y_column, repr(row)))
-			
+	
+	def setUserDataPreprocessingFlags(self):
+		"""
+		2014.07.25
+		"""
+		
+		self.xValuePreProcessor = ValuePreProcessor(na = self.entry_x_na.get_text())
+		self.yValuePreProcessor = ValuePreProcessor(na = self.entry_y_na.get_text())
+		
+		if self.entry_multiply_x.get_text():
+			self.xValuePreProcessor.scalar = float(self.entry_multiply_x.get_text())
+		if self.entry_multiply_y.get_text():
+			self.yValuePreProcessor.scalar = float(self.entry_multiply_y.get_text())
+
+		if self.entry_add_x.get_text():
+			self.xValuePreProcessor.addition = float(self.entry_add_x.get_text())
+		if self.entry_add_y.get_text():
+			self.yValuePreProcessor.addition = float(self.entry_add_y.get_text())
+		
+		if self.entry_x_error.get_text():
+			self.xValuePreProcessor.errorColumnIndex = int(self.entry_x_error.get_text())
+		if self.entry_y_error.get_text():
+			self.yValuePreProcessor.errorColumnIndex = int(self.entry_y_error.get_text())
+		
+		if self.checkbutton_logX.get_active():
+			self.xValuePreProcessor.logScale = True
+		if self.checkbutton_logY.get_active():
+			self.yValuePreProcessor.logScale = True
+	
+	def processDataValue(self, value=None, valuePreProcessor=None):
+		"""
+		2014.07.31
+		"""
+		
+		if valuePreProcessor.na is not None and (value==valuePreProcessor.na or float(value)==float(valuePreProcessor.na)):
+			return None
+		value = float(value)
+		if valuePreProcessor.scalar is not None:
+			value = value*valuePreProcessor.scalar
+		if valuePreProcessor.addition is not None:
+			value = value + valuePreProcessor.addition
+		return value
+	
+	def decorateAxisLabel(self, label=None, valuePreProcessor=None):
+		"""
+		2014.07.31
+		"""
+		if valuePreProcessor.scalar is not None:
+			label = "%s*%s"%(valuePreProcessor.scalar, label)
+		if valuePreProcessor.addition:
+			label = "%s+%s"%(label, valuePreProcessor.addition)
+		return label
+	
 	def plotXY(self, ax, canvas, liststore, plot_title='', chosen_index_ls=[]):
 		"""
 		2014.04.29 add error bars
@@ -169,14 +259,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		"""
 		x_column = int(self.entry_x_column.get_text())
 		y_column = int(self.entry_y_column.get_text())
-		if self.entry_x_error.get_text():
-			x_error_column_index = int(self.entry_x_error.get_text())
-		else:
-			x_error_column_index = None
-		if self.entry_y_error.get_text():
-			y_error_column_index = int(self.entry_y_error.get_text())
-		else:
-			y_error_column_index = None    
+		self.setUserDataPreprocessingFlags()   
 		
 		plot_title = self.entry_plot_title.get_text()
 		
@@ -199,17 +282,25 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		for i in range(len(liststore)):
 			row = liststore[i]
 			x = row[x_column]
-			if x_error_column_index is not None:
-				x_error = row[x_error_column_index]
-			else:
-				x_error = 0
-			if y_error_column_index is not None:
-				y_error = row[y_error_column_index]
-			else:
-				y_error = 0
 			y = row[y_column]
 			if not x or not y:	#2013.07.12 skip if empty cells
 				continue
+			x = self.processDataValue(x, self.xValuePreProcessor)
+			if x is None:
+				continue
+			y = self.processDataValue(y, self.yValuePreProcessor)
+			if y is None:
+				continue
+			
+			if self.xValuePreProcessor.errorColumnIndex is not None:
+				x_error = row[self.xValuePreProcessor.errorColumnIndex]
+			else:
+				x_error = 0
+			if self.yValuePreProcessor.errorColumnIndex is not None:
+				y_error = row[self.yValuePreProcessor.errorColumnIndex]
+			else:
+				y_error = 0
+
 			if x<min_x:
 				min_x = x
 			if x>max_x:
@@ -218,6 +309,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 				min_y = y
 			if y>max_y:
 				max_y = y
+			
 			if i in chosen_index_set:
 				x_chosen_ls.append(x)
 				y_chosen_ls.append(y)
@@ -230,13 +322,15 @@ class DataMatrixGuiXYProbe(gtk.Window):
 				y_error_ls.append(y_error)
 		
 		ax.clear()
-		#ax.plot(x_ls, y_ls, '.')
-		if self.checkbutton_logX.get_active():
+		if self.xValuePreProcessor.logScale:
 			ax.set_xscale('log')
-		if self.checkbutton_logY.get_active():
+		if self.yValuePreProcessor.logScale:
 			ax.set_yscale('log')
 		
-		ax.errorbar(x_ls, y_ls, xerr=x_error_ls, yerr=y_error_ls, ecolor='g', fmt='o')
+		if self.x_error_column_index is not None and self.y_error_column_index is not None:
+			ax.errorbar(x_ls, y_ls, xerr=x_error_ls, yerr=y_error_ls, ecolor='g', fmt='o')
+		else:
+			ax.plot(x_ls, y_ls, '.')
 		
 		
 		"""
@@ -247,11 +341,16 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		"""
 		if x_chosen_ls and y_chosen_ls:	#highlight
 			ax.plot(x_chosen_ls, y_chosen_ls, '.', c='r')
-			ax.errorbar(x_chosen_ls, y_chosen_ls, xerr=x_chosen_error_ls, yerr=y_chosen_error_ls, ecolor='r', color='r', fmt='o')
+			if self.x_error_column_index is not None and self.y_error_column_index is not None:
+				ax.errorbar(x_chosen_ls, y_chosen_ls, xerr=x_chosen_error_ls, yerr=y_chosen_error_ls, ecolor='r', color='r', fmt='o')
 		if plot_title:
 			ax.set_title(plot_title)
-		ax.set_xlabel(self.column_header[x_column])
-		ax.set_ylabel(self.column_header[y_column])
+		xlabel = "(%s)"%self.column_header[x_column]
+		xlabel = self.decorateAxisLabel(xlabel, self.xValuePreProcessor)
+		ax.set_xlabel(xlabel)
+		ylabel = "(%s)"%self.column_header[y_column]
+		ylabel = self.decorateAxisLabel(ylabel, self.yValuePreProcessor)
+		ax.set_ylabel(ylabel)
 		canvas.draw()
 	
 	def plot_row(self, treeview, path, view_column):
@@ -352,20 +451,40 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		if not getattr(self, 'column_header', None):
 			sys.stderr.write("Nothing in columns yet.\n")
 			return
+		self.setUserDataPreprocessingFlags()
+		
 		self.ax.clear()
 		self.canvas.mpl_disconnect(self._idClick)	#drop the signal handler
 		self._idClick = None	#reset the _idClick
 		hist_ls = []
 		hist_column = int(self.entry_hist_column.get_text())
 		for i in range(len(self.liststore)):
-			hist_ls.append(float(self.liststore[i][hist_column]))
+			x = self.liststore[i][hist_column]
+			if not x:
+				continue
+			x = self.processDataValue(x, self.xValuePreProcessor)
+			if x is None:
+				continue
+			if self.xValuePreProcessor.logScale:
+				if x>0:
+					x = math.log10(x)
+				else:
+					sys.stderr.write("x value %s, not good for log10.\n"%(x))
+					continue
+			hist_ls.append(x)
 		self.ax.set_title("Histogram of %s %s"%(self.plot_title, self.column_header[hist_column]))
 		no_of_bins = int(self.entry_no_of_bins.get_text())
 		
-		if self.checkbutton_histLogX.get_active():
-			self.ax.set_xscale('log')
-		if self.checkbutton_histLogY.get_active():
+		#if self.x_logScale:
+		#	self.ax.set_xscale('log')
+		if self.yValuePreProcessor.logScale:
 			self.ax.set_yscale('log')
+		
+		xlabel = "(%s)"%self.column_header[hist_column]
+		xlabel = self.decorateAxisLabel(xlabel, self.xValuePreProcessor)
+		if self.xValuePreProcessor.logScale:
+			xlabel = "log10(%s)"%(xlabel)
+		self.ax.set_xlabel(xlabel)
 		self.ax.hist(hist_ls, no_of_bins)
 		self.canvas.draw()
 	
@@ -379,8 +498,9 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		app1_appbar1.push("%s rows selected."%len(pathlist_strains1))
 		return True
 	
-	def readInDataToPlot(self, input_fname):
+	def readInDataToPlot(self, input_fname, sampling_probability=1.0):
 		"""
+		2015.01.23 added argument sampling_probability to sub-sample data
 		2013.07.11 use MatrixFile to read in the file
 		2009-5-20
 			add the column index into the column header for easy picking
@@ -388,6 +508,8 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			wrap the float conversion part into try...except to report what goes wrong
 		2009-3-13
 		"""
+		if sampling_probability>1 or sampling_probability<0:
+			sampling_probability=1.0
 		reader = MatrixFile(inputFname=input_fname)
 		self.column_header=reader.next()
 		for i in range(len(self.column_header)):
@@ -395,8 +517,11 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		no_of_cols = len(self.column_header)
 		self.column_types = [str]*2 + [float]*(no_of_cols-2)
 		self.column_editable_flag_ls = [True, True] + [False]*(no_of_cols-2)
-		self.list_2d = []		
+		self.list_2d = []
 		for row in reader:
+			if sampling_probability>0 and sampling_probability<1:
+				if random.random()>sampling_probability:	#skip
+					continue
 			float_part = row[2:]
 			try:
 				float_part = map(float, float_part)
@@ -422,13 +547,21 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		"""
 		self.filechooserdialog_open.show_all()
 	
+	def on_button_fileopen_cancel_clicked(self, widget, data=None):
+		"""
+		2015.01.23
+		"""
+		self.filechooserdialog_open.hide()
+		
+	
 	def on_button_fileopen_ok_clicked(self, widget, data=None):
 		"""
 		2009-3-13
 		"""
 		input_fname = self.filechooserdialog_open.get_filename()
+		sampling_probability = float(self.entry_sampling_probability.get_text())
 		self.filechooserdialog_open.hide()
-		self.readInDataToPlot(input_fname)
+		self.readInDataToPlot(input_fname, sampling_probability)
 	
 	def on_entry_plot_title_change(self, widget, data=None):
 		"""
