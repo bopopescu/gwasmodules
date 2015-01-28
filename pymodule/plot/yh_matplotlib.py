@@ -3,6 +3,7 @@
 2008-10-07 simple functions related to matplotlib
 """
 import os,sys
+from scipy import stats
 
 def assignMatPlotlibHueColorToLs(name_ls, debug=0):
 	"""
@@ -327,6 +328,7 @@ def drawScatter(x_ls=None, y_ls=None, fig_fname=None, title=None, xlabel=None, y
 
 def constructTitleFromTwoDataSummaryStat(x_ls=None, y_ls=None):
 	"""
+	2015.01.28 added wilcoxon signed rank test
 	2012.8.21
 	
 	"""
@@ -338,8 +340,9 @@ def constructTitleFromTwoDataSummaryStat(x_ls=None, y_ls=None):
 		xMedianValue =  numpy.median(x_ls)
 		yMedianValue =  numpy.median(y_ls)
 		corr = numpy.corrcoef(x_ls, y_ls)[0,1]
-		
-		title = "n=%s, cor=%.3f, xMedian=%.3f, yMedian=%.3f"%(n, corr, xMedianValue, yMedianValue)
+		wilcoxonSignedRankTestMinRankSumDif, wilcoxonSignedRankTestPvalue = stats.wilcoxon(x=x_ls, y=y_ls, zero_method='wilcox', correction=False)
+		title = "n=%s p=%.4g r2=%.3f xMed=%.3g yMed=%.3g"%(n, wilcoxonSignedRankTestPvalue, 
+															corr, xMedianValue, yMedianValue)
 	else:
 		title = ""
 	return title
@@ -352,7 +355,7 @@ def constructTitleFromDataSummaryStat(data_ls=None):
 	medianValue =  numpy.median(data_ls)
 	meanValue = numpy.mean(data_ls)
 	std = numpy.std(data_ls)
-	title = 'n=%s, mean %.3f, median %.3f, std %.3f'%(len(data_ls), meanValue, medianValue, std)
+	title = 'n=%s mean=%.3g med=%.3g std %.3g'%(len(data_ls), meanValue, medianValue, std)
 	return title
 
 if __name__ == '__main__':

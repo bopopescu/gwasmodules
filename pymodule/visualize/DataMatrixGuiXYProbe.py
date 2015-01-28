@@ -25,6 +25,7 @@ import yh_gnome, csv, traceback
 from pymodule.yhio.SNP import SNPData, read_data
 from pymodule.utils import figureOutDelimiter
 from pymodule import MatrixFile
+from pymodule.plot import yh_matplotlib
 from variation.src.qc.FilterStrainSNPMatrix import FilterStrainSNPMatrix
 
 class ValuePreProcessor(object):
@@ -142,8 +143,6 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		self.yValuePreProcessor = None
 		
 		self.x_error_column_index = None
-		
-
 		self.y_error_column_index = None
 		
 		#self.add_events(gdk.BUTTON_PRESS_MASK|gdk.KEY_PRESS_MASK|gdk.KEY_RELEASE_MASK)
@@ -250,6 +249,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 	
 	def plotXY(self, ax, canvas, liststore, plot_title='', chosen_index_ls=[]):
 		"""
+		2015.01.28 add summary stats to title
 		2014.04.29 add error bars
 		2009-3-13
 			rename plot_NA_mismatch_rate to plotXY()
@@ -340,11 +340,18 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		ax.plot([diagonal_start, diagonal_end],[diagonal_start, diagonal_end])
 		"""
 		if x_chosen_ls and y_chosen_ls:	#highlight
+			titleWithStats = "chosen\n" + yh_matplotlib.constructTitleFromTwoDataSummaryStat(x_chosen_ls, y_chosen_ls)
+			
 			ax.plot(x_chosen_ls, y_chosen_ls, '.', c='r')
 			if self.x_error_column_index is not None and self.y_error_column_index is not None:
 				ax.errorbar(x_chosen_ls, y_chosen_ls, xerr=x_chosen_error_ls, yerr=y_chosen_error_ls, ecolor='r', color='r', fmt='o')
+		else:	#take all data
+			titleWithStats = yh_matplotlib.constructTitleFromTwoDataSummaryStat(x_ls+x_chosen_ls, y_ls+y_chosen_ls)
 		if plot_title:
-			ax.set_title(plot_title)
+			ax.set_title("%s %s"%(plot_title, titleWithStats))
+		else:
+			ax.set_title(titleWithStats)
+		
 		xlabel = "(%s)"%self.column_header[x_column]
 		xlabel = self.decorateAxisLabel(xlabel, self.xValuePreProcessor)
 		ax.set_xlabel(xlabel)
@@ -442,6 +449,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 	
 	def on_button_histogram_clicked(self, widget, data=None):
 		"""
+		2015.01.28 add summary stats to title
 		2009-5-20
 			get the number of bins from entry_no_of_bins 
 		2009-3-13
@@ -472,7 +480,9 @@ class DataMatrixGuiXYProbe(gtk.Window):
 					sys.stderr.write("x value %s, not good for log10.\n"%(x))
 					continue
 			hist_ls.append(x)
-		self.ax.set_title("Histogram of %s %s"%(self.plot_title, self.column_header[hist_column]))
+		title = "%s %s %s"%(self.plot_title, self.column_header[hist_column],
+				yh_matplotlib.constructTitleFromDataSummaryStat(hist_ls))
+		self.ax.set_title(title);	#"Histogram of %s %s"%(self.plot_title, self.column_header[hist_column]))
 		no_of_bins = int(self.entry_no_of_bins.get_text())
 		
 		#if self.x_logScale:
