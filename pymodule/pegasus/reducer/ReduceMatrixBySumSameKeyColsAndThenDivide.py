@@ -42,19 +42,20 @@ class ReduceMatrixBySumSameKeyColsAndThenDivide(ReduceMatrixByChosenColumn):
 			2. modify newHeader to reflect that
 		"""
 		sys.stderr.write("Averaging key2dataLs (%s entries ) ..."%(len(key2dataLs)))
-		keyColHeader = header[:no_of_key_columns]
-		valueColHeader = header[no_of_key_columns:]
-		if self.operatorType==3:
-			for valueSingleColHeader in valueColHeader:
-				header.append("%s_byFixedValue"%(valueSingleColHeader))
-		else:
-			if len(valueColHeader)>1:
-				if self.operatorType==2:
-					header.append("%s_subtract_%s"%(valueColHeader[0], valueColHeader[1]))
-				
-				else:
-					header.append('%s_by_%s'%(valueColHeader[0], valueColHeader[1]))
+		if self.noHeader==0:
+			keyColHeader = header[:no_of_key_columns]
+			valueColHeader = header[no_of_key_columns:]
+			if self.operatorType==3:
+				for valueSingleColHeader in valueColHeader:
+					header.append("%s_byFixedValue"%(valueSingleColHeader))
+			else:
+				if len(valueColHeader)>1:
+					if self.operatorType==2:
+						header.append("%s_subtract_%s"%(valueColHeader[0], valueColHeader[1]))
 					
+					else:
+						header.append('%s_by_%s'%(valueColHeader[0], valueColHeader[1]))
+			
 		for key, dataLs in key2dataLs.iteritems():
 			no_of_value_columns = len(dataLs)
 			if self.operatorType==3:
