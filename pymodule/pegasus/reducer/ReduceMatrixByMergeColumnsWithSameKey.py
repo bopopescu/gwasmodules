@@ -84,7 +84,7 @@ class ReduceMatrixByMergeColumnsWithSameKey(AbstractReducer):
 		writer = MatrixFile(inputFname=outputFname, delimiter=delimiter, openMode='w')
 		if header and delimiter:
 			writer.writerow(header)
-		if key2dataLs and delimiter and header:
+		if key2dataLs and delimiter:
 			keyLs = key2dataLs.keys()
 			keyLs.sort()
 			for key in keyLs:
