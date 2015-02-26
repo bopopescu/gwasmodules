@@ -542,7 +542,11 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			self.list_2d.append(new_row)
 		reader.close()
 		self.setupColumns(self.treeview_matrix)
+		#update status to reflect the input filename
+		self.app1.set_title(os.path.basename(input_fname))
+		self.app1_appbar1.push(input_fname)
 		self.plotXY(self.ax, self.canvas, self.liststore, self.plot_title)
+		
 	
 	def readInRawMatrixData(self, input_fname):
 		"""
