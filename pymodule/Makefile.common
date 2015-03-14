@@ -11,8 +11,9 @@ HDF5Lib  = -lhdf5_cpp -lhdf5
 #CXXStaticTargets	=
 StaticStartFlags	= -Wl,--no-as-needed -Wl,-Bstatic -static-libgcc -static-libstdc++ 
 StaticEndFlags	= -Wl,-Bdynamic -lz -lpthread -ldl
-CXXFLAGS	= -fPIC -O3 -std=c++0x -Wl,--no-as-needed 
-#  -std=c++11
+CXXFLAGS	= -fPIC -O3 -std=c++11 -std=gnu++11 -Wl,--no-as-needed
+# -std=c++0x 
+# -std=c++11
 # -std=gnu++11
 CXXCOMPILER	= g++
 #CXXLDFLAGS	= 
