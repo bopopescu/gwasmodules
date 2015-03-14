@@ -312,8 +312,8 @@
                         <signal name="backspace" handler="on_entry_plot_title_change" swapped="no"/>
                       </widget>
                       <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">False</property>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
                         <property name="position">1</property>
                       </packing>
                     </child>
@@ -325,6 +325,48 @@
                     <property name="expand">False</property>
                     <property name="fill">False</property>
                     <property name="position">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <widget class="GtkHBox" id="hbox_filters">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <child>
+                      <widget class="GtkLabel" id="label_filters">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Filters: </property>
+                      </widget>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">False</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <widget class="GtkEntry" id="entry_filters">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="tooltip" translatable="yes">Example: 1&gt;=20 AND (2=3 OR 3&lt;5)</property>
+                        <property name="primary_icon_activatable">False</property>
+                        <property name="secondary_icon_activatable">False</property>
+                        <property name="primary_icon_sensitive">True</property>
+                        <property name="secondary_icon_sensitive">True</property>
+                      </widget>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                  </widget>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">False</property>
+                    <property name="position">3</property>
                   </packing>
                 </child>
                 <child>
@@ -539,7 +581,7 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <child>
-                      <widget class="GtkButton" id="button_highlight">
+                      <widget class="GtkButton" id="button_PlotXY">
                         <property name="label" translatable="yes">Plot XY</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
@@ -547,7 +589,7 @@
                         <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
                         <property name="tooltip" translatable="yes">Make an XY scatter plot. Selected rows will be highlighted as red dots. pValue is from Wilcoxon signed rank test (non-parametric pairwise t-test), NOT pValue for correlation.</property>
                         <property name="use_action_appearance">False</property>
-                        <signal name="clicked" handler="on_button_highlight_clicked" swapped="no"/>
+                        <signal name="clicked" handler="on_button_PlotXY_clicked" swapped="no"/>
                       </widget>
                       <packing>
                         <property name="expand">False</property>
@@ -716,15 +758,15 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <child>
-                      <widget class="GtkButton" id="button_histogram">
-                        <property name="label" translatable="yes">Column for histogram:</property>
+                      <widget class="GtkButton" id="button_PlotHistogram">
+                        <property name="label" translatable="yes">PlotHist #Col:</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
                         <property name="events">GDK_POINTER_MOTION_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK</property>
                         <property name="tooltip" translatable="yes">Draw histogram of data from a given column (0-based), subject to preprocessing of X (NA X, MultiX, AddX, XError) </property>
                         <property name="use_action_appearance">False</property>
-                        <signal name="clicked" handler="on_button_histogram_clicked" swapped="no"/>
+                        <signal name="clicked" handler="on_button_PlotHistogram_clicked" swapped="no"/>
                       </widget>
                       <packing>
                         <property name="expand">False</property>

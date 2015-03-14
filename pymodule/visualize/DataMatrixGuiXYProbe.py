@@ -90,7 +90,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		# matplotlib stuff
 		fig = Figure(figsize=(8,8))
 		self.canvas = FigureCanvas(fig)  # a gtk.DrawingArea
-		self._idClick = self.canvas.mpl_connect('button_press_event', self.on_click)
+		self._idClick = self.canvas.mpl_connect('button_press_event', self.onUserClickCanvas)
 		self.vpaned1 = xml.get_widget("vpaned1")
 		self.vpaned1.add2(self.canvas)
 		
@@ -147,7 +147,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		
 		#self.add_events(gdk.BUTTON_PRESS_MASK|gdk.KEY_PRESS_MASK|gdk.KEY_RELEASE_MASK)
 	
-	def on_click(self, event):
+	def onUserClickCanvas(self, event):
 		"""
 		2009-3-13
 			use (x_lim[1]-x_lim[0])/200. as the resolution for a dot to be called identical to a data point.
@@ -247,7 +247,8 @@ class DataMatrixGuiXYProbe(gtk.Window):
 			label = "%s+%s"%(label, valuePreProcessor.addition)
 		return label
 	
-	def plotXY(self, ax, canvas, liststore, plot_title='', chosen_index_ls=[]):
+	def plotXY(self, ax, canvas, liststore, plot_title='', 
+			chosen_index_ls=[]):
 		"""
 		2015.01.28 add summary stats to title
 		2014.04.29 add error bars
@@ -340,7 +341,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		ax.plot([diagonal_start, diagonal_end],[diagonal_start, diagonal_end])
 		"""
 		if x_chosen_ls and y_chosen_ls:	#highlight
-			titleWithStats = "chosen\n" + yh_matplotlib.constructTitleFromTwoDataSummaryStat(x_chosen_ls, y_chosen_ls)
+			titleWithStats = "Highlighted data\n" + yh_matplotlib.constructTitleFromTwoDataSummaryStat(x_chosen_ls, y_chosen_ls)
 			
 			ax.plot(x_chosen_ls, y_chosen_ls, '.', c='r')
 			if self.x_error_column_index is not None and self.y_error_column_index is not None:
@@ -362,7 +363,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 	
 	def plot_row(self, treeview, path, view_column):
 		if self._idClick==None:
-			self._idClick = self.canvas.mpl_connect('button_press_event', self.on_click)
+			self._idClick = self.canvas.mpl_connect('button_press_event', self.onUserClickCanvas)
 		self.plotXY(self.ax, self.canvas, self.liststore, self.plot_title, path)
 	
 	def setupColumns(self, treeview):
@@ -378,14 +379,14 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		yh_gnome.fill_treeview(self.treeview_matrix, self.liststore, self.list_2d, reorderable=True)
 		self.treeselection = self.treeview_matrix.get_selection()
 	
-	def on_button_highlight_clicked(self, widget, data=None):
+	def on_button_PlotXY_clicked(self, widget, data=None):
 		"""
 		2008-02-12
 		to update the no_of_selected rows (have to double click a row to change a cursor if it's multiple selection)
 		2008-02-05
 		"""
 		if self._idClick==None:
-			self._idClick = self.canvas.mpl_connect('button_press_event', self.on_click)
+			self._idClick = self.canvas.mpl_connect('button_press_event', self.onUserClickCanvas)
 		pathlist_strains1 = []
 		self.treeselection.selected_foreach(yh_gnome.foreach_cb, pathlist_strains1)
 		index_ls = []
@@ -447,7 +448,7 @@ class DataMatrixGuiXYProbe(gtk.Window):
 		"""
 		self.app1.show_all()
 	
-	def on_button_histogram_clicked(self, widget, data=None):
+	def on_button_PlotHistogram_clicked(self, widget, data=None):
 		"""
 		2015.01.28 add summary stats to title
 		2009-5-20
