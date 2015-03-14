@@ -5,12 +5,8 @@
 
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
-if bit_number>40:       #64bit
-	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64')))
-else:   #32bit
-	sys.path.insert(0, os.path.expanduser('~/lib/python'))
-	sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+sys.path.insert(0, os.path.expanduser('~/lib/python'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
 
 if __name__ == '__main__':
 	import pygtk
@@ -29,9 +25,9 @@ if __name__ == '__main__':
 	
 	#from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 	#2008-02-04 use a custom navigation tool bar
-	from pymodule.yh_gnome import NavigationToolbar2GTKAgg_chromosome as NavigationToolbar
+	from pymodule.visualize.yh_gnome import NavigationToolbar2GTKAgg_chromosome as NavigationToolbar
 	
-	from pymodule import yh_gnome
+	from pymodule.visualize import yh_gnome
 	from variation.src.common import get_chr_pos_from_x_axis_pos
 
 import numpy, traceback
@@ -41,14 +37,14 @@ from matplotlib.patches import Patch, Rectangle, Polygon
 from matplotlib.text import Text
 from matplotlib.collections import LineCollection, Collection
 
-from pymodule.yh_matplotlib_artists import Gene, ExonIntronCollection
+from pymodule.plot.yh_matplotlib_artists import Gene, ExonIntronCollection
 from pymodule.db import TableClass
-from Results2DB_250k import Results2DB_250k
+from db.Results2DB_250k import Results2DB_250k
 from pymodule import GenomeWideResults, GenomeWideResult, DataObject, getGenomeWideResultFromFile, PassingData, CNV, SNP
-from pymodule.CNV import getCNVDataFromFileInGWA
-from DrawSNPRegion import DrawSNPRegion	#2008-12-16 dealWithGeneAnnotation()
-import Stock_250kDB
-from GeneListRankTest import GeneListRankTest
+from pymodule.yhio.CNV import getCNVDataFromFileInGWA
+from plot.DrawSNPRegion import DrawSNPRegion	#2008-12-16 dealWithGeneAnnotation()
+from db import Stock_250kDB
+from enrichment.GeneListRankTest import GeneListRankTest
 
 
 class GeneModel:

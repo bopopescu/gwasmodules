@@ -83,10 +83,11 @@ from numpy import linalg
 from pymodule import pca_module
 from pymodule import read_data, ProcessOptions, PassingData, SNPData, getListOutOfStr, GenomeWideResult, DataObject
 from pymodule import LocusMapTableFile, AssociationTableFile
-from mixmogam import linear_models 
-from mixmogam import kinship
 from Kruskal_Wallis import Kruskal_Wallis
 from variation.src.db.output.OutputPhenotype import OutputPhenotype
+#2015.02.26 commented out due to external package 
+#from mixmogam import kinship
+#from mixmogam import linear_models
 
 if __name__ == '__main__':
 	import rpy
@@ -709,6 +710,7 @@ class Association(Kruskal_Wallis):
 		new_data_matrix = newSNPData.data_matrix
 		if not kinshipData:	#if it's None, generate it.
 			#2013.1.6 Calculate kinship (IBS) using bjarni's method, faster
+			from mixmogam import kinship
 			K = kinship.calc_ibs_kinship(new_data_matrix.transpose())
 			#K = newSNPData.get_kinship_matrix()
 			kinshipData = SNPData(row_id_ls=newSNPData.row_id_ls, col_id_ls=newSNPData.row_id_ls, \
@@ -758,6 +760,7 @@ class Association(Kruskal_Wallis):
 				snpData = newSnpData
 			else:
 				snpData = independentSNPData
+			from mixmogam import kinship
 			kinship_matrix = kinship.calc_ibs_kinship(snpData.data_matrix.transpose())
 			#kinship_matrix = snpData.get_kinship_matrix()
 			kinshipData = SNPData(row_id_ls=snpData.row_id_ls, col_id_ls=snpData.row_id_ls, data_matrix=kinship_matrix)
@@ -1050,6 +1053,7 @@ class Association(Kruskal_Wallis):
 		#2013.1.6 use bjarni's method to run emmax
 		#bjarni's emmax accepts a list of snp objects. each SNP object is a numpy array with 0 or 1 for two alleles.
 		#the 2nd argument is just a list of phenotype values.
+		from mixmogam import linear_models
 		mm_results = linear_models.emmax(new_data_matrix.transpose(), returnData.non_NA_phenotype_ls, \
 												kinship_matrix, with_betas=True)
 		
