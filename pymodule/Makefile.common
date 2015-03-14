@@ -8,12 +8,17 @@ HDF5Lib  = -lhdf5_cpp -lhdf5
 
 ## CXXTARGETS, CXXLDFLAGS, CTARGETS, CLDFLAGS, ExtraTargets will be defined in child Makefiles 
 #CXXTARGETS	= 
-CXXFLAGS	= -fPIC -O3 -std=c++0x 
+#CXXStaticTargets	=
+StaticStartFlags	= -Wl,--no-as-needed -Wl,-Bstatic -static-libgcc -static-libstdc++ 
+StaticEndFlags	= -Wl,-Bdynamic -lz -lpthread -ldl
+CXXFLAGS	= -fPIC -O3 -std=c++0x -Wl,--no-as-needed 
+#  -std=c++11
+# -std=gnu++11
 CXXCOMPILER	= g++
 #CXXLDFLAGS	= 
 
 #CTARGETS	= 
-CFLAGS		= -fPIC -O2
+CFLAGS		= -fPIC -O2 -Wl,--no-as-needed 
 CCOMPILER	= gcc
 #CLDFLAGS	=
 
@@ -25,7 +30,7 @@ SharedLibFlags	= -shared -fPIC
 #ExtraTargets
 #SRCS
 
-all:	depend $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(StaticLibTargets) $(ExtraTargets) subdirs
+all:	depend $(CXXStaticTargets) $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(StaticLibTargets) $(ExtraTargets) subdirs
 
 
 $(StaticLibTargets):	%.a:	%.o
@@ -39,6 +44,9 @@ $(SharedLibTargets):	%.so:	%.o
 
 $(CXXTARGETS):	%:	%.o
 	-$(CXXCOMPILER) $< $(CXXFLAGS) -o $@ $(CXXLDFLAGS)
+
+$(CXXStaticTargets):	%:	%.o
+	-$(CXXCOMPILER) $< $(CXXFLAGS) -o $@ $(StaticStartFlags) $(CXXLDFLAGS) $(StaticEndFlags)
 
 .cc.o:
 	-$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) -c -o $@
